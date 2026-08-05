@@ -1,0 +1,24 @@
+{
+  "fixture": true,
+  "description": "Deterministic component-gallery states; never product evidence.",
+  "rows": [
+    {
+      "id": "runtime",
+      "title": "Native runtime",
+      "detail": "Pinned GPUI revision · healthy",
+      "state": "ready"
+    },
+    {
+      "id": "permission",
+      "title": "Permission mode",
+      "detail": "Approval required for consequential actions",
+      "state": "neutral"
+    },
+    {
+      "id": "catalog",
+      "title": "Model catalog",
+      "detail": "Last refresh failed; showing the last real result",
+      "state": "stale"
+    }
+  ]
+}

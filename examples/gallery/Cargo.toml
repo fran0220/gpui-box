@@ -1,0 +1,23 @@
+[package]
+name = "gpui-kit-gallery"
+publish = false
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+gpui.workspace = true
+gpui_platform.workspace = true
+gpui-kit.workspace = true
+gpui-kit-assets.workspace = true
+gpui-kit-semantics.workspace = true
+gpui-kit-testkit.workspace = true
+gpui-kit-theme.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

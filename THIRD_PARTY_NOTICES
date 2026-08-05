@@ -1,0 +1,52 @@
+THIRD-PARTY NOTICES — gpui-kit
+================================================================================
+
+gpui-kit contains or derives portions of the projects and assets below.
+The repository itself is MIT licensed; third-party material remains under the
+license named in each entry.
+
+Comet
+--------------------------------------------------------------------------------
+Source: https://github.com/zeronsh/comet
+Revision: fb22e269ac57331ee7aa4a9673530acf3299a886
+License: MIT
+Copyright (c) 2026 Wing
+
+Scope: theme geometry, motion, loader math, popover/dialog and settings
+scaffolding, frost, edge fade, font registration, and generic icon assets.
+License text: licenses/COMET-MIT.txt
+
+GPUI / Zed
+--------------------------------------------------------------------------------
+Source: https://github.com/zed-industries/zed
+Fork: https://github.com/fran0220/zed
+Baseline: a6a23c7b80a5cefa0487b7856335be89ace7e483
+Pinned revision: cb2ce82766e42c55fc8563de3c5c98ac8e1c9fd9
+License: Apache-2.0
+Copyright 2022–2024 Zed Industries, Inc.
+
+Scope: linked GPUI, gpui_platform, and the published EdgeFade,
+BackdropBlur/native-surface patch chain.
+License text: licenses/ZED-APACHE-2.0.txt
+
+Geist and Geist Mono
+--------------------------------------------------------------------------------
+Source: https://vercel.com/font
+License: SIL Open Font License 1.1
+Copyright 2023 Vercel Inc.
+
+Scope: embedded variable fonts and static Medium/SemiBold/Bold faces under
+crates/gpui-kit-assets/assets/fonts.
+License text: licenses/GEIST-OFL-1.1.txt
+
+Solar Icons
+--------------------------------------------------------------------------------
+Source: Solar Icons, Linear weight, by 480 Design
+https://www.figma.com/community/file/1166831539721848736
+License: Creative Commons Attribution 4.0 International
+https://creativecommons.org/licenses/by/4.0/
+Attribution: “Solar Icons by 480 Design.”
+
+Scope: product-neutral SVGs under crates/gpui-kit-assets/assets/icons.
+Comet-authored generic glyphs in that directory are covered by the Comet MIT
+entry instead. See crates/gpui-kit-assets/assets/SOURCE.md.

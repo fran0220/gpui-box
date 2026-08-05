@@ -1,0 +1,100 @@
+{
+  "$schema": "./schema.json",
+  "meta": {
+    "id": "studio-dark",
+    "name": "Studio Dark",
+    "appearance": "dark"
+  },
+  "color": {
+    "surface": {
+      "canvas": "#060606",
+      "panel": "#0d0d0d",
+      "raised": "#1b1b1b",
+      "overlay": "#161616"
+    },
+    "text": {
+      "primary": "#e9e9e9",
+      "muted": "#a1a1a1",
+      "faint": "#737373",
+      "onAccent": "#0e0e0e"
+    },
+    "interactive": {
+      "hover": "#ebebeb24",
+      "active": "#ebebeb29",
+      "selected": "#ebebeb24",
+      "hairline": "#ffffff14",
+      "hairlineStrong": "#ffffff24",
+      "focus": "#7c86ff"
+    },
+    "semantic": {
+      "accent": "#7c86ff",
+      "accentStrong": "#5865f2",
+      "danger": "#ff6467",
+      "warning": "#ffb900",
+      "success": "#57c47f",
+      "info": "#7fb3cf"
+    },
+    "loader": {
+      "gradient": ["#b6d3ef", "#edb185", "#f888a0"]
+    }
+  },
+  "space": {
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "xxl": 32
+  },
+  "radius": {
+    "small": 5,
+    "control": 8,
+    "card": 12,
+    "dialog": 16,
+    "bubble": 16,
+    "pill": 999
+  },
+  "typography": {
+    "sans": {
+      "family": "Geist",
+      "fallbackMacos": "Helvetica",
+      "fallbackWindows": "Segoe UI",
+      "fallbackLinux": "DejaVu Sans"
+    },
+    "mono": {
+      "family": "Geist Mono",
+      "fallbackMacos": "Menlo",
+      "fallbackWindows": "Consolas",
+      "fallbackLinux": "DejaVu Sans Mono"
+    },
+    "scale": {
+      "caption": { "size": 10.5, "lineHeight": 14, "weight": 400 },
+      "label": { "size": 12, "lineHeight": 16, "weight": 500 },
+      "body": { "size": 13, "lineHeight": 19, "weight": 400 },
+      "title": { "size": 16, "lineHeight": 22, "weight": 600 },
+      "code": { "size": 12, "lineHeight": 18, "weight": 400 }
+    }
+  },
+  "motion": {
+    "durationMs": {
+      "instant": 90,
+      "quick": 150,
+      "menu": 140,
+      "dialog": 180,
+      "resize": 200,
+      "entrance": 500,
+      "pulse": 2400
+    },
+    "easing": {
+      "standard": [0.4, 0, 0.2, 1],
+      "exit": [0, 0, 0.58, 1],
+      "settle": [0.16, 1, 0.3, 1]
+    }
+  },
+  "effect": {
+    "glassAlphaMacos": 0.9,
+    "backdropBlur": 16,
+    "edgeFadeBand": 20,
+    "selectedRingAlpha": 0.09
+  }
+}

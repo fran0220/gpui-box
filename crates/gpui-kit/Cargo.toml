@@ -1,0 +1,20 @@
+[package]
+name = "gpui-kit"
+description = "Design-system components and interaction primitives for GPUI desktop applications"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+gpui.workspace = true
+gpui-kit-assets.workspace = true
+gpui-kit-theme.workspace = true
+gpui-kit-tokens.workspace = true
+
+[dev-dependencies]
+gpui = { workspace = true, features = ["test-support"] }
+
+[lints]
+workspace = true

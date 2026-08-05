@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fran0220/gpui-kit/tokens/schema.json",
+  "title": "gpui-kit theme tokens",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["meta", "color", "space", "radius", "typography", "motion", "effect"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "appearance"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "appearance": { "enum": ["light", "dark"] }
+      }
+    },
+    "color": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["surface", "text", "interactive", "semantic", "loader"],
+      "properties": {
+        "surface": { "$ref": "#/$defs/surfaceColors" },
+        "text": { "$ref": "#/$defs/textColors" },
+        "interactive": { "$ref": "#/$defs/interactiveColors" },
+        "semantic": { "$ref": "#/$defs/semanticColors" },
+        "loader": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["gradient"],
+          "properties": {
+            "gradient": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": { "$ref": "#/$defs/color" }
+            }
+          }
+        }
+      }
+    },
+    "space": { "$ref": "#/$defs/spacing" },
+    "radius": { "$ref": "#/$defs/radii" },
+    "typography": { "$ref": "#/$defs/typography" },
+    "motion": { "$ref": "#/$defs/motion" },
+    "effect": { "$ref": "#/$defs/effect" }
+  },
+  "$defs": {
+    "color": {
+      "type": "string",
+      "pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$"
+    },
+    "positiveNumber": { "type": "number", "minimum": 0 },
+    "surfaceColors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canvas", "panel", "raised", "overlay"],
+      "properties": {
+        "canvas": { "$ref": "#/$defs/color" },
+        "panel": { "$ref": "#/$defs/color" },
+        "raised": { "$ref": "#/$defs/color" },
+        "overlay": { "$ref": "#/$defs/color" }
+      }
+    },
+    "textColors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primary", "muted", "faint", "onAccent"],
+      "properties": {
+        "primary": { "$ref": "#/$defs/color" },
+        "muted": { "$ref": "#/$defs/color" },
+        "faint": { "$ref": "#/$defs/color" },
+        "onAccent": { "$ref": "#/$defs/color" }
+      }
+    },
+    "interactiveColors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hover", "active", "selected", "hairline", "hairlineStrong", "focus"],
+      "properties": {
+        "hover": { "$ref": "#/$defs/color" },
+        "active": { "$ref": "#/$defs/color" },
+        "selected": { "$ref": "#/$defs/color" },
+        "hairline": { "$ref": "#/$defs/color" },
+        "hairlineStrong": { "$ref": "#/$defs/color" },
+        "focus": { "$ref": "#/$defs/color" }
+      }
+    },
+    "semanticColors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["accent", "accentStrong", "danger", "warning", "success", "info"],
+      "properties": {
+        "accent": { "$ref": "#/$defs/color" },
+        "accentStrong": { "$ref": "#/$defs/color" },
+        "danger": { "$ref": "#/$defs/color" },
+        "warning": { "$ref": "#/$defs/color" },
+        "success": { "$ref": "#/$defs/color" },
+        "info": { "$ref": "#/$defs/color" }
+      }
+    },
+    "spacing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["xs", "sm", "md", "lg", "xl", "xxl"],
+      "properties": {
+        "xs": { "$ref": "#/$defs/positiveNumber" },
+        "sm": { "$ref": "#/$defs/positiveNumber" },
+        "md": { "$ref": "#/$defs/positiveNumber" },
+        "lg": { "$ref": "#/$defs/positiveNumber" },
+        "xl": { "$ref": "#/$defs/positiveNumber" },
+        "xxl": { "$ref": "#/$defs/positiveNumber" }
+      }
+    },
+    "radii": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["small", "control", "card", "dialog", "bubble", "pill"],
+      "properties": {
+        "small": { "$ref": "#/$defs/positiveNumber" },
+        "control": { "$ref": "#/$defs/positiveNumber" },
+        "card": { "$ref": "#/$defs/positiveNumber" },
+        "dialog": { "$ref": "#/$defs/positiveNumber" },
+        "bubble": { "$ref": "#/$defs/positiveNumber" },
+        "pill": { "$ref": "#/$defs/positiveNumber" }
+      }
+    },
+    "font": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["family", "fallbackMacos", "fallbackWindows", "fallbackLinux"],
+      "properties": {
+        "family": { "type": "string" },
+        "fallbackMacos": { "type": "string" },
+        "fallbackWindows": { "type": "string" },
+        "fallbackLinux": { "type": "string" }
+      }
+    },
+    "typeStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["size", "lineHeight", "weight"],
+      "properties": {
+        "size": { "$ref": "#/$defs/positiveNumber" },
+        "lineHeight": { "$ref": "#/$defs/positiveNumber" },
+        "weight": { "type": "number", "minimum": 100, "maximum": 900 }
+      }
+    },
+    "typography": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sans", "mono", "scale"],
+      "properties": {
+        "sans": { "$ref": "#/$defs/font" },
+        "mono": { "$ref": "#/$defs/font" },
+        "scale": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["caption", "label", "body", "title", "code"],
+          "properties": {
+            "caption": { "$ref": "#/$defs/typeStep" },
+            "label": { "$ref": "#/$defs/typeStep" },
+            "body": { "$ref": "#/$defs/typeStep" },
+            "title": { "$ref": "#/$defs/typeStep" },
+            "code": { "$ref": "#/$defs/typeStep" }
+          }
+        }
+      }
+    },
+    "motion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["durationMs", "easing"],
+      "properties": {
+        "durationMs": { "type": "object" },
+        "easing": { "type": "object" }
+      }
+    },
+    "effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["glassAlphaMacos", "backdropBlur", "edgeFadeBand", "selectedRingAlpha"],
+      "properties": {
+        "glassAlphaMacos": { "type": "number", "minimum": 0, "maximum": 1 },
+        "backdropBlur": { "$ref": "#/$defs/positiveNumber" },
+        "edgeFadeBand": { "$ref": "#/$defs/positiveNumber" },
+        "selectedRingAlpha": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}

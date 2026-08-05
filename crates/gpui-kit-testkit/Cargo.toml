@@ -1,0 +1,25 @@
+[package]
+name = "gpui-kit-testkit"
+description = "Semantic assertions, window capture, and visual diff helpers for GPUI"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+gpui.workspace = true
+gpui-kit-semantics.workspace = true
+png.workspace = true
+raw-window-handle.workspace = true
+thiserror.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-graphics.workspace = true
+objc2-app-kit.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

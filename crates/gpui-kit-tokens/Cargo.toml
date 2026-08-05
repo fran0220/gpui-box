@@ -1,0 +1,16 @@
+[package]
+name = "gpui-kit-tokens"
+description = "Typed, GPUI-independent design tokens for gpui-kit"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

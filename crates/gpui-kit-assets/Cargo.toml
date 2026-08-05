@@ -1,0 +1,15 @@
+[package]
+name = "gpui-kit-assets"
+description = "Licensed fonts and generic icon assets for gpui-kit"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+gpui.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,55 @@
+[workspace]
+resolver = "3"
+members = [
+  "crates/gpui-kit-assets",
+  "crates/gpui-kit-semantics",
+  "crates/gpui-kit-testkit",
+  "crates/gpui-kit-theme",
+  "crates/gpui-kit-tokens",
+  "crates/gpui-kit",
+  "examples/gallery",
+  "xtask",
+]
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+license = "MIT"
+repository = "https://github.com/fran0220/gpui-kit"
+rust-version = "1.97"
+
+[workspace.dependencies]
+anyhow = "1"
+gpui = { git = "https://github.com/fran0220/zed", rev = "cb2ce82766e42c55fc8563de3c5c98ac8e1c9fd9" }
+gpui_platform = { git = "https://github.com/fran0220/zed", rev = "cb2ce82766e42c55fc8563de3c5c98ac8e1c9fd9", features = ["font-kit"] }
+png = "=0.18.1"
+raw-window-handle = "=0.6.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tracing = "0.1"
+tempfile = "3"
+
+core-graphics = "=0.24.0"
+objc2-app-kit = { version = "=0.3.2", features = ["NSView", "NSWindow"] }
+
+gpui-kit-assets = { path = "crates/gpui-kit-assets" }
+gpui-kit-semantics = { path = "crates/gpui-kit-semantics" }
+gpui-kit-testkit = { path = "crates/gpui-kit-testkit" }
+gpui-kit-theme = { path = "crates/gpui-kit-theme" }
+gpui-kit-tokens = { path = "crates/gpui-kit-tokens" }
+gpui-kit = { path = "crates/gpui-kit" }
+
+[workspace.lints.rust]
+missing_debug_implementations = "warn"
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+dbg_macro = "deny"
+todo = "warn"
+unwrap_used = "warn"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"
