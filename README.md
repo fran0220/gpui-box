@@ -76,6 +76,12 @@ cargo run -p gpui-kit-gallery -- \
 
 This uses the owning process and window id. It does not capture the desktop.
 
+### Gallery
+
+![Actions, status, settings, and truthful states](snapshots/macos/gallery.png)
+
+![Loading, popover, and dialog patterns](snapshots/macos/gallery-patterns.png)
+
 ## Tokens
 
 `tokens/studio-dark.json` is the source of truth. Views consume semantic roles
