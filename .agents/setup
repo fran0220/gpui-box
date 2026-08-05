@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+packages=(
+  build-essential
+  clang
+  cmake
+  pkg-config
+  libfontconfig1-dev
+  libwayland-dev
+  libx11-xcb-dev
+  libxkbcommon-x11-dev
+  libvulkan1
+)
+missing_packages=()
+for package in "${packages[@]}"; do
+  if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -Fq "install ok installed"; then
+    missing_packages+=("$package")
+  fi
+done
+
+if ((${#missing_packages[@]})); then
+  echo "Installing system build dependencies: ${missing_packages[*]}"
+  if ((EUID == 0)); then
+    apt-get update
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${missing_packages[@]}"
+  else
+    sudo apt-get update
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${missing_packages[@]}"
+  fi
+else
+  echo "System build dependencies are already installed."
+fi
+
+if [ -f "$HOME/.cargo/env" ]; then
+  # shellcheck disable=SC1091
+  source "$HOME/.cargo/env"
+fi
+
+if ! command -v rustup >/dev/null 2>&1; then
+  echo "Installing rustup."
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |
+    sh -s -- -y --profile minimal --default-toolchain none
+  # shellcheck disable=SC1091
+  source "$HOME/.cargo/env"
+fi
+
+profile_marker="# gpui-kit Rust toolchain"
+if ! grep -Fqx "$profile_marker" "$HOME/.bash_profile" 2>/dev/null; then
+  cat >>"$HOME/.bash_profile" <<'EOF'
+
+# gpui-kit Rust toolchain
+if [ -f "$HOME/.cargo/env" ]; then
+  . "$HOME/.cargo/env"
+fi
+EOF
+fi
+
+toolchain="$(sed -n 's/^channel = "\([^"]*\)"/\1/p' rust-toolchain.toml)"
+echo "Installing Rust $toolchain with repository-required components."
+rustup toolchain install "$toolchain" --profile minimal --component clippy --component rustfmt
+
+echo "Fetching locked Cargo dependencies."
+cargo fetch --locked
+
+echo "Orb setup complete."
