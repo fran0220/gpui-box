@@ -38,10 +38,14 @@ pub mod prelude {
     pub use crate::controls::select::{Select, SelectEvent, SelectOption};
     pub use crate::controls::slider::Slider;
     pub use crate::controls::toggle::{Checkbox, Radio, Switch};
+    pub use crate::display::avatar::Avatar;
     pub use crate::display::badge::{Badge, Tone};
     pub use crate::display::card::{Card, ListRow};
+    pub use crate::display::empty::{Divider, EmptyKind, EmptyState};
     pub use crate::display::loading::{GradientSpinner, PulseLoader, Skeleton};
+    pub use crate::display::progress::ProgressBar;
     pub use crate::display::status::{Callout, StatusDot, StatusLine};
+    pub use crate::display::tag::Tag;
     pub use crate::foundation::{
         ActiveTheme, ControlSize, Density, Disableable, Elevation, Ident, Layer, Selectable,
         Sizable, StyledExt, ThemeRegistry, activate_theme, set_density,

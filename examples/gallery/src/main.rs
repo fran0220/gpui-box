@@ -219,6 +219,54 @@ impl Render for Gallery {
                             .child(Badge::new("Danger").danger())
                             .child(Badge::new("Info").info()),
                     )
+                    .child(recipes::section_title(&theme, "Content"))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap(px(theme.spacing.sm))
+                            .w(px(420.0))
+                            .child(
+                                ProgressBar::new("gallery.index")
+                                    .label("Indexing workspace")
+                                    .count(3, 12),
+                            )
+                            .child(
+                                ProgressBar::new("gallery.contact").label("Contacting host"),
+                            )
+                            .child(Divider::new().id("gallery.rule").label("Filters"))
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_row()
+                                    .flex_wrap()
+                                    .gap(px(theme.spacing.xs))
+                                    .child(
+                                        Tag::new("gallery.tag.rust", "rust")
+                                            .on_remove(|_, _| {}),
+                                    )
+                                    .child(
+                                        Tag::new("gallery.tag.failing", "failing")
+                                            .tone(Tone::Danger)
+                                            .on_remove(|_, _| {}),
+                                    )
+                                    .child(
+                                        Tag::new("gallery.tag.pinned", "pinned").disabled(true),
+                                    )
+                                    .child(Avatar::new("Ada Lovelace").id("gallery.avatar")),
+                            )
+                            .child(
+                                EmptyState::new("gallery.refused", "The host refused the request")
+                                    .kind(EmptyKind::Unavailable)
+                                    .detail("Approval is required for this workspace.")
+                                    .action(
+                                        Button::new("gallery.retry")
+                                            .label("Try again")
+                                            .secondary()
+                                            .on_click(|_, _| {}),
+                                    ),
+                            ),
+                    )
                     .child(recipes::section_title(&theme, "Settings pattern"))
                     .child(fixture_settings_card(&theme))
                     .child(recipes::section_title(&theme, "Truthful states"))

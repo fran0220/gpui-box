@@ -60,6 +60,10 @@ pub fn catalog() -> Vec<Scene> {
             build: input,
         },
         Scene {
+            name: "content",
+            build: content,
+        },
+        Scene {
             name: "kbd",
             build: kbd,
         },
@@ -339,6 +343,63 @@ fn choice(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .value(0.7)
                 .display("0.7")
                 .on_change(|_, _, _| {}),
+        )
+        .into_any_element()
+}
+
+fn content(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(theme.space(Space::Lg)))
+        .p(px(theme.space(Space::Lg)))
+        .w(px(420.0))
+        .child(
+            ProgressBar::new("scene.content.upload")
+                .label("Indexing workspace")
+                .count(3, 12),
+        )
+        .child(ProgressBar::new("scene.content.unknown").label("Contacting host"))
+        .child(Divider::new().id("scene.content.rule").label("Filters"))
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .flex_wrap()
+                .gap(px(theme.space(Space::Xs)))
+                .child(Tag::new("scene.content.tag.rust", "rust").on_remove(|_, _| {}))
+                .child(
+                    Tag::new("scene.content.tag.failing", "failing")
+                        .tone(Tone::Danger)
+                        .on_remove(|_, _| {}),
+                )
+                .child(Tag::new("scene.content.tag.pinned", "pinned").disabled(true)),
+        )
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap(px(theme.space(Space::Sm)))
+                .child(Avatar::new("Ada Lovelace").id("scene.content.avatar"))
+                .child(Avatar::new("").size(24.0)),
+        )
+        .child(
+            EmptyState::new("scene.content.empty", "No runs yet")
+                .kind(EmptyKind::Unstarted)
+                .detail("A run appears here once one has been started."),
+        )
+        .child(
+            EmptyState::new("scene.content.refused", "The host refused the request")
+                .kind(EmptyKind::Unavailable)
+                .detail("Approval is required for this workspace.")
+                .action(
+                    Button::new("scene.content.retry")
+                        .label("Try again")
+                        .secondary()
+                        .on_click(|_, _| {}),
+                ),
         )
         .into_any_element()
 }
