@@ -22,7 +22,7 @@ use crate::layout::measure;
 
 /// How wide the grab area of the divider is, and how long the grip drawn
 /// inside it is. Neither value repeats anywhere else.
-const HANDLE: f32 = 7.0;
+pub(crate) const HANDLE: f32 = 7.0;
 const GRIP: f32 = 24.0;
 
 /// How far one arrow key moves the divider when the caller says nothing.

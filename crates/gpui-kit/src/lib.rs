@@ -77,6 +77,7 @@ pub mod prelude {
     pub use crate::controls::form_field::FormField;
     pub use crate::controls::inline_edit::InlineEdit;
     pub use crate::controls::input::{TextInput, TextInputEvent};
+    pub use crate::controls::keybinding_recorder::{KeybindingRecorder, KeybindingRecorderEvent};
     pub use crate::controls::number_input::{NumberInput, NumberInputEvent};
     pub use crate::controls::segmented::{Segment, SegmentedControl};
     pub use crate::controls::select::{Select, SelectEvent, SelectOption};
@@ -114,7 +115,9 @@ pub mod prelude {
         ActiveDrag, DragItem, DropAxis, DropIntent, DropPosition, StagedDrag,
     };
     pub use crate::layout::{
-        ScrollArea, ScrollAxis, SplitAxis, SplitPane, SplitSide, Toolbar, ToolbarItem,
+        Dock, DockEvent, DockPanel, DockRegion, ScrollArea, ScrollAxis, SplitAxis, SplitChange,
+        SplitKind, SplitLayout, SplitPane, SplitPaneSpec, SplitRecord, SplitRecordError, SplitSide,
+        SplitTree, StatusBar, StatusGroup, StatusItem, Toolbar, ToolbarItem,
     };
     pub use crate::motion::{Flip, Flipping, Presence, Transition, flip};
     pub use crate::navigation::{

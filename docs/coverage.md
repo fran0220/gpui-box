@@ -21,7 +21,9 @@ input, and an entry in `docs/components.md`.
 | Data | `List` (virtualized), `Table`, `DataGrid` (virtualized), `BulkBar`, `Tree` |
 | Display | `Badge`, `Tag`, `Avatar`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `StatusDot`, `StatusLine`, `Callout`, `PulseLoader`, `GradientSpinner`, `Skeleton`, `ProgressCircle`, `DescriptionList`, `Timeline` |
 | Overlay | `Overlay`, `Dialog`, `Drawer`, `Popover`, `Menu`, `ContextMenu`, `CommandPalette`, `Tooltip`, `Toast`, `ToastLayer`, `Kbd` |
-| Layout | `SplitPane`, `ScrollArea`, `Toolbar` |
+| Layout | `SplitPane`, `SplitTree`, `ScrollArea`, `Toolbar` |
+| Shell | `Dock`, `StatusBar` |
+| Keymap | `KeybindingRecorder` |
 | Interaction | `Dropzone` |
 | Filtering | `FilterBar` |
 
@@ -37,12 +39,24 @@ against every surface that implements it.
 
 | System | Contract | Implemented by |
 |---|---|---|
-| Drag and drop (`gpui_kit::interaction::dnd`) | `docs/interaction.md` | `List`, `Tree`, `Tabs`, `Dropzone`, `DataGrid` (column headers) |
+| Drag and drop (`gpui_kit::interaction::dnd`) | `docs/interaction.md` | `List`, `Tree`, `Tabs`, `Dropzone`, `DataGrid` (column headers), `Dock` (panel headers) |
 
 Drag and drop is covered: the contract is written down, the scenes `drag-list`,
 `drag-tree`, and `dropzone` stage it, and `crates/gpui-kit/tests/dnd.rs` drives
 a simulated pointer through every surface above. `DataGrid` reorders its column
-headers through the same system, driven in `crates/gpui-kit/tests/grid.rs`.
+headers through the same system, driven in `crates/gpui-kit/tests/grid.rs`, and
+`Dock` moves panels between regions through it, driven in
+`crates/gpui-kit/tests/shell.rs`.
+
+## One resize implementation
+
+`SplitPane` is two panes and a divider; `SplitTree` is however many of those the
+caller nests; `Dock` builds a `SplitLayout` from the regions that hold panels
+and hands it to a `SplitTree`. So a divider between two dock regions is the
+same divider a plain split gives, with the same minimums and the same published
+travel range, and there is one place where dragging a divider is implemented.
+A dock region's header is a `Tabs` strip for the same reason: dragging a panel
+is the drag system, not a second one.
 
 ## Table or DataGrid
 
@@ -74,6 +88,13 @@ own; both are exercised through every control and overlay that uses them.
   time-zone and locale work, not UI work. A library that ships a half-correct
   calendar is worse than one that ships none, and the honest form of it belongs
   next to a date library this crate does not have.
+- **Judging a keybinding.** `KeybindingRecorder` captures a keystroke and
+  reports it. Whether it clashes with something, and what to do about it, needs
+  the keymap, which the host owns; the recorder renders the conflict the host
+  found rather than inventing one.
+- **Persisting a layout.** `SplitLayout` converts to and from plain records so
+  a host can write it out, and this crate takes no serialization dependency to
+  do it for them.
 - **Rich text and code editing.** `TextArea` edits plain text. Syntax
   highlighting, folding, and multi-caret editing are an editor, not a control.
 - **Charts.** A chart is a data-visualisation library with its own scales,

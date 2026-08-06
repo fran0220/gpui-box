@@ -28,6 +28,7 @@ that must survive a frame is a view.
 | `SettingsRow`, `SettingsSection` | builder | — | One setting per row: name and description on the left, the caller's control on the right. A row that is managed elsewhere, or that belongs to a section which does not apply here, never renders the control at all |
 | `FilterBar` | builder | add, remove one condition, clear them all | The conditions are the caller's, and so is the result count. Counting, a known count, a count nobody established, and a count the host refused are four different things |
 | `InlineEdit` | view | edit requested, commit, cancel | Text that becomes a field where it stands. The component never opens itself, never applies a commit, and a refused save keeps what was typed |
+| `KeybindingRecorder` | view | recording started, a captured keystroke, cancelled | Captures the next keystroke instead of acting on it, and reports it in GPUI's own syntax so it goes straight into a keymap. A modifier alone is not a keystroke, escape ends recording rather than being captured, and a conflict is the reason the host found |
 | `field_shell`, `FieldState` | helper | — | The one border, background, and focus treatment every editable control draws. A composed field — `NumberInput`, `Combobox`, `TagInput` — wraps a bare input in one of these rather than nesting two frames |
 
 ## Display
@@ -82,6 +83,63 @@ page would be a number nobody counted.
 | `SplitPane` | builder | the ratio a drag or a keystroke asked for, and the side a double-click would collapse | Minimum sizes become a travel range published on the divider, and a drag past a minimum reports the minimum rather than a value the caller would have to clamp. A pane at ratio 0 or 1 drops its content instead of drawing it at zero size |
 | `ScrollArea` | builder | — | Scroll position is transient view state, held per identity like `List`. A gutter is reserved for every enabled axis whether or not a thumb is drawn, so turning a scrollbar on never reflows the content that decided it was needed |
 | `Toolbar` | builder | — | Groups separated by rules, a spacer, and an overflow menu. Every action inside still reports itself |
+| `SplitTree` | builder | the ratio a divider asked for, and the pane a double-click would collapse | However many nested splits the caller declares, as a `SplitLayout` the caller owns. Minimums propagate up the tree, so a divider stops where a leaf far below it would run out of room, and a collapsed leaf is drawn at its rail with no divider beside it |
+| `Dock` | builder | a panel that was picked, a panel that was dragged somewhere, a region asked to collapse, and a region divider's share | Panels in a left, centre, right, and bottom region around one another. Region sizes go through `SplitTree` and panel headers are `Tabs` strips, so resizing and dragging are the same two systems used elsewhere. It moves nothing |
+| `StatusBar` | builder | a click on an item that has an action | Text, a toned state dot, a progress ring, an action, or a caller-supplied element, in a start, centre, and end group. An item the host gave no state claims none |
+
+### A layout the host can write down
+
+`SplitLayout` is data, not view state. This crate takes no serialization
+dependency, so instead of a derived `Serialize` the layout converts losslessly
+to and from a flat `Vec<SplitRecord>` of plain fields through `to_records` and
+`from_records`, which a host persists with whatever format it already uses.
+`from_records` reports why a set of records is not a tree — no root, two roots,
+a duplicate id, a missing parent, a split without exactly two children, records
+the root does not reach — rather than silently building something else.
+
+A reported `SplitChange` is still only a request. `SplitLayout::applied` exists
+for the host that accepts every change and wants one call to make; a host that
+judges them applies the ones it accepts with `with_ratio` and `with_collapsed`.
+
+### The dock moves nothing
+
+Which panels a region holds, which one is on top, whether a region is
+collapsed, and how much room it takes are all the caller's. `DockEvent`
+names what the typist asked for and the arrangement on screen stays as it was,
+so a host that refuses a move keeps showing the layout that still holds. A move
+names the panel the dragged one should sit **in front of**, never an index: an
+index stops meaning anything the moment the host applies the move.
+
+What the dock deliberately cannot do: a region holding no panels is not drawn,
+so it cannot be dropped onto; a panel is drawn in exactly one region, with no
+split inside a region and no floating panel; and a collapsed region shows a
+rail whose glyphs report both the selection and the request to expand without
+applying either. A panel the host cannot show keeps its tab and states the
+reason where its content would be, because a panel that vanished would read as
+one the workspace never had.
+
+### A status bar never invents reassurance
+
+Every fact in the strip belongs to the host, so an item with no state carries
+no state rather than a green dot nobody asked for.
+`StatusItem::tracking` reads `AsyncValue` straight: a value whose refresh is in
+flight or has failed while a value is still held is drawn with its last
+verified text and the word `stale` beside it, and publishes `stale` as its
+value. It is never drawn as current. A progress item with neither a fraction
+nor a count is drawn as an unknown extent rather than as a ring that happens to
+be part full.
+
+### A recorder that cannot bind escape
+
+`KeybindingRecorder` reports `gpui::Keystroke::unparse`, which is exactly what
+`gpui::Keystroke::parse` reads and what `Kbd` splits, so a captured binding is
+usable without translation. Escape ends recording without capturing: that is
+how everything else in this library abandons something in flight, and a
+recorder that swallowed it would leave the typist inside a field that eats
+every key. The cost is stated rather than hidden — escape cannot be bound
+unless the caller turns `allow_escape` on and provides its own way out. A
+conflict is never the recorder's judgement: it has no keymap to consult, so it
+renders the reason the host found and nothing else.
 
 ### A scrollbar that is absent means there is nothing more
 

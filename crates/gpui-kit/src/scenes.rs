@@ -13,6 +13,7 @@ use gpui_kit_theme::{Radius, Space, Theme};
 
 use crate::controls::combobox::Combobox;
 use crate::controls::input::TextInput;
+use crate::controls::keybinding_recorder::KeybindingRecorder;
 use crate::controls::number_input::NumberInput;
 use crate::controls::select::{Select, SelectOption};
 use crate::controls::split_button::SplitButton;
@@ -226,6 +227,18 @@ pub fn catalog() -> Vec<Scene> {
         Scene {
             name: "progress-circle",
             build: progress_circle,
+        },
+        Scene {
+            name: "split-tree",
+            build: split_tree,
+        },
+        Scene {
+            name: "ide-shell",
+            build: ide_shell,
+        },
+        Scene {
+            name: "keybinding",
+            build: keybinding,
         },
     ]
 }
@@ -2611,6 +2624,229 @@ fn progress_circle(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .large(),
                 ),
         )
+        .into_any_element()
+}
+
+/// A layout nested three deep, with one leaf collapsed to its rail. The tree
+/// is the caller's: every divider reports the ratio it was asked for and moves
+/// nothing here.
+fn split_tree(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let layout = SplitLayout::horizontal(
+        "workspace",
+        0.26,
+        SplitLayout::leaf(SplitPaneSpec::new("files").min_width(140.0)),
+        SplitLayout::horizontal(
+            "body",
+            0.74,
+            SplitLayout::vertical(
+                "editing",
+                0.6,
+                SplitLayout::leaf(SplitPaneSpec::new("editor").min_height(90.0)),
+                SplitLayout::leaf(SplitPaneSpec::new("terminal").min_height(70.0)),
+            ),
+            // A collapsed leaf is drawn at its rail, and the divider beside it
+            // is not offered: a fixed extent has no ratio to trade.
+            SplitLayout::leaf(SplitPaneSpec::new("outline").rail(40.0).collapsed(true)),
+        ),
+    );
+
+    stack(&theme)
+        .w(px(680.0))
+        .child(
+            div()
+                .h(px(340.0))
+                .hairline(&theme)
+                .radius(&theme, Radius::Card)
+                .overflow_hidden()
+                .child(
+                    SplitTree::new("scene.tree.workspace")
+                        .layout(layout)
+                        .pane("files", filler(&theme, "Files", 6))
+                        .pane("editor", filler(&theme, "main.rs", 6))
+                        .pane("terminal", filler(&theme, "Terminal", 2))
+                        // The rail is narrower than any label, so the collapsed
+                        // leaf is drawn as the room it still holds.
+                        .pane("outline", div())
+                        .on_change(|_, _, _| {}),
+                ),
+        )
+        .child(caption(
+            &theme,
+            "A divider high in the tree stops where a leaf far below it would \
+             run out of room.",
+        ))
+        .into_any_element()
+}
+
+/// A whole application frame: panels in regions, one region collapsed to a
+/// rail, one panel the host refuses, and a status bar under all of it.
+fn ide_shell(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let mut branch = AsyncValue::<SharedString, String>::ready("main@a1b2c3".into());
+    branch.refresh();
+    branch.fail_refresh("the host is unreachable".into());
+
+    div()
+        .column()
+        .w(px(900.0))
+        .h(px(560.0))
+        .bg(theme.colors.canvas)
+        .text_color(theme.colors.text)
+        .font_family(theme.typography.sans.clone())
+        .child(
+            div().flex_1().min_h(px(0.0)).child(
+                Dock::new("scene.shell")
+                    .share(DockRegion::Left, 0.24)
+                    .share(DockRegion::Bottom, 0.3)
+                    .panel(
+                        DockRegion::Left,
+                        DockPanel::new("files", "Files")
+                            .icon(Icon::Folder)
+                            .content(filler(&theme, "Workspace", 8)),
+                    )
+                    .panel(
+                        DockRegion::Left,
+                        DockPanel::new("search", "Search")
+                            .icon(Icon::Magnifier)
+                            .badge("12"),
+                    )
+                    .active(DockRegion::Left, "files")
+                    .panel(
+                        DockRegion::Centre,
+                        DockPanel::new("editor", "main.rs")
+                            .icon(Icon::Document)
+                            .content(filler(&theme, "fn main()", 12)),
+                    )
+                    .panel(
+                        DockRegion::Right,
+                        DockPanel::new("outline", "Outline").icon(Icon::List),
+                    )
+                    .panel(
+                        DockRegion::Right,
+                        DockPanel::new("history", "History").icon(Icon::GitBranch),
+                    )
+                    .collapsed(DockRegion::Right, true)
+                    .panel(
+                        DockRegion::Bottom,
+                        DockPanel::new("terminal", "Terminal")
+                            .icon(Icon::Terminal)
+                            .content(filler(&theme, "$ cargo test", 4)),
+                    )
+                    .panel(
+                        DockRegion::Bottom,
+                        DockPanel::new("problems", "Problems")
+                            .icon(Icon::Danger)
+                            .badge("3")
+                            .unavailable(
+                                "The language server is not running, so problems cannot be \
+                                 listed. Nothing here is out of date; there is nothing here.",
+                            ),
+                    )
+                    // The refused panel is the one on top, because a refusal
+                    // nobody can see is a refusal nobody was told about.
+                    .active(DockRegion::Bottom, "problems")
+                    .on_event(|_, _, _| {}),
+            ),
+        )
+        .child(
+            StatusBar::new("scene.shell.status")
+                .label("Workspace status")
+                .start([
+                    StatusItem::text("branch", "main")
+                        .icon(Icon::GitBranch)
+                        .tracking(&branch),
+                    StatusItem::state("build", "Build passing", Tone::Success),
+                ])
+                .centre([StatusItem::progress("index", "Indexing the workspace")
+                    .count(7, 12)
+                    .state_name("loading")])
+                .end([
+                    StatusItem::text("position", "Ln 42, Col 7"),
+                    StatusItem::action("encoding", "UTF-8").on_click(|_, _| {}),
+                ]),
+        )
+        .into_any_element()
+}
+
+#[derive(Clone)]
+struct SceneRecorders {
+    idle: Entity<KeybindingRecorder>,
+    recording: Entity<KeybindingRecorder>,
+    captured: Entity<KeybindingRecorder>,
+    conflicting: Entity<KeybindingRecorder>,
+}
+
+impl Global for SceneRecorders {}
+
+fn keybinding(window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<SceneRecorders>() {
+        let idle = cx.new(|cx| {
+            KeybindingRecorder::new("scene.keybinding.idle", window, cx).label("Open workspace")
+        });
+        let recording = cx.new(|cx| {
+            KeybindingRecorder::new("scene.keybinding.recording", window, cx)
+                .label("Command palette")
+        });
+        let captured = cx.new(|cx| {
+            KeybindingRecorder::new("scene.keybinding.captured", window, cx)
+                .label("Toggle terminal")
+                .binding("ctrl-`")
+        });
+        let conflicting = cx.new(|cx| {
+            KeybindingRecorder::new("scene.keybinding.conflicting", window, cx)
+                .label("Split editor")
+                .binding("cmd-shift-p")
+                // The host's words, not the recorder's: it has no keymap.
+                .conflict(Some("Already opens the command palette"))
+        });
+        // Recording is a state, not a gesture, so the scene puts one recorder
+        // into it by hand rather than waiting for a keystroke that a still
+        // image could not photograph anyway.
+        recording.update(cx, |recorder, cx| recorder.start(window, cx));
+        cx.set_global(SceneRecorders {
+            idle,
+            recording,
+            captured,
+            conflicting,
+        });
+    }
+    let recorders = cx.global::<SceneRecorders>().clone();
+    let theme = cx.theme().clone();
+
+    // A recorder carries its name in the tree rather than drawing one, the way
+    // every other control here does, so the scene puts it where a keymap page
+    // would: in a settings row that states what the binding is for.
+    stack(&theme)
+        .w(px(680.0))
+        .child(
+            SettingsSection::new("scene.keybinding.keymap", "Keyboard shortcuts")
+                .description("Recording captures the next keystroke instead of acting on it.")
+                .row(
+                    SettingsRow::new("scene.keybinding.row.open", "Open workspace")
+                        .description("Nothing is bound yet")
+                        .control(recorders.idle),
+                )
+                .row(
+                    SettingsRow::new("scene.keybinding.row.palette", "Command palette")
+                        .description("Listening for a keystroke")
+                        .control(recorders.recording),
+                )
+                .row(
+                    SettingsRow::new("scene.keybinding.row.terminal", "Toggle terminal")
+                        .control(recorders.captured),
+                )
+                .row(
+                    SettingsRow::new("scene.keybinding.row.split", "Split editor")
+                        .description("The host judged this one, and said so")
+                        .control(recorders.conflicting),
+                ),
+        )
+        .child(caption(
+            &theme,
+            "Escape ends recording without capturing, so escape cannot be bound \
+             unless the caller turns allow_escape on.",
+        ))
         .into_any_element()
 }
 

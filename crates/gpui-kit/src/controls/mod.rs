@@ -8,6 +8,7 @@ pub mod filter_bar;
 pub mod form_field;
 pub mod inline_edit;
 pub mod input;
+pub mod keybinding_recorder;
 pub mod number_input;
 pub mod segmented;
 pub mod select;
