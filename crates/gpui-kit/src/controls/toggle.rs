@@ -333,6 +333,9 @@ impl RenderOnce for Radio {
 pub struct Switch {
     ident: Ident,
     label: Option<SharedString>,
+    /// A name for a reader who has only the tree, when the words on screen
+    /// belong to something else.
+    name: Option<SharedString>,
     description: Option<SharedString>,
     on: bool,
     disabled: bool,
@@ -358,6 +361,7 @@ impl Switch {
         Self {
             ident: ident.into(),
             label: None,
+            name: None,
             description: None,
             on: false,
             disabled: false,
@@ -373,6 +377,17 @@ impl Switch {
 
     pub fn description(mut self, description: impl Into<SharedString>) -> Self {
         self.description = Some(description.into());
+        self
+    }
+
+    /// Names the switch without drawing the name.
+    ///
+    /// A switch at the right edge of a settings row is named by the row, and
+    /// repeating those words beside the track would say everything twice. The
+    /// name still has to reach the tree, because a control nobody can name is
+    /// a control nobody can operate without looking at it.
+    pub fn named(mut self, name: impl Into<SharedString>) -> Self {
+        self.name = Some(name.into());
         self
     }
 
@@ -458,7 +473,13 @@ impl RenderOnce for Switch {
         )
         .semantic_in(
             cx,
-            spec(&self.ident, Role::Switch, self.label.clone(), self.disabled).checked(self.on),
+            spec(
+                &self.ident,
+                Role::Switch,
+                self.label.clone().or_else(|| self.name.clone()),
+                self.disabled,
+            )
+            .checked(self.on),
         )
     }
 }

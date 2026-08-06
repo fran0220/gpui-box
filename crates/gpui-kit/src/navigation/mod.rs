@@ -10,9 +10,11 @@ pub mod breadcrumb;
 pub mod pagination;
 pub mod sidebar;
 pub mod tabs;
+pub mod wizard;
 
 pub use accordion::{Accordion, AccordionSection};
 pub use breadcrumb::{Breadcrumb, Crumb};
 pub use pagination::{PageTotal, Pagination};
 pub use sidebar::{Sidebar, SidebarItem, SidebarSection};
 pub use tabs::{TabItem, Tabs};
+pub use wizard::{StepStatus, Wizard, WizardIntent, WizardLayout, WizardStep};

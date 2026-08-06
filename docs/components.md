@@ -25,6 +25,9 @@ that must survive a frame is a view.
 | `SegmentedControl` | builder | the segment that was picked | A single-choice strip. Left, right, home, and end move over refused segments and stop at the ends, because a strip has ends |
 | `Combobox` | view | selected, custom, opened, closed | A `Select` you can type into. Escape puts the query back to the current answer and reports nothing. A query nothing answers reports nothing unless `allow_custom` |
 | `TagInput` | view | added, removed, duplicate, refused | Enter or comma commits a token. The first backspace in an empty field singles out the last tag and the second removes it. A duplicate and a full field are refusals shown where the typist is looking |
+| `SettingsRow`, `SettingsSection` | builder | — | One setting per row: name and description on the left, the caller's control on the right. A row that is managed elsewhere, or that belongs to a section which does not apply here, never renders the control at all |
+| `FilterBar` | builder | add, remove one condition, clear them all | The conditions are the caller's, and so is the result count. Counting, a known count, a count nobody established, and a count the host refused are four different things |
+| `InlineEdit` | view | edit requested, commit, cancel | Text that becomes a field where it stands. The component never opens itself, never applies a commit, and a refused save keeps what was typed |
 | `field_shell`, `FieldState` | helper | — | The one border, background, and focus treatment every editable control draws. A composed field — `NumberInput`, `Combobox`, `TagInput` — wraps a bare input in one of these rather than nesting two frames |
 
 ## Display
@@ -40,6 +43,9 @@ that must survive a frame is a view.
 | `Divider` | builder | Optional caption |
 | `EmptyState` | builder | Names which of empty, unstarted, unavailable, or failed holds |
 | `PulseLoader`, `GradientSpinner`, `Skeleton` | builder | Publish a busy indeterminate node |
+| `ProgressCircle` | builder | The ring form of `ProgressBar`, over the same state. A position only when the extent is known; an unknown extent tints the whole ring rather than part of it |
+| `DescriptionList` | builder | Term and value pairs for a detail page. Unknown, not applicable, and redacted are three different facts, and a redacted value carries only its shape |
+| `Timeline` | builder | A chronological feed. Every time and every day heading is a string the caller already formatted, and an entry whose time nobody knows says so |
 
 ## Navigation
 
@@ -49,7 +55,17 @@ that must survive a frame is a view.
 | `Accordion` | builder | a section id and the state it should take | A closed section does not render its body at all. `exclusive` changes only what is reported: opening a section also reports a close for every other open one |
 | `Breadcrumb` | builder | the crumb that was picked, and the ids an ellipsis hides | The last crumb is the current place: it publishes `Text` rather than `Link` and installs no handler. `max_visible` collapses the middle of a long trail and publishes the hidden count |
 | `Sidebar` | builder | the place that was picked | Sections, badges, and one level of nesting. Collapsing narrows the drawing, never the substance: a glyph-only rail reaches each label through a `Tooltip` and every item still publishes its full name and its depth |
+| `Wizard` | builder | a step to jump to, back, next, or finish | A step strip with the caller's body under it, horizontal or vertical. A step is complete, current, upcoming, blocked, or failed, and the last two say why |
 | `Pagination` | builder | the page that was asked for | First, previous, next, last, and a numbered range with an ellipsis that says how many pages it stands for. A step with nowhere to go installs no handler. With `PageTotal::Unknown` there is no last-page control, no numbers, and no total in the copy |
+
+### The wizard moves nothing
+
+`Wizard` reports `Step`, `Back`, `Next`, and `Finish`; which step is current
+stays with the caller, exactly as `Tabs` never switches its own tab. Only
+completed steps are revisitable by default, and a step nobody may jump to
+installs no handler. `Blocked` and `Failed` carry the host's reason and publish
+it as a child node, because a step that has gone grey for a reason nobody
+states is a dead end.
 
 ### An unknown page count is not a page count
 
@@ -245,6 +261,23 @@ number outside the range stays on screen exactly as it is, published `invalid`;
 a tag the field will not take leaves the typed text in place and says why.
 Neither silently corrects the caller, because a value nobody chose is a value
 nobody can trust.
+
+### A settings row withholds the control, not just the colour
+
+A setting decided by policy, and a setting that belongs to a section which
+does not apply on this machine, are both shown with their value and with a
+line saying so. Neither renders the control the caller passed: dimming a live
+switch leaves something on screen that can be operated to no effect. The
+section states the reason once above its rows rather than once per row.
+
+### The timeline does not know what time it is
+
+`Timeline` takes times and day headings as finished strings. Turning an instant
+into words is calendar, time-zone and locale work — the same reason
+`docs/coverage.md` puts date pickers out of scope — so whoever owns the clock
+owns the wording. An entry with no known time is neither floated to the top nor
+dropped to the bottom: it says its time is unknown and publishes `time unknown`
+as its value.
 
 ## What every component agrees on
 

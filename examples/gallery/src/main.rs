@@ -22,11 +22,11 @@ const SETTINGS_FIXTURE: &str = include_str!("../../../fixtures/settings/states.j
 #[derive(Debug, Deserialize)]
 struct SettingsFixture {
     fixture: bool,
-    rows: Vec<SettingsRow>,
+    rows: Vec<SettingsFixtureRow>,
 }
 
 #[derive(Debug, Deserialize)]
-struct SettingsRow {
+struct SettingsFixtureRow {
     id: String,
     title: String,
     detail: String,
@@ -936,6 +936,16 @@ impl Render for Gallery {
                         "A host that can only say whether one more page exists says exactly \
                          that: no last page, no numbers, and no total in the copy.",
                     ))
+                    .child(recipes::section_title(&theme, "Multi-step flows"))
+                    .child(wizard_section(&theme, cx))
+                    .child(recipes::section_title(&theme, "Settings rows"))
+                    .child(settings_section(&theme, cx))
+                    .child(recipes::section_title(&theme, "Filtering and inline editing"))
+                    .child(filter_section(&theme, cx))
+                    .child(recipes::section_title(&theme, "Detail pages"))
+                    .child(detail_section(&theme, window, cx))
+                    .child(recipes::section_title(&theme, "Compact progress"))
+                    .child(progress_circle_section(&theme))
                     .child(recipes::section_title(&theme, "Drawer"))
                     .child({
                         let drawer = self.filter_drawer.clone();
@@ -1863,4 +1873,318 @@ fn capture(path: &Path, cx: &mut gpui::AsyncApp) -> Result<()> {
         bytes
     );
     Ok(())
+}
+
+/// Where the multi-step flow in the gallery currently stands.
+///
+/// The wizard reports where the typist wants to go and moves nothing itself,
+/// so the gallery has to hold the current step for it.
+#[derive(Debug)]
+struct GalleryFlow {
+    step: usize,
+}
+
+impl Global for GalleryFlow {}
+
+/// What the inline editors and the filter bar are currently showing.
+#[derive(Debug)]
+struct GalleryEditing {
+    title: SharedString,
+    editing: bool,
+    failure: Option<SharedString>,
+    filters: Vec<(SharedString, SharedString, SharedString, SharedString)>,
+}
+
+impl Global for GalleryEditing {}
+
+const FLOW_STEPS: [(&str, &str, &str); 4] = [
+    ("prepare", "Prepare", "Check the workspace is clean"),
+    ("build", "Build", "Compile every target"),
+    ("sign", "Sign", "Sign the artifacts"),
+    ("publish", "Publish", "Send the release to the host"),
+];
+
+fn wizard_section(theme: &Theme, cx: &mut App) -> gpui::AnyElement {
+    if !cx.has_global::<GalleryFlow>() {
+        cx.set_global(GalleryFlow { step: 1 });
+    }
+    let current = cx.global::<GalleryFlow>().step;
+    let steps = FLOW_STEPS
+        .iter()
+        .enumerate()
+        .map(|(index, (id, title, description))| {
+            let step = WizardStep::new(*id, *title).description(*description);
+            match index.cmp(&current) {
+                std::cmp::Ordering::Less => step.complete(),
+                std::cmp::Ordering::Equal => step.current(),
+                std::cmp::Ordering::Greater if index == FLOW_STEPS.len() - 1 => {
+                    step.blocked("Approval is required for this workspace.")
+                }
+                std::cmp::Ordering::Greater => step.upcoming(),
+            }
+        });
+
+    let mut wizard =
+        Wizard::new("gallery.wizard")
+            .steps(steps)
+            .body(
+                Card::new().child(div().p(px(theme.spacing.lg)).child(SharedString::from(
+                    format!(
+                        "The body of \u{201c}{}\u{201d} belongs to the application.",
+                        FLOW_STEPS[current].1
+                    ),
+                ))),
+            )
+            .can_advance(current + 2 < FLOW_STEPS.len())
+            .finish(current + 2 == FLOW_STEPS.len())
+            .on_navigate(|intent, _, cx| {
+                let intent = intent.clone();
+                cx.update_global::<GalleryFlow, ()>(|flow, _| match &intent {
+                    WizardIntent::Back => flow.step = flow.step.saturating_sub(1),
+                    WizardIntent::Next | WizardIntent::Finish => {
+                        flow.step = (flow.step + 1).min(FLOW_STEPS.len() - 1)
+                    }
+                    WizardIntent::Step(id) => {
+                        if let Some(index) = FLOW_STEPS
+                            .iter()
+                            .position(|(step, _, _)| *step == id.as_ref())
+                        {
+                            flow.step = index;
+                        }
+                    }
+                });
+                cx.refresh_windows();
+            });
+    if current > 0 {
+        wizard = wizard.back_to(FLOW_STEPS[current - 1].0);
+    }
+
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(theme.spacing.md))
+        .child(wizard)
+        .child(recipes::footnote(
+            theme,
+            "The wizard reports Back, Next, Finish, and a jump to a revisited step. Which step is \
+             current is the application's, and a blocked step says why rather than going grey.",
+        ))
+        .into_any_element()
+}
+
+fn settings_section(theme: &Theme, cx: &mut App) -> gpui::AnyElement {
+    if !cx.has_global::<GalleryStates>() {
+        cx.set_global(GalleryStates { forward: false });
+    }
+    let on = cx.global::<GalleryStates>().forward;
+
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(theme.spacing.lg))
+        .child(
+            SettingsSection::new("gallery.settings.general", "General")
+                .description("How this workspace behaves")
+                .action(|_, _| {
+                    Button::new("gallery.settings.reset")
+                        .label("Reset to defaults")
+                        .ghost()
+                        .on_click(|_, _| {})
+                        .into_any_element()
+                })
+                .row(
+                    SettingsRow::new("gallery.settings.autosave", "Save automatically")
+                        .description("Write changes as they happen")
+                        .control(
+                            Switch::new("gallery.settings.autosave.switch")
+                                .named("Save automatically")
+                                .on(on)
+                                .on_change(|_, _, cx| {
+                                    cx.update_global::<GalleryStates, ()>(|state, _| {
+                                        state.forward = !state.forward
+                                    });
+                                    cx.refresh_windows();
+                                }),
+                        ),
+                )
+                .row(
+                    SettingsRow::new("gallery.settings.telemetry", "Usage reporting")
+                        .description("Nobody on this machine can change this")
+                        .value("Off")
+                        .managed("your administrator"),
+                ),
+        )
+        .child(
+            SettingsSection::new("gallery.settings.sync", "Synchronisation")
+                .description("What travels between machines")
+                .dimmed_by("This workspace is local, so nothing synchronises.")
+                .row(
+                    SettingsRow::new("gallery.settings.sync.settings", "Sync settings")
+                        .value("Off")
+                        .control(
+                            Switch::new("gallery.settings.sync.settings.switch")
+                                .named("Sync settings")
+                                .on(false)
+                                .on_change(|_, _, _| {}),
+                        ),
+                ),
+        )
+        .child(recipes::footnote(
+            theme,
+            "A managed or inapplicable row never renders its control, so nothing on screen can be \
+             operated to no effect.",
+        ))
+        .into_any_element()
+}
+
+fn filter_section(theme: &Theme, cx: &mut App) -> gpui::AnyElement {
+    if !cx.has_global::<GalleryEditing>() {
+        cx.set_global(GalleryEditing {
+            title: SharedString::new_static("Indexing the workspace"),
+            editing: false,
+            failure: None,
+            filters: vec![
+                (
+                    SharedString::new_static("status"),
+                    SharedString::new_static("Status"),
+                    SharedString::new_static("is"),
+                    SharedString::new_static("failed"),
+                ),
+                (
+                    SharedString::new_static("owner"),
+                    SharedString::new_static("Owner"),
+                    SharedString::new_static("is"),
+                    SharedString::new_static("fixture-owner"),
+                ),
+            ],
+        });
+    }
+    let state = cx.global::<GalleryEditing>();
+    let conditions: Vec<FilterCondition> = state
+        .filters
+        .iter()
+        .map(|(id, field, operator, value)| {
+            FilterCondition::new(id.clone(), field.clone(), operator.clone(), value.clone())
+        })
+        .collect();
+    let count = conditions.len();
+    let title = state.title.clone();
+    let editing = state.editing;
+    let failure = state.failure.clone();
+
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(theme.spacing.md))
+        .child(
+            FilterBar::new("gallery.filters")
+                .conditions(conditions)
+                .count(if count == 0 {
+                    ResultCount::Counting
+                } else {
+                    ResultCount::Known(14 * count)
+                })
+                .noun("runs")
+                .on_add(|_, _| {})
+                .on_remove(|id, _, cx| {
+                    let id = id.clone();
+                    cx.update_global::<GalleryEditing, ()>(|state, _| {
+                        state.filters.retain(|(existing, _, _, _)| existing != &id)
+                    });
+                    cx.refresh_windows();
+                })
+                .on_clear(|_, cx| {
+                    cx.update_global::<GalleryEditing, ()>(|state, _| state.filters.clear());
+                    cx.refresh_windows();
+                }),
+        )
+        .child(
+            InlineEdit::new("gallery.inline", title)
+                .editing(editing)
+                .when_some(failure, |edit, reason| edit.failure(reason))
+                .on_edit(|_, cx| {
+                    cx.update_global::<GalleryEditing, ()>(|state, _| state.editing = true);
+                    cx.refresh_windows();
+                })
+                .on_commit(|value, _, cx| {
+                    let value = value.clone();
+                    cx.update_global::<GalleryEditing, ()>(|state, _| {
+                        // Every third save is refused, so the gallery shows a
+                        // failure that keeps what was typed.
+                        if value.ends_with('?') {
+                            state.failure = Some(SharedString::new_static(
+                                "The host refused this change. What you typed is still here.",
+                            ));
+                        } else {
+                            state.title = value;
+                            state.editing = false;
+                            state.failure = None;
+                        }
+                    });
+                    cx.refresh_windows();
+                })
+                .on_cancel(|_, cx| {
+                    cx.update_global::<GalleryEditing, ()>(|state, _| {
+                        state.editing = false;
+                        state.failure = None;
+                    });
+                    cx.refresh_windows();
+                }),
+        )
+        .child(recipes::footnote(
+            theme,
+            "Remove a chip or clear them all and the count follows. Rename the run and end the \
+             name with a question mark to see a refused save keep the text.",
+        ))
+        .into_any_element()
+}
+
+fn detail_section(theme: &Theme, window: &mut Window, cx: &mut App) -> gpui::AnyElement {
+    let scene = gpui_kit::scenes::find("detail").expect("scene is registered");
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(theme.spacing.md))
+        .child((scene.build)(window, cx))
+        .child(recipes::footnote(
+            theme,
+            "Unknown, not applicable, and redacted are three different facts, and a timestamp is \
+             a string the application already formatted.",
+        ))
+        .into_any_element()
+}
+
+fn progress_circle_section(theme: &Theme) -> gpui::AnyElement {
+    div()
+        .flex()
+        .flex_row()
+        .items_center()
+        .flex_wrap()
+        .gap(px(theme.spacing.xl))
+        .child(
+            ProgressCircle::new("gallery.ring.upload")
+                .count(3, 12)
+                .label("Uploading artifacts")
+                .centre("25%"),
+        )
+        .child(
+            ProgressCircle::new("gallery.ring.verify")
+                .fraction(0.72)
+                .label("Verifying checksums")
+                .display("72%")
+                .centre("72%"),
+        )
+        .child(ProgressCircle::new("gallery.ring.contact").label("Contacting the host"))
+        .child(
+            ProgressCircle::new("gallery.ring.small")
+                .fraction(0.4)
+                .label("Small")
+                .small(),
+        )
+        .child(recipes::footnote(
+            theme,
+            "The ring with no extent is tinted whole rather than part-filled, because a part-\
+             filled ring would be read as a position.",
+        ))
+        .into_any_element()
 }

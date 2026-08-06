@@ -14,15 +14,16 @@ input, and an entry in `docs/components.md`.
 | Family | Components |
 |---|---|
 | Action | `Button`, `IconButton`, `ButtonGroup`, `SplitButton` |
-| Text entry | `TextInput`, `TextArea`, `NumberInput`, `TagInput` |
+| Text entry | `TextInput`, `TextArea`, `NumberInput`, `TagInput`, `InlineEdit` |
 | Choice | `Select`, `Combobox`, `Checkbox`, `Radio`, `Switch`, `Slider`, `SegmentedControl` |
-| Form | `FormField` |
-| Navigation | `Tabs`, `Accordion`, `Breadcrumb`, `Sidebar`, `Pagination` |
+| Form | `FormField`, `SettingsRow`, `SettingsSection` |
+| Navigation | `Tabs`, `Accordion`, `Breadcrumb`, `Sidebar`, `Pagination`, `Wizard` |
 | Data | `List` (virtualized), `Table`, `DataGrid` (virtualized), `BulkBar`, `Tree` |
-| Display | `Badge`, `Tag`, `Avatar`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `StatusDot`, `StatusLine`, `Callout`, `PulseLoader`, `GradientSpinner`, `Skeleton` |
+| Display | `Badge`, `Tag`, `Avatar`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `StatusDot`, `StatusLine`, `Callout`, `PulseLoader`, `GradientSpinner`, `Skeleton`, `ProgressCircle`, `DescriptionList`, `Timeline` |
 | Overlay | `Overlay`, `Dialog`, `Drawer`, `Popover`, `Menu`, `ContextMenu`, `CommandPalette`, `Tooltip`, `Toast`, `ToastLayer`, `Kbd` |
 | Layout | `SplitPane`, `ScrollArea`, `Toolbar` |
 | Interaction | `Dropzone` |
+| Filtering | `FilterBar` |
 
 `Tooltipped` is an extension trait rather than a component: it attaches a
 `Tooltip` to any element, and is covered wherever that `Tooltip` is.
@@ -64,6 +65,11 @@ own; both are exercised through every control and overlay that uses them.
 
 ## Out of scope, and why
 
+- **Time formatting.** `Timeline` displays times and day headings, and
+  formats neither: it takes strings the host has already put into words. The
+  same reasoning that keeps calendars out of this crate keeps
+  “two minutes ago” out of it, and the seam is the adapter above the
+  component.
 - **Date, time, and calendar pickers.** Correctness here is calendar,
   time-zone and locale work, not UI work. A library that ships a half-correct
   calendar is worse than one that ships none, and the honest form of it belongs

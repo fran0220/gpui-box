@@ -203,6 +203,30 @@ pub fn catalog() -> Vec<Scene> {
             name: "dropzone",
             build: dropzone,
         },
+        Scene {
+            name: "wizard",
+            build: wizard,
+        },
+        Scene {
+            name: "settings",
+            build: settings,
+        },
+        Scene {
+            name: "detail",
+            build: detail,
+        },
+        Scene {
+            name: "filter-bar",
+            build: filter_bar,
+        },
+        Scene {
+            name: "inline-edit",
+            build: inline_edit,
+        },
+        Scene {
+            name: "progress-circle",
+            build: progress_circle,
+        },
     ]
 }
 
@@ -2275,6 +2299,316 @@ fn dropzone(_window: &mut Window, cx: &mut App) -> AnyElement {
                             .state(DropzoneState::Refusing)
                             .on_files(|_, _, _| {}),
                     ),
+                ),
+        )
+        .into_any_element()
+}
+
+fn wizard(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(720.0))
+        .child(caption(
+            &theme,
+            "horizontal, with a blocked step and a failed one",
+        ))
+        .child(
+            Wizard::new("scene.wizard.release")
+                .steps([
+                    WizardStep::new("prepare", "Prepare")
+                        .description("Check the workspace is clean")
+                        .complete(),
+                    WizardStep::new("build", "Build")
+                        .description("Compile every target")
+                        .failed("The build failed on the test target."),
+                    WizardStep::new("sign", "Sign").current(),
+                    WizardStep::new("publish", "Publish")
+                        .blocked("Approval is required for this workspace."),
+                ])
+                .body(
+                    div()
+                        .p(px(theme.spacing.md))
+                        .radius(&theme, Radius::Card)
+                        .hairline(&theme)
+                        .child(SharedString::new_static(
+                            "The body of the current step belongs to the caller.",
+                        )),
+                )
+                .back_to("build")
+                .on_navigate(|_, _, _| {}),
+        )
+        .child(caption(&theme, "vertical, finishing"))
+        .child(
+            Wizard::new("scene.wizard.setup")
+                .vertical()
+                .steps([
+                    WizardStep::new("account", "Account").complete(),
+                    WizardStep::new("workspace", "Workspace").complete(),
+                    WizardStep::new("review", "Review").current(),
+                ])
+                .back_to("workspace")
+                .finish(true)
+                .on_navigate(|_, _, _| {}),
+        )
+        .into_any_element()
+}
+
+fn settings(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(620.0))
+        .child(
+            SettingsSection::new("scene.settings.general", "General")
+                .description("How this workspace behaves")
+                .row(
+                    SettingsRow::new("scene.settings.general.autosave", "Save automatically")
+                        .description("Write changes as they happen")
+                        .control(
+                            Switch::new("scene.settings.general.autosave.switch")
+                                .named("Save automatically")
+                                .on(true)
+                                .on_change(|_, _, _| {}),
+                        ),
+                )
+                .row(
+                    SettingsRow::new("scene.settings.general.runtime", "Native runtime")
+                        .description("Runs work on this machine instead of a host")
+                        .badge("Requires restart")
+                        .control(
+                            Switch::new("scene.settings.general.runtime.switch")
+                                .named("Native runtime")
+                                .on(false)
+                                .on_change(|_, _, _| {}),
+                        ),
+                )
+                .row(
+                    SettingsRow::new("scene.settings.general.telemetry", "Usage reporting")
+                        .description("Nobody on this machine can change this")
+                        .value("Off")
+                        .managed("your administrator"),
+                ),
+        )
+        .child(
+            SettingsSection::new("scene.settings.sync", "Synchronisation")
+                .description("What travels between machines")
+                .dimmed_by("This workspace is local, so nothing synchronises.")
+                .row(
+                    SettingsRow::new("scene.settings.sync.settings", "Sync settings")
+                        .value("Off")
+                        .control(
+                            Switch::new("scene.settings.sync.settings.switch")
+                                .named("Sync settings")
+                                .on(false)
+                                .on_change(|_, _, _| {}),
+                        ),
+                )
+                .row(
+                    SettingsRow::new("scene.settings.sync.history", "Sync history")
+                        .value("Off")
+                        .control(
+                            Switch::new("scene.settings.sync.history.switch")
+                                .named("Sync history")
+                                .on(false)
+                                .on_change(|_, _, _| {}),
+                        ),
+                ),
+        )
+        .into_any_element()
+}
+
+fn detail(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(640.0))
+        .child(caption(
+            &theme,
+            "unknown, not applicable, and redacted are three facts",
+        ))
+        .child(
+            DescriptionList::new("scene.detail.facts")
+                .columns(2)
+                .items([
+                    DescriptionItem::new("id", "Run", "run-4821"),
+                    DescriptionItem::new("owner", "Owner", "fixture-owner"),
+                    DescriptionItem::new("finished", "Finished", DescriptionValue::Unknown),
+                    DescriptionItem::new("artifact", "Artifact", DescriptionValue::NotApplicable),
+                    DescriptionItem::new(
+                        "token",
+                        "Access token",
+                        DescriptionValue::redacted("51 characters"),
+                    )
+                    .copyable(true),
+                ])
+                .on_copy(|_, _, _| {}),
+        )
+        .child(caption(
+            &theme,
+            "what happened, in the words the host chose",
+        ))
+        .child(
+            Timeline::new("scene.detail.activity")
+                .group(
+                    TimelineGroup::new("today", "Today")
+                        .entry(
+                            TimelineEntry::new("queued", "Run queued")
+                                .time("09:12")
+                                .actor("fixture-owner")
+                                .tone(Tone::Neutral),
+                        )
+                        .entry(
+                            TimelineEntry::new("started", "Indexing started")
+                                .time("09:13")
+                                .actor("scheduler")
+                                .tone(Tone::Info),
+                        )
+                        .entry(
+                            TimelineEntry::new("failed", "Indexing failed")
+                                .time("09:41")
+                                .actor("scheduler")
+                                .tone(Tone::Danger)
+                                .detail(div().child(SharedString::new_static(
+                                    "The host refused the request. The refusal is shown as it \
+                                     arrived.",
+                                ))),
+                        ),
+                )
+                .group(
+                    TimelineGroup::new("earlier", "Earlier").entry(
+                        TimelineEntry::new("imported", "Workspace imported")
+                            .time_unknown()
+                            .actor("fixture-owner")
+                            .tone(Tone::Neutral),
+                    ),
+                ),
+        )
+        .into_any_element()
+}
+
+fn filter_bar(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(720.0))
+        .child(
+            FilterBar::new("scene.filter-bar.runs")
+                .conditions([
+                    FilterCondition::new("status", "Status", "is", "failed"),
+                    FilterCondition::new("owner", "Owner", "is", "fixture-owner"),
+                    FilterCondition::new("started", "Started", "after", "09:00"),
+                ])
+                .count(ResultCount::Known(14))
+                .noun("runs")
+                .on_add(|_, _| {})
+                .on_remove(|_, _, _| {})
+                .on_clear(|_, _| {}),
+        )
+        .child(caption(&theme, "counting is not zero"))
+        .child(
+            FilterBar::new("scene.filter-bar.counting")
+                .conditions([FilterCondition::new("status", "Status", "is", "queued")])
+                .count(ResultCount::Counting)
+                .on_add(|_, _| {})
+                .on_remove(|_, _, _| {})
+                .on_clear(|_, _| {}),
+        )
+        .into_any_element()
+}
+
+fn inline_edit(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(420.0))
+        .child(caption(
+            &theme,
+            "reading, editing, and a save that did not take",
+        ))
+        .child(
+            InlineEdit::new("scene.inline-edit.title", "Indexing the workspace")
+                .on_edit(|_, _| {})
+                .on_commit(|_, _, _| {})
+                .on_cancel(|_, _| {}),
+        )
+        .child(
+            InlineEdit::new("scene.inline-edit.owner", "fixture-owner")
+                .editing(true)
+                .on_edit(|_, _| {})
+                .on_commit(|_, _, _| {})
+                .on_cancel(|_, _| {}),
+        )
+        .child(
+            InlineEdit::new(
+                "scene.inline-edit.note",
+                "Retry after the host is reachable",
+            )
+            .editing(true)
+            .failure("The host refused this change. What you typed is still here.")
+            .on_edit(|_, _| {})
+            .on_commit(|_, _, _| {})
+            .on_cancel(|_, _| {}),
+        )
+        .child(
+            InlineEdit::new("scene.inline-edit.policy", "Set by the administrator")
+                .disabled(true)
+                .on_edit(|_, _| {}),
+        )
+        .into_any_element()
+}
+
+fn progress_circle(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(520.0))
+        .child(caption(
+            &theme,
+            "a position exists only when the extent is known",
+        ))
+        .child(
+            row(&theme)
+                .gap(px(theme.spacing.lg))
+                .child(
+                    ProgressCircle::new("scene.progress-circle.upload")
+                        .count(3, 12)
+                        .label("Uploading artifacts")
+                        .centre("25%"),
+                )
+                .child(
+                    ProgressCircle::new("scene.progress-circle.verify")
+                        .fraction(0.72)
+                        .label("Verifying checksums")
+                        .display("72%")
+                        .centre("72%"),
+                )
+                .child(
+                    ProgressCircle::new("scene.progress-circle.contact")
+                        .label("Contacting the host"),
+                ),
+        )
+        .child(caption(&theme, "the size ramp"))
+        .child(
+            row(&theme)
+                .gap(px(theme.spacing.lg))
+                .child(
+                    ProgressCircle::new("scene.progress-circle.xs")
+                        .fraction(0.4)
+                        .label("Extra small")
+                        .xs(),
+                )
+                .child(
+                    ProgressCircle::new("scene.progress-circle.sm")
+                        .fraction(0.4)
+                        .label("Small")
+                        .small(),
+                )
+                .child(
+                    ProgressCircle::new("scene.progress-circle.md")
+                        .fraction(0.4)
+                        .label("Medium")
+                        .medium(),
+                )
+                .child(
+                    ProgressCircle::new("scene.progress-circle.lg")
+                        .fraction(0.4)
+                        .label("Large")
+                        .large(),
                 ),
         )
         .into_any_element()

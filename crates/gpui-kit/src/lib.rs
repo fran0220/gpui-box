@@ -73,11 +73,14 @@ pub mod prelude {
     pub use crate::controls::combobox::{Combobox, ComboboxEvent};
     pub use crate::controls::dropzone::{Dropzone, DropzoneState};
     pub use crate::controls::field::{FieldState, field_shell};
+    pub use crate::controls::filter_bar::{FilterBar, FilterCondition, ResultCount};
     pub use crate::controls::form_field::FormField;
+    pub use crate::controls::inline_edit::InlineEdit;
     pub use crate::controls::input::{TextInput, TextInputEvent};
     pub use crate::controls::number_input::{NumberInput, NumberInputEvent};
     pub use crate::controls::segmented::{Segment, SegmentedControl};
     pub use crate::controls::select::{Select, SelectEvent, SelectOption};
+    pub use crate::controls::settings_row::{SettingsRow, SettingsSection};
     pub use crate::controls::slider::Slider;
     pub use crate::controls::split_button::SplitButton;
     pub use crate::controls::tag_input::{TagInput, TagInputEvent};
@@ -92,11 +95,16 @@ pub mod prelude {
     pub use crate::display::avatar::Avatar;
     pub use crate::display::badge::{Badge, Tone};
     pub use crate::display::card::{Card, ListRow};
+    pub use crate::display::description_list::{
+        DescriptionItem, DescriptionList, DescriptionValue,
+    };
     pub use crate::display::empty::{Divider, EmptyKind, EmptyState};
     pub use crate::display::loading::{GradientSpinner, PulseLoader, Skeleton};
     pub use crate::display::progress::ProgressBar;
+    pub use crate::display::progress_circle::ProgressCircle;
     pub use crate::display::status::{Callout, StatusDot, StatusLine};
     pub use crate::display::tag::Tag;
+    pub use crate::display::timeline::{EntryTime, Timeline, TimelineEntry, TimelineGroup};
     pub use crate::foundation::{
         ActiveTheme, ControlSize, Density, Disableable, Elevation, FocusRing, HoverLift, Ident,
         Layer, Pressable, Selectable, Sizable, StyledExt, ThemeRegistry, activate_theme,
@@ -111,7 +119,8 @@ pub mod prelude {
     pub use crate::motion::{Flip, Flipping, Presence, Transition, flip};
     pub use crate::navigation::{
         Accordion, AccordionSection, Breadcrumb, Crumb, PageTotal, Pagination, Sidebar,
-        SidebarItem, SidebarSection, TabItem, Tabs,
+        SidebarItem, SidebarSection, StepStatus, TabItem, Tabs, Wizard, WizardIntent, WizardLayout,
+        WizardStep,
     };
     pub use crate::overlay::{
         Command, CommandPalette, CommandPaletteEvent, ContextMenu, ContextMenuEvent, Dialog,
