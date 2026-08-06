@@ -90,6 +90,18 @@ pub fn catalog() -> Vec<Scene> {
             build: tooltip,
         },
         Scene {
+            name: "menu",
+            build: menu,
+        },
+        Scene {
+            name: "context-menu",
+            build: context_menu,
+        },
+        Scene {
+            name: "command-palette",
+            build: command_palette,
+        },
+        Scene {
             name: "toast",
             build: toast,
         },
@@ -396,6 +408,133 @@ fn tooltip(_window: &mut Window, cx: &mut App) -> AnyElement {
                     .describes("scene.tooltip.export"),
             ),
         )
+        .into_any_element()
+}
+
+/// The menu family the scenes show, kept across frames.
+///
+/// Each of these owns whether it is open, where the keyboard is, and which
+/// submenu stands expanded, so rebuilding them every frame would reopen them
+/// every frame. Building them once is also what makes the capture static.
+struct SceneMenus {
+    menu: Entity<Menu>,
+    context: Entity<ContextMenu>,
+    palette: Entity<CommandPalette>,
+}
+
+impl Global for SceneMenus {}
+
+fn menu_items() -> Vec<MenuItem> {
+    vec![
+        MenuItem::section("group", "This run"),
+        MenuItem::command("copy", "Copy run id")
+            .icon(Icon::Copy)
+            .shortcut("cmd-c"),
+        MenuItem::check("follow", "Follow output", true),
+        MenuItem::separator("rule"),
+        MenuItem::command("publish", "Publish").disabled(true),
+        MenuItem::submenu(
+            "share",
+            "Share",
+            [
+                MenuItem::command("share.link", "Copy link").shortcut("cmd-shift-c"),
+                MenuItem::command("share.export", "Export as file"),
+            ],
+        ),
+    ]
+}
+
+fn scene_commands() -> Vec<Command> {
+    vec![
+        Command::new("workspace.open", "Open workspace")
+            .section("Workspace")
+            .shortcut("cmd-o"),
+        Command::new("workspace.close", "Close workspace").section("Workspace"),
+        Command::new("workspace.publish", "Publish workspace")
+            .section("Workspace")
+            .unavailable("Approval is required"),
+        Command::new("editor.wrap", "Toggle word wrap").section("Editor"),
+    ]
+}
+
+fn ensure_menus(window: &mut Window, cx: &mut App) {
+    if cx.has_global::<SceneMenus>() {
+        return;
+    }
+    let menu = cx.new(|cx| {
+        Menu::new("scene.menu.run", window, cx)
+            .trigger("Run actions")
+            .items(menu_items())
+    });
+    menu.update(cx, |menu, cx| {
+        menu.open_submenu("share", window, cx);
+    });
+
+    let context = cx.new(|cx| {
+        ContextMenu::new("scene.context.run", window, cx)
+            .target("run-a04")
+            .menu(menu_items())
+            .content(|_, cx| {
+                let theme = cx.theme().clone();
+                div()
+                    .w(px(320.0))
+                    .p(px(theme.spacing.md))
+                    .hairline(&theme)
+                    .radius(&theme, Radius::Card)
+                    .child("Right-click this fixture row")
+                    .into_any_element()
+            })
+    });
+    context.update(cx, |context, cx| {
+        context.open_at(gpui::point(px(180.0), px(150.0)), window, cx);
+    });
+
+    let palette = cx.new(|cx| {
+        CommandPalette::new("scene.palette.commands", window, cx).commands(scene_commands())
+    });
+    palette.update(cx, |palette, cx| palette.set_query("work", cx));
+
+    cx.set_global(SceneMenus {
+        menu,
+        context,
+        palette,
+    });
+}
+
+fn menu(window: &mut Window, cx: &mut App) -> AnyElement {
+    ensure_menus(window, cx);
+    let menu = cx.global::<SceneMenus>().menu.clone();
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(560.0))
+        .h(px(360.0))
+        .child(menu)
+        .into_any_element()
+}
+
+fn context_menu(window: &mut Window, cx: &mut App) -> AnyElement {
+    ensure_menus(window, cx);
+    let context = cx.global::<SceneMenus>().context.clone();
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(560.0))
+        .h(px(400.0))
+        // Opening a context menu reports the row that was pointed at; what is
+        // selected stays the host's answer.
+        .child(div().child("The right-click reports the row. Nothing is selected by it."))
+        .child(context)
+        .into_any_element()
+}
+
+fn command_palette(window: &mut Window, cx: &mut App) -> AnyElement {
+    ensure_menus(window, cx);
+    let palette = cx.global::<SceneMenus>().palette.clone();
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(560.0))
+        .h(px(420.0))
+        .items_center()
+        .child(palette)
         .into_any_element()
 }
 

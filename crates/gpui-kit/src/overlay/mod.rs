@@ -6,11 +6,17 @@
 //! [`Tooltip`] is hover-delayed help that is never the only way to act.
 //! [`ToastLayer`] holds transient notifications, which report what happened
 //! and never hide a failure on a timer.
+//!
+//! [`Popover`] is the anchored surface the menu family is built from:
+//! [`Menu`] hangs one off a trigger, [`ContextMenu`] opens the same list at
+//! the pointer, and [`CommandPalette`] filters it from the keyboard.
 
 mod dialog;
 mod focus;
 mod kbd;
 mod layer;
+mod menu;
+mod palette;
 pub mod popover;
 pub mod toast;
 pub mod tooltip;
@@ -19,5 +25,8 @@ pub use dialog::{Dialog, DialogEvent};
 pub use focus::FocusTrap;
 pub use kbd::{Kbd, caps};
 pub use layer::{Overlay, Placement, priority, surface};
+pub use menu::{ContextMenu, ContextMenuEvent, Menu, MenuEvent, MenuItem};
+pub use palette::{Command, CommandPalette, CommandPaletteEvent};
+pub use popover::{Popover, PopoverEvent};
 pub use toast::{Toast, ToastCorner, ToastLayer};
 pub use tooltip::{Tooltip, Tooltipped};

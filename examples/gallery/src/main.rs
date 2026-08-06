@@ -53,6 +53,46 @@ struct Gallery {
     notes: Entity<TextArea>,
     confirm: Entity<Dialog>,
     toasts: Entity<ToastLayer>,
+    filters: Entity<Popover>,
+    menu: Entity<Menu>,
+    records: Entity<ContextMenu>,
+    palette: Entity<CommandPalette>,
+}
+
+fn gallery_menu_items() -> Vec<MenuItem> {
+    vec![
+        MenuItem::section("group", "This run"),
+        MenuItem::command("copy", "Copy run id")
+            .icon(Icon::Copy)
+            .shortcut("cmd-c"),
+        MenuItem::check("follow", "Follow output", true),
+        MenuItem::separator("rule"),
+        MenuItem::command("publish", "Publish").disabled(true),
+        MenuItem::submenu(
+            "share",
+            "Share",
+            [
+                MenuItem::command("share.link", "Copy link").shortcut("cmd-shift-c"),
+                MenuItem::command("share.export", "Export as file"),
+            ],
+        ),
+    ]
+}
+
+fn gallery_commands() -> Vec<Command> {
+    vec![
+        Command::new("workspace.open", "Open workspace")
+            .section("Workspace")
+            .shortcut("cmd-o"),
+        Command::new("workspace.close", "Close workspace").section("Workspace"),
+        Command::new("workspace.publish", "Publish workspace")
+            .section("Workspace")
+            .unavailable("Approval is required"),
+        Command::new("editor.wrap", "Toggle word wrap").section("Editor"),
+        Command::new("editor.split", "Split editor")
+            .section("Editor")
+            .shortcut("cmd-\\"),
+    ]
 }
 
 impl Render for Gallery {
@@ -436,6 +476,29 @@ impl Render for Gallery {
                     )
                     .child(recipes::section_title(&theme, "Popover primitives"))
                     .child(menu_sample(&theme, 320.0))
+                    .child(recipes::section_title(&theme, "Menus"))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .items_start()
+                            .gap(px(theme.spacing.sm))
+                            .child(self.filters.clone())
+                            .child(self.menu.clone()),
+                    )
+                    .child(recipes::footnote(
+                        &theme,
+                        "A checkable row reports the intent to change it. The host owns the \
+                         answer, so the check only moves when the host moves it.",
+                    ))
+                    .child(self.records.clone())
+                    .child(recipes::section_title(&theme, "Command palette"))
+                    .child(self.palette.clone())
+                    .child(recipes::footnote(
+                        &theme,
+                        "A command the host refused stays listed with its reason: hiding a \
+                         command a typist knows exists is a lie about the application.",
+                    ))
                     .child(recipes::section_title(&theme, "Dialog and hover help"))
                     .child(
                         div()
@@ -871,6 +934,50 @@ fn main() {
                                 .confirm_label("Delete")
                         }),
                         toasts: cx.new(ToastLayer::new),
+                        filters: cx.new(|cx| {
+                            Popover::new("gallery.filters", window, cx)
+                                .trigger("Filters")
+                                .content(|_, cx| {
+                                    let theme = Theme::get(cx).clone();
+                                    div()
+                                        .flex()
+                                        .flex_col()
+                                        .w(px(220.0))
+                                        .gap(px(theme.spacing.sm))
+                                        .child("Anything can live in a popover.")
+                                        .child(
+                                            Checkbox::new("gallery.filters.failing")
+                                                .label("Failing runs only")
+                                                .on_change(|_, _, _| {}),
+                                        )
+                                        .into_any_element()
+                                })
+                        }),
+                        menu: cx.new(|cx| {
+                            Menu::new("gallery.run", window, cx)
+                                .trigger("Run actions")
+                                .items(gallery_menu_items())
+                        }),
+                        records: cx.new(|cx| {
+                            ContextMenu::new("gallery.record", window, cx)
+                                .target("run-a04")
+                                .menu(gallery_menu_items())
+                                .content(|_, cx| {
+                                    let theme = Theme::get(cx).clone();
+                                    div()
+                                        .w(px(360.0))
+                                        .p(px(theme.spacing.md))
+                                        .rounded(px(theme.radii.card))
+                                        .border(px(theme.borders.hairline))
+                                        .border_color(theme.colors.hairline)
+                                        .child("Right-click this fixture row")
+                                        .into_any_element()
+                                })
+                        }),
+                        palette: cx.new(|cx| {
+                            CommandPalette::new("gallery.palette", window, cx)
+                                .commands(gallery_commands())
+                        }),
                     })
                 },
             )

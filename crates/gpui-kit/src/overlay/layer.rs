@@ -23,7 +23,8 @@ pub enum Placement {
     Below,
     /// Above the anchor element, left edges aligned.
     Above,
-    /// At an absolute window position, such as a cursor.
+    /// At an absolute window position, such as a cursor. A surface that would
+    /// leave the viewport flips to the other side of that position.
     At(Point<Pixels>),
     /// Centered in the window.
     Center,
@@ -128,11 +129,15 @@ impl RenderOnce for Overlay {
             .child(content)
             .into_any_element();
 
-        let mut anchored = gpui::anchored()
-            .anchor(anchor)
-            .snap_to_window_with_margin(px(theme.spacing.sm));
+        // An anchored surface flips to the opposite corner rather than being
+        // slid along the edge, so a menu that would leave the viewport still
+        // hangs off its anchor instead of covering it.
+        let mut anchored = gpui::anchored().anchor(anchor);
         if let Placement::At(position) = self.placement {
             anchored = anchored.position(position);
+        }
+        if self.placement == Placement::Center {
+            anchored = anchored.snap_to_window_with_margin(px(theme.spacing.sm));
         }
 
         let placed = match self.placement {

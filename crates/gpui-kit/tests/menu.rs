@@ -1,0 +1,484 @@
+//! A menu presents what can be done and reports what was taken. It never
+//! takes anything itself, and it never lands the keyboard on a rule, a label,
+//! or a row the host refused.
+
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use gpui::{
+    AppContext as _, Entity, IntoElement, Modifiers, MouseButton, MouseDownEvent, TestAppContext,
+    div, prelude::*, px,
+};
+use gpui_kit::prelude::*;
+use gpui_kit_testkit::harness::Harness;
+
+fn items() -> Vec<MenuItem> {
+    vec![
+        MenuItem::section("group", "Edit"),
+        MenuItem::command("undo", "Undo").shortcut("cmd-z"),
+        MenuItem::separator("rule"),
+        MenuItem::command("paste", "Paste").disabled(true),
+        MenuItem::check("wrap", "Wrap lines", true),
+        MenuItem::submenu(
+            "share",
+            "Share",
+            [
+                MenuItem::command("share.link", "Copy link"),
+                MenuItem::command("share.mail", "Send by mail"),
+            ],
+        ),
+    ]
+}
+
+fn menu(cx: &mut TestAppContext) -> (Harness, Entity<Menu>) {
+    let slot: Rc<RefCell<Option<Entity<Menu>>>> = Rc::new(RefCell::new(None));
+    let build_slot = slot.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        let menu = build_slot
+            .borrow_mut()
+            .get_or_insert_with(|| {
+                cx.new(|cx| {
+                    Menu::new("workspace.edit", window, cx)
+                        .trigger("Edit")
+                        .items(items())
+                })
+            })
+            .clone();
+        div()
+            .w(px(600.0))
+            .h(px(400.0))
+            .child(menu)
+            .into_any_element()
+    });
+    harness.snapshot();
+    let entity = slot.borrow().clone().expect("menu was built");
+    (harness, entity)
+}
+
+fn events(harness: &mut Harness, menu: &Entity<Menu>) -> Rc<RefCell<Vec<MenuEvent>>> {
+    let seen: Rc<RefCell<Vec<MenuEvent>>> = Rc::new(RefCell::new(Vec::new()));
+    let sink = seen.clone();
+    harness.update({
+        let menu = menu.clone();
+        move |_, cx| {
+            cx.subscribe(&menu, move |_, event: &MenuEvent, _| {
+                sink.borrow_mut().push(event.clone());
+            })
+            .detach();
+        }
+    });
+    seen
+}
+
+fn taken(seen: &Rc<RefCell<Vec<MenuEvent>>>) -> Vec<String> {
+    seen.borrow()
+        .iter()
+        .filter_map(|event| match event {
+            MenuEvent::Invoked(id) => Some(id.to_string()),
+            _ => None,
+        })
+        .collect()
+}
+
+fn open(harness: &mut Harness, menu: &Entity<Menu>) {
+    let menu = menu.clone();
+    harness.update(move |window, cx| {
+        menu.update(cx, |menu, cx| menu.open(window, cx));
+    });
+}
+
+#[gpui::test]
+fn a_closed_menu_publishes_its_trigger_and_nothing_else(cx: &mut TestAppContext) {
+    let (mut harness, _menu) = menu(cx);
+
+    assert_eq!(
+        harness.node("workspace.edit").expect("published").expanded,
+        Some(false)
+    );
+    assert!(harness.node("workspace.edit.trigger").is_some());
+    assert!(
+        harness.node("workspace.edit.undo").is_none(),
+        "a closed menu must not publish its commands"
+    );
+}
+
+#[gpui::test]
+fn opening_publishes_every_row_with_the_state_the_host_holds(cx: &mut TestAppContext) {
+    let (mut harness, menu) = menu(cx);
+    open(&mut harness, &menu);
+
+    assert_eq!(
+        harness.node("workspace.edit").expect("published").expanded,
+        Some(true)
+    );
+    assert_eq!(
+        harness
+            .node("workspace.edit.undo")
+            .expect("published")
+            .text
+            .as_deref(),
+        Some("Undo")
+    );
+    assert_eq!(
+        harness
+            .node("workspace.edit.wrap")
+            .expect("published")
+            .checked,
+        Some(true)
+    );
+    assert!(
+        harness
+            .node("workspace.edit.paste")
+            .expect("published")
+            .disabled
+    );
+    assert!(harness.node("workspace.edit.rule").is_some());
+    assert_eq!(
+        harness
+            .node("workspace.edit.group")
+            .expect("published")
+            .text
+            .as_deref(),
+        Some("Edit")
+    );
+    assert_eq!(
+        harness
+            .node("workspace.edit.share")
+            .expect("published")
+            .expanded,
+        Some(false)
+    );
+}
+
+#[gpui::test]
+fn the_keyboard_steps_over_rules_labels_and_refusals(cx: &mut TestAppContext) {
+    let (mut harness, menu) = menu(cx);
+    open(&mut harness, &menu);
+
+    assert!(
+        harness
+            .node("workspace.edit.undo")
+            .expect("published")
+            .hovered,
+        "the cursor opens on the first row that can be taken"
+    );
+
+    harness.keystrokes("down");
+    assert!(
+        harness
+            .node("workspace.edit.wrap")
+            .expect("published")
+            .hovered,
+        "the rule and the refused row are stepped over"
+    );
+    assert!(
+        !harness
+            .node("workspace.edit.paste")
+            .expect("published")
+            .hovered
+    );
+
+    harness.keystrokes("down down");
+    assert!(
+        harness
+            .node("workspace.edit.undo")
+            .expect("published")
+            .hovered,
+        "the cursor wraps past the section label"
+    );
+}
+
+#[gpui::test]
+fn typing_a_letter_jumps_to_the_row_that_starts_with_it(cx: &mut TestAppContext) {
+    let (mut harness, menu) = menu(cx);
+    open(&mut harness, &menu);
+
+    harness.keystrokes("w");
+    assert!(
+        harness
+            .node("workspace.edit.wrap")
+            .expect("published")
+            .hovered
+    );
+}
+
+#[gpui::test]
+fn escape_closes_without_taking_anything(cx: &mut TestAppContext) {
+    let (mut harness, menu) = menu(cx);
+    let seen = events(&mut harness, &menu);
+    open(&mut harness, &menu);
+
+    harness.keystrokes("escape");
+
+    assert!(taken(&seen).is_empty(), "escape reports no command");
+    assert_eq!(
+        *seen.borrow(),
+        vec![MenuEvent::Opened, MenuEvent::Dismissed, MenuEvent::Closed]
+    );
+    assert_eq!(
+        harness.node("workspace.edit").expect("published").expanded,
+        Some(false)
+    );
+}
+
+#[gpui::test]
+fn taking_a_command_reports_it_once_and_closes_the_chain(cx: &mut TestAppContext) {
+    let (mut harness, menu) = menu(cx);
+    let seen = events(&mut harness, &menu);
+    open(&mut harness, &menu);
+
+    // Open a submenu first, so closing has a chain to close.
+    harness.keystrokes("down down right");
+    assert!(harness.node("workspace.edit.share.link").is_some());
+
+    harness.keystrokes("enter");
+
+    assert_eq!(taken(&seen), vec!["share.link".to_string()]);
+    assert_eq!(
+        harness.node("workspace.edit").expect("published").expanded,
+        Some(false)
+    );
+    assert!(
+        harness.node("workspace.edit.share.link").is_none(),
+        "the submenu closes with the menu that opened it"
+    );
+    assert_eq!(seen.borrow().last(), Some(&MenuEvent::Closed));
+}
+
+#[gpui::test]
+fn a_submenu_opens_to_the_side_and_folds_back(cx: &mut TestAppContext) {
+    let (mut harness, menu) = menu(cx);
+    let seen = events(&mut harness, &menu);
+    open(&mut harness, &menu);
+
+    harness.keystrokes("down down");
+    assert!(
+        harness
+            .node("workspace.edit.share")
+            .expect("published")
+            .hovered
+    );
+
+    harness.keystrokes("right");
+    assert_eq!(
+        harness
+            .node("workspace.edit.share")
+            .expect("published")
+            .expanded,
+        Some(true)
+    );
+    assert!(
+        harness
+            .node("workspace.edit.share.link")
+            .expect("published")
+            .hovered
+    );
+    let submenu = harness.bounds("workspace.edit.share.link").expect("bounds");
+    let parent = harness.bounds("workspace.edit.share").expect("bounds");
+    assert!(
+        submenu.origin.x > parent.origin.x,
+        "a submenu opens beside the row that owns it"
+    );
+
+    harness.keystrokes("left");
+    assert!(
+        harness.node("workspace.edit.share.link").is_none(),
+        "leaving folds the submenu away"
+    );
+    assert!(
+        harness
+            .node("workspace.edit.share")
+            .expect("published")
+            .hovered,
+        "the cursor returns to the row that opened it"
+    );
+    assert!(taken(&seen).is_empty(), "moving takes nothing");
+}
+
+#[gpui::test]
+fn escape_folds_one_submenu_before_it_closes_the_menu(cx: &mut TestAppContext) {
+    let (mut harness, menu) = menu(cx);
+    open(&mut harness, &menu);
+    harness.keystrokes("down down right");
+
+    harness.keystrokes("escape");
+    assert_eq!(
+        harness.node("workspace.edit").expect("published").expanded,
+        Some(true),
+        "the first escape only folds the submenu away"
+    );
+
+    harness.keystrokes("escape");
+    assert_eq!(
+        harness.node("workspace.edit").expect("published").expanded,
+        Some(false)
+    );
+}
+
+#[gpui::test]
+fn a_checkable_row_reports_its_intent_and_does_not_toggle_itself(cx: &mut TestAppContext) {
+    let (mut harness, menu) = menu(cx);
+    let seen = events(&mut harness, &menu);
+    open(&mut harness, &menu);
+
+    harness.click("workspace.edit.wrap");
+    assert_eq!(taken(&seen), vec!["wrap".to_string()]);
+
+    open(&mut harness, &menu);
+    assert_eq!(
+        harness
+            .node("workspace.edit.wrap")
+            .expect("published")
+            .checked,
+        Some(true),
+        "the host still holds the answer, so the check has not moved"
+    );
+}
+
+#[gpui::test]
+fn a_refused_row_ignores_a_click(cx: &mut TestAppContext) {
+    let (mut harness, menu) = menu(cx);
+    let seen = events(&mut harness, &menu);
+    open(&mut harness, &menu);
+
+    harness.click("workspace.edit.paste");
+
+    assert!(taken(&seen).is_empty());
+    assert_eq!(
+        harness.node("workspace.edit").expect("published").expanded,
+        Some(true),
+        "a refused row does not close the menu either"
+    );
+}
+
+#[gpui::test]
+fn clicking_outside_dismisses_the_menu(cx: &mut TestAppContext) {
+    let (mut harness, menu) = menu(cx);
+    let seen = events(&mut harness, &menu);
+    open(&mut harness, &menu);
+
+    harness
+        .context()
+        .simulate_click(gpui::point(px(560.0), px(380.0)), Modifiers::none());
+    harness.context().run_until_parked();
+
+    assert!(taken(&seen).is_empty());
+    assert_eq!(
+        harness.node("workspace.edit").expect("published").expanded,
+        Some(false)
+    );
+}
+
+fn context_menu(cx: &mut TestAppContext) -> (Harness, Entity<ContextMenu>) {
+    let slot: Rc<RefCell<Option<Entity<ContextMenu>>>> = Rc::new(RefCell::new(None));
+    let build_slot = slot.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        let menu = build_slot
+            .borrow_mut()
+            .get_or_insert_with(|| {
+                cx.new(|cx| {
+                    ContextMenu::new("records.row", window, cx)
+                        .target("record-a04")
+                        .menu(items())
+                        .content(|_, _| {
+                            div()
+                                .w(px(240.0))
+                                .h(px(80.0))
+                                .child("Fixture record 0004")
+                                .into_any_element()
+                        })
+                })
+            })
+            .clone();
+        div()
+            .w(px(600.0))
+            .h(px(400.0))
+            .child(menu)
+            .into_any_element()
+    });
+    harness.snapshot();
+    let entity = slot.borrow().clone().expect("context menu was built");
+    (harness, entity)
+}
+
+fn context_events(
+    harness: &mut Harness,
+    menu: &Entity<ContextMenu>,
+) -> Rc<RefCell<Vec<ContextMenuEvent>>> {
+    let seen: Rc<RefCell<Vec<ContextMenuEvent>>> = Rc::new(RefCell::new(Vec::new()));
+    let sink = seen.clone();
+    harness.update({
+        let menu = menu.clone();
+        move |_, cx| {
+            cx.subscribe(&menu, move |_, event: &ContextMenuEvent, _| {
+                sink.borrow_mut().push(event.clone());
+            })
+            .detach();
+        }
+    });
+    seen
+}
+
+#[gpui::test]
+fn a_right_click_opens_the_menu_at_the_pointer_and_reports_the_target(cx: &mut TestAppContext) {
+    let (mut harness, menu) = context_menu(cx);
+    let seen = context_events(&mut harness, &menu);
+
+    let position = harness.point_in("records.row");
+    harness.context().simulate_event(MouseDownEvent {
+        button: MouseButton::Right,
+        position,
+        modifiers: Modifiers::none(),
+        click_count: 1,
+        first_mouse: false,
+    });
+    harness.context().run_until_parked();
+
+    assert_eq!(
+        *seen.borrow(),
+        vec![ContextMenuEvent::Opened("record-a04".into())],
+        "opening reports what was pointed at and selects nothing"
+    );
+    assert_eq!(
+        harness
+            .node("records.row.menu")
+            .expect("published")
+            .expanded,
+        Some(true)
+    );
+    let menu_bounds = harness.bounds("records.row.menu").expect("bounds");
+    assert!(
+        menu_bounds.origin.x >= position.x - px(1.0),
+        "the menu opens at the pointer"
+    );
+}
+
+#[gpui::test]
+fn a_context_menu_reports_the_command_and_closes(cx: &mut TestAppContext) {
+    let (mut harness, menu) = context_menu(cx);
+    let seen = context_events(&mut harness, &menu);
+    harness.update({
+        let menu = menu.clone();
+        move |window, cx| {
+            menu.update(cx, |menu, cx| {
+                menu.open_at(gpui::point(px(120.0), px(120.0)), window, cx);
+            });
+        }
+    });
+
+    harness.click("records.row.undo");
+
+    assert_eq!(
+        *seen.borrow(),
+        vec![
+            ContextMenuEvent::Opened("record-a04".into()),
+            ContextMenuEvent::Invoked("undo".into()),
+            ContextMenuEvent::Closed
+        ]
+    );
+    assert!(harness.node("records.row.menu").is_none());
+    assert!(
+        harness.node("records.row").is_some(),
+        "the wrapped region stays after the menu closes"
+    );
+}

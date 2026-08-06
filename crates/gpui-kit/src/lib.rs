@@ -59,8 +59,9 @@ pub mod prelude {
     pub use crate::motion::{Presence, Transition};
     pub use crate::navigation::{Accordion, AccordionSection, Breadcrumb, Crumb, TabItem, Tabs};
     pub use crate::overlay::{
-        Dialog, DialogEvent, FocusTrap, Kbd, Overlay, Placement, Toast, ToastCorner, ToastLayer,
-        Tooltip, Tooltipped,
+        Command, CommandPalette, CommandPaletteEvent, ContextMenu, ContextMenuEvent, Dialog,
+        DialogEvent, FocusTrap, Kbd, Menu, MenuEvent, MenuItem, Overlay, Placement, Popover,
+        PopoverEvent, Toast, ToastCorner, ToastLayer, Tooltip, Tooltipped,
     };
     pub use crate::state::{AsyncStatus, AsyncValue, Loadable};
 }

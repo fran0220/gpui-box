@@ -78,11 +78,16 @@ a header that does not sort publishes a `Cell` and installs no handler.
 |---|---|---|
 | `Overlay` | builder | Placement, token-driven paint priority, scrim, dismissal |
 | `Dialog` | view | Composed modal: reports opened, confirmed, cancelled, dismissed, closed. A dialog that is not dismissable installs no escape or scrim handler |
+| `Popover` | view | The anchored surface `Menu` and `Select` are special cases of. Owns only whether it is open: the body is a per-frame callback, escape and a click outside dismiss it unless it is not dismissable, and closing gives the keyboard back to the trigger |
+| `Menu` | view | Commands, checkable rows, separators, section labels, and nested submenus, opened from a trigger. Up and down step over rules, labels, and refused rows; a letter jumps to the next row starting with it; right and left enter and leave a submenu; escape folds one submenu away before it closes the menu. Taking a row reports it once and closes the whole chain, and a refused row installs no handler |
+| `ContextMenu` | view | The same list opened at the pointer over a wrapped region. Reports the target it was opened on and selects nothing, because opening a menu is not choosing anything. A surface that would leave the viewport flips to the other side of the pointer |
+| `MenuItem` | builder | One row: `command`, `check`, `separator`, `section`, or `submenu`, with an optional shortcut hint and icon. A checkable row draws the state the host holds and reports the intent to change it |
+| `CommandPalette`, `Command` | view, builder | A query field over a command list, filtered by `popover::match_rank` — prefix, then word start, then substring, then subsequence — with sections kept contiguous behind their best match. Nothing matching shows an `EmptyState` naming the query that answered nothing, and a command the host marked unavailable stays listed with its reason rather than being hidden |
 | `Tooltip` | builder | Hover-delayed help on GPUI's hover machinery. Never actionable, and never the only copy of what is needed to act |
 | `ToastLayer`, `Toast` | view, builder | Transient notifications. The host mounts the layer in the window it wants them drawn in; `overlay::toast::push` reaches it from any call site and reports whether a layer was mounted to deliver to. One action at most, an optional dismiss control, entry and exit through `Presence` |
 | `FocusTrap` | helper | Keeps the keyboard inside an open overlay and restores focus |
 | `Kbd` | builder | Platform-specific keystroke caps |
-| `popover` | helpers | Anchoring, menu rows, filtering, and key classification |
+| `popover` | helpers | Anchoring, menu rows, cursor movement, type-ahead, filtering, and key classification |
 
 ### Failures do not time out
 
