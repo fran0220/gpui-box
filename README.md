@@ -117,6 +117,7 @@ effects. See [`docs/compatibility.md`](docs/compatibility.md).
 
 - [Design principles](docs/design-principles.md)
 - [Token model](docs/token-model.md)
+- [Components](docs/components.md)
 - [Component contracts](docs/component-contracts.md)
 - [Truthful UI](docs/truthful-ui.md)
 - [Host/view boundary](docs/host-view-boundary.md)
@@ -124,6 +125,7 @@ effects. See [`docs/compatibility.md`](docs/compatibility.md).
 - [Screenshot testing](docs/screenshot-testing.md)
 - [Accessibility](docs/accessibility.md)
 - [GPUI recipes](docs/gpui-recipes.md)
+- [Motion](docs/motion.md)
 - [Migration guide](docs/migration-guide.md)
 - [Agent Skill](skills/building-gpui-product-ui/SKILL.md)
 

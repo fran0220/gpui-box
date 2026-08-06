@@ -1,0 +1,68 @@
+# Components
+
+Every component derives its GPUI element id and its semantic assertion id from
+one caller-supplied `Ident`, reads the theme from the application context, and
+publishes a semantic node during prepaint. Builders are `RenderOnce`; anything
+that must survive a frame is a view.
+
+## Controls
+
+| Component | Kind | Reports | Notes |
+|---|---|---|---|
+| `Button` | builder | click | No handler is installed while disabled or loading |
+| `TextInput` | view | change, submit, cancel, focus, blur | Grapheme-aware editing, input-method composition, masking, length limit |
+| `Select` | view | selected, opened, closed | Owns only whether the menu is open |
+| `Checkbox` | builder | next state | Supports a mixed state for a group that disagrees |
+| `Radio` | builder | selection | The group is owned by the caller |
+| `Switch` | builder | next state | For changes that take effect at once |
+| `Slider` | builder | value on the step grid | Pointer and keyboard |
+| `FieldFrame`, `SearchFrame` | builder | — | Chrome for a host-supplied editable surface |
+
+## Display
+
+| Component | Kind | Notes |
+|---|---|---|
+| `Badge`, `StatusDot`, `StatusLine`, `Callout` | builder | Status vocabulary |
+| `Card`, `ListRow` | builder | Grouping |
+| `ProgressBar` | builder | Reports a position only when the extent is known |
+| `Tag` | builder | Removal exists only when removal is allowed |
+| `Avatar` | builder | Initials fallback, blank when there is no name |
+| `Divider` | builder | Optional caption |
+| `EmptyState` | builder | Names which of empty, unstarted, unavailable, or failed holds |
+| `PulseLoader`, `GradientSpinner`, `Skeleton` | builder | Publish a busy indeterminate node |
+
+## Overlay
+
+| Component | Kind | Notes |
+|---|---|---|
+| `Overlay` | builder | Placement, token-driven paint priority, scrim, dismissal |
+| `FocusTrap` | helper | Keeps the keyboard inside an open overlay and restores focus |
+| `Kbd` | builder | Platform-specific keystroke caps |
+| `popover` | helpers | Anchoring, menu rows, filtering, and key classification |
+
+## What a component owns
+
+A component holds hover, focus, open, and animation state. It never holds the
+answer: a value, a selection, and a list all belong to the caller. A host that
+refuses a change simply does not apply it, and the control keeps showing what
+is still true. This is why `Select` reports the option that was picked instead
+of moving its own checkmark.
+
+## Still missing
+
+These are known gaps rather than deliberate omissions:
+
+- `TextArea`: multi-line editing with wrapped shaping and vertical motion.
+- `Tabs`, `Accordion`, `Breadcrumb`: navigation and disclosure.
+- `Dialog`: a composed modal on top of `Overlay` and `FocusTrap`.
+- `Tooltip`: hover-delayed help.
+- `Table`, `Tree`, virtualized `List`: large data surfaces.
+- `Toast`: transient notifications with a stack and a timer.
+
+## Validation
+
+Every component appears in `gpui_kit::scenes`, which the gallery renders, the
+`xtask scenes capture` task photographs in every bundled theme, and
+`crates/gpui-kit/tests/scenes.rs` audits headlessly. Behaviour is asserted
+through simulated key and mouse input against the published semantic tree, in
+`crates/gpui-kit/tests/`.
