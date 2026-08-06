@@ -10,7 +10,13 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+mod color;
+pub mod contrast;
+
+pub use color::{Color, Palette, contrast_ratio, over};
+
 const STUDIO_DARK_JSON: &str = include_str!("../../../tokens/studio-dark.json");
+const STUDIO_LIGHT_JSON: &str = include_str!("../../../tokens/studio-light.json");
 
 #[derive(Debug, Error)]
 pub enum TokenError {
@@ -18,49 +24,6 @@ pub enum TokenError {
     Json(#[from] serde_json::Error),
     #[error("token `{path}` is invalid: {message}")]
     Invalid { path: String, message: String },
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Color {
-    pub red: f32,
-    pub green: f32,
-    pub blue: f32,
-    pub alpha: f32,
-}
-
-impl Color {
-    pub fn parse(path: &str, value: &str) -> Result<Self, TokenError> {
-        let digits = value.strip_prefix('#').ok_or_else(|| TokenError::Invalid {
-            path: path.into(),
-            message: "expected #RRGGBB or #RRGGBBAA".into(),
-        })?;
-        if digits.len() != 6 && digits.len() != 8 {
-            return Err(TokenError::Invalid {
-                path: path.into(),
-                message: "expected six or eight hexadecimal digits".into(),
-            });
-        }
-        let channel = |range: std::ops::Range<usize>| {
-            u8::from_str_radix(&digits[range], 16).map(|value| f32::from(value) / 255.0)
-        };
-        Ok(Self {
-            red: channel(0..2).map_err(|_| invalid_color(path))?,
-            green: channel(2..4).map_err(|_| invalid_color(path))?,
-            blue: channel(4..6).map_err(|_| invalid_color(path))?,
-            alpha: if digits.len() == 8 {
-                channel(6..8).map_err(|_| invalid_color(path))?
-            } else {
-                1.0
-            },
-        })
-    }
-}
-
-fn invalid_color(path: &str) -> TokenError {
-    TokenError::Invalid {
-        path: path.into(),
-        message: "contains a non-hexadecimal color channel".into(),
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -80,6 +43,9 @@ pub struct TokenDocument {
     pub control: ControlTokens,
     pub border: BorderTokens,
     pub opacity: OpacityTokens,
+    pub elevation: ElevationTokens,
+    pub z_index: ZIndexTokens,
+    pub density: DensityTokens,
     pub typography: TypographyTokens,
     pub motion: MotionTokens,
     pub effect: EffectTokens,
@@ -100,8 +66,45 @@ impl TokenDocument {
             return invalid("meta.name", "must not be empty");
         }
 
+        for (group, steps) in &self.color.palette {
+            for (step, value) in steps {
+                Color::parse(&format!("color.palette.{group}.{step}"), value)?;
+            }
+        }
         for (path, value) in self.color.entries() {
-            Color::parse(path, value)?;
+            Color::resolve(path, value, &self.color.palette)?;
+        }
+        for (path, level) in self.elevation.entries() {
+            Color::resolve(&format!("{path}.color"), &level.color, &self.color.palette)?;
+            if level.blur < 0.0 {
+                return invalid(path, "blur must not be negative");
+            }
+        }
+
+        let layers = self.z_index.ordered();
+        if layers.windows(2).any(|window| window[0].1 >= window[1].1) {
+            return invalid("zIndex", "layers must be strictly increasing");
+        }
+
+        for (path, scale) in self.density.entries() {
+            for (field, value) in [
+                ("space", scale.space),
+                ("control", scale.control),
+                ("font", scale.font),
+            ] {
+                if !(0.5..=1.5).contains(&value) {
+                    return invalid(&format!("{path}.{field}"), "must be between 0.5 and 1.5");
+                }
+            }
+        }
+        if self.density.comfortable.space != 1.0
+            || self.density.comfortable.control != 1.0
+            || self.density.comfortable.font != 1.0
+        {
+            return invalid(
+                "density.comfortable",
+                "is the reference density and must scale by exactly 1",
+            );
         }
 
         let spacing = [
@@ -168,7 +171,7 @@ impl TokenDocument {
             Surface::Raised => ("color.surface.raised", self.color.surface.raised.as_str()),
             Surface::Overlay => ("color.surface.overlay", self.color.surface.overlay.as_str()),
         };
-        embedded_color(path, value)
+        self.resolved(path, value)
     }
 
     pub fn text(&self, role: TextTone) -> Color {
@@ -178,7 +181,7 @@ impl TokenDocument {
             TextTone::Faint => ("color.text.faint", self.color.text.faint.as_str()),
             TextTone::OnAccent => ("color.text.onAccent", self.color.text.on_accent.as_str()),
         };
-        embedded_color(path, value)
+        self.resolved(path, value)
     }
 
     pub fn interactive(&self, role: InteractiveColor) -> Color {
@@ -208,7 +211,7 @@ impl TokenDocument {
                 self.color.interactive.focus.as_str(),
             ),
         };
-        embedded_color(path, value)
+        self.resolved(path, value)
     }
 
     pub fn semantic(&self, role: SemanticColor) -> Color {
@@ -229,15 +232,20 @@ impl TokenDocument {
             ),
             SemanticColor::Info => ("color.semantic.info", self.color.semantic.info.as_str()),
         };
-        embedded_color(path, value)
+        self.resolved(path, value)
     }
 
     pub fn loader_gradient(&self) -> [Color; 3] {
         [
-            embedded_color("color.loader.gradient.0", &self.color.loader.gradient[0]),
-            embedded_color("color.loader.gradient.1", &self.color.loader.gradient[1]),
-            embedded_color("color.loader.gradient.2", &self.color.loader.gradient[2]),
+            self.resolved("color.loader.gradient.0", &self.color.loader.gradient[0]),
+            self.resolved("color.loader.gradient.1", &self.color.loader.gradient[1]),
+            self.resolved("color.loader.gradient.2", &self.color.loader.gradient[2]),
         ]
+    }
+
+    fn resolved(&self, path: &str, value: &str) -> Color {
+        Color::resolve(path, value, &self.color.palette)
+            .expect("the embedded token document is validated before release")
     }
 
     pub fn spacing(&self, step: Space) -> f32 {
@@ -259,6 +267,48 @@ impl TokenDocument {
             Radius::Dialog => self.radius.dialog,
             Radius::Bubble => self.radius.bubble,
             Radius::Pill => self.radius.pill,
+        }
+    }
+
+    pub fn elevation(&self, level: Elevation) -> ResolvedElevation {
+        let (path, step) = match level {
+            Elevation::Flat => ("elevation.flat", &self.elevation.flat),
+            Elevation::Raised => ("elevation.raised", &self.elevation.raised),
+            Elevation::Overlay => ("elevation.overlay", &self.elevation.overlay),
+            Elevation::Modal => ("elevation.modal", &self.elevation.modal),
+        };
+        ResolvedElevation {
+            y: step.y,
+            blur: step.blur,
+            spread: step.spread,
+            color: self.resolved(&format!("{path}.color"), &step.color),
+        }
+    }
+
+    pub fn z_index(&self, layer: Layer) -> i32 {
+        match layer {
+            Layer::Content => self.z_index.content,
+            Layer::Sticky => self.z_index.sticky,
+            Layer::Dock => self.z_index.dock,
+            Layer::Popover => self.z_index.popover,
+            Layer::Tooltip => self.z_index.tooltip,
+            Layer::Modal => self.z_index.modal,
+            Layer::Toast => self.z_index.toast,
+        }
+    }
+
+    pub fn density(&self, density: Density) -> DensityScale {
+        match density {
+            Density::Compact => self.density.compact,
+            Density::Comfortable => self.density.comfortable,
+        }
+    }
+
+    pub fn spring(&self, spring: SpringPreset) -> SpringTokens {
+        match spring {
+            SpringPreset::Snappy => self.motion.spring.snappy,
+            SpringPreset::Smooth => self.motion.spring.smooth,
+            SpringPreset::Bouncy => self.motion.spring.bouncy,
         }
     }
 
@@ -310,7 +360,13 @@ impl TokenDocument {
 
     pub fn easing(&self, step: MotionEasing) -> [f32; 4] {
         match step {
+            MotionEasing::Linear => self.motion.easing.linear,
             MotionEasing::Standard => self.motion.easing.standard,
+            MotionEasing::EaseIn => self.motion.easing.ease_in,
+            MotionEasing::EaseOut => self.motion.easing.ease_out,
+            MotionEasing::EaseInOut => self.motion.easing.ease_in_out,
+            MotionEasing::Emphasized => self.motion.easing.emphasized,
+            MotionEasing::Overshoot => self.motion.easing.overshoot,
             MotionEasing::Exit => self.motion.easing.exit,
             MotionEasing::Settle => self.motion.easing.settle,
         }
@@ -324,10 +380,6 @@ fn invalid<T>(path: &str, message: &str) -> Result<T, TokenError> {
     })
 }
 
-fn embedded_color(path: &str, value: &str) -> Color {
-    Color::parse(path, value).expect("the embedded token document is validated before release")
-}
-
 pub fn studio_dark() -> &'static TokenDocument {
     static TOKENS: OnceLock<TokenDocument> = OnceLock::new();
     TOKENS.get_or_init(|| {
@@ -336,8 +388,29 @@ pub fn studio_dark() -> &'static TokenDocument {
     })
 }
 
+pub fn studio_light() -> &'static TokenDocument {
+    static TOKENS: OnceLock<TokenDocument> = OnceLock::new();
+    TOKENS.get_or_init(|| {
+        TokenDocument::parse(STUDIO_LIGHT_JSON)
+            .expect("tokens/studio-light.json must pass TokenDocument::validate")
+    })
+}
+
+/// Every theme shipped with the library, in registration order.
+pub fn bundled() -> [&'static TokenDocument; 2] {
+    [studio_dark(), studio_light()]
+}
+
 pub fn studio_dark_json() -> &'static str {
     STUDIO_DARK_JSON
+}
+
+pub fn studio_light_json() -> &'static str {
+    STUDIO_LIGHT_JSON
+}
+
+pub fn bundled_json() -> [&'static str; 2] {
+    [STUDIO_DARK_JSON, STUDIO_LIGHT_JSON]
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -410,6 +483,62 @@ impl ControlSize {
     pub const ALL: [Self; 4] = [Self::Xs, Self::Sm, Self::Md, Self::Lg];
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Elevation {
+    #[default]
+    Flat,
+    Raised,
+    Overlay,
+    Modal,
+}
+
+/// Painting order for floating surfaces.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Layer {
+    Content,
+    Sticky,
+    Dock,
+    Popover,
+    Tooltip,
+    Modal,
+    Toast,
+}
+
+impl Layer {
+    pub const ALL: [Self; 7] = [
+        Self::Content,
+        Self::Sticky,
+        Self::Dock,
+        Self::Popover,
+        Self::Tooltip,
+        Self::Modal,
+        Self::Toast,
+    ];
+}
+
+/// The information-density axis applications expose as a preference.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
+pub enum Density {
+    Compact,
+    #[default]
+    Comfortable,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpringPreset {
+    Snappy,
+    Smooth,
+    Bouncy,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ResolvedElevation {
+    pub y: f32,
+    pub blur: f32,
+    pub spread: f32,
+    pub color: Color,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BorderWeight {
     Hairline,
@@ -445,9 +574,43 @@ pub enum MotionDuration {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MotionEasing {
+    Linear,
     Standard,
+    EaseIn,
+    EaseOut,
+    EaseInOut,
+    Emphasized,
+    Overshoot,
     Exit,
     Settle,
+}
+
+impl MotionEasing {
+    pub const ALL: [Self; 9] = [
+        Self::Linear,
+        Self::Standard,
+        Self::EaseIn,
+        Self::EaseOut,
+        Self::EaseInOut,
+        Self::Emphasized,
+        Self::Overshoot,
+        Self::Exit,
+        Self::Settle,
+    ];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Linear => "linear",
+            Self::Standard => "standard",
+            Self::EaseIn => "easeIn",
+            Self::EaseOut => "easeOut",
+            Self::EaseInOut => "easeInOut",
+            Self::Emphasized => "emphasized",
+            Self::Overshoot => "overshoot",
+            Self::Exit => "exit",
+            Self::Settle => "settle",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -458,7 +621,98 @@ pub struct Metadata {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ElevationTokens {
+    pub flat: ElevationStep,
+    pub raised: ElevationStep,
+    pub overlay: ElevationStep,
+    pub modal: ElevationStep,
+}
+
+impl ElevationTokens {
+    fn entries(&self) -> [(&'static str, &ElevationStep); 4] {
+        [
+            ("elevation.flat", &self.flat),
+            ("elevation.raised", &self.raised),
+            ("elevation.overlay", &self.overlay),
+            ("elevation.modal", &self.modal),
+        ]
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ElevationStep {
+    pub y: f32,
+    pub blur: f32,
+    pub spread: f32,
+    pub color: String,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ZIndexTokens {
+    pub content: i32,
+    pub sticky: i32,
+    pub dock: i32,
+    pub popover: i32,
+    pub tooltip: i32,
+    pub modal: i32,
+    pub toast: i32,
+}
+
+impl ZIndexTokens {
+    fn ordered(&self) -> [(&'static str, i32); 7] {
+        [
+            ("content", self.content),
+            ("sticky", self.sticky),
+            ("dock", self.dock),
+            ("popover", self.popover),
+            ("tooltip", self.tooltip),
+            ("modal", self.modal),
+            ("toast", self.toast),
+        ]
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+pub struct DensityTokens {
+    pub compact: DensityScale,
+    pub comfortable: DensityScale,
+}
+
+impl DensityTokens {
+    fn entries(&self) -> [(&'static str, DensityScale); 2] {
+        [
+            ("density.compact", self.compact),
+            ("density.comfortable", self.comfortable),
+        ]
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
+pub struct DensityScale {
+    pub space: f32,
+    pub control: f32,
+    pub font: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
+pub struct SpringTokens {
+    pub stiffness: f32,
+    pub damping: f32,
+    pub mass: f32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SpringPresetTokens {
+    pub snappy: SpringTokens,
+    pub smooth: SpringTokens,
+    pub bouncy: SpringTokens,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ColorTokens {
+    #[serde(default)]
+    pub palette: color::Palette,
     pub surface: SurfaceColors,
     pub text: TextColors,
     pub interactive: InteractiveColors,
@@ -667,6 +921,7 @@ pub struct TypeStep {
 pub struct MotionTokens {
     pub duration_ms: DurationTokens,
     pub easing: EasingTokens,
+    pub spring: SpringPresetTokens,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -681,8 +936,15 @@ pub struct DurationTokens {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EasingTokens {
+    pub linear: [f32; 4],
     pub standard: [f32; 4],
+    pub ease_in: [f32; 4],
+    pub ease_out: [f32; 4],
+    pub ease_in_out: [f32; 4],
+    pub emphasized: [f32; 4],
+    pub overshoot: [f32; 4],
     pub exit: [f32; 4],
     pub settle: [f32; 4],
 }
@@ -711,6 +973,74 @@ mod tests {
             tokens.motion_duration(MotionDuration::Menu),
             Duration::from_millis(140)
         );
+    }
+
+    #[test]
+    fn palette_references_preserve_the_literal_values_they_replaced() {
+        let tokens = studio_dark();
+        assert_eq!(
+            tokens.surface(Surface::Canvas),
+            Color::parse("literal", "#060606").expect("literal")
+        );
+        assert_eq!(
+            tokens.interactive(InteractiveColor::Hover),
+            Color::parse("literal", "#ebebeb24").expect("literal")
+        );
+        assert_eq!(
+            tokens.semantic(SemanticColor::Accent),
+            Color::parse("literal", "#7c86ff").expect("literal")
+        );
+    }
+
+    #[test]
+    fn every_bundled_theme_parses_and_declares_its_appearance() {
+        let ids: Vec<&str> = bundled().iter().map(|doc| doc.meta.id.as_str()).collect();
+        assert_eq!(ids, vec!["studio-dark", "studio-light"]);
+        assert_eq!(studio_light().meta.appearance, Appearance::Light);
+    }
+
+    #[test]
+    fn themes_agree_on_every_metric_that_is_not_a_color() {
+        let dark = studio_dark();
+        let light = studio_light();
+        for size in ControlSize::ALL {
+            assert_eq!(dark.control(size).height, light.control(size).height);
+            assert_eq!(dark.control(size).font_size, light.control(size).font_size);
+        }
+        for step in [Space::Xs, Space::Md, Space::Xxl] {
+            assert_eq!(dark.spacing(step), light.spacing(step));
+        }
+        for layer in Layer::ALL {
+            assert_eq!(dark.z_index(layer), light.z_index(layer));
+        }
+        for easing in MotionEasing::ALL {
+            assert_eq!(dark.easing(easing), light.easing(easing));
+        }
+    }
+
+    #[test]
+    fn layers_paint_in_a_fixed_order() {
+        let tokens = studio_dark();
+        assert!(tokens.z_index(Layer::Popover) < tokens.z_index(Layer::Modal));
+        assert!(tokens.z_index(Layer::Modal) < tokens.z_index(Layer::Toast));
+    }
+
+    #[test]
+    fn compact_density_shrinks_and_comfortable_is_the_reference() {
+        let tokens = studio_dark();
+        let compact = tokens.density(Density::Compact);
+        let comfortable = tokens.density(Density::Comfortable);
+        assert_eq!(comfortable.space, 1.0);
+        assert!(compact.space < comfortable.space);
+        assert!(compact.font < comfortable.font);
+    }
+
+    #[test]
+    fn elevation_grows_with_the_layer_it_serves() {
+        let tokens = studio_dark();
+        assert_eq!(tokens.elevation(Elevation::Flat).blur, 0.0);
+        assert_eq!(tokens.elevation(Elevation::Flat).color.alpha, 0.0);
+        assert!(tokens.elevation(Elevation::Modal).blur > tokens.elevation(Elevation::Raised).blur);
     }
 
     #[test]

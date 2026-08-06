@@ -203,3 +203,68 @@ fn credentials_never_reach_a_snapshot(cx: &mut TestAppContext) {
         Some("[REDACTED]")
     );
 }
+
+#[gpui::test]
+fn a_selected_button_publishes_its_selection(cx: &mut TestAppContext) {
+    let mut harness = harness(cx, |_, _| {
+        div()
+            .child(
+                Button::new("view.list")
+                    .label("List")
+                    .secondary()
+                    .selected(true)
+                    .on_click(|_, _| {}),
+            )
+            .child(
+                Button::new("view.grid")
+                    .label("Grid")
+                    .secondary()
+                    .on_click(|_, _| {}),
+            )
+            .into_any_element()
+    });
+
+    let snapshot = harness.snapshot();
+    assert_eq!(
+        present(&snapshot, "view.list").expect("node").checked,
+        Some(true)
+    );
+    assert_eq!(present(&snapshot, "view.grid").expect("node").checked, None);
+}
+
+#[gpui::test]
+fn switching_the_theme_repaints_components_with_the_new_appearance(cx: &mut TestAppContext) {
+    let mut harness = harness(cx, |_, cx| {
+        let theme = cx.theme();
+        div()
+            .child(Callout::new(theme.id.clone(), Tone::Neutral).id("appearance"))
+            .into_any_element()
+    });
+
+    text(&harness.snapshot(), "appearance", "studio-dark").expect("dark is the default theme");
+
+    harness.update(|_, cx| {
+        assert!(activate_theme("studio-light", cx));
+    });
+
+    text(&harness.snapshot(), "appearance", "studio-light")
+        .expect("switching the theme rebuilds the tree");
+}
+
+#[gpui::test]
+fn compact_density_shrinks_a_rendered_control(cx: &mut TestAppContext) {
+    let mut harness = harness(cx, |_, _| {
+        Button::new("settings.save")
+            .label("Save")
+            .primary()
+            .on_click(|_, _| {})
+            .into_any_element()
+    });
+
+    let comfortable = harness.bounds("settings.save").expect("measured button");
+
+    harness.update(|_, cx| set_density(Density::Compact, cx));
+
+    let compact = harness.bounds("settings.save").expect("measured button");
+    assert!(compact.size.height < comfortable.size.height);
+}

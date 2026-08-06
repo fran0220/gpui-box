@@ -15,7 +15,8 @@ Components:
 
 ## Token authority
 
-`tokens/studio-dark.json` is the source of truth. Repeated semantic color,
+`tokens/*.json` is the source of truth, and every theme carries the same key
+set. Repeated semantic color,
 spacing, radius, typography, motion, and effect values belong there. Local
 geometry that occurs once may stay next to the component.
 

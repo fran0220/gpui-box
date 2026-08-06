@@ -14,7 +14,7 @@ use gpui_kit::assets::{Icon, icon};
 use gpui_kit::overlay::popover;
 use gpui_kit::prelude::*;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic, SemanticRegistry};
-use gpui_kit_theme::Theme;
+use gpui_kit_theme::{Theme, ThemeRegistry, activate_theme, set_density};
 use serde::Deserialize;
 
 const SETTINGS_FIXTURE: &str = include_str!("../../../fixtures/settings/states.json");
@@ -71,6 +71,7 @@ impl Render for Gallery {
                         &theme,
                         "A truthful desktop UI design system, semantic tree, and test kit.",
                     ))
+                    .child(theme_switcher(&theme, cx))
                     .child(recipes::section_title(&theme, "Actions"))
                     .child(
                         div()
@@ -245,6 +246,43 @@ fn settings_fixture() -> &'static SettingsFixture {
     })
 }
 
+/// Exercises runtime theme and density switching, which only a live window can
+/// demonstrate.
+fn theme_switcher(theme: &Theme, cx: &App) -> impl IntoElement {
+    let active = theme.id.clone();
+    let density = theme.density;
+    div()
+        .flex()
+        .flex_row()
+        .items_center()
+        .flex_wrap()
+        .gap(px(theme.spacing.sm))
+        .children(ThemeRegistry::global(cx).ids().into_iter().map(|id| {
+            let selected = id == active;
+            let target = id.clone();
+            Button::new(Ident::new("gallery.theme").child(id.as_ref()))
+                .label(id.clone())
+                .secondary()
+                .selected(selected)
+                .on_click(move |_, cx| {
+                    activate_theme(target.as_ref(), cx);
+                })
+        }))
+        .children(
+            [
+                ("Compact", Density::Compact),
+                ("Comfortable", Density::Comfortable),
+            ]
+            .map(|(label, option)| {
+                Button::new(Ident::new("gallery.density").child(label))
+                    .label(label)
+                    .ghost()
+                    .selected(density == option)
+                    .on_click(move |_, cx| set_density(option, cx))
+            }),
+        )
+}
+
 fn lower_gallery(theme: &Theme, cx: &mut App) -> gpui::AnyElement {
     div()
         .id("gallery-lower-root")
@@ -330,9 +368,19 @@ fn lower_gallery(theme: &Theme, cx: &mut App) -> gpui::AnyElement {
 fn main() {
     let capture_path = capture_path();
     let lower_scene = env::args().any(|argument| argument == "--scene=lower");
+    let theme_id = flag("--theme");
+    let compact = env::args().any(|argument| argument == "--density=compact");
     let app = gpui_platform::application().with_assets(gpui_kit::assets::Assets);
     app.run(move |cx: &mut App| {
         gpui_kit::install(cx);
+        if let Some(id) = theme_id.as_deref()
+            && !activate_theme(id, cx)
+        {
+            eprintln!("unknown theme `{id}`");
+        }
+        if compact {
+            set_density(Density::Compact, cx);
+        }
         let bounds = Bounds::centered(None, size(px(920.0), px(1000.0)), cx);
         let _window = cx
             .open_window(
@@ -365,10 +413,14 @@ fn main() {
 }
 
 fn capture_path() -> Option<PathBuf> {
+    flag("--capture").map(PathBuf::from)
+}
+
+fn flag(name: &str) -> Option<String> {
     let mut args = env::args().skip(1);
     while let Some(argument) = args.next() {
-        if argument == "--capture" {
-            return args.next().map(PathBuf::from);
+        if argument == name {
+            return args.next();
         }
     }
     None

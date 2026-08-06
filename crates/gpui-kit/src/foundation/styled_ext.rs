@@ -1,5 +1,5 @@
 use gpui::{FontWeight, Styled, px};
-use gpui_kit_theme::{Radius, Space, Surface, TextTone, Theme, TypeScale};
+use gpui_kit_theme::{Elevation, Radius, Space, Surface, TextTone, Theme, TypeScale};
 
 /// Token-addressed styling helpers.
 ///
@@ -45,6 +45,16 @@ pub trait StyledExt: Styled + Sized {
 
     fn mt_token(self, theme: &Theme, space: Space) -> Self {
         self.mt(px(theme.space(space)))
+    }
+
+    /// Applies the shadow for an elevation step. Flat applies nothing.
+    fn elevation(self, theme: &Theme, level: Elevation) -> Self {
+        let shadow = theme.shadow(level);
+        if shadow.is_empty() {
+            self
+        } else {
+            self.shadow(shadow.to_vec())
+        }
     }
 
     fn hairline(self, theme: &Theme) -> Self {

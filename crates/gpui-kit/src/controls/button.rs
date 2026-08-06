@@ -9,7 +9,7 @@ use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlMetrics, ControlSize, Radius, Theme};
 
-use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
+use crate::foundation::{Disableable, Ident, Selectable, Sizable, StyledExt};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ButtonVariant {
@@ -43,6 +43,7 @@ pub struct Button {
     variant: ButtonVariant,
     size: ControlSize,
     disabled: bool,
+    selected: bool,
     loading: bool,
     full_width: bool,
     on_click: Option<ClickHandler>,
@@ -57,6 +58,7 @@ impl std::fmt::Debug for Button {
             .field("variant", &self.variant)
             .field("size", &self.size)
             .field("disabled", &self.disabled)
+            .field("selected", &self.selected)
             .field("loading", &self.loading)
             .field("has_handler", &self.on_click.is_some())
             .finish()
@@ -73,6 +75,7 @@ impl Button {
             variant: ButtonVariant::default(),
             size: ControlSize::default(),
             disabled: false,
+            selected: false,
             loading: false,
             full_width: false,
             on_click: None,
@@ -151,6 +154,13 @@ impl Disableable for Button {
     }
 }
 
+impl Selectable for Button {
+    fn selected(mut self, selected: bool) -> Self {
+        self.selected = selected;
+        self
+    }
+}
+
 impl Sizable for Button {
     fn control_size(mut self, size: ControlSize) -> Self {
         self.size = size;
@@ -190,6 +200,11 @@ impl RenderOnce for Button {
         }
 
         let mut button = frame(&theme, self.variant, metrics, inert)
+            .when(self.selected, |element| {
+                element
+                    .bg(theme.colors.selected)
+                    .border_color(theme.colors.hairline_strong)
+            })
             .id(self.ident.element_id())
             .role(gpui::Role::Button)
             .when(self.full_width, |element| element.w_full())
@@ -220,6 +235,9 @@ impl RenderOnce for Button {
         let mut spec = NodeSpec::new(self.ident.semantic_id(), Role::Button)
             .disabled(inert)
             .busy(self.loading);
+        if self.selected {
+            spec = spec.checked(true);
+        }
         if let Some(name) = self.accessible_name() {
             spec = spec.text(name);
         }

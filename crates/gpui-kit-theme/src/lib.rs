@@ -1,12 +1,16 @@
 //! Maps GPUI-independent tokens into the paint and typography types views use.
 
-use gpui::{App, BoxShadow, Global, Hsla, Rgba, SharedString, point, px};
+use std::sync::Arc;
+
+use gpui::{App, BorrowAppContext, BoxShadow, Global, Hsla, Rgba, SharedString, point, px};
 use gpui_kit_tokens::{
-    BorderWeight, Color, InteractiveColor, MotionDuration, MotionEasing, OpacityRole, studio_dark,
+    BorderWeight, Color, DensityScale, InteractiveColor, MotionDuration, MotionEasing, OpacityRole,
+    TokenDocument, TokenError, bundled,
 };
 
 pub use gpui_kit_tokens::{
-    ControlSize, Radius, SemanticColor, Space, Surface, TextTone, TypeScale,
+    Appearance, ControlSize, Density, Elevation, Layer, Radius, SemanticColor, Space, SpringPreset,
+    Surface, TextTone, TypeScale,
 };
 
 /// Reads the active theme from any context that dereferences to [`App`].
@@ -25,6 +29,10 @@ impl ActiveTheme for App {
 
 #[derive(Debug, Clone)]
 pub struct Theme {
+    pub id: SharedString,
+    pub name: SharedString,
+    pub appearance: Appearance,
+    pub density: Density,
     pub colors: Colors,
     pub typography: Typography,
     pub spacing: Spacing,
@@ -33,6 +41,8 @@ pub struct Theme {
     pub borders: Borders,
     pub opacity: Opacity,
     pub motion: Motion,
+    pub elevation: Elevations,
+    pub z_index: ZIndices,
     pub effects: Effects,
 }
 
@@ -156,6 +166,52 @@ pub struct Motion {
     pub settle: [f32; 4],
 }
 
+/// Shadows for each elevation step. Flat is intentionally empty rather than a
+/// transparent shadow, so a flat surface allocates no shadow work at all.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Elevations {
+    pub flat: Vec<BoxShadow>,
+    pub raised: Vec<BoxShadow>,
+    pub overlay: Vec<BoxShadow>,
+    pub modal: Vec<BoxShadow>,
+}
+
+impl Elevations {
+    pub fn get(&self, level: Elevation) -> &[BoxShadow] {
+        match level {
+            Elevation::Flat => &self.flat,
+            Elevation::Raised => &self.raised,
+            Elevation::Overlay => &self.overlay,
+            Elevation::Modal => &self.modal,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ZIndices {
+    pub content: i32,
+    pub sticky: i32,
+    pub dock: i32,
+    pub popover: i32,
+    pub tooltip: i32,
+    pub modal: i32,
+    pub toast: i32,
+}
+
+impl ZIndices {
+    pub fn get(&self, layer: Layer) -> i32 {
+        match layer {
+            Layer::Content => self.content,
+            Layer::Sticky => self.sticky,
+            Layer::Dock => self.dock,
+            Layer::Popover => self.popover,
+            Layer::Tooltip => self.tooltip,
+            Layer::Modal => self.modal,
+            Layer::Toast => self.toast,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Effects {
     pub glass_alpha: f32,
@@ -166,16 +222,32 @@ pub struct Effects {
 
 impl Theme {
     pub fn studio_dark() -> Self {
-        let tokens = studio_dark();
+        Self::from_tokens(gpui_kit_tokens::studio_dark(), Density::default())
+    }
+
+    pub fn studio_light() -> Self {
+        Self::from_tokens(gpui_kit_tokens::studio_light(), Density::default())
+    }
+
+    /// Builds a theme from any validated token document at one density.
+    ///
+    /// Density scales spacing, control geometry and type independently, and
+    /// rounds to whole pixels so compact layouts stay on the pixel grid.
+    pub fn from_tokens(tokens: &TokenDocument, density: Density) -> Self {
+        let scale = tokens.density(density);
         let style = |step| {
             let step = tokens.type_step(step);
             TypeStyle {
-                size: step.size,
-                line_height: step.line_height,
+                size: scale_font(step.size, scale),
+                line_height: scale_font(step.line_height, scale),
                 weight: step.weight,
             }
         };
         Self {
+            id: tokens.meta.id.clone().into(),
+            name: tokens.meta.name.clone().into(),
+            appearance: tokens.meta.appearance,
+            density,
             colors: Colors {
                 canvas: color(tokens.surface(Surface::Canvas)),
                 panel: color(tokens.surface(Surface::Panel)),
@@ -221,12 +293,12 @@ impl Theme {
                 code: style(TypeScale::Code),
             },
             spacing: Spacing {
-                xs: tokens.spacing(Space::Xs),
-                sm: tokens.spacing(Space::Sm),
-                md: tokens.spacing(Space::Md),
-                lg: tokens.spacing(Space::Lg),
-                xl: tokens.spacing(Space::Xl),
-                xxl: tokens.spacing(Space::Xxl),
+                xs: scale_space(tokens.spacing(Space::Xs), scale),
+                sm: scale_space(tokens.spacing(Space::Sm), scale),
+                md: scale_space(tokens.spacing(Space::Md), scale),
+                lg: scale_space(tokens.spacing(Space::Lg), scale),
+                xl: scale_space(tokens.spacing(Space::Xl), scale),
+                xxl: scale_space(tokens.spacing(Space::Xxl), scale),
             },
             radii: Radii {
                 small: tokens.radius(Radius::Small),
@@ -240,11 +312,11 @@ impl Theme {
                 let metrics = |size| {
                     let step = tokens.control(size);
                     ControlMetrics {
-                        height: step.height,
-                        padding_x: step.padding_x,
-                        gap: step.gap,
-                        font_size: step.font_size,
-                        icon_size: step.icon_size,
+                        height: scale_control(step.height, scale),
+                        padding_x: scale_control(step.padding_x, scale),
+                        gap: scale_control(step.gap, scale),
+                        font_size: scale_font(step.font_size, scale),
+                        icon_size: scale_control(step.icon_size, scale),
                     }
                 };
                 Control {
@@ -274,6 +346,21 @@ impl Theme {
                 standard: tokens.easing(MotionEasing::Standard),
                 exit: tokens.easing(MotionEasing::Exit),
                 settle: tokens.easing(MotionEasing::Settle),
+            },
+            elevation: Elevations {
+                flat: shadow(tokens, Elevation::Flat),
+                raised: shadow(tokens, Elevation::Raised),
+                overlay: shadow(tokens, Elevation::Overlay),
+                modal: shadow(tokens, Elevation::Modal),
+            },
+            z_index: ZIndices {
+                content: tokens.z_index(Layer::Content),
+                sticky: tokens.z_index(Layer::Sticky),
+                dock: tokens.z_index(Layer::Dock),
+                popover: tokens.z_index(Layer::Popover),
+                tooltip: tokens.z_index(Layer::Tooltip),
+                modal: tokens.z_index(Layer::Modal),
+                toast: tokens.z_index(Layer::Toast),
             },
             effects: Effects {
                 glass_alpha: if cfg!(target_os = "macos") {
@@ -349,12 +436,23 @@ impl Theme {
         }
     }
 
+    pub fn shadow(&self, level: Elevation) -> &[BoxShadow] {
+        self.elevation.get(level)
+    }
+
+    pub fn layer(&self, layer: Layer) -> i32 {
+        self.z_index.get(layer)
+    }
+
+    /// Installs the bundled theme registry. Idempotent.
     pub fn install(cx: &mut App) {
-        cx.set_global(Self::studio_dark());
+        if !cx.has_global::<ThemeRegistry>() {
+            cx.set_global(ThemeRegistry::new());
+        }
     }
 
     pub fn get(cx: &App) -> &Self {
-        cx.global::<Self>()
+        cx.global::<ThemeRegistry>().active()
     }
 
     pub fn selected_ring(&self) -> Vec<BoxShadow> {
@@ -374,7 +472,135 @@ impl Default for Theme {
     }
 }
 
-impl Global for Theme {}
+/// The set of themes an application can switch between at runtime.
+#[derive(Debug)]
+pub struct ThemeRegistry {
+    tokens: Vec<Arc<TokenDocument>>,
+    active: usize,
+    density: Density,
+    theme: Theme,
+}
+
+impl Global for ThemeRegistry {}
+
+impl ThemeRegistry {
+    pub fn global(cx: &App) -> &Self {
+        cx.global::<Self>()
+    }
+
+    pub fn new() -> Self {
+        let tokens: Vec<Arc<TokenDocument>> = bundled()
+            .into_iter()
+            .map(|document| Arc::new(document.clone()))
+            .collect();
+        let theme = Theme::from_tokens(&tokens[0], Density::default());
+        Self {
+            tokens,
+            active: 0,
+            density: Density::default(),
+            theme,
+        }
+    }
+
+    /// Adds or replaces a theme. A registered id replaces the earlier document
+    /// so an application can override a bundled theme without shadowing it.
+    pub fn register(&mut self, tokens: TokenDocument) {
+        let id = tokens.meta.id.clone();
+        match self.tokens.iter().position(|other| other.meta.id == id) {
+            Some(index) => self.tokens[index] = Arc::new(tokens),
+            None => self.tokens.push(Arc::new(tokens)),
+        }
+        self.rebuild();
+    }
+
+    pub fn register_json(&mut self, json: &str) -> Result<(), TokenError> {
+        self.register(TokenDocument::parse(json)?);
+        Ok(())
+    }
+
+    pub fn ids(&self) -> Vec<SharedString> {
+        self.tokens
+            .iter()
+            .map(|tokens| SharedString::from(tokens.meta.id.clone()))
+            .collect()
+    }
+
+    pub fn active(&self) -> &Theme {
+        &self.theme
+    }
+
+    pub fn density(&self) -> Density {
+        self.density
+    }
+
+    /// Returns false when the id is not registered, leaving the active theme
+    /// untouched rather than falling back to a default the caller did not ask
+    /// for.
+    pub fn activate(&mut self, id: &str) -> bool {
+        let Some(index) = self.tokens.iter().position(|tokens| tokens.meta.id == id) else {
+            return false;
+        };
+        self.active = index;
+        self.rebuild();
+        true
+    }
+
+    pub fn set_density(&mut self, density: Density) {
+        self.density = density;
+        self.rebuild();
+    }
+
+    fn rebuild(&mut self) {
+        self.theme = Theme::from_tokens(&self.tokens[self.active], self.density);
+    }
+}
+
+impl Default for ThemeRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Switches the active theme and repaints every window.
+pub fn activate_theme(id: &str, cx: &mut App) -> bool {
+    let switched = cx.update_global::<ThemeRegistry, bool>(|registry, _| registry.activate(id));
+    if switched {
+        cx.refresh_windows();
+    }
+    switched
+}
+
+/// Changes the density axis and repaints every window.
+pub fn set_density(density: Density, cx: &mut App) {
+    cx.update_global::<ThemeRegistry, ()>(|registry, _| registry.set_density(density));
+    cx.refresh_windows();
+}
+
+fn scale_space(value: f32, scale: DensityScale) -> f32 {
+    (value * scale.space).round().max(1.0)
+}
+
+fn scale_control(value: f32, scale: DensityScale) -> f32 {
+    (value * scale.control).round().max(1.0)
+}
+
+fn scale_font(value: f32, scale: DensityScale) -> f32 {
+    ((value * scale.font) * 2.0).round() / 2.0
+}
+
+fn shadow(tokens: &TokenDocument, level: Elevation) -> Vec<BoxShadow> {
+    let step = tokens.elevation(level);
+    if step.color.alpha == 0.0 {
+        return Vec::new();
+    }
+    vec![BoxShadow {
+        color: color(step.color),
+        offset: point(px(0.0), px(step.y)),
+        blur_radius: px(step.blur),
+        spread_radius: px(step.spread),
+        inset: false,
+    }]
+}
 
 fn millis(tokens: &gpui_kit_tokens::TokenDocument, step: MotionDuration) -> u64 {
     tokens.motion_duration(step).as_millis() as u64
@@ -394,12 +620,81 @@ mod tests {
     use super::*;
 
     #[test]
-    fn studio_theme_preserves_surface_hierarchy() {
+    fn every_theme_separates_surfaces_and_text_emphasis() {
+        for theme in [Theme::studio_dark(), Theme::studio_light()] {
+            assert!(theme.colors.canvas.l < theme.colors.panel.l);
+            assert!(theme.colors.panel.l <= theme.colors.raised.l);
+
+            // Emphasis is distance from the canvas, which inverts with
+            // appearance, so compare magnitudes rather than raw lightness.
+            let emphasis = |tone: Hsla| (tone.l - theme.colors.canvas.l).abs();
+            assert!(emphasis(theme.colors.text) > emphasis(theme.colors.text_muted));
+            assert!(emphasis(theme.colors.text_muted) > emphasis(theme.colors.text_faint));
+        }
+    }
+
+    #[test]
+    fn compact_density_shrinks_geometry_without_touching_color() {
+        let comfortable = Theme::from_tokens(gpui_kit_tokens::studio_dark(), Density::Comfortable);
+        let compact = Theme::from_tokens(gpui_kit_tokens::studio_dark(), Density::Compact);
+        assert!(compact.spacing.lg < comfortable.spacing.lg);
+        assert!(
+            compact.control.get(ControlSize::Md).height
+                < comfortable.control.get(ControlSize::Md).height
+        );
+        assert!(compact.typography.body.size < comfortable.typography.body.size);
+        assert_eq!(compact.colors.accent, comfortable.colors.accent);
+        assert_eq!(compact.radii.card, comfortable.radii.card);
+    }
+
+    #[test]
+    fn density_keeps_geometry_on_the_pixel_grid() {
+        let compact = Theme::from_tokens(gpui_kit_tokens::studio_dark(), Density::Compact);
+        for size in ControlSize::ALL {
+            let metrics = compact.control.get(size);
+            assert_eq!(metrics.height.fract(), 0.0);
+            assert_eq!(metrics.padding_x.fract(), 0.0);
+        }
+        assert_eq!(compact.spacing.md.fract(), 0.0);
+    }
+
+    #[test]
+    fn the_registry_switches_themes_and_refuses_unknown_ids() {
+        let mut registry = ThemeRegistry::new();
+        assert_eq!(registry.active().id, "studio-dark");
+        assert!(registry.activate("studio-light"));
+        assert_eq!(registry.active().appearance, Appearance::Light);
+        assert!(!registry.activate("studio-solarized"));
+        assert_eq!(registry.active().id, "studio-light");
+    }
+
+    #[test]
+    fn a_registered_theme_replaces_the_bundled_one_with_the_same_id() {
+        let mut registry = ThemeRegistry::new();
+        let before = registry.ids().len();
+        registry
+            .register_json(gpui_kit_tokens::studio_dark_json())
+            .expect("bundled json is valid");
+        assert_eq!(registry.ids().len(), before);
+    }
+
+    #[test]
+    fn density_survives_a_theme_switch() {
+        let mut registry = ThemeRegistry::new();
+        registry.set_density(Density::Compact);
+        registry.activate("studio-light");
+        assert_eq!(registry.active().density, Density::Compact);
+    }
+
+    #[test]
+    fn flat_elevation_costs_nothing_and_deeper_layers_cast_more() {
         let theme = Theme::studio_dark();
-        assert!(theme.colors.canvas.l < theme.colors.panel.l);
-        assert!(theme.colors.panel.l < theme.colors.raised.l);
-        assert!(theme.colors.text_faint.l < theme.colors.text_muted.l);
-        assert!(theme.colors.text_muted.l < theme.colors.text.l);
+        assert!(theme.shadow(Elevation::Flat).is_empty());
+        assert!(
+            theme.shadow(Elevation::Modal)[0].blur_radius
+                > theme.shadow(Elevation::Raised)[0].blur_radius
+        );
+        assert!(theme.layer(Layer::Toast) > theme.layer(Layer::Popover));
     }
 
     #[test]

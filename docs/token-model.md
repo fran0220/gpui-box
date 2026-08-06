@@ -2,8 +2,9 @@
 
 ## Authority
 
-`tokens/studio-dark.json` is the authority. `gpui-kit-tokens` embeds and
-validates it; `gpui-kit-theme` is the only GPUI adapter.
+The documents under `tokens/` are the authority. `gpui-kit-tokens` embeds and
+validates every bundled theme; `gpui-kit-theme` is the only GPUI adapter.
+`studio-dark` is the default and `studio-light` is its light counterpart.
 
 ```text
 JSON token document
@@ -23,10 +24,18 @@ No crate reads a path outside this repository.
 
 ### Raw values
 
-Literal values live only in the token document:
+Literal values live only in the token document, in one palette per theme:
 
 ```json
-"raised": "#1b1b1b"
+"palette": { "neutral": { "200": "#1b1b1b" } }
+```
+
+Everything else references the palette, optionally with a hexadecimal alpha
+suffix, so a theme is retuned by editing its scales rather than every role:
+
+```json
+"raised": "{neutral.200}",
+"hover": "{neutral.850}/24"
 ```
 
 ### Semantic roles
@@ -54,11 +63,34 @@ alias into JSON only when several components must share and evolve it together.
 
 ## Color
 
-Colors use `#RRGGBB` or `#RRGGBBAA`. Alpha is part of a token where it expresses
-a reusable wash, hairline, or effect. Application views do not invent new
-palette colors.
+Colors use `#RRGGBB`, `#RRGGBBAA`, or a `{group.step}` palette reference. Alpha
+is part of a token where it expresses a reusable wash, hairline, or effect.
+Application views do not invent new palette colors.
 
 Large planes use surface roles. Accent and semantic colors remain compact.
+
+### Contrast
+
+`cargo run -p xtask -- tokens check` fails when a theme drops below its
+contrast floor: 4.5:1 for body text and `text.onAccent` over `semantic.accent`,
+3.0:1 for `text.faint` and for status colors, which never carry required
+instructions on their own. `semantic.accentStrong` is an emphasis, border and
+hover color rather than a text-bearing fill, so it is held to the non-text
+minimum.
+
+## Elevation, layers, and density
+
+`elevation` describes the shadow each surface casts, `zIndex` fixes the paint
+order of floating surfaces, and `density` scales spacing, control geometry and
+type independently. Density is applied when a `Theme` is built, and
+`gpui_kit::set_density` rebuilds the active theme and repaints every window.
+Colors and radii never change with density.
+
+## Themes at runtime
+
+`ThemeRegistry` holds every registered document. An application registers its
+own JSON with `ThemeRegistry::register_json`, replacing a bundled theme when it
+reuses its id, and switches with `gpui_kit::activate_theme`.
 
 ## Typography
 
@@ -82,11 +114,14 @@ support is proven.
 
 `TokenDocument::validate` rejects:
 
-- invalid RGB/RGBA literals;
+- invalid RGB/RGBA literals and unresolvable palette references;
 - empty metadata;
-- non-increasing spacing;
+- non-increasing spacing and control heights;
 - invalid type size, line-height, or weight;
-- effect alpha outside 0–1.
+- effect and opacity alpha outside 0–1;
+- negative elevation blur;
+- z-index layers that are not strictly increasing;
+- density factors outside 0.5–1.5, or a `comfortable` axis that is not 1.
 
 Run:
 

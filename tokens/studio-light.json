@@ -1,47 +1,47 @@
 {
   "$schema": "./schema.json",
   "meta": {
-    "id": "studio-dark",
-    "name": "Studio Dark",
-    "appearance": "dark"
+    "id": "studio-light",
+    "name": "Studio Light",
+    "appearance": "light"
   },
   "color": {
     "palette": {
       "neutral": {
         "0": "#000000",
-        "50": "#060606",
-        "100": "#0d0d0d",
-        "150": "#161616",
-        "200": "#1b1b1b",
-        "300": "#2a2a2a",
-        "500": "#565656",
-        "600": "#737373",
-        "700": "#a1a1a1",
-        "800": "#e9e9e9",
-        "850": "#ebebeb",
+        "50": "#f2f2f4",
+        "100": "#fafafb",
+        "150": "#ffffff",
+        "200": "#ffffff",
+        "300": "#e4e4e8",
+        "500": "#a3a3a9",
+        "600": "#86868c",
+        "700": "#55555c",
+        "800": "#17171a",
+        "850": "#0a0a0c",
         "900": "#ffffff",
-        "ink": "#0e0e0e"
+        "ink": "#ffffff"
       },
       "indigo": {
-        "400": "#7c86ff",
-        "600": "#5865f2"
+        "400": "#4f5bd5",
+        "600": "#3b46b8"
       },
       "red": {
-        "400": "#ff6467"
+        "400": "#d5322f"
       },
       "amber": {
-        "500": "#ffb900"
+        "500": "#a76a00"
       },
       "green": {
-        "500": "#57c47f"
+        "500": "#237a48"
       },
       "cyan": {
-        "400": "#7fb3cf"
+        "400": "#2a6f8f"
       },
       "loader": {
-        "blue": "#b6d3ef",
-        "orange": "#edb185",
-        "pink": "#f888a0"
+        "blue": "#6ba7e0",
+        "orange": "#d98442",
+        "pink": "#e2557a"
       }
     },
     "surface": {
@@ -57,11 +57,11 @@
       "onAccent": "{neutral.ink}"
     },
     "interactive": {
-      "hover": "{neutral.850}/24",
-      "active": "{neutral.850}/29",
-      "selected": "{neutral.850}/24",
-      "hairline": "{neutral.900}/14",
-      "hairlineStrong": "{neutral.900}/24",
+      "hover": "{neutral.850}/0f",
+      "active": "{neutral.850}/1a",
+      "selected": "{neutral.850}/0f",
+      "hairline": "{neutral.850}/1a",
+      "hairlineStrong": "{neutral.850}/2e",
       "focus": "{indigo.400}"
     },
     "semantic": {
@@ -105,13 +105,13 @@
   "opacity": {
     "disabled": 0.45,
     "muted": 0.68,
-    "scrim": 0.6
+    "scrim": 0.35
   },
   "elevation": {
     "flat": { "y": 0, "blur": 0, "spread": 0, "color": "{neutral.0}/00" },
-    "raised": { "y": 1, "blur": 3, "spread": 0, "color": "{neutral.0}/40" },
-    "overlay": { "y": 8, "blur": 24, "spread": -4, "color": "{neutral.0}/66" },
-    "modal": { "y": 16, "blur": 48, "spread": -8, "color": "{neutral.0}/8c" }
+    "raised": { "y": 1, "blur": 3, "spread": 0, "color": "{neutral.0}/14" },
+    "overlay": { "y": 8, "blur": 24, "spread": -4, "color": "{neutral.0}/1f" },
+    "modal": { "y": 16, "blur": 48, "spread": -8, "color": "{neutral.0}/29" }
   },
   "zIndex": {
     "content": 0,
@@ -175,9 +175,9 @@
     }
   },
   "effect": {
-    "glassAlphaMacos": 0.9,
+    "glassAlphaMacos": 0.95,
     "backdropBlur": 16,
     "edgeFadeBand": 20,
-    "selectedRingAlpha": 0.09
+    "selectedRingAlpha": 0.12
   }
 }

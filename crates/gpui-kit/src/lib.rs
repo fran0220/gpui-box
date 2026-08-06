@@ -38,7 +38,8 @@ pub mod prelude {
     pub use crate::display::loading::{GradientSpinner, PulseLoader, Skeleton};
     pub use crate::display::status::{Callout, StatusDot, StatusLine};
     pub use crate::foundation::{
-        ActiveTheme, ControlSize, Disableable, Ident, Selectable, Sizable, StyledExt,
+        ActiveTheme, ControlSize, Density, Disableable, Elevation, Ident, Layer, Selectable,
+        Sizable, StyledExt, ThemeRegistry, activate_theme, set_density,
     };
     pub use crate::state::{AsyncStatus, AsyncValue, Loadable};
 }

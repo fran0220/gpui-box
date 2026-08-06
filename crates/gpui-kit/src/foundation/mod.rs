@@ -11,7 +11,9 @@ mod styled_ext;
 pub use ident::Ident;
 pub use styled_ext::StyledExt;
 
-pub use gpui_kit_theme::{ActiveTheme, ControlSize};
+pub use gpui_kit_theme::{
+    ActiveTheme, ControlSize, Density, Elevation, Layer, ThemeRegistry, activate_theme, set_density,
+};
 
 /// A control that can refuse interaction.
 ///

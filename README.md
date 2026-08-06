@@ -79,8 +79,14 @@ This uses the owning process and window id. It does not capture the desktop.
 
 ## Tokens
 
-`tokens/studio-dark.json` is the source of truth. Views consume semantic roles
-through `gpui-kit-tokens` and `gpui-kit-theme`.
+`tokens/studio-dark.json` and `tokens/studio-light.json` are the source of
+truth. Views consume semantic roles through `gpui-kit-tokens` and
+`gpui-kit-theme`, and switch at runtime:
+
+```rust
+gpui_kit::theme::activate_theme("studio-light", cx);
+gpui_kit::theme::set_density(Density::Compact, cx);
+```
 
 ```bash
 cargo run -p xtask -- tokens generate
@@ -88,7 +94,7 @@ cargo run -p xtask -- tokens check
 ```
 
 The first command updates `docs/token-reference.md`; the second fails if that
-generated reference has drifted.
+generated reference has drifted or if a theme falls below its contrast floor.
 
 ## Validation
 

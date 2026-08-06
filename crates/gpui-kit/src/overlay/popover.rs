@@ -1,7 +1,9 @@
 use gpui::{
     Anchor, AnyElement, ElementId, IntoElement, Pixels, Point, SharedString, div, prelude::*, px,
 };
-use gpui_kit_theme::Theme;
+use gpui_kit_theme::{Elevation, Theme};
+
+use crate::foundation::StyledExt;
 
 use crate::{effects, motion};
 
@@ -70,7 +72,7 @@ pub fn card(theme: &Theme) -> gpui::Div {
         .border_1()
         .border_color(theme.colors.hairline_strong)
         .rounded(px(theme.radii.card))
-        .shadow_lg()
+        .elevation(theme, Elevation::Overlay)
         .p(px(theme.spacing.xs))
         .overflow_hidden()
         .bg(theme.colors.overlay.opacity(theme.effects.glass_alpha))
@@ -248,7 +250,7 @@ pub fn dialog_card(theme: &Theme) -> gpui::Div {
         .bg(theme.colors.overlay)
         .border_1()
         .border_color(theme.colors.hairline_strong)
-        .shadow_lg()
+        .elevation(theme, Elevation::Modal)
         .flex()
         .flex_col()
         .text_color(theme.colors.text)

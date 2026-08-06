@@ -100,6 +100,14 @@ impl Harness {
         })
     }
 
+    /// Mutates application state the way a host would, then settles the window
+    /// so the next snapshot reflects the change.
+    pub fn update<R>(&mut self, update: impl FnOnce(&mut Window, &mut App) -> R) -> R {
+        let result = self.cx.update(|window, cx| update(window, cx));
+        self.cx.run_until_parked();
+        result
+    }
+
     pub fn keystrokes(&mut self, keystrokes: &str) {
         self.cx.simulate_keystrokes(keystrokes);
         self.cx.run_until_parked();
