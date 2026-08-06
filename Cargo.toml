@@ -19,6 +19,7 @@ repository = "https://github.com/fran0220/gpui-kit"
 rust-version = "1.97"
 
 [workspace.dependencies]
+unicode-segmentation = "1"
 anyhow = "1"
 gpui = { git = "https://github.com/fran0220/zed", rev = "cb2ce82766e42c55fc8563de3c5c98ac8e1c9fd9" }
 # Matches the instant type GPUI's executor clock returns, so tests can drive

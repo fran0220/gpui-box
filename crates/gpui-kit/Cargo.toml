@@ -8,6 +8,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+unicode-segmentation.workspace = true
 gpui.workspace = true
 gpui-kit-assets.workspace = true
 gpui-kit-semantics.workspace = true

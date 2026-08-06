@@ -7,8 +7,8 @@ use std::time::Duration;
 
 use anyhow::{Result, bail};
 use gpui::{
-    App, Bounds, Context, IntoElement, Render, SharedString, Window, WindowBounds, WindowOptions,
-    div, prelude::*, px, size,
+    App, Bounds, Context, Entity, IntoElement, Render, SharedString, Window, WindowBounds,
+    WindowOptions, div, prelude::*, px, size,
 };
 use gpui_kit::assets::{Icon, icon};
 use gpui_kit::overlay::popover;
@@ -46,6 +46,9 @@ struct Gallery {
     /// A single component scene from the library catalog, for review and
     /// capture in isolation.
     scene: Option<&'static str>,
+    search: Entity<TextInput>,
+    token: Entity<TextInput>,
+    rejected: Entity<TextInput>,
 }
 
 impl Render for Gallery {
@@ -141,6 +144,17 @@ impl Render for Gallery {
                             .child(Button::new("gallery.size.sm").label("Small").small())
                             .child(Button::new("gallery.size.md").label("Medium").medium())
                             .child(Button::new("gallery.size.lg").label("Large").large()),
+                    )
+                    .child(recipes::section_title(&theme, "Editing"))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap(px(theme.spacing.sm))
+                            .w(px(360.0))
+                            .child(self.search.clone())
+                            .child(self.token.clone())
+                            .child(self.rejected.clone()),
                     )
                     .child(recipes::section_title(&theme, "Status"))
                     .child(
@@ -407,7 +421,26 @@ fn main() {
                     window_bounds: Some(WindowBounds::Windowed(bounds)),
                     ..Default::default()
                 },
-                |_, cx| cx.new(|_| Gallery { lower_scene, scene }),
+                |window, cx| {
+                    cx.new(|cx| Gallery {
+                        lower_scene,
+                        scene,
+                        search: cx.new(|cx| {
+                            TextInput::new("gallery.search", window, cx).placeholder("Search")
+                        }),
+                        token: cx.new(|cx| {
+                            TextInput::new("gallery.token", window, cx)
+                                .placeholder("sk-...")
+                                .secret(true)
+                        }),
+                        rejected: cx.new(|cx| {
+                            TextInput::new("gallery.rejected", window, cx)
+                                .text("not an email")
+                                .invalid(true)
+                                .required(true)
+                        }),
+                    })
+                },
             )
             .expect("open gallery window");
 

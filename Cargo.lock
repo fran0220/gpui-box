@@ -2063,6 +2063,7 @@ dependencies = [
  "gpui-kit-testkit",
  "gpui-kit-theme",
  "gpui-kit-tokens",
+ "unicode-segmentation",
  "web-time",
 ]
 

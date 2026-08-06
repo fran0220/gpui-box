@@ -33,6 +33,16 @@ native-surface portals. `gpui-kit` links these crates by public Git revision.
 
 The Apache-2.0 text is stored at `licenses/ZED-APACHE-2.0.txt`.
 
+### P02a: Text input structure
+
+`crates/gpui-kit/src/controls/input/` follows the editing architecture shown in
+GPUI's own `crates/gpui/examples/input.rs` at the pinned revision above: the
+`EntityInputHandler` implementation, the UTF-8 to UTF-16 offset conversion an
+input method requires, and a custom element that shapes one line and paints the
+caret and selection around it. That structure is dictated by the GPUI API. The
+editing model, key bindings, masking, length limits, scrolling, semantics, and
+theming are this repository's own work, under the same Apache-2.0 terms.
+
 ## P03: Geist
 
 - Source: <https://vercel.com/font>

@@ -4,9 +4,10 @@
 //! gallery and the audit tests consume, so a component cannot be reviewed
 //! visually in one arrangement and tested in another.
 
-use gpui::{AnyElement, App, IntoElement, Window, div, prelude::*, px};
-use gpui_kit_theme::Theme;
+use gpui::{AnyElement, App, Entity, Global, IntoElement, Window, div, prelude::*, px};
+use gpui_kit_theme::{Space, Theme};
 
+use crate::controls::input::TextInput;
 use crate::display::badge::Tone;
 use crate::foundation::ActiveTheme;
 use crate::overlay::{Kbd, Overlay, Placement};
@@ -48,6 +49,10 @@ pub fn catalog() -> Vec<Scene> {
         Scene {
             name: "loading",
             build: loading,
+        },
+        Scene {
+            name: "input",
+            build: input,
         },
         Scene {
             name: "kbd",
@@ -273,6 +278,60 @@ fn overlay(_window: &mut Window, cx: &mut App) -> AnyElement {
                         ),
                 ),
         )
+        .into_any_element()
+}
+
+/// The inputs the scene shows, kept across frames.
+///
+/// An editable control carries state, so the scene builds its entities once
+/// rather than on every frame, which would discard whatever was typed.
+struct SceneInputs {
+    token: Entity<TextInput>,
+    disabled: Entity<TextInput>,
+    invalid: Entity<TextInput>,
+}
+
+impl Global for SceneInputs {}
+
+fn input(window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<SceneInputs>() {
+        let inputs = SceneInputs {
+            token: cx.new(|cx| {
+                TextInput::new("scene.input.token", window, cx)
+                    .placeholder("sk-...")
+                    .secret(true)
+            }),
+            disabled: cx.new(|cx| {
+                TextInput::new("scene.input.disabled", window, cx)
+                    .text("read only")
+                    .disabled(true)
+            }),
+            invalid: cx.new(|cx| {
+                TextInput::new("scene.input.invalid", window, cx)
+                    .text("not an email")
+                    .invalid(true)
+                    .required(true)
+            }),
+        };
+        cx.set_global(inputs);
+    }
+    let inputs = cx.global::<SceneInputs>();
+    let (token, disabled, invalid) = (
+        inputs.token.clone(),
+        inputs.disabled.clone(),
+        inputs.invalid.clone(),
+    );
+    let theme = cx.theme().clone();
+
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(theme.space(Space::Md)))
+        .p(px(theme.space(Space::Lg)))
+        .w(px(360.0))
+        .child(token)
+        .child(disabled)
+        .child(invalid)
         .into_any_element()
 }
 

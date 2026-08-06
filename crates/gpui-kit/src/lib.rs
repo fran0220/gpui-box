@@ -34,6 +34,7 @@ use gpui::App;
 pub mod prelude {
     pub use crate::controls::button::{Button, ButtonVariant, IconPosition};
     pub use crate::controls::field::{FieldFrame, SearchFrame};
+    pub use crate::controls::input::{TextInput, TextInputEvent};
     pub use crate::display::badge::{Badge, Tone};
     pub use crate::display::card::{Card, ListRow};
     pub use crate::display::loading::{GradientSpinner, PulseLoader, Skeleton};
@@ -52,4 +53,5 @@ pub fn install(cx: &mut App) {
     gpui_kit_assets::register_fonts(cx);
     gpui_kit_theme::Theme::install(cx);
     gpui_kit_semantics::install(cx);
+    controls::input::install(cx);
 }
