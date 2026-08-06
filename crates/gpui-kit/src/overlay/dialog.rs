@@ -18,9 +18,7 @@ use crate::controls::button::{Button, ButtonVariant};
 use crate::foundation::{Ident, StyledExt};
 use crate::overlay::focus::FocusTrap;
 use crate::overlay::layer::{Overlay, surface};
-
-/// Builds the dialog body for one frame.
-type Body = Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>;
+use crate::overlay::panel::{self, Body};
 
 /// What the dialog reports. The owner decides what any of it means.
 ///
@@ -336,33 +334,9 @@ impl Render for Dialog {
             spec = spec.text(title.clone());
         }
 
-        let heading = (!title.is_empty()).then(|| {
-            div()
-                .text_size(px(theme.typography.title.size))
-                .line_height(px(theme.typography.title.line_height))
-                .font_weight(gpui::FontWeight(theme.typography.title.weight))
-                .child(title)
-                .semantic_in(
-                    cx,
-                    NodeSpec::new(self.ident.child("title").semantic_id(), Role::Heading)
-                        .parent(self.ident.semantic_id())
-                        .level(1)
-                        .text(self.title.clone()),
-                )
-        });
-        let description = description.map(|description| {
-            div()
-                .text_size(px(theme.typography.body.size))
-                .line_height(px(theme.typography.body.line_height))
-                .text_color(theme.colors.text_muted)
-                .child(description.clone())
-                .semantic_in(
-                    cx,
-                    NodeSpec::new(self.ident.child("description").semantic_id(), Role::Text)
-                        .parent(self.ident.semantic_id())
-                        .text(description),
-                )
-        });
+        let heading = (!title.is_empty()).then(|| panel::heading(&self.ident, &theme, title, cx));
+        let description =
+            description.map(|description| panel::description(&self.ident, &theme, description, cx));
 
         let mut card = surface(&theme, Elevation::Modal)
             .w(px(360.0))

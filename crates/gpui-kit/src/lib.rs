@@ -19,6 +19,7 @@ pub mod data;
 pub mod display;
 pub mod effects;
 pub mod foundation;
+pub mod layout;
 pub mod motion;
 pub mod navigation;
 pub mod overlay;
@@ -64,12 +65,18 @@ pub mod prelude {
         ActiveTheme, ControlSize, Density, Disableable, Elevation, Ident, Layer, Selectable,
         Sizable, StyledExt, ThemeRegistry, activate_theme, set_density,
     };
+    pub use crate::layout::{
+        ScrollArea, ScrollAxis, SplitAxis, SplitPane, SplitSide, Toolbar, ToolbarItem,
+    };
     pub use crate::motion::{Presence, Transition};
-    pub use crate::navigation::{Accordion, AccordionSection, Breadcrumb, Crumb, TabItem, Tabs};
+    pub use crate::navigation::{
+        Accordion, AccordionSection, Breadcrumb, Crumb, PageTotal, Pagination, Sidebar,
+        SidebarItem, SidebarSection, TabItem, Tabs,
+    };
     pub use crate::overlay::{
         Command, CommandPalette, CommandPaletteEvent, ContextMenu, ContextMenuEvent, Dialog,
-        DialogEvent, FocusTrap, Kbd, Menu, MenuEvent, MenuItem, Overlay, Placement, Popover,
-        PopoverEvent, Toast, ToastCorner, ToastLayer, Tooltip, Tooltipped,
+        DialogEvent, Drawer, DrawerEvent, Edge, FocusTrap, Kbd, Menu, MenuEvent, MenuItem, Overlay,
+        Placement, Popover, PopoverEvent, Toast, ToastCorner, ToastLayer, Tooltip, Tooltipped,
     };
     pub use crate::state::{AsyncStatus, AsyncValue, Loadable};
 }

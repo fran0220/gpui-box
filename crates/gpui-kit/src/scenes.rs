@@ -21,7 +21,7 @@ use crate::controls::textarea::TextArea;
 use crate::display::badge::Tone;
 use crate::foundation::ActiveTheme;
 use crate::overlay::toast::push as toast_push;
-use crate::overlay::{Kbd, Overlay, Placement, Tooltip, Tooltipped};
+use crate::overlay::{Edge, Kbd, Overlay, Placement, Tooltip, Tooltipped};
 use crate::prelude::*;
 
 pub struct Scene {
@@ -140,6 +140,30 @@ pub fn catalog() -> Vec<Scene> {
         Scene {
             name: "tree",
             build: tree,
+        },
+        Scene {
+            name: "split-pane",
+            build: split_pane,
+        },
+        Scene {
+            name: "scroll-area",
+            build: scroll_area,
+        },
+        Scene {
+            name: "toolbar",
+            build: toolbar,
+        },
+        Scene {
+            name: "sidebar",
+            build: sidebar,
+        },
+        Scene {
+            name: "pagination",
+            build: pagination,
+        },
+        Scene {
+            name: "drawer",
+            build: drawer,
         },
     ]
 }
@@ -1254,6 +1278,359 @@ fn textarea(window: &mut Window, cx: &mut App) -> AnyElement {
         .child(notes)
         .child(review)
         .child(frozen)
+        .into_any_element()
+}
+
+/// A pane of fixture copy, for a scene that needs something on both sides of a
+/// divider or below a viewport.
+fn filler(theme: &Theme, title: &'static str, lines: usize) -> gpui::Div {
+    let mut pane = div()
+        .flex()
+        .flex_col()
+        .gap(px(theme.space(Space::Xs)))
+        .p(px(theme.space(Space::Md)))
+        .child(
+            div()
+                .type_scale(theme, gpui_kit_theme::TypeScale::Label)
+                .child(SharedString::from(title)),
+        );
+    for line in 1..=lines {
+        pane = pane.child(
+            div()
+                .type_scale(theme, gpui_kit_theme::TypeScale::Caption)
+                .text_color(theme.colors.text_muted)
+                .child(SharedString::from(format!("Fixture line {line:02}"))),
+        );
+    }
+    pane
+}
+
+fn split_pane(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(620.0))
+        .h(px(380.0))
+        .child(
+            div()
+                .h(px(320.0))
+                .hairline(&theme)
+                .radius(&theme, Radius::Card)
+                .overflow_hidden()
+                .child(
+                    SplitPane::new("scene.split.workspace")
+                        .horizontal()
+                        .ratio(0.34)
+                        .min_sizes(120.0, 200.0)
+                        .collapsible(true)
+                        .handle_label("Resize the file tree")
+                        .start(filler(&theme, "Files", 6))
+                        .end(filler(&theme, "Editor", 8))
+                        .on_resize(|_, _, _| {})
+                        .on_collapse(|_, _, _| {}),
+                ),
+        )
+        .into_any_element()
+}
+
+fn scroll_area(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(480.0))
+        .child(
+            div()
+                .hairline(&theme)
+                .radius(&theme, Radius::Card)
+                .overflow_hidden()
+                .child(
+                    ScrollArea::new("scene.scroll.output")
+                        .label("Run output")
+                        .vertical()
+                        .height(200.0)
+                        .child(filler(&theme, "Output", 20)),
+                ),
+        )
+        // Nothing overflows here, so no scrollbar is drawn or published.
+        .child(
+            div()
+                .hairline(&theme)
+                .radius(&theme, Radius::Card)
+                .overflow_hidden()
+                .child(
+                    ScrollArea::new("scene.scroll.summary")
+                        .label("Summary")
+                        .vertical()
+                        .height(120.0)
+                        .child(filler(&theme, "Summary", 2)),
+                ),
+        )
+        .into_any_element()
+}
+
+/// The overflow menu of the toolbar scene, kept across frames.
+struct SceneToolbar {
+    overflow: Entity<Menu>,
+}
+
+impl Global for SceneToolbar {}
+
+fn toolbar(window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<SceneToolbar>() {
+        let overflow = cx.new(|cx| {
+            Menu::new("scene.toolbar.overflow", window, cx)
+                .trigger_icon(Icon::List)
+                .trigger_name("More actions")
+        });
+        cx.set_global(SceneToolbar { overflow });
+    }
+    let overflow = cx.global::<SceneToolbar>().overflow.clone();
+    let theme = cx.theme().clone();
+
+    stack(&theme)
+        .w(px(620.0))
+        .child(
+            Toolbar::new("scene.toolbar.editor")
+                .label("Editor actions")
+                .group(
+                    "history",
+                    [
+                        ToolbarItem::new(
+                            "editor.undo",
+                            "Undo",
+                            IconButton::new("scene.toolbar.undo", Icon::ArrowLeft, "Undo")
+                                .ghost()
+                                .small()
+                                .on_click(|_, _| {}),
+                        )
+                        .icon(Icon::ArrowLeft)
+                        .shortcut("cmd-z"),
+                        ToolbarItem::new(
+                            "editor.redo",
+                            "Redo",
+                            IconButton::new("scene.toolbar.redo", Icon::ArrowRight, "Redo")
+                                .ghost()
+                                .small()
+                                .on_click(|_, _| {}),
+                        )
+                        .icon(Icon::ArrowRight),
+                    ],
+                )
+                .group(
+                    "view",
+                    [ToolbarItem::new(
+                        "editor.view",
+                        "View",
+                        SegmentedControl::new("scene.toolbar.view")
+                            .label("View")
+                            .segments([
+                                Segment::new("code", "Code"),
+                                Segment::new("split", "Split"),
+                                Segment::new("preview", "Preview"),
+                            ])
+                            .selected("split")
+                            .small()
+                            .on_select(|_, _, _| {}),
+                    )],
+                )
+                .spacer()
+                .group(
+                    "publish",
+                    [
+                        ToolbarItem::new(
+                            "editor.share",
+                            "Share",
+                            Button::new("scene.toolbar.share")
+                                .label("Share")
+                                .secondary()
+                                .small()
+                                .on_click(|_, _| {}),
+                        )
+                        .icon(Icon::Copy),
+                        ToolbarItem::new(
+                            "editor.publish",
+                            "Publish",
+                            Button::new("scene.toolbar.publish")
+                                .label("Publish")
+                                .primary()
+                                .small()
+                                .on_click(|_, _| {}),
+                        )
+                        .icon(Icon::ArchiveUp),
+                        ToolbarItem::new(
+                            "editor.archive",
+                            "Archive",
+                            Button::new("scene.toolbar.archive")
+                                .label("Archive")
+                                .secondary()
+                                .small()
+                                .on_click(|_, _| {}),
+                        )
+                        .icon(Icon::Archive)
+                        .disabled(true),
+                    ],
+                )
+                .overflow_after(4)
+                .overflow_menu(overflow),
+        )
+        .child(div().child("The last two actions moved into the overflow menu."))
+        .into_any_element()
+}
+
+fn navigation_sections() -> Vec<SidebarSection> {
+    vec![
+        SidebarSection::new("work").title("Work").items([
+            SidebarItem::new("runs", "Runs")
+                .icon(Icon::List)
+                .badge("12")
+                .children([
+                    SidebarItem::new("runs.active", "Active").icon(Icon::Refresh),
+                    SidebarItem::new("runs.archived", "Archived").icon(Icon::Archive),
+                ]),
+            SidebarItem::new("files", "Files").icon(Icon::Folder),
+        ]),
+        SidebarSection::new("admin").title("Administration").items([
+            SidebarItem::new("settings", "Settings").icon(Icon::Settings),
+            SidebarItem::new("policy", "Managed by policy")
+                .icon(Icon::Key)
+                .disabled(true),
+        ]),
+    ]
+}
+
+fn sidebar(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let rail = |ident: &'static str, collapsed: bool| {
+        Sidebar::new(ident)
+            .sections(navigation_sections())
+            .active("runs.active")
+            .collapsed(collapsed)
+            .footer(
+                div()
+                    .type_scale(&theme, gpui_kit_theme::TypeScale::Caption)
+                    .text_color(theme.colors.text_faint)
+                    .child(if collapsed {
+                        SharedString::new_static("v0")
+                    } else {
+                        SharedString::new_static("Fixture workspace")
+                    }),
+            )
+            .on_select(|_, _, _| {})
+    };
+
+    stack(&theme)
+        .h(px(420.0))
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .h(px(360.0))
+                .gap(px(theme.space(Space::Lg)))
+                .child(rail("scene.sidebar.expanded", false))
+                .child(rail("scene.sidebar.collapsed", true)),
+        )
+        .into_any_element()
+}
+
+/// The page-size control of the pagination scene, kept across frames.
+struct ScenePagination {
+    page_size: Entity<Select>,
+}
+
+impl Global for ScenePagination {}
+
+fn pagination(window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<ScenePagination>() {
+        let page_size = cx.new(|cx| {
+            Select::new("scene.pagination.size", window, cx)
+                .options([
+                    SelectOption::new("25", "25 per page"),
+                    SelectOption::new("50", "50 per page"),
+                    SelectOption::new("100", "100 per page"),
+                ])
+                .selected("50")
+        });
+        cx.set_global(ScenePagination { page_size });
+    }
+    let page_size = cx.global::<ScenePagination>().page_size.clone();
+    let theme = cx.theme().clone();
+
+    stack(&theme)
+        .w(px(620.0))
+        .child(
+            Pagination::new("scene.pagination.known")
+                .page(9)
+                .total_pages(20)
+                .page_size(page_size)
+                .on_select(|_, _, _| {}),
+        )
+        // A host that only knows there is another page says exactly that: no
+        // last-page control, no numbers, and no total.
+        .child(
+            Pagination::new("scene.pagination.unknown")
+                .page(3)
+                .unknown_total(true)
+                .on_select(|_, _, _| {}),
+        )
+        .into_any_element()
+}
+
+/// The drawer the scene shows, kept across frames and settled so the capture
+/// photographs the panel where it comes to rest rather than mid-slide.
+struct SceneDrawer {
+    filters: Entity<Drawer>,
+}
+
+impl Global for SceneDrawer {}
+
+fn drawer(window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<SceneDrawer>() {
+        let filters = cx.new(|cx| {
+            Drawer::new("scene.drawer.filters", window, cx)
+                .edge(Edge::Right)
+                .size(320.0)
+                .title("Filter runs")
+                .description("The drawer reports what was chosen. The host applies it.")
+                .content(|_, cx| {
+                    let theme = cx.theme().clone();
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap(px(theme.space(Space::Sm)))
+                        .child(
+                            Checkbox::new("scene.drawer.failed")
+                                .label("Failed runs only")
+                                .checked(true)
+                                .on_change(|_, _, _| {}),
+                        )
+                        .child(
+                            Checkbox::new("scene.drawer.mine")
+                                .label("Started by me")
+                                .on_change(|_, _, _| {}),
+                        )
+                        .into_any_element()
+                })
+                .footer(|_, _| {
+                    Button::new("scene.drawer.apply")
+                        .label("Apply")
+                        .primary()
+                        .full_width(true)
+                        .on_click(|_, _| {})
+                        .into_any_element()
+                })
+        });
+        filters.update(cx, |drawer, cx| {
+            drawer.open(window, cx);
+            drawer.settle(cx);
+        });
+        cx.set_global(SceneDrawer { filters });
+    }
+    let filters = cx.global::<SceneDrawer>().filters.clone();
+    let theme = cx.theme().clone();
+
+    stack(&theme)
+        .w(px(620.0))
+        .h(px(400.0))
+        .child(div().child("Content behind the drawer"))
+        .child(filters)
         .into_any_element()
 }
 

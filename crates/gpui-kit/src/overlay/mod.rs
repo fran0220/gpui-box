@@ -2,8 +2,9 @@
 //!
 //! [`Overlay`] owns placement, stacking and dismissal; [`FocusTrap`] keeps the
 //! keyboard inside an open overlay and gives focus back when it closes.
-//! [`Dialog`] composes both into a modal that asks one question, and
-//! [`Tooltip`] is hover-delayed help that is never the only way to act.
+//! [`Dialog`] composes both into a modal that asks one question, [`Drawer`] is
+//! the same surface arriving from an edge, and [`Tooltip`] is hover-delayed
+//! help that is never the only way to act.
 //! [`ToastLayer`] holds transient notifications, which report what happened
 //! and never hide a failure on a timer.
 //!
@@ -12,19 +13,22 @@
 //! the pointer, and [`CommandPalette`] filters it from the keyboard.
 
 mod dialog;
+mod drawer;
 mod focus;
 mod kbd;
 mod layer;
 mod menu;
 mod palette;
+pub mod panel;
 pub mod popover;
 pub mod toast;
 pub mod tooltip;
 
 pub use dialog::{Dialog, DialogEvent};
+pub use drawer::{Drawer, DrawerEvent};
 pub use focus::FocusTrap;
 pub use kbd::{Kbd, caps};
-pub use layer::{Overlay, Placement, priority, surface};
+pub use layer::{Edge, Overlay, Placement, priority, surface};
 pub use menu::{ContextMenu, ContextMenuEvent, Menu, MenuEvent, MenuItem};
 pub use palette::{Command, CommandPalette, CommandPaletteEvent};
 pub use popover::{Popover, PopoverEvent};

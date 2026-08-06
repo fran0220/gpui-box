@@ -16,6 +16,27 @@ use crate::foundation::{ActiveTheme, Ident, StyledExt};
 
 type DismissHandler = Rc<dyn Fn(&mut Window, &mut App)>;
 
+/// One side of the window.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Edge {
+    Left,
+    Right,
+    Top,
+    Bottom,
+}
+
+impl Edge {
+    /// True when the surface stretches vertically and is pinned horizontally.
+    pub fn is_horizontal(self) -> bool {
+        matches!(self, Self::Left | Self::Right)
+    }
+
+    /// True when the surface hangs off the low end of its axis.
+    pub fn is_leading(self) -> bool {
+        matches!(self, Self::Left | Self::Top)
+    }
+}
+
 /// Where a floating surface sits.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Placement {
@@ -28,6 +49,8 @@ pub enum Placement {
     At(Point<Pixels>),
     /// Centered in the window.
     Center,
+    /// Pinned to one side of the window and stretched along it.
+    Edge(Edge),
 }
 
 /// A floating surface.
@@ -74,6 +97,15 @@ impl Overlay {
         Self::new(ident)
             .layer(Layer::Modal)
             .placement(Placement::Center)
+            .scrim(true)
+    }
+
+    /// A drawer: pinned to one side of the window, on the modal layer, behind
+    /// a scrim.
+    pub fn edge(ident: impl Into<Ident>, edge: Edge) -> Self {
+        Self::new(ident)
+            .layer(Layer::Modal)
+            .placement(Placement::Edge(edge))
             .scrim(true)
     }
 
@@ -146,6 +178,28 @@ impl RenderOnce for Overlay {
                 .justify_center()
                 .child(surface)
                 .into_any_element(),
+            // The surface keeps its own size along the pinned axis and is
+            // left to stretch across the other one, which is what makes a
+            // drawer reach both ends of the side it hangs from.
+            Placement::Edge(edge) => {
+                scrim_frame(&theme, viewport, self.scrim, self.on_dismiss.clone())
+                    .map(|frame| {
+                        if edge.is_horizontal() {
+                            frame.flex_row()
+                        } else {
+                            frame.flex_col()
+                        }
+                    })
+                    .map(|frame| {
+                        if edge.is_leading() {
+                            frame.justify_start()
+                        } else {
+                            frame.justify_end()
+                        }
+                    })
+                    .child(surface)
+                    .into_any_element()
+            }
             _ if self.scrim => scrim_frame(&theme, viewport, true, self.on_dismiss.clone())
                 .child(anchored.child(surface))
                 .into_any_element(),

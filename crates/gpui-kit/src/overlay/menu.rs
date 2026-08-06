@@ -630,6 +630,12 @@ impl Menu {
         self
     }
 
+    /// The rows the menu currently offers, so an owner that maintains them can
+    /// tell whether a replacement would change anything.
+    pub fn offered(&self) -> &[MenuItem] {
+        &self.items
+    }
+
     /// Replaces the items from the host side, dropping a cursor that pointed
     /// into what is no longer offered.
     pub fn set_items(&mut self, items: Vec<MenuItem>, cx: &mut Context<Self>) {

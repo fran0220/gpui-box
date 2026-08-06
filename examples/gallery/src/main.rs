@@ -62,6 +62,9 @@ struct Gallery {
     menu: Entity<Menu>,
     records: Entity<ContextMenu>,
     palette: Entity<CommandPalette>,
+    overflow: Entity<Menu>,
+    page_size: Entity<Select>,
+    filter_drawer: Entity<Drawer>,
 }
 
 fn gallery_menu_items() -> Vec<MenuItem> {
@@ -645,7 +648,176 @@ impl Render for Gallery {
                         "A success times out. A warning or a danger notification stays until it \
                          is dismissed, and a pointer resting on one pauses its timer.",
                     ))
+                    .child(recipes::section_title(&theme, "Toolbar"))
+                    .child(
+                        Toolbar::new("gallery.toolbar")
+                            .label("Editor actions")
+                            .group(
+                                "history",
+                                [
+                                    ToolbarItem::new(
+                                        "editor.undo",
+                                        "Undo",
+                                        IconButton::new(
+                                            "gallery.toolbar.undo",
+                                            Icon::ArrowLeft,
+                                            "Undo",
+                                        )
+                                        .ghost()
+                                        .small()
+                                        .on_click(|_, _| {}),
+                                    )
+                                    .icon(Icon::ArrowLeft)
+                                    .shortcut("cmd-z"),
+                                    ToolbarItem::new(
+                                        "editor.redo",
+                                        "Redo",
+                                        IconButton::new(
+                                            "gallery.toolbar.redo",
+                                            Icon::ArrowRight,
+                                            "Redo",
+                                        )
+                                        .ghost()
+                                        .small()
+                                        .on_click(|_, _| {}),
+                                    )
+                                    .icon(Icon::ArrowRight),
+                                ],
+                            )
+                            .spacer()
+                            .group(
+                                "publish",
+                                [
+                                    ToolbarItem::new(
+                                        "editor.share",
+                                        "Share",
+                                        Button::new("gallery.toolbar.share")
+                                            .label("Share")
+                                            .secondary()
+                                            .small()
+                                            .on_click(|_, _| {}),
+                                    )
+                                    .icon(Icon::Copy),
+                                    ToolbarItem::new(
+                                        "editor.publish",
+                                        "Publish",
+                                        Button::new("gallery.toolbar.publish")
+                                            .label("Publish")
+                                            .primary()
+                                            .small()
+                                            .on_click(|_, _| {}),
+                                    )
+                                    .icon(Icon::ArchiveUp),
+                                    ToolbarItem::new(
+                                        "editor.archive",
+                                        "Archive",
+                                        Button::new("gallery.toolbar.archive")
+                                            .label("Archive")
+                                            .secondary()
+                                            .small()
+                                            .on_click(|_, _| {}),
+                                    )
+                                    .icon(Icon::Archive)
+                                    .disabled(true),
+                                ],
+                            )
+                            .overflow_after(3)
+                            .overflow_menu(self.overflow.clone()),
+                    )
+                    .child(recipes::footnote(
+                        &theme,
+                        "An action past the declared cut is moved into the overflow menu, never \
+                         dropped: it keeps its identity, its label, and its refusal.",
+                    ))
+                    .child(recipes::section_title(&theme, "Split and scroll"))
+                    .child(
+                        div()
+                            .h(px(240.0))
+                            .rounded(px(theme.radii.card))
+                            .border(px(theme.borders.hairline))
+                            .border_color(theme.colors.hairline)
+                            .overflow_hidden()
+                            .child(
+                                SplitPane::new("gallery.split")
+                                    .horizontal()
+                                    .ratio(0.35)
+                                    .min_sizes(140.0, 220.0)
+                                    .collapsible(true)
+                                    .handle_label("Resize the run list")
+                                    .start(
+                                        ScrollArea::new("gallery.split.runs")
+                                            .label("Runs")
+                                            .vertical()
+                                            .child(fixture_lines(&theme, "Run", 24)),
+                                    )
+                                    .end(
+                                        ScrollArea::new("gallery.split.detail")
+                                            .label("Run detail")
+                                            .vertical()
+                                            .child(fixture_lines(&theme, "Detail line", 6)),
+                                    )
+                                    .on_resize(|_, _, _| {})
+                                    .on_collapse(|_, _, _| {}),
+                            ),
+                    )
+                    .child(recipes::footnote(
+                        &theme,
+                        "The right pane fits its content, so it publishes no scrollbar at all. \
+                         An absent scrollbar is how a reader learns there is nothing more.",
+                    ))
+                    .child(recipes::section_title(&theme, "Sidebar"))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .h(px(320.0))
+                            .gap(px(theme.spacing.lg))
+                            .child(
+                                Sidebar::new("gallery.rail")
+                                    .sections(gallery_places())
+                                    .active("runs.active")
+                                    .footer(recipes::footnote(&theme, "Fixture workspace"))
+                                    .on_select(|_, _, _| {}),
+                            )
+                            .child(
+                                Sidebar::new("gallery.rail.collapsed")
+                                    .sections(gallery_places())
+                                    .active("runs.active")
+                                    .collapsed(true)
+                                    .on_select(|_, _, _| {}),
+                            ),
+                    )
+                    .child(recipes::section_title(&theme, "Pagination"))
+                    .child(
+                        Pagination::new("gallery.pages")
+                            .page(9)
+                            .total_pages(20)
+                            .page_size(self.page_size.clone())
+                            .on_select(|_, _, _| {}),
+                    )
+                    .child(
+                        Pagination::new("gallery.pages.unknown")
+                            .page(3)
+                            .unknown_total(true)
+                            .on_select(|_, _, _| {}),
+                    )
+                    .child(recipes::footnote(
+                        &theme,
+                        "A host that can only say whether one more page exists says exactly \
+                         that: no last page, no numbers, and no total in the copy.",
+                    ))
+                    .child(recipes::section_title(&theme, "Drawer"))
+                    .child({
+                        let drawer = self.filter_drawer.clone();
+                        Button::new("gallery.drawer.open")
+                            .label("Filter runs")
+                            .secondary()
+                            .on_click(move |window, cx| {
+                                drawer.update(cx, |drawer, cx| drawer.open(window, cx));
+                            })
+                    })
                     .child(self.confirm.clone())
+                    .child(self.filter_drawer.clone())
                     .child(self.toasts.clone())
                     .child(recipes::footnote(
                         &theme,
@@ -760,6 +932,44 @@ const FIXTURE_RECORDS: usize = 240;
 
 /// Synthetic rows. Nothing here stands for a product; the identities are
 /// fixture keys.
+/// Fixture copy, long enough for a scroll area to have something to scroll.
+fn fixture_lines(theme: &Theme, title: &str, lines: usize) -> gpui::Div {
+    let mut pane = div()
+        .flex()
+        .flex_col()
+        .gap(px(theme.spacing.xs))
+        .p(px(theme.spacing.md));
+    for line in 1..=lines {
+        pane = pane.child(
+            div()
+                .text_color(theme.colors.text_muted)
+                .child(SharedString::from(format!("{title} {line:02}"))),
+        );
+    }
+    pane
+}
+
+fn gallery_places() -> Vec<SidebarSection> {
+    vec![
+        SidebarSection::new("work").title("Work").items([
+            SidebarItem::new("runs", "Runs")
+                .icon(Icon::List)
+                .badge("12")
+                .children([
+                    SidebarItem::new("runs.active", "Active").icon(Icon::Refresh),
+                    SidebarItem::new("runs.archived", "Archived").icon(Icon::Archive),
+                ]),
+            SidebarItem::new("files", "Files").icon(Icon::Folder),
+        ]),
+        SidebarSection::new("admin").title("Administration").items([
+            SidebarItem::new("settings", "Settings").icon(Icon::Settings),
+            SidebarItem::new("policy", "Managed by policy")
+                .icon(Icon::Key)
+                .disabled(true),
+        ]),
+    ]
+}
+
 fn fixture_runs() -> Vec<Row> {
     [
         ("run-a04", "Indexing", "Ready", Tone::Success, "4m 12s"),
@@ -1128,6 +1338,57 @@ fn main() {
                         palette: cx.new(|cx| {
                             CommandPalette::new("gallery.palette", window, cx)
                                 .commands(gallery_commands())
+                        }),
+                        overflow: cx.new(|cx| {
+                            Menu::new("gallery.toolbar.overflow", window, cx)
+                                .trigger_icon(Icon::List)
+                                .trigger_name("More actions")
+                        }),
+                        page_size: cx.new(|cx| {
+                            Select::new("gallery.pages.size", window, cx)
+                                .options([
+                                    SelectOption::new("25", "25 per page"),
+                                    SelectOption::new("50", "50 per page"),
+                                    SelectOption::new("100", "100 per page"),
+                                ])
+                                .selected("50")
+                        }),
+                        filter_drawer: cx.new(|cx| {
+                            Drawer::new("gallery.drawer", window, cx)
+                                .edge(Edge::Right)
+                                .size(340.0)
+                                .title("Filter runs")
+                                .description(
+                                    "The drawer reports what was chosen. \
+                                     The application decides what it means.",
+                                )
+                                .content(|_, cx| {
+                                    let theme = Theme::get(cx).clone();
+                                    div()
+                                        .flex()
+                                        .flex_col()
+                                        .gap(px(theme.spacing.sm))
+                                        .child(
+                                            Checkbox::new("gallery.drawer.failed")
+                                                .label("Failed runs only")
+                                                .checked(true)
+                                                .on_change(|_, _, _| {}),
+                                        )
+                                        .child(
+                                            Checkbox::new("gallery.drawer.mine")
+                                                .label("Started by me")
+                                                .on_change(|_, _, _| {}),
+                                        )
+                                        .into_any_element()
+                                })
+                                .footer(|_, _| {
+                                    Button::new("gallery.drawer.apply")
+                                        .label("Apply")
+                                        .primary()
+                                        .full_width(true)
+                                        .on_click(|_, _| {})
+                                        .into_any_element()
+                                })
                         }),
                     })
                 },

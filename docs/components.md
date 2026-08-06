@@ -47,6 +47,51 @@ that must survive a frame is a view.
 | `Tabs` | builder | the tab that was picked | Renders the strip only, never a panel, so no `TabPanel` node is published; the caller renders the body. Left, right, home, and end move between tabs, skipping disabled ones and stopping at the ends |
 | `Accordion` | builder | a section id and the state it should take | A closed section does not render its body at all. `exclusive` changes only what is reported: opening a section also reports a close for every other open one |
 | `Breadcrumb` | builder | the crumb that was picked, and the ids an ellipsis hides | The last crumb is the current place: it publishes `Text` rather than `Link` and installs no handler. `max_visible` collapses the middle of a long trail and publishes the hidden count |
+| `Sidebar` | builder | the place that was picked | Sections, badges, and one level of nesting. Collapsing narrows the drawing, never the substance: a glyph-only rail reaches each label through a `Tooltip` and every item still publishes its full name and its depth |
+| `Pagination` | builder | the page that was asked for | First, previous, next, last, and a numbered range with an ellipsis that says how many pages it stands for. A step with nowhere to go installs no handler. With `PageTotal::Unknown` there is no last-page control, no numbers, and no total in the copy |
+
+### An unknown page count is not a page count
+
+`PageTotal::Known` and `PageTotal::Unknown { has_next }` are different facts. A
+host that paginates a cursor knows only whether one more page exists, so that
+is all the control claims: it offers next and previous, states "Page 9" with no
+total, and publishes no `value` on the container. Rendering an invented last
+page would be a number nobody counted.
+
+## Layout
+
+| Component | Kind | Reports | Notes |
+|---|---|---|---|
+| `SplitPane` | builder | the ratio a drag or a keystroke asked for, and the side a double-click would collapse | Minimum sizes become a travel range published on the divider, and a drag past a minimum reports the minimum rather than a value the caller would have to clamp. A pane at ratio 0 or 1 drops its content instead of drawing it at zero size |
+| `ScrollArea` | builder | — | Scroll position is transient view state, held per identity like `List`. A gutter is reserved for every enabled axis whether or not a thumb is drawn, so turning a scrollbar on never reflows the content that decided it was needed |
+| `Toolbar` | builder | — | Groups separated by rules, a spacer, and an overflow menu. Every action inside still reports itself |
+
+### A scrollbar that is absent means there is nothing more
+
+A viewport can mean two different things: the content fits, or there is more
+off screen. `ScrollArea` publishes a `Scrollbar` node **only** in the second
+case, carrying how far the content reaches and how far it has been scrolled. A
+test therefore tells the two apart from the tree, rather than guessing from
+what happens to be visible.
+
+Both the divider's travel and the scrollbar's reach are extents only layout
+knows, so they are measured during prepaint and published by the following
+frame. Tests deliver that frame themselves with `Harness::advance`.
+
+### Toolbar overflow is declared, not measured
+
+A truthful overflow would have to know how wide every item is before deciding
+which ones fit, but GPUI measures after the element tree is built and a
+toolbar child is an `AnyElement` that can be consumed exactly once — so a
+builder cannot measure a child and then still move it into a menu. Guessing at
+widths would produce a bar claiming to have dropped items it in fact drew.
+
+So the caller declares the cut with `Toolbar::overflow_after`, and the toolbar
+guarantees the part it can: an item past the cut is **moved**, never dropped.
+It becomes a row in the overflow `Menu` keeping its identity, its label, and
+its refusal, and the trigger publishes how many items went there. With no menu
+to move them into, every item is drawn inline, because losing an action is
+never the better failure.
 
 ## Data
 
@@ -86,6 +131,7 @@ a header that does not sort publishes a `Cell` and installs no handler.
 |---|---|---|
 | `Overlay` | builder | Placement, token-driven paint priority, scrim, dismissal |
 | `Dialog` | view | Composed modal: reports opened, confirmed, cancelled, dismissed, closed. A dialog that is not dismissable installs no escape or scrim handler |
+| `Drawer` | view | The same surface arriving from an edge: same scrim, same focus trap, same escape and scrim dismissal. It slides out through `Presence`, and because an element cannot animate after it is dropped it stays in the tree until the exit finishes and only then reports `Closed` |
 | `Popover` | view | The anchored surface `Menu` and `Select` are special cases of. Owns only whether it is open: the body is a per-frame callback, escape and a click outside dismiss it unless it is not dismissable, and closing gives the keyboard back to the trigger |
 | `Menu` | view | Commands, checkable rows, separators, section labels, and nested submenus, opened from a trigger. Up and down step over rules, labels, and refused rows; a letter jumps to the next row starting with it; right and left enter and leave a submenu; escape folds one submenu away before it closes the menu. Taking a row reports it once and closes the whole chain, and a refused row installs no handler |
 | `ContextMenu` | view | The same list opened at the pointer over a wrapped region. Reports the target it was opened on and selects nothing, because opening a menu is not choosing anything. A surface that would leave the viewport flips to the other side of the pointer |
