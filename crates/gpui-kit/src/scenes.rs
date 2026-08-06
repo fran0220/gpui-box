@@ -5,6 +5,7 @@
 //! visually in one arrangement and tested in another.
 
 use gpui::{AnyElement, App, Entity, Global, IntoElement, Window, div, prelude::*, px};
+use gpui_kit_assets::Icon;
 use gpui_kit_theme::{Space, Theme};
 
 use crate::controls::input::TextInput;
@@ -78,6 +79,18 @@ pub fn catalog() -> Vec<Scene> {
         Scene {
             name: "tooltip",
             build: tooltip,
+        },
+        Scene {
+            name: "tabs",
+            build: tabs,
+        },
+        Scene {
+            name: "accordion",
+            build: accordion,
+        },
+        Scene {
+            name: "breadcrumb",
+            build: breadcrumb,
         },
     ]
 }
@@ -357,6 +370,83 @@ fn tooltip(_window: &mut Window, cx: &mut App) -> AnyElement {
                 Tooltip::new("scene.tooltip.help", "Writes the theme to a file on disk")
                     .describes("scene.tooltip.export"),
             ),
+        )
+        .into_any_element()
+}
+
+fn tabs(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(520.0))
+        .child(
+            Tabs::new("scene.tabs.workspace")
+                .tabs([
+                    TabItem::new("overview", "Overview").icon(Icon::Widget),
+                    TabItem::new("runs", "Runs").badge("12"),
+                    TabItem::new("logs", "Logs"),
+                    TabItem::new("billing", "Billing").disabled(true),
+                ])
+                .selected("runs")
+                .on_select(|_, _, _| {}),
+        )
+        // The body belongs to the caller: tabs render the strip only.
+        .child(div().child("Runs are rendered by the caller, not by the strip."))
+        .into_any_element()
+}
+
+fn accordion(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(520.0))
+        .child(
+            Accordion::new("scene.accordion.settings")
+                .expanded_ids(&["network"])
+                .on_toggle(|_, _, _, _| {})
+                .section(
+                    AccordionSection::new("network", "Network")
+                        .description("How this machine reaches a host")
+                        .body(div().child("Requests go out over the system proxy.")),
+                )
+                .section(
+                    AccordionSection::new("storage", "Storage")
+                        .description("Where verified results are kept")
+                        .body(div().child("Nothing is written outside the workspace.")),
+                )
+                .section(
+                    AccordionSection::new("policy", "Managed by policy")
+                        .description("This machine cannot change these")
+                        .disabled(true)
+                        .body(div().child("Set by the administrator.")),
+                ),
+        )
+        .into_any_element()
+}
+
+fn breadcrumb(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(520.0))
+        .child(
+            Breadcrumb::new("scene.breadcrumb.short")
+                .crumbs([
+                    Crumb::new("workspace", "Workspace"),
+                    Crumb::new("runs", "Runs"),
+                    Crumb::new("run-4821", "Indexing"),
+                ])
+                .on_select(|_, _, _| {}),
+        )
+        .child(
+            Breadcrumb::new("scene.breadcrumb.long")
+                .crumbs([
+                    Crumb::new("workspace", "Workspace"),
+                    Crumb::new("projects", "Projects"),
+                    Crumb::new("gpui-kit", "gpui-kit"),
+                    Crumb::new("runs", "Runs"),
+                    Crumb::new("run-4821", "Indexing"),
+                ])
+                .max_visible(3)
+                .on_select(|_, _, _| {})
+                .on_reveal(|_, _, _| {}),
         )
         .into_any_element()
 }

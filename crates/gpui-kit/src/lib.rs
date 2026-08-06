@@ -19,6 +19,7 @@ pub mod display;
 pub mod effects;
 pub mod foundation;
 pub mod motion;
+pub mod navigation;
 pub mod overlay;
 pub mod scenes;
 pub mod state;
@@ -51,6 +52,7 @@ pub mod prelude {
         Sizable, StyledExt, ThemeRegistry, activate_theme, set_density,
     };
     pub use crate::motion::{Presence, Transition};
+    pub use crate::navigation::{Accordion, AccordionSection, Breadcrumb, Crumb, TabItem, Tabs};
     pub use crate::overlay::{
         Dialog, DialogEvent, FocusTrap, Kbd, Overlay, Placement, Tooltip, Tooltipped,
     };

@@ -31,6 +31,14 @@ that must survive a frame is a view.
 | `EmptyState` | builder | Names which of empty, unstarted, unavailable, or failed holds |
 | `PulseLoader`, `GradientSpinner`, `Skeleton` | builder | Publish a busy indeterminate node |
 
+## Navigation
+
+| Component | Kind | Reports | Notes |
+|---|---|---|---|
+| `Tabs` | builder | the tab that was picked | Renders the strip only, never a panel, so no `TabPanel` node is published; the caller renders the body. Left, right, home, and end move between tabs, skipping disabled ones and stopping at the ends |
+| `Accordion` | builder | a section id and the state it should take | A closed section does not render its body at all. `exclusive` changes only what is reported: opening a section also reports a close for every other open one |
+| `Breadcrumb` | builder | the crumb that was picked, and the ids an ellipsis hides | The last crumb is the current place: it publishes `Text` rather than `Link` and installs no handler. `max_visible` collapses the middle of a long trail and publishes the hidden count |
+
 ## Overlay
 
 | Component | Kind | Notes |
@@ -55,7 +63,6 @@ of moving its own checkmark.
 These are known gaps rather than deliberate omissions:
 
 - `TextArea`: multi-line editing with wrapped shaping and vertical motion.
-- `Tabs`, `Accordion`, `Breadcrumb`: navigation and disclosure.
 - `Table`, `Tree`, virtualized `List`: large data surfaces.
 - `Toast`: transient notifications with a stack and a timer.
 

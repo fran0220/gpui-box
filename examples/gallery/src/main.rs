@@ -206,6 +206,66 @@ impl Render for Gallery {
                                     .on_change(|_, _, _| {}),
                             ),
                     )
+                    .child(recipes::section_title(&theme, "Navigation"))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap(px(theme.spacing.md))
+                            .w(px(520.0))
+                            .child(
+                                Breadcrumb::new("gallery.trail")
+                                    .crumbs([
+                                        Crumb::new("workspace", "Workspace"),
+                                        Crumb::new("projects", "Projects"),
+                                        Crumb::new("gpui-kit", "gpui-kit"),
+                                        Crumb::new("runs", "Runs"),
+                                        Crumb::new("indexing", "Indexing"),
+                                    ])
+                                    .max_visible(3)
+                                    .on_select(|_, _, _| {})
+                                    .on_reveal(|_, _, _| {}),
+                            )
+                            .child(
+                                Tabs::new("gallery.tabs")
+                                    .tabs([
+                                        TabItem::new("overview", "Overview").icon(Icon::Widget),
+                                        TabItem::new("runs", "Runs").badge("12"),
+                                        TabItem::new("logs", "Logs"),
+                                        TabItem::new("billing", "Billing").disabled(true),
+                                    ])
+                                    .selected("runs")
+                                    .on_select(|_, _, _| {}),
+                            )
+                            // The body is the caller's: the strip reports the
+                            // tab that was picked and nothing else.
+                            .child(div().child("Runs are rendered by the caller."))
+                            .child(
+                                Accordion::new("gallery.sections")
+                                    .expanded_ids(&["network"])
+                                    .on_toggle(|_, _, _, _| {})
+                                    .section(
+                                        AccordionSection::new("network", "Network")
+                                            .description("How this machine reaches a host")
+                                            .body(div().child(
+                                                "Requests go out over the system proxy.",
+                                            )),
+                                    )
+                                    .section(
+                                        AccordionSection::new("storage", "Storage")
+                                            .description("Where verified results are kept")
+                                            .body(div().child(
+                                                "Nothing is written outside the workspace.",
+                                            )),
+                                    )
+                                    .section(
+                                        AccordionSection::new("policy", "Managed by policy")
+                                            .description("This machine cannot change these")
+                                            .disabled(true)
+                                            .body(div().child("Set by the administrator.")),
+                                    ),
+                            ),
+                    )
                     .child(recipes::section_title(&theme, "Status"))
                     .child(
                         div()
