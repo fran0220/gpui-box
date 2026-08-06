@@ -20,6 +20,7 @@ pub mod effects;
 pub mod foundation;
 pub mod motion;
 pub mod overlay;
+pub mod scenes;
 pub mod state;
 
 pub use gpui_kit_assets as assets;

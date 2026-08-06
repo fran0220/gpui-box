@@ -22,3 +22,6 @@ jobs:
       - run: cargo test --workspace
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo run -p xtask -- tokens check
+      - run: cargo doc --no-deps --workspace
+        env:
+          RUSTDOCFLAGS: -D warnings

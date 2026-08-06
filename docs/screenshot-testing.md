@@ -65,3 +65,32 @@ Screenshot tests prove appearance. They do not prove:
 
 Behavioral tests assert those outcomes separately. A fixture screenshot is not
 a host smoke test.
+
+## Scenes
+
+`gpui_kit::scenes::catalog()` is the single description of each component's
+states. The gallery renders a scene with `--scene <name>`, and
+
+```bash
+cargo run -p xtask -- scenes list
+cargo run -p xtask -- scenes capture
+```
+
+writes one image per scene per bundled theme under
+`snapshots/<platform>/scenes/`. Each capture runs in its own process because a
+GPUI application owns the window system for its lifetime.
+
+The same catalog is rendered headlessly by `crates/gpui-kit/tests/scenes.rs`,
+which audits every published tree, so a component cannot be reviewed visually
+in one arrangement and tested in another.
+
+## Audit
+
+`gpui_kit_testkit::audit` reports the properties that make a tree usable:
+
+- ids that are non-empty, unique, and not derived from list position;
+- an accessible name on every actionable role;
+- a value inside the range the same node reports, with indeterminate waits
+  exempt because they have no position to report;
+- no text that survived redaction;
+- no visible node that occupies no space.

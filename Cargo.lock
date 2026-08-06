@@ -6762,8 +6762,8 @@ name = "xtask"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "gpui-kit",
  "gpui-kit-tokens",
- "serde_json",
 ]
 
 [[package]]

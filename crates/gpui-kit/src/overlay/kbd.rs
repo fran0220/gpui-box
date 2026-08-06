@@ -1,8 +1,9 @@
 //! Rendering a keyboard shortcut the way the platform writes it.
 
 use gpui::{App, IntoElement, RenderOnce, SharedString, Window, div, prelude::*, px};
+use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 
-use crate::foundation::{ActiveTheme, StyledExt};
+use crate::foundation::{ActiveTheme, Ident, StyledExt};
 
 /// A keyboard shortcut, written the way the current platform writes it.
 ///
@@ -12,6 +13,7 @@ use crate::foundation::{ActiveTheme, StyledExt};
 #[derive(Debug, Clone, IntoElement)]
 pub struct Kbd {
     keystroke: SharedString,
+    ident: Option<Ident>,
 }
 
 impl Kbd {
@@ -19,7 +21,15 @@ impl Kbd {
     pub fn new(keystroke: impl Into<SharedString>) -> Self {
         Self {
             keystroke: keystroke.into(),
+            ident: None,
         }
+    }
+
+    /// Publishes the shortcut, for hints a test needs to assert. A shortcut
+    /// shown next to the action it belongs to is decorative and needs no id.
+    pub fn id(mut self, ident: impl Into<Ident>) -> Self {
+        self.ident = Some(ident.into());
+        self
     }
 
     pub fn caps(&self) -> Vec<SharedString> {
@@ -30,6 +40,9 @@ impl Kbd {
 impl RenderOnce for Kbd {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
+        let published = self.ident.as_ref().map(|ident| {
+            NodeSpec::new(ident.semantic_id(), Role::Text).text(self.keystroke.clone())
+        });
         div()
             .row()
             .gap(px(theme.spacing.xs / 2.0))
@@ -54,6 +67,7 @@ impl RenderOnce for Kbd {
                     .text_color(theme.colors.text_muted)
                     .child(cap)
             }))
+            .when_some(published, |element, spec| element.semantic_in(cx, spec))
     }
 }
 

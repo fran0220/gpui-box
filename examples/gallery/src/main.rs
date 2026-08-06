@@ -43,12 +43,23 @@ enum FixtureState {
 
 struct Gallery {
     lower_scene: bool,
+    /// A single component scene from the library catalog, for review and
+    /// capture in isolation.
+    scene: Option<&'static str>,
 }
 
 impl Render for Gallery {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         SemanticRegistry::global(cx).begin_frame();
         let theme = Theme::get(cx).clone();
+        if let Some(name) = self.scene {
+            let scene = gpui_kit::scenes::find(name).expect("scene is registered");
+            return div()
+                .size_full()
+                .bg(theme.colors.canvas)
+                .child((scene.build)(window, cx))
+                .into_any_element();
+        }
         if self.lower_scene {
             return lower_gallery(&theme, cx).into_any_element();
         }
@@ -368,6 +379,14 @@ fn lower_gallery(theme: &Theme, cx: &mut App) -> gpui::AnyElement {
 fn main() {
     let capture_path = capture_path();
     let lower_scene = env::args().any(|argument| argument == "--scene=lower");
+    if env::args().any(|argument| argument == "--list-scenes") {
+        for scene in gpui_kit::scenes::catalog() {
+            println!("{}", scene.name);
+        }
+        return;
+    }
+    let scene =
+        flag("--scene").and_then(|name| gpui_kit::scenes::find(&name).map(|scene| scene.name));
     let theme_id = flag("--theme");
     let compact = env::args().any(|argument| argument == "--density=compact");
     let app = gpui_platform::application().with_assets(gpui_kit::assets::Assets);
@@ -388,7 +407,7 @@ fn main() {
                     window_bounds: Some(WindowBounds::Windowed(bounds)),
                     ..Default::default()
                 },
-                |_, cx| cx.new(|_| Gallery { lower_scene }),
+                |_, cx| cx.new(|_| Gallery { lower_scene, scene }),
             )
             .expect("open gallery window");
 

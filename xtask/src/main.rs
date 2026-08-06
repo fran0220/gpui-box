@@ -2,11 +2,12 @@ use std::env;
 use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use anyhow::{Context, Result, bail};
 use gpui_kit_tokens::{
     BorderWeight, ControlSize, Density, Elevation, Layer, MotionEasing, OpacityRole, Radius, Space,
-    SpringPreset, TokenDocument, bundled, bundled_json, contrast,
+    SpringPreset, TokenDocument, bundled, contrast,
 };
 
 fn main() -> Result<()> {
@@ -14,7 +15,63 @@ fn main() -> Result<()> {
     match (args.next().as_deref(), args.next().as_deref()) {
         (Some("tokens"), Some("generate")) => tokens(false),
         (Some("tokens"), Some("check")) => tokens(true),
-        _ => bail!("usage: cargo xtask tokens <generate|check>"),
+        (Some("scenes"), Some("list")) => scenes_list(),
+        (Some("scenes"), Some("capture")) => scenes_capture(),
+        _ => bail!("usage: cargo xtask <tokens generate|tokens check|scenes list|scenes capture>"),
+    }
+}
+
+fn scenes_list() -> Result<()> {
+    for scene in gpui_kit::scenes::catalog() {
+        println!("{}", scene.name);
+    }
+    Ok(())
+}
+
+/// Renders every scene in every bundled theme to a reviewable image.
+///
+/// Each capture runs in its own process because a GPUI application owns the
+/// window system for its lifetime.
+fn scenes_capture() -> Result<()> {
+    let directory = root().join("snapshots").join(platform()).join("scenes");
+    fs::create_dir_all(&directory).with_context(|| format!("create {}", directory.display()))?;
+
+    for theme in bundled() {
+        for scene in gpui_kit::scenes::catalog() {
+            let path = directory.join(format!("{}-{}.png", scene.name, theme.meta.id));
+            let status = Command::new(env!("CARGO"))
+                .args([
+                    "run",
+                    "--quiet",
+                    "-p",
+                    "gpui-kit-gallery",
+                    "--",
+                    "--scene",
+                    scene.name,
+                    "--theme",
+                    &theme.meta.id,
+                    "--capture",
+                ])
+                .arg(&path)
+                .current_dir(root())
+                .status()
+                .with_context(|| format!("capture scene {}", scene.name))?;
+            if !status.success() {
+                bail!("capturing scene `{}` failed", scene.name);
+            }
+        }
+    }
+    println!("captured {} scenes", directory.display());
+    Ok(())
+}
+
+fn platform() -> &'static str {
+    if cfg!(target_os = "macos") {
+        "macos"
+    } else if cfg!(target_os = "windows") {
+        "windows"
+    } else {
+        "linux"
     }
 }
 
@@ -27,10 +84,8 @@ fn tokens(check: bool) -> Result<()> {
          The JSON documents under `tokens/` are the authority. These tables are\n\
          a review aid, and every theme below is validated on each run.\n",
     );
-    for (document, json) in bundled().into_iter().zip(bundled_json()) {
-        let json: serde_json::Value =
-            serde_json::from_str(json).context("parse bundled token JSON")?;
-        theme_section(&mut output, document, &json)?;
+    for document in bundled() {
+        theme_section(&mut output, document)?;
     }
 
     let path = root().join("docs/token-reference.md");
@@ -74,11 +129,13 @@ fn contrast_gate() -> Result<()> {
     Ok(())
 }
 
-fn theme_section(
-    output: &mut String,
-    tokens: &TokenDocument,
-    json: &serde_json::Value,
-) -> Result<()> {
+/// Emits one theme, in a fixed order.
+///
+/// The table is built from typed accessors rather than by iterating the parsed
+/// JSON, because whether `serde_json` preserves document order depends on
+/// feature unification across the workspace, and a generated file must not
+/// change with an unrelated dependency.
+fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
     write!(
         output,
         "\n## {} (`{}`)\n\nAppearance: `{:?}`.\n",
@@ -93,29 +150,80 @@ fn theme_section(
     }
 
     output.push_str("\n### Semantic color\n\n| Token | Source | Resolved |\n|---|---|---|\n");
-    for prefix in ["surface", "text", "interactive", "semantic"] {
-        let object = json["color"][prefix]
-            .as_object()
-            .with_context(|| format!("color.{prefix} must be an object"))?;
-        for (name, value) in object {
-            let source = value.as_str().context("color value must be a string")?;
-            writeln!(
-                output,
-                "| `color.{prefix}.{name}` | `{source}` | `{}` |",
-                hex(tokens, source)
-            )?;
-        }
-    }
-    for (index, value) in json["color"]["loader"]["gradient"]
-        .as_array()
-        .context("color.loader.gradient must be an array")?
-        .iter()
-        .enumerate()
-    {
-        let source = value.as_str().context("loader color must be a string")?;
+    let color = &tokens.color;
+    let sources: Vec<(String, &str)> = vec![
+        ("color.surface.canvas".into(), color.surface.canvas.as_str()),
+        ("color.surface.panel".into(), color.surface.panel.as_str()),
+        ("color.surface.raised".into(), color.surface.raised.as_str()),
+        (
+            "color.surface.overlay".into(),
+            color.surface.overlay.as_str(),
+        ),
+        ("color.text.primary".into(), color.text.primary.as_str()),
+        ("color.text.muted".into(), color.text.muted.as_str()),
+        ("color.text.faint".into(), color.text.faint.as_str()),
+        ("color.text.onAccent".into(), color.text.on_accent.as_str()),
+        (
+            "color.interactive.hover".into(),
+            color.interactive.hover.as_str(),
+        ),
+        (
+            "color.interactive.active".into(),
+            color.interactive.active.as_str(),
+        ),
+        (
+            "color.interactive.selected".into(),
+            color.interactive.selected.as_str(),
+        ),
+        (
+            "color.interactive.hairline".into(),
+            color.interactive.hairline.as_str(),
+        ),
+        (
+            "color.interactive.hairlineStrong".into(),
+            color.interactive.hairline_strong.as_str(),
+        ),
+        (
+            "color.interactive.focus".into(),
+            color.interactive.focus.as_str(),
+        ),
+        (
+            "color.semantic.accent".into(),
+            color.semantic.accent.as_str(),
+        ),
+        (
+            "color.semantic.accentStrong".into(),
+            color.semantic.accent_strong.as_str(),
+        ),
+        (
+            "color.semantic.danger".into(),
+            color.semantic.danger.as_str(),
+        ),
+        (
+            "color.semantic.warning".into(),
+            color.semantic.warning.as_str(),
+        ),
+        (
+            "color.semantic.success".into(),
+            color.semantic.success.as_str(),
+        ),
+        ("color.semantic.info".into(), color.semantic.info.as_str()),
+    ]
+    .into_iter()
+    .chain(
+        color
+            .loader
+            .gradient
+            .iter()
+            .enumerate()
+            .map(|(index, value)| (format!("color.loader.gradient.{index}"), value.as_str())),
+    )
+    .collect();
+
+    for (path, source) in sources {
         writeln!(
             output,
-            "| `color.loader.gradient.{index}` | `{source}` | `{}` |",
+            "| `{path}` | `{source}` | `{}` |",
             hex(tokens, source)
         )?;
     }

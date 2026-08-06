@@ -68,7 +68,7 @@ impl Spring {
         1.0 - displacement
     }
 
-    /// How long until the spring stays within [`SETTLE_EPSILON`] of its target.
+    /// How long until the spring stays within one part in a thousand of its target.
     pub fn settle_time(self) -> Duration {
         let step = Duration::from_millis(4);
         let mut elapsed = step;

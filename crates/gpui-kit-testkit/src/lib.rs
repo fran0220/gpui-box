@@ -1,8 +1,11 @@
 //! Test helpers that assert native UI behavior and capture product-owned windows.
 
+pub mod audit;
 pub mod capture;
 #[cfg(feature = "test-support")]
 pub mod harness;
+
+pub use audit::{Finding, Problem, audit};
 
 use gpui_kit_semantics::{Node, Snapshot};
 use thiserror::Error;

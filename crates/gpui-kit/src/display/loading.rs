@@ -4,6 +4,7 @@
 //! single static frame when the platform asks for reduced motion.
 
 use gpui::{App, IntoElement, ParentElement, RenderOnce, Styled, Window, div, px};
+use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::ActiveTheme;
 
 use crate::foundation::Ident;
@@ -17,6 +18,7 @@ const MATRIX_SIDE: usize = 3;
 pub struct PulseLoader {
     ident: Ident,
     cell_size: f32,
+    label: Option<gpui::SharedString>,
 }
 
 impl PulseLoader {
@@ -24,7 +26,14 @@ impl PulseLoader {
         Self {
             ident: ident.into(),
             cell_size: 8.0,
+            label: None,
         }
+    }
+
+    /// What the wait is for. Announced with the busy state.
+    pub fn label(mut self, label: impl Into<gpui::SharedString>) -> Self {
+        self.label = Some(label.into());
+        self
     }
 
     pub fn cell_size(mut self, cell_size: f32) -> Self {
@@ -43,11 +52,13 @@ impl RenderOnce for PulseLoader {
             motion::CubicBezier::new(0.25, 0.1, 0.25, 1.0),
         );
         let ident = self.ident.clone();
+        let spec = busy_spec(&self.ident, self.label.clone());
         div()
             .flex()
             .flex_row()
             .items_center()
             .gap(px(cell_size / 2.0))
+            .semantic_in(cx, spec)
             .children((0..PULSE_CELLS).map(move |index| {
                 div()
                     .size(px(cell_size))
@@ -80,6 +91,7 @@ impl RenderOnce for PulseLoader {
 pub struct GradientSpinner {
     ident: Ident,
     cell_size: f32,
+    label: Option<gpui::SharedString>,
 }
 
 impl GradientSpinner {
@@ -87,7 +99,13 @@ impl GradientSpinner {
         Self {
             ident: ident.into(),
             cell_size: 5.0,
+            label: None,
         }
+    }
+
+    pub fn label(mut self, label: impl Into<gpui::SharedString>) -> Self {
+        self.label = Some(label.into());
+        self
     }
 
     pub fn cell_size(mut self, cell_size: f32) -> Self {
@@ -102,10 +120,12 @@ impl RenderOnce for GradientSpinner {
         let cell_size = self.cell_size;
         let period = MotionSpec::new(750, motion::CubicBezier::new(0.25, 0.1, 0.25, 1.0));
         let ident = self.ident.clone();
+        let spec = busy_spec(&self.ident, self.label.clone());
         div()
             .flex()
             .flex_col()
             .gap(px(cell_size / 2.0))
+            .semantic_in(cx, spec)
             .children((0..MATRIX_SIDE).map(move |row| {
                 let ident = ident.clone();
                 div()
@@ -140,6 +160,7 @@ pub struct Skeleton {
     ident: Ident,
     rows: usize,
     row_height: f32,
+    label: Option<gpui::SharedString>,
 }
 
 impl Skeleton {
@@ -148,7 +169,13 @@ impl Skeleton {
             ident: ident.into(),
             rows: 3,
             row_height: 28.0,
+            label: None,
         }
+    }
+
+    pub fn label(mut self, label: impl Into<gpui::SharedString>) -> Self {
+        self.label = Some(label.into());
+        self
     }
 
     pub fn rows(mut self, rows: usize) -> Self {
@@ -173,10 +200,12 @@ impl RenderOnce for Skeleton {
             motion::CubicBezier::new(0.25, 0.1, 0.25, 1.0),
         );
         let ident = self.ident.clone();
+        let spec = busy_spec(&self.ident, self.label.clone());
         div()
             .flex()
             .flex_col()
             .gap(px(6.0))
+            .semantic_in(cx, spec)
             .children((0..self.rows).map(move |index| {
                 div()
                     .h(px(row_height))
@@ -193,4 +222,14 @@ impl RenderOnce for Skeleton {
                     )
             }))
     }
+}
+
+/// Loading is a distinct state, so every indicator publishes it rather than
+/// leaving a test to infer a wait from an absence of content.
+fn busy_spec(ident: &Ident, label: Option<gpui::SharedString>) -> NodeSpec {
+    let mut spec = NodeSpec::new(ident.semantic_id(), Role::Progress).busy(true);
+    if let Some(label) = label {
+        spec = spec.text(label);
+    }
+    spec
 }
