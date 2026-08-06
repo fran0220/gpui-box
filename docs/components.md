@@ -36,6 +36,8 @@ that must survive a frame is a view.
 | Component | Kind | Notes |
 |---|---|---|
 | `Overlay` | builder | Placement, token-driven paint priority, scrim, dismissal |
+| `Dialog` | view | Composed modal: reports opened, confirmed, cancelled, dismissed, closed. A dialog that is not dismissable installs no escape or scrim handler |
+| `Tooltip` | builder | Hover-delayed help on GPUI's hover machinery. Never actionable, and never the only copy of what is needed to act |
 | `FocusTrap` | helper | Keeps the keyboard inside an open overlay and restores focus |
 | `Kbd` | builder | Platform-specific keystroke caps |
 | `popover` | helpers | Anchoring, menu rows, filtering, and key classification |
@@ -54,8 +56,6 @@ These are known gaps rather than deliberate omissions:
 
 - `TextArea`: multi-line editing with wrapped shaping and vertical motion.
 - `Tabs`, `Accordion`, `Breadcrumb`: navigation and disclosure.
-- `Dialog`: a composed modal on top of `Overlay` and `FocusTrap`.
-- `Tooltip`: hover-delayed help.
 - `Table`, `Tree`, virtualized `List`: large data surfaces.
 - `Toast`: transient notifications with a stack and a timer.
 

@@ -51,7 +51,9 @@ pub mod prelude {
         Sizable, StyledExt, ThemeRegistry, activate_theme, set_density,
     };
     pub use crate::motion::{Presence, Transition};
-    pub use crate::overlay::{FocusTrap, Kbd, Overlay, Placement};
+    pub use crate::overlay::{
+        Dialog, DialogEvent, FocusTrap, Kbd, Overlay, Placement, Tooltip, Tooltipped,
+    };
     pub use crate::state::{AsyncStatus, AsyncValue, Loadable};
 }
 

@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, Div, FontWeight, Hsla, InteractiveElement, IntoElement, ParentElement,
-    RenderOnce, SharedString, StatefulInteractiveElement, Styled, Window, div,
+    AnyElement, App, Div, FocusHandle, FontWeight, Hsla, InteractiveElement, IntoElement,
+    ParentElement, RenderOnce, SharedString, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::{Icon, icon};
@@ -37,6 +37,7 @@ type ClickHandler = Rc<dyn Fn(&mut Window, &mut App)>;
 #[derive(IntoElement)]
 pub struct Button {
     ident: Ident,
+    focus_handle: Option<FocusHandle>,
     label: Option<SharedString>,
     glyph: Option<Icon>,
     icon_position: IconPosition,
@@ -69,6 +70,7 @@ impl Button {
     pub fn new(ident: impl Into<Ident>) -> Self {
         Self {
             ident: ident.into(),
+            focus_handle: None,
             label: None,
             glyph: None,
             icon_position: IconPosition::Leading,
@@ -130,6 +132,16 @@ impl Button {
 
     pub fn full_width(mut self, full_width: bool) -> Self {
         self.full_width = full_width;
+        self
+    }
+
+    /// Puts the button on a caller-owned focus handle.
+    ///
+    /// An overlay that keeps its own tab order needs a handle it can focus
+    /// directly, and the published node then reports whether the keyboard is
+    /// on this action.
+    pub fn track_focus(mut self, handle: &FocusHandle) -> Self {
+        self.focus_handle = Some(handle.clone());
         self
     }
 
@@ -206,6 +218,9 @@ impl RenderOnce for Button {
                     .border_color(theme.colors.hairline_strong)
             })
             .id(self.ident.element_id())
+            .when_some(self.focus_handle.clone(), |element, handle| {
+                element.track_focus(&handle)
+            })
             .role(gpui::Role::Button)
             .when(self.full_width, |element| element.w_full())
             .when(actionable, |element| {
@@ -237,6 +252,9 @@ impl RenderOnce for Button {
             .busy(self.loading);
         if self.selected {
             spec = spec.checked(true);
+        }
+        if let Some(handle) = &self.focus_handle {
+            spec = spec.focus(handle);
         }
         if let Some(name) = self.accessible_name() {
             spec = spec.text(name);

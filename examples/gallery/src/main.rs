@@ -50,6 +50,7 @@ struct Gallery {
     provider: Entity<Select>,
     token: Entity<TextInput>,
     rejected: Entity<TextInput>,
+    confirm: Entity<Dialog>,
 }
 
 impl Render for Gallery {
@@ -299,6 +300,42 @@ impl Render for Gallery {
                     )
                     .child(recipes::section_title(&theme, "Popover primitives"))
                     .child(menu_sample(&theme, 320.0))
+                    .child(recipes::section_title(&theme, "Dialog and hover help"))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap(px(theme.spacing.sm))
+                            .child({
+                                let confirm = self.confirm.clone();
+                                Button::new("gallery.confirm.open")
+                                    .label("Delete workspace")
+                                    .danger()
+                                    .on_click(move |window, cx| {
+                                        confirm.update(cx, |dialog, cx| dialog.open(window, cx));
+                                    })
+                            })
+                            .child(
+                                div()
+                                    .id("gallery.export.host")
+                                    .tip("gallery.export", "Writes the theme to a file on disk")
+                                    .child(
+                                        Button::new("gallery.export")
+                                            .label("Export theme")
+                                            .secondary()
+                                            .on_click(|_, _| {}),
+                                    ),
+                            )
+                            .child(
+                                Tooltip::new(
+                                    "gallery.export.sample",
+                                    "Writes the theme to a file on disk",
+                                )
+                                .describes("gallery.export"),
+                            ),
+                    )
+                    .child(self.confirm.clone())
                     .child(recipes::footnote(
                         &theme,
                         "Fixture data is explicitly labeled. Product applications must render host-backed facts.",
@@ -546,6 +583,17 @@ fn main() {
                                 .text("not an email")
                                 .invalid(true)
                                 .required(true)
+                        }),
+                        confirm: cx.new(|cx| {
+                            Dialog::new("gallery.confirm", window, cx)
+                                .title("Delete this workspace?")
+                                .description(
+                                    "Everything in it is removed from this machine. \
+                                     The application owns the decision; the dialog reports it.",
+                                )
+                                .destructive(true)
+                                .cancel_label("Keep")
+                                .confirm_label("Delete")
                         }),
                     })
                 },

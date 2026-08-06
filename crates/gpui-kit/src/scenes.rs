@@ -11,7 +11,7 @@ use crate::controls::input::TextInput;
 use crate::controls::select::{Select, SelectOption};
 use crate::display::badge::Tone;
 use crate::foundation::ActiveTheme;
-use crate::overlay::{Kbd, Overlay, Placement};
+use crate::overlay::{Kbd, Overlay, Placement, Tooltip, Tooltipped};
 use crate::prelude::*;
 
 pub struct Scene {
@@ -70,6 +70,14 @@ pub fn catalog() -> Vec<Scene> {
         Scene {
             name: "overlay",
             build: overlay,
+        },
+        Scene {
+            name: "dialog",
+            build: dialog,
+        },
+        Scene {
+            name: "tooltip",
+            build: tooltip,
         },
     ]
 }
@@ -286,6 +294,69 @@ fn overlay(_window: &mut Window, cx: &mut App) -> AnyElement {
                                 ),
                         ),
                 ),
+        )
+        .into_any_element()
+}
+
+/// The dialog the scene shows, kept across frames.
+///
+/// A dialog owns whether it is open and which element had the keyboard before
+/// it opened, so rebuilding it every frame would reopen it every frame.
+struct SceneDialog {
+    replace: Entity<Dialog>,
+}
+
+impl Global for SceneDialog {}
+
+fn dialog(window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<SceneDialog>() {
+        let replace = cx.new(|cx| {
+            Dialog::new("scene.dialog.replace", window, cx)
+                .title("Replace the existing theme?")
+                .description(
+                    "The application owns this decision. The dialog presents it and reports what \
+                     was chosen.",
+                )
+                .cancel_label("Cancel")
+                .confirm_label("Replace")
+        });
+        replace.update(cx, |dialog, cx| dialog.open(window, cx));
+        cx.set_global(SceneDialog { replace });
+    }
+    let replace = cx.global::<SceneDialog>().replace.clone();
+    let theme = cx.theme().clone();
+
+    stack(&theme)
+        .w(px(560.0))
+        .h(px(360.0))
+        .child(div().child("Content behind the dialog"))
+        .child(replace)
+        .into_any_element()
+}
+
+fn tooltip(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .child(
+            row(&theme).child(
+                div()
+                    .id("scene.tooltip.host")
+                    .tip("scene.tooltip.export", "Writes the theme to a file on disk")
+                    .child(
+                        Button::new("scene.tooltip.export")
+                            .label("Export theme")
+                            .secondary()
+                            .on_click(|_, _| {}),
+                    ),
+            ),
+        )
+        // Hover help only exists while a pointer rests on the control, so the
+        // surface itself is also shown outright, where it can be reviewed.
+        .child(
+            row(&theme).child(
+                Tooltip::new("scene.tooltip.help", "Writes the theme to a file on disk")
+                    .describes("scene.tooltip.export"),
+            ),
         )
         .into_any_element()
 }
