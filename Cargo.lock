@@ -2059,6 +2059,8 @@ version = "0.1.0"
 dependencies = [
  "gpui",
  "gpui-kit-assets",
+ "gpui-kit-semantics",
+ "gpui-kit-testkit",
  "gpui-kit-theme",
  "gpui-kit-tokens",
 ]

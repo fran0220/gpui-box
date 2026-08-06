@@ -1,0 +1,48 @@
+//! The contracts every component in this library implements.
+//!
+//! Components are `RenderOnce` builders. They read the active theme from the
+//! application context instead of accepting a `&Theme` argument, and they
+//! derive both their GPUI element id and their semantic assertion id from a
+//! single caller-supplied [`Ident`].
+
+mod ident;
+mod styled_ext;
+
+pub use ident::Ident;
+pub use styled_ext::StyledExt;
+
+pub use gpui_kit_theme::{ActiveTheme, ControlSize};
+
+/// A control that can refuse interaction.
+///
+/// Implementations must not install action handlers while disabled, so a
+/// disabled control cannot fire even if a host mis-routes an event.
+pub trait Disableable {
+    fn disabled(self, disabled: bool) -> Self;
+}
+
+/// A control that can present itself as the current choice.
+pub trait Selectable {
+    fn selected(self, selected: bool) -> Self;
+}
+
+/// A control that resolves its metrics from the token control scale.
+pub trait Sizable: Sized {
+    fn control_size(self, size: ControlSize) -> Self;
+
+    fn xs(self) -> Self {
+        self.control_size(ControlSize::Xs)
+    }
+
+    fn small(self) -> Self {
+        self.control_size(ControlSize::Sm)
+    }
+
+    fn medium(self) -> Self {
+        self.control_size(ControlSize::Md)
+    }
+
+    fn large(self) -> Self {
+        self.control_size(ControlSize::Lg)
+    }
+}

@@ -7,24 +7,51 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use gpui::{Bounds, FocusHandle, IntoElement, ParentElement, Pixels, SharedString, Styled, canvas};
+use gpui::{
+    App, Bounds, FocusHandle, Global, IntoElement, ParentElement, Pixels, SharedString, Styled,
+    canvas,
+};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Role {
     Window,
+    #[default]
     Region,
+    Group,
     List,
     Row,
     Button,
+    Link,
     Tab,
+    TabPanel,
     Input,
     Text,
+    Heading,
     Dialog,
     Menu,
     MenuItem,
     Status,
+    Checkbox,
+    Radio,
+    Switch,
+    Slider,
+    Table,
+    Cell,
+    Tree,
+    TreeItem,
+    Progress,
+    Toast,
+    Tooltip,
+    Separator,
+    Toolbar,
+    Scrollbar,
+    Combobox,
+    Option,
+    Form,
+    Field,
+    Image,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
@@ -52,7 +79,13 @@ impl Rect {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// A single assertion target published for one frame.
+///
+/// Fields added after the initial protocol are omitted from serialized
+/// snapshots unless a component sets them, so recorded baselines stay stable
+/// as new roles gain state.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Node {
     pub id: String,
     pub role: Role,
@@ -65,6 +98,32 @@ pub struct Node {
     pub selected: bool,
     pub hovered: bool,
     pub pressed: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub checked: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expanded: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub placeholder: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value_min: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value_max: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value_now: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub level: Option<u32>,
+    #[serde(skip_serializing_if = "is_false")]
+    pub busy: bool,
+    #[serde(skip_serializing_if = "is_false")]
+    pub invalid: bool,
+    #[serde(skip_serializing_if = "is_false")]
+    pub required: bool,
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -115,6 +174,10 @@ impl Snapshot {
         found
     }
 
+    /// Re-applies redaction.
+    ///
+    /// The probe already redacts recorded text and values; this covers nodes a
+    /// host constructed directly, and is idempotent.
     pub fn redacted(mut self) -> Self {
         for node in &mut self.nodes {
             if let Some(text) = &mut node.text {
@@ -189,6 +252,20 @@ impl SemanticRegistry {
         }
     }
 
+    /// The registry components self-register into.
+    ///
+    /// Panics when [`install`] has not run, because a missing registry would
+    /// otherwise silently produce empty snapshots that tests read as passes.
+    pub fn global(cx: &App) -> Self {
+        Self::try_global(cx)
+            .expect("call gpui_kit_semantics::install(cx) before rendering components")
+    }
+
+    pub fn try_global(cx: &App) -> Option<Self> {
+        cx.try_global::<GlobalRegistry>()
+            .map(|global| global.0.clone())
+    }
+
     fn record(&self, node: Node) {
         let mut inner = self.lock();
         let generation = inner.generation;
@@ -216,6 +293,15 @@ pub struct NodeSpec {
     selected: bool,
     hovered: bool,
     pressed: bool,
+    checked: Option<bool>,
+    expanded: Option<bool>,
+    value: Option<SharedString>,
+    placeholder: Option<SharedString>,
+    range: Option<(f32, f32, f32)>,
+    level: Option<u32>,
+    busy: bool,
+    invalid: bool,
+    required: bool,
 }
 
 impl NodeSpec {
@@ -230,7 +316,70 @@ impl NodeSpec {
             selected: false,
             hovered: false,
             pressed: false,
+            checked: None,
+            expanded: None,
+            value: None,
+            placeholder: None,
+            range: None,
+            level: None,
+            busy: false,
+            invalid: false,
+            required: false,
         }
+    }
+
+    pub fn checked(mut self, checked: bool) -> Self {
+        self.checked = Some(checked);
+        self
+    }
+
+    pub fn tristate(mut self, checked: Option<bool>) -> Self {
+        self.checked = checked;
+        self
+    }
+
+    pub fn expanded(mut self, expanded: bool) -> Self {
+        self.expanded = Some(expanded);
+        self
+    }
+
+    /// Records the committed value of an editable control.
+    ///
+    /// Values pass through [`redact_sensitive_text`] before publication so a
+    /// snapshot never carries a credential typed by a user.
+    pub fn value(mut self, value: impl Into<SharedString>) -> Self {
+        self.value = Some(value.into());
+        self
+    }
+
+    pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self {
+        self.placeholder = Some(placeholder.into());
+        self
+    }
+
+    pub fn range(mut self, min: f32, max: f32, now: f32) -> Self {
+        self.range = Some((min, max, now));
+        self
+    }
+
+    pub fn level(mut self, level: u32) -> Self {
+        self.level = Some(level);
+        self
+    }
+
+    pub fn busy(mut self, busy: bool) -> Self {
+        self.busy = busy;
+        self
+    }
+
+    pub fn invalid(mut self, invalid: bool) -> Self {
+        self.invalid = invalid;
+        self
+    }
+
+    pub fn required(mut self, required: bool) -> Self {
+        self.required = required;
+        self
     }
 
     pub fn parent(mut self, parent: impl Into<SharedString>) -> Self {
@@ -269,9 +418,30 @@ impl NodeSpec {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+struct GlobalRegistry(SemanticRegistry);
+
+impl Global for GlobalRegistry {}
+
+/// Installs the process-wide registry that components self-register into.
+pub fn install(cx: &mut App) {
+    if !cx.has_global::<GlobalRegistry>() {
+        cx.set_global(GlobalRegistry(SemanticRegistry::new()));
+    }
+}
+
 pub trait Semantic: Styled + ParentElement + Sized {
     fn semantic(self, registry: &SemanticRegistry, spec: NodeSpec) -> Self {
         self.relative().child(probe(registry, spec))
+    }
+
+    /// Registers into the global registry, or does nothing when a host has not
+    /// installed one. Hosts that opt out get no semantic tree, not a panic.
+    fn semantic_in(self, cx: &App, spec: NodeSpec) -> Self {
+        match SemanticRegistry::try_global(cx) {
+            Some(registry) => self.semantic(&registry, spec),
+            None => self,
+        }
     }
 }
 
@@ -292,7 +462,7 @@ fn probe(registry: &SemanticRegistry, spec: NodeSpec) -> impl IntoElement {
                 id: spec.id.to_string(),
                 role: spec.role,
                 parent: spec.parent.as_ref().map(ToString::to_string),
-                text: spec.text.as_ref().map(ToString::to_string),
+                text: spec.text.as_ref().map(|text| redact_sensitive_text(text)),
                 bounds: rect,
                 visible: rect.area() > 0.0,
                 focused: spec
@@ -303,6 +473,20 @@ fn probe(registry: &SemanticRegistry, spec: NodeSpec) -> impl IntoElement {
                 selected: spec.selected,
                 hovered: spec.hovered,
                 pressed: spec.pressed,
+                checked: spec.checked,
+                expanded: spec.expanded,
+                value: spec
+                    .value
+                    .as_ref()
+                    .map(|value| redact_sensitive_text(value)),
+                placeholder: spec.placeholder.as_ref().map(ToString::to_string),
+                value_min: spec.range.map(|(min, _, _)| min),
+                value_max: spec.range.map(|(_, max, _)| max),
+                value_now: spec.range.map(|(_, _, now)| now),
+                level: spec.level,
+                busy: spec.busy,
+                invalid: spec.invalid,
+                required: spec.required,
             });
         },
         |_, _, _, _| {},
@@ -345,7 +529,6 @@ mod tests {
             id: id.into(),
             role: Role::Region,
             parent: parent.map(str::to_string),
-            text: None,
             bounds: Rect {
                 x: 0.0,
                 y: 0.0,
@@ -353,11 +536,7 @@ mod tests {
                 height: 10.0,
             },
             visible: true,
-            focused: false,
-            disabled: false,
-            selected: false,
-            hovered: false,
-            pressed: false,
+            ..Node::default()
         }
     }
 
@@ -453,5 +632,35 @@ mod tests {
         let encoded = serde_json::to_string(&snapshot).expect("serialize");
         let decoded: Snapshot = serde_json::from_str(&encoded).expect("deserialize");
         assert_eq!(decoded, snapshot);
+    }
+
+    #[test]
+    fn unused_state_fields_stay_out_of_serialized_snapshots() {
+        let encoded = serde_json::to_string(&node("window", None)).expect("serialize");
+        for absent in ["checked", "expanded", "value", "busy", "invalid", "level"] {
+            assert!(!encoded.contains(absent), "{absent} must not be emitted");
+        }
+    }
+
+    #[test]
+    fn older_snapshots_still_deserialize() {
+        let legacy = r#"{
+            "generation": 2,
+            "nodes": [{
+                "id": "run", "role": "button", "parent": null, "text": "Run",
+                "bounds": {"x": 0, "y": 0, "width": 10, "height": 10},
+                "visible": true, "focused": false, "disabled": false,
+                "selected": false, "hovered": false, "pressed": false
+            }]
+        }"#;
+        let snapshot: Snapshot = serde_json::from_str(legacy).expect("legacy snapshot");
+        let node = snapshot.find("run").expect("node");
+        assert_eq!(node.checked, None);
+        assert!(!node.busy);
+    }
+
+    #[test]
+    fn recorded_values_are_redacted_like_text() {
+        assert_eq!(redact_sensitive_text("sk-live-value"), "[REDACTED]");
     }
 }

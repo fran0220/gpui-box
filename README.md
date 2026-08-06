@@ -37,25 +37,20 @@ gpui-kit-semantics = { git = "https://github.com/fran0220/gpui-kit", rev = "<com
 ```
 
 ```rust
-use gpui_kit::button::{action_button, ButtonSize, ButtonVariant};
-use gpui_kit_theme::Theme;
+use gpui_kit::prelude::*;
 
-// Once, during application boot.
+// Once, during application boot. Installs fonts, the theme, and the
+// semantic registry components publish into.
 gpui_kit::install(cx);
 
-// In a view.
-let theme = Theme::get(cx);
-let save = action_button(
-    "settings.save",
-    theme,
-    "Save",
-    ButtonVariant::Primary,
-    ButtonSize::Medium,
-    saving,
-    move |window, cx| {
+// In a view. Components read the theme from the context themselves.
+let save = Button::new("settings.save")
+    .label("Save")
+    .primary()
+    .disabled(saving)
+    .on_click(move |window, cx| {
         controller.update(cx, |controller, cx| controller.save(window, cx));
-    },
-);
+    });
 ```
 
 `action_button` does not install its click handler while disabled. Disabled is

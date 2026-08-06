@@ -54,6 +54,21 @@
     "bubble": 16,
     "pill": 999
   },
+  "control": {
+    "xs": { "height": 20, "paddingX": 6, "gap": 4, "fontSize": 11, "iconSize": 12 },
+    "sm": { "height": 24, "paddingX": 8, "gap": 5, "fontSize": 12, "iconSize": 14 },
+    "md": { "height": 28, "paddingX": 12, "gap": 6, "fontSize": 13, "iconSize": 15 },
+    "lg": { "height": 34, "paddingX": 16, "gap": 8, "fontSize": 14, "iconSize": 17 }
+  },
+  "border": {
+    "hairline": 1,
+    "thick": 2
+  },
+  "opacity": {
+    "disabled": 0.45,
+    "muted": 0.68,
+    "scrim": 0.6
+  },
   "typography": {
     "sans": {
       "family": "Geist",

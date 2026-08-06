@@ -1,3 +1,5 @@
+mod recipes;
+
 use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
@@ -9,9 +11,8 @@ use gpui::{
     div, prelude::*, px, size,
 };
 use gpui_kit::assets::{Icon, icon};
-use gpui_kit::badge::{BadgeTone, badge};
-use gpui_kit::button::{ButtonSize, ButtonVariant, action_button};
-use gpui_kit::{card, loaders, popover, settings, status};
+use gpui_kit::overlay::popover;
+use gpui_kit::prelude::*;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic, SemanticRegistry};
 use gpui_kit_theme::Theme;
 use serde::Deserialize;
@@ -41,36 +42,16 @@ enum FixtureState {
 }
 
 struct Gallery {
-    semantics: SemanticRegistry,
     lower_scene: bool,
 }
 
 impl Render for Gallery {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        self.semantics.begin_frame();
+        SemanticRegistry::global(cx).begin_frame();
         let theme = Theme::get(cx).clone();
         if self.lower_scene {
-            return lower_gallery(&theme, &self.semantics).into_any_element();
+            return lower_gallery(&theme, cx).into_any_element();
         }
-        let action = |id: &'static str, label: &'static str, variant, disabled| {
-            action_button(
-                id,
-                &theme,
-                label,
-                variant,
-                ButtonSize::Medium,
-                disabled,
-                |_, _| {},
-            )
-            .semantic(
-                &self.semantics,
-                NodeSpec::new(id, Role::Button)
-                    .text(label)
-                    .disabled(disabled),
-            )
-        };
-
-        let settings_card = fixture_settings_card(&theme);
 
         div()
             .id("gallery-root")
@@ -79,132 +60,123 @@ impl Render for Gallery {
             .bg(theme.colors.canvas)
             .font_family(theme.typography.sans.clone())
             .text_color(theme.colors.text)
-            .semantic(
-                &self.semantics,
+            .semantic_in(
+                cx,
                 NodeSpec::new("gallery.root", Role::Window).text("gpui-kit gallery"),
             )
             .child(
-                settings::page(&theme)
-                    .child(settings::page_header(&theme, "gpui-kit", Some(24)))
-                    .child(settings::subtitle(
+                recipes::page(&theme)
+                    .child(recipes::page_header(&theme, "gpui-kit", Some(24)))
+                    .child(recipes::subtitle(
                         &theme,
                         "A truthful desktop UI design system, semantic tree, and test kit.",
                     ))
-                    .child(settings::section_title(&theme, "Actions"))
+                    .child(recipes::section_title(&theme, "Actions"))
                     .child(
                         div()
                             .flex()
                             .flex_row()
                             .flex_wrap()
                             .gap(px(theme.spacing.sm))
-                            .child(action(
-                                "gallery.primary",
-                                "Primary action",
-                                ButtonVariant::Primary,
-                                false,
-                            ))
-                            .child(action(
-                                "gallery.ghost",
-                                "Ghost action",
-                                ButtonVariant::Ghost,
-                                false,
-                            ))
-                            .child(action(
-                                "gallery.danger",
-                                "Destructive",
-                                ButtonVariant::Danger,
-                                false,
-                            ))
-                            .child(action(
-                                "gallery.disabled",
-                                "Unavailable",
-                                ButtonVariant::Primary,
-                                true,
-                            )),
+                            .child(
+                                Button::new("gallery.primary")
+                                    .label("Primary action")
+                                    .primary()
+                                    .on_click(|_, _| {}),
+                            )
+                            .child(
+                                Button::new("gallery.secondary")
+                                    .label("Secondary")
+                                    .secondary()
+                                    .icon(Icon::Copy)
+                                    .on_click(|_, _| {}),
+                            )
+                            .child(
+                                Button::new("gallery.ghost")
+                                    .label("Ghost action")
+                                    .ghost()
+                                    .on_click(|_, _| {}),
+                            )
+                            .child(
+                                Button::new("gallery.danger")
+                                    .label("Destructive")
+                                    .danger()
+                                    .on_click(|_, _| {}),
+                            )
+                            .child(
+                                Button::new("gallery.disabled")
+                                    .label("Unavailable")
+                                    .primary()
+                                    .disabled(true)
+                                    .on_click(|_, _| {}),
+                            )
+                            .child(
+                                Button::new("gallery.loading")
+                                    .label("Saving")
+                                    .primary()
+                                    .loading(true)
+                                    .on_click(|_, _| {}),
+                            ),
                     )
-                    .child(settings::section_title(&theme, "Status"))
+                    .child(recipes::section_title(&theme, "Control sizes"))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap(px(theme.spacing.sm))
+                            .child(Button::new("gallery.size.xs").label("Extra small").xs())
+                            .child(Button::new("gallery.size.sm").label("Small").small())
+                            .child(Button::new("gallery.size.md").label("Medium").medium())
+                            .child(Button::new("gallery.size.lg").label("Large").large()),
+                    )
+                    .child(recipes::section_title(&theme, "Status"))
                     .child(
                         div()
                             .flex()
                             .flex_row()
                             .flex_wrap()
                             .gap(px(theme.spacing.sm))
-                            .child(badge(&theme, "Neutral", BadgeTone::Neutral))
-                            .child(badge(&theme, "Accent", BadgeTone::Accent))
-                            .child(badge(&theme, "Success", BadgeTone::Success))
-                            .child(badge(&theme, "Warning", BadgeTone::Warning))
-                            .child(badge(&theme, "Danger", BadgeTone::Danger))
-                            .child(badge(&theme, "Info", BadgeTone::Info)),
+                            .child(Badge::new("Neutral").neutral())
+                            .child(Badge::new("Accent").accent())
+                            .child(Badge::new("Success").success())
+                            .child(Badge::new("Warning").warning())
+                            .child(Badge::new("Danger").danger())
+                            .child(Badge::new("Info").info()),
                     )
-                    .child(settings::section_title(&theme, "Settings pattern"))
-                    .child(settings_card)
-                    .child(settings::section_title(&theme, "Truthful states"))
-                    .child(status::callout(
-                        &theme,
+                    .child(recipes::section_title(&theme, "Settings pattern"))
+                    .child(fixture_settings_card(&theme))
+                    .child(recipes::section_title(&theme, "Truthful states"))
+                    .child(Callout::new(
                         "The host refused this action. Preserve its exact reason instead of showing an empty state.",
-                        status::StatusTone::Danger,
-                    ))
+                        Tone::Danger,
+                    ).id("gallery.callout.refusal"))
                     .child(
                         div()
                             .mt(px(theme.spacing.sm))
-                            .child(status::callout(
-                                &theme,
+                            .child(Callout::new(
                                 "Refreshing failed. The last verified model catalog remains visible.",
-                                status::StatusTone::Warning,
-                            )),
+                                Tone::Warning,
+                            ).id("gallery.callout.stale")),
                     )
-                    .child(settings::section_title(&theme, "Motion and loading"))
+                    .child(recipes::section_title(&theme, "Motion and loading"))
                     .child(
                         div()
                             .flex()
                             .flex_row()
                             .items_center()
                             .gap(px(theme.spacing.xl))
-                            .child(loaders::pulse_loader(
-                                "gallery-pulse",
-                                &theme,
-                                8.0,
-                            ))
-                            .child(loaders::gradient_spinner(
-                                "gallery-gradient",
-                                &theme,
-                                5.0,
-                            ))
+                            .child(PulseLoader::new("gallery.pulse"))
+                            .child(GradientSpinner::new("gallery.gradient"))
                             .child(
                                 div()
                                     .w(px(220.0))
-                                    .child(loaders::skeleton_rows(
-                                        "gallery-skeleton",
-                                        &theme,
-                                        3,
-                                    )),
+                                    .child(Skeleton::new("gallery.skeleton").rows(3)),
                             ),
                     )
-                    .child(settings::section_title(&theme, "Popover primitives"))
-                    .child(
-                        popover::card(&theme)
-                            .w(px(320.0))
-                            .child(popover::heading(&theme, "Recent"))
-                            .child(
-                                popover::menu_row(&theme, true, false)
-                                    .child(icon(Icon::Folder).size(px(15.0)))
-                                    .child(SharedString::from("gpui-kit"))
-                                    .child(div().flex_1())
-                                    .child(popover::key_cap(&theme, "↵")),
-                            )
-                            .child(
-                                popover::menu_row(&theme, false, true)
-                                    .child(icon(Icon::GitBranch).size(px(15.0)))
-                                    .child(SharedString::from("feature/design-system")),
-                            )
-                            .child(popover::separator(&theme))
-                            .child(
-                                popover::menu_row(&theme, false, false)
-                                    .child(icon(Icon::Settings).size(px(15.0)))
-                                    .child(SharedString::from("Settings")),
-                            ),
-                    )
-                    .child(settings::footnote(
+                    .child(recipes::section_title(&theme, "Popover primitives"))
+                    .child(menu_sample(&theme, 320.0))
+                    .child(recipes::footnote(
                         &theme,
                         "Fixture data is explicitly labeled. Product applications must render host-backed facts.",
                     )),
@@ -213,32 +185,57 @@ impl Render for Gallery {
     }
 }
 
-fn fixture_settings_card(theme: &Theme) -> gpui::Div {
+fn menu_sample(theme: &Theme, width: f32) -> gpui::Div {
+    popover::card(theme)
+        .w(px(width))
+        .child(popover::heading(theme, "Recent"))
+        .child(
+            popover::menu_row(theme, true, false)
+                .child(icon(Icon::Folder).size(px(15.0)))
+                .child(SharedString::from("gpui-kit"))
+                .child(div().flex_1())
+                .child(popover::key_cap(theme, "↵")),
+        )
+        .child(
+            popover::menu_row(theme, false, true)
+                .child(icon(Icon::GitBranch).size(px(15.0)))
+                .child(SharedString::from("feature/design-system")),
+        )
+        .child(popover::separator(theme))
+        .child(
+            popover::menu_row(theme, false, false)
+                .child(icon(Icon::Settings).size(px(15.0)))
+                .child(SharedString::from("Settings")),
+        )
+}
+
+fn fixture_settings_card(theme: &Theme) -> Card {
     let fixture = settings_fixture();
     assert!(
         fixture.fixture,
         "gallery data must identify itself as fixture"
     );
-    let mut result = card::section_card(theme);
+    let mut card = Card::new();
     for (index, row) in fixture.rows.iter().enumerate() {
         let (glyph, label, tone) = match row.state {
-            FixtureState::Ready => (Icon::Monitor, "Ready", BadgeTone::Success),
-            FixtureState::Stale => (Icon::Global, "Stale", BadgeTone::Warning),
-            FixtureState::Neutral => (Icon::Key, "Approval", BadgeTone::Neutral),
+            FixtureState::Ready => (Icon::Monitor, "Ready", Tone::Success),
+            FixtureState::Stale => (Icon::Global, "Stale", Tone::Warning),
+            FixtureState::Neutral => (Icon::Key, "Approval", Tone::Neutral),
         };
-        result = result.child(
-            card::card_row(theme, index == 0)
-                .id(SharedString::from(format!("fixture.settings.{}", row.id)))
-                .child(card::identity_tile(theme, glyph))
-                .child(card::row_content(
+        card = card.child(
+            ListRow::new()
+                .id(format!("fixture.settings.{}", row.id))
+                .first(index == 0)
+                .child(recipes::identity_tile(theme, glyph))
+                .child(recipes::row_content(
                     theme,
                     row.title.clone(),
                     row.detail.clone(),
                 ))
-                .child(badge(theme, label, tone)),
+                .child(Badge::new(label).tone(tone)),
         );
     }
-    result
+    card
 }
 
 fn settings_fixture() -> &'static SettingsFixture {
@@ -248,7 +245,7 @@ fn settings_fixture() -> &'static SettingsFixture {
     })
 }
 
-fn lower_gallery(theme: &Theme, semantics: &SemanticRegistry) -> gpui::AnyElement {
+fn lower_gallery(theme: &Theme, cx: &mut App) -> gpui::AnyElement {
     div()
         .id("gallery-lower-root")
         .size_full()
@@ -256,65 +253,43 @@ fn lower_gallery(theme: &Theme, semantics: &SemanticRegistry) -> gpui::AnyElemen
         .bg(theme.colors.canvas)
         .font_family(theme.typography.sans.clone())
         .text_color(theme.colors.text)
-        .semantic(
-            semantics,
+        .semantic_in(
+            cx,
             NodeSpec::new("gallery.lower", Role::Window).text("gpui-kit gallery lower scene"),
         )
         .child(
-            settings::page(theme)
-                .child(settings::page_header(theme, "Patterns and effects", None))
-                .child(settings::subtitle(
+            recipes::page(theme)
+                .child(recipes::page_header(theme, "Patterns and effects", None))
+                .child(recipes::subtitle(
                     theme,
                     "Deterministic fixture scene for floating surfaces and loading states.",
                 ))
-                .child(settings::section_title(theme, "Motion and loading"))
+                .child(recipes::section_title(theme, "Motion and loading"))
                 .child(
-                    card::section_card(theme).child(
+                    Card::new().child(
                         div()
                             .p(px(theme.spacing.xl))
                             .flex()
                             .flex_row()
                             .items_center()
                             .gap(px(theme.spacing.xl))
-                            .child(loaders::pulse_loader("lower-pulse", theme, 8.0))
-                            .child(loaders::gradient_spinner("lower-gradient", theme, 5.0))
+                            .child(PulseLoader::new("lower.pulse"))
+                            .child(GradientSpinner::new("lower.gradient"))
                             .child(
                                 div()
                                     .w(px(260.0))
-                                    .child(loaders::skeleton_rows("lower-skeleton", theme, 4)),
+                                    .child(Skeleton::new("lower.skeleton").rows(4)),
                             ),
                     ),
                 )
-                .child(settings::section_title(theme, "Floating surfaces"))
+                .child(recipes::section_title(theme, "Floating surfaces"))
                 .child(
                     div()
                         .flex()
                         .flex_row()
                         .items_start()
                         .gap(px(theme.spacing.lg))
-                        .child(
-                            popover::card(theme)
-                                .w(px(360.0))
-                                .child(popover::heading(theme, "Recent"))
-                                .child(
-                                    popover::menu_row(theme, true, false)
-                                        .child(icon(Icon::Folder).size(px(15.0)))
-                                        .child(SharedString::from("gpui-kit"))
-                                        .child(div().flex_1())
-                                        .child(popover::key_cap(theme, "↵")),
-                                )
-                                .child(
-                                    popover::menu_row(theme, false, true)
-                                        .child(icon(Icon::GitBranch).size(px(15.0)))
-                                        .child(SharedString::from("feature/design-system")),
-                                )
-                                .child(popover::separator(theme))
-                                .child(
-                                    popover::menu_row(theme, false, false)
-                                        .child(icon(Icon::Settings).size(px(15.0)))
-                                        .child(SharedString::from("Settings")),
-                                ),
-                        )
+                        .child(menu_sample(theme, 360.0))
                         .child(
                             popover::dialog_card(theme)
                                 .child(popover::dialog_title(theme, "Replace existing theme?"))
@@ -329,28 +304,22 @@ fn lower_gallery(theme: &Theme, semantics: &SemanticRegistry) -> gpui::AnyElemen
                                         .flex_row()
                                         .justify_end()
                                         .gap(px(theme.spacing.sm))
-                                        .child(action_button(
-                                            "gallery.dialog.cancel",
-                                            theme,
-                                            "Cancel",
-                                            ButtonVariant::Ghost,
-                                            ButtonSize::Medium,
-                                            false,
-                                            |_, _| {},
-                                        ))
-                                        .child(action_button(
-                                            "gallery.dialog.replace",
-                                            theme,
-                                            "Replace",
-                                            ButtonVariant::Primary,
-                                            ButtonSize::Medium,
-                                            false,
-                                            |_, _| {},
-                                        )),
+                                        .child(
+                                            Button::new("gallery.dialog.cancel")
+                                                .label("Cancel")
+                                                .ghost()
+                                                .on_click(|_, _| {}),
+                                        )
+                                        .child(
+                                            Button::new("gallery.dialog.replace")
+                                                .label("Replace")
+                                                .primary()
+                                                .on_click(|_, _| {}),
+                                        ),
                                 ),
                         ),
                 )
-                .child(settings::footnote(
+                .child(recipes::footnote(
                     theme,
                     "Frost uses the pinned BackdropBlur patch on macOS and an opaque fallback elsewhere.",
                 )),
@@ -364,19 +333,14 @@ fn main() {
     let app = gpui_platform::application().with_assets(gpui_kit::assets::Assets);
     app.run(move |cx: &mut App| {
         gpui_kit::install(cx);
-        let bounds = Bounds::centered(None, size(px(920.0), px(900.0)), cx);
+        let bounds = Bounds::centered(None, size(px(920.0), px(1000.0)), cx);
         let _window = cx
             .open_window(
                 WindowOptions {
                     window_bounds: Some(WindowBounds::Windowed(bounds)),
                     ..Default::default()
                 },
-                |_, cx| {
-                    cx.new(|_| Gallery {
-                        semantics: SemanticRegistry::new(),
-                        lower_scene,
-                    })
-                },
+                |_, cx| cx.new(|_| Gallery { lower_scene }),
             )
             .expect("open gallery window");
 
@@ -389,7 +353,7 @@ fn main() {
                     Ok(()) => cx.update(|cx| cx.quit()),
                     Err(error) => {
                         eprintln!("gallery capture failed: {error:#}");
-                        cx.update(|cx| cx.quit());
+                        cx.update(|cx| cx.quit())
                     }
                 }
             })

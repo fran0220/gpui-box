@@ -2,9 +2,26 @@
 
 use gpui::{App, BoxShadow, Global, Hsla, Rgba, SharedString, point, px};
 use gpui_kit_tokens::{
-    Color, InteractiveColor, MotionDuration, MotionEasing, Radius, SemanticColor, Space, Surface,
-    TextTone, TypeScale, studio_dark,
+    BorderWeight, Color, InteractiveColor, MotionDuration, MotionEasing, OpacityRole, studio_dark,
 };
+
+pub use gpui_kit_tokens::{
+    ControlSize, Radius, SemanticColor, Space, Surface, TextTone, TypeScale,
+};
+
+/// Reads the active theme from any context that dereferences to [`App`].
+///
+/// Components take `&mut App` during render and pull the theme themselves, so
+/// callers never thread a `&Theme` through builder arguments.
+pub trait ActiveTheme {
+    fn theme(&self) -> &Theme;
+}
+
+impl ActiveTheme for App {
+    fn theme(&self) -> &Theme {
+        Theme::get(self)
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Theme {
@@ -12,6 +29,9 @@ pub struct Theme {
     pub typography: Typography,
     pub spacing: Spacing,
     pub radii: Radii,
+    pub control: Control,
+    pub borders: Borders,
+    pub opacity: Opacity,
     pub motion: Motion,
     pub effects: Effects,
 }
@@ -79,6 +99,47 @@ pub struct Radii {
     pub dialog: f32,
     pub bubble: f32,
     pub pill: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Control {
+    pub xs: ControlMetrics,
+    pub sm: ControlMetrics,
+    pub md: ControlMetrics,
+    pub lg: ControlMetrics,
+}
+
+impl Control {
+    pub fn get(&self, size: ControlSize) -> ControlMetrics {
+        match size {
+            ControlSize::Xs => self.xs,
+            ControlSize::Sm => self.sm,
+            ControlSize::Md => self.md,
+            ControlSize::Lg => self.lg,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ControlMetrics {
+    pub height: f32,
+    pub padding_x: f32,
+    pub gap: f32,
+    pub font_size: f32,
+    pub icon_size: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Borders {
+    pub hairline: f32,
+    pub thick: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Opacity {
+    pub disabled: f32,
+    pub muted: f32,
+    pub scrim: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -175,6 +236,33 @@ impl Theme {
                 bubble: tokens.radius(Radius::Bubble),
                 pill: tokens.radius(Radius::Pill),
             },
+            control: {
+                let metrics = |size| {
+                    let step = tokens.control(size);
+                    ControlMetrics {
+                        height: step.height,
+                        padding_x: step.padding_x,
+                        gap: step.gap,
+                        font_size: step.font_size,
+                        icon_size: step.icon_size,
+                    }
+                };
+                Control {
+                    xs: metrics(ControlSize::Xs),
+                    sm: metrics(ControlSize::Sm),
+                    md: metrics(ControlSize::Md),
+                    lg: metrics(ControlSize::Lg),
+                }
+            },
+            borders: Borders {
+                hairline: tokens.border_width(BorderWeight::Hairline),
+                thick: tokens.border_width(BorderWeight::Thick),
+            },
+            opacity: Opacity {
+                disabled: tokens.opacity(OpacityRole::Disabled),
+                muted: tokens.opacity(OpacityRole::Muted),
+                scrim: tokens.opacity(OpacityRole::Scrim),
+            },
             motion: Motion {
                 instant_ms: millis(tokens, MotionDuration::Instant),
                 quick_ms: millis(tokens, MotionDuration::Quick),
@@ -197,6 +285,67 @@ impl Theme {
                 edge_fade_band: tokens.effect.edge_fade_band,
                 selected_ring_alpha: tokens.effect.selected_ring_alpha,
             },
+        }
+    }
+
+    pub fn surface(&self, surface: Surface) -> Hsla {
+        match surface {
+            Surface::Canvas => self.colors.canvas,
+            Surface::Panel => self.colors.panel,
+            Surface::Raised => self.colors.raised,
+            Surface::Overlay => self.colors.overlay,
+        }
+    }
+
+    pub fn text_color(&self, tone: TextTone) -> Hsla {
+        match tone {
+            TextTone::Primary => self.colors.text,
+            TextTone::Muted => self.colors.text_muted,
+            TextTone::Faint => self.colors.text_faint,
+            TextTone::OnAccent => self.colors.text_on_accent,
+        }
+    }
+
+    pub fn semantic_color(&self, color: SemanticColor) -> Hsla {
+        match color {
+            SemanticColor::Accent => self.colors.accent,
+            SemanticColor::AccentStrong => self.colors.accent_strong,
+            SemanticColor::Danger => self.colors.danger,
+            SemanticColor::Warning => self.colors.warning,
+            SemanticColor::Success => self.colors.success,
+            SemanticColor::Info => self.colors.info,
+        }
+    }
+
+    pub fn space(&self, step: Space) -> f32 {
+        match step {
+            Space::Xs => self.spacing.xs,
+            Space::Sm => self.spacing.sm,
+            Space::Md => self.spacing.md,
+            Space::Lg => self.spacing.lg,
+            Space::Xl => self.spacing.xl,
+            Space::Xxl => self.spacing.xxl,
+        }
+    }
+
+    pub fn radius(&self, step: Radius) -> f32 {
+        match step {
+            Radius::Small => self.radii.small,
+            Radius::Control => self.radii.control,
+            Radius::Card => self.radii.card,
+            Radius::Dialog => self.radii.dialog,
+            Radius::Bubble => self.radii.bubble,
+            Radius::Pill => self.radii.pill,
+        }
+    }
+
+    pub fn type_style(&self, scale: TypeScale) -> TypeStyle {
+        match scale {
+            TypeScale::Caption => self.typography.caption,
+            TypeScale::Label => self.typography.label,
+            TypeScale::Body => self.typography.body,
+            TypeScale::Title => self.typography.title,
+            TypeScale::Code => self.typography.code,
         }
     }
 
@@ -260,6 +409,18 @@ mod tests {
         assert_eq!(theme.radii.card, 12.0);
         assert_eq!(theme.radii.dialog, 16.0);
         assert_eq!(theme.motion.menu_ms, 140);
+    }
+
+    #[test]
+    fn control_metrics_grow_with_size() {
+        let theme = Theme::studio_dark();
+        let heights: Vec<f32> = ControlSize::ALL
+            .iter()
+            .map(|size| theme.control.get(*size).height)
+            .collect();
+        assert!(heights.windows(2).all(|window| window[0] < window[1]));
+        assert_eq!(theme.borders.hairline, 1.0);
+        assert!(theme.opacity.disabled < 1.0);
     }
 
     #[test]

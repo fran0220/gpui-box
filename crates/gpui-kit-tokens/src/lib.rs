@@ -77,6 +77,9 @@ pub struct TokenDocument {
     pub color: ColorTokens,
     pub space: SpacingTokens,
     pub radius: RadiusTokens,
+    pub control: ControlTokens,
+    pub border: BorderTokens,
+    pub opacity: OpacityTokens,
     pub typography: TypographyTokens,
     pub motion: MotionTokens,
     pub effect: EffectTokens,
@@ -122,9 +125,34 @@ impl TokenDocument {
             }
         }
 
+        let heights = [
+            self.control.xs.height,
+            self.control.sm.height,
+            self.control.md.height,
+            self.control.lg.height,
+        ];
+        if heights.windows(2).any(|window| window[0] >= window[1]) {
+            return invalid("control", "heights must be strictly increasing");
+        }
+        for (path, step) in self.control.entries() {
+            if step.height <= 0.0 || step.font_size <= 0.0 || step.icon_size <= 0.0 {
+                return invalid(path, "height, fontSize and iconSize must be positive");
+            }
+            if step.height < step.font_size {
+                return invalid(path, "height must not be smaller than fontSize");
+            }
+        }
+
+        if self.border.hairline <= 0.0 || self.border.thick <= self.border.hairline {
+            return invalid("border", "thick must exceed a positive hairline");
+        }
+
         for (path, value) in [
             ("effect.glassAlphaMacos", self.effect.glass_alpha_macos),
             ("effect.selectedRingAlpha", self.effect.selected_ring_alpha),
+            ("opacity.disabled", self.opacity.disabled),
+            ("opacity.muted", self.opacity.muted),
+            ("opacity.scrim", self.opacity.scrim),
         ] {
             if !(0.0..=1.0).contains(&value) {
                 return invalid(path, "must be between 0 and 1");
@@ -231,6 +259,30 @@ impl TokenDocument {
             Radius::Dialog => self.radius.dialog,
             Radius::Bubble => self.radius.bubble,
             Radius::Pill => self.radius.pill,
+        }
+    }
+
+    pub fn control(&self, size: ControlSize) -> &ControlStep {
+        match size {
+            ControlSize::Xs => &self.control.xs,
+            ControlSize::Sm => &self.control.sm,
+            ControlSize::Md => &self.control.md,
+            ControlSize::Lg => &self.control.lg,
+        }
+    }
+
+    pub fn border_width(&self, weight: BorderWeight) -> f32 {
+        match weight {
+            BorderWeight::Hairline => self.border.hairline,
+            BorderWeight::Thick => self.border.thick,
+        }
+    }
+
+    pub fn opacity(&self, role: OpacityRole) -> f32 {
+        match role {
+            OpacityRole::Disabled => self.opacity.disabled,
+            OpacityRole::Muted => self.opacity.muted,
+            OpacityRole::Scrim => self.opacity.scrim,
         }
     }
 
@@ -342,6 +394,33 @@ pub enum Radius {
     Dialog,
     Bubble,
     Pill,
+}
+
+/// The four control heights every interactive component resolves against.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash, PartialOrd, Ord)]
+pub enum ControlSize {
+    Xs,
+    Sm,
+    #[default]
+    Md,
+    Lg,
+}
+
+impl ControlSize {
+    pub const ALL: [Self; 4] = [Self::Xs, Self::Sm, Self::Md, Self::Lg];
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BorderWeight {
+    Hairline,
+    Thick,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OpacityRole {
+    Disabled,
+    Muted,
+    Scrim,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -485,6 +564,48 @@ pub struct RadiusTokens {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ControlTokens {
+    pub xs: ControlStep,
+    pub sm: ControlStep,
+    pub md: ControlStep,
+    pub lg: ControlStep,
+}
+
+impl ControlTokens {
+    fn entries(&self) -> [(&'static str, &ControlStep); 4] {
+        [
+            ("control.xs", &self.xs),
+            ("control.sm", &self.sm),
+            ("control.md", &self.md),
+            ("control.lg", &self.lg),
+        ]
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ControlStep {
+    pub height: f32,
+    pub padding_x: f32,
+    pub gap: f32,
+    pub font_size: f32,
+    pub icon_size: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
+pub struct BorderTokens {
+    pub hairline: f32,
+    pub thick: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
+pub struct OpacityTokens {
+    pub disabled: f32,
+    pub muted: f32,
+    pub scrim: f32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TypographyTokens {
     pub sans: FontTokens,
     pub mono: FontTokens,
@@ -590,6 +711,28 @@ mod tests {
             tokens.motion_duration(MotionDuration::Menu),
             Duration::from_millis(140)
         );
+    }
+
+    #[test]
+    fn control_steps_are_ordered_and_complete() {
+        let tokens = studio_dark();
+        let heights: Vec<f32> = ControlSize::ALL
+            .iter()
+            .map(|size| tokens.control(*size).height)
+            .collect();
+        assert!(heights.windows(2).all(|window| window[0] < window[1]));
+        assert_eq!(tokens.control(ControlSize::Md).padding_x, 12.0);
+        assert_eq!(tokens.border_width(BorderWeight::Hairline), 1.0);
+        assert!(tokens.opacity(OpacityRole::Disabled) < 1.0);
+    }
+
+    #[test]
+    fn out_of_order_control_heights_fail_validation() {
+        let mut value: serde_json::Value =
+            serde_json::from_str(studio_dark_json()).expect("bundled JSON");
+        value["control"]["lg"]["height"] = serde_json::json!(10);
+        let error = TokenDocument::parse(&value.to_string()).expect_err("unordered heights");
+        assert!(error.to_string().contains("control"));
     }
 
     #[test]

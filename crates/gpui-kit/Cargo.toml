@@ -10,11 +10,13 @@ rust-version.workspace = true
 [dependencies]
 gpui.workspace = true
 gpui-kit-assets.workspace = true
+gpui-kit-semantics.workspace = true
 gpui-kit-theme.workspace = true
 gpui-kit-tokens.workspace = true
 
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }
+gpui-kit-testkit = { workspace = true, features = ["test-support"] }
 
 [lints]
 workspace = true

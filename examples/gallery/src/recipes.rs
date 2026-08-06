@@ -1,4 +1,11 @@
+//! Product-shaped layout that belongs to an application, not to the library.
+//!
+//! These helpers used to live in `gpui-kit` as `settings` and `card` row
+//! fragments. They encode one product's page rhythm, so they stay here as a
+//! recipe the gallery renders and applications can copy.
+
 use gpui::{SharedString, div, prelude::*, px};
+use gpui_kit::assets::{Icon, icon};
 use gpui_kit_theme::Theme;
 
 pub fn page(theme: &Theme) -> gpui::Div {
@@ -66,4 +73,51 @@ pub fn footnote(theme: &Theme, text: impl Into<SharedString>) -> gpui::Div {
         .line_height(px(theme.typography.label.line_height))
         .text_color(theme.colors.text_faint)
         .child(text.into())
+}
+
+pub fn identity_tile(theme: &Theme, glyph: Icon) -> gpui::Div {
+    div()
+        .flex_none()
+        .size(px(36.0))
+        .rounded(px(10.0))
+        .border_1()
+        .border_color(theme.colors.hairline)
+        .bg(theme.colors.hover.opacity(0.25))
+        .flex()
+        .items_center()
+        .justify_center()
+        .child(
+            icon(glyph)
+                .size(px(16.0))
+                .text_color(theme.colors.text_muted),
+        )
+}
+
+pub fn row_content(
+    theme: &Theme,
+    title: impl Into<SharedString>,
+    detail: impl Into<SharedString>,
+) -> gpui::Div {
+    div()
+        .flex_1()
+        .min_w_0()
+        .flex()
+        .flex_col()
+        .child(
+            div()
+                .min_w_0()
+                .truncate()
+                .text_size(px(13.5))
+                .font_weight(gpui::FontWeight::MEDIUM)
+                .text_color(theme.colors.text)
+                .child(title.into()),
+        )
+        .child(
+            div()
+                .mt(px(theme.spacing.xs))
+                .min_w_0()
+                .text_size(px(11.5))
+                .text_color(theme.colors.text_muted.opacity(0.68))
+                .child(detail.into()),
+        )
 }

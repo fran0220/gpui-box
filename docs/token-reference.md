@@ -58,3 +58,22 @@ The JSON document is the authority. This table is a review aid.
 | `dialog` | 16 |
 | `bubble` | 16 |
 | `pill` | 999 |
+
+## Control scale
+
+| Step | Height | Padding X | Gap | Font | Icon |
+|---|---:|---:|---:|---:|---:|
+| `xs` | 20 | 6 | 4 | 11 | 12 |
+| `sm` | 24 | 8 | 5 | 12 | 14 |
+| `md` | 28 | 12 | 6 | 13 | 15 |
+| `lg` | 34 | 16 | 8 | 14 | 17 |
+
+## Border and opacity
+
+| Token | Value |
+|---|---:|
+| `border.hairline` | 1 |
+| `border.thick` | 2 |
+| `opacity.disabled` | 0.45 |
+| `opacity.muted` | 0.68 |
+| `opacity.scrim` | 0.6 |

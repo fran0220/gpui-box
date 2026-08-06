@@ -3,7 +3,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
-use gpui_kit_tokens::{Radius, Space, studio_dark, studio_dark_json};
+use gpui_kit_tokens::{
+    BorderWeight, ControlSize, OpacityRole, Radius, Space, studio_dark, studio_dark_json,
+};
 
 fn main() -> Result<()> {
     let mut args = env::args().skip(1);
@@ -76,6 +78,36 @@ fn generate(check: bool) -> Result<()> {
         ("pill", Radius::Pill),
     ] {
         output.push_str(&format!("| `{name}` | {} |\n", tokens.radius(step)));
+    }
+
+    output.push_str(
+        "\n## Control scale\n\n| Step | Height | Padding X | Gap | Font | Icon |\n|---|---:|---:|---:|---:|---:|\n",
+    );
+    for (name, size) in [
+        ("xs", ControlSize::Xs),
+        ("sm", ControlSize::Sm),
+        ("md", ControlSize::Md),
+        ("lg", ControlSize::Lg),
+    ] {
+        let step = tokens.control(size);
+        output.push_str(&format!(
+            "| `{name}` | {} | {} | {} | {} | {} |\n",
+            step.height, step.padding_x, step.gap, step.font_size, step.icon_size
+        ));
+    }
+
+    output.push_str("\n## Border and opacity\n\n| Token | Value |\n|---|---:|\n");
+    for (name, value) in [
+        (
+            "border.hairline",
+            tokens.border_width(BorderWeight::Hairline),
+        ),
+        ("border.thick", tokens.border_width(BorderWeight::Thick)),
+        ("opacity.disabled", tokens.opacity(OpacityRole::Disabled)),
+        ("opacity.muted", tokens.opacity(OpacityRole::Muted)),
+        ("opacity.scrim", tokens.opacity(OpacityRole::Scrim)),
+    ] {
+        output.push_str(&format!("| `{name}` | {value} |\n"));
     }
 
     let path = root().join("docs/token-reference.md");

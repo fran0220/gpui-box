@@ -7,6 +7,11 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+# Pulls in GPUI's test harness. Off by default so shipping binaries that link
+# the capture helpers do not compile the test platform.
+test-support = ["gpui/test-support"]
+
 [dependencies]
 gpui.workspace = true
 gpui-kit-semantics.workspace = true

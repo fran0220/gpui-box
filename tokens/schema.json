@@ -4,7 +4,18 @@
   "title": "gpui-kit theme tokens",
   "type": "object",
   "additionalProperties": false,
-  "required": ["meta", "color", "space", "radius", "typography", "motion", "effect"],
+  "required": [
+    "meta",
+    "color",
+    "space",
+    "radius",
+    "control",
+    "border",
+    "opacity",
+    "typography",
+    "motion",
+    "effect"
+  ],
   "properties": {
     "$schema": { "type": "string" },
     "meta": {
@@ -43,6 +54,9 @@
     },
     "space": { "$ref": "#/$defs/spacing" },
     "radius": { "$ref": "#/$defs/radii" },
+    "control": { "$ref": "#/$defs/control" },
+    "border": { "$ref": "#/$defs/border" },
+    "opacity": { "$ref": "#/$defs/opacity" },
     "typography": { "$ref": "#/$defs/typography" },
     "motion": { "$ref": "#/$defs/motion" },
     "effect": { "$ref": "#/$defs/effect" }
@@ -125,6 +139,48 @@
         "dialog": { "$ref": "#/$defs/positiveNumber" },
         "bubble": { "$ref": "#/$defs/positiveNumber" },
         "pill": { "$ref": "#/$defs/positiveNumber" }
+      }
+    },
+    "controlStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["height", "paddingX", "gap", "fontSize", "iconSize"],
+      "properties": {
+        "height": { "$ref": "#/$defs/positiveNumber" },
+        "paddingX": { "$ref": "#/$defs/positiveNumber" },
+        "gap": { "$ref": "#/$defs/positiveNumber" },
+        "fontSize": { "$ref": "#/$defs/positiveNumber" },
+        "iconSize": { "$ref": "#/$defs/positiveNumber" }
+      }
+    },
+    "control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["xs", "sm", "md", "lg"],
+      "properties": {
+        "xs": { "$ref": "#/$defs/controlStep" },
+        "sm": { "$ref": "#/$defs/controlStep" },
+        "md": { "$ref": "#/$defs/controlStep" },
+        "lg": { "$ref": "#/$defs/controlStep" }
+      }
+    },
+    "border": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hairline", "thick"],
+      "properties": {
+        "hairline": { "$ref": "#/$defs/positiveNumber" },
+        "thick": { "$ref": "#/$defs/positiveNumber" }
+      }
+    },
+    "opacity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["disabled", "muted", "scrim"],
+      "properties": {
+        "disabled": { "type": "number", "minimum": 0, "maximum": 1 },
+        "muted": { "type": "number", "minimum": 0, "maximum": 1 },
+        "scrim": { "type": "number", "minimum": 0, "maximum": 1 }
       }
     },
     "font": {

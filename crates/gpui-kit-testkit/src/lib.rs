@@ -1,6 +1,8 @@
 //! Test helpers that assert native UI behavior and capture product-owned windows.
 
 pub mod capture;
+#[cfg(feature = "test-support")]
+pub mod harness;
 
 use gpui_kit_semantics::{Node, Snapshot};
 use thiserror::Error;
@@ -145,11 +147,8 @@ mod tests {
                 height: 10.0,
             },
             visible: true,
-            focused: false,
             disabled,
-            selected: false,
-            hovered: false,
-            pressed: false,
+            ..Node::default()
         }
     }
 
