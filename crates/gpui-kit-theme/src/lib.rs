@@ -4,13 +4,13 @@ use std::sync::Arc;
 
 use gpui::{App, BorrowAppContext, BoxShadow, Global, Hsla, Rgba, SharedString, point, px};
 use gpui_kit_tokens::{
-    BorderWeight, Color, DensityScale, InteractiveColor, MotionDuration, MotionEasing, OpacityRole,
-    TokenDocument, TokenError, bundled,
+    BorderWeight, Color, DensityScale, InteractiveColor, OpacityRole, TokenDocument, TokenError,
+    bundled,
 };
 
 pub use gpui_kit_tokens::{
-    Appearance, ControlSize, Density, Elevation, Layer, Radius, SemanticColor, Space, SpringPreset,
-    Surface, TextTone, TypeScale,
+    Appearance, ControlSize, Density, Elevation, Layer, MotionDuration, MotionEasing, Radius,
+    SemanticColor, Space, SpringPreset, SpringTokens, Surface, TextTone, TypeScale,
 };
 
 /// Reads the active theme from any context that dereferences to [`App`].
@@ -161,9 +161,18 @@ pub struct Motion {
     pub resize_ms: u64,
     pub entrance_ms: u64,
     pub pulse_ms: u64,
+    pub linear: [f32; 4],
     pub standard: [f32; 4],
+    pub ease_in: [f32; 4],
+    pub ease_out: [f32; 4],
+    pub ease_in_out: [f32; 4],
+    pub emphasized: [f32; 4],
+    pub overshoot: [f32; 4],
     pub exit: [f32; 4],
     pub settle: [f32; 4],
+    pub snappy: SpringTokens,
+    pub smooth: SpringTokens,
+    pub bouncy: SpringTokens,
 }
 
 /// Shadows for each elevation step. Flat is intentionally empty rather than a
@@ -343,9 +352,18 @@ impl Theme {
                 resize_ms: millis(tokens, MotionDuration::Resize),
                 entrance_ms: millis(tokens, MotionDuration::Entrance),
                 pulse_ms: millis(tokens, MotionDuration::Pulse),
+                linear: tokens.easing(MotionEasing::Linear),
                 standard: tokens.easing(MotionEasing::Standard),
+                ease_in: tokens.easing(MotionEasing::EaseIn),
+                ease_out: tokens.easing(MotionEasing::EaseOut),
+                ease_in_out: tokens.easing(MotionEasing::EaseInOut),
+                emphasized: tokens.easing(MotionEasing::Emphasized),
+                overshoot: tokens.easing(MotionEasing::Overshoot),
                 exit: tokens.easing(MotionEasing::Exit),
                 settle: tokens.easing(MotionEasing::Settle),
+                snappy: tokens.spring(SpringPreset::Snappy),
+                smooth: tokens.spring(SpringPreset::Smooth),
+                bouncy: tokens.spring(SpringPreset::Bouncy),
             },
             elevation: Elevations {
                 flat: shadow(tokens, Elevation::Flat),
@@ -433,6 +451,28 @@ impl Theme {
             TypeScale::Body => self.typography.body,
             TypeScale::Title => self.typography.title,
             TypeScale::Code => self.typography.code,
+        }
+    }
+
+    pub fn easing(&self, easing: MotionEasing) -> [f32; 4] {
+        match easing {
+            MotionEasing::Linear => self.motion.linear,
+            MotionEasing::Standard => self.motion.standard,
+            MotionEasing::EaseIn => self.motion.ease_in,
+            MotionEasing::EaseOut => self.motion.ease_out,
+            MotionEasing::EaseInOut => self.motion.ease_in_out,
+            MotionEasing::Emphasized => self.motion.emphasized,
+            MotionEasing::Overshoot => self.motion.overshoot,
+            MotionEasing::Exit => self.motion.exit,
+            MotionEasing::Settle => self.motion.settle,
+        }
+    }
+
+    pub fn spring(&self, preset: SpringPreset) -> SpringTokens {
+        match preset {
+            SpringPreset::Snappy => self.motion.snappy,
+            SpringPreset::Smooth => self.motion.smooth,
+            SpringPreset::Bouncy => self.motion.bouncy,
         }
     }
 

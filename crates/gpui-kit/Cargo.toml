@@ -13,6 +13,7 @@ gpui-kit-assets.workspace = true
 gpui-kit-semantics.workspace = true
 gpui-kit-theme.workspace = true
 gpui-kit-tokens.workspace = true
+web-time.workspace = true
 
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }

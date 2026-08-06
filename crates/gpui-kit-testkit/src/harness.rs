@@ -3,6 +3,8 @@
 //! Tests assert against the semantic snapshot and simulate real input, never
 //! against source text or private component state.
 
+use std::time::Duration;
+
 use gpui::{
     AnyElement, AnyWindowHandle, App, Bounds, Context, IntoElement, Modifiers, Pixels, Point,
     Render, TestAppContext, VisualTestContext, Window, WindowBounds, WindowOptions, div, point,
@@ -106,6 +108,19 @@ impl Harness {
         let result = self.cx.update(|window, cx| update(window, cx));
         self.cx.run_until_parked();
         result
+    }
+
+    /// Advances the simulated clock and delivers one animation frame.
+    ///
+    /// Tests have no platform frame loop, so motion driven by
+    /// `Window::request_animation_frame` only progresses when a test asks for
+    /// the next frame explicitly.
+    pub fn advance(&mut self, delta: Duration) {
+        self.cx.executor().advance_clock(delta);
+        self.cx.update(|window, cx| {
+            window.simulate_next_frame(cx);
+        });
+        self.cx.run_until_parked();
     }
 
     pub fn keystrokes(&mut self, keystrokes: &str) {

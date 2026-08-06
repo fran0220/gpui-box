@@ -216,9 +216,18 @@ impl SemanticRegistry {
         Self::default()
     }
 
+    /// Opens a frame, discarding everything the previous one published.
+    ///
+    /// Without the discard, a frame that publishes nothing would still report
+    /// the previous tree, and a test asserting that an element disappeared
+    /// would pass against a stale snapshot.
     pub fn begin_frame(&self) {
         let mut inner = self.lock();
-        inner.generation += 1;
+        let generation = inner.generation;
+        inner.nodes.retain(|_, (frame, _)| *frame == generation);
+        let live: Vec<String> = inner.nodes.keys().cloned().collect();
+        inner.order.retain(|id, _| live.contains(id));
+        inner.generation = generation + 1;
         inner.next_sequence = 0;
     }
 
@@ -226,14 +235,10 @@ impl SemanticRegistry {
         self.lock().generation
     }
 
+    /// The tree published by the most recent completed frame.
     pub fn snapshot(&self) -> Snapshot {
         let inner = self.lock();
-        let Some(published) = inner.nodes.values().map(|(frame, _)| *frame).max() else {
-            return Snapshot {
-                generation: inner.generation,
-                nodes: Vec::new(),
-            };
-        };
+        let published = inner.generation;
         let mut nodes: Vec<(u64, Node)> = inner
             .nodes
             .values()
@@ -621,6 +626,32 @@ mod tests {
             assert_eq!(redact_sensitive_text(secret), "[REDACTED]");
         }
         assert_eq!(redact_sensitive_text("Token usage"), "Token usage");
+    }
+
+    #[test]
+    fn a_frame_that_publishes_nothing_reports_an_empty_tree() {
+        let registry = SemanticRegistry::new();
+        registry.begin_frame();
+        registry.record(node("toast", None));
+        assert_eq!(registry.snapshot().ids(), vec!["toast"]);
+
+        registry.begin_frame();
+        assert!(
+            registry.snapshot().nodes.is_empty(),
+            "a removed element must not linger in the next frame"
+        );
+    }
+
+    #[test]
+    fn a_node_that_stops_rendering_leaves_the_snapshot() {
+        let registry = SemanticRegistry::new();
+        registry.begin_frame();
+        registry.record(node("row.a", None));
+        registry.record(node("row.b", None));
+
+        registry.begin_frame();
+        registry.record(node("row.a", None));
+        assert_eq!(registry.snapshot().ids(), vec!["row.a"]);
     }
 
     #[test]
