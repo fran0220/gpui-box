@@ -17,9 +17,24 @@
 //!
 //! `Table` takes materialized rows, so the caller has already built every cell
 //! element by the time the table sees them, and an element can be laid out
-//! once. Virtualization needs a row it can build on demand, which is what
-//! [`crate::data::List`] is for. The table therefore renders every row it is
-//! given, under a header that stays put while the body scrolls.
+//! once. Virtualization needs a row it can build on demand. The table
+//! therefore renders every row it is given, under a header that stays put
+//! while the body scrolls.
+//!
+//! # Table or DataGrid
+//!
+//! [`crate::data::DataGrid`] is the heavyweight alternative: it takes a render
+//! closure instead of rows, so it virtualizes over
+//! [`gpui::uniform_list`], and it carries the machinery an administrative
+//! surface needs — resizable and reorderable columns, a left-pinned group,
+//! three selection modes with a truthful select-all, opened rows with a detail
+//! region, and cells that become fields.
+//!
+//! Reach for `Table` for a settings summary, a short run list, a preview of a
+//! result set — anything a reader takes in at a glance. Reach for `DataGrid`
+//! when the data set is larger than the viewport, or when the surface needs
+//! any of the above. If a surface would work as either, pick `Table`: it is
+//! smaller, and a grid's machinery costs something even when nothing uses it.
 
 use std::rc::Rc;
 
@@ -124,9 +139,9 @@ impl Column {
 
 /// One cell's content, and whether it is an assertion target.
 pub struct Cell {
-    content: AnyElement,
-    text: Option<SharedString>,
-    published: bool,
+    pub(crate) content: AnyElement,
+    pub(crate) text: Option<SharedString>,
+    pub(crate) published: bool,
 }
 
 impl std::fmt::Debug for Cell {

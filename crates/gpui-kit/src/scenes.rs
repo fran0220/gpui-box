@@ -144,6 +144,14 @@ pub fn catalog() -> Vec<Scene> {
             build: table,
         },
         Scene {
+            name: "data-grid",
+            build: data_grid,
+        },
+        Scene {
+            name: "data-grid-editing",
+            build: data_grid_editing,
+        },
+        Scene {
             name: "tree",
             build: tree,
         },
@@ -868,6 +876,182 @@ fn table(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .visible_rows(6)
                 .on_sort(|_, _, _, _| {})
                 .on_select(|_, _, _| {}),
+        )
+        .into_any_element()
+}
+
+/// How many rows the fixture host has handed over, and how many exist behind
+/// it. The two numbers differ on purpose: that gap is what the select-all box
+/// and the bulk bar have to be honest about.
+const FIXTURE_JOBS_LOADED: usize = 240;
+const FIXTURE_JOBS_TOTAL: usize = 12_000;
+
+/// One synthetic job. Nothing here stands for a product: the identity is a
+/// fixture key and the label says so.
+fn fixture_job(index: usize) -> (SharedString, SharedString, SharedString, SharedString) {
+    const PHASES: [&str; 4] = ["Indexing", "Verifying", "Publishing", "Archiving"];
+    const OWNERS: [&str; 3] = ["fixture-a", "fixture-b", "fixture-c"];
+    (
+        SharedString::from(format!("job-{index:04}")),
+        SharedString::from(format!("{} {index:04}", PHASES[index % PHASES.len()])),
+        SharedString::from(OWNERS[index % OWNERS.len()]),
+        SharedString::from(format!("{}m {:02}s", index % 9 + 1, index * 7 % 60)),
+    )
+}
+
+fn fixture_job_tone(index: usize) -> (&'static str, Tone) {
+    match index % 4 {
+        0 => ("Ready", Tone::Success),
+        1 => ("Stale", Tone::Warning),
+        2 => ("Refused", Tone::Danger),
+        _ => ("Managed", Tone::Neutral),
+    }
+}
+
+fn grid_columns() -> [GridColumn; 4] {
+    [
+        // Declared second, drawn first: a pinned column holds the left edge
+        // whatever order the caller puts the columns in.
+        GridColumn::new("owner", "Owner")
+            .fixed(120.0)
+            .reorderable(true)
+            .editable(true),
+        GridColumn::new("name", "Job")
+            .flex(2.0)
+            .min_width(140.0)
+            .pinned(true)
+            .sortable(true)
+            .resizable(true),
+        GridColumn::new("state", "State")
+            .fixed(110.0)
+            .reorderable(true),
+        GridColumn::new("duration", "Duration")
+            .fixed(104.0)
+            .align(Align::End)
+            .sortable(true)
+            .resizable(true)
+            .reorderable(true),
+    ]
+}
+
+fn grid_row(index: usize) -> GridRow {
+    let (id, name, owner, duration) = fixture_job(index);
+    let (label, tone) = fixture_job_tone(index);
+    GridRow::new(id)
+        .text(name.clone())
+        .cell("name", Cell::new(name.clone()).text(name).published(true))
+        .cell("owner", Cell::new(owner.clone()).text(owner))
+        .cell(
+            "state",
+            Cell::new(Badge::new(label).tone(tone))
+                .text(label)
+                .published(true),
+        )
+        .cell("duration", duration)
+}
+
+fn grid_detail(theme: &Theme, id: SharedString) -> AnyElement {
+    div()
+        .column()
+        .gap(px(theme.spacing.xs))
+        .type_scale(theme, gpui_kit_theme::TypeScale::Caption)
+        .text_color(theme.colors.text_muted)
+        .child(SharedString::from(format!("Fixture detail for {id}")))
+        .child(SharedString::from(
+            "Only an opened row builds this region; the rest never ask for it.",
+        ))
+        .into_any_element()
+}
+
+fn data_grid(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let detail_theme = theme.clone();
+    stack(&theme)
+        .w(px(760.0))
+        .child(
+            BulkBar::new("scene.data-grid.bulk", 2)
+                .total(FIXTURE_JOBS_TOTAL)
+                .action(
+                    Button::new("scene.data-grid.bulk.retry")
+                        .label("Retry")
+                        .secondary()
+                        .small()
+                        .on_click(|_, _| {}),
+                )
+                .action(
+                    Button::new("scene.data-grid.bulk.archive")
+                        .label("Archive")
+                        .secondary()
+                        .small()
+                        .on_click(|_, _| {}),
+                )
+                .on_select_all(|_, _| {})
+                .on_dismiss(|_, _| {}),
+        )
+        .child(
+            DataGrid::new(
+                "scene.data-grid.jobs",
+                FIXTURE_JOBS_LOADED,
+                |index, _, _| grid_row(index),
+            )
+            .total(FIXTURE_JOBS_TOTAL)
+            .columns(grid_columns())
+            .sorted_by("duration", SortDirection::Descending)
+            .selection_mode(SelectionMode::Multiple)
+            .selected(["job-0001", "job-0003"])
+            .expanded([Expanded::new("job-0002", 2)])
+            .detail_rows(2)
+            .detail(move |id, _, _| grid_detail(&detail_theme, id))
+            .visible_rows(9)
+            .on_sort(|_, _, _, _| {})
+            .on_select(|_, _, _| {})
+            .on_resize(|_, _, _, _| {})
+            .on_fit(|_, _, _| {})
+            .on_reorder(|_, _, _| {})
+            .on_expand(|_, _, _, _| {})
+            .on_edit_request(|_, _, _, _| {})
+            .on_edit(|_, _, _| {}),
+        )
+        .child(
+            div()
+                .type_scale(&theme, gpui_kit_theme::TypeScale::Caption)
+                .text_color(theme.colors.text_muted)
+                .child(SharedString::from(format!(
+                    "{FIXTURE_JOBS_LOADED} rows loaded of {FIXTURE_JOBS_TOTAL}; only the drawn \
+                     ones publish"
+                ))),
+        )
+        .into_any_element()
+}
+
+fn data_grid_editing(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(760.0))
+        .child(
+            DataGrid::new("scene.data-grid-editing.jobs", 6, |index, _, _| {
+                grid_row(index)
+            })
+            .columns(grid_columns())
+            .sorted_by("duration", SortDirection::Descending)
+            .selection_mode(SelectionMode::Single)
+            .selected(["job-0001"])
+            .editing(Some(EditingCell::new("job-0001", "owner", "fixture-b")))
+            .visible_rows(6)
+            .on_sort(|_, _, _, _| {})
+            .on_select(|_, _, _| {})
+            .on_resize(|_, _, _, _| {})
+            .on_edit_request(|_, _, _, _| {})
+            .on_edit(|_, _, _| {}),
+        )
+        .child(
+            div()
+                .type_scale(&theme, gpui_kit_theme::TypeScale::Caption)
+                .text_color(theme.colors.text_muted)
+                .child(SharedString::from(
+                    "Escape reverts, enter commits, tab commits and moves on. The grid never \
+                     writes the value.",
+                )),
         )
         .into_any_element()
 }

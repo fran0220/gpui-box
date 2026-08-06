@@ -599,6 +599,8 @@ impl Render for Gallery {
                                  and only the rows it drew.",
                             )),
                     )
+                    .child(recipes::section_title(&theme, "Data grid"))
+                    .child(data_grid_section(&theme, window, cx))
                     .child(recipes::section_title(&theme, "Status"))
                     .child(
                         div()
@@ -1245,6 +1247,26 @@ struct GalleryStates {
 impl Global for GalleryStates {}
 
 /// Reordering, the two pointer responses, and a counting readout.
+/// The grid, shown through the scenes the capture task and the audit use, so
+/// the arrangement reviewed here is the arrangement that is tested.
+fn data_grid_section(theme: &Theme, window: &mut Window, cx: &mut App) -> gpui::AnyElement {
+    let scene = |name: &str, window: &mut Window, cx: &mut App| {
+        gpui_kit::scenes::find(name).map(|scene| (scene.build)(window, cx))
+    };
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(theme.spacing.md))
+        .children(scene("data-grid", window, cx))
+        .children(scene("data-grid-editing", window, cx))
+        .child(recipes::footnote(
+            theme,
+            "Widths, order, sort, selection, expansion, and the value in an open cell are all \
+             host state. The grid reports what was operated and draws what it was handed back.",
+        ))
+        .into_any_element()
+}
+
 fn motion_section(theme: &Theme, window: &mut Window, cx: &mut App) -> gpui::AnyElement {
     if !cx.has_global::<GalleryQueue>() {
         cx.set_global(GalleryQueue {

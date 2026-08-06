@@ -99,7 +99,9 @@ never the better failure.
 | Component | Kind | Reports | Notes |
 |---|---|---|---|
 | `List` | builder | the row that was picked | Virtualized over GPUI's `uniform_list`. The caller renders one index at a time and stamps each row with its own identity. Up, down, home, and end move the reported selection, skip refusals, and scroll the reported row into view |
-| `Table` | builder | the sort a header click implies, and the row that was picked | Sorting is caller-owned: the table reports `(key, next direction)` and renders whatever order it is handed. Columns are fixed or flex, and the header stays put while the body scrolls |
+| `Table` | builder | the sort a header click implies, and the row that was picked | Sorting is caller-owned: the table reports `(key, next direction)` and renders whatever order it is handed. Columns are fixed or flex, and the header stays put while the body scrolls. Not virtualized — reach for `DataGrid` past a few hundred rows |
+| `DataGrid` | builder | a sort, a column width, a column order, a selection change, a disclosure, and a finished edit | The heavyweight tabular surface: virtualized over `uniform_list`, resizable and reorderable columns, a left-pinned group, three selection modes with a truthful select-all, opened rows with a detail region, and cells that become fields. It applies none of it |
+| `BulkBar` | builder | the wider selection, and the dismissal that clears the selection | Appears over a selection through `Presence`, states the count it actually has, and offers "select all N" as a separate named action when more rows exist than the host has loaded |
 | `Tree` | builder | a node id and the disclosure state it should take, and the node that was picked | A collapsed node renders none of its children. Up and down walk visible nodes, right opens a shut branch or descends into an open one, left shuts an open branch or ascends |
 
 ### Only rendered rows are published
@@ -118,6 +120,68 @@ and every row is laid out.
 `Table` is the exception, and deliberately: it takes materialized rows, so
 every cell element already exists by the time the table sees it and every row
 it is given is rendered. Reach for `List` when the data set is large.
+
+### Table or DataGrid
+
+Both are column-oriented and both report rather than apply. The difference is
+what they are handed:
+
+- **`Table` takes rows.** The caller builds every cell before the table sees
+  it, which is why the whole set is laid out and why a table stays readable at
+  a few dozen rows and stops being sensible at a few thousand. Reach for it for
+  a settings summary, a short run list, a preview of a result set.
+- **`DataGrid` takes a closure.** It asks for one row at a time and only for
+  the rows the viewport holds, which is what lets it carry twelve thousand rows
+  and also what makes column resizing, reordering, selection over an
+  incompletely loaded set, opened rows, and cell editing worth its weight.
+  Reach for it for the administrative surface: the thing with a header, a
+  selection, a bulk bar, and more rows than fit.
+
+If a surface would work as either, pick `Table`. It is smaller, and a grid's
+machinery costs something even when nothing uses it.
+
+### What DataGrid does not do
+
+**It does not scroll horizontally.** `uniform_list` owns its own scroll offset
+and lays every row out at the width it is given. A frozen left group under a
+horizontal scroll needs either two vertically-synchronised uniform lists —
+and nothing keeps two `UniformListScrollHandle`s in step without one writing
+the other every frame, which is a redraw loop — or a per-row
+counter-translation that fights the list's own content mask. So
+`GridColumn::pinned` means "this column holds the left edge whatever order the
+caller declares, and may not be dragged out of it or dropped across", not
+"this column stays while the rest scrolls away". Columns share the grid's
+width the way a table's do.
+
+**It does not measure a column to its content.** A double click on a resize
+handle reports a fit request through `on_fit` and stops. The grid can only
+measure the rows it drew, and a width fitted to fourteen of twelve thousand
+rows is a guess wearing a measurement's clothes; the host owns the data and
+can answer properly.
+
+**An opened row declares where it sits.** A virtualized body reserves room by
+counting fixed-height slots, so it has to know where an opened row is before it
+has drawn it — hence `Expanded { id, index }`. The index is layout arithmetic
+and never reaches an id.
+
+**Tab moves within the row.** Tab commits the open cell and names the next
+editable column in the same row. When a row's editable columns are exhausted
+the edit simply commits: the row below may never have been drawn, and the grid
+will not build a row nobody asked to see in order to guess where a caret goes.
+
+### Select all is two different claims
+
+A header checkbox over a virtualized grid can only speak for the rows the host
+has handed over. `DataGrid` keeps the two apart:
+
+- the box publishes both numbers, as `"<selected> of <loaded> loaded, <total>
+  total"`, and reports `SelectionChange::Loaded` — never anything wider;
+- `SelectionChange::Everything` is only ever reported by a control that says
+  that is what it does, which is `BulkBar`'s "Select all N".
+
+So a typist who selects everything on screen is told they selected forty rows
+and offered twelve thousand as a separate, named step, rather than being
+quietly credited with rows nobody has loaded.
 
 Cells are quiet by default. A table of two hundred rows and six columns would
 bury every other assertion target under twelve hundred nodes that repeat what

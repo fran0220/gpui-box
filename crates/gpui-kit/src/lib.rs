@@ -84,7 +84,9 @@ pub mod prelude {
     pub use crate::controls::textarea::{TextArea, TextAreaEvent};
     pub use crate::controls::toggle::{Checkbox, Radio, Switch};
     pub use crate::data::{
-        Align, Cell, Column, ColumnWidth, List, ListItem, Row, SortDirection, Table, Tree, TreeNode,
+        Align, BulkBar, Cell, Column, ColumnWidth, DataGrid, EditIntent, EditOutcome, EditingCell,
+        Expanded, GridColumn, GridRow, List, ListItem, Row, SelectionChange, SelectionMode,
+        SortDirection, Table, Tree, TreeNode,
     };
     pub use crate::display::animated_number::{AnimatedNumber, grouped};
     pub use crate::display::avatar::Avatar;

@@ -18,7 +18,7 @@ input, and an entry in `docs/components.md`.
 | Choice | `Select`, `Combobox`, `Checkbox`, `Radio`, `Switch`, `Slider`, `SegmentedControl` |
 | Form | `FormField` |
 | Navigation | `Tabs`, `Accordion`, `Breadcrumb`, `Sidebar`, `Pagination` |
-| Data | `List` (virtualized), `Table`, `Tree` |
+| Data | `List` (virtualized), `Table`, `DataGrid` (virtualized), `BulkBar`, `Tree` |
 | Display | `Badge`, `Tag`, `Avatar`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `StatusDot`, `StatusLine`, `Callout`, `PulseLoader`, `GradientSpinner`, `Skeleton` |
 | Overlay | `Overlay`, `Dialog`, `Drawer`, `Popover`, `Menu`, `ContextMenu`, `CommandPalette`, `Tooltip`, `Toast`, `ToastLayer`, `Kbd` |
 | Layout | `SplitPane`, `ScrollArea`, `Toolbar` |
@@ -36,11 +36,24 @@ against every surface that implements it.
 
 | System | Contract | Implemented by |
 |---|---|---|
-| Drag and drop (`gpui_kit::interaction::dnd`) | `docs/interaction.md` | `List`, `Tree`, `Tabs`, `Dropzone` |
+| Drag and drop (`gpui_kit::interaction::dnd`) | `docs/interaction.md` | `List`, `Tree`, `Tabs`, `Dropzone`, `DataGrid` (column headers) |
 
 Drag and drop is covered: the contract is written down, the scenes `drag-list`,
 `drag-tree`, and `dropzone` stage it, and `crates/gpui-kit/tests/dnd.rs` drives
-a simulated pointer through every surface above.
+a simulated pointer through every surface above. `DataGrid` reorders its column
+headers through the same system, driven in `crates/gpui-kit/tests/grid.rs`.
+
+## Table or DataGrid
+
+Both are covered and neither replaces the other. `Table` takes materialized
+rows and lays all of them out; `DataGrid` takes a render closure and lays out
+only the rows the viewport holds, which is what buys it column resizing and
+reordering, a pinned group, selection over an incompletely loaded set, opened
+rows, and cell editing. `docs/components.md` has the guidance on which to
+reach for, and the limits `DataGrid` states rather than fakes: no horizontal
+scroll, so a pinned column holds the left edge rather than freezing under one;
+and no fit-to-content measurement, so a double click on a column edge reports
+the request and lets the host answer.
 
 ## Helpers, which the four-part rule does not reach
 
