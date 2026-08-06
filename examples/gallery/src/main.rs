@@ -156,6 +156,53 @@ impl Render for Gallery {
                             .child(self.token.clone())
                             .child(self.rejected.clone()),
                     )
+                    .child(recipes::section_title(&theme, "Choices"))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap(px(theme.spacing.sm))
+                            .w(px(360.0))
+                            .child(
+                                Checkbox::new("gallery.telemetry")
+                                    .label("Send anonymous usage data")
+                                    .description("Counts only, never file contents")
+                                    .checked(true)
+                                    .on_change(|_, _, _| {}),
+                            )
+                            .child(
+                                Checkbox::new("gallery.partial")
+                                    .label("Some providers enabled")
+                                    .mixed()
+                                    .on_change(|_, _, _| {}),
+                            )
+                            .child(
+                                Radio::new("gallery.mode.ask")
+                                    .label("Ask before every action")
+                                    .selected(true)
+                                    .on_select(|_, _| {}),
+                            )
+                            .child(
+                                Radio::new("gallery.mode.auto")
+                                    .label("Run without asking")
+                                    .on_select(|_, _| {}),
+                            )
+                            .child(
+                                Switch::new("gallery.preview")
+                                    .label("Preview releases")
+                                    .on(true)
+                                    .on_change(|_, _, _| {}),
+                            )
+                            .child(
+                                Slider::new("gallery.temperature")
+                                    .label("Temperature")
+                                    .range(0.0, 2.0)
+                                    .step(0.1)
+                                    .value(0.7)
+                                    .display("0.7")
+                                    .on_change(|_, _, _| {}),
+                            ),
+                    )
                     .child(recipes::section_title(&theme, "Status"))
                     .child(
                         div()

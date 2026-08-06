@@ -51,6 +51,10 @@ pub fn catalog() -> Vec<Scene> {
             build: loading,
         },
         Scene {
+            name: "choice",
+            build: choice,
+        },
+        Scene {
             name: "input",
             build: input,
         },
@@ -277,6 +281,63 @@ fn overlay(_window: &mut Window, cx: &mut App) -> AnyElement {
                                 ),
                         ),
                 ),
+        )
+        .into_any_element()
+}
+
+fn choice(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(theme.space(Space::Md)))
+        .p(px(theme.space(Space::Lg)))
+        .w(px(360.0))
+        .child(
+            Checkbox::new("scene.choice.telemetry")
+                .label("Send anonymous usage data")
+                .description("Counts only, never file contents")
+                .checked(true)
+                .on_change(|_, _, _| {}),
+        )
+        .child(
+            Checkbox::new("scene.choice.partial")
+                .label("Some providers enabled")
+                .mixed()
+                .on_change(|_, _, _| {}),
+        )
+        .child(
+            Checkbox::new("scene.choice.locked")
+                .label("Managed by policy")
+                .checked(true)
+                .disabled(true),
+        )
+        .child(
+            Radio::new("scene.choice.ask")
+                .label("Ask before every action")
+                .selected(true)
+                .on_select(|_, _| {}),
+        )
+        .child(
+            Radio::new("scene.choice.auto")
+                .label("Run without asking")
+                .description("Consequential actions still require approval")
+                .on_select(|_, _| {}),
+        )
+        .child(
+            Switch::new("scene.choice.preview")
+                .label("Preview releases")
+                .on(true)
+                .on_change(|_, _, _| {}),
+        )
+        .child(
+            Slider::new("scene.choice.temperature")
+                .label("Temperature")
+                .range(0.0, 2.0)
+                .step(0.1)
+                .value(0.7)
+                .display("0.7")
+                .on_change(|_, _, _| {}),
         )
         .into_any_element()
 }

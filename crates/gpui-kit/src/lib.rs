@@ -35,6 +35,8 @@ pub mod prelude {
     pub use crate::controls::button::{Button, ButtonVariant, IconPosition};
     pub use crate::controls::field::{FieldFrame, SearchFrame};
     pub use crate::controls::input::{TextInput, TextInputEvent};
+    pub use crate::controls::slider::Slider;
+    pub use crate::controls::toggle::{Checkbox, Radio, Switch};
     pub use crate::display::badge::{Badge, Tone};
     pub use crate::display::card::{Card, ListRow};
     pub use crate::display::loading::{GradientSpinner, PulseLoader, Skeleton};
