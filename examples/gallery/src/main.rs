@@ -47,6 +47,7 @@ struct Gallery {
     /// capture in isolation.
     scene: Option<&'static str>,
     search: Entity<TextInput>,
+    provider: Entity<Select>,
     token: Entity<TextInput>,
     rejected: Entity<TextInput>,
 }
@@ -154,7 +155,8 @@ impl Render for Gallery {
                             .w(px(360.0))
                             .child(self.search.clone())
                             .child(self.token.clone())
-                            .child(self.rejected.clone()),
+                            .child(self.rejected.clone())
+                            .child(self.provider.clone()),
                     )
                     .child(recipes::section_title(&theme, "Choices"))
                     .child(
@@ -472,6 +474,17 @@ fn main() {
                     cx.new(|cx| Gallery {
                         lower_scene,
                         scene,
+                        provider: cx.new(|cx| {
+                            Select::new("gallery.provider", window, cx)
+                                .options([
+                                    SelectOption::new("anthropic", "Anthropic"),
+                                    SelectOption::new("openai", "OpenAI")
+                                        .description("Requires a key"),
+                                    SelectOption::new("local", "Local runtime").disabled(true),
+                                ])
+                                .selected("anthropic")
+                                .placeholder("Choose a provider")
+                        }),
                         search: cx.new(|cx| {
                             TextInput::new("gallery.search", window, cx).placeholder("Search")
                         }),

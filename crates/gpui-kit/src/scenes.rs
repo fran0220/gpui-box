@@ -8,6 +8,7 @@ use gpui::{AnyElement, App, Entity, Global, IntoElement, Window, div, prelude::*
 use gpui_kit_theme::{Space, Theme};
 
 use crate::controls::input::TextInput;
+use crate::controls::select::{Select, SelectOption};
 use crate::display::badge::Tone;
 use crate::foundation::ActiveTheme;
 use crate::overlay::{Kbd, Overlay, Placement};
@@ -350,6 +351,7 @@ struct SceneInputs {
     token: Entity<TextInput>,
     disabled: Entity<TextInput>,
     invalid: Entity<TextInput>,
+    provider: Entity<Select>,
 }
 
 impl Global for SceneInputs {}
@@ -373,14 +375,25 @@ fn input(window: &mut Window, cx: &mut App) -> AnyElement {
                     .invalid(true)
                     .required(true)
             }),
+            provider: cx.new(|cx| {
+                Select::new("scene.input.provider", window, cx)
+                    .options([
+                        SelectOption::new("anthropic", "Anthropic"),
+                        SelectOption::new("openai", "OpenAI").description("Requires a key"),
+                        SelectOption::new("local", "Local runtime").disabled(true),
+                    ])
+                    .selected("anthropic")
+                    .placeholder("Choose a provider")
+            }),
         };
         cx.set_global(inputs);
     }
     let inputs = cx.global::<SceneInputs>();
-    let (token, disabled, invalid) = (
+    let (token, disabled, invalid, provider) = (
         inputs.token.clone(),
         inputs.disabled.clone(),
         inputs.invalid.clone(),
+        inputs.provider.clone(),
     );
     let theme = cx.theme().clone();
 
@@ -393,6 +406,7 @@ fn input(window: &mut Window, cx: &mut App) -> AnyElement {
         .child(token)
         .child(disabled)
         .child(invalid)
+        .child(provider)
         .into_any_element()
 }
 
