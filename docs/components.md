@@ -126,6 +126,17 @@ marks it with `Cell::published`, under the id `<row id>.<column key>`. A
 sortable header publishes a `Button` carrying its current direction in `value`;
 a header that does not sort publishes a `Cell` and installs no handler.
 
+## Interaction
+
+| Component | Kind | Reports | Notes |
+|---|---|---|---|
+| `Dropzone` | builder | the item that was dropped, and the paths a platform file drop carried | Distinguishes idle, accepting, and refusing, and never renders refusing as idle. It refuses by payload kind and says why; `state` pins one of the three for review. File paths reach the handler and never the semantic tree |
+
+`List`, `Tree`, and `Tabs` also take part in drag and drop, through
+`reorderable`, `accepts`, and `on_reorder` or `on_move`. The contract they all
+share — what a drop reports, what a drag publishes, what the host has to do —
+is in `docs/interaction.md`.
+
 ## Overlay
 
 | Component | Kind | Notes |

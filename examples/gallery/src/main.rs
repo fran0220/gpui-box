@@ -65,6 +65,116 @@ struct Gallery {
     overflow: Entity<Menu>,
     page_size: Entity<Select>,
     filter_drawer: Entity<Drawer>,
+    /// The order the host holds. A reorder only shows once this changes,
+    /// because the library reports the intent and moves nothing itself.
+    queue: Vec<(SharedString, SharedString)>,
+    /// What the host attached, in the order it accepted the drops.
+    attached: Vec<SharedString>,
+}
+
+fn gallery_queue() -> Vec<(SharedString, SharedString)> {
+    [
+        ("step-clone", "Clone repository"),
+        ("step-restore", "Restore dependencies"),
+        ("step-build", "Build workspace"),
+        ("step-test", "Run tests"),
+        ("step-publish", "Publish artifacts"),
+    ]
+    .into_iter()
+    .map(|(id, label)| {
+        (
+            SharedString::new_static(id),
+            SharedString::new_static(label),
+        )
+    })
+    .collect()
+}
+
+impl Gallery {
+    /// Applies a reported move to the order the host owns.
+    ///
+    /// This is the host's half of the contract, written out so the gallery
+    /// shows a real reorder rather than a component pretending to do one.
+    fn apply_move(&mut self, intent: &DropIntent) {
+        let Some(from) = self.queue.iter().position(|(id, _)| id == &intent.item.id) else {
+            return;
+        };
+        let carried = self.queue.remove(from);
+        let anchor = self
+            .queue
+            .iter()
+            .position(|(id, _)| id == intent.position.anchor());
+        let at = match (&intent.position, anchor) {
+            (DropPosition::Before(_), Some(anchor)) => anchor,
+            (DropPosition::After(_), Some(anchor)) => anchor + 1,
+            _ => self.queue.len(),
+        };
+        self.queue.insert(at, carried);
+    }
+
+    fn interaction_section(&self, theme: &Theme, cx: &mut Context<Self>) -> gpui::AnyElement {
+        let queue = self.queue.clone();
+        let handle = cx.entity();
+        let attaching = handle.clone();
+        let attached = if self.attached.is_empty() {
+            SharedString::new_static("Nothing attached yet.")
+        } else {
+            SharedString::from(format!("Attached: {}", self.attached.join(", ")))
+        };
+
+        div()
+            .flex()
+            .flex_col()
+            .gap(px(theme.spacing.md))
+            .w(px(620.0))
+            .child(recipes::footnote(
+                theme,
+                "A drop reports where the item should go. The order below only changes \
+                 because this window applied the report to the data it owns; escape \
+                 abandons a drag and reports nothing.",
+            ))
+            .child(
+                div()
+                    .border(px(theme.borders.hairline))
+                    .border_color(theme.colors.hairline)
+                    .rounded(px(theme.radii.card))
+                    .overflow_hidden()
+                    .child(
+                        List::new("gallery.queue", queue.len(), {
+                            let queue = queue.clone();
+                            move |index, _, _| {
+                                let (id, label) = queue[index].clone();
+                                ListItem::new(id, label.clone()).text(label)
+                            }
+                        })
+                        .reorderable(true)
+                        .on_select(|_, _, _| {})
+                        .on_reorder(move |intent, _, cx| {
+                            let intent = intent.clone();
+                            handle.update(cx, |gallery, cx| {
+                                gallery.apply_move(&intent);
+                                cx.notify();
+                            });
+                        }),
+                    ),
+            )
+            .child(
+                Dropzone::new("gallery.attachments", "Drop a step to attach it")
+                    .hint("Steps only")
+                    .refusal("Only a build step can be attached.")
+                    .accepts([gpui_kit::interaction::ROW_KIND])
+                    .icon(Icon::Paperclip)
+                    .on_drop(move |item, _, cx| {
+                        let label = item.label.clone();
+                        attaching.update(cx, |gallery, cx| {
+                            gallery.attached.push(label);
+                            cx.notify();
+                        });
+                    }),
+            )
+            .child(recipes::footnote(theme, attached))
+            .into_any_element()
+    }
 }
 
 fn gallery_menu_items() -> Vec<MenuItem> {
@@ -595,6 +705,8 @@ impl Render for Gallery {
                                     .child(Skeleton::new("gallery.skeleton").rows(3)),
                             ),
                     )
+                    .child(recipes::section_title(&theme, "Interaction"))
+                    .child(self.interaction_section(&theme, cx))
                     .child(recipes::section_title(&theme, "Motion"))
                     .child(motion_section(&theme, window, cx))
                     .child(recipes::section_title(&theme, "Popover primitives"))
@@ -1481,6 +1593,8 @@ fn main() {
                     cx.new(|cx| Gallery {
                         lower_scene,
                         scene,
+                        queue: gallery_queue(),
+                        attached: Vec::new(),
                         provider: cx.new(|cx| {
                             Select::new("gallery.provider", window, cx)
                                 .options([

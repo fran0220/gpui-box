@@ -52,6 +52,8 @@ pub enum Role {
     Form,
     Field,
     Image,
+    /// A drag in flight: what is being carried, and where it would land.
+    Drag,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]

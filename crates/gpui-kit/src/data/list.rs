@@ -24,15 +24,20 @@ use std::rc::Rc;
 use gpui::{
     AnyElement, App, Global, InteractiveElement, IntoElement, ListSizingBehavior, ParentElement,
     RenderOnce, ScrollStrategy, SharedString, StatefulInteractiveElement, Styled,
-    UniformListScrollHandle, Window, div, prelude::FluentBuilder, px, uniform_list,
+    UniformListScrollHandle, Window, div, point, prelude::FluentBuilder, px, uniform_list,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Theme};
 
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
+use crate::interaction::dnd::{
+    self, DragItem, DropAxis, DropIntent, DropPosition, MakingWay, RowTarget, SurfaceDrag,
+};
 
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 type RenderRow = Rc<dyn Fn(usize, &mut Window, &mut App) -> ListItem>;
+type ReorderHandler = Rc<dyn Fn(&DropIntent, &mut Window, &mut App)>;
+type Accepts = Rc<dyn Fn(&DragItem, &DropPosition) -> bool>;
 
 /// One row, named by the caller.
 pub struct ListItem {
@@ -88,6 +93,9 @@ pub struct List {
     size: ControlSize,
     disabled: bool,
     on_select: Option<SelectHandler>,
+    reorderable: bool,
+    accepts: Option<Accepts>,
+    on_reorder: Option<ReorderHandler>,
 }
 
 impl std::fmt::Debug for List {
@@ -120,6 +128,9 @@ impl List {
             size: ControlSize::Md,
             disabled: false,
             on_select: None,
+            reorderable: false,
+            accepts: None,
+            on_reorder: None,
         }
     }
 
@@ -149,6 +160,38 @@ impl List {
         self.on_select = Some(Rc::new(handler));
         self
     }
+
+    /// Lets a row be picked up and put down somewhere else in the list.
+    ///
+    /// The whole row is the handle. A list row's ordinary action is a click,
+    /// and GPUI only calls a press a drag once it has travelled two pixels, so
+    /// both fit on the same row without a grip column the caller would have to
+    /// render into every row it owns.
+    pub fn reorderable(mut self, reorderable: bool) -> Self {
+        self.reorderable = reorderable;
+        self
+    }
+
+    /// Whether this list takes a payload, and where.
+    ///
+    /// Without one, a reorderable list takes its own rows and nothing else.
+    /// Anything wider than that is policy, and policy is the caller's.
+    pub fn accepts(
+        mut self,
+        predicate: impl Fn(&DragItem, &DropPosition) -> bool + 'static,
+    ) -> Self {
+        self.accepts = Some(Rc::new(predicate));
+        self
+    }
+
+    /// Reports where a dropped row should go. The list does not move it.
+    pub fn on_reorder(
+        mut self,
+        handler: impl Fn(&DropIntent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_reorder = Some(Rc::new(handler));
+        self
+    }
 }
 
 impl Disableable for List {
@@ -166,7 +209,7 @@ impl Sizable for List {
 }
 
 impl RenderOnce for List {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let metrics = theme.control.get(self.size);
         let row_height = self.row_height.unwrap_or(metrics.height);
@@ -179,6 +222,7 @@ impl RenderOnce for List {
             .filter(|_| count > 0);
         let render_row = Rc::clone(&self.render_row);
         let scroll = scroll_handle(&ident, cx);
+        let reorder = self.reorder(window, cx);
 
         // Which index published which id on the last frame. The rows fill it
         // during prepaint, so the keyboard handler, which runs later, can name
@@ -192,6 +236,7 @@ impl RenderOnce for List {
             let handler = handler.clone();
             let render_row = Rc::clone(&render_row);
             let rendered = Rc::clone(&rendered);
+            let reorder = reorder.clone();
             uniform_list(
                 ident.child("rows").element_id(),
                 count,
@@ -208,8 +253,11 @@ impl RenderOnce for List {
                                 &theme,
                                 row_height,
                                 item,
+                                index,
                                 selected.as_ref(),
                                 handler.as_ref(),
+                                reorder.as_ref(),
+                                window,
                                 cx,
                             )
                         })
@@ -229,6 +277,38 @@ impl RenderOnce for List {
         });
 
         let mut container = div().id(ident.element_id()).column().w_full().child(rows);
+
+        // A drag that reaches the edge of the viewport has run out of list to
+        // aim at, so the list brings the next row to the pointer rather than
+        // asking the pointer to go somewhere it cannot.
+        if reorder.is_some() {
+            let rendered = Rc::clone(&rendered);
+            let scroll = scroll.clone();
+            container = container.on_drag_move::<DragItem>(move |event, window, _| {
+                let pointer = event.event.position;
+                if !event.bounds.contains(&pointer) {
+                    return;
+                }
+                let band = px(row_height);
+                let rendered = rendered.borrow();
+                let next = if pointer.y < event.bounds.top() + band {
+                    rendered.keys().min().and_then(|first| first.checked_sub(1))
+                } else if pointer.y > event.bounds.bottom() - band {
+                    rendered
+                        .keys()
+                        .max()
+                        .map(|last| last + 1)
+                        .filter(|next| *next < count)
+                } else {
+                    None
+                };
+                let Some(next) = next else {
+                    return;
+                };
+                scroll.scroll_to_item(next, ScrollStrategy::Nearest);
+                window.refresh();
+            });
+        }
 
         if let Some(handler) = handler {
             let selected = self.selected.clone();
@@ -270,18 +350,56 @@ impl RenderOnce for List {
 
 type Rendered = Rc<RefCell<HashMap<usize, SharedString>>>;
 
+/// What a row needs to take part in a reorder.
+#[derive(Clone)]
+struct Reorder {
+    surface: SharedString,
+    drag: Option<SurfaceDrag>,
+    accepts: Accepts,
+    on_drop: ReorderHandler,
+}
+
+impl List {
+    fn reorder(&self, window: &mut Window, cx: &mut App) -> Option<Reorder> {
+        if self.disabled || !self.reorderable {
+            return None;
+        }
+        let on_drop = self.on_reorder.clone()?;
+        let surface = self.ident.semantic_id();
+        let accepts = self.accepts.clone().unwrap_or_else(|| {
+            let own = surface.clone();
+            Rc::new(move |item: &DragItem, _: &DropPosition| item.source == own)
+        });
+        Some(Reorder {
+            drag: dnd::surface_drag(&surface, window, cx),
+            surface,
+            accepts,
+            on_drop,
+        })
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 fn row_element(
     list: &Ident,
     theme: &Theme,
     height: f32,
     item: ListItem,
+    index: usize,
     selected: Option<&SharedString>,
     handler: Option<&SelectHandler>,
+    reorder: Option<&Reorder>,
+    window: &mut Window,
     cx: &mut App,
 ) -> AnyElement {
     let ident = list.child(item.id.as_ref());
     let selected = selected == Some(&item.id);
     let actionable = !item.disabled && handler.is_some();
+    let draggable = reorder.filter(|_| !item.disabled);
+    let drag = draggable.and_then(|reorder| reorder.drag.as_ref());
+    let carried = drag.is_some_and(|drag| drag.carries(&item.id));
+    let landing = drag.and_then(|drag| drag.indicator_for(&item.id));
+    let label = item.text.clone().unwrap_or_else(|| item.id.clone());
 
     let mut row = div()
         .id(ident.element_id())
@@ -294,6 +412,9 @@ fn row_element(
         .when(item.disabled, |element| {
             element.opacity(theme.opacity.disabled)
         })
+        // The row the pointer is carrying stays where the data still says it
+        // is, and says so by receding rather than by leaving a hole.
+        .when(carried, |element| element.opacity(theme.opacity.muted))
         .when(actionable, |element| {
             element
                 .cursor_pointer()
@@ -304,12 +425,34 @@ fn row_element(
                 })
                 .focus_ring(theme)
         })
-        .child(div().flex_1().overflow_hidden().child(item.content));
+        .child(div().flex_1().overflow_hidden().child(item.content))
+        .children(landing.map(|(position, accepted)| {
+            dnd::indicator(&position, accepted, DropAxis::Vertical, cx)
+        }));
 
     if let (true, Some(handler)) = (actionable, handler) {
         let id = item.id.clone();
         let handler = Rc::clone(handler);
         row = row.on_click(move |_, window, cx| handler(id.clone(), window, cx));
+    }
+
+    if let Some(reorder) = draggable {
+        row = dnd::draggable(
+            row,
+            DragItem::new(reorder.surface.clone(), item.id.clone(), label),
+        );
+        row = dnd::drop_target(
+            row,
+            RowTarget {
+                surface: reorder.surface.clone(),
+                id: item.id.clone(),
+                index,
+                allow_into: false,
+                axis: DropAxis::Vertical,
+                accepts: Rc::clone(&reorder.accepts),
+                on_drop: Rc::clone(&reorder.on_drop),
+            },
+        );
     }
 
     let mut spec = NodeSpec::new(ident.semantic_id(), Role::Row)
@@ -319,7 +462,20 @@ fn row_element(
     if let Some(text) = item.text {
         spec = spec.text(text);
     }
-    row.semantic_in(cx, spec).into_any_element()
+    let row = row.semantic_in(cx, spec);
+
+    match draggable {
+        Some(reorder) => {
+            let shift = reorder
+                .drag
+                .as_ref()
+                .filter(|drag| drag.makes_way(index))
+                .map_or(px(0.0), |_| dnd::make_way_gap(cx, DropAxis::Vertical));
+            row.make_way(ident.semantic_id(), point(px(0.0), shift), window, cx)
+                .into_any_element()
+        }
+        None => row.into_any_element(),
+    }
 }
 
 /// Where the reported selection sits among the rows that were rendered.

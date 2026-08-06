@@ -22,9 +22,25 @@ input, and an entry in `docs/components.md`.
 | Display | `Badge`, `Tag`, `Avatar`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `StatusDot`, `StatusLine`, `Callout`, `PulseLoader`, `GradientSpinner`, `Skeleton` |
 | Overlay | `Overlay`, `Dialog`, `Drawer`, `Popover`, `Menu`, `ContextMenu`, `CommandPalette`, `Tooltip`, `Toast`, `ToastLayer`, `Kbd` |
 | Layout | `SplitPane`, `ScrollArea`, `Toolbar` |
+| Interaction | `Dropzone` |
 
 `Tooltipped` is an extension trait rather than a component: it attaches a
 `Tooltip` to any element, and is covered wherever that `Tooltip` is.
+
+## Systems, which span more than one component
+
+A system is not a component. It has no builder of its own to place on a
+screen; it is a contract several families implement, so it is covered when the
+contract is documented, staged in a scene, and driven through simulated input
+against every surface that implements it.
+
+| System | Contract | Implemented by |
+|---|---|---|
+| Drag and drop (`gpui_kit::interaction::dnd`) | `docs/interaction.md` | `List`, `Tree`, `Tabs`, `Dropzone` |
+
+Drag and drop is covered: the contract is written down, the scenes `drag-list`,
+`drag-tree`, and `dropzone` stage it, and `crates/gpui-kit/tests/dnd.rs` drives
+a simulated pointer through every surface above.
 
 ## Helpers, which the four-part rule does not reach
 

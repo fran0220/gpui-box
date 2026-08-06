@@ -6,9 +6,9 @@
 use std::time::Duration;
 
 use gpui::{
-    AnyElement, AnyWindowHandle, App, Bounds, Context, IntoElement, Modifiers, Pixels, Point,
-    Render, TestAppContext, VisualTestContext, Window, WindowBounds, WindowOptions, div, point,
-    prelude::*, px, size,
+    AnyElement, AnyWindowHandle, App, Bounds, Context, IntoElement, Modifiers, MouseButton, Pixels,
+    Point, Render, TestAppContext, VisualTestContext, Window, WindowBounds, WindowOptions, div,
+    point, prelude::*, px, size,
 };
 use gpui_kit_semantics::{Node, SemanticRegistry, Snapshot};
 
@@ -30,6 +30,9 @@ impl Render for Scene {
 pub struct Harness {
     cx: VisualTestContext,
     window: AnyWindowHandle,
+    /// Where the simulated pointer is, so a drag can be driven one step at a
+    /// time without a test having to carry the position itself.
+    pointer: Point<Pixels>,
 }
 
 impl std::fmt::Debug for Harness {
@@ -57,6 +60,7 @@ impl Harness {
         Self {
             window: handle.into(),
             cx: visual,
+            pointer: Point::default(),
         }
     }
 
@@ -144,6 +148,86 @@ impl Harness {
             .unwrap_or_else(|| panic!("semantic node `{id}` is missing"));
         let center = node.bounds.center();
         point(px(center.0), px(center.1))
+    }
+
+    /// A point `fraction` of the way down a node, horizontally centred.
+    ///
+    /// A drop target offers different slots at different heights, so a test
+    /// that wants one of them has to aim at it.
+    pub fn point_down(&mut self, id: &str, fraction: f32) -> Point<Pixels> {
+        let node = self
+            .node(id)
+            .unwrap_or_else(|| panic!("semantic node `{id}` is missing"));
+        point(
+            px(node.bounds.x + node.bounds.width / 2.0),
+            px(node.bounds.y + node.bounds.height * fraction),
+        )
+    }
+
+    /// A point `fraction` of the way across a node, vertically centred.
+    pub fn point_across(&mut self, id: &str, fraction: f32) -> Point<Pixels> {
+        let node = self
+            .node(id)
+            .unwrap_or_else(|| panic!("semantic node `{id}` is missing"));
+        point(
+            px(node.bounds.x + node.bounds.width * fraction),
+            px(node.bounds.y + node.bounds.height / 2.0),
+        )
+    }
+
+    /// Where the simulated pointer currently is.
+    pub fn pointer(&self) -> Point<Pixels> {
+        self.pointer
+    }
+
+    /// Presses on a node and travels far enough for the press to become a
+    /// drag.
+    ///
+    /// GPUI only calls a press a drag once it has moved past its own
+    /// threshold, so a test that pressed and released without moving would be
+    /// testing a click.
+    pub fn drag_start(&mut self, id: &str) {
+        let from = self.point_in(id);
+        self.cx
+            .simulate_mouse_down(from, MouseButton::Left, Modifiers::none());
+        self.cx.run_until_parked();
+        self.pointer = from;
+        self.drag_to(from + point(px(4.0), px(4.0)));
+    }
+
+    /// Moves the pointer, with the button still down.
+    pub fn drag_to(&mut self, position: Point<Pixels>) {
+        self.pointer = position;
+        self.cx
+            .simulate_mouse_move(position, MouseButton::Left, Modifiers::none());
+        self.cx.run_until_parked();
+    }
+
+    /// Moves the pointer to the middle of a node.
+    pub fn drag_over(&mut self, id: &str) {
+        let over = self.point_in(id);
+        self.drag_to(over);
+    }
+
+    /// Releases wherever the pointer is.
+    pub fn drop_here(&mut self) {
+        let at = self.pointer;
+        self.cx
+            .simulate_mouse_up(at, MouseButton::Left, Modifiers::none());
+        self.cx.run_until_parked();
+    }
+
+    /// Abandons a drag in flight.
+    pub fn cancel_drag(&mut self) {
+        self.keystrokes("escape");
+    }
+
+    /// The whole gesture: press on `from`, travel to the middle of `to`, and
+    /// let go.
+    pub fn drag(&mut self, from: &str, to: &str) {
+        self.drag_start(from);
+        self.drag_over(to);
+        self.drop_here();
     }
 }
 

@@ -20,6 +20,7 @@ use crate::controls::tag_input::TagInput;
 use crate::controls::textarea::TextArea;
 use crate::display::badge::Tone;
 use crate::foundation::ActiveTheme;
+use crate::interaction::dnd;
 use crate::overlay::toast::push as toast_push;
 use crate::overlay::{Edge, Kbd, Overlay, Placement, Tooltip, Tooltipped};
 use crate::prelude::*;
@@ -181,6 +182,18 @@ pub fn catalog() -> Vec<Scene> {
         Scene {
             name: "animated-number",
             build: animated_number,
+        },
+        Scene {
+            name: "drag-list",
+            build: drag_list,
+        },
+        Scene {
+            name: "drag-tree",
+            build: drag_tree,
+        },
+        Scene {
+            name: "dropzone",
+            build: dropzone,
         },
     ]
 }
@@ -1926,6 +1939,159 @@ fn animated_number(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .text_size(px(theme.typography.caption.size))
                 .text_color(theme.colors.text_muted)
                 .child("The published value is the target, from the frame it changes."),
+        )
+        .into_any_element()
+}
+
+/// A caption naming the state a drag scene was staged in.
+fn caption(theme: &Theme, text: impl Into<SharedString>) -> gpui::Div {
+    div()
+        .type_scale(theme, gpui_kit_theme::TypeScale::Caption)
+        .text_color(theme.colors.text_muted)
+        .child(text.into())
+}
+
+fn drag_list(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let carried = fixture_record(4);
+    let anchor = fixture_record(1);
+    // A capture cannot photograph a gesture, so the drag is placed by hand.
+    // Staging fixes the ghost, the indicator, and the open slot, and takes the
+    // pointer and the spring out of the picture.
+    dnd::stage(
+        StagedDrag::new(DragItem::new(
+            "scene.drag.records",
+            carried.0.clone(),
+            carried.1.clone(),
+        ))
+        .landing(
+            "scene.drag.records",
+            DropPosition::Before(anchor.0.clone()),
+            Some(1),
+            true,
+        ),
+        cx,
+    );
+
+    stack(&theme)
+        .w(px(420.0))
+        .child(caption(
+            &theme,
+            SharedString::from(format!("{} moving before {}", carried.1, anchor.1)),
+        ))
+        .child(
+            div()
+                .relative()
+                .hairline(&theme)
+                .radius(&theme, Radius::Card)
+                .overflow_hidden()
+                .child(
+                    List::new("scene.drag.records", 6, |index, _, _| {
+                        let (id, label) = fixture_record(index);
+                        ListItem::new(id, label.clone()).text(label)
+                    })
+                    // A row slides without its layout slot moving, so the
+                    // viewport is one row taller than the rows it holds and
+                    // the open slot has somewhere to be.
+                    .visible_rows(7)
+                    .reorderable(true)
+                    .on_select(|_, _, _| {})
+                    .on_reorder(|_, _, _| {}),
+                )
+                .children(
+                    dnd::staged_ghost(cx)
+                        .map(|ghost| div().absolute().left(px(96.0)).top(px(18.0)).child(ghost)),
+                ),
+        )
+        .into_any_element()
+}
+
+fn drag_tree(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    dnd::stage(
+        StagedDrag::new(
+            DragItem::new("scene.drag.workspace", "kit", "gpui-kit").icon(Icon::Document),
+        )
+        .landing(
+            "scene.drag.workspace",
+            DropPosition::Into(SharedString::new_static("docs")),
+            None,
+            true,
+        ),
+        cx,
+    );
+
+    stack(&theme)
+        .w(px(360.0))
+        .child(caption(&theme, "gpui-kit moving into docs"))
+        .child(
+            div()
+                .relative()
+                .child(
+                    Tree::new("scene.drag.workspace")
+                        .expanded_ids(&["workspace", "crates", "docs"])
+                        .nodes([TreeNode::new("workspace", "workspace")
+                            .icon(Icon::Folder)
+                            .children([
+                                TreeNode::new("crates", "crates")
+                                    .icon(Icon::Folder)
+                                    .children([
+                                        TreeNode::new("kit", "gpui-kit").icon(Icon::Document),
+                                        TreeNode::new("tokens", "gpui-kit-tokens")
+                                            .icon(Icon::Document),
+                                    ]),
+                                TreeNode::new("docs", "docs")
+                                    .icon(Icon::Folder)
+                                    .children([TreeNode::new("components", "components.md")
+                                        .icon(Icon::Document)]),
+                            ])])
+                        .reorderable(true)
+                        .on_toggle(|_, _, _, _| {})
+                        .on_select(|_, _, _| {})
+                        .on_move(|_, _, _| {}),
+                )
+                .children(
+                    dnd::staged_ghost(cx)
+                        .map(|ghost| div().absolute().left(px(212.0)).top(px(116.0)).child(ghost)),
+                ),
+        )
+        .into_any_element()
+}
+
+fn dropzone(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    // No single pointer position can produce all three states at once, so each
+    // zone is pinned to the one it is here to show.
+    stack(&theme)
+        .w(px(560.0))
+        .child(caption(&theme, "idle, accepting, refusing"))
+        .child(
+            row(&theme)
+                .items_stretch()
+                .child(
+                    div().flex_1().child(
+                        Dropzone::new("scene.dropzone.idle", "Drop files to attach")
+                            .hint("PDF, PNG, or plain text")
+                            .state(DropzoneState::Idle)
+                            .on_files(|_, _, _| {}),
+                    ),
+                )
+                .child(
+                    div().flex_1().child(
+                        Dropzone::new("scene.dropzone.accepting", "Drop files to attach")
+                            .hint("PDF, PNG, or plain text")
+                            .state(DropzoneState::Accepting)
+                            .on_files(|_, _, _| {}),
+                    ),
+                )
+                .child(
+                    div().flex_1().child(
+                        Dropzone::new("scene.dropzone.refusing", "Drop files to attach")
+                            .refusal("A folder cannot be attached.")
+                            .state(DropzoneState::Refusing)
+                            .on_files(|_, _, _| {}),
+                    ),
+                ),
         )
         .into_any_element()
 }

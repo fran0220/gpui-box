@@ -12,17 +12,22 @@ use std::rc::Rc;
 
 use gpui::{
     App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
-    StatefulInteractiveElement, Styled, Transformation, Window, div, prelude::FluentBuilder, px,
-    radians,
+    StatefulInteractiveElement, Styled, Transformation, Window, div, point, prelude::FluentBuilder,
+    px, radians,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Theme};
 
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
+use crate::interaction::dnd::{
+    self, DragItem, DropAxis, DropIntent, DropPosition, MakingWay, RowTarget, SurfaceDrag,
+};
 
 type ToggleHandler = Rc<dyn Fn(SharedString, bool, &mut Window, &mut App)>;
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
+type MoveHandler = Rc<dyn Fn(&DropIntent, &mut Window, &mut App)>;
+type Accepts = Rc<dyn Fn(&DragItem, &DropPosition) -> bool>;
 
 /// One node, identified by business identity rather than by its place in the
 /// hierarchy, so moving a branch does not rename what hangs under it.
@@ -78,6 +83,9 @@ pub struct Tree {
     disabled: bool,
     on_toggle: Option<ToggleHandler>,
     on_select: Option<SelectHandler>,
+    reorderable: bool,
+    accepts: Option<Accepts>,
+    on_move: Option<MoveHandler>,
 }
 
 impl std::fmt::Debug for Tree {
@@ -104,6 +112,9 @@ impl Tree {
             disabled: false,
             on_toggle: None,
             on_select: None,
+            reorderable: false,
+            accepts: None,
+            on_move: None,
         }
     }
 
@@ -148,6 +159,35 @@ impl Tree {
         handler: impl Fn(SharedString, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_select = Some(Rc::new(handler));
+        self
+    }
+
+    /// Lets a node be picked up and put somewhere else in the hierarchy.
+    pub fn reorderable(mut self, reorderable: bool) -> Self {
+        self.reorderable = reorderable;
+        self
+    }
+
+    /// Whether this tree takes a payload, and where.
+    ///
+    /// Structural impossibilities are refused before this is consulted: a node
+    /// cannot be moved inside itself or below one of its own descendants,
+    /// because the descendant travels with it. Everything else — which kinds
+    /// of node may hold which — is policy, and policy is the caller's.
+    pub fn accepts(
+        mut self,
+        predicate: impl Fn(&DragItem, &DropPosition) -> bool + 'static,
+    ) -> Self {
+        self.accepts = Some(Rc::new(predicate));
+        self
+    }
+
+    /// Reports where a dropped node should go. The tree does not move it.
+    pub fn on_move(
+        mut self,
+        handler: impl Fn(&DropIntent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_move = Some(Rc::new(handler));
         self
     }
 }
@@ -273,10 +313,82 @@ fn step(visible: &[Visible], from: isize, delta: isize) -> Option<SharedString> 
     None
 }
 
+/// The node named `id`, wherever it sits.
+fn find<'a>(nodes: &'a [TreeNode], id: &SharedString) -> Option<&'a TreeNode> {
+    for node in nodes {
+        if &node.id == id {
+            return Some(node);
+        }
+        if let Some(found) = find(&node.children, id) {
+            return Some(found);
+        }
+    }
+    None
+}
+
+fn collect(node: &TreeNode, out: &mut Vec<SharedString>) {
+    out.push(node.id.clone());
+    for child in &node.children {
+        collect(child, out);
+    }
+}
+
+/// A node and everything hanging under it.
+///
+/// A node cannot be moved into, before, or after anything in here: its
+/// descendants travel with it, so the destination would end up inside the
+/// thing being moved. That is a structural impossibility rather than a policy,
+/// which is why the tree judges it instead of asking the caller.
+fn subtree(nodes: &[TreeNode], id: &SharedString) -> Vec<SharedString> {
+    let mut ids = Vec::new();
+    if let Some(node) = find(nodes, id) {
+        collect(node, &mut ids);
+    }
+    ids
+}
+
+/// What a node needs to take part in a move.
+#[derive(Clone)]
+struct Reorder {
+    surface: SharedString,
+    drag: Option<SurfaceDrag>,
+    accepts: Accepts,
+    on_drop: MoveHandler,
+}
+
+impl Tree {
+    fn reorder(&self, window: &mut Window, cx: &mut App) -> Option<Reorder> {
+        if self.disabled || !self.reorderable {
+            return None;
+        }
+        let on_drop = self.on_move.clone()?;
+        let surface = self.ident.semantic_id();
+        let nodes = self.nodes.clone();
+        let caller = self.accepts.clone();
+        let own = surface.clone();
+        let accepts: Accepts = Rc::new(move |item: &DragItem, position: &DropPosition| {
+            if item.source == own && subtree(&nodes, &item.id).contains(position.anchor()) {
+                return false;
+            }
+            match &caller {
+                Some(caller) => caller(item, position),
+                None => item.source == own,
+            }
+        });
+        Some(Reorder {
+            drag: dnd::surface_drag(&surface, window, cx),
+            surface,
+            accepts,
+            on_drop,
+        })
+    }
+}
+
 impl RenderOnce for Tree {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let metrics = theme.control.get(self.size);
+        let reorder = self.reorder(window, cx);
         let mut visible = Vec::new();
         flatten(&self.nodes, &self.expanded, 1, None, &mut visible);
 
@@ -318,8 +430,16 @@ impl RenderOnce for Tree {
             });
         }
 
-        for node in &visible {
-            stack = stack.child(self.node_element(node, &theme, metrics.icon_size, cx));
+        for (index, node) in visible.iter().enumerate() {
+            stack = stack.child(self.node_element(
+                node,
+                index,
+                &theme,
+                metrics.icon_size,
+                reorder.as_ref(),
+                window,
+                cx,
+            ));
         }
 
         stack.semantic_in(cx, NodeSpec::new(self.ident.semantic_id(), Role::Tree))
@@ -327,16 +447,24 @@ impl RenderOnce for Tree {
 }
 
 impl Tree {
+    #[allow(clippy::too_many_arguments)]
     fn node_element(
         &self,
         node: &Visible,
+        index: usize,
         theme: &Theme,
         icon_size: f32,
+        reorder: Option<&Reorder>,
+        window: &mut Window,
         cx: &mut App,
-    ) -> impl IntoElement {
+    ) -> gpui::AnyElement {
         let ident = self.ident.child(node.id.as_ref());
         let selected = self.selected.as_ref() == Some(&node.id);
         let disabled = self.disabled || node.disabled;
+        let draggable = reorder.filter(|_| !disabled);
+        let drag = draggable.and_then(|reorder| reorder.drag.as_ref());
+        let carried = drag.is_some_and(|drag| drag.carries(&node.id));
+        let landing = drag.and_then(|drag| drag.indicator_for(&node.id));
         let selectable = !disabled && self.on_select.is_some();
         let toggleable = !disabled && node.has_children && self.on_toggle.is_some();
         let color = if disabled {
@@ -412,6 +540,7 @@ impl Tree {
             .text_color(color)
             .when(selected, |element| element.bg(theme.colors.selected))
             .when(disabled, |element| element.opacity(theme.opacity.disabled))
+            .when(carried, |element| element.opacity(theme.opacity.muted))
             .when(selectable, |element| {
                 element
                     .cursor_pointer()
@@ -432,11 +561,37 @@ impl Tree {
                 node.icon
                     .map(|glyph| icon(glyph).size(px(icon_size)).text_color(color)),
             )
-            .child(div().flex_1().overflow_hidden().child(node.label.clone()));
+            .child(div().flex_1().overflow_hidden().child(node.label.clone()))
+            .children(landing.map(|(position, accepted)| {
+                dnd::indicator(&position, accepted, DropAxis::Vertical, cx)
+            }));
 
         if let (true, Some(handler)) = (selectable, self.on_select.clone()) {
             let id = node.id.clone();
             row = row.on_click(move |_, window, cx| handler(id.clone(), window, cx));
+        }
+
+        if let Some(reorder) = draggable {
+            let mut item =
+                DragItem::new(reorder.surface.clone(), node.id.clone(), node.label.clone());
+            if let Some(glyph) = node.icon {
+                item = item.icon(glyph);
+            }
+            row = dnd::draggable(row, item);
+            row = dnd::drop_target(
+                row,
+                RowTarget {
+                    surface: reorder.surface.clone(),
+                    id: node.id.clone(),
+                    index,
+                    // Only a branch can be entered; a leaf offers the slots
+                    // beside it and nothing else.
+                    allow_into: node.has_children,
+                    axis: DropAxis::Vertical,
+                    accepts: Rc::clone(&reorder.accepts),
+                    on_drop: Rc::clone(&reorder.on_drop),
+                },
+            );
         }
 
         let mut spec = NodeSpec::new(ident.semantic_id(), Role::TreeItem)
@@ -457,7 +612,19 @@ impl Tree {
             spec = spec.expanded(node.open);
         }
 
-        row.semantic_in(cx, spec)
+        let row = row.semantic_in(cx, spec);
+        match draggable {
+            Some(reorder) => {
+                let shift = reorder
+                    .drag
+                    .as_ref()
+                    .filter(|drag| drag.makes_way(index))
+                    .map_or(px(0.0), |_| dnd::make_way_gap(cx, DropAxis::Vertical));
+                row.make_way(ident.semantic_id(), point(px(0.0), shift), window, cx)
+                    .into_any_element()
+            }
+            None => row.into_any_element(),
+        }
     }
 }
 

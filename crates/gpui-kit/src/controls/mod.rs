@@ -2,6 +2,7 @@
 
 pub mod button;
 pub mod combobox;
+pub mod dropzone;
 pub mod field;
 pub mod form_field;
 pub mod input;

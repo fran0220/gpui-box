@@ -11,7 +11,7 @@ use std::rc::Rc;
 
 use gpui::{
     App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
-    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    StatefulInteractiveElement, Styled, Window, div, point, prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -20,9 +20,14 @@ use gpui_kit_theme::{ActiveTheme, ControlMetrics, ControlSize, Space, Theme};
 use crate::display::badge::Badge;
 use crate::foundation::stepping::bounded_step;
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
+use crate::interaction::dnd::{
+    self, DragItem, DropAxis, DropIntent, DropPosition, MakingWay, RowTarget, SurfaceDrag,
+};
 use crate::motion::{Flipping, flip};
 
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
+type ReorderHandler = Rc<dyn Fn(&DropIntent, &mut Window, &mut App)>;
+type Accepts = Rc<dyn Fn(&DragItem, &DropPosition) -> bool>;
 
 /// One tab, identified by business identity rather than by position.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -71,6 +76,9 @@ pub struct Tabs {
     size: ControlSize,
     disabled: bool,
     on_select: Option<SelectHandler>,
+    reorderable: bool,
+    accepts: Option<Accepts>,
+    on_reorder: Option<ReorderHandler>,
 }
 
 impl std::fmt::Debug for Tabs {
@@ -95,6 +103,9 @@ impl Tabs {
             size: ControlSize::Md,
             disabled: false,
             on_select: None,
+            reorderable: false,
+            accepts: None,
+            on_reorder: None,
         }
     }
 
@@ -121,17 +132,67 @@ impl Tabs {
         self
     }
 
+    /// Lets a tab be dragged to another place in the strip.
+    pub fn reorderable(mut self, reorderable: bool) -> Self {
+        self.reorderable = reorderable;
+        self
+    }
+
+    /// Whether this strip takes a payload, and where. Without one, it takes
+    /// its own tabs and nothing else.
+    pub fn accepts(
+        mut self,
+        predicate: impl Fn(&DragItem, &DropPosition) -> bool + 'static,
+    ) -> Self {
+        self.accepts = Some(Rc::new(predicate));
+        self
+    }
+
+    /// Reports where a dropped tab should go. The strip does not move it.
+    pub fn on_reorder(
+        mut self,
+        handler: impl Fn(&DropIntent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_reorder = Some(Rc::new(handler));
+        self
+    }
+
+    fn reorder(&self, window: &mut Window, cx: &mut App) -> Option<Reorder> {
+        if self.disabled || !self.reorderable {
+            return None;
+        }
+        let on_drop = self.on_reorder.clone()?;
+        let surface = self.ident.semantic_id();
+        let accepts = self.accepts.clone().unwrap_or_else(|| {
+            let own = surface.clone();
+            Rc::new(move |item: &DragItem, _: &DropPosition| item.source == own)
+        });
+        Some(Reorder {
+            drag: dnd::surface_drag(&surface, window, cx),
+            surface,
+            accepts,
+            on_drop,
+        })
+    }
+
+    #[allow(clippy::too_many_arguments)]
     fn tab_element(
         &self,
         tab: &TabItem,
+        index: usize,
         theme: &Theme,
         metrics: ControlMetrics,
+        reorder: Option<&Reorder>,
         window: &mut Window,
         cx: &mut App,
-    ) -> impl IntoElement {
+    ) -> gpui::AnyElement {
         let selected = self.selected.as_ref() == Some(&tab.id);
         let disabled = self.disabled || tab.disabled;
         let actionable = !disabled && self.on_select.is_some();
+        let draggable = reorder.filter(|_| !disabled);
+        let drag = draggable.and_then(|reorder| reorder.drag.as_ref());
+        let carried = drag.is_some_and(|drag| drag.carries(&tab.id));
+        let landing = drag.and_then(|drag| drag.indicator_for(&tab.id));
         let ident = self.ident.child(tab.id.as_ref());
         let color = if disabled {
             theme.colors.text_faint
@@ -178,7 +239,11 @@ impl Tabs {
                             .flip(&indicator, window, cx)
                     })),
             )
+            .children(landing.map(|(position, accepted)| {
+                dnd::indicator(&position, accepted, DropAxis::Horizontal, cx)
+            }))
             .when(disabled, |element| element.opacity(theme.opacity.disabled))
+            .when(carried, |element| element.opacity(theme.opacity.muted))
             .when(actionable, |element| {
                 element
                     .cursor_pointer()
@@ -202,15 +267,59 @@ impl Tabs {
                 });
         }
 
-        element.semantic_in(
+        if let Some(reorder) = draggable {
+            let mut item =
+                DragItem::new(reorder.surface.clone(), tab.id.clone(), tab.label.clone());
+            if let Some(glyph) = tab.icon {
+                item = item.icon(glyph);
+            }
+            element = dnd::draggable(element, item);
+            element = dnd::drop_target(
+                element,
+                RowTarget {
+                    surface: reorder.surface.clone(),
+                    id: tab.id.clone(),
+                    index,
+                    allow_into: false,
+                    axis: DropAxis::Horizontal,
+                    accepts: Rc::clone(&reorder.accepts),
+                    on_drop: Rc::clone(&reorder.on_drop),
+                },
+            );
+        }
+
+        let element = element.semantic_in(
             cx,
             NodeSpec::new(ident.semantic_id(), Role::Tab)
                 .parent(self.ident.semantic_id())
                 .checked(selected)
                 .disabled(disabled)
                 .text(tab.label.clone()),
-        )
+        );
+
+        match draggable {
+            Some(reorder) => {
+                let shift = reorder
+                    .drag
+                    .as_ref()
+                    .filter(|drag| drag.makes_way(index))
+                    .map_or(px(0.0), |_| dnd::make_way_gap(cx, DropAxis::Horizontal));
+                element
+                    .make_way(ident.semantic_id(), point(shift, px(0.0)), window, cx)
+                    .into_any_element()
+            }
+            None => element.into_any_element(),
+        }
     }
+}
+
+/// What a tab needs to take part in a reorder.
+#[derive(Clone)]
+struct Reorder {
+    surface: SharedString,
+    drag: Option<SurfaceDrag>,
+    accepts: Accepts,
+    on_drop: ReorderHandler,
 }
 
 impl Disableable for Tabs {
@@ -233,6 +342,7 @@ impl RenderOnce for Tabs {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let metrics = theme.control.get(self.size);
+        let reorder = self.reorder(window, cx);
 
         let mut strip = div()
             .id(self.ident.element_id())
@@ -264,8 +374,16 @@ impl RenderOnce for Tabs {
             });
         }
 
-        for tab in &self.tabs {
-            strip = strip.child(self.tab_element(tab, &theme, metrics, window, cx));
+        for (index, tab) in self.tabs.iter().enumerate() {
+            strip = strip.child(self.tab_element(
+                tab,
+                index,
+                &theme,
+                metrics,
+                reorder.as_ref(),
+                window,
+                cx,
+            ));
         }
 
         strip.semantic_in(cx, NodeSpec::new(self.ident.semantic_id(), Role::List))

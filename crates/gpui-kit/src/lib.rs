@@ -18,6 +18,8 @@
 //! - [`data`] — list, table, and tree.
 //! - [`layout`] — split panes, scroll areas, and toolbars.
 //! - [`overlay`] — anchored and modal surfaces, menus, notifications.
+//! - [`interaction`] — drag and drop, the one gesture that starts in one
+//!   component and finishes in another.
 //! - [`motion`] and [`effects`] — token-driven animation and paint.
 //! - [`state`] — the explicit async states a truthful surface distinguishes.
 //! - [`scenes`] — one canonical rendering per component, shared by the gallery,
@@ -30,6 +32,8 @@
 //! - `docs/truthful-ui.md` — why a refusal is never rendered as an absence.
 //! - `docs/semantic-automation.md` — the semantic tree and what a node reports.
 //! - `docs/token-model.md` — where visible values come from.
+//! - `docs/interaction.md` — the drag contract: what a drop reports, what a
+//!   drag publishes, and what the host has to do with it.
 //!
 //! ```no_run
 //! # use gpui_kit::prelude::*;
@@ -46,6 +50,7 @@ pub mod data;
 pub mod display;
 pub mod effects;
 pub mod foundation;
+pub mod interaction;
 pub mod layout;
 pub mod motion;
 pub mod navigation;
@@ -66,6 +71,7 @@ pub mod prelude {
         Button, ButtonGroup, ButtonJoin, ButtonVariant, IconButton, IconPosition,
     };
     pub use crate::controls::combobox::{Combobox, ComboboxEvent};
+    pub use crate::controls::dropzone::{Dropzone, DropzoneState};
     pub use crate::controls::field::{FieldState, field_shell};
     pub use crate::controls::form_field::FormField;
     pub use crate::controls::input::{TextInput, TextInputEvent};
@@ -94,6 +100,9 @@ pub mod prelude {
         Layer, Pressable, Selectable, Sizable, StyledExt, ThemeRegistry, activate_theme,
         set_density,
     };
+    pub use crate::interaction::dnd::{
+        ActiveDrag, DragItem, DropAxis, DropIntent, DropPosition, StagedDrag,
+    };
     pub use crate::layout::{
         ScrollArea, ScrollAxis, SplitAxis, SplitPane, SplitSide, Toolbar, ToolbarItem,
     };
@@ -115,6 +124,7 @@ pub fn install(cx: &mut App) {
     gpui_kit_assets::register_fonts(cx);
     gpui_kit_theme::Theme::install(cx);
     gpui_kit_semantics::install(cx);
+    interaction::install(cx);
     controls::input::install(cx);
     controls::textarea::install(cx);
     overlay::toast::install(cx);
