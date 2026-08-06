@@ -174,6 +174,11 @@ pub struct Motion {
     pub snappy: SpringTokens,
     pub smooth: SpringTokens,
     pub bouncy: SpringTokens,
+    pub grab: SpringTokens,
+    /// How far a pressed control sinks, in pixels.
+    pub press_offset: f32,
+    /// How far a hovered control rises, in pixels.
+    pub hover_lift: f32,
 }
 
 /// Shadows for each elevation step. Flat is intentionally empty rather than a
@@ -368,6 +373,9 @@ impl Theme {
                 snappy: tokens.spring(SpringPreset::Snappy),
                 smooth: tokens.spring(SpringPreset::Smooth),
                 bouncy: tokens.spring(SpringPreset::Bouncy),
+                grab: tokens.spring(SpringPreset::Grab),
+                press_offset: tokens.press_offset(),
+                hover_lift: tokens.hover_lift(),
             },
             elevation: Elevations {
                 flat: shadow(tokens, Elevation::Flat),
@@ -479,6 +487,7 @@ impl Theme {
             SpringPreset::Snappy => self.motion.snappy,
             SpringPreset::Smooth => self.motion.smooth,
             SpringPreset::Bouncy => self.motion.bouncy,
+            SpringPreset::Grab => self.motion.grab,
         }
     }
 

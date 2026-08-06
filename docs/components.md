@@ -34,6 +34,7 @@ that must survive a frame is a view.
 | `Badge`, `StatusDot`, `StatusLine`, `Callout` | builder | Status vocabulary |
 | `Card`, `ListRow` | builder | Grouping |
 | `ProgressBar` | builder | Reports a position only when the extent is known |
+| `AnimatedNumber` | builder | Counts to a new value, and publishes the target from the frame it changes: a number in flight is not a fact. A caller-supplied format function decides the text |
 | `Tag` | builder | Removal exists only when removal is allowed |
 | `Avatar` | builder | Initials fallback, blank when there is no name |
 | `Divider` | builder | Optional caption |

@@ -6,10 +6,12 @@
 //! single caller-supplied [`Ident`].
 
 mod ident;
+mod interaction;
 pub(crate) mod stepping;
 mod styled_ext;
 
 pub use ident::Ident;
+pub use interaction::{HoverLift, Pressable};
 pub use styled_ext::{FocusRing, StyledExt};
 
 pub use gpui_kit_theme::{

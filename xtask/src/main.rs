@@ -317,17 +317,23 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
         )?;
     }
     output.push_str("\n| Spring | Stiffness | Damping | Mass |\n|---|---:|---:|---:|\n");
-    for (name, preset) in [
-        ("snappy", SpringPreset::Snappy),
-        ("smooth", SpringPreset::Smooth),
-        ("bouncy", SpringPreset::Bouncy),
-    ] {
+    for preset in SpringPreset::ALL {
         let spring = tokens.spring(preset);
         writeln!(
             output,
-            "| `{name}` | {} | {} | {} |",
-            spring.stiffness, spring.damping, spring.mass
+            "| `{}` | {} | {} | {} |",
+            preset.name(),
+            spring.stiffness,
+            spring.damping,
+            spring.mass
         )?;
+    }
+    output.push_str("\n| Response | Pixels |\n|---|---:|\n");
+    for (name, value) in [
+        ("motion.pressOffsetPx", tokens.press_offset()),
+        ("motion.hoverLiftPx", tokens.hover_lift()),
+    ] {
+        writeln!(output, "| `{name}` | {value} |")?;
     }
 
     output.push_str("\n### Border and opacity\n\n| Token | Value |\n|---|---:|\n");

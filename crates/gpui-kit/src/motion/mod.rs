@@ -8,14 +8,21 @@
 //! - [`Interpolate`] moves a value between two states;
 //! - [`Transition`] animates a value whose target can change mid-flight;
 //! - [`Presence`] keeps an element alive long enough to animate out;
-//! - [`Stagger`] spreads one specification across a group.
+//! - [`Stagger`] spreads one specification across a group;
+//! - [`Flipping::flip`] slides an element from where it was to where it is.
+//!
+//! Motion never changes what a surface publishes. A slide, a press response
+//! and a counting number are all painted over a layout, a hit target and a
+//! semantic tree that already report the settled value.
 //!
 //! Decorative motion built on GPUI's `with_animation` already stops when
 //! [`gpui::App::reduce_motion`] is set. [`Transition::animate`] and
 //! [`Presence::animate`] honor the same preference by finishing immediately.
 
 mod easing;
+mod flip;
 mod interpolate;
+pub(crate) mod keyed;
 mod presence;
 mod spec;
 mod spring;
@@ -23,6 +30,7 @@ mod stagger;
 mod transition;
 
 pub use easing::{CubicBezier, Easing};
+pub use flip::{Flip, Flipped, Flipping, flip, tracked_ids};
 pub use interpolate::Interpolate;
 pub use presence::{Phase, Presence};
 pub use spec::{

@@ -141,6 +141,12 @@ Appearance: `Dark`.
 | `snappy` | 380 | 30 | 1 |
 | `smooth` | 180 | 26 | 1 |
 | `bouncy` | 260 | 16 | 1 |
+| `grab` | 520 | 42 | 1 |
+
+| Response | Pixels |
+|---|---:|
+| `motion.pressOffsetPx` | 1 |
+| `motion.hoverLiftPx` | 1 |
 
 ### Border and opacity
 
@@ -338,6 +344,12 @@ Appearance: `Light`.
 | `snappy` | 380 | 30 | 1 |
 | `smooth` | 180 | 26 | 1 |
 | `bouncy` | 260 | 16 | 1 |
+| `grab` | 520 | 42 | 1 |
+
+| Response | Pixels |
+|---|---:|
+| `motion.pressOffsetPx` | 1 |
+| `motion.hoverLiftPx` | 1 |
 
 ### Border and opacity
 

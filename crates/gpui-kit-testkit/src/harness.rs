@@ -115,6 +115,16 @@ impl Harness {
     /// Tests have no platform frame loop, so motion driven by
     /// `Window::request_animation_frame` only progresses when a test asks for
     /// the next frame explicitly.
+    /// Draws one frame without advancing the clock.
+    ///
+    /// Motion keyed by identity is measured and pruned while rendering, so a
+    /// test that asserts what a component learned from the last layout needs
+    /// another frame rather than more time.
+    pub fn frame(&mut self) {
+        self.cx.update(|_, cx| cx.refresh_windows());
+        self.cx.run_until_parked();
+    }
+
     pub fn advance(&mut self, delta: Duration) {
         self.cx.executor().advance_clock(delta);
         self.cx.update(|window, cx| {

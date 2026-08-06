@@ -170,6 +170,14 @@ pub fn catalog() -> Vec<Scene> {
             name: "drawer",
             build: drawer,
         },
+        Scene {
+            name: "motion-flip",
+            build: motion_flip,
+        },
+        Scene {
+            name: "animated-number",
+            build: animated_number,
+        },
     ]
 }
 
@@ -1685,6 +1693,139 @@ fn drawer(window: &mut Window, cx: &mut App) -> AnyElement {
         .h(px(400.0))
         .child(div().child("Content behind the drawer"))
         .child(filters)
+        .into_any_element()
+}
+
+/// The order the reorder scene is currently showing.
+///
+/// A still frame cannot show a slide, so the capture is the settled list and
+/// the button is what a reviewer presses to watch a row travel.
+#[derive(Debug)]
+struct SceneQueue {
+    steps: Vec<(&'static str, &'static str)>,
+}
+
+impl Global for SceneQueue {}
+
+fn motion_flip(window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<SceneQueue>() {
+        cx.set_global(SceneQueue {
+            steps: vec![
+                ("render", "Render frames"),
+                ("upload", "Upload artifacts"),
+                ("verify", "Verify checksums"),
+                ("publish", "Publish release"),
+            ],
+        });
+    }
+    let steps = cx.global::<SceneQueue>().steps.clone();
+    let theme = cx.theme().clone();
+
+    let mut queue = Card::new().id("scene.motion.queue");
+    for (index, (id, label)) in steps.iter().enumerate() {
+        let ident = format!("scene.motion.{id}");
+        let handle = flip(ident.clone(), cx);
+        queue = queue.child(
+            ListRow::new()
+                .id(ident)
+                .first(index == 0)
+                .child(div().flex_1().child(*label))
+                .child(Badge::new(format!("{}", index + 1)).neutral())
+                .flip(&handle, window, cx),
+        );
+    }
+
+    stack(&theme)
+        .w(px(420.0))
+        .child(
+            row(&theme).child(
+                Button::new("scene.motion.reorder")
+                    .label("Move the last step first")
+                    .secondary()
+                    .on_click(|_, cx| {
+                        cx.update_global::<SceneQueue, ()>(|queue, _| queue.steps.rotate_right(1));
+                        cx.refresh_windows();
+                    }),
+            ),
+        )
+        .child(queue)
+        .child(
+            div()
+                .text_size(px(theme.typography.caption.size))
+                .text_color(theme.colors.text_muted)
+                .child("Rows land in their new slot at once and slide into it."),
+        )
+        .into_any_element()
+}
+
+/// The counts the animated readout scene is currently showing.
+#[derive(Debug)]
+struct SceneCounts {
+    runs: f64,
+    seconds: f64,
+}
+
+impl Global for SceneCounts {}
+
+fn animated_number(_window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<SceneCounts>() {
+        cx.set_global(SceneCounts {
+            runs: 1204.0,
+            seconds: 18.4,
+        });
+    }
+    let counts = cx.global::<SceneCounts>();
+    let (runs, seconds) = (counts.runs, counts.seconds);
+    let theme = cx.theme().clone();
+
+    let readout = |label: &'static str, number: AnimatedNumber| {
+        div()
+            .column()
+            .gap(px(theme.spacing.xs))
+            .child(
+                div()
+                    .text_size(px(theme.typography.caption.size))
+                    .text_color(theme.colors.text_muted)
+                    .child(label),
+            )
+            .child(number)
+    };
+
+    stack(&theme)
+        .child(
+            row(&theme)
+                .gap(px(theme.spacing.xl))
+                .items_start()
+                .child(readout(
+                    "Runs this week",
+                    AnimatedNumber::new("scene.number.runs", runs).format(grouped),
+                ))
+                .child(readout(
+                    "Median duration",
+                    AnimatedNumber::new("scene.number.seconds", seconds)
+                        .format(|value| format!("{value:.1}s")),
+                )),
+        )
+        .child(
+            row(&theme).child(
+                Button::new("scene.number.recount")
+                    .label("Recount")
+                    .secondary()
+                    .on_click(|_, cx| {
+                        cx.update_global::<SceneCounts, ()>(|counts, _| {
+                            counts.runs += 318.0;
+                            counts.seconds += 4.7;
+                        });
+                        cx.refresh_windows();
+                    }),
+            ),
+        )
+        .child(
+            div()
+                .text_size(px(theme.typography.caption.size))
+                .text_color(theme.colors.text_muted)
+                .child("The published value is the target, from the frame it changes."),
+        )
         .into_any_element()
 }
 

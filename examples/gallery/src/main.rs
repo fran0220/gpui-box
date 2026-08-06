@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use anyhow::{Result, bail};
 use gpui::{
-    App, Bounds, Context, Entity, IntoElement, Render, SharedString, Window, WindowBounds,
+    App, Bounds, Context, Entity, Global, IntoElement, Render, SharedString, Window, WindowBounds,
     WindowOptions, div, prelude::*, px, size,
 };
 use gpui_kit::assets::{Icon, icon};
@@ -595,6 +595,8 @@ impl Render for Gallery {
                                     .child(Skeleton::new("gallery.skeleton").rows(3)),
                             ),
                     )
+                    .child(recipes::section_title(&theme, "Motion"))
+                    .child(motion_section(&theme, window, cx))
                     .child(recipes::section_title(&theme, "Popover primitives"))
                     .child(menu_sample(&theme, 320.0))
                     .child(recipes::section_title(&theme, "Menus"))
@@ -1100,6 +1102,163 @@ fn theme_switcher(theme: &Theme, cx: &App) -> impl IntoElement {
                     .on_click(move |_, cx| set_density(option, cx))
             }),
         )
+}
+
+/// The order the reorder demonstration is currently showing.
+#[derive(Debug)]
+struct GalleryQueue {
+    steps: Vec<(&'static str, &'static str)>,
+}
+
+impl Global for GalleryQueue {}
+
+/// The counts the animated readouts are currently showing.
+#[derive(Debug)]
+struct GalleryCounts {
+    runs: f64,
+    seconds: f64,
+}
+
+impl Global for GalleryCounts {}
+
+/// Reordering, the two pointer responses, and a counting readout.
+fn motion_section(theme: &Theme, window: &mut Window, cx: &mut App) -> gpui::AnyElement {
+    if !cx.has_global::<GalleryQueue>() {
+        cx.set_global(GalleryQueue {
+            steps: vec![
+                ("render", "Render frames"),
+                ("upload", "Upload artifacts"),
+                ("verify", "Verify checksums"),
+                ("publish", "Publish release"),
+            ],
+        });
+    }
+    if !cx.has_global::<GalleryCounts>() {
+        cx.set_global(GalleryCounts {
+            runs: 1204.0,
+            seconds: 18.4,
+        });
+    }
+    let steps = cx.global::<GalleryQueue>().steps.clone();
+    let counts = cx.global::<GalleryCounts>();
+    let (runs, seconds) = (counts.runs, counts.seconds);
+
+    let mut queue = Card::new().id("gallery.motion.queue");
+    for (index, (id, label)) in steps.iter().enumerate() {
+        let ident = format!("gallery.motion.{id}");
+        let handle = flip(ident.clone(), cx);
+        queue = queue.child(
+            ListRow::new()
+                .id(ident)
+                .first(index == 0)
+                .child(div().flex_1().child(*label))
+                .child(Badge::new(format!("{}", index + 1)).neutral())
+                .flip(&handle, window, cx),
+        );
+    }
+
+    let tile = |id: &'static str, label: &'static str| {
+        div()
+            .id(id)
+            .w(px(150.0))
+            .p(px(theme.spacing.md))
+            .rounded(px(theme.radii.card))
+            .border(px(theme.borders.hairline))
+            .border_color(theme.colors.hairline)
+            .bg(theme.colors.raised)
+            .cursor_pointer()
+            .hover_lift(cx)
+            .pressable(cx)
+            .child(label)
+    };
+
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(theme.spacing.lg))
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .items_start()
+                .gap(px(theme.spacing.lg))
+                .child(div().w(px(320.0)).child(queue))
+                .child(
+                    Button::new("gallery.motion.reorder")
+                        .label("Move the last step first")
+                        .secondary()
+                        .on_click(|_, cx| {
+                            cx.update_global::<GalleryQueue, ()>(|queue, _| {
+                                queue.steps.rotate_right(1)
+                            });
+                            cx.refresh_windows();
+                        }),
+                ),
+        )
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap(px(theme.spacing.md))
+                .child(tile("gallery.motion.lift", "Hover to lift"))
+                .child(tile("gallery.motion.press", "Hold to press"))
+                .child(
+                    Button::new("gallery.motion.pressable")
+                        .label("Buttons sink when held")
+                        .primary()
+                        .on_click(|_, _| {}),
+                ),
+        )
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .items_end()
+                .gap(px(theme.spacing.xl))
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap(px(theme.spacing.xs))
+                        .child(
+                            div()
+                                .text_size(px(theme.typography.caption.size))
+                                .text_color(theme.colors.text_muted)
+                                .child("Runs this week"),
+                        )
+                        .child(AnimatedNumber::new("gallery.motion.runs", runs).format(grouped)),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap(px(theme.spacing.xs))
+                        .child(
+                            div()
+                                .text_size(px(theme.typography.caption.size))
+                                .text_color(theme.colors.text_muted)
+                                .child("Median duration"),
+                        )
+                        .child(
+                            AnimatedNumber::new("gallery.motion.seconds", seconds)
+                                .format(|value| format!("{value:.1}s")),
+                        ),
+                )
+                .child(
+                    Button::new("gallery.motion.recount")
+                        .label("Recount")
+                        .secondary()
+                        .on_click(|_, cx| {
+                            cx.update_global::<GalleryCounts, ()>(|counts, _| {
+                                counts.runs += 318.0;
+                                counts.seconds += 4.7;
+                            });
+                            cx.refresh_windows();
+                        }),
+                ),
+        )
+        .into_any_element()
 }
 
 fn lower_gallery(theme: &Theme, cx: &mut App) -> gpui::AnyElement {

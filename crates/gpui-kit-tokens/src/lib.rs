@@ -166,6 +166,28 @@ impl TokenDocument {
                 return invalid(path, "must be between 0 and 1");
             }
         }
+
+        for preset in SpringPreset::ALL {
+            let spring = self.spring(preset);
+            if spring.stiffness <= 0.0 || spring.mass <= 0.0 || spring.damping < 0.0 {
+                return invalid(
+                    &format!("motion.spring.{}", preset.name()),
+                    "requires positive stiffness and mass and non-negative damping",
+                );
+            }
+        }
+
+        // A press or hover response that travels further than a hairline stops
+        // reading as a response to the pointer and starts reading as a layout
+        // change the user did not ask for.
+        for (path, value) in [
+            ("motion.pressOffsetPx", self.motion.press_offset_px),
+            ("motion.hoverLiftPx", self.motion.hover_lift_px),
+        ] {
+            if !(0.0..=4.0).contains(&value) {
+                return invalid(path, "must be between 0 and 4 pixels");
+            }
+        }
         Ok(())
     }
 
@@ -314,6 +336,7 @@ impl TokenDocument {
             SpringPreset::Snappy => self.motion.spring.snappy,
             SpringPreset::Smooth => self.motion.spring.smooth,
             SpringPreset::Bouncy => self.motion.spring.bouncy,
+            SpringPreset::Grab => self.motion.spring.grab,
         }
     }
 
@@ -362,6 +385,16 @@ impl TokenDocument {
             MotionDuration::Pulse => self.motion.duration_ms.pulse,
             MotionDuration::Toast => self.motion.duration_ms.toast,
         })
+    }
+
+    /// How far a pressed control sinks, in pixels.
+    pub fn press_offset(&self) -> f32 {
+        self.motion.press_offset_px
+    }
+
+    /// How far a hovered control rises, in pixels.
+    pub fn hover_lift(&self) -> f32 {
+        self.motion.hover_lift_px
     }
 
     pub fn easing(&self, step: MotionEasing) -> [f32; 4] {
@@ -535,6 +568,22 @@ pub enum SpringPreset {
     Snappy,
     Smooth,
     Bouncy,
+    /// Direct manipulation: tight enough that the element reads as attached to
+    /// the pointer rather than trailing it.
+    Grab,
+}
+
+impl SpringPreset {
+    pub const ALL: [Self; 4] = [Self::Snappy, Self::Smooth, Self::Bouncy, Self::Grab];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Snappy => "snappy",
+            Self::Smooth => "smooth",
+            Self::Bouncy => "bouncy",
+            Self::Grab => "grab",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -715,6 +764,7 @@ pub struct SpringPresetTokens {
     pub snappy: SpringTokens,
     pub smooth: SpringTokens,
     pub bouncy: SpringTokens,
+    pub grab: SpringTokens,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -930,6 +980,10 @@ pub struct MotionTokens {
     pub duration_ms: DurationTokens,
     pub easing: EasingTokens,
     pub spring: SpringPresetTokens,
+    /// How far a control sinks while the pointer is held on it.
+    pub press_offset_px: f32,
+    /// How far a control rises under the pointer.
+    pub hover_lift_px: f32,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

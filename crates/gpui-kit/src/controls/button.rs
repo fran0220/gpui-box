@@ -9,7 +9,7 @@ use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlMetrics, ControlSize, Radius, Theme};
 
-use crate::foundation::{Disableable, FocusRing, Ident, Selectable, Sizable, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Selectable, Sizable, StyledExt};
 
 /// How much weight an action carries. Primary is the one decision a local
 /// area is asking for; Danger is reserved for irreversible intent.
@@ -287,7 +287,11 @@ impl RenderOnce for Button {
             .role(gpui::Role::Button)
             .when(self.full_width, |element| element.w_full())
             .when(actionable, |element| {
-                element.cursor_pointer().tab_index(0).focus_ring(&theme)
+                element
+                    .cursor_pointer()
+                    .tab_index(0)
+                    .focus_ring(&theme)
+                    .pressable(cx)
             })
             .children(content);
 

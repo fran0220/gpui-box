@@ -225,13 +225,36 @@
         }
       }
     },
+    "spring": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stiffness", "damping", "mass"],
+      "properties": {
+        "stiffness": { "type": "number", "exclusiveMinimum": 0 },
+        "damping": { "$ref": "#/$defs/positiveNumber" },
+        "mass": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
     "motion": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["durationMs", "easing"],
+      "required": ["durationMs", "easing", "spring", "pressOffsetPx", "hoverLiftPx"],
       "properties": {
         "durationMs": { "type": "object" },
-        "easing": { "type": "object" }
+        "easing": { "type": "object" },
+        "spring": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["snappy", "smooth", "bouncy", "grab"],
+          "properties": {
+            "snappy": { "$ref": "#/$defs/spring" },
+            "smooth": { "$ref": "#/$defs/spring" },
+            "bouncy": { "$ref": "#/$defs/spring" },
+            "grab": { "$ref": "#/$defs/spring" }
+          }
+        },
+        "pressOffsetPx": { "$ref": "#/$defs/positiveNumber" },
+        "hoverLiftPx": { "$ref": "#/$defs/positiveNumber" }
       }
     },
     "effect": {

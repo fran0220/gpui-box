@@ -80,6 +80,7 @@ pub mod prelude {
     pub use crate::data::{
         Align, Cell, Column, ColumnWidth, List, ListItem, Row, SortDirection, Table, Tree, TreeNode,
     };
+    pub use crate::display::animated_number::{AnimatedNumber, grouped};
     pub use crate::display::avatar::Avatar;
     pub use crate::display::badge::{Badge, Tone};
     pub use crate::display::card::{Card, ListRow};
@@ -89,13 +90,14 @@ pub mod prelude {
     pub use crate::display::status::{Callout, StatusDot, StatusLine};
     pub use crate::display::tag::Tag;
     pub use crate::foundation::{
-        ActiveTheme, ControlSize, Density, Disableable, Elevation, FocusRing, Ident, Layer,
-        Selectable, Sizable, StyledExt, ThemeRegistry, activate_theme, set_density,
+        ActiveTheme, ControlSize, Density, Disableable, Elevation, FocusRing, HoverLift, Ident,
+        Layer, Pressable, Selectable, Sizable, StyledExt, ThemeRegistry, activate_theme,
+        set_density,
     };
     pub use crate::layout::{
         ScrollArea, ScrollAxis, SplitAxis, SplitPane, SplitSide, Toolbar, ToolbarItem,
     };
-    pub use crate::motion::{Presence, Transition};
+    pub use crate::motion::{Flip, Flipping, Presence, Transition, flip};
     pub use crate::navigation::{
         Accordion, AccordionSection, Breadcrumb, Crumb, PageTotal, Pagination, Sidebar,
         SidebarItem, SidebarSection, TabItem, Tabs,
