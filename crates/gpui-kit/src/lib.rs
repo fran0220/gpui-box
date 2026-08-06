@@ -15,6 +15,7 @@
 //! ```
 
 pub mod controls;
+pub mod data;
 pub mod display;
 pub mod effects;
 pub mod foundation;
@@ -40,6 +41,9 @@ pub mod prelude {
     pub use crate::controls::slider::Slider;
     pub use crate::controls::textarea::{TextArea, TextAreaEvent};
     pub use crate::controls::toggle::{Checkbox, Radio, Switch};
+    pub use crate::data::{
+        Align, Cell, Column, ColumnWidth, List, ListItem, Row, SortDirection, Table, Tree, TreeNode,
+    };
     pub use crate::display::avatar::Avatar;
     pub use crate::display::badge::{Badge, Tone};
     pub use crate::display::card::{Card, ListRow};

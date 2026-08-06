@@ -40,6 +40,38 @@ that must survive a frame is a view.
 | `Accordion` | builder | a section id and the state it should take | A closed section does not render its body at all. `exclusive` changes only what is reported: opening a section also reports a close for every other open one |
 | `Breadcrumb` | builder | the crumb that was picked, and the ids an ellipsis hides | The last crumb is the current place: it publishes `Text` rather than `Link` and installs no handler. `max_visible` collapses the middle of a long trail and publishes the hidden count |
 
+## Data
+
+| Component | Kind | Reports | Notes |
+|---|---|---|---|
+| `List` | builder | the row that was picked | Virtualized over GPUI's `uniform_list`. The caller renders one index at a time and stamps each row with its own identity. Up, down, home, and end move the reported selection, skip refusals, and scroll the reported row into view |
+| `Table` | builder | the sort a header click implies, and the row that was picked | Sorting is caller-owned: the table reports `(key, next direction)` and renders whatever order it is handed. Columns are fixed or flex, and the header stays put while the body scrolls |
+| `Tree` | builder | a node id and the disclosure state it should take, and the node that was picked | A collapsed node renders none of its children. Up and down walk visible nodes, right opens a shut branch or descends into an open one, left shuts an open branch or ascends |
+
+### Only rendered rows are published
+
+A virtualized surface holds a viewport, not a data set. A row outside the
+viewport is never laid out, has no bounds, and publishes no semantic node, so a
+snapshot describes what is on screen and nothing else. The container node
+carries the total in `value`: a test asserts that the list holds a thousand
+items and drew twelve, rather than pretending the other nine hundred and
+eighty-eight are addressable.
+
+Virtualization needs a bounded viewport. With `List::visible_rows` the list
+draws only the rows that fit; without it the list sizes itself to its content
+and every row is laid out.
+
+`Table` is the exception, and deliberately: it takes materialized rows, so
+every cell element already exists by the time the table sees it and every row
+it is given is rendered. Reach for `List` when the data set is large.
+
+Cells are quiet by default. A table of two hundred rows and six columns would
+bury every other assertion target under twelve hundred nodes that repeat what
+the row already says, so a cell publishes a `Cell` node only where the caller
+marks it with `Cell::published`, under the id `<row id>.<column key>`. A
+sortable header publishes a `Button` carrying its current direction in `value`;
+a header that does not sort publishes a `Cell` and installs no handler.
+
 ## Overlay
 
 | Component | Kind | Notes |
@@ -63,7 +95,6 @@ of moving its own checkmark.
 
 These are known gaps rather than deliberate omissions:
 
-- `Table`, `Tree`, virtualized `List`: large data surfaces.
 - `Toast`: transient notifications with a stack and a timer.
 
 ## Validation

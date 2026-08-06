@@ -4,9 +4,12 @@
 //! gallery and the audit tests consume, so a component cannot be reviewed
 //! visually in one arrangement and tested in another.
 
-use gpui::{AnyElement, App, Entity, Focusable, Global, IntoElement, Window, div, prelude::*, px};
+use gpui::{
+    AnyElement, App, Entity, Focusable, Global, IntoElement, SharedString, Window, div, prelude::*,
+    px,
+};
 use gpui_kit_assets::Icon;
-use gpui_kit_theme::{Space, Theme};
+use gpui_kit_theme::{Radius, Space, Theme};
 
 use crate::controls::input::TextInput;
 use crate::controls::select::{Select, SelectOption};
@@ -96,6 +99,18 @@ pub fn catalog() -> Vec<Scene> {
         Scene {
             name: "breadcrumb",
             build: breadcrumb,
+        },
+        Scene {
+            name: "list",
+            build: list,
+        },
+        Scene {
+            name: "table",
+            build: table,
+        },
+        Scene {
+            name: "tree",
+            build: tree,
         },
     ]
 }
@@ -452,6 +467,136 @@ fn breadcrumb(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .max_visible(3)
                 .on_select(|_, _, _| {})
                 .on_reveal(|_, _, _| {}),
+        )
+        .into_any_element()
+}
+
+/// How many records the list fixture claims to hold.
+///
+/// The count exists to make the difference visible: the list publishes all of
+/// it, and renders only the handful the viewport can show.
+const FIXTURE_RECORDS: usize = 240;
+
+/// One synthetic record. Nothing here stands for a product: the identity is a
+/// fixture key and the label says so.
+fn fixture_record(index: usize) -> (SharedString, SharedString) {
+    (
+        SharedString::from(format!("record-{index:04}")),
+        SharedString::from(format!("Fixture record {index:04}")),
+    )
+}
+
+fn list(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(420.0))
+        .child(
+            div()
+                .type_scale(&theme, gpui_kit_theme::TypeScale::Caption)
+                .text_color(theme.colors.text_muted)
+                .child(SharedString::from(format!(
+                    "{FIXTURE_RECORDS} fixture records; only the rendered ones publish"
+                ))),
+        )
+        .child(
+            div()
+                .hairline(&theme)
+                .radius(&theme, Radius::Card)
+                .overflow_hidden()
+                .child(
+                    List::new("scene.list.records", FIXTURE_RECORDS, |index, _, _| {
+                        let (id, label) = fixture_record(index);
+                        ListItem::new(id, label.clone()).text(label)
+                    })
+                    .selected(fixture_record(2).0)
+                    .visible_rows(8)
+                    .on_select(|_, _, _| {}),
+                ),
+        )
+        .into_any_element()
+}
+
+fn table(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let state = |label: &'static str, tone: Tone| {
+        Cell::new(Badge::new(label).tone(tone))
+            .text(label)
+            .published(true)
+    };
+    stack(&theme)
+        .w(px(600.0))
+        .child(
+            Table::new("scene.table.runs")
+                .columns([
+                    Column::new("name", "Run").flex(2.0).sortable(true),
+                    Column::new("state", "State").fixed(110.0),
+                    Column::new("duration", "Duration")
+                        .fixed(96.0)
+                        .align(Align::End)
+                        .sortable(true),
+                ])
+                .sorted_by("duration", SortDirection::Descending)
+                .selected("run-b12")
+                .rows([
+                    Row::new("run-a04")
+                        .text("Indexing")
+                        .cell("name", "Indexing")
+                        .cell("state", state("Ready", Tone::Success))
+                        .cell("duration", "4m 12s"),
+                    Row::new("run-b12")
+                        .text("Verifying")
+                        .cell("name", "Verifying")
+                        .cell("state", state("Stale", Tone::Warning))
+                        .cell("duration", "2m 08s"),
+                    Row::new("run-c31")
+                        .text("Publishing")
+                        .cell("name", "Publishing")
+                        .cell("state", state("Refused", Tone::Danger))
+                        .cell("duration", "1m 44s"),
+                    Row::new("run-d02")
+                        .text("Archiving")
+                        .disabled(true)
+                        .cell("name", "Archiving")
+                        .cell("state", state("Managed", Tone::Neutral))
+                        .cell("duration", "0m 51s"),
+                ])
+                .visible_rows(6)
+                .on_sort(|_, _, _, _| {})
+                .on_select(|_, _, _| {}),
+        )
+        .into_any_element()
+}
+
+fn tree(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(360.0))
+        .child(
+            Tree::new("scene.tree.workspace")
+                .expanded_ids(&["workspace", "crates"])
+                .selected("tokens")
+                .nodes([
+                    TreeNode::new("workspace", "workspace")
+                        .icon(Icon::Folder)
+                        .children([
+                            TreeNode::new("crates", "crates")
+                                .icon(Icon::Folder)
+                                .children([
+                                    TreeNode::new("kit", "gpui-kit").icon(Icon::Document),
+                                    TreeNode::new("tokens", "gpui-kit-tokens").icon(Icon::Document),
+                                ]),
+                            TreeNode::new("docs", "docs")
+                                .icon(Icon::Folder)
+                                .children([TreeNode::new("components", "components.md")
+                                    .icon(Icon::Document)]),
+                        ]),
+                    TreeNode::new("target", "target")
+                        .icon(Icon::Archive)
+                        .disabled(true)
+                        .children([TreeNode::new("debug", "debug").icon(Icon::Folder)]),
+                ])
+                .on_toggle(|_, _, _, _| {})
+                .on_select(|_, _, _| {}),
         )
         .into_any_element()
 }

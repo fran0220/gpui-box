@@ -268,6 +268,79 @@ impl Render for Gallery {
                                     ),
                             ),
                     )
+                    .child(recipes::section_title(&theme, "Data"))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap(px(theme.spacing.md))
+                            .w(px(620.0))
+                            .child(
+                                Table::new("gallery.runs")
+                                    .columns([
+                                        Column::new("name", "Run").flex(2.0).sortable(true),
+                                        Column::new("state", "State").fixed(110.0),
+                                        Column::new("duration", "Duration")
+                                            .fixed(96.0)
+                                            .align(Align::End)
+                                            .sortable(true),
+                                    ])
+                                    .sorted_by("duration", SortDirection::Descending)
+                                    .selected("run-b12")
+                                    .rows(fixture_runs())
+                                    .visible_rows(6)
+                                    .on_sort(|_, _, _, _| {})
+                                    .on_select(|_, _, _| {}),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_row()
+                                    .gap(px(theme.spacing.md))
+                                    .child(
+                                        div()
+                                            .w(px(300.0))
+                                            .rounded(px(theme.radii.card))
+                                            .border(px(theme.borders.hairline))
+                                            .border_color(theme.colors.hairline)
+                                            .overflow_hidden()
+                                            .child(
+                                                List::new(
+                                                    "gallery.records",
+                                                    FIXTURE_RECORDS,
+                                                    |index, _, _| {
+                                                        let label = SharedString::from(format!(
+                                                            "Fixture record {index:04}"
+                                                        ));
+                                                        ListItem::new(
+                                                            format!("record-{index:04}"),
+                                                            label.clone(),
+                                                        )
+                                                        .text(label)
+                                                    },
+                                                )
+                                                .selected("record-0002")
+                                                .visible_rows(8)
+                                                .on_select(|_, _, _| {}),
+                                            ),
+                                    )
+                                    .child(
+                                        div().w(px(300.0)).child(
+                                            Tree::new("gallery.tree")
+                                                .expanded_ids(&["workspace", "crates"])
+                                                .selected("tokens")
+                                                .nodes(fixture_tree())
+                                                .on_toggle(|_, _, _, _| {})
+                                                .on_select(|_, _, _| {}),
+                                        ),
+                                    ),
+                            )
+                            .child(recipes::footnote(
+                                &theme,
+                                "The list holds a viewport, not a data set: it publishes the total \
+                                 and only the rows it drew.",
+                            )),
+                    )
                     .child(recipes::section_title(&theme, "Status"))
                     .child(
                         div()
@@ -429,6 +502,56 @@ fn menu_sample(theme: &Theme, width: f32) -> gpui::Div {
                 .child(icon(Icon::Settings).size(px(15.0)))
                 .child(SharedString::from("Settings")),
         )
+}
+
+/// How many records the list fixture claims to hold.
+const FIXTURE_RECORDS: usize = 240;
+
+/// Synthetic rows. Nothing here stands for a product; the identities are
+/// fixture keys.
+fn fixture_runs() -> Vec<Row> {
+    [
+        ("run-a04", "Indexing", "Ready", Tone::Success, "4m 12s"),
+        ("run-b12", "Verifying", "Stale", Tone::Warning, "2m 08s"),
+        ("run-c31", "Publishing", "Refused", Tone::Danger, "1m 44s"),
+        ("run-d02", "Archiving", "Managed", Tone::Neutral, "0m 51s"),
+    ]
+    .into_iter()
+    .map(|(id, name, state, tone, duration)| {
+        Row::new(id)
+            .text(name)
+            .cell("name", name)
+            .cell(
+                "state",
+                Cell::new(Badge::new(state).tone(tone))
+                    .text(state)
+                    .published(true),
+            )
+            .cell("duration", duration)
+    })
+    .collect()
+}
+
+fn fixture_tree() -> Vec<TreeNode> {
+    vec![
+        TreeNode::new("workspace", "workspace")
+            .icon(Icon::Folder)
+            .children([
+                TreeNode::new("crates", "crates")
+                    .icon(Icon::Folder)
+                    .children([
+                        TreeNode::new("kit", "gpui-kit").icon(Icon::Document),
+                        TreeNode::new("tokens", "gpui-kit-tokens").icon(Icon::Document),
+                    ]),
+                TreeNode::new("docs", "docs")
+                    .icon(Icon::Folder)
+                    .children([TreeNode::new("components", "components.md").icon(Icon::Document)]),
+            ]),
+        TreeNode::new("target", "target")
+            .icon(Icon::Archive)
+            .disabled(true)
+            .children([TreeNode::new("debug", "debug").icon(Icon::Folder)]),
+    ]
 }
 
 fn fixture_settings_card(theme: &Theme) -> Card {
