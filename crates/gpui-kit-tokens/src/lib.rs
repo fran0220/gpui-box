@@ -355,6 +355,7 @@ impl TokenDocument {
             MotionDuration::Resize => self.motion.duration_ms.resize,
             MotionDuration::Entrance => self.motion.duration_ms.entrance,
             MotionDuration::Pulse => self.motion.duration_ms.pulse,
+            MotionDuration::Toast => self.motion.duration_ms.toast,
         })
     }
 
@@ -570,6 +571,8 @@ pub enum MotionDuration {
     Resize,
     Entrance,
     Pulse,
+    /// How long a transient notification stays before it leaves on its own.
+    Toast,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -933,6 +936,7 @@ pub struct DurationTokens {
     pub resize: u64,
     pub entrance: u64,
     pub pulse: u64,
+    pub toast: u64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

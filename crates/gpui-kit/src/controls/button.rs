@@ -37,6 +37,7 @@ type ClickHandler = Rc<dyn Fn(&mut Window, &mut App)>;
 #[derive(IntoElement)]
 pub struct Button {
     ident: Ident,
+    semantic_parent: Option<SharedString>,
     focus_handle: Option<FocusHandle>,
     label: Option<SharedString>,
     glyph: Option<Icon>,
@@ -70,6 +71,7 @@ impl Button {
     pub fn new(ident: impl Into<Ident>) -> Self {
         Self {
             ident: ident.into(),
+            semantic_parent: None,
             focus_handle: None,
             label: None,
             glyph: None,
@@ -86,6 +88,13 @@ impl Button {
 
     pub fn label(mut self, label: impl Into<SharedString>) -> Self {
         self.label = Some(label.into());
+        self
+    }
+
+    /// Names the surface this action belongs to in the semantic tree, so a
+    /// reader can tell which notification or row an action came from.
+    pub fn semantic_parent(mut self, parent: impl Into<SharedString>) -> Self {
+        self.semantic_parent = Some(parent.into());
         self
     }
 
@@ -250,6 +259,9 @@ impl RenderOnce for Button {
         let mut spec = NodeSpec::new(self.ident.semantic_id(), Role::Button)
             .disabled(inert)
             .busy(self.loading);
+        if let Some(parent) = self.semantic_parent.clone() {
+            spec = spec.parent(parent);
+        }
         if self.selected {
             spec = spec.checked(true);
         }

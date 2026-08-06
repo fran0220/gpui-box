@@ -19,6 +19,19 @@ pub enum Tone {
 }
 
 impl Tone {
+    /// The name a semantic node publishes, so a test can assert the severity
+    /// a surface reported rather than the color it painted.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Neutral => "neutral",
+            Self::Accent => "accent",
+            Self::Success => "success",
+            Self::Warning => "warning",
+            Self::Danger => "danger",
+            Self::Info => "info",
+        }
+    }
+
     pub(crate) fn color(self, theme: &Theme) -> Hsla {
         match self {
             Self::Neutral => theme.colors.text_faint,

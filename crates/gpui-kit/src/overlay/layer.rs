@@ -200,7 +200,7 @@ fn scrim_frame(
 
 /// Anchors the deferred subtree to the window origin without occupying layout
 /// space in the parent.
-fn pinned(layer: AnyElement) -> AnyElement {
+pub(crate) fn pinned(layer: AnyElement) -> AnyElement {
     div()
         .absolute()
         .top_0()

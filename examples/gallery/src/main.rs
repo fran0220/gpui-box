@@ -11,7 +11,7 @@ use gpui::{
     WindowOptions, div, prelude::*, px, size,
 };
 use gpui_kit::assets::{Icon, icon};
-use gpui_kit::overlay::popover;
+use gpui_kit::overlay::{popover, toast};
 use gpui_kit::prelude::*;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic, SemanticRegistry};
 use gpui_kit_theme::{Theme, ThemeRegistry, activate_theme, set_density};
@@ -52,6 +52,7 @@ struct Gallery {
     rejected: Entity<TextInput>,
     notes: Entity<TextArea>,
     confirm: Entity<Dialog>,
+    toasts: Entity<ToastLayer>,
 }
 
 impl Render for Gallery {
@@ -470,7 +471,15 @@ impl Render for Gallery {
                                 .describes("gallery.export"),
                             ),
                     )
+                    .child(recipes::section_title(&theme, "Notifications"))
+                    .child(toast_buttons(&theme))
+                    .child(recipes::footnote(
+                        &theme,
+                        "A success times out. A warning or a danger notification stays until it \
+                         is dismissed, and a pointer resting on one pauses its timer.",
+                    ))
                     .child(self.confirm.clone())
+                    .child(self.toasts.clone())
                     .child(recipes::footnote(
                         &theme,
                         "Fixture data is explicitly labeled. Product applications must render host-backed facts.",
@@ -478,6 +487,81 @@ impl Render for Gallery {
             )
             .into_any_element()
     }
+}
+
+/// Pushes one of each kind of notification, so the timing rules can be watched
+/// rather than read about.
+fn toast_buttons(theme: &Theme) -> gpui::Div {
+    div()
+        .flex()
+        .flex_row()
+        .flex_wrap()
+        .gap(px(theme.spacing.sm))
+        .child(
+            Button::new("gallery.toast.saved")
+                .label("Report a success")
+                .secondary()
+                .on_click(|_, cx| {
+                    toast::push(
+                        cx,
+                        Toast::new("gallery.toast.saved.note", "Theme exported to disk")
+                            .tone(Tone::Success),
+                    );
+                }),
+        )
+        .child(
+            Button::new("gallery.toast.stale")
+                .label("Report a stale refresh")
+                .secondary()
+                .on_click(|_, cx| {
+                    toast::push(
+                        cx,
+                        Toast::new(
+                            "gallery.toast.stale.note",
+                            "Refreshing the model catalog failed",
+                        )
+                        .tone(Tone::Warning)
+                        .detail("The last verified catalog is still shown."),
+                    );
+                }),
+        )
+        .child(
+            Button::new("gallery.toast.refused")
+                .label("Report a refusal")
+                .danger()
+                .on_click(|_, cx| {
+                    toast::push(
+                        cx,
+                        Toast::new(
+                            "gallery.toast.refused.note",
+                            "The host refused to publish this run",
+                        )
+                        .tone(Tone::Danger)
+                        .detail("Approval is required for this workspace.")
+                        .action("Try again", |_, _| {}),
+                    );
+                }),
+        )
+        .child(
+            Button::new("gallery.toast.pinned")
+                .label("Report something that stays")
+                .ghost()
+                .on_click(|_, cx| {
+                    toast::push(
+                        cx,
+                        Toast::new("gallery.toast.pinned.note", "Indexing is still running")
+                            .tone(Tone::Info)
+                            .persistent()
+                            .dismissable(false),
+                    );
+                }),
+        )
+        .child(
+            Button::new("gallery.toast.clear")
+                .label("Clear")
+                .ghost()
+                .on_click(|_, cx| toast::clear(cx)),
+        )
 }
 
 fn menu_sample(theme: &Theme, width: f32) -> gpui::Div {
@@ -786,6 +870,7 @@ fn main() {
                                 .cancel_label("Keep")
                                 .confirm_label("Delete")
                         }),
+                        toasts: cx.new(ToastLayer::new),
                     })
                 },
             )

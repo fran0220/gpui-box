@@ -4,16 +4,20 @@
 //! keyboard inside an open overlay and gives focus back when it closes.
 //! [`Dialog`] composes both into a modal that asks one question, and
 //! [`Tooltip`] is hover-delayed help that is never the only way to act.
+//! [`ToastLayer`] holds transient notifications, which report what happened
+//! and never hide a failure on a timer.
 
 mod dialog;
 mod focus;
 mod kbd;
 mod layer;
 pub mod popover;
+pub mod toast;
 pub mod tooltip;
 
 pub use dialog::{Dialog, DialogEvent};
 pub use focus::FocusTrap;
 pub use kbd::{Kbd, caps};
 pub use layer::{Overlay, Placement, priority, surface};
+pub use toast::{Toast, ToastCorner, ToastLayer};
 pub use tooltip::{Tooltip, Tooltipped};

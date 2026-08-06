@@ -59,7 +59,8 @@ pub mod prelude {
     pub use crate::motion::{Presence, Transition};
     pub use crate::navigation::{Accordion, AccordionSection, Breadcrumb, Crumb, TabItem, Tabs};
     pub use crate::overlay::{
-        Dialog, DialogEvent, FocusTrap, Kbd, Overlay, Placement, Tooltip, Tooltipped,
+        Dialog, DialogEvent, FocusTrap, Kbd, Overlay, Placement, Toast, ToastCorner, ToastLayer,
+        Tooltip, Tooltipped,
     };
     pub use crate::state::{AsyncStatus, AsyncValue, Loadable};
 }
@@ -71,4 +72,5 @@ pub fn install(cx: &mut App) {
     gpui_kit_semantics::install(cx);
     controls::input::install(cx);
     controls::textarea::install(cx);
+    overlay::toast::install(cx);
 }

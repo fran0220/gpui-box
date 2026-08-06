@@ -155,7 +155,8 @@
       "dialog": 180,
       "resize": 200,
       "entrance": 500,
-      "pulse": 2400
+      "pulse": 2400,
+      "toast": 6000
     },
     "easing": {
       "linear": [0, 0, 1, 1],

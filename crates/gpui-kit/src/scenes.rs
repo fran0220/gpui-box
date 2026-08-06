@@ -16,6 +16,7 @@ use crate::controls::select::{Select, SelectOption};
 use crate::controls::textarea::TextArea;
 use crate::display::badge::Tone;
 use crate::foundation::ActiveTheme;
+use crate::overlay::toast::push as toast_push;
 use crate::overlay::{Kbd, Overlay, Placement, Tooltip, Tooltipped};
 use crate::prelude::*;
 
@@ -87,6 +88,10 @@ pub fn catalog() -> Vec<Scene> {
         Scene {
             name: "tooltip",
             build: tooltip,
+        },
+        Scene {
+            name: "toast",
+            build: toast,
         },
         Scene {
             name: "tabs",
@@ -391,6 +396,54 @@ fn tooltip(_window: &mut Window, cx: &mut App) -> AnyElement {
                     .describes("scene.tooltip.export"),
             ),
         )
+        .into_any_element()
+}
+
+/// The notification layer the scene shows, kept across frames.
+///
+/// The stack, each timer, and each entry animation outlive a frame, so the
+/// layer is built once and the toasts are pushed once with it.
+struct SceneToasts {
+    layer: Entity<ToastLayer>,
+}
+
+impl Global for SceneToasts {}
+
+fn toast(_window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<SceneToasts>() {
+        let layer = cx.new(|cx| ToastLayer::new(cx).capacity(4));
+        cx.set_global(SceneToasts { layer });
+        toast_push(
+            cx,
+            Toast::new("scene.toast.saved", "Theme exported to disk").tone(Tone::Success),
+        );
+        toast_push(
+            cx,
+            Toast::new("scene.toast.stale", "Refreshing the model catalog failed")
+                .tone(Tone::Warning)
+                .detail("The last verified catalog is still shown."),
+        );
+        toast_push(
+            cx,
+            Toast::new(
+                "scene.toast.refused",
+                "The host refused to publish this run",
+            )
+            .tone(Tone::Danger)
+            .detail("Approval is required for this workspace.")
+            .action("Try again", |_, _| {}),
+        );
+    }
+    let layer = cx.global::<SceneToasts>().layer.clone();
+    let theme = cx.theme().clone();
+
+    stack(&theme)
+        .w(px(560.0))
+        .h(px(360.0))
+        .child(div().child("Content behind the notifications"))
+        // A failure keeps its report on screen; only the success times out.
+        .child(div().child("A danger or warning toast stays until it is dismissed."))
+        .child(layer)
         .into_any_element()
 }
 

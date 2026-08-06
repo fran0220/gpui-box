@@ -79,9 +79,23 @@ a header that does not sort publishes a `Cell` and installs no handler.
 | `Overlay` | builder | Placement, token-driven paint priority, scrim, dismissal |
 | `Dialog` | view | Composed modal: reports opened, confirmed, cancelled, dismissed, closed. A dialog that is not dismissable installs no escape or scrim handler |
 | `Tooltip` | builder | Hover-delayed help on GPUI's hover machinery. Never actionable, and never the only copy of what is needed to act |
+| `ToastLayer`, `Toast` | view, builder | Transient notifications. The host mounts the layer in the window it wants them drawn in; `overlay::toast::push` reaches it from any call site and reports whether a layer was mounted to deliver to. One action at most, an optional dismiss control, entry and exit through `Presence` |
 | `FocusTrap` | helper | Keeps the keyboard inside an open overlay and restores focus |
 | `Kbd` | builder | Platform-specific keystroke caps |
 | `popover` | helpers | Anchoring, menu rows, filtering, and key classification |
+
+### Failures do not time out
+
+A notification that reports a failure — `Tone::Danger` or `Tone::Warning` —
+stays until it is dismissed. A failure the typist never saw is a failure that
+was never reported, so no timer is allowed to hide one. Every other tone times
+out after `motion.durationMs.toast`, and a pointer resting on a toast pauses
+its timer so nothing disappears mid-sentence.
+
+The stack has a cap. When it overflows, the oldest toast that both times out
+and can be dismissed leaves first; a persistent one is never evicted to make
+room, and when nothing may be evicted the cap yields rather than swallow a
+report.
 
 ## What a component owns
 
@@ -90,12 +104,6 @@ answer: a value, a selection, and a list all belong to the caller. A host that
 refuses a change simply does not apply it, and the control keeps showing what
 is still true. This is why `Select` reports the option that was picked instead
 of moving its own checkmark.
-
-## Still missing
-
-These are known gaps rather than deliberate omissions:
-
-- `Toast`: transient notifications with a stack and a timer.
 
 ## Validation
 
