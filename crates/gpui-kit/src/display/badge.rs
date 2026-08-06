@@ -7,6 +7,10 @@ use gpui_kit_theme::{ActiveTheme, Theme, TypeScale};
 
 use crate::foundation::{Ident, StyledExt};
 
+/// The severity a status surface claims.
+///
+/// A tone is a statement about the state, not a decoration: Success on an idle
+/// thing says the thing succeeded, which is a different and untrue sentence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Tone {
     #[default]

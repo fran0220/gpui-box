@@ -15,6 +15,8 @@ const SETTLE_EPSILON: f32 = 0.001;
 /// so an over-soft configuration cannot animate forever.
 const MAX_SETTLE: Duration = Duration::from_secs(4);
 
+/// A damped spring, solved in closed form so a position is a function of time
+/// rather than of how many frames happened to be delivered.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Spring {
     pub stiffness: f32,

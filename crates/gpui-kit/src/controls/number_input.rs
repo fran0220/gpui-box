@@ -37,6 +37,11 @@ pub enum NumberInputEvent {
 
 impl EventEmitter<NumberInputEvent> for NumberInput {}
 
+/// A number field with a step grid and, optionally, a range.
+///
+/// It never clamps. A value outside the range stays on screen exactly as it is
+/// and is published `invalid`, because silently correcting a number nobody
+/// chose hides the disagreement instead of reporting it.
 pub struct NumberInput {
     ident: Ident,
     focus_handle: FocusHandle,

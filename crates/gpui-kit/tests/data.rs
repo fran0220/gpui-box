@@ -443,6 +443,21 @@ fn the_disclosure_reports_the_state_the_node_should_take(cx: &mut TestAppContext
 }
 
 #[gpui::test]
+fn the_disclosure_answers_the_keyboard_it_is_reachable_by(cx: &mut TestAppContext) {
+    let (mut harness, toggles, _selects) = tree(cx, &[], "workspace");
+
+    harness.click("data.tree.workspace.toggle");
+    toggles.borrow_mut().clear();
+    harness.keystrokes("enter");
+
+    assert_eq!(
+        *toggles.borrow(),
+        vec![("workspace".to_string(), true)],
+        "a control tab can reach must answer the keyboard as well as the pointer"
+    );
+}
+
+#[gpui::test]
 fn the_keyboard_walks_only_the_visible_nodes(cx: &mut TestAppContext) {
     let (mut harness, _toggles, selects) = tree(cx, &["workspace"], "workspace");
 

@@ -103,6 +103,8 @@ pub fn caps(keystroke: &str, macos: bool) -> Vec<SharedString> {
     }
 }
 
+/// The bundled faces carry none of the modifier symbols; the platform's own
+/// fallback draws them, which is why they are only ever reached under macOS.
 fn modifier_label(modifier: &str, macos: bool) -> String {
     match (modifier, macos) {
         ("cmd" | "super" | "win", true) => "⌘".into(),
@@ -119,7 +121,9 @@ fn modifier_label(modifier: &str, macos: bool) -> String {
 
 fn key_label(key: &str, macos: bool) -> String {
     match (key, macos) {
-        ("enter", true) => "↩".into(),
+        // U+23CE, not U+21A9: the bundled mono face draws the hooked arrow as
+        // a shape that reads as something other than a return key.
+        ("enter", true) => "⏎".into(),
         ("escape", true) => "esc".into(),
         ("backspace", true) => "⌫".into(),
         ("delete", true) => "⌦".into(),
@@ -165,7 +169,7 @@ mod tests {
 
     #[test]
     fn named_keys_use_their_symbols_where_the_platform_expects_them() {
-        assert_eq!(caps("enter", true), vec![SharedString::from("↩")]);
+        assert_eq!(caps("enter", true), vec![SharedString::from("⏎")]);
         assert_eq!(caps("enter", false), vec![SharedString::from("Enter")]);
         assert_eq!(caps("up", false), vec![SharedString::from("↑")]);
     }

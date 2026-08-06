@@ -6,6 +6,8 @@
 use gpui_kit_theme::Theme;
 use gpui_kit_tokens::MotionEasing;
 
+/// A CSS-compatible cubic-bezier curve, evaluated in pure Rust so a curve can
+/// be asserted without a window.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CubicBezier {
     pub x1: f32,

@@ -9,6 +9,9 @@ use gpui::{
 };
 use gpui_kit_theme::Theme;
 
+/// Wraps `child` in one backdrop blur, or in nothing where the platform has
+/// no equivalent. It must wrap the complete affected subtree: blurring each
+/// row separately produces unstable paint ordering.
 pub fn frosted(theme: &Theme, corner_radius: f32, child: impl IntoElement) -> Frosted {
     Frosted {
         enabled: theme.effects.glass_alpha < 1.0,
@@ -18,6 +21,7 @@ pub fn frosted(theme: &Theme, corner_radius: f32, child: impl IntoElement) -> Fr
     }
 }
 
+/// The element [`frosted`] produces.
 pub struct Frosted {
     enabled: bool,
     corner_radius: f32,
@@ -103,6 +107,8 @@ impl IntoElement for Frosted {
     }
 }
 
+/// Fades the named edges of `child` over the token band, so content that
+/// continues past a viewport looks continued rather than cut.
 pub fn edge_faded(theme: &Theme, top: bool, bottom: bool, child: impl IntoElement) -> EdgeFaded {
     EdgeFaded {
         band: theme.effects.edge_fade_band,
@@ -114,6 +120,7 @@ pub fn edge_faded(theme: &Theme, top: bool, bottom: bool, child: impl IntoElemen
     }
 }
 
+/// The element [`edge_faded`] produces.
 pub struct EdgeFaded {
     band: f32,
     top: bool,

@@ -6,10 +6,11 @@
 //! single caller-supplied [`Ident`].
 
 mod ident;
+pub(crate) mod stepping;
 mod styled_ext;
 
 pub use ident::Ident;
-pub use styled_ext::StyledExt;
+pub use styled_ext::{FocusRing, StyledExt};
 
 pub use gpui_kit_theme::{
     ActiveTheme, ControlSize, Density, Elevation, Layer, ThemeRegistry, activate_theme, set_density,

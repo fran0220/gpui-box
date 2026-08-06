@@ -15,9 +15,9 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TypeScale};
 
-use crate::foundation::{Ident, StyledExt};
+use crate::foundation::{FocusRing, Ident, Sizable, StyledExt};
 
 type ToggleHandler = Rc<dyn Fn(SharedString, bool, &mut Window, &mut App)>;
 
@@ -78,6 +78,7 @@ pub struct Accordion {
     sections: Vec<AccordionSection>,
     expanded: Vec<SharedString>,
     exclusive: bool,
+    size: ControlSize,
     on_toggle: Option<ToggleHandler>,
 }
 
@@ -101,6 +102,7 @@ impl Accordion {
             sections: Vec::new(),
             expanded: Vec::new(),
             exclusive: false,
+            size: ControlSize::Md,
             on_toggle: None,
         }
     }
@@ -149,10 +151,17 @@ impl Accordion {
     }
 }
 
+impl Sizable for Accordion {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.size = size;
+        self
+    }
+}
+
 impl RenderOnce for Accordion {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let metrics = theme.control.get(gpui_kit_theme::ControlSize::Md);
+        let metrics = theme.control.get(self.size);
         let last = self.sections.len().saturating_sub(1);
         let expanded_ids = self.expanded.clone();
 
@@ -210,7 +219,7 @@ impl RenderOnce for Accordion {
                         .cursor_pointer()
                         .tab_index(0)
                         .hover(|style| style.bg(theme.colors.hover))
-                        .focus(|style| style.shadow(theme.selected_ring()))
+                        .focus_ring(&theme)
                 });
 
             if let (true, Some(handler)) = (actionable, self.on_toggle.clone()) {

@@ -11,7 +11,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space};
 
 use crate::display::badge::Tone;
-use crate::foundation::{Disableable, Ident, Selectable, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Selectable, StyledExt};
 
 type RemoveHandler = Rc<dyn Fn(&mut Window, &mut App)>;
 
@@ -96,6 +96,7 @@ impl RenderOnce for Tag {
                 .justify_center()
                 .cursor_pointer()
                 .tab_index(0)
+                .focus_ring(&theme)
                 .child(icon(Icon::Close).size(px(10.0)).text_color(color))
                 .semantic_in(
                     cx,

@@ -25,7 +25,7 @@ that must survive a frame is a view.
 | `SegmentedControl` | builder | the segment that was picked | A single-choice strip. Left, right, home, and end move over refused segments and stop at the ends, because a strip has ends |
 | `Combobox` | view | selected, custom, opened, closed | A `Select` you can type into. Escape puts the query back to the current answer and reports nothing. A query nothing answers reports nothing unless `allow_custom` |
 | `TagInput` | view | added, removed, duplicate, refused | Enter or comma commits a token. The first backspace in an empty field singles out the last tag and the second removes it. A duplicate and a full field are refusals shown where the typist is looking |
-| `FieldFrame`, `SearchFrame`, `field_shell` | builder, helper | — | Chrome for a host-supplied editable surface. `field_shell` is the one border, background, and focus treatment every editable control draws |
+| `field_shell`, `FieldState` | helper | — | The one border, background, and focus treatment every editable control draws. A composed field — `NumberInput`, `Combobox`, `TagInput` — wraps a bare input in one of these rather than nesting two frames |
 
 ## Display
 
@@ -137,7 +137,7 @@ a header that does not sort publishes a `Cell` and installs no handler.
 | `ContextMenu` | view | The same list opened at the pointer over a wrapped region. Reports the target it was opened on and selects nothing, because opening a menu is not choosing anything. A surface that would leave the viewport flips to the other side of the pointer |
 | `MenuItem` | builder | One row: `command`, `check`, `separator`, `section`, or `submenu`, with an optional shortcut hint and icon. A checkable row draws the state the host holds and reports the intent to change it |
 | `CommandPalette`, `Command` | view, builder | A query field over a command list, filtered by `popover::match_rank` — prefix, then word start, then substring, then subsequence — with sections kept contiguous behind their best match. Nothing matching shows an `EmptyState` naming the query that answered nothing, and a command the host marked unavailable stays listed with its reason rather than being hidden |
-| `Tooltip` | builder | Hover-delayed help on GPUI's hover machinery. Never actionable, and never the only copy of what is needed to act |
+| `Tooltip`, `Tooltipped` | builder, trait | Hover-delayed help on GPUI's hover machinery. Never actionable, and never the only copy of what is needed to act. `Tooltipped` attaches one to any element |
 | `ToastLayer`, `Toast` | view, builder | Transient notifications. The host mounts the layer in the window it wants them drawn in; `overlay::toast::push` reaches it from any call site and reports whether a layer was mounted to deliver to. One action at most, an optional dismiss control, entry and exit through `Presence` |
 | `FocusTrap` | helper | Keeps the keyboard inside an open overlay and restores focus |
 | `Kbd` | builder | Platform-specific keystroke caps |
@@ -169,6 +169,59 @@ number outside the range stays on screen exactly as it is, published `invalid`;
 a tag the field will not take leaves the typed text in place and says why.
 Neither silently corrects the caller, because a value nobody chose is a value
 nobody can trust.
+
+## What every component agrees on
+
+These hold across the families above, so a habit learned on one component
+transfers to the next.
+
+**Identity.** A constructor takes `impl Into<Ident>` and derives every child id
+from it with `Ident::child`. A part with no business identity — a loader cell,
+a skeleton row — gets `indexed_element_id` and publishes nothing. Purely
+decorative display components (`Badge`, `Card`, `ListRow`, `Divider`, `Avatar`,
+`StatusLine`, `Callout`, `Kbd`) take no `Ident` and publish a node only when
+the caller gives them one with `.id(..)`, so an ornamental badge does not bury
+the assertion target next to it.
+
+**Refusal.** Anything that can be refused implements `Disableable`. A refused
+control installs **no** handler — not a handler that returns early — so it
+cannot fire even if a host mis-routes an event, and it publishes
+`disabled: true`. Dimming alone is not a refusal.
+
+**Size.** Anything with a size implements `Sizable` and takes every metric —
+height, horizontal padding, gap, font size, glyph size — from one step of
+`control.*` in the token document. A `sm` button and a `sm` select are the same
+height because they read the same row of the same table; nothing hard-codes a
+height beside it.
+
+**Selection.** Anything that can present itself as the current choice
+implements `Selectable`.
+
+**Focus.** Every interactive element is reachable with tab and wears the same
+ring, from `effect.focusRingWidth` and `effect.focusRingAlpha` in the focus
+colour, applied through `FocusRing::focus_ring`. The ring is a shadow rather
+than a border, so focus never reflows what is around it, and it is a different
+treatment from the selected ring on purpose: focus says where the next
+keystroke goes, selection says which answer is current.
+
+## What a node's `value` means
+
+`value` carries the one fact a node reports about itself that a reader would
+otherwise have to measure off the pixels:
+
+- a control that holds something publishes what it holds — the committed text
+  of an input, the label of the chosen option, a divider's ratio, a
+  scrollbar's position and reach, a progress position;
+- a container publishes how much it holds, as a count — a list's total, a
+  toolbar's item count, the number of pages, the number of rows an ellipsis
+  stands for, the tags in a field against its limit;
+- a state carrier publishes the **name** of the state rather than its colour —
+  a toast's tone, a header's sort direction, which of empty, unstarted,
+  unavailable, or failed an empty state names;
+- a refused row publishes the host's reason for refusing it.
+
+`value` never repeats a label, a role, or a position in a list; the node's
+`text` carries the name, and `bounds` carry the geometry.
 
 ## What a component owns
 

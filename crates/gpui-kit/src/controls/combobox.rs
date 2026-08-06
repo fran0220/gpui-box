@@ -42,6 +42,10 @@ pub enum ComboboxEvent {
 
 impl EventEmitter<ComboboxEvent> for Combobox {}
 
+/// A [`Select`](crate::controls::select::Select) you can type into.
+///
+/// It owns the query and whether the menu is open. Which option holds is the
+/// caller's answer, so escape puts the query back to it and reports nothing.
 pub struct Combobox {
     ident: Ident,
     focus_handle: FocusHandle,

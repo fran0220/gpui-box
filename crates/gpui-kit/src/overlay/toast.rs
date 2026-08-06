@@ -36,7 +36,7 @@ use web_time::Instant;
 use crate::controls::button::Button;
 use crate::display::badge::Tone;
 use crate::display::status::StatusDot;
-use crate::foundation::{Ident, Sizable, StyledExt};
+use crate::foundation::{FocusRing, Ident, Sizable, StyledExt};
 use crate::motion::{Easing, MotionSpec, Phase, Presence};
 use crate::overlay::layer::{pinned, priority, surface};
 
@@ -449,6 +449,7 @@ impl ToastLayer {
                 .size(px(16.0))
                 .cursor_pointer()
                 .tab_index(0)
+                .focus_ring(theme)
                 .child(
                     icon(Icon::Close)
                         .size(px(11.0))

@@ -16,12 +16,22 @@ input, and an entry in `docs/components.md`.
 | Action | `Button`, `IconButton`, `ButtonGroup`, `SplitButton` |
 | Text entry | `TextInput`, `TextArea`, `NumberInput`, `TagInput` |
 | Choice | `Select`, `Combobox`, `Checkbox`, `Radio`, `Switch`, `Slider`, `SegmentedControl` |
-| Form | `FormField`, `FieldFrame`, `SearchFrame` |
-| Navigation | `Tabs`, `Accordion`, `Breadcrumb`, `Sidebar`, `Pagination`, `Toolbar` |
+| Form | `FormField` |
+| Navigation | `Tabs`, `Accordion`, `Breadcrumb`, `Sidebar`, `Pagination` |
 | Data | `List` (virtualized), `Table`, `Tree` |
 | Display | `Badge`, `Tag`, `Avatar`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `StatusDot`, `StatusLine`, `Callout`, `PulseLoader`, `GradientSpinner`, `Skeleton` |
-| Overlay | `Overlay`, `Dialog`, `Drawer`, `Popover`, `Menu`, `ContextMenu`, `CommandPalette`, `Tooltip`, `Toast`, `Kbd`, `FocusTrap` |
-| Layout | `SplitPane`, `ScrollArea` |
+| Overlay | `Overlay`, `Dialog`, `Drawer`, `Popover`, `Menu`, `ContextMenu`, `CommandPalette`, `Tooltip`, `Toast`, `ToastLayer`, `Kbd` |
+| Layout | `SplitPane`, `ScrollArea`, `Toolbar` |
+
+`Tooltipped` is an extension trait rather than a component: it attaches a
+`Tooltip` to any element, and is covered wherever that `Tooltip` is.
+
+## Helpers, which the four-part rule does not reach
+
+`field_shell` and `FieldState` draw the one border, background, and focus
+treatment every editable control wears. `FocusTrap` keeps the keyboard inside
+an open overlay. Neither renders on its own, so neither has a scene of its
+own; both are exercised through every control and overlay that uses them.
 
 ## Out of scope, and why
 

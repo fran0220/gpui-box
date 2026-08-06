@@ -110,6 +110,12 @@ Glass alpha is platform-resolved by `gpui-kit-theme`: macOS may use backdrop
 blur; other platforms receive opaque surfaces unless equivalent compositor
 support is proven.
 
+The two rings live here too. `effect.selectedRingAlpha` draws the inset ring on
+the current answer; `effect.focusRingWidth` and `effect.focusRingAlpha` draw the
+outset ring, in `color.interactive.focus`, on whatever holds the keyboard. They
+are separate tokens because they answer separate questions, and a theme that
+collapsed them would leave a reader unable to tell selection from focus.
+
 ## Validation
 
 `TokenDocument::validate` rejects:
@@ -118,7 +124,7 @@ support is proven.
 - empty metadata;
 - non-increasing spacing and control heights;
 - invalid type size, line-height, or weight;
-- effect and opacity alpha outside 0–1;
+- effect and opacity alpha outside 0–1, or a non-positive focus ring width;
 - negative elevation blur;
 - z-index layers that are not strictly increasing;
 - density factors outside 0.5–1.5, or a `comfortable` axis that is not 1.

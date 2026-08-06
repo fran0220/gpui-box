@@ -150,9 +150,14 @@ impl TokenDocument {
             return invalid("border", "thick must exceed a positive hairline");
         }
 
+        if self.effect.focus_ring_width <= 0.0 {
+            return invalid("effect.focusRingWidth", "must be positive");
+        }
+
         for (path, value) in [
             ("effect.glassAlphaMacos", self.effect.glass_alpha_macos),
             ("effect.selectedRingAlpha", self.effect.selected_ring_alpha),
+            ("effect.focusRingAlpha", self.effect.focus_ring_alpha),
             ("opacity.disabled", self.opacity.disabled),
             ("opacity.muted", self.opacity.muted),
             ("opacity.scrim", self.opacity.scrim),
@@ -960,6 +965,9 @@ pub struct EffectTokens {
     pub backdrop_blur: f32,
     pub edge_fade_band: f32,
     pub selected_ring_alpha: f32,
+    /// How wide the ring around the focused control is drawn, in pixels.
+    pub focus_ring_width: f32,
+    pub focus_ring_alpha: f32,
 }
 
 #[cfg(test)]

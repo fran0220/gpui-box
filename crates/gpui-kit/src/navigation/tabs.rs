@@ -18,7 +18,8 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlMetrics, ControlSize, Space, Theme};
 
 use crate::display::badge::Badge;
-use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
+use crate::foundation::stepping::bounded_step;
+use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
 
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 
@@ -171,7 +172,7 @@ impl Tabs {
                     .cursor_pointer()
                     .tab_index(0)
                     .hover(|style| style.text_color(theme.colors.text))
-                    .focus(|style| style.shadow(theme.selected_ring()))
+                    .focus_ring(theme)
             });
 
         if let (true, Some(handler)) = (actionable, self.on_select.clone()) {
@@ -263,29 +264,13 @@ impl RenderOnce for Tabs {
 /// Movement stops at the ends instead of wrapping, so arrowing past the last
 /// tab reports nothing rather than jumping back to the first.
 fn step(tabs: &[TabItem], selected: Option<&SharedString>, delta: isize) -> Option<SharedString> {
-    let Some(from) = selected.and_then(|id| tabs.iter().position(|tab| &tab.id == id)) else {
-        // With nothing selected, a move enters the strip from the side it
-        // travels away from: right lands on the first tab, left on the last.
-        return edge(tabs, -delta);
-    };
-    let mut index = from as isize + delta;
-    while index >= 0 && (index as usize) < tabs.len() {
-        let tab = &tabs[index as usize];
-        if !tab.disabled {
-            return Some(tab.id.clone());
-        }
-        index += delta;
-    }
-    None
+    let from = selected.and_then(|id| tabs.iter().position(|tab| &tab.id == id));
+    bounded_step(tabs.len(), from, delta, |index| tabs[index].disabled)
+        .map(|index| tabs[index].id.clone())
 }
 
 /// The first tab from the left when `delta` is negative, from the right when
 /// it is positive.
 fn edge(tabs: &[TabItem], delta: isize) -> Option<SharedString> {
-    let mut candidates = tabs.iter().filter(|tab| !tab.disabled);
-    if delta >= 0 {
-        candidates.next_back().map(|tab| tab.id.clone())
-    } else {
-        candidates.next().map(|tab| tab.id.clone())
-    }
+    step(tabs, None, -delta)
 }

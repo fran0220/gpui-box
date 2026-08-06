@@ -9,8 +9,10 @@ use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlMetrics, ControlSize, Radius, Theme};
 
-use crate::foundation::{Disableable, Ident, Selectable, Sizable, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Selectable, Sizable, StyledExt};
 
+/// How much weight an action carries. Primary is the one decision a local
+/// area is asking for; Danger is reserved for irreversible intent.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ButtonVariant {
     #[default]
@@ -21,6 +23,7 @@ pub enum ButtonVariant {
     Link,
 }
 
+/// Which side of the label the glyph sits on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum IconPosition {
     #[default]
@@ -284,11 +287,7 @@ impl RenderOnce for Button {
             .role(gpui::Role::Button)
             .when(self.full_width, |element| element.w_full())
             .when(actionable, |element| {
-                element.cursor_pointer().tab_index(0).focus(|style| {
-                    style
-                        .border_color(theme.colors.focus)
-                        .shadow(theme.selected_ring())
-                })
+                element.cursor_pointer().tab_index(0).focus_ring(&theme)
             })
             .children(content);
 

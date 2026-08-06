@@ -20,7 +20,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Theme, TypeScale};
 
 use crate::display::badge::Badge;
-use crate::foundation::{Disableable, Ident, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
 use crate::overlay::Tooltipped;
 
 /// How wide the rail is expanded, and how wide it is collapsed to glyphs.
@@ -141,6 +141,7 @@ pub struct Sidebar {
     header: Option<AnyElement>,
     footer: Option<AnyElement>,
     disabled: bool,
+    size: ControlSize,
     on_select: Option<SelectHandler>,
 }
 
@@ -168,6 +169,7 @@ impl Sidebar {
             header: None,
             footer: None,
             disabled: false,
+            size: ControlSize::Md,
             on_select: None,
         }
     }
@@ -221,7 +223,7 @@ impl Sidebar {
         theme: &Theme,
         cx: &mut App,
     ) -> AnyElement {
-        let metrics = theme.control.get(ControlSize::Md);
+        let metrics = theme.control.get(self.size);
         let ident = self.ident.child(item.id.as_ref());
         let active = self.active.as_ref() == Some(&item.id);
         let disabled = self.disabled || item.disabled;
@@ -276,7 +278,7 @@ impl Sidebar {
                     .cursor_pointer()
                     .tab_index(0)
                     .hover(|style| style.bg(theme.colors.hover))
-                    .focus(|style| style.shadow(theme.selected_ring()))
+                    .focus_ring(theme)
             });
 
         // A narrow rail hides the wording, so the wording has to reach the
@@ -318,6 +320,13 @@ impl Disableable for Sidebar {
     /// Freezes the whole rail. A frozen rail installs no handler at all.
     fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
+        self
+    }
+}
+
+impl Sizable for Sidebar {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.size = size;
         self
     }
 }

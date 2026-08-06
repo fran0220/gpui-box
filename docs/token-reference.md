@@ -152,6 +152,17 @@ Appearance: `Dark`.
 | `opacity.muted` | 0.68 |
 | `opacity.scrim` | 0.6 |
 
+### Effects
+
+| Token | Value |
+|---|---:|
+| `effect.glassAlphaMacos` | 0.9 |
+| `effect.backdropBlur` | 16 |
+| `effect.edgeFadeBand` | 20 |
+| `effect.selectedRingAlpha` | 0.09 |
+| `effect.focusRingWidth` | 2 |
+| `effect.focusRingAlpha` | 0.55 |
+
 ### Contrast
 
 | Foreground | Background | Ratio | Minimum |
@@ -337,6 +348,17 @@ Appearance: `Light`.
 | `opacity.disabled` | 0.45 |
 | `opacity.muted` | 0.68 |
 | `opacity.scrim` | 0.35 |
+
+### Effects
+
+| Token | Value |
+|---|---:|
+| `effect.glassAlphaMacos` | 0.95 |
+| `effect.backdropBlur` | 16 |
+| `effect.edgeFadeBand` | 20 |
+| `effect.selectedRingAlpha` | 0.12 |
+| `effect.focusRingWidth` | 2 |
+| `effect.focusRingAlpha` | 0.45 |
 
 ### Contrast
 

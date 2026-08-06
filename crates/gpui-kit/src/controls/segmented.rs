@@ -15,7 +15,8 @@ use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space};
 
-use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
+use crate::foundation::stepping::bounded_step;
+use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
 
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 
@@ -153,19 +154,9 @@ impl Sizable for SegmentedControl {
 /// stopping at the ends rather than wrapping onto the other side of the
 /// strip, which a strip does not look like it does.
 fn neighbour(segments: &[Segment], from: Option<usize>, delta: isize) -> Option<usize> {
-    let count = segments.len() as isize;
-    if count == 0 {
-        return None;
-    }
-    let start = from.map_or(if delta >= 0 { -1 } else { count }, |index| index as isize);
-    let mut index = start + delta;
-    while (0..count).contains(&index) {
-        if !segments[index as usize].disabled {
-            return Some(index as usize);
-        }
-        index += delta;
-    }
-    None
+    bounded_step(segments.len(), from, delta, |index| {
+        segments[index].disabled
+    })
 }
 
 /// The first segment that can be chosen, from whichever end.
@@ -264,11 +255,7 @@ impl RenderOnce for SegmentedControl {
                 element.opacity(theme.opacity.disabled)
             })
             .when(actionable, |element| {
-                element.tab_index(0).focus(|style| {
-                    style
-                        .border_color(theme.colors.focus)
-                        .shadow(theme.selected_ring())
-                })
+                element.tab_index(0).focus_ring(&theme)
             })
             .children(segments);
 

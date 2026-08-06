@@ -228,6 +228,8 @@ pub struct Effects {
     pub backdrop_blur: f32,
     pub edge_fade_band: f32,
     pub selected_ring_alpha: f32,
+    pub focus_ring_width: f32,
+    pub focus_ring_alpha: f32,
 }
 
 impl Theme {
@@ -391,6 +393,8 @@ impl Theme {
                 backdrop_blur: tokens.effect.backdrop_blur,
                 edge_fade_band: tokens.effect.edge_fade_band,
                 selected_ring_alpha: tokens.effect.selected_ring_alpha,
+                focus_ring_width: tokens.effect.focus_ring_width,
+                focus_ring_alpha: tokens.effect.focus_ring_alpha,
             },
         }
     }
@@ -495,6 +499,22 @@ impl Theme {
 
     pub fn get(cx: &App) -> &Self {
         cx.global::<ThemeRegistry>().active()
+    }
+
+    /// The ring drawn around whichever control currently has the keyboard.
+    ///
+    /// It spreads outward in the focus colour, so it reads differently from
+    /// [`Self::selected_ring`]: focus says where the next keystroke goes,
+    /// selection says which answer is current, and a reader that cannot tell
+    /// the two apart cannot tell what pressing a key would do.
+    pub fn focus_ring(&self) -> Vec<BoxShadow> {
+        vec![BoxShadow {
+            color: self.colors.focus.opacity(self.effects.focus_ring_alpha),
+            offset: point(px(0.0), px(0.0)),
+            blur_radius: px(0.0),
+            spread_radius: px(self.effects.focus_ring_width),
+            inset: false,
+        }]
     }
 
     pub fn selected_ring(&self) -> Vec<BoxShadow> {
@@ -758,6 +778,21 @@ mod tests {
         assert!(heights.windows(2).all(|window| window[0] < window[1]));
         assert_eq!(theme.borders.hairline, 1.0);
         assert!(theme.opacity.disabled < 1.0);
+    }
+
+    #[test]
+    fn focus_and_selection_do_not_look_alike() {
+        for theme in [Theme::studio_dark(), Theme::studio_light()] {
+            let focus = theme.focus_ring();
+            let selected = theme.selected_ring();
+            assert_eq!(focus.len(), 1);
+            assert_ne!(focus[0].color, selected[0].color);
+            assert!(!focus[0].inset && selected[0].inset);
+            // A ring that reserved space would move the layout the moment the
+            // keyboard arrived on a control.
+            assert_eq!(focus[0].offset, point(px(0.0), px(0.0)));
+            assert!(focus[0].spread_radius > px(0.0));
+        }
     }
 
     #[test]

@@ -11,6 +11,7 @@ use web_time::Instant;
 
 use super::MotionSpec;
 
+/// Where an element is in its arrival or departure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Phase {
     Entering,

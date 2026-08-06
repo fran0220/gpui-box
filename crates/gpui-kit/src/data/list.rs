@@ -29,7 +29,7 @@ use gpui::{
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Theme};
 
-use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
 
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 type RenderRow = Rc<dyn Fn(usize, &mut Window, &mut App) -> ListItem>;
@@ -301,7 +301,7 @@ fn row_element(
                 .when(!selected, |element| {
                     element.hover(|style| style.bg(theme.colors.hover.opacity(0.3)))
                 })
-                .focus(|style| style.shadow(theme.selected_ring()))
+                .focus_ring(theme)
         })
         .child(div().flex_1().overflow_hidden().child(item.content));
 

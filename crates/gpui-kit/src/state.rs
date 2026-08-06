@@ -1,5 +1,9 @@
 //! Explicit async states for truthful user interfaces.
 
+/// The states a value a host is fetching can be in.
+///
+/// Empty, unavailable, and failed are separate variants on purpose: a refusal
+/// rendered as an absence of data is a lie about the host.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum Loadable<T, E = String> {
     #[default]
@@ -35,12 +39,17 @@ impl<T, E> Loadable<T, E> {
     }
 }
 
+/// A value and, separately, what is currently happening to it.
+///
+/// Splitting the two is what lets a failed refresh keep the last verified
+/// value on screen instead of replacing it with an error.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AsyncValue<T, E = String> {
     pub value: Option<T>,
     pub status: AsyncStatus<E>,
 }
 
+/// What is happening to an [`AsyncValue`] right now.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum AsyncStatus<E = String> {
     #[default]

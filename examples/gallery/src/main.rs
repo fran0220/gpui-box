@@ -554,6 +554,20 @@ impl Render for Gallery {
                     .child(recipes::section_title(&theme, "Settings pattern"))
                     .child(fixture_settings_card(&theme))
                     .child(recipes::section_title(&theme, "Truthful states"))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap(px(theme.spacing.xl))
+                            .mb(px(theme.spacing.sm))
+                            .child(StatusLine::new("Connected", Tone::Success))
+                            .child(StatusLine::new("Reconnecting", Tone::Warning))
+                            .child(StatusLine::new("Refused", Tone::Danger))
+                            .child(StatusDot::new(Tone::Neutral))
+                            .child(Kbd::new("cmd-shift-p"))
+                            .child(Kbd::new("enter")),
+                    )
                     .child(Callout::new(
                         "The host refused this action. Preserve its exact reason instead of showing an empty state.",
                         Tone::Danger,

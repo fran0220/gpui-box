@@ -1,16 +1,16 @@
 //! A control for choosing a number inside a known range.
 
-use std::cell::Cell;
 use std::rc::Rc;
 
 use gpui::{
-    App, Bounds, InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels, RenderOnce,
-    SharedString, Styled, Window, div, prelude::FluentBuilder, px,
+    App, InteractiveElement, IntoElement, MouseButton, ParentElement, RenderOnce, SharedString,
+    Styled, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Space};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Space};
 
-use crate::foundation::{Disableable, Ident};
+use crate::foundation::{Disableable, FocusRing, Ident, Sizable};
+use crate::layout::measure;
 
 type ChangeHandler = Rc<dyn Fn(f32, &mut Window, &mut App)>;
 
@@ -27,6 +27,7 @@ pub struct Slider {
     max: f32,
     value: f32,
     step: Option<f32>,
+    size: ControlSize,
     disabled: bool,
     /// Rendered next to the label, for a unit the number alone does not carry.
     display: Option<SharedString>,
@@ -55,6 +56,7 @@ impl Slider {
             max: 1.0,
             value: 0.0,
             step: None,
+            size: ControlSize::Md,
             disabled: false,
             display: None,
             on_change: None,
@@ -117,20 +119,30 @@ impl Disableable for Slider {
     }
 }
 
+impl Sizable for Slider {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.size = size;
+        self
+    }
+}
+
 impl RenderOnce for Slider {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
+        let metrics = theme.control.get(self.size);
         let actionable = !self.disabled && self.on_change.is_some();
         let fraction = self.fraction();
         let track_height = px(4.0);
-        let knob = px(14.0);
+        // The handle is the control's only tappable part, so it is sized from
+        // the same scale step the other controls take their glyphs from.
+        let knob = px(metrics.icon_size);
 
         // The track is the assertion target, not the row: an automated click
         // on the centre of a slider has to land on something draggable.
         let track_id = self.ident.clone();
         // The handlers need the track's measured width to turn a pointer
         // position into a value, and only prepaint knows it.
-        let measured: Rc<Cell<Bounds<Pixels>>> = Rc::new(Cell::new(Bounds::default()));
+        let measured = measure::cell(&track_id.semantic_id(), cx);
         let mut track = div()
             .id(track_id.element_id())
             .relative()
@@ -237,11 +249,7 @@ impl RenderOnce for Slider {
                 element.opacity(theme.opacity.disabled)
             })
             .when(actionable, |element| {
-                element.tab_index(0).focus(|style| {
-                    style
-                        .border_color(theme.colors.focus)
-                        .shadow(theme.selected_ring())
-                })
+                element.tab_index(0).focus_ring(&theme)
             })
             .when_some(self.label.clone(), |element, label| {
                 element.child(
@@ -249,7 +257,7 @@ impl RenderOnce for Slider {
                         .flex()
                         .flex_row()
                         .justify_between()
-                        .text_size(px(theme.typography.body.size))
+                        .text_size(px(metrics.font_size))
                         .text_color(theme.colors.text_muted)
                         .child(label)
                         .when_some(self.display.clone(), |element, display| {
@@ -263,9 +271,9 @@ impl RenderOnce for Slider {
                     .semantic_in(cx, spec)
                     .on_children_prepainted({
                         let measured = Rc::clone(&measured);
-                        move |bounds, _, _| {
+                        move |bounds, window, _| {
                             if let Some(first) = bounds.first() {
-                                measured.set(*first);
+                                measure::record(&measured, *first, window);
                             }
                         }
                     })

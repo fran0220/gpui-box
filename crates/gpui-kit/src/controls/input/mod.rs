@@ -183,6 +183,12 @@ pub enum TextInputEvent {
 
 impl EventEmitter<TextInputEvent> for TextInput {}
 
+/// One line of editable text.
+///
+/// The field owns the caret, the selection, and any composition in flight; the
+/// committed text belongs to the caller, which is why a host that refuses a
+/// change simply does not apply it and the field keeps showing what is true.
+/// A secret field publishes its shape and never its content.
 pub struct TextInput {
     ident: Ident,
     focus_handle: FocusHandle,

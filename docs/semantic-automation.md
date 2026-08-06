@@ -57,7 +57,14 @@ A node reports:
 - measured bounds;
 - visible and focused;
 - disabled and selected;
-- hovered and pressed.
+- hovered and pressed;
+- optionally `checked`, `expanded`, `level`, `busy`, `invalid`, `required`, a
+  numeric `value_min`/`value_max`/`value_now` range, and a `value`.
+
+`value` has one meaning across the library — what a control holds, how much a
+container holds, the name of a state, or the reason a row was refused. The
+cases are spelled out in `docs/components.md`; a component that publishes
+`value` for anything else is a bug in that component, not a new case.
 
 The tree does not define a network server. Applications may serialize the
 snapshot through a debug-only transport, read it in-process, or use it directly

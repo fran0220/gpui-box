@@ -17,7 +17,12 @@ popovers:
 4. restore focus to the trigger;
 5. hand focus predictably to and from native child views.
 
-Focus is both painted and reported in the semantic tree.
+Focus is both painted and reported in the semantic tree. It is painted the same
+way everywhere: one ring in `color.interactive.focus`, sized by
+`effect.focusRingWidth` and `effect.focusRingAlpha`, applied through
+`FocusRing::focus_ring`. It is drawn as a shadow, so showing it never moves
+anything, and it is deliberately unlike the selected ring — focus says where
+the next keystroke lands, selection says which answer is current.
 
 ## Roles and names
 

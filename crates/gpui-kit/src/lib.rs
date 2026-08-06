@@ -1,8 +1,35 @@
 //! Product-neutral components and interaction primitives for GPUI.
 //!
-//! Components are `RenderOnce` builders that read [`gpui_kit_theme::Theme`]
-//! from the application context and caller-owned data. They do not know about
-//! transports, databases, credentials, or application hosts.
+//! Components read [`gpui_kit_theme::Theme`] from the application context and
+//! caller-owned data. They do not know about transports, databases,
+//! credentials, or application hosts. Anything that has to survive a frame —
+//! a text field, a menu, a dialog — is a `Render` view; everything else is a
+//! `RenderOnce` builder.
+//!
+//! # Modules
+//!
+//! - [`foundation`] — the contracts every component implements:
+//!   [`Ident`](foundation::Ident), [`Disableable`](foundation::Disableable),
+//!   [`Sizable`](foundation::Sizable), [`Selectable`](foundation::Selectable),
+//!   and the one focus ring, [`FocusRing`](foundation::FocusRing).
+//! - [`controls`] — actions and editable fields.
+//! - [`display`] — status, grouping, and waiting vocabulary.
+//! - [`navigation`] — tabs, accordions, trails, rails, and pages.
+//! - [`data`] — list, table, and tree.
+//! - [`layout`] — split panes, scroll areas, and toolbars.
+//! - [`overlay`] — anchored and modal surfaces, menus, notifications.
+//! - [`motion`] and [`effects`] — token-driven animation and paint.
+//! - [`state`] — the explicit async states a truthful surface distinguishes.
+//! - [`scenes`] — one canonical rendering per component, shared by the gallery,
+//!   the capture task, and the headless audit.
+//!
+//! # Documentation
+//!
+//! - `docs/components.md` — every component and the rules it keeps.
+//! - `docs/coverage.md` — what is provided, and what is deliberately not.
+//! - `docs/truthful-ui.md` — why a refusal is never rendered as an absence.
+//! - `docs/semantic-automation.md` — the semantic tree and what a node reports.
+//! - `docs/token-model.md` — where visible values come from.
 //!
 //! ```no_run
 //! # use gpui_kit::prelude::*;
@@ -39,7 +66,7 @@ pub mod prelude {
         Button, ButtonGroup, ButtonJoin, ButtonVariant, IconButton, IconPosition,
     };
     pub use crate::controls::combobox::{Combobox, ComboboxEvent};
-    pub use crate::controls::field::{FieldFrame, FieldState, SearchFrame, field_shell};
+    pub use crate::controls::field::{FieldState, field_shell};
     pub use crate::controls::form_field::FormField;
     pub use crate::controls::input::{TextInput, TextInputEvent};
     pub use crate::controls::number_input::{NumberInput, NumberInputEvent};
@@ -62,8 +89,8 @@ pub mod prelude {
     pub use crate::display::status::{Callout, StatusDot, StatusLine};
     pub use crate::display::tag::Tag;
     pub use crate::foundation::{
-        ActiveTheme, ControlSize, Density, Disableable, Elevation, Ident, Layer, Selectable,
-        Sizable, StyledExt, ThemeRegistry, activate_theme, set_density,
+        ActiveTheme, ControlSize, Density, Disableable, Elevation, FocusRing, Ident, Layer,
+        Selectable, Sizable, StyledExt, ThemeRegistry, activate_theme, set_density,
     };
     pub use crate::layout::{
         ScrollArea, ScrollAxis, SplitAxis, SplitPane, SplitSide, Toolbar, ToolbarItem,

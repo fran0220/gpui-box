@@ -13,8 +13,9 @@ Every component:
 
 ## Buttons
 
-`action_button` supports Primary, Ghost, and Danger variants and Small or
-Medium density. When disabled it does not register the click listener.
+`Button` supports Primary, Secondary, Ghost, Danger, and Link variants across
+the four steps of the control scale. When disabled or loading it does not
+register the click listener at all.
 
 Primary is reserved for the main action in a local decision area. Danger is
 only for destructive or irreversible intent.
@@ -29,9 +30,9 @@ Do not use Success to make an idle state look healthy.
 
 ## Cards and settings
 
-`section_card` groups related rows. `card_row` supplies spacing, separators, and
-the quiet hover wash. Identity tiles are optional. Row content must preserve
-the title when detail text is long.
+`Card` groups related rows. `ListRow` supplies spacing, separators, and the
+quiet hover wash. Identity tiles are optional. Row content must preserve the
+title when detail text is long.
 
 Settings pages use:
 

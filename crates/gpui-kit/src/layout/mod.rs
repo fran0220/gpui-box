@@ -6,7 +6,7 @@
 //! exactly what the caller says is true, so a host that refuses a change keeps
 //! showing the layout that still holds.
 
-mod measure;
+pub(crate) mod measure;
 pub mod scroll;
 pub mod split;
 pub mod toolbar;

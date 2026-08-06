@@ -35,6 +35,11 @@ pub enum TagInputEvent {
 
 impl EventEmitter<TagInputEvent> for TagInput {}
 
+/// A field that collects a set of short tokens.
+///
+/// A duplicate and a full field are refusals, shown where the typist is
+/// looking and with the typed text left in place, because a token the host
+/// will not take is not a token that silently vanished.
 pub struct TagInput {
     ident: Ident,
     focus_handle: FocusHandle,

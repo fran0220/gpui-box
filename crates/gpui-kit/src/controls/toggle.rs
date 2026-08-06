@@ -13,7 +13,7 @@ use gpui::{
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Theme};
 
-use crate::foundation::{Disableable, Ident, Selectable, Sizable, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Selectable, Sizable, StyledExt};
 
 type ToggleHandler = Rc<dyn Fn(bool, &mut Window, &mut App)>;
 type ActionHandler = Rc<dyn Fn(&mut Window, &mut App)>;
@@ -467,11 +467,7 @@ fn choice_row(
         .text_color(text_color)
         .when(disabled, |element| element.opacity(theme.opacity.disabled))
         .when(actionable, |element| {
-            element.cursor_pointer().tab_index(0).focus(|style| {
-                style
-                    .border_color(theme.colors.focus)
-                    .shadow(theme.selected_ring())
-            })
+            element.cursor_pointer().tab_index(0).focus_ring(theme)
         })
         .child(div().mt(px(1.0)).child(mark))
         .when_some(label, |element, label| {

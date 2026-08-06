@@ -24,6 +24,8 @@ use crate::overlay::layer::{Overlay, Placement, surface};
 
 use crate::{effects, motion};
 
+/// What a keystroke means to a menu-like surface, once the platform's
+/// modifier conventions have been applied.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MenuKey {
     Up,
@@ -39,6 +41,8 @@ pub enum MenuKey {
     Other,
 }
 
+/// Reads one keystroke as a menu intent, so every menu-like surface answers
+/// the same keys the same way.
 pub fn classify_key(key: &str, command: bool, control: bool) -> MenuKey {
     match key {
         "up" => MenuKey::Up,
@@ -97,6 +101,11 @@ pub fn jump_to<S: AsRef<str>>(
         })
 }
 
+/// The index `delta` steps from `active`, wrapping at the ends.
+///
+/// A menu wraps where a strip stops: the list is short, the whole of it is on
+/// screen, and arrowing off the bottom onto the top is how a menu has always
+/// behaved. A strip stops instead, which `foundation::stepping` handles.
 pub fn step(active: Option<usize>, count: usize, delta: isize) -> Option<usize> {
     if count == 0 {
         return None;
@@ -152,6 +161,7 @@ fn is_subsequence(query: &str, label: &str) -> bool {
         .all(|wanted| characters.any(|character| character == wanted))
 }
 
+/// The indices of the labels `query` answers, best answer first.
 pub fn filter_indices<S: AsRef<str>>(query: &str, labels: &[S]) -> Vec<usize> {
     let mut ranked: Vec<_> = labels
         .iter()
@@ -162,6 +172,7 @@ pub fn filter_indices<S: AsRef<str>>(query: &str, labels: &[S]) -> Vec<usize> {
     ranked.into_iter().map(|(_, index)| index).collect()
 }
 
+/// The bordered, elevated surface every anchored overlay draws.
 pub fn card(theme: &Theme) -> gpui::Div {
     div()
         .border_1()
@@ -175,6 +186,8 @@ pub fn card(theme: &Theme) -> gpui::Div {
         .text_color(theme.colors.text)
 }
 
+/// [`card`] without the inner padding, for a surface that draws its own rows
+/// edge to edge.
 pub fn card_flush(theme: &Theme) -> gpui::Div {
     card(theme).p_0()
 }
@@ -189,6 +202,7 @@ fn pinned(layer: AnyElement) -> AnyElement {
         .into_any_element()
 }
 
+/// Places `content` under `anchor`, flipping above when there is no room.
 pub fn anchored_below(id: impl Into<ElementId>, theme: &Theme, content: AnyElement) -> AnyElement {
     let content = effects::frosted(theme, theme.radii.card, content).into_any_element();
     pinned(
@@ -210,6 +224,7 @@ pub fn anchored_below(id: impl Into<ElementId>, theme: &Theme, content: AnyEleme
     )
 }
 
+/// Places `content` over `anchor`, flipping below when there is no room.
 pub fn anchored_above(id: impl Into<ElementId>, theme: &Theme, content: AnyElement) -> AnyElement {
     let content = effects::frosted(theme, theme.radii.card, content).into_any_element();
     pinned(
@@ -231,6 +246,7 @@ pub fn anchored_above(id: impl Into<ElementId>, theme: &Theme, content: AnyEleme
     )
 }
 
+/// Places `content` at a point, which is what a context menu needs.
 pub fn at(
     id: impl Into<ElementId>,
     theme: &Theme,
@@ -249,6 +265,7 @@ pub fn at(
     .into_any_element()
 }
 
+/// Places `content` in the middle of the window, over a scrim.
 pub fn modal(
     id: impl Into<ElementId>,
     theme: &Theme,
@@ -275,6 +292,8 @@ pub fn modal(
     .into_any_element()
 }
 
+/// One row of a menu-like surface, with the shared height, hover wash, and
+/// refusal treatment.
 pub fn menu_row(theme: &Theme, selected: bool, highlighted: bool) -> gpui::Div {
     div()
         .flex()
@@ -303,6 +322,7 @@ pub fn menu_row(theme: &Theme, selected: bool, highlighted: bool) -> gpui::Div {
         })
 }
 
+/// A section label inside a menu-like surface.
 pub fn heading(theme: &Theme, label: &str) -> gpui::Div {
     div()
         .px(px(theme.spacing.sm))
@@ -314,6 +334,7 @@ pub fn heading(theme: &Theme, label: &str) -> gpui::Div {
         .child(SharedString::from(tracked_upper(label)))
 }
 
+/// The hairline between two groups of menu rows.
 pub fn separator(theme: &Theme) -> gpui::Div {
     div()
         .h(px(1.0))
@@ -322,6 +343,7 @@ pub fn separator(theme: &Theme) -> gpui::Div {
         .bg(theme.colors.hairline)
 }
 
+/// The shortcut cap a menu row carries on its trailing edge.
 pub fn key_cap(theme: &Theme, label: impl Into<SharedString>) -> gpui::Div {
     div()
         .h(px(22.0))
@@ -337,6 +359,7 @@ pub fn key_cap(theme: &Theme, label: impl Into<SharedString>) -> gpui::Div {
         .child(label.into())
 }
 
+/// The surface a modal draws itself on.
 pub fn dialog_card(theme: &Theme) -> gpui::Div {
     div()
         .w(px(360.0))
@@ -351,6 +374,7 @@ pub fn dialog_card(theme: &Theme) -> gpui::Div {
         .text_color(theme.colors.text)
 }
 
+/// The one question a modal is asking.
 pub fn dialog_title(theme: &Theme, title: impl Into<SharedString>) -> gpui::Div {
     div()
         .text_size(px(15.0))
@@ -359,6 +383,7 @@ pub fn dialog_title(theme: &Theme, title: impl Into<SharedString>) -> gpui::Div 
         .child(title.into())
 }
 
+/// The detail under a modal's question.
 pub fn dialog_body(theme: &Theme, body: impl Into<SharedString>) -> gpui::Div {
     div()
         .mt(px(theme.spacing.sm))
@@ -613,6 +638,8 @@ impl Render for Popover {
     }
 }
 
+/// Upper-cases a section label and opens its letter spacing, which is the one
+/// place in the library that shouts.
 pub fn tracked_upper(label: &str) -> String {
     let mut output = String::with_capacity(label.len() * 2);
     for (index, character) in label.to_uppercase().chars().enumerate() {

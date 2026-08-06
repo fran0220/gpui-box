@@ -5,7 +5,7 @@ use gpui::{
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface};
 
-use crate::foundation::{Ident, StyledExt};
+use crate::foundation::{Ident, Selectable, StyledExt};
 
 /// A bordered panel that groups related rows or content.
 #[derive(IntoElement)]
@@ -125,7 +125,7 @@ impl ListRow {
     }
 }
 
-impl crate::foundation::Selectable for ListRow {
+impl Selectable for ListRow {
     fn selected(mut self, selected: bool) -> Self {
         self.selected = selected;
         self

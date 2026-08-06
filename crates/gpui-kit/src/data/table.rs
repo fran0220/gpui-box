@@ -30,11 +30,13 @@ use gpui::{
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Theme, TypeScale};
 
-use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
 
 type SortHandler = Rc<dyn Fn(SharedString, SortDirection, &mut Window, &mut App)>;
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 
+/// Which way a sorted column runs. The table reports a direction and renders
+/// whatever order it is handed; it never sorts the rows itself.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SortDirection {
     Ascending,
@@ -65,6 +67,7 @@ pub enum ColumnWidth {
     Flex(f32),
 }
 
+/// Where a cell's content sits inside its column.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Align {
     #[default]
@@ -375,7 +378,7 @@ impl Table {
                         .cursor_pointer()
                         .tab_index(0)
                         .hover(|style| style.text_color(theme.colors.text))
-                        .focus(|style| style.shadow(theme.selected_ring()))
+                        .focus_ring(theme)
                 })
                 .child(content);
 
@@ -451,7 +454,7 @@ impl Table {
                     .when(!selected, |element| {
                         element.hover(|style| style.bg(theme.colors.hover.opacity(0.3)))
                     })
-                    .focus(|style| style.shadow(theme.selected_ring()))
+                    .focus_ring(theme)
             });
 
         for column in &self.columns {

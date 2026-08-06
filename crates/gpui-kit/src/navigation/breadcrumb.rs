@@ -14,7 +14,7 @@ use gpui::{
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Space, TypeScale};
 
-use crate::foundation::{Ident, StyledExt};
+use crate::foundation::{FocusRing, Ident, StyledExt};
 
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 type RevealHandler = Rc<dyn Fn(Vec<SharedString>, &mut Window, &mut App)>;
@@ -176,7 +176,7 @@ impl Breadcrumb {
                     .cursor_pointer()
                     .tab_index(0)
                     .hover(|style| style.text_color(theme.colors.text))
-                    .focus(|style| style.shadow(theme.selected_ring()))
+                    .focus_ring(&theme)
             });
 
         if let (true, Some(handler)) = (actionable, self.on_select.clone()) {
@@ -229,7 +229,7 @@ impl Breadcrumb {
                     .cursor_pointer()
                     .tab_index(0)
                     .hover(|style| style.text_color(theme.colors.text))
-                    .focus(|style| style.shadow(theme.selected_ring()))
+                    .focus_ring(&theme)
             });
 
         if let Some(handler) = self.on_reveal.clone() {

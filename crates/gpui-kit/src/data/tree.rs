@@ -19,7 +19,7 @@ use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Theme};
 
-use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
 
 type ToggleHandler = Rc<dyn Fn(SharedString, bool, &mut Window, &mut App)>;
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
@@ -360,16 +360,26 @@ impl Tree {
                             glyph.with_transformation(Transformation::rotate(radians(FRAC_PI_2)))
                         }),
                 )
-                .when(toggleable, |element| element.cursor_pointer().tab_index(0));
+                .when(toggleable, |element| {
+                    element.cursor_pointer().tab_index(0).focus_ring(theme)
+                });
 
             if let (true, Some(handler)) = (toggleable, self.on_toggle.clone()) {
                 let id = node.id.clone();
                 let open = node.open;
+                let keyed = Rc::clone(&handler);
+                let keyed_id = id.clone();
                 glyph = glyph.on_click(move |_, window, cx| {
                     handler(id.clone(), !open, window, cx);
                     // A disclosure is not a selection, so the row underneath
                     // must not also report one.
                     cx.stop_propagation();
+                });
+                glyph = glyph.on_key_down(move |event, window, cx| {
+                    if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                        keyed(keyed_id.clone(), !open, window, cx);
+                        cx.stop_propagation();
+                    }
                 });
             }
 
@@ -405,7 +415,7 @@ impl Tree {
                     .when(!selected, |element| {
                         element.hover(|style| style.bg(theme.colors.hover.opacity(0.3)))
                     })
-                    .focus(|style| style.shadow(theme.selected_ring()))
+                    .focus_ring(theme)
             })
             .children(chevron)
             // A leaf still lines up with its siblings, which is what makes the

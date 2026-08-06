@@ -17,7 +17,7 @@ use gpui::{
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::ActiveTheme;
 
-use crate::foundation::{Disableable, Ident};
+use crate::foundation::{Disableable, FocusRing, Ident};
 use crate::layout::measure;
 
 /// How wide the grab area of the divider is, and how long the grip drawn
@@ -275,7 +275,7 @@ impl RenderOnce for SplitPane {
                     .cursor_pointer()
                     .tab_index(0)
                     .hover(|style| style.bg(theme.colors.hover))
-                    .focus(|style| style.shadow(theme.selected_ring()))
+                    .focus_ring(&theme)
             });
 
         // A drag has to be followed across the whole split, not just the few

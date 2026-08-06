@@ -47,6 +47,7 @@ impl SelectOption {
     }
 }
 
+/// What a [`Select`] reports. The owner decides what any of it means.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SelectEvent {
     /// The typist picked this option. The owner decides whether it holds.
@@ -57,6 +58,11 @@ pub enum SelectEvent {
 
 impl EventEmitter<SelectEvent> for Select {}
 
+/// A closed list of options with one answer.
+///
+/// The select owns only whether its menu is open. It reports the option that
+/// was picked and draws whatever the caller says is current, so a refused
+/// choice is visible as the checkmark not moving.
 pub struct Select {
     ident: Ident,
     focus_handle: FocusHandle,

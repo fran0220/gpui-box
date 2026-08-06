@@ -200,6 +200,11 @@ pub enum TextAreaEvent {
 
 impl EventEmitter<TextAreaEvent> for TextArea {}
 
+/// Wrapped, multi-line editable text.
+///
+/// Enter inserts a line and the platform modifier plus enter submits. Motion
+/// follows visual rows with a preserved goal column, and the frame grows from
+/// `rows` to `max_rows` before it scrolls rather than pushing the page around.
 pub struct TextArea {
     ident: Ident,
     focus_handle: FocusHandle,

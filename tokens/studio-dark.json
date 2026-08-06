@@ -179,6 +179,8 @@
     "glassAlphaMacos": 0.9,
     "backdropBlur": 16,
     "edgeFadeBand": 20,
-    "selectedRingAlpha": 0.09
+    "selectedRingAlpha": 0.09,
+    "focusRingWidth": 2,
+    "focusRingAlpha": 0.55
   }
 }

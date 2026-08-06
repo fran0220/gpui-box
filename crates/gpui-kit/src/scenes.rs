@@ -24,6 +24,7 @@ use crate::overlay::toast::push as toast_push;
 use crate::overlay::{Edge, Kbd, Overlay, Placement, Tooltip, Tooltipped};
 use crate::prelude::*;
 
+/// One canonical rendering, addressed by name.
 pub struct Scene {
     pub name: &'static str,
     pub build: fn(&mut Window, &mut App) -> AnyElement,
@@ -110,6 +111,10 @@ pub fn catalog() -> Vec<Scene> {
             build: context_menu,
         },
         Scene {
+            name: "popover",
+            build: popover,
+        },
+        Scene {
             name: "command-palette",
             build: command_palette,
         },
@@ -168,6 +173,7 @@ pub fn catalog() -> Vec<Scene> {
     ]
 }
 
+/// The scene registered under `name`, or `None` when nothing is.
 pub fn find(name: &str) -> Option<Scene> {
     catalog().into_iter().find(|scene| scene.name == name)
 }
@@ -301,6 +307,13 @@ fn card(_window: &mut Window, cx: &mut App) -> AnyElement {
 fn status(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)
+        .child(
+            row(&theme)
+                .child(StatusDot::new(Tone::Success))
+                .child(StatusDot::new(Tone::Warning))
+                .child(StatusDot::new(Tone::Danger))
+                .child(StatusDot::new(Tone::Neutral)),
+        )
         .child(
             StatusLine::new("Connected", Tone::Success).id("scene.status.line"),
         )
@@ -456,6 +469,7 @@ struct SceneMenus {
     menu: Entity<Menu>,
     context: Entity<ContextMenu>,
     palette: Entity<CommandPalette>,
+    popover: Entity<Popover>,
 }
 
 impl Global for SceneMenus {}
@@ -530,11 +544,46 @@ fn ensure_menus(window: &mut Window, cx: &mut App) {
     });
     palette.update(cx, |palette, cx| palette.set_query("work", cx));
 
+    let popover = cx.new(|cx| {
+        Popover::new("scene.popover.filters", window, cx)
+            .trigger("Filters")
+            .content(|_, cx| {
+                let theme = cx.theme().clone();
+                div()
+                    .column()
+                    .w(px(260.0))
+                    .gap(px(theme.spacing.sm))
+                    .child("Anything can live in a popover.")
+                    .child(
+                        Checkbox::new("scene.popover.failing")
+                            .label("Failing runs only")
+                            .on_change(|_, _, _| {}),
+                    )
+                    .into_any_element()
+            })
+    });
+    popover.update(cx, |popover, cx| popover.open(window, cx));
+
     cx.set_global(SceneMenus {
         menu,
         context,
         palette,
+        popover,
     });
+}
+
+fn popover(window: &mut Window, cx: &mut App) -> AnyElement {
+    ensure_menus(window, cx);
+    let popover = cx.global::<SceneMenus>().popover.clone();
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(520.0))
+        .h(px(320.0))
+        // The trigger keeps its place while the surface is open, because the
+        // surface is anchored to it rather than laid out beside it.
+        .child(div().child("The trigger owns whether the surface is open."))
+        .child(popover)
+        .into_any_element()
 }
 
 fn menu(window: &mut Window, cx: &mut App) -> AnyElement {
@@ -566,10 +615,13 @@ fn command_palette(window: &mut Window, cx: &mut App) -> AnyElement {
     ensure_menus(window, cx);
     let palette = cx.global::<SceneMenus>().palette.clone();
     let theme = cx.theme().clone();
+    // A palette is summoned over whatever is on screen, so it sits centred
+    // near the top of the surface rather than in a corner of it.
     stack(&theme)
-        .w(px(560.0))
+        .w_full()
         .h(px(420.0))
         .items_center()
+        .pt(px(theme.spacing.xxl))
         .child(palette)
         .into_any_element()
 }
@@ -1000,7 +1052,9 @@ fn form(window: &mut Window, cx: &mut App) -> AnyElement {
         .child(
             FormField::new("scene.form.labels.field", "Labels")
                 .control("scene.form.labels")
-                .description("Enter or comma adds one; backspace targets the last.")
+                // The keystroke lives in the hint, so the description does not
+                // spend a second line repeating it.
+                .description("At most five, and each one only once.")
                 .hint("enter")
                 .child(labels),
         )

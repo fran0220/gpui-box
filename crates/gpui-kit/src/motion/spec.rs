@@ -7,6 +7,8 @@ use gpui_kit_theme::Theme;
 
 use super::easing::{CubicBezier, Easing};
 
+/// A curve with a duration and a delay: everything one animation needs, taken
+/// from the token document rather than written beside the element.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MotionSpec {
     pub duration_ms: u64,
@@ -50,18 +52,22 @@ impl MotionSpec {
     }
 }
 
+/// How a surface that is part of the page arrives.
 pub fn entrance(theme: &Theme) -> MotionSpec {
     MotionSpec::new(theme.motion.entrance_ms, Easing::Settle.curve(theme))
 }
 
+/// How a menu opens: short, because it is answering a click.
 pub fn menu(theme: &Theme) -> MotionSpec {
     MotionSpec::new(theme.motion.menu_ms, Easing::Standard.curve(theme))
 }
 
+/// How a modal arrives: slower, because it is taking the page over.
 pub fn dialog(theme: &Theme) -> MotionSpec {
     MotionSpec::new(theme.motion.dialog_ms, Easing::Standard.curve(theme))
 }
 
+/// Fades `element` in over the entrance specification.
 pub fn fade_in<E>(id: impl Into<ElementId>, theme: &Theme, element: E) -> AnimationElement<E>
 where
     E: Styled + IntoElement + 'static,
@@ -74,6 +80,7 @@ where
     })
 }
 
+/// The opening a menu makes: a fade with a small rise.
 pub fn menu_in<E>(id: impl Into<ElementId>, theme: &Theme, element: E) -> AnimationElement<E>
 where
     E: Styled + IntoElement + 'static,
@@ -86,6 +93,7 @@ where
     })
 }
 
+/// The arrival a modal makes: a fade with a slight scale.
 pub fn dialog_in<E>(id: impl Into<ElementId>, theme: &Theme, element: E) -> AnimationElement<E>
 where
     E: Styled + IntoElement + 'static,
@@ -98,10 +106,12 @@ where
     })
 }
 
+/// The repeating wave a loading placeholder breathes on.
 pub fn pulse_wave(phase: f32) -> f32 {
     0.5 - 0.5 * (phase * std::f32::consts::TAU).cos()
 }
 
+/// The repeating opacity a gradient spinner turns on.
 pub fn gradient_opacity(phase: f32, dim: f32) -> f32 {
     let phase = phase.rem_euclid(1.0);
     if phase < 0.45 {

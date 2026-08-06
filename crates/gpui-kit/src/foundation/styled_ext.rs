@@ -1,4 +1,4 @@
-use gpui::{FontWeight, Styled, px};
+use gpui::{FontWeight, InteractiveElement, Styled, px};
 use gpui_kit_theme::{Elevation, Radius, Space, Surface, TextTone, Theme, TypeScale};
 
 /// Token-addressed styling helpers.
@@ -78,3 +78,21 @@ pub trait StyledExt: Styled + Sized {
 }
 
 impl<T: Styled + Sized> StyledExt for T {}
+
+/// The one focus treatment in the library.
+///
+/// Every keyboard-reachable element wears the same ring from the same tokens,
+/// so "the keyboard is here" looks identical whether it is on a button, a
+/// table header, or a tree row. It is a shadow rather than a border so turning
+/// focus on never reflows what is around it.
+pub trait FocusRing: InteractiveElement + Sized {
+    fn focus_ring(self, theme: &Theme) -> Self {
+        self.focus(|style| {
+            style
+                .border_color(theme.colors.focus)
+                .shadow(theme.focus_ring())
+        })
+    }
+}
+
+impl<T: InteractiveElement + Sized> FocusRing for T {}
