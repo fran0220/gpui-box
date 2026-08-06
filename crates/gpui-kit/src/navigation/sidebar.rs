@@ -20,7 +20,8 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Theme, TypeScale};
 
 use crate::display::badge::Badge;
-use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
+use crate::motion::{Flipping, flip};
 use crate::overlay::Tooltipped;
 
 /// How wide the rail is expanded, and how wide it is collapsed to glyphs.
@@ -221,6 +222,7 @@ impl Sidebar {
         item: &SidebarItem,
         level: u32,
         theme: &Theme,
+        window: &mut Window,
         cx: &mut App,
     ) -> AnyElement {
         let metrics = theme.control.get(self.size);
@@ -240,6 +242,7 @@ impl Sidebar {
         } else {
             NESTING_INDENT
         };
+        let glyph_slot = flip(ident.child("glyph").semantic_id(), cx);
 
         let mut row = div()
             .id(ident.element_id())
@@ -258,6 +261,9 @@ impl Sidebar {
             .when(active, |element| element.bg(theme.colors.selected))
             .when(disabled, |element| element.opacity(theme.opacity.disabled))
             .child(
+                // The glyph is the one thing that survives collapsing, so it
+                // travels to its narrow position rather than being redrawn
+                // there.
                 div()
                     .flex()
                     .flex_none()
@@ -266,7 +272,8 @@ impl Sidebar {
                     .children(
                         item.icon
                             .map(|glyph| icon(glyph).size(px(metrics.icon_size)).text_color(color)),
-                    ),
+                    )
+                    .flip(&glyph_slot, window, cx),
             )
             .when(!self.collapsed, |element| {
                 element
@@ -277,6 +284,7 @@ impl Sidebar {
                 element
                     .cursor_pointer()
                     .tab_index(0)
+                    .pressable(cx)
                     .hover(|style| style.bg(theme.colors.hover))
                     .focus_ring(theme)
             });
@@ -332,7 +340,7 @@ impl Sizable for Sidebar {
 }
 
 impl RenderOnce for Sidebar {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let mut body = div()
             .flex()
@@ -345,9 +353,9 @@ impl RenderOnce for Sidebar {
             let section_ident = self.ident.child(section.id.as_ref());
             let mut rows: Vec<AnyElement> = Vec::new();
             for item in &section.items {
-                rows.push(self.item_element(item, 1, &theme, cx));
+                rows.push(self.item_element(item, 1, &theme, window, cx));
                 for child in &item.children {
-                    rows.push(self.item_element(child, 2, &theme, cx));
+                    rows.push(self.item_element(child, 2, &theme, window, cx));
                 }
             }
 

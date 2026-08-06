@@ -4,6 +4,14 @@ use std::time::Duration;
 
 use super::MotionSpec;
 
+/// How far apart two neighbouring rows start, and how many rows the wave is
+/// allowed to span before it compresses instead of growing.
+const ROW_STEP_MS: u64 = 16;
+const ROW_WINDOW: usize = 8;
+
+/// The longest a row wave can last, whatever the row count.
+pub const ROW_STAGGER_CAP: Duration = Duration::from_millis(ROW_STEP_MS * (ROW_WINDOW as u64 - 1));
+
 /// Delays each item in a list so a group animates as a wave.
 ///
 /// The total is capped so a long list stays responsive: past `max_items` the
@@ -24,6 +32,15 @@ impl Stagger {
 
     pub fn from_millis(step_ms: u64) -> Self {
         Self::new(Duration::from_millis(step_ms), 12)
+    }
+
+    /// The wave a list of menu-shaped rows arrives on.
+    ///
+    /// Sixteen milliseconds a row across at most eight rows, so the last row
+    /// in a fifty-row menu starts 112ms after the first rather than a second
+    /// later: past eight rows the step shrinks to keep the window fixed.
+    pub fn rows() -> Self {
+        Self::new(Duration::from_millis(ROW_STEP_MS), ROW_WINDOW)
     }
 
     pub fn max_items(mut self, max_items: usize) -> Self {
@@ -102,6 +119,23 @@ mod tests {
     fn the_group_window_covers_the_last_items_span() {
         let stagger = Stagger::from_millis(30);
         assert_eq!(stagger.total(3, spec()), Duration::from_millis(160));
+    }
+
+    #[test]
+    fn a_row_wave_never_outlasts_its_cap() {
+        let stagger = Stagger::rows();
+        assert_eq!(stagger.delay(0, 50), Duration::ZERO);
+        for count in [2, 8, 50, 500] {
+            // Compared in whole milliseconds, which is the granularity the cap
+            // is stated in; the compressed step is a float division and lands
+            // a few tens of nanoseconds either side of it.
+            let waited = stagger.delay(count - 1, count);
+            assert!(
+                waited.as_millis() <= ROW_STAGGER_CAP.as_millis(),
+                "{count} rows waited {waited:?}"
+            );
+        }
+        assert_eq!(stagger.delay(7, 8), ROW_STAGGER_CAP);
     }
 
     #[test]

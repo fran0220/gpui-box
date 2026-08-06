@@ -3,17 +3,26 @@
 use std::time::Duration;
 
 use gpui::{Animation, AnimationElement, AnimationExt, ElementId, IntoElement, Styled, px};
-use gpui_kit_theme::Theme;
+use gpui_kit_theme::{SpringPreset, Theme};
 
+use super::Spring;
 use super::easing::{CubicBezier, Easing};
 
 /// A curve with a duration and a delay: everything one animation needs, taken
 /// from the token document rather than written beside the element.
+///
+/// A specification can carry a spring instead of a curve. Its duration is then
+/// the spring's settle time, so everything that already knows how to run a
+/// specification — [`Transition`](super::Transition),
+/// [`Presence`](super::Presence), [`Stagger`](super::Stagger) and GPUI's
+/// `with_animation` — runs a spring without knowing it is one.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MotionSpec {
     pub duration_ms: u64,
     pub delay_ms: u64,
     pub curve: CubicBezier,
+    /// Set when the specification is sprung; the curve is then unused.
+    spring: Option<Spring>,
 }
 
 impl MotionSpec {
@@ -22,12 +31,32 @@ impl MotionSpec {
             duration_ms,
             delay_ms: 0,
             curve,
+            spring: None,
+        }
+    }
+
+    /// A specification that arrives on a spring rather than along a curve.
+    ///
+    /// The duration is the spring's settle time, which is where the weight
+    /// comes from: a spring is still moving after a curve of the same nominal
+    /// length has stopped.
+    pub fn sprung(spring: Spring) -> Self {
+        let settle = spring.settle_time().as_millis() as u64;
+        Self {
+            duration_ms: settle.max(1),
+            delay_ms: 0,
+            curve: CubicBezier::new(0.0, 0.0, 1.0, 1.0),
+            spring: Some(spring),
         }
     }
 
     pub const fn with_delay(mut self, delay_ms: u64) -> Self {
         self.delay_ms = delay_ms;
         self
+    }
+
+    pub fn is_sprung(self) -> bool {
+        self.spring.is_some()
     }
 
     pub fn total(self) -> Duration {
@@ -39,12 +68,30 @@ impl MotionSpec {
         if total == 0.0 || self.duration_ms == 0 {
             return 1.0;
         }
-        let local = (raw.clamp(0.0, 1.0) * total - self.delay_ms as f32) / self.duration_ms as f32;
-        self.curve.eval(local.clamp(0.0, 1.0))
+        let local = ((raw.clamp(0.0, 1.0) * total - self.delay_ms as f32)
+            / self.duration_ms as f32)
+            .clamp(0.0, 1.0);
+        match self.spring {
+            Some(spring) => {
+                if local >= 1.0 {
+                    return 1.0;
+                }
+                spring.value(Duration::from_secs_f32(
+                    local * self.duration_ms as f32 / 1000.0,
+                ))
+            }
+            None => self.curve.eval(local),
+        }
     }
 
+    /// Adapts the specification to GPUI's animation driver.
+    ///
+    /// GPUI requires an eased delta inside 0..1, so an overshooting curve or
+    /// an underdamped spring is clamped here. Overshoot survives in
+    /// [`Transition`](super::Transition) and [`Presence`](super::Presence),
+    /// which sample [`MotionSpec::progress`] directly.
     pub fn animation(self) -> Animation {
-        Animation::new(self.total()).with_easing(move |delta| self.progress(delta))
+        Animation::new(self.total()).with_easing(move |delta| self.progress(delta).clamp(0.0, 1.0))
     }
 
     pub fn repeating(self) -> Animation {
@@ -65,6 +112,30 @@ pub fn menu(theme: &Theme) -> MotionSpec {
 /// How a modal arrives: slower, because it is taking the page over.
 pub fn dialog(theme: &Theme) -> MotionSpec {
     MotionSpec::new(theme.motion.dialog_ms, Easing::Standard.curve(theme))
+}
+
+/// How a modal arrives when it should arrive with weight: on the smooth
+/// spring, which keeps moving after a curve of the same length has stopped.
+pub fn dialog_arrival(theme: &Theme) -> MotionSpec {
+    MotionSpec::sprung(Spring::preset(theme, SpringPreset::Smooth))
+}
+
+/// How one control moves to a new state: short, because it is answering a
+/// pointer that is still on it.
+pub fn state_change(theme: &Theme) -> MotionSpec {
+    MotionSpec::new(theme.motion.quick_ms, Easing::Standard.curve(theme))
+}
+
+/// How a value that has a position moves to a new one, such as a progress
+/// fill or an opening section.
+pub fn resize(theme: &Theme) -> MotionSpec {
+    MotionSpec::new(theme.motion.resize_ms, Easing::Standard.curve(theme))
+}
+
+/// How a control that is being manipulated follows the value: the tight
+/// spring, so it feels attached rather than trailing.
+pub fn tracking(theme: &Theme) -> MotionSpec {
+    MotionSpec::sprung(Spring::preset(theme, SpringPreset::Grab))
 }
 
 /// Fades `element` in over the entrance specification.
@@ -93,17 +164,66 @@ where
     })
 }
 
-/// The arrival a modal makes: a fade with a slight scale.
+/// The arrival a modal makes: it rises onto the page on a spring, so it
+/// arrives with weight rather than simply appearing at full strength.
 pub fn dialog_in<E>(id: impl Into<ElementId>, theme: &Theme, element: E) -> AnimationElement<E>
 where
     E: Styled + IntoElement + 'static,
 {
-    element.with_animation(id, dialog(theme).animation(), |element, progress| {
+    let spec = dialog_arrival(theme);
+    element.with_animation(id, spec.animation(), |element, progress| {
         element
             .relative()
             .opacity(progress)
-            .top(px(2.0 * (1.0 - progress)))
+            .top(px(8.0 * (1.0 - progress)))
     })
+}
+
+/// The arrival one row of a menu-shaped list makes.
+///
+/// Opacity only, and deliberately so: a rise is a layout input, so a row that
+/// slid into place would publish a moving box while it travelled. The wave is
+/// [`Stagger::rows`](super::Stagger::rows), whose window is capped however
+/// long the list is.
+pub fn row_in<E>(
+    id: impl Into<ElementId>,
+    theme: &Theme,
+    index: usize,
+    count: usize,
+    element: E,
+) -> AnimationElement<E>
+where
+    E: Styled + IntoElement + 'static,
+{
+    let spec = super::Stagger::rows().spec(index, count, menu(theme));
+    element.with_animation(id, spec.animation(), |element, progress| {
+        element.opacity(progress)
+    })
+}
+
+/// The arrival a block of content makes when it replaces what was there.
+///
+/// The rise belongs on a wrapper inside the element that publishes the node,
+/// so the published box is the settled one and only the pixels travel.
+pub fn content_in<E>(id: impl Into<ElementId>, theme: &Theme, element: E) -> AnimationElement<E>
+where
+    E: Styled + IntoElement + 'static,
+{
+    element.with_animation(id, entrance(theme).animation(), |element, progress| {
+        element
+            .relative()
+            .opacity(progress)
+            .top(px(6.0 * (1.0 - progress)))
+    })
+}
+
+/// The sweep a loading placeholder's highlight travels on, as a fraction of
+/// the placeholder's own width.
+///
+/// The band starts fully off the leading edge and finishes fully off the
+/// trailing one, so a row is never left with a bright edge parked on it.
+pub fn shimmer_offset(phase: f32, band: f32) -> f32 {
+    phase.rem_euclid(1.0) * (1.0 + band) - band
 }
 
 /// The repeating wave a loading placeholder breathes on.

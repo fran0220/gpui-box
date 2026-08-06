@@ -7,7 +7,7 @@ without a window.
 |---|---|---|
 | Curve | `CubicBezier`, `Easing` | Names a shape; `Easing` resolves against the theme. |
 | Physics | `Spring` | Closed-form damped spring from stiffness, damping and mass. |
-| Specification | `MotionSpec` | A curve plus duration and delay. |
+| Specification | `MotionSpec` | A curve — or a spring, via `MotionSpec::sprung` — plus duration and delay. |
 | Value | `Interpolate` | Moves `f32`, `Pixels`, `Rems`, `Hsla`, `Point` and `Size`. |
 | State | `Transition` | Animates a value whose target can change mid-flight. |
 | Lifecycle | `Presence` | Keeps an element alive long enough to animate out. |
@@ -15,6 +15,45 @@ without a window.
 | Position | `Flipping::flip` | Slides an element from where it was to where it is. |
 | Pointer | `Pressable`, `HoverLift` | The two responses a control gives a pointer. |
 | Value | `AnimatedNumber` | Counts to a new number while publishing the target. |
+
+## What moves, where
+
+Every animation in the library is one of the layers above applied to one
+component. Anything not listed here does not move.
+
+| Component | What moves | Layer | Why |
+|---|---|---|---|
+| `Button`, `IconButton`, `SplitButton` | Sinks while held | `Pressable` | The control answers the pointer that is on it. |
+| `Checkbox` | Check draws in, mixed bar and check cross over | `Transition<Point<f32>>` on `motion.quick` | Mixed and checked are tracked separately, so the box is never momentarily empty between them. |
+| `Radio` | Dot scales in, border tints | `Transition<f32>` on `motion.quick` | The dot arrives rather than blinking on. |
+| `Switch` | Knob slides, track crossfades | `Transition<f32>` on `motion.quick` | The knob is placed by margin, so the switch is the same size at every point of the slide. |
+| `Slider` | Fill and handle follow the value | `Transition<f32>` on `spring.grab`, snapped while dragging | A value the pointer is holding must be exactly under the pointer; a value from anywhere else settles onto it. |
+| `SegmentedControl` | Selection background slides | `Flipping::flip` | One background for the whole strip, so choosing moves it rather than redrawing it elsewhere. |
+| `Select`, `Combobox`, `Menu`, `ContextMenu`, `CommandPalette` | Rows fade in as a wave | `Stagger::rows` + `motion.menu` | Opacity only: a rise is a layout input and would publish a moving box. |
+| `Tabs` | Accent underline slides | `Flipping::flip` | The indicator is one element for the strip, not one per tab. |
+| `Accordion` | Body height opens and closes | `Transition<f32>` on `motion.resize` + `layout::measure` | A settled section is laid out exactly as it was before there was motion here; only a section in flight is driven. |
+| `Sidebar` | Icon slot slides on collapse | `Flipping::flip` | The glyph is what survives collapsing, so it travels rather than being redrawn narrow. |
+| `ProgressBar` | Determinate fill moves | `Transition<f32>` on `motion.resize` | The published range is the caller's number from the frame it changes. |
+| `Skeleton` | Highlight band sweeps | `with_animation`, `motion.shimmer` | A sweep reads as work moving through the list where a pulse reads as the list blinking. |
+| `PulseLoader`, `GradientSpinner` | Cells breathe | `with_animation`, `motion.pulse` | Decorative, self-contained loops. |
+| `EmptyState`, `Callout` | Content fades and rises | `motion::content_in` | The travel is inside the element that publishes the node, so the published box never moves. |
+| `Card` | Rises on hover, sinks while held | `HoverLift`, `Pressable` | Only when the card is itself an action. |
+| `ListRow`, `List`, `Table`, `Tree` rows | Sink while held | `Pressable` | Rows get no entrance: a row scrolled into a viewport is the same row that was always there. |
+| `Dialog`, `Drawer` | Arrive on a spring, leave on a curve | `Presence` + `spring.smooth` | Arriving has weight; being dismissed is just gone. |
+| `Toast` | Slot slides when the stack reflows | `Flipping::flip` | The slot slides, not the card, because the card is already carrying its own arrival. |
+| `AnimatedNumber` | Glyphs count | `Transition<f32>` | The target is published from the frame it changes. |
+
+Deliberately still: `Tooltip`, `Badge`, `Tag` (the body of it), `Breadcrumb`,
+`Divider`, `Avatar`, `Kbd`, the split divider, and every scrim. A drag handle
+in particular gets no press response, because a handle that sank under the
+pointer would fight the drag it exists to serve.
+
+### The stagger cap
+
+`Stagger::rows` is 16ms a row across at most eight rows, so a wave never
+lasts longer than `ROW_STAGGER_CAP` — 112ms — however many rows there are.
+Past eight rows the step shrinks rather than the window growing, so a fifty-row
+menu is fully drawn in about a sixth of a second instead of most of a second.
 
 ## Motion never changes what is published
 
@@ -42,6 +81,10 @@ renders a static state when it is set; `Transition::animate` and
 caller never has to branch on it.
 
 Tests set `cx.set_reduce_motion(true)` when they need a deterministic frame.
+`crates/gpui-kit/tests/motion.rs` carries one reduced-motion test per family —
+choice controls, navigation, display, overlay — and each asserts the same
+thing: what the tree publishes on the frame a change lands on is what it
+publishes for good.
 
 ## Choosing a layer
 
@@ -152,7 +195,12 @@ Durations, the nine easing curves and the four spring presets live in
 `SpringPreset::Snappy`) rather than control points.
 
 `spring.grab` is the tight, quick-settling spring for direct manipulation: it
-drives FLIP, and anything else that has to feel attached to the pointer rather
-than trailing it. `motion.pressOffsetPx` and `motion.hoverLiftPx` are the two
+drives FLIP, the slider's follow, and anything else that has to feel attached
+to the pointer rather than trailing it. `spring.smooth` is what a dialog and a
+drawer arrive on, through `MotionSpec::sprung`, which takes its duration from
+`Spring::settle_time` so a sprung specification runs anywhere a curved one
+does. GPUI requires an eased delta inside `0..1`, so `MotionSpec::animation`
+clamps; overshoot survives in `Transition` and `Presence`, which sample
+`MotionSpec::progress` directly. `motion.pressOffsetPx` and `motion.hoverLiftPx` are the two
 pointer responses, both validated to stay within a hairline so a response can
 never be mistaken for a layout change.

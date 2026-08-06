@@ -16,7 +16,8 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space};
 
 use crate::foundation::stepping::bounded_step;
-use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
+use crate::motion::{Flipping, flip};
 
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 
@@ -169,11 +170,15 @@ fn edge(segments: &[Segment], from_start: bool) -> Option<usize> {
 }
 
 impl RenderOnce for SegmentedControl {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let metrics = theme.control.get(self.size);
         let actionable = self.actionable();
         let strip_id = self.ident.semantic_id();
+        // One background for the whole strip, drawn inside whichever segment
+        // holds. Because it is the same element from frame to frame, changing
+        // the choice moves it rather than redrawing it somewhere else.
+        let selection = flip(self.ident.child("selection").semantic_id(), cx);
 
         let segments = self
             .segments
@@ -184,11 +189,22 @@ impl RenderOnce for SegmentedControl {
                 let ident = self.ident.child(segment.id.as_ref());
                 let id = segment.id.clone();
 
+                let fill = selected.then(|| {
+                    div()
+                        .absolute()
+                        .inset_0()
+                        .radius(&theme, Radius::Control)
+                        .bg(theme.colors.raised)
+                        .shadow(theme.shadow(gpui_kit_theme::Elevation::Raised).to_vec())
+                        .flip(&selection, window, cx)
+                });
+
                 div()
                     .id(ident.element_id())
                     .row()
                     .justify_center()
                     .flex_none()
+                    .relative()
                     .h(px(metrics.height - 2.0 * theme.borders.hairline))
                     .gap(px(metrics.gap))
                     .px(px(metrics.padding_x))
@@ -201,17 +217,14 @@ impl RenderOnce for SegmentedControl {
                     } else {
                         theme.colors.text_muted
                     })
-                    .when(selected, |element| {
-                        element
-                            .bg(theme.colors.raised)
-                            .shadow(theme.shadow(gpui_kit_theme::Elevation::Raised).to_vec())
-                    })
+                    .children(fill)
                     .when(segment.disabled, |element| {
                         element.opacity(theme.opacity.disabled)
                     })
                     .when(actionable && !segment.disabled, |element| {
                         element
                             .cursor_pointer()
+                            .pressable(cx)
                             .when(!selected, |element| {
                                 element.hover(|style| style.text_color(theme.colors.text))
                             })

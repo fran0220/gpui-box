@@ -19,7 +19,7 @@ use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Theme};
 
-use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
 
 type ToggleHandler = Rc<dyn Fn(SharedString, bool, &mut Window, &mut App)>;
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
@@ -361,7 +361,11 @@ impl Tree {
                         }),
                 )
                 .when(toggleable, |element| {
-                    element.cursor_pointer().tab_index(0).focus_ring(theme)
+                    element
+                        .cursor_pointer()
+                        .tab_index(0)
+                        .pressable(cx)
+                        .focus_ring(theme)
                 });
 
             if let (true, Some(handler)) = (toggleable, self.on_toggle.clone()) {
@@ -412,6 +416,7 @@ impl Tree {
                 element
                     .cursor_pointer()
                     .tab_index(0)
+                    .pressable(cx)
                     .when(!selected, |element| {
                         element.hover(|style| style.bg(theme.colors.hover.opacity(0.3)))
                     })

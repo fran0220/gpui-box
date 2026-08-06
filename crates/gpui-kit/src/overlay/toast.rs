@@ -37,7 +37,7 @@ use crate::controls::button::Button;
 use crate::display::badge::Tone;
 use crate::display::status::StatusDot;
 use crate::foundation::{FocusRing, Ident, Sizable, StyledExt};
-use crate::motion::{Easing, MotionSpec, Phase, Presence};
+use crate::motion::{Easing, Flipping, MotionSpec, Phase, Presence, flip};
 use crate::overlay::layer::{pinned, priority, surface};
 
 /// How many toasts stand in the stack before one is evicted to make room.
@@ -414,7 +414,13 @@ impl ToastLayer {
         }
     }
 
-    fn card(&self, index: usize, theme: &Theme, cx: &mut Context<Self>) -> AnyElement {
+    fn card(
+        &self,
+        index: usize,
+        theme: &Theme,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let entry = &self.entries[index];
         let toast = &entry.toast;
         let id = toast.ident.semantic_id();
@@ -502,7 +508,7 @@ impl ToastLayer {
         let hovered = entry.hovered;
         let hover_id = id.clone();
 
-        surface(theme, Elevation::Overlay)
+        let card = surface(theme, Elevation::Overlay)
             .id(toast.ident.element_id())
             .row()
             .items_start()
@@ -546,8 +552,15 @@ impl ToastLayer {
                     .text(toast.message.clone())
                     .value(toast.tone.name())
                     .hovered(hovered),
-            )
-            .into_any_element()
+            );
+
+        // The slot the card sits in is what slides, not the card: the card is
+        // already carrying its own arrival travel, and a flip that watched
+        // that would mistake an arrival for a reorder. The slot moves only
+        // when the stack itself reflows, which is what happens when a toast
+        // in the middle of the stack leaves.
+        let slot = flip(toast.ident.child("slot").semantic_id(), cx);
+        div().child(card).flip(&slot, window, cx).into_any_element()
     }
 }
 
@@ -567,7 +580,7 @@ impl Render for ToastLayer {
         }
         let mut cards: Vec<AnyElement> = Vec::with_capacity(order.len());
         for index in order {
-            cards.push(self.card(index, &theme, cx));
+            cards.push(self.card(index, &theme, window, cx));
         }
 
         let leading = self.corner.is_leading();

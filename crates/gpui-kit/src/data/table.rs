@@ -30,7 +30,7 @@ use gpui::{
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Theme, TypeScale};
 
-use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
 
 type SortHandler = Rc<dyn Fn(SharedString, SortDirection, &mut Window, &mut App)>;
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
@@ -377,6 +377,7 @@ impl Table {
                     element
                         .cursor_pointer()
                         .tab_index(0)
+                        .pressable(cx)
                         .hover(|style| style.text_color(theme.colors.text))
                         .focus_ring(theme)
                 })
@@ -451,6 +452,7 @@ impl Table {
                 element
                     .cursor_pointer()
                     .tab_index(0)
+                    .pressable(cx)
                     .when(!selected, |element| {
                         element.hover(|style| style.bg(theme.colors.hover.opacity(0.3)))
                     })

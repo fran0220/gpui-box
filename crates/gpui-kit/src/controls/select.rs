@@ -14,7 +14,8 @@ use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space};
 
-use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
+use crate::foundation::{Disableable, Ident, Pressable, Sizable, StyledExt};
+use crate::motion;
 use crate::overlay::popover::{self, MenuKey};
 
 /// One choice, identified by business identity rather than by position.
@@ -283,7 +284,7 @@ impl Select {
             .options
             .iter()
             .enumerate()
-            .map(|(index, option)| self.row(index, option, cx))
+            .map(|(index, option)| self.row(index, option, self.options.len(), cx))
             .collect::<Vec<_>>();
 
         let list = popover::card_flush(&theme)
@@ -309,7 +310,13 @@ impl Select {
         )
     }
 
-    fn row(&self, index: usize, option: &SelectOption, cx: &mut Context<Self>) -> AnyElement {
+    fn row(
+        &self,
+        index: usize,
+        option: &SelectOption,
+        count: usize,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let theme = cx.theme().clone();
         let selected = self.selected.as_ref() == Some(&option.id);
         let active = self.active == Some(index);
@@ -324,9 +331,11 @@ impl Select {
             spec = spec.hovered(true);
         }
 
-        popover::menu_row(&theme, selected, active)
+        let row = popover::menu_row(&theme, selected, active)
             .id(ident.element_id())
-            .when(!option.disabled, |element| element.cursor_pointer())
+            .when(!option.disabled, |element| {
+                element.cursor_pointer().pressable(cx)
+            })
             .when(option.disabled, |element| {
                 element.opacity(theme.opacity.disabled)
             })
@@ -362,8 +371,9 @@ impl Select {
                     }),
                 )
             })
-            .semantic_in(cx, spec)
-            .into_any_element()
+            .semantic_in(cx, spec);
+
+        motion::row_in(ident.child("in").element_id(), &theme, index, count, row).into_any_element()
     }
 }
 

@@ -5,7 +5,7 @@
 //! exactly the space it did before and nothing beside it shifts. Both are
 //! nothing at all under [`gpui::App::reduce_motion`].
 
-use gpui::{App, InteractiveElement, StatefulInteractiveElement, Styled, px};
+use gpui::{App, InteractiveElement, StatefulInteractiveElement, StyleRefinement, Styled, px};
 use gpui_kit_theme::{ActiveTheme, Elevation};
 
 /// The response a control gives while the pointer is held on it.
@@ -36,13 +36,27 @@ pub trait HoverLift: InteractiveElement + Styled + Sized {
     /// The shadow does the work and the pixel of travel only sells it, so a
     /// theme that casts no shadow at all still gets a legible response.
     fn hover_lift(self, cx: &App) -> Self {
+        self.hover_lift_with(cx, |style| style)
+    }
+
+    /// The same lift, folded into a hover style the caller already wanted.
+    ///
+    /// GPUI allows exactly one hover style per element, so a surface that
+    /// already washes its background on hover cannot ask for the lift
+    /// separately; it asks for both at once. `wash` is applied whether or not
+    /// motion is reduced, because a colour change is not motion.
+    fn hover_lift_with(
+        self,
+        cx: &App,
+        wash: impl FnOnce(StyleRefinement) -> StyleRefinement,
+    ) -> Self {
         if cx.reduce_motion() {
-            return self;
+            return self.hover(wash);
         }
         let theme = cx.theme();
         let lift = px(-theme.motion.hover_lift);
         let shadow = theme.shadow(Elevation::Raised).to_vec();
-        self.hover(move |style| style.top(lift).shadow(shadow.clone()))
+        self.hover(move |style| wash(style).top(lift).shadow(shadow.clone()))
     }
 }
 

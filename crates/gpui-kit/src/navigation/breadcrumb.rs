@@ -14,7 +14,7 @@ use gpui::{
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Space, TypeScale};
 
-use crate::foundation::{FocusRing, Ident, StyledExt};
+use crate::foundation::{FocusRing, Ident, Pressable, StyledExt};
 
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 type RevealHandler = Rc<dyn Fn(Vec<SharedString>, &mut Window, &mut App)>;
@@ -175,6 +175,7 @@ impl Breadcrumb {
                 element
                     .cursor_pointer()
                     .tab_index(0)
+                    .pressable(cx)
                     .hover(|style| style.text_color(theme.colors.text))
                     .focus_ring(&theme)
             });
@@ -228,6 +229,7 @@ impl Breadcrumb {
                 element
                     .cursor_pointer()
                     .tab_index(0)
+                    .pressable(cx)
                     .hover(|style| style.text_color(theme.colors.text))
                     .focus_ring(&theme)
             });

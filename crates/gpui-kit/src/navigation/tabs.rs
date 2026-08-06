@@ -19,7 +19,8 @@ use gpui_kit_theme::{ActiveTheme, ControlMetrics, ControlSize, Space, Theme};
 
 use crate::display::badge::Badge;
 use crate::foundation::stepping::bounded_step;
-use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
+use crate::motion::{Flipping, flip};
 
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 
@@ -125,6 +126,7 @@ impl Tabs {
         tab: &TabItem,
         theme: &Theme,
         metrics: ControlMetrics,
+        window: &mut Window,
         cx: &mut App,
     ) -> impl IntoElement {
         let selected = self.selected.as_ref() == Some(&tab.id);
@@ -160,17 +162,28 @@ impl Tabs {
             )
             // The underline is a sibling rather than a border so an unselected
             // tab reserves the same height and nothing shifts when it is
-            // chosen.
+            // chosen. The accent bar inside it is one element for the whole
+            // strip, so choosing another tab moves it instead of putting a
+            // second one somewhere else.
             .child(
                 div()
+                    .relative()
                     .h(px(theme.borders.thick))
-                    .when(selected, |element| element.bg(theme.colors.accent)),
+                    .children(selected.then(|| {
+                        let indicator = flip(self.ident.child("indicator").semantic_id(), cx);
+                        div()
+                            .absolute()
+                            .inset_0()
+                            .bg(theme.colors.accent)
+                            .flip(&indicator, window, cx)
+                    })),
             )
             .when(disabled, |element| element.opacity(theme.opacity.disabled))
             .when(actionable, |element| {
                 element
                     .cursor_pointer()
                     .tab_index(0)
+                    .pressable(cx)
                     .hover(|style| style.text_color(theme.colors.text))
                     .focus_ring(theme)
             });
@@ -217,7 +230,7 @@ impl Sizable for Tabs {
 }
 
 impl RenderOnce for Tabs {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let metrics = theme.control.get(self.size);
 
@@ -252,7 +265,7 @@ impl RenderOnce for Tabs {
         }
 
         for tab in &self.tabs {
-            strip = strip.child(self.tab_element(tab, &theme, metrics, cx));
+            strip = strip.child(self.tab_element(tab, &theme, metrics, window, cx));
         }
 
         strip.semantic_in(cx, NodeSpec::new(self.ident.semantic_id(), Role::List))

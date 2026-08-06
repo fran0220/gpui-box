@@ -175,6 +175,10 @@ pub fn catalog() -> Vec<Scene> {
             build: motion_flip,
         },
         Scene {
+            name: "motion-state",
+            build: motion_state,
+        },
+        Scene {
             name: "animated-number",
             build: animated_number,
         },
@@ -1754,6 +1758,103 @@ fn motion_flip(window: &mut Window, cx: &mut App) -> AnyElement {
                 .text_size(px(theme.typography.caption.size))
                 .text_color(theme.colors.text_muted)
                 .child("Rows land in their new slot at once and slide into it."),
+        )
+        .into_any_element()
+}
+
+/// Which way every state in the state-transition scene is currently pointing.
+///
+/// One flag drives all of them, so a reviewer flips the whole row at once and
+/// watches a check draw, a knob slide, an indicator travel and a section open
+/// on the same frame.
+#[derive(Debug)]
+struct SceneStates {
+    forward: bool,
+}
+
+impl Global for SceneStates {}
+
+fn motion_state(_window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<SceneStates>() {
+        cx.set_global(SceneStates { forward: false });
+    }
+    let forward = cx.global::<SceneStates>().forward;
+    let theme = cx.theme().clone();
+
+    stack(&theme)
+        .w(px(460.0))
+        .child(
+            row(&theme).child(
+                Button::new("scene.state.flip")
+                    .label("Flip every state")
+                    .secondary()
+                    .on_click(|_, cx| {
+                        cx.update_global::<SceneStates, ()>(|state, _| {
+                            state.forward = !state.forward
+                        });
+                        cx.refresh_windows();
+                    }),
+            ),
+        )
+        .child({
+            let terms = Checkbox::new("scene.state.terms").label("Accept the terms");
+            if forward {
+                terms.checked(true)
+            } else {
+                terms.mixed()
+            }
+            .on_change(|_, _, _| {})
+        })
+        .child(
+            Radio::new("scene.state.plan")
+                .label("Bill monthly")
+                .selected(forward)
+                .on_select(|_, _| {}),
+        )
+        .child(
+            Switch::new("scene.state.notify")
+                .label("Send run notifications")
+                .on(forward)
+                .on_change(|_, _, _| {}),
+        )
+        .child(
+            SegmentedControl::new("scene.state.view")
+                .segments(vec![
+                    Segment::new("list", "List"),
+                    Segment::new("grid", "Grid"),
+                ])
+                .selected(if forward { "grid" } else { "list" })
+                .on_select(|_, _, _| {}),
+        )
+        .child(
+            Tabs::new("scene.state.tabs")
+                .tabs(vec![
+                    TabItem::new("overview", "Overview"),
+                    TabItem::new("runs", "Runs"),
+                ])
+                .selected(if forward { "runs" } else { "overview" })
+                .on_select(|_, _, _| {}),
+        )
+        .child(
+            ProgressBar::new("scene.state.progress")
+                .label("Uploading artifacts")
+                .fraction(if forward { 0.86 } else { 0.12 }),
+        )
+        .child(
+            Accordion::new("scene.state.sections")
+                .expanded_ids(if forward { &["retention"][..] } else { &[][..] })
+                .on_toggle(|_, _, _, _| {})
+                .section(
+                    AccordionSection::new("retention", "Retention")
+                        .description("How long verified results are kept")
+                        .body(div().child("Results are kept in the workspace for 30 days.")),
+                ),
+        )
+        .child(
+            div()
+                .text_size(px(theme.typography.caption.size))
+                .text_color(theme.colors.text_muted)
+                .child("Every state settles within a fifth of a second; the values are published the moment they change."),
         )
         .into_any_element()
 }

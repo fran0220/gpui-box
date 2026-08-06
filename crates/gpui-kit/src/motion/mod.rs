@@ -34,11 +34,13 @@ pub use flip::{Flip, Flipped, Flipping, flip, tracked_ids};
 pub use interpolate::Interpolate;
 pub use presence::{Phase, Presence};
 pub use spec::{
-    MotionSpec, dialog, dialog_in, entrance, fade_in, gradient_opacity, menu, menu_in, pulse_wave,
+    MotionSpec, content_in, dialog, dialog_arrival, dialog_in, entrance, fade_in, gradient_opacity,
+    menu, menu_in, pulse_wave, resize, row_in, shimmer_offset, state_change, tracking,
 };
 pub use spring::Spring;
-pub use stagger::{Stagger, staggered_phase};
+pub use stagger::{ROW_STAGGER_CAP, Stagger, staggered_phase};
 pub use transition::Transition;
+pub(crate) use transition::{tracked, tracked_or_snap};
 
 pub use gpui::AnimationExt;
 

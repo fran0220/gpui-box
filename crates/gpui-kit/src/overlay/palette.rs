@@ -17,7 +17,8 @@ use gpui_kit_theme::{ActiveTheme, Elevation, Space, TypeScale};
 
 use crate::controls::input::{TextInput, TextInputEvent};
 use crate::display::empty::{EmptyKind, EmptyState};
-use crate::foundation::{Ident, StyledExt};
+use crate::foundation::{Ident, Pressable, StyledExt};
+use crate::motion;
 use crate::overlay::kbd::Kbd;
 use crate::overlay::layer::surface;
 use crate::overlay::popover::{self, MenuKey};
@@ -318,8 +319,9 @@ impl CommandPalette {
         let results_id = self.ident.child("results").semantic_id();
         let mut section: Option<SharedString> = None;
         let mut rows: Vec<gpui::AnyElement> = Vec::with_capacity(ordered.len());
+        let count = ordered.len();
 
-        for index in ordered {
+        for (position, index) in ordered.into_iter().enumerate() {
             let command = &self.commands[index];
             if command.section != section {
                 section = command.section.clone();
@@ -357,36 +359,44 @@ impl CommandPalette {
                 spec = spec.value(reason.clone());
             }
 
-            rows.push(
-                popover::menu_row(&theme, false, active)
-                    .id(row_ident.element_id())
-                    .when(available, |element| element.cursor_pointer())
-                    .when(!available, |element| {
-                        element.opacity(theme.opacity.disabled)
-                    })
-                    .child(div().flex_1().child(command.label.clone()))
-                    .children(command.reason().map(|reason| {
-                        div()
-                            .type_scale(&theme, TypeScale::Caption)
-                            .text_color(theme.colors.warning)
-                            .child(reason.clone())
-                    }))
-                    .children(
-                        command
-                            .shortcut
-                            .clone()
-                            .map(|keystroke| Kbd::new(keystroke).into_any_element()),
+            let row = popover::menu_row(&theme, false, active)
+                .id(row_ident.element_id())
+                .when(available, |element| element.cursor_pointer().pressable(cx))
+                .when(!available, |element| {
+                    element.opacity(theme.opacity.disabled)
+                })
+                .child(div().flex_1().child(command.label.clone()))
+                .children(command.reason().map(|reason| {
+                    div()
+                        .type_scale(&theme, TypeScale::Caption)
+                        .text_color(theme.colors.warning)
+                        .child(reason.clone())
+                }))
+                .children(
+                    command
+                        .shortcut
+                        .clone()
+                        .map(|keystroke| Kbd::new(keystroke).into_any_element()),
+                )
+                .when(available, |element| {
+                    element.on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(move |palette, _, _, cx| {
+                            palette.choose(id.clone(), cx);
+                        }),
                     )
-                    .when(available, |element| {
-                        element.on_mouse_down(
-                            MouseButton::Left,
-                            cx.listener(move |palette, _, _, cx| {
-                                palette.choose(id.clone(), cx);
-                            }),
-                        )
-                    })
-                    .semantic_in(cx, spec)
-                    .into_any_element(),
+                })
+                .semantic_in(cx, spec);
+
+            rows.push(
+                motion::row_in(
+                    row_ident.child("in").element_id(),
+                    &theme,
+                    position,
+                    count,
+                    row,
+                )
+                .into_any_element(),
             );
         }
 

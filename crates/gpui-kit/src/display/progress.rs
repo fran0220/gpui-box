@@ -60,9 +60,20 @@ impl ProgressBar {
 }
 
 impl RenderOnce for ProgressBar {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let indeterminate = self.fraction.is_none();
+        // The published range stays the caller's number from the frame it
+        // changes; only the fill takes its time getting there.
+        let drawn = self.fraction.map(|fraction| {
+            motion::tracked(
+                &self.ident.semantic_id(),
+                fraction,
+                motion::resize(&theme),
+                window,
+                cx,
+            )
+        });
 
         let mut spec = NodeSpec::new(self.ident.semantic_id(), Role::Progress).busy(true);
         if let Some(fraction) = self.fraction {
@@ -102,7 +113,7 @@ impl RenderOnce for ProgressBar {
                     .rounded_full()
                     .overflow_hidden()
                     .bg(theme.colors.hairline_strong)
-                    .when_some(self.fraction, |element, fraction| {
+                    .when_some(drawn, |element, fraction| {
                         element.child(
                             div()
                                 .absolute()

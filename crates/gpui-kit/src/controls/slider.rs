@@ -11,6 +11,16 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Space};
 
 use crate::foundation::{Disableable, FocusRing, Ident, Sizable};
 use crate::layout::measure;
+use crate::motion::{self, keyed};
+
+/// Set by the slider's own pointer handlers, and cleared by the render that
+/// reads it.
+///
+/// A value the pointer is holding must be exactly under the pointer, so the
+/// spring is skipped for a change this slider caused itself and used for one
+/// that arrived from anywhere else.
+#[derive(Default)]
+struct PointerDriven(bool);
 
 type ChangeHandler = Rc<dyn Fn(f32, &mut Window, &mut App)>;
 
@@ -127,11 +137,20 @@ impl Sizable for Slider {
 }
 
 impl RenderOnce for Slider {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let metrics = theme.control.get(self.size);
         let actionable = !self.disabled && self.on_change.is_some();
-        let fraction = self.fraction();
+        let dragging = keyed::slot::<PointerDriven>(&self.ident.semantic_id(), cx);
+        let snap = std::mem::take(&mut dragging.borrow_mut().0);
+        let fraction = motion::tracked_or_snap(
+            &self.ident.semantic_id(),
+            self.fraction(),
+            motion::tracking(&theme),
+            snap,
+            window,
+            cx,
+        );
         let track_height = px(4.0);
         // The handle is the control's only tappable part, so it is sized from
         // the same scale step the other controls take their glyphs from.
@@ -188,12 +207,14 @@ impl RenderOnce for Slider {
             let (min, max, step) = (self.min, self.max, self.step);
             let down = Rc::clone(&handler);
             let down_bounds = Rc::clone(&measured);
+            let down_dragging = Rc::clone(&dragging);
             track = track.on_mouse_down(MouseButton::Left, move |event, window, cx| {
                 let bounds = down_bounds.get();
                 let width = f32::from(bounds.size.width);
                 if width <= 0.0 {
                     return;
                 }
+                down_dragging.borrow_mut().0 = true;
                 let fraction =
                     (f32::from(event.position.x - bounds.left()) / width).clamp(0.0, 1.0);
                 down(
@@ -208,6 +229,7 @@ impl RenderOnce for Slider {
             // track, which is what a mouse reports without a captured drag
             // payload. Leaving the track ends the drag.
             let move_bounds = Rc::clone(&measured);
+            let move_dragging = Rc::clone(&dragging);
             track = track.on_mouse_move(move |event, window, cx| {
                 if event.pressed_button != Some(MouseButton::Left) {
                     return;
@@ -217,6 +239,7 @@ impl RenderOnce for Slider {
                 if width <= 0.0 {
                     return;
                 }
+                move_dragging.borrow_mut().0 = true;
                 let fraction =
                     (f32::from(event.position.x - bounds.left()) / width).clamp(0.0, 1.0);
                 drag(

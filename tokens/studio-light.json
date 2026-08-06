@@ -156,6 +156,7 @@
       "resize": 200,
       "entrance": 500,
       "pulse": 2400,
+      "shimmer": 1400,
       "toast": 6000
     },
     "easing": {

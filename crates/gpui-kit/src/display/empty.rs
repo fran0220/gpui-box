@@ -13,6 +13,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Space};
 
 use crate::foundation::Ident;
+use crate::motion;
 
 /// Which fact the surface is reporting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -89,13 +90,12 @@ impl RenderOnce for EmptyState {
             EmptyKind::Failed => (Icon::Danger, theme.colors.danger),
         };
 
-        div()
+        let content = div()
             .flex()
             .flex_col()
             .items_center()
             .justify_center()
             .gap(px(theme.space(Space::Sm)))
-            .p(px(theme.space(Space::Lg)))
             .w_full()
             .text_align(gpui::TextAlign::Center)
             .child(icon(glyph).size(px(20.0)).text_color(tint))
@@ -114,7 +114,22 @@ impl RenderOnce for EmptyState {
                         .child(detail),
                 )
             })
-            .children(self.action)
+            .children(self.action);
+
+        // The rise happens inside the element that publishes the node, so the
+        // published box is the settled one and only the pixels travel.
+        div()
+            .flex()
+            .flex_col()
+            .items_center()
+            .justify_center()
+            .p(px(theme.space(Space::Lg)))
+            .w_full()
+            .child(motion::content_in(
+                self.ident.child("in").element_id(),
+                &theme,
+                content,
+            ))
             .semantic_in(
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::Status)

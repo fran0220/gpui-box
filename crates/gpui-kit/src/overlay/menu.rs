@@ -21,7 +21,8 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Space, Theme};
 
 use crate::controls::button::{Button, ButtonJoin, ButtonVariant};
-use crate::foundation::{Ident, Sizable, StyledExt};
+use crate::foundation::{Ident, Pressable, Sizable, StyledExt};
+use crate::motion;
 use crate::overlay::focus::FocusTrap;
 use crate::overlay::kbd::Kbd;
 use crate::overlay::layer::{Overlay, Placement, surface};
@@ -390,6 +391,8 @@ fn panel<V: 'static>(
                 parent.clone(),
                 active == Some(index),
                 opened == Some(index),
+                index,
+                items.len(),
                 theme,
                 cx,
                 activate.clone(),
@@ -412,6 +415,8 @@ fn row<V: 'static>(
     parent: SharedString,
     active: bool,
     opened: bool,
+    index: usize,
+    count: usize,
     theme: &Theme,
     cx: &mut Context<V>,
     activate: Activate<V>,
@@ -457,46 +462,49 @@ fn row<V: 'static>(
                 (None, glyph) => glyph,
             };
 
-            popover::menu_row(theme, false, active || opened)
-                .id(row_ident.element_id())
-                .when(!item.disabled, |element| element.cursor_pointer())
-                .when(item.disabled, |element| {
-                    element.opacity(theme.opacity.disabled)
-                })
-                .child(
-                    div()
-                        .flex()
-                        .flex_none()
-                        .w(px(GLYPH_SLOT))
-                        .justify_center()
-                        .children(
-                            glyph.map(|glyph| {
+            let row =
+                popover::menu_row(theme, false, active || opened)
+                    .id(row_ident.element_id())
+                    .when(!item.disabled, |element| {
+                        element.cursor_pointer().pressable(cx)
+                    })
+                    .when(item.disabled, |element| {
+                        element.opacity(theme.opacity.disabled)
+                    })
+                    .child(
+                        div()
+                            .flex()
+                            .flex_none()
+                            .w(px(GLYPH_SLOT))
+                            .justify_center()
+                            .children(glyph.map(|glyph| {
                                 icon(glyph).size(px(14.0)).text_color(theme.colors.text)
+                            })),
+                    )
+                    .child(div().flex_1().child(item.label.clone()))
+                    .children(
+                        item.shortcut
+                            .clone()
+                            .map(|keystroke| Kbd::new(keystroke).into_any_element()),
+                    )
+                    .when(submenu, |element| {
+                        element.child(
+                            icon(Icon::AltArrowRight)
+                                .size(px(12.0))
+                                .text_color(theme.colors.text_muted),
+                        )
+                    })
+                    .when(!item.disabled, |element| {
+                        element.on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |view, _, window, cx| {
+                                activate(view, path.clone(), window, cx);
                             }),
-                        ),
-                )
-                .child(div().flex_1().child(item.label.clone()))
-                .children(
-                    item.shortcut
-                        .clone()
-                        .map(|keystroke| Kbd::new(keystroke).into_any_element()),
-                )
-                .when(submenu, |element| {
-                    element.child(
-                        icon(Icon::AltArrowRight)
-                            .size(px(12.0))
-                            .text_color(theme.colors.text_muted),
-                    )
-                })
-                .when(!item.disabled, |element| {
-                    element.on_mouse_down(
-                        MouseButton::Left,
-                        cx.listener(move |view, _, window, cx| {
-                            activate(view, path.clone(), window, cx);
-                        }),
-                    )
-                })
-                .semantic_in(cx, spec)
+                        )
+                    })
+                    .semantic_in(cx, spec);
+
+            motion::row_in(row_ident.child("in").element_id(), theme, index, count, row)
                 .into_any_element()
         }
     }

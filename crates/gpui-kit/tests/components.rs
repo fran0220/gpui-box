@@ -268,3 +268,64 @@ fn compact_density_shrinks_a_rendered_control(cx: &mut TestAppContext) {
     let compact = harness.bounds("settings.save").expect("measured button");
     assert!(compact.size.height < comfortable.size.height);
 }
+
+#[gpui::test]
+fn a_card_becomes_an_action_only_when_it_is_given_one(cx: &mut TestAppContext) {
+    let taken = Rc::new(Cell::new(0));
+    let sink = taken.clone();
+    let mut harness = harness(cx, move |_, _| {
+        let sink = sink.clone();
+        div()
+            .child(Card::new().id("plans.free").child(div().child("Free")))
+            .child(
+                Card::new()
+                    .id("plans.team")
+                    .on_click(move |_, _| sink.set(sink.get() + 1))
+                    .child(div().child("Team")),
+            )
+            .into_any_element()
+    });
+
+    let snapshot = harness.snapshot();
+    assert_eq!(
+        present(&snapshot, "plans.free").expect("card").role,
+        Role::Group,
+        "a card nobody can act on stays a grouping"
+    );
+    assert_eq!(
+        present(&snapshot, "plans.team").expect("card").role,
+        Role::Button
+    );
+
+    harness.click("plans.free");
+    assert_eq!(taken.get(), 0);
+    harness.click("plans.team");
+    assert_eq!(taken.get(), 1);
+}
+
+#[gpui::test]
+fn an_actionable_row_reports_itself_and_stays_a_row(cx: &mut TestAppContext) {
+    let taken = Rc::new(Cell::new(0));
+    let sink = taken.clone();
+    let mut harness = harness(cx, move |_, _| {
+        let sink = sink.clone();
+        Card::new()
+            .id("providers")
+            .child(
+                ListRow::new()
+                    .id("providers.anthropic")
+                    .first(true)
+                    .on_click(move |_, _| sink.set(sink.get() + 1))
+                    .child(div().child("Anthropic")),
+            )
+            .into_any_element()
+    });
+
+    assert_eq!(
+        harness.node("providers.anthropic").expect("row").role,
+        Role::Row,
+        "acting on a row does not stop it being a row"
+    );
+    harness.click("providers.anthropic");
+    assert_eq!(taken.get(), 1);
+}

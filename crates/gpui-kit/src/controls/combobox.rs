@@ -19,7 +19,8 @@ use crate::controls::field::{FieldState, field_shell};
 use crate::controls::input::{TextInput, TextInputEvent};
 use crate::controls::select::SelectOption;
 use crate::display::empty::{EmptyKind, EmptyState};
-use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
+use crate::foundation::{Disableable, Ident, Pressable, Sizable, StyledExt};
+use crate::motion;
 use crate::overlay::popover::{self, MenuKey};
 
 /// How wide the list gets before it stops growing, and how tall before it
@@ -389,11 +390,9 @@ impl Combobox {
         } else {
             div()
                 .column()
-                .children(
-                    matches
-                        .iter()
-                        .map(|index| self.row(*index, highlighted, cx)),
-                )
+                .children(matches.iter().enumerate().map(|(position, index)| {
+                    self.row(*index, highlighted, position, matches.len(), cx)
+                }))
                 .into_any_element()
         };
 
@@ -419,16 +418,25 @@ impl Combobox {
         )
     }
 
-    fn row(&self, index: usize, highlighted: Option<usize>, cx: &mut Context<Self>) -> AnyElement {
+    fn row(
+        &self,
+        index: usize,
+        highlighted: Option<usize>,
+        position: usize,
+        count: usize,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let theme = cx.theme().clone();
         let option = &self.options[index];
         let selected = self.selected.as_ref() == Some(&option.id);
         let active = highlighted == Some(index);
         let ident = self.ident.child(option.id.as_ref());
 
-        popover::menu_row(&theme, selected, active)
+        let row = popover::menu_row(&theme, selected, active)
             .id(ident.element_id())
-            .when(!option.disabled, |element| element.cursor_pointer())
+            .when(!option.disabled, |element| {
+                element.cursor_pointer().pressable(cx)
+            })
             .when(option.disabled, |element| {
                 element.opacity(theme.opacity.disabled)
             })
@@ -469,7 +477,9 @@ impl Combobox {
                     .disabled(option.disabled)
                     .hovered(active)
                     .text(option.label.clone()),
-            )
+            );
+
+        motion::row_in(ident.child("in").element_id(), &theme, position, count, row)
             .into_any_element()
     }
 }

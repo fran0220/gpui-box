@@ -506,3 +506,29 @@ fn a_refused_node_reports_nothing(cx: &mut TestAppContext) {
             .disabled
     );
 }
+
+#[gpui::test]
+fn a_virtualized_row_is_settled_on_the_frame_it_first_renders(cx: &mut TestAppContext) {
+    // A row that entered a viewport is not an arrival, it is the same row that
+    // was always there, so it gets no entrance and nothing about it is still
+    // moving on the next frame.
+    let data: Data = Rc::new(RefCell::new(records(4)));
+    let (mut harness, _calls) = list(cx, data.clone(), "record-0000", &[]);
+
+    harness.update({
+        let data = data.clone();
+        move |_, cx| {
+            data.borrow_mut()
+                .insert(0, ("record-new".into(), "Fixture record new".into()));
+            cx.refresh_windows();
+        }
+    });
+    let arrived: Vec<Node> = rows_of(&mut harness, "data.list");
+
+    harness.advance(std::time::Duration::from_millis(400));
+    assert_eq!(
+        rows_of(&mut harness, "data.list"),
+        arrived,
+        "a row must be where it belongs on the frame it appears"
+    );
+}

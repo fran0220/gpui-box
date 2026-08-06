@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use gpui::{
     AnyElement, App, InteractiveElement, IntoElement, ParentElement, RenderOnce, Styled, Window,
     div, prelude::FluentBuilder, px,
@@ -5,7 +7,9 @@ use gpui::{
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface};
 
-use crate::foundation::{Ident, Selectable, StyledExt};
+use crate::foundation::{FocusRing, HoverLift, Ident, Pressable, Selectable, StyledExt};
+
+type ClickHandler = Rc<dyn Fn(&mut Window, &mut App)>;
 
 /// A bordered panel that groups related rows or content.
 #[derive(IntoElement)]
@@ -13,6 +17,7 @@ pub struct Card {
     ident: Option<Ident>,
     children: Vec<AnyElement>,
     padded: bool,
+    on_click: Option<ClickHandler>,
 }
 
 impl std::fmt::Debug for Card {
@@ -37,6 +42,7 @@ impl Card {
             ident: None,
             children: Vec::new(),
             padded: false,
+            on_click: None,
         }
     }
 
@@ -51,6 +57,20 @@ impl Card {
         self.padded = padded;
         self
     }
+
+    /// Makes the whole card one action.
+    ///
+    /// Only a card that carries an identity can be one: an action nothing can
+    /// address is an action no test and no reader can reach, so the handler is
+    /// ignored without [`Card::id`].
+    pub fn on_click(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
+        self.on_click = Some(Rc::new(handler));
+        self
+    }
+
+    fn actionable(&self) -> bool {
+        self.ident.is_some() && self.on_click.is_some()
+    }
 }
 
 impl ParentElement for Card {
@@ -62,7 +82,8 @@ impl ParentElement for Card {
 impl RenderOnce for Card {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        div()
+        let actionable = self.actionable();
+        let frame = div()
             .w_full()
             .radius(&theme, Radius::Card)
             .hairline(&theme)
@@ -70,10 +91,40 @@ impl RenderOnce for Card {
             .overflow_hidden()
             .column()
             .when(self.padded, |element| element.p_token(&theme, Space::Lg))
-            .children(self.children)
-            .when_some(self.ident, |element, ident| {
-                element.semantic_in(cx, NodeSpec::new(ident.semantic_id(), Role::Group))
-            })
+            .children(self.children);
+
+        let Some(ident) = self.ident else {
+            return frame.into_any_element();
+        };
+        if !actionable {
+            return frame
+                .semantic_in(cx, NodeSpec::new(ident.semantic_id(), Role::Group))
+                .into_any_element();
+        }
+
+        // A card is a surface, so it is the one place in the library where
+        // rising off the page reads as a response rather than as a component
+        // climbing out of its own frame.
+        let mut card = frame
+            .id(ident.element_id())
+            .cursor_pointer()
+            .tab_index(0)
+            .focus_ring(&theme)
+            .hover_lift(cx)
+            .pressable(cx);
+        let handler = self.on_click.clone().expect("an actionable card has one");
+        let click = Rc::clone(&handler);
+        card.interactivity()
+            .on_click(move |_, window, cx| click(window, cx));
+        card.interactivity().on_key_down(move |event, window, cx| {
+            if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                handler(window, cx);
+                cx.stop_propagation();
+            }
+        });
+
+        card.semantic_in(cx, NodeSpec::new(ident.semantic_id(), Role::Button))
+            .into_any_element()
     }
 }
 
@@ -84,6 +135,7 @@ pub struct ListRow {
     first: bool,
     selected: bool,
     children: Vec<AnyElement>,
+    on_click: Option<ClickHandler>,
 }
 
 impl std::fmt::Debug for ListRow {
@@ -110,6 +162,7 @@ impl ListRow {
             first: false,
             selected: false,
             children: Vec::new(),
+            on_click: None,
         }
     }
 
@@ -122,6 +175,16 @@ impl ListRow {
     pub fn first(mut self, first: bool) -> Self {
         self.first = first;
         self
+    }
+
+    /// Makes the row one action, which it can only be once it has an identity.
+    pub fn on_click(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
+        self.on_click = Some(Rc::new(handler));
+        self
+    }
+
+    fn actionable(&self) -> bool {
+        self.ident.is_some() && self.on_click.is_some()
     }
 }
 
@@ -142,7 +205,8 @@ impl RenderOnce for ListRow {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let selected = self.selected;
-        div()
+        let actionable = self.actionable();
+        let row = div()
             .w_full()
             .px(px(theme.spacing.lg + theme.spacing.xs))
             .py(px(theme.spacing.md + 2.0))
@@ -157,12 +221,35 @@ impl RenderOnce for ListRow {
             })
             .row()
             .gap(px(theme.spacing.md + 2.0))
-            .children(self.children)
-            .when_some(self.ident, |element, ident| {
-                element.semantic_in(
-                    cx,
-                    NodeSpec::new(ident.semantic_id(), Role::Row).selected(selected),
-                )
-            })
+            .children(self.children);
+
+        let Some(ident) = self.ident else {
+            return row.into_any_element();
+        };
+        let spec = NodeSpec::new(ident.semantic_id(), Role::Row).selected(selected);
+        if !actionable {
+            return row.semantic_in(cx, spec).into_any_element();
+        }
+
+        // A row lives inside a card's frame, so it takes the press response
+        // and not the lift: a row that rose would leave the frame it belongs
+        // to.
+        let mut row = row
+            .id(ident.element_id())
+            .cursor_pointer()
+            .tab_index(0)
+            .focus_ring(&theme)
+            .pressable(cx);
+        let handler = self.on_click.clone().expect("an actionable row has one");
+        let click = Rc::clone(&handler);
+        row.interactivity()
+            .on_click(move |_, window, cx| click(window, cx));
+        row.interactivity().on_key_down(move |event, window, cx| {
+            if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                handler(window, cx);
+                cx.stop_propagation();
+            }
+        });
+        row.semantic_in(cx, spec).into_any_element()
     }
 }

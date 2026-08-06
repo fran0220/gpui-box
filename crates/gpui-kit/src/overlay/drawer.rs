@@ -19,7 +19,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Elevation, Space, Theme};
 
 use crate::foundation::{Ident, StyledExt};
-use crate::motion::{Easing, MotionSpec, Phase, Presence};
+use crate::motion::{self, Easing, MotionSpec, Phase, Presence};
 use crate::overlay::focus::FocusTrap;
 use crate::overlay::layer::{Edge, Overlay, surface};
 use crate::overlay::panel::{self, Body};
@@ -268,8 +268,10 @@ impl Drawer {
     }
 }
 
+/// A drawer is a heavy thing being pulled out, so it arrives on a spring and
+/// leaves on a curve: the pull has weight, the dismissal is just gone.
 fn enter_spec(theme: &Theme) -> MotionSpec {
-    MotionSpec::new(theme.motion.dialog_ms, Easing::Emphasized.curve(theme))
+    motion::dialog_arrival(theme)
 }
 
 fn exit_spec(theme: &Theme) -> MotionSpec {

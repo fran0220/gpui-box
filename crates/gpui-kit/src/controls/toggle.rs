@@ -8,12 +8,13 @@ use std::rc::Rc;
 
 use gpui::{
     AnyElement, App, Hsla, InteractiveElement, IntoElement, ParentElement, RenderOnce,
-    SharedString, Styled, Window, div, prelude::FluentBuilder, px,
+    SharedString, Styled, Window, div, point, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Theme};
 
-use crate::foundation::{Disableable, FocusRing, Ident, Selectable, Sizable, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Selectable, Sizable, StyledExt};
+use crate::motion::{self, Interpolate};
 
 type ToggleHandler = Rc<dyn Fn(bool, &mut Window, &mut App)>;
 type ActionHandler = Rc<dyn Fn(&mut Window, &mut App)>;
@@ -107,7 +108,7 @@ impl Sizable for Checkbox {
 }
 
 impl RenderOnce for Checkbox {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let metrics = theme.control.get(self.size);
         let actionable = self.actionable();
@@ -115,39 +116,57 @@ impl RenderOnce for Checkbox {
         let on = self.checked.unwrap_or(false);
         let mixed = self.checked.is_none();
 
+        // The two marks are tracked separately so mixed and checked can cross
+        // over each other: the bar shrinks while the check draws, and the box
+        // is never momentarily empty between the two states.
+        let drawn = motion::tracked(
+            &self.ident.semantic_id(),
+            point(f32::from(u8::from(on)), f32::from(u8::from(mixed))),
+            motion::state_change(&theme),
+            window,
+            cx,
+        );
+        let filled = drawn.x.max(drawn.y);
+
         let mark = div()
             .size(side)
             .flex()
             .items_center()
             .justify_center()
             .flex_none()
+            .relative()
             .radius(&theme, Radius::Small)
             .border(px(theme.borders.hairline))
-            .border_color(if on || mixed {
-                theme.colors.accent
-            } else {
-                theme.colors.hairline_strong
-            })
-            .when(on || mixed, |element| element.bg(theme.colors.accent))
-            .when(mixed, |element| {
+            .border_color(
+                theme
+                    .colors
+                    .hairline_strong
+                    .lerp(theme.colors.accent, filled),
+            )
+            .bg(theme.colors.accent.opacity(filled))
+            .when(drawn.y > 0.0, |element| {
                 element.child(
                     div()
-                        .w(side * 0.5)
+                        .absolute()
+                        .w(side * 0.5 * drawn.y)
                         .h(px(theme.borders.thick))
                         .bg(theme.colors.text_on_accent),
                 )
             })
-            .when(on, |element| {
+            .when(drawn.x > 0.0, |element| {
                 element.child(
-                    gpui_kit_assets::icon(gpui_kit_assets::Icon::Check)
-                        .size(side * 0.8)
-                        .text_color(theme.colors.text_on_accent),
+                    div().absolute().opacity(drawn.x).child(
+                        gpui_kit_assets::icon(gpui_kit_assets::Icon::Check)
+                            .size(side * (0.4 + 0.4 * drawn.x))
+                            .text_color(theme.colors.text_on_accent),
+                    ),
                 )
             });
 
         let next = !on;
         choice_row(
             &theme,
+            cx,
             self.ident.clone(),
             mark.into_any_element(),
             self.label.clone(),
@@ -249,11 +268,19 @@ impl Sizable for Radio {
 }
 
 impl RenderOnce for Radio {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let metrics = theme.control.get(self.size);
         let actionable = !self.disabled && self.on_select.is_some();
         let side = px(metrics.icon_size);
+
+        let drawn = motion::tracked(
+            &self.ident.semantic_id(),
+            f32::from(u8::from(self.selected)),
+            motion::state_change(&theme),
+            window,
+            cx,
+        );
 
         let mark = div()
             .size(side)
@@ -263,15 +290,16 @@ impl RenderOnce for Radio {
             .flex_none()
             .rounded_full()
             .border(px(theme.borders.hairline))
-            .border_color(if self.selected {
-                theme.colors.accent
-            } else {
-                theme.colors.hairline_strong
-            })
-            .when(self.selected, |element| {
+            .border_color(
+                theme
+                    .colors
+                    .hairline_strong
+                    .lerp(theme.colors.accent, drawn),
+            )
+            .when(drawn > 0.0, |element| {
                 element.child(
                     div()
-                        .size(side * 0.5)
+                        .size(side * 0.5 * drawn)
                         .rounded_full()
                         .bg(theme.colors.accent),
                 )
@@ -279,6 +307,7 @@ impl RenderOnce for Radio {
 
         choice_row(
             &theme,
+            cx,
             self.ident.clone(),
             mark.into_any_element(),
             self.label.clone(),
@@ -373,13 +402,23 @@ impl Sizable for Switch {
 }
 
 impl RenderOnce for Switch {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let metrics = theme.control.get(self.size);
         let actionable = !self.disabled && self.on_change.is_some();
         let height = px(metrics.icon_size);
         let width = height * 1.8;
         let knob = height - px(4.0);
+
+        // The knob is placed by margin rather than by a relative offset, so
+        // the switch is the same size at every point of the slide.
+        let drawn = motion::tracked(
+            &self.ident.semantic_id(),
+            f32::from(u8::from(self.on)),
+            motion::state_change(&theme),
+            window,
+            cx,
+        );
 
         let track = div()
             .w(width)
@@ -389,25 +428,22 @@ impl RenderOnce for Switch {
             .items_center()
             .rounded_full()
             .p(px(2.0))
-            .bg(if self.on {
-                theme.colors.accent
-            } else {
-                theme.colors.hairline_strong
-            })
+            .bg(theme
+                .colors
+                .hairline_strong
+                .lerp(theme.colors.accent, drawn))
             .child(
                 div()
                     .size(knob)
                     .rounded_full()
                     .bg(theme.colors.text_on_accent)
-                    // The knob is placed by margin rather than by animation,
-                    // because a caller-owned value can change without this
-                    // control ever seeing the previous frame.
-                    .when(self.on, |element| element.ml(width - knob - px(4.0))),
+                    .ml((width - knob - px(4.0)) * drawn),
             );
 
         let next = !self.on;
         choice_row(
             &theme,
+            cx,
             self.ident.clone(),
             track.into_any_element(),
             self.label.clone(),
@@ -442,6 +478,7 @@ fn spec(ident: &Ident, role: Role, label: Option<SharedString>, disabled: bool) 
 #[allow(clippy::too_many_arguments)]
 fn choice_row(
     theme: &Theme,
+    cx: &App,
     ident: Ident,
     mark: AnyElement,
     label: Option<SharedString>,
@@ -467,7 +504,11 @@ fn choice_row(
         .text_color(text_color)
         .when(disabled, |element| element.opacity(theme.opacity.disabled))
         .when(actionable, |element| {
-            element.cursor_pointer().tab_index(0).focus_ring(theme)
+            element
+                .cursor_pointer()
+                .tab_index(0)
+                .focus_ring(theme)
+                .pressable(cx)
         })
         .child(div().mt(px(1.0)).child(mark))
         .when_some(label, |element, label| {

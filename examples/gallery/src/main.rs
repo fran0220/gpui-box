@@ -1121,6 +1121,17 @@ struct GalleryCounts {
 
 impl Global for GalleryCounts {}
 
+/// Which way every state in the state-transition row is currently pointing.
+///
+/// One flag drives all of them, so the row can be flipped at once and every
+/// transition watched against the same frame.
+#[derive(Debug)]
+struct GalleryStates {
+    forward: bool,
+}
+
+impl Global for GalleryStates {}
+
 /// Reordering, the two pointer responses, and a counting readout.
 fn motion_section(theme: &Theme, window: &mut Window, cx: &mut App) -> gpui::AnyElement {
     if !cx.has_global::<GalleryQueue>() {
@@ -1139,6 +1150,10 @@ fn motion_section(theme: &Theme, window: &mut Window, cx: &mut App) -> gpui::Any
             seconds: 18.4,
         });
     }
+    if !cx.has_global::<GalleryStates>() {
+        cx.set_global(GalleryStates { forward: false });
+    }
+    let forward = cx.global::<GalleryStates>().forward;
     let steps = cx.global::<GalleryQueue>().steps.clone();
     let counts = cx.global::<GalleryCounts>();
     let (runs, seconds) = (counts.runs, counts.seconds);
@@ -1195,6 +1210,7 @@ fn motion_section(theme: &Theme, window: &mut Window, cx: &mut App) -> gpui::Any
                         }),
                 ),
         )
+        .child(state_transitions(theme, forward))
         .child(
             div()
                 .flex()
@@ -1257,6 +1273,93 @@ fn motion_section(theme: &Theme, window: &mut Window, cx: &mut App) -> gpui::Any
                             cx.refresh_windows();
                         }),
                 ),
+        )
+        .into_any_element()
+}
+
+/// The state transitions, all driven by one switch so they can be compared.
+fn state_transitions(theme: &Theme, forward: bool) -> gpui::AnyElement {
+    let column = || div().flex().flex_col().gap(px(theme.spacing.md));
+
+    div()
+        .flex()
+        .flex_row()
+        .items_start()
+        .gap(px(theme.spacing.xl))
+        .child(
+            column()
+                .w(px(280.0))
+                .child({
+                    let terms = Checkbox::new("gallery.state.terms").label("Accept the terms");
+                    if forward {
+                        terms.checked(true)
+                    } else {
+                        terms.mixed()
+                    }
+                    .on_change(|_, _, _| {})
+                })
+                .child(
+                    Radio::new("gallery.state.plan")
+                        .label("Bill monthly")
+                        .selected(forward)
+                        .on_select(|_, _| {}),
+                )
+                .child(
+                    Switch::new("gallery.state.notify")
+                        .label("Send run notifications")
+                        .on(forward)
+                        .on_change(|_, _, _| {}),
+                ),
+        )
+        .child(
+            column()
+                .w(px(320.0))
+                .child(
+                    SegmentedControl::new("gallery.state.view")
+                        .segments(vec![
+                            Segment::new("list", "List"),
+                            Segment::new("grid", "Grid"),
+                        ])
+                        .selected(if forward { "grid" } else { "list" })
+                        .on_select(|_, _, _| {}),
+                )
+                .child(
+                    Tabs::new("gallery.state.tabs")
+                        .tabs(vec![
+                            TabItem::new("overview", "Overview"),
+                            TabItem::new("runs", "Runs"),
+                        ])
+                        .selected(if forward { "runs" } else { "overview" })
+                        .on_select(|_, _, _| {}),
+                )
+                .child(
+                    ProgressBar::new("gallery.state.progress")
+                        .label("Uploading artifacts")
+                        .fraction(if forward { 0.86 } else { 0.12 }),
+                ),
+        )
+        .child(
+            column().w(px(320.0)).child(
+                Accordion::new("gallery.state.sections")
+                    .expanded_ids(if forward { &["retention"][..] } else { &[][..] })
+                    .on_toggle(|_, _, _, _| {})
+                    .section(
+                        AccordionSection::new("retention", "Retention")
+                            .description("How long verified results are kept")
+                            .body(div().child("Results are kept in the workspace for 30 days.")),
+                    ),
+            ),
+        )
+        .child(
+            Button::new("gallery.state.flip")
+                .label("Flip every state")
+                .secondary()
+                .on_click(|_, cx| {
+                    cx.update_global::<GalleryStates, ()>(|state, _| {
+                        state.forward = !state.forward
+                    });
+                    cx.refresh_windows();
+                }),
         )
         .into_any_element()
 }

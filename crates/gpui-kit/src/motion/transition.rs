@@ -2,10 +2,10 @@
 
 use std::time::Duration;
 
-use gpui::{App, Window};
+use gpui::{App, SharedString, Window};
 use web_time::Instant;
 
-use super::{Interpolate, MotionSpec};
+use super::{Interpolate, MotionSpec, keyed};
 
 /// A value that animates toward whatever it is last told to be.
 ///
@@ -108,6 +108,69 @@ impl<T: Interpolate> Transition<T> {
         }
         self.value()
     }
+}
+
+/// One transition kept per semantic id, for a `RenderOnce` builder that is
+/// rebuilt every frame and cannot carry state of its own.
+///
+/// `Default` is what the keyed global needs, and `None` is the honest default:
+/// the transition can only be created once the caller's first target is known,
+/// so it starts settled there rather than animating in from nothing.
+struct Tracked<T: Interpolate>(Option<Transition<T>>);
+
+impl<T: Interpolate> Default for Tracked<T> {
+    fn default() -> Self {
+        Self(None)
+    }
+}
+
+/// Moves the value kept for `id` toward `target` and returns what to draw.
+///
+/// The first frame for an id is already settled, so a control that appears
+/// with a value does not animate up to it from zero.
+pub(crate) fn tracked<T>(
+    id: &SharedString,
+    target: T,
+    spec: MotionSpec,
+    window: &mut Window,
+    cx: &mut App,
+) -> T
+where
+    T: Interpolate + PartialEq + 'static,
+{
+    tracked_or_snap(id, target, spec, false, window, cx)
+}
+
+/// The same, except that `snap` jumps straight to the target.
+///
+/// A control the pointer is holding must be exactly where the pointer is: a
+/// spring that trails the finger by even a frame reads as the control being
+/// broken rather than as motion.
+pub(crate) fn tracked_or_snap<T>(
+    id: &SharedString,
+    target: T,
+    spec: MotionSpec,
+    snap: bool,
+    window: &mut Window,
+    cx: &mut App,
+) -> T
+where
+    T: Interpolate + PartialEq + 'static,
+{
+    let cell = keyed::slot::<Tracked<T>>(id, cx);
+    let mut tracked = cell.borrow_mut();
+    let mut transition = tracked
+        .0
+        .unwrap_or_else(|| Transition::new(target, spec))
+        .spec(spec);
+    if snap {
+        transition.snap(target);
+    } else {
+        transition.set(target);
+    }
+    let shown = transition.animate(window, cx);
+    tracked.0 = Some(transition);
+    shown
 }
 
 #[cfg(test)]

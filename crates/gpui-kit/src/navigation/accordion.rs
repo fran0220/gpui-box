@@ -17,7 +17,9 @@ use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TypeScale};
 
-use crate::foundation::{FocusRing, Ident, Sizable, StyledExt};
+use crate::foundation::{FocusRing, Ident, Pressable, Sizable, StyledExt};
+use crate::layout::measure;
+use crate::motion;
 
 type ToggleHandler = Rc<dyn Fn(SharedString, bool, &mut Window, &mut App)>;
 
@@ -159,7 +161,7 @@ impl Sizable for Accordion {
 }
 
 impl RenderOnce for Accordion {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let metrics = theme.control.get(self.size);
         let last = self.sections.len().saturating_sub(1);
@@ -218,6 +220,7 @@ impl RenderOnce for Accordion {
                     element
                         .cursor_pointer()
                         .tab_index(0)
+                        .pressable(cx)
                         .hover(|style| style.bg(theme.colors.hover))
                         .focus_ring(&theme)
                 });
@@ -251,9 +254,22 @@ impl RenderOnce for Accordion {
                     .text(section.title.clone()),
             );
 
-            // A closed section drops its body entirely rather than hiding it,
-            // so nothing invisible stays addressable.
-            let body = open.then_some(section.body).flatten();
+            let body_id = ident.child("body").semantic_id();
+            let disclosed = motion::tracked(
+                &body_id,
+                f32::from(u8::from(open)),
+                motion::resize(&theme),
+                window,
+                cx,
+            );
+            // A section that is not disclosing at all drops its body entirely
+            // rather than hiding it, so nothing invisible stays addressable.
+            // While a section is still collapsing its body is still on screen,
+            // and something on screen is something a typist can point at, so
+            // it stays addressable exactly as long as it stays visible.
+            let body = (disclosed > 0.0).then_some(section.body).flatten();
+            let measured = measure::cell(&body_id, cx);
+            let height = px(f32::from(measured.get().size.height) * disclosed);
 
             stack = stack.child(
                 div()
@@ -265,7 +281,7 @@ impl RenderOnce for Accordion {
                     })
                     .child(header)
                     .children(body.map(|body| {
-                        div()
+                        let content = div()
                             // Indented to the title rather than to the
                             // chevron, so the body reads as belonging to the
                             // section it hangs under.
@@ -276,7 +292,36 @@ impl RenderOnce for Accordion {
                             .pb(px(theme.space(Space::Sm)))
                             .text_size(px(metrics.font_size))
                             .text_color(theme.colors.text_muted)
-                            .child(body)
+                            .child(body);
+                        let record = {
+                            let measured = Rc::clone(&measured);
+                            move |bounds: Vec<gpui::Bounds<gpui::Pixels>>,
+                                  window: &mut Window,
+                                  _: &mut App| {
+                                if let Some(first) = bounds.first() {
+                                    measure::record(&measured, *first, window);
+                                }
+                            }
+                        };
+
+                        // A settled section is laid out exactly as it was
+                        // before there was any motion here: the body sits in
+                        // the flow and its own height is the section's height.
+                        // Only a section in flight uses the driven height, and
+                        // it takes the body out of the flow to get one, so the
+                        // measurement stays the body's natural height instead
+                        // of chasing the frame being animated around it.
+                        if disclosed >= 1.0 {
+                            div().w_full().on_children_prepainted(record).child(content)
+                        } else {
+                            div()
+                                .relative()
+                                .w_full()
+                                .h(height)
+                                .overflow_hidden()
+                                .on_children_prepainted(record)
+                                .child(content.absolute().top_0().left_0().right_0())
+                        }
                     })),
             );
         }
