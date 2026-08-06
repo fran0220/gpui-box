@@ -17,7 +17,15 @@ that must survive a frame is a view.
 | `Radio` | builder | selection | The group is owned by the caller |
 | `Switch` | builder | next state | For changes that take effect at once |
 | `Slider` | builder | value on the step grid | Pointer and keyboard |
-| `FieldFrame`, `SearchFrame` | builder | — | Chrome for a host-supplied editable surface |
+| `IconButton` | builder | click | A glyph-only action. The accessible name is a required argument, because a glyph nobody can name is a button nobody can reach |
+| `ButtonGroup` | builder | — | Adjacent related actions sharing one frame. It reports nothing: every action inside still reports itself, and the group only decides where the corners are and forces one control size |
+| `SplitButton` | view | click on the default action; the menu reports the alternatives | The action and the arrow are separate targets with separate ids. `default_disabled` refuses the usual thing while leaving the alternatives reachable |
+| `FormField` | builder | — | Label, description, and error around a caller-supplied control. The label carries `labels` so a test that knows only the wording can reach the control |
+| `NumberInput` | view | change, unparsable text, submit | Typing, arrow and page keys, and step buttons. It never clamps: a value outside the range is shown as it is and published `invalid` |
+| `SegmentedControl` | builder | the segment that was picked | A single-choice strip. Left, right, home, and end move over refused segments and stop at the ends, because a strip has ends |
+| `Combobox` | view | selected, custom, opened, closed | A `Select` you can type into. Escape puts the query back to the current answer and reports nothing. A query nothing answers reports nothing unless `allow_custom` |
+| `TagInput` | view | added, removed, duplicate, refused | Enter or comma commits a token. The first backspace in an empty field singles out the last tag and the second removes it. A duplicate and a full field are refusals shown where the typist is looking |
+| `FieldFrame`, `SearchFrame`, `field_shell` | builder, helper | — | Chrome for a host-supplied editable surface. `field_shell` is the one border, background, and focus treatment every editable control draws |
 
 ## Display
 
@@ -101,6 +109,20 @@ The stack has a cap. When it overflows, the oldest toast that both times out
 and can be dismissed leaves first; a persistent one is never evicted to make
 room, and when nothing may be evicted the cap yields rather than swallow a
 report.
+
+### A field says what is wrong without taking back what it said
+
+`FormField` shows the description and the error together. They answer different
+questions — what the field is for, and what went wrong this time — and swapping
+one for the other loses an answer the typist still needs. The exception is a
+pair that says the same thing twice: when the error repeats the description
+word for word, only the error is drawn.
+
+`NumberInput` and `TagInput` extend the same rule to what the host holds. A
+number outside the range stays on screen exactly as it is, published `invalid`;
+a tag the field will not take leaves the typed text in place and says why.
+Neither silently corrects the caller, because a value nobody chose is a value
+nobody can trust.
 
 ## What a component owns
 

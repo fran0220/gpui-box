@@ -18,10 +18,10 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Space, Theme};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Space, Theme};
 
-use crate::controls::button::Button;
-use crate::foundation::{Ident, StyledExt};
+use crate::controls::button::{Button, ButtonJoin, ButtonVariant};
+use crate::foundation::{Ident, Sizable, StyledExt};
 use crate::overlay::focus::FocusTrap;
 use crate::overlay::kbd::Kbd;
 use crate::overlay::layer::{Overlay, Placement, surface};
@@ -523,6 +523,11 @@ pub struct Menu {
     trigger_focus: FocusHandle,
     trigger: SharedString,
     trigger_icon: Option<Icon>,
+    /// What the trigger is called when it carries a glyph instead of a label.
+    trigger_name: Option<SharedString>,
+    trigger_variant: ButtonVariant,
+    trigger_join: ButtonJoin,
+    trigger_size: ControlSize,
     items: Vec<MenuItem>,
     placement: Placement,
     open: bool,
@@ -553,6 +558,10 @@ impl Menu {
             trigger_focus: cx.focus_handle(),
             trigger: SharedString::default(),
             trigger_icon: None,
+            trigger_name: None,
+            trigger_variant: ButtonVariant::Secondary,
+            trigger_join: ButtonJoin::Alone,
+            trigger_size: ControlSize::Md,
             items: Vec::new(),
             placement: Placement::Below,
             open: false,
@@ -571,6 +580,44 @@ impl Menu {
     pub fn trigger_icon(mut self, glyph: Icon) -> Self {
         self.trigger_icon = Some(glyph);
         self
+    }
+
+    /// What the trigger is called when it has no label of its own, for a menu
+    /// opened from a glyph such as the arrow of a split button.
+    pub fn trigger_name(mut self, name: impl Into<SharedString>) -> Self {
+        self.trigger_name = Some(name.into());
+        self
+    }
+
+    pub fn set_trigger_name(&mut self, name: impl Into<SharedString>, cx: &mut Context<Self>) {
+        self.trigger_name = Some(name.into());
+        cx.notify();
+    }
+
+    /// How the trigger is painted, for a menu that sits inside another
+    /// control and has to look like part of it.
+    pub fn trigger_variant(mut self, variant: ButtonVariant) -> Self {
+        self.trigger_variant = variant;
+        self
+    }
+
+    /// Where the trigger sits in a joined run of buttons.
+    pub fn trigger_join(mut self, join: ButtonJoin) -> Self {
+        self.trigger_join = join;
+        self
+    }
+
+    /// Repaints the trigger for an owner whose own paint is decided after the
+    /// menu is built.
+    pub fn set_trigger_style(
+        &mut self,
+        variant: ButtonVariant,
+        size: ControlSize,
+        cx: &mut Context<Self>,
+    ) {
+        self.trigger_variant = variant;
+        self.trigger_size = size;
+        cx.notify();
     }
 
     pub fn items(mut self, items: impl IntoIterator<Item = MenuItem>) -> Self {
@@ -749,6 +796,13 @@ fn handle_key(state: &mut MenuState, items: &[MenuItem], event: &KeyDownEvent) -
     }
 }
 
+impl Sizable for Menu {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.trigger_size = size;
+        self
+    }
+}
+
 impl Focusable for Menu {
     fn focus_handle(&self, _cx: &App) -> FocusHandle {
         self.focus_handle.clone()
@@ -759,11 +813,22 @@ impl Render for Menu {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let menu = cx.entity().downgrade();
+        let glyph_only = self.trigger.is_empty();
         let trigger = Button::new(self.ident.child("trigger"))
             .label(self.trigger.clone())
-            .secondary()
+            .variant(self.trigger_variant)
+            .join(self.trigger_join)
+            .control_size(self.trigger_size)
             .track_focus(&self.trigger_focus)
-            .when_some(self.trigger_icon, |button, glyph| button.icon(glyph))
+            .when_some(self.trigger_icon, |button, glyph| {
+                match (glyph_only, self.trigger_name.clone()) {
+                    (true, Some(name)) => button.icon_only(glyph, name),
+                    _ => button.icon(glyph),
+                }
+            })
+            .when_some(self.trigger_name.clone(), |button, name| {
+                button.accessible_name(name)
+            })
             .on_click(move |window, cx| {
                 menu.update(cx, |menu, cx| menu.toggle(window, cx)).ok();
             })

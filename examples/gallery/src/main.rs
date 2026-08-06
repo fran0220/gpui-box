@@ -51,6 +51,11 @@ struct Gallery {
     token: Entity<TextInput>,
     rejected: Entity<TextInput>,
     notes: Entity<TextArea>,
+    workspace: Entity<TextInput>,
+    retention: Entity<NumberInput>,
+    region: Entity<Combobox>,
+    labels: Entity<TagInput>,
+    publish: Entity<SplitButton>,
     confirm: Entity<Dialog>,
     toasts: Entity<ToastLayer>,
     filters: Entity<Popover>,
@@ -177,6 +182,54 @@ impl Render for Gallery {
                                     .on_click(|_, _| {}),
                             ),
                     )
+                    .child(recipes::section_title(&theme, "Icons, groups, and split actions"))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .flex_wrap()
+                            .items_start()
+                            .gap(px(theme.spacing.sm))
+                            .child(
+                                IconButton::new("gallery.copy", Icon::Copy, "Copy run id")
+                                    .on_click(|_, _| {}),
+                            )
+                            .child(
+                                IconButton::new("gallery.rename", Icon::Pen, "Rename run")
+                                    .secondary()
+                                    .on_click(|_, _| {}),
+                            )
+                            .child(
+                                IconButton::new("gallery.remove", Icon::Trash, "Delete run")
+                                    .danger()
+                                    .on_click(|_, _| {}),
+                            )
+                            .child(
+                                IconButton::new("gallery.archive", Icon::Archive, "Archive run")
+                                    .secondary()
+                                    .disabled(true)
+                                    .on_click(|_, _| {}),
+                            )
+                            .child(
+                                ButtonGroup::new("gallery.range")
+                                    .children([
+                                        Button::new("gallery.range.day")
+                                            .label("Day")
+                                            .secondary()
+                                            .on_click(|_, _| {}),
+                                        Button::new("gallery.range.week")
+                                            .label("Week")
+                                            .secondary()
+                                            .selected(true)
+                                            .on_click(|_, _| {}),
+                                        Button::new("gallery.range.month")
+                                            .label("Month")
+                                            .secondary()
+                                            .on_click(|_, _| {}),
+                                    ]),
+                            )
+                            .child(self.publish.clone()),
+                    )
                     .child(recipes::section_title(&theme, "Control sizes"))
                     .child(
                         div()
@@ -201,6 +254,57 @@ impl Render for Gallery {
                             .child(self.rejected.clone())
                             .child(self.provider.clone())
                             .child(self.notes.clone()),
+                    )
+                    .child(recipes::section_title(&theme, "Form fields"))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap(px(theme.spacing.md))
+                            .w(px(360.0))
+                            .child(
+                                FormField::new("gallery.workspace.field", "Workspace name")
+                                    .control("gallery.workspace")
+                                    .required(true)
+                                    .description("Shown wherever this workspace appears.")
+                                    .error("A workspace with this name already exists.")
+                                    .child(self.workspace.clone()),
+                            )
+                            .child(
+                                FormField::new("gallery.retention.field", "Retention")
+                                    .control("gallery.retention")
+                                    .description("How long a finished run is kept.")
+                                    .child(self.retention.clone()),
+                            )
+                            .child(
+                                FormField::new("gallery.visibility.field", "Visibility")
+                                    .control("gallery.visibility")
+                                    .description("Who can open the runs in this workspace.")
+                                    .child(
+                                        SegmentedControl::new("gallery.visibility")
+                                            .label("Visibility")
+                                            .segments([
+                                                Segment::new("private", "Private"),
+                                                Segment::new("team", "Team"),
+                                                Segment::new("public", "Public").disabled(true),
+                                            ])
+                                            .selected("team")
+                                            .on_select(|_, _, _| {}),
+                                    ),
+                            )
+                            .child(
+                                FormField::new("gallery.labels.field", "Labels")
+                                    .control("gallery.labels")
+                                    .description("Enter or comma adds one.")
+                                    .hint("enter")
+                                    .child(self.labels.clone()),
+                            )
+                            .child(
+                                FormField::new("gallery.region.field", "Region")
+                                    .control("gallery.region")
+                                    .description("Where runs in this workspace are executed.")
+                                    .child(self.region.clone()),
+                            ),
                     )
                     .child(recipes::section_title(&theme, "Choices"))
                     .child(
@@ -921,6 +1025,53 @@ fn main() {
                                 .placeholder("What changed, and why")
                                 .rows(3)
                                 .max_rows(8)
+                        }),
+                        workspace: cx.new(|cx| {
+                            TextInput::new("gallery.workspace", window, cx).text("Runs 2024")
+                        }),
+                        retention: cx.new(|cx| {
+                            NumberInput::new("gallery.retention", window, cx)
+                                .value(30.0)
+                                .range(1.0, 60.0)
+                                .step(5.0)
+                                .unit("days")
+                        }),
+                        region: cx.new(|cx| {
+                            Combobox::new("gallery.region", window, cx)
+                                .options([
+                                    SelectOption::new("eu-west", "Europe (Ireland)"),
+                                    SelectOption::new("eu-north", "Europe (Stockholm)"),
+                                    SelectOption::new("us-east", "United States (Virginia)"),
+                                    SelectOption::new("ap-south", "Asia Pacific (Mumbai)")
+                                        .disabled(true),
+                                ])
+                                .selected("eu-west")
+                                .placeholder("Choose a region")
+                        }),
+                        labels: cx.new(|cx| {
+                            TagInput::new("gallery.labels", window, cx)
+                                .tags(["indexing", "nightly"])
+                                .placeholder("Add a label")
+                                .max(5)
+                        }),
+                        publish: cx.new(|cx| {
+                            SplitButton::new("gallery.publish", window, cx)
+                                .label("Publish")
+                                .primary()
+                                .on_click(|_, _| {})
+                                .items(
+                                    [
+                                        MenuItem::command("publish.draft", "Save as draft"),
+                                        MenuItem::command("publish.schedule", "Schedule\u{2026}")
+                                            .shortcut("cmd-shift-s"),
+                                        MenuItem::separator("publish.rule"),
+                                        MenuItem::command(
+                                            "publish.export",
+                                            "Export without publishing",
+                                        ),
+                                    ],
+                                    cx,
+                                )
                         }),
                         confirm: cx.new(|cx| {
                             Dialog::new("gallery.confirm", window, cx)

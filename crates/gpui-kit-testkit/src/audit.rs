@@ -151,6 +151,7 @@ mod tests {
             id: id.into(),
             role,
             parent: None,
+            labels: None,
             text: None,
             bounds: Rect {
                 x: 0.0,

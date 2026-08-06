@@ -1,0 +1,562 @@
+//! A select you can type into.
+//!
+//! The list, the choice, and whether a typed value is acceptable all belong
+//! to the caller. The combobox owns the query, whether the list is open, and
+//! where the keyboard is — and reports what was picked without moving its own
+//! answer, exactly as `Select` does.
+
+use gpui::{
+    AnyElement, App, AppContext as _, Context, ElementId, Entity, EventEmitter, FocusHandle,
+    Focusable, InteractiveElement, IntoElement, KeyDownEvent, MouseButton, ParentElement, Render,
+    SharedString, StatefulInteractiveElement, Styled, Subscription, Window, div,
+    prelude::FluentBuilder, px,
+};
+use gpui_kit_assets::{Icon, icon};
+use gpui_kit_semantics::{NodeSpec, Role, Semantic};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Space};
+
+use crate::controls::field::{FieldState, field_shell};
+use crate::controls::input::{TextInput, TextInputEvent};
+use crate::controls::select::SelectOption;
+use crate::display::empty::{EmptyKind, EmptyState};
+use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
+use crate::overlay::popover::{self, MenuKey};
+
+/// How wide the list gets before it stops growing, and how tall before it
+/// scrolls. Both occur once, so they stay next to the component.
+const MENU_MIN_WIDTH: f32 = 200.0;
+const MENU_MAX_HEIGHT: f32 = 320.0;
+
+/// What a combobox reports. The owner decides what any of it means.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ComboboxEvent {
+    QueryChanged(SharedString),
+    /// One of the offered options was taken.
+    Selected(SharedString),
+    /// A value nothing offered answers, reported only when the caller allows
+    /// custom values.
+    Custom(SharedString),
+    Opened,
+    Closed,
+}
+
+impl EventEmitter<ComboboxEvent> for Combobox {}
+
+pub struct Combobox {
+    ident: Ident,
+    focus_handle: FocusHandle,
+    query: Entity<TextInput>,
+    options: Vec<SelectOption>,
+    selected: Option<SharedString>,
+    placeholder: SharedString,
+    size: ControlSize,
+    disabled: bool,
+    invalid: bool,
+    open: bool,
+    /// The highlighted option by identity, so filtering does not move the
+    /// highlight onto whatever happens to sit at the same position.
+    active: Option<SharedString>,
+    allow_custom: bool,
+    /// Whether the current answer has been put in the field. The text is the
+    /// typist's afterwards, so it is written once.
+    seeded: bool,
+    /// Held so the query subscription lives as long as the combobox does.
+    _subscriptions: Vec<Subscription>,
+}
+
+impl std::fmt::Debug for Combobox {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Combobox")
+            .field("ident", &self.ident)
+            .field("options", &self.options.len())
+            .field("selected", &self.selected)
+            .field("open", &self.open)
+            .field("allow_custom", &self.allow_custom)
+            .finish()
+    }
+}
+
+impl Combobox {
+    pub fn new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let ident = ident.into();
+        let query = cx.new(|cx| TextInput::new(ident.child("query"), window, cx).bare(true));
+        let subscription = cx.subscribe(&query, |combobox, _query, event, cx| match event {
+            TextInputEvent::Change(text) => combobox.on_query(text.clone(), cx),
+            TextInputEvent::Submit => combobox.commit(cx),
+            TextInputEvent::Cancel => combobox.revert(cx),
+            _ => {}
+        });
+
+        Self {
+            ident,
+            focus_handle: cx.focus_handle(),
+            query,
+            options: Vec::new(),
+            selected: None,
+            placeholder: SharedString::from("Select"),
+            size: ControlSize::Md,
+            disabled: false,
+            invalid: false,
+            open: false,
+            active: None,
+            allow_custom: false,
+            seeded: false,
+            _subscriptions: vec![subscription],
+        }
+    }
+
+    pub fn options(mut self, options: impl IntoIterator<Item = SelectOption>) -> Self {
+        self.options = options.into_iter().collect();
+        self
+    }
+
+    pub fn selected(mut self, id: impl Into<SharedString>) -> Self {
+        self.selected = Some(id.into());
+        self
+    }
+
+    pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self {
+        self.placeholder = placeholder.into();
+        self
+    }
+
+    pub fn invalid(mut self, invalid: bool) -> Self {
+        self.invalid = invalid;
+        self
+    }
+
+    /// Whether a query nothing answers may be reported as a new value.
+    ///
+    /// With it off the combobox reports nothing at all for such a query, and
+    /// the list says that this is a closed set rather than drawing an empty
+    /// list that looks like a list with nothing in it.
+    pub fn allow_custom(mut self, allow_custom: bool) -> Self {
+        self.allow_custom = allow_custom;
+        self
+    }
+
+    pub fn set_options(&mut self, options: Vec<SelectOption>, cx: &mut Context<Self>) {
+        let still_offered = self
+            .selected
+            .as_ref()
+            .is_some_and(|id| options.iter().any(|option| &option.id == id));
+        if !still_offered {
+            self.selected = None;
+        }
+        self.options = options;
+        self.active = None;
+        cx.notify();
+    }
+
+    /// Replaces the choice from the host side, and puts its label back in the
+    /// field so the query and the answer agree again.
+    pub fn set_selected(&mut self, id: Option<SharedString>, cx: &mut Context<Self>) {
+        self.selected = id;
+        self.seeded = true;
+        let label = self.selected_label().unwrap_or_default();
+        self.query
+            .update(cx, |query, cx| query.set_text_quietly(label, cx));
+        cx.notify();
+    }
+
+    pub fn set_query(&mut self, text: impl Into<SharedString>, cx: &mut Context<Self>) {
+        // Once something is being asked, the field is no longer waiting for
+        // the answer's label to be written into it.
+        self.seeded = true;
+        self.query.update(cx, |query, cx| query.set_value(text, cx));
+    }
+
+    pub fn selected_id(&self) -> Option<&SharedString> {
+        self.selected.as_ref()
+    }
+
+    pub fn selected_option(&self) -> Option<&SelectOption> {
+        let id = self.selected.as_ref()?;
+        self.options.iter().find(|option| &option.id == id)
+    }
+
+    fn selected_label(&self) -> Option<SharedString> {
+        self.selected_option().map(|option| option.label.clone())
+    }
+
+    pub fn is_open(&self) -> bool {
+        self.open
+    }
+
+    pub fn query_text(&self, cx: &App) -> SharedString {
+        self.query.read(cx).value().clone()
+    }
+
+    pub fn query_input(&self) -> &Entity<TextInput> {
+        &self.query
+    }
+
+    pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
+        self.disabled = disabled;
+        self.query
+            .update(cx, |query, cx| query.set_disabled(disabled, cx));
+        if disabled {
+            self.open = false;
+        }
+        cx.notify();
+    }
+
+    /// The query the list is filtered by.
+    ///
+    /// A query that is exactly the current answer is not a filter: it is what
+    /// the field says while nothing has been typed, and it must not hide the
+    /// rest of the list the moment the control opens.
+    fn filter(&self, cx: &App) -> SharedString {
+        let text = self.query.read(cx).value().clone();
+        match self.selected_label() {
+            Some(label) if label == text => SharedString::default(),
+            _ => text,
+        }
+    }
+
+    /// The options answering the query, best answer first.
+    fn matches(&self, cx: &App) -> Vec<usize> {
+        let labels: Vec<&str> = self
+            .options
+            .iter()
+            .map(|option| option.label.as_ref())
+            .collect();
+        popover::filter_indices(self.filter(cx).as_ref(), &labels)
+    }
+
+    /// The option the highlight sits on: the one the typist put it on while
+    /// it still answers the query, or the best answer that can be taken.
+    fn resolved(&self, matches: &[usize]) -> Option<usize> {
+        if let Some(active) = &self.active
+            && let Some(index) = matches
+                .iter()
+                .copied()
+                .find(|index| &self.options[*index].id == active)
+            && !self.options[index].disabled
+        {
+            return Some(index);
+        }
+        matches
+            .iter()
+            .copied()
+            .find(|index| !self.options[*index].disabled)
+    }
+
+    pub fn open(&mut self, cx: &mut Context<Self>) {
+        if self.disabled || self.open {
+            return;
+        }
+        self.open = true;
+        cx.emit(ComboboxEvent::Opened);
+        cx.notify();
+    }
+
+    fn close(&mut self, cx: &mut Context<Self>) {
+        if !self.open {
+            return;
+        }
+        self.open = false;
+        self.active = None;
+        cx.emit(ComboboxEvent::Closed);
+        cx.notify();
+    }
+
+    pub fn toggle(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.open {
+            self.close(cx);
+        } else {
+            self.open(cx);
+            self.query.read(cx).focus_handle(cx).focus(window, cx);
+        }
+    }
+
+    fn on_query(&mut self, text: SharedString, cx: &mut Context<Self>) {
+        // A new query is a new list, so the highlight goes back to the best
+        // answer rather than staying on a row that may be gone.
+        self.active = None;
+        self.open(cx);
+        cx.emit(ComboboxEvent::QueryChanged(text));
+        cx.notify();
+    }
+
+    /// Puts the query back to the answer that still holds, and closes without
+    /// reporting anything: abandoning an edit is not a choice.
+    fn revert(&mut self, cx: &mut Context<Self>) {
+        let label = self.selected_label().unwrap_or_default();
+        self.query
+            .update(cx, |query, cx| query.set_text_quietly(label, cx));
+        self.close(cx);
+    }
+
+    fn commit(&mut self, cx: &mut Context<Self>) {
+        let matches = self.matches(cx);
+        if let Some(index) = self.resolved(&matches) {
+            self.take(index, cx);
+            return;
+        }
+        let typed = self.query.read(cx).value().clone();
+        if self.allow_custom && !typed.trim().is_empty() {
+            cx.emit(ComboboxEvent::Custom(typed));
+            self.close(cx);
+        }
+    }
+
+    /// Reports the option and closes. The field goes back to the answer the
+    /// host still holds, because a report is not an application.
+    fn take(&mut self, index: usize, cx: &mut Context<Self>) {
+        let Some(option) = self.options.get(index) else {
+            return;
+        };
+        if option.disabled {
+            return;
+        }
+        let id = option.id.clone();
+        let label = self.selected_label().unwrap_or_default();
+        self.query
+            .update(cx, |query, cx| query.set_text_quietly(label, cx));
+        cx.emit(ComboboxEvent::Selected(id));
+        self.close(cx);
+    }
+
+    fn step(&mut self, delta: isize, cx: &mut Context<Self>) {
+        let matches = self.matches(cx);
+        let choosable: Vec<usize> = matches
+            .iter()
+            .copied()
+            .filter(|index| !self.options[*index].disabled)
+            .collect();
+        if choosable.is_empty() {
+            return;
+        }
+        let current = self
+            .resolved(&matches)
+            .and_then(|index| choosable.iter().position(|choice| *choice == index));
+        let Some(next) = popover::step(current, choosable.len(), delta) else {
+            return;
+        };
+        self.active = Some(self.options[choosable[next]].id.clone());
+        cx.notify();
+    }
+
+    fn on_key_down(&mut self, event: &KeyDownEvent, _window: &mut Window, cx: &mut Context<Self>) {
+        if self.disabled {
+            return;
+        }
+        let key = popover::classify_key(
+            event.keystroke.key.as_str(),
+            event.keystroke.modifiers.platform,
+            event.keystroke.modifiers.control,
+        );
+        match key {
+            MenuKey::Down => {
+                self.open(cx);
+                self.step(1, cx);
+                cx.stop_propagation();
+            }
+            MenuKey::Up => {
+                self.open(cx);
+                self.step(-1, cx);
+                cx.stop_propagation();
+            }
+            _ => {}
+        }
+    }
+
+    fn menu(&self, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        let matches = self.matches(cx);
+        let highlighted = self.resolved(&matches);
+        let menu_ident = self.ident.child("menu");
+
+        let body = if matches.is_empty() {
+            let query = self.filter(cx);
+            EmptyState::new(
+                self.ident.child("empty"),
+                SharedString::from(format!("Nothing here answers “{query}”")),
+            )
+            .kind(EmptyKind::Empty)
+            .detail(if self.allow_custom {
+                "Press enter to add it as a new value."
+            } else {
+                "This field only accepts one of the options offered."
+            })
+            .into_any_element()
+        } else {
+            div()
+                .column()
+                .children(
+                    matches
+                        .iter()
+                        .map(|index| self.row(*index, highlighted, cx)),
+                )
+                .into_any_element()
+        };
+
+        let list = popover::card_flush(&theme)
+            .p(px(theme.space(Space::Xs)))
+            .min_w(px(MENU_MIN_WIDTH))
+            .column()
+            .max_h(px(MENU_MAX_HEIGHT))
+            .id(menu_ident.element_id())
+            .overflow_y_scroll()
+            .child(body)
+            .semantic_in(
+                cx,
+                NodeSpec::new(menu_ident.semantic_id(), Role::Menu)
+                    .parent(self.ident.semantic_id()),
+            )
+            .into_any_element();
+
+        popover::anchored_below(
+            ElementId::from(self.ident.child("menu.anchor").semantic_id()),
+            &theme,
+            list,
+        )
+    }
+
+    fn row(&self, index: usize, highlighted: Option<usize>, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        let option = &self.options[index];
+        let selected = self.selected.as_ref() == Some(&option.id);
+        let active = highlighted == Some(index);
+        let ident = self.ident.child(option.id.as_ref());
+
+        popover::menu_row(&theme, selected, active)
+            .id(ident.element_id())
+            .when(!option.disabled, |element| element.cursor_pointer())
+            .when(option.disabled, |element| {
+                element.opacity(theme.opacity.disabled)
+            })
+            .child(
+                div()
+                    .column()
+                    .gap(px(2.0))
+                    .child(option.label.clone())
+                    .when_some(option.description.clone(), |element, description| {
+                        element.child(
+                            div()
+                                .text_size(px(theme.typography.caption.size))
+                                .text_color(theme.colors.text_muted)
+                                .child(description),
+                        )
+                    }),
+            )
+            .when(selected, |element| {
+                element.child(
+                    div().ml_auto().child(
+                        icon(Icon::Check)
+                            .size(px(14.0))
+                            .text_color(theme.colors.text),
+                    ),
+                )
+            })
+            .when(!option.disabled, |element| {
+                element.on_mouse_down(
+                    MouseButton::Left,
+                    cx.listener(move |combobox, _, _, cx| combobox.take(index, cx)),
+                )
+            })
+            .semantic_in(
+                cx,
+                NodeSpec::new(ident.semantic_id(), Role::Option)
+                    .parent(self.ident.child("menu").semantic_id())
+                    .checked(selected)
+                    .disabled(option.disabled)
+                    .hovered(active)
+                    .text(option.label.clone()),
+            )
+            .into_any_element()
+    }
+}
+
+impl Disableable for Combobox {
+    fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
+    }
+}
+
+impl Sizable for Combobox {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.size = size;
+        self
+    }
+}
+
+impl Focusable for Combobox {
+    fn focus_handle(&self, _cx: &App) -> FocusHandle {
+        self.focus_handle.clone()
+    }
+}
+
+impl Render for Combobox {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = cx.theme().clone();
+        if !self.seeded {
+            self.seeded = true;
+            if let Some(label) = self.selected_label() {
+                self.query
+                    .update(cx, |query, cx| query.set_text_quietly(label, cx));
+            }
+        }
+        if self.query.read(cx).placeholder_text().is_empty() {
+            let placeholder = self.placeholder.clone();
+            self.query
+                .update(cx, |query, cx| query.set_placeholder(placeholder, cx));
+        }
+        if self.disabled != self.query.read(cx).is_disabled() {
+            let disabled = self.disabled;
+            self.query
+                .update(cx, |query, cx| query.set_disabled(disabled, cx));
+        }
+
+        let focused = self.query.read(cx).focus_handle(cx).is_focused(window);
+        let menu = self.open.then(|| self.menu(cx));
+        let mut spec = NodeSpec::new(self.ident.semantic_id(), Role::Combobox)
+            .disabled(self.disabled)
+            .invalid(self.invalid)
+            .expanded(self.open)
+            .focus(&self.query.read(cx).focus_handle(cx))
+            .placeholder(self.placeholder.clone());
+        if let Some(label) = self.selected_label() {
+            spec = spec.value(label);
+        }
+
+        div()
+            .id(self.ident.element_id())
+            .column()
+            .w_full()
+            .track_focus(&self.focus_handle)
+            .on_key_down(cx.listener(Self::on_key_down))
+            .child(
+                field_shell(
+                    &theme,
+                    self.size,
+                    FieldState::default()
+                        .focused(focused)
+                        .invalid(self.invalid)
+                        .disabled(self.disabled),
+                )
+                .id(self.ident.child("shell").element_id())
+                .when(!self.disabled, |element| {
+                    element.on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|combobox, _, window, cx| {
+                            if !combobox.open {
+                                combobox.toggle(window, cx);
+                            }
+                        }),
+                    )
+                })
+                .child(div().flex_1().child(self.query.clone()))
+                .child(
+                    icon(Icon::AltArrowDown)
+                        .size(px(theme.control.get(self.size).icon_size * 0.9))
+                        .text_color(theme.colors.text_muted),
+                ),
+            )
+            .child(div().relative().children(menu))
+            .semantic_in(cx, spec)
+    }
+}

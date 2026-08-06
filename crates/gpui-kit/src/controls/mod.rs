@@ -1,10 +1,16 @@
 //! Interactive controls that emit caller-owned actions.
 
 pub mod button;
+pub mod combobox;
 pub mod field;
+pub mod form_field;
 pub mod input;
+pub mod number_input;
+pub mod segmented;
 pub mod select;
 pub mod slider;
+pub mod split_button;
+pub mod tag_input;
 mod text_edit;
 pub mod textarea;
 pub mod toggle;

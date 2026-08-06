@@ -28,6 +28,19 @@ pub enum IconPosition {
     Trailing,
 }
 
+/// Where a button sits in a joined run of them.
+///
+/// A joined button gives up the radius on the side it touches its neighbour
+/// and overlaps its border, so the run reads as one frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ButtonJoin {
+    #[default]
+    Alone,
+    Leading,
+    Middle,
+    Trailing,
+}
+
 type ClickHandler = Rc<dyn Fn(&mut Window, &mut App)>;
 
 /// A labeled action.
@@ -40,6 +53,9 @@ pub struct Button {
     semantic_parent: Option<SharedString>,
     focus_handle: Option<FocusHandle>,
     label: Option<SharedString>,
+    /// What the button is called when the label is not what it is called, or
+    /// when there is no label at all.
+    name: Option<SharedString>,
     glyph: Option<Icon>,
     icon_position: IconPosition,
     variant: ButtonVariant,
@@ -48,6 +64,8 @@ pub struct Button {
     selected: bool,
     loading: bool,
     full_width: bool,
+    icon_only: bool,
+    join: ButtonJoin,
     on_click: Option<ClickHandler>,
 }
 
@@ -74,6 +92,7 @@ impl Button {
             semantic_parent: None,
             focus_handle: None,
             label: None,
+            name: None,
             glyph: None,
             icon_position: IconPosition::Leading,
             variant: ButtonVariant::default(),
@@ -82,12 +101,40 @@ impl Button {
             selected: false,
             loading: false,
             full_width: false,
+            icon_only: false,
+            join: ButtonJoin::Alone,
             on_click: None,
         }
     }
 
     pub fn label(mut self, label: impl Into<SharedString>) -> Self {
         self.label = Some(label.into());
+        self
+    }
+
+    /// What assistive technology and a test call this action.
+    ///
+    /// Overrides the label, which a graphic button does not have.
+    pub fn accessible_name(mut self, name: impl Into<SharedString>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    /// Draws the button as a square carrying only its glyph, and names it.
+    ///
+    /// The name is required rather than optional because a glyph on its own
+    /// is an action nobody can announce or address.
+    pub fn icon_only(mut self, glyph: Icon, name: impl Into<SharedString>) -> Self {
+        self.glyph = Some(glyph);
+        self.label = None;
+        self.icon_only = true;
+        self.name = Some(name.into());
+        self
+    }
+
+    /// Places the button in a joined run.
+    pub fn join(mut self, join: ButtonJoin) -> Self {
+        self.join = join;
         self
     }
 
@@ -163,8 +210,8 @@ impl Button {
         !self.disabled && !self.loading && self.on_click.is_some()
     }
 
-    fn accessible_name(&self) -> Option<SharedString> {
-        self.label.clone()
+    fn announced_name(&self) -> Option<SharedString> {
+        self.name.clone().or_else(|| self.label.clone())
     }
 }
 
@@ -221,6 +268,10 @@ impl RenderOnce for Button {
         }
 
         let mut button = frame(&theme, self.variant, metrics, inert)
+            .when(self.icon_only, |element| {
+                element.w(px(metrics.height)).px(px(0.0))
+            })
+            .map(|element| joined(element, &theme, self.join))
             .when(self.selected, |element| {
                 element
                     .bg(theme.colors.selected)
@@ -268,10 +319,28 @@ impl RenderOnce for Button {
         if let Some(handle) = &self.focus_handle {
             spec = spec.focus(handle);
         }
-        if let Some(name) = self.accessible_name() {
+        if let Some(name) = self.announced_name() {
             spec = spec.text(name);
         }
         button.semantic_in(cx, spec)
+    }
+}
+
+/// Flattens the edges a joined button shares with its neighbour, and pulls it
+/// onto that neighbour's border so the run carries one hairline, not two.
+fn joined(element: Div, theme: &Theme, join: ButtonJoin) -> Div {
+    let flat = px(0.0);
+    let overlap = px(-theme.borders.hairline);
+    match join {
+        ButtonJoin::Alone => element,
+        ButtonJoin::Leading => element.rounded_tr(flat).rounded_br(flat),
+        ButtonJoin::Middle => element
+            .ml(overlap)
+            .rounded_tl(flat)
+            .rounded_bl(flat)
+            .rounded_tr(flat)
+            .rounded_br(flat),
+        ButtonJoin::Trailing => element.ml(overlap).rounded_tl(flat).rounded_bl(flat),
     }
 }
 
@@ -327,5 +396,209 @@ fn frame(theme: &Theme, variant: ButtonVariant, metrics: ControlMetrics, inert: 
             .when(!inert, |element| {
                 element.hover(|style| style.text_color(theme.colors.accent_strong))
             }),
+    }
+}
+
+/// An action carried by a glyph alone.
+///
+/// The accessible name is a constructor argument rather than an option: an
+/// icon with no name is an action neither a screen reader nor a test can
+/// address, and there is no sensible default for what a picture means.
+/// Everything else — tone, size, refusal, the action in flight — is
+/// [`Button`]'s behaviour, reused rather than reimplemented.
+#[derive(IntoElement)]
+pub struct IconButton {
+    button: Button,
+}
+
+impl std::fmt::Debug for IconButton {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("IconButton")
+            .field("button", &self.button)
+            .finish()
+    }
+}
+
+impl IconButton {
+    pub fn new(ident: impl Into<Ident>, glyph: Icon, name: impl Into<SharedString>) -> Self {
+        Self {
+            button: Button::new(ident)
+                .ghost()
+                .icon_only(glyph, name)
+                .icon_position(IconPosition::Leading),
+        }
+    }
+
+    pub fn variant(mut self, variant: ButtonVariant) -> Self {
+        self.button = self.button.variant(variant);
+        self
+    }
+
+    pub fn primary(self) -> Self {
+        self.variant(ButtonVariant::Primary)
+    }
+
+    pub fn secondary(self) -> Self {
+        self.variant(ButtonVariant::Secondary)
+    }
+
+    pub fn ghost(self) -> Self {
+        self.variant(ButtonVariant::Ghost)
+    }
+
+    pub fn danger(self) -> Self {
+        self.variant(ButtonVariant::Danger)
+    }
+
+    pub fn loading(mut self, loading: bool) -> Self {
+        self.button = self.button.loading(loading);
+        self
+    }
+
+    pub fn semantic_parent(mut self, parent: impl Into<SharedString>) -> Self {
+        self.button = self.button.semantic_parent(parent);
+        self
+    }
+
+    pub fn track_focus(mut self, handle: &FocusHandle) -> Self {
+        self.button = self.button.track_focus(handle);
+        self
+    }
+
+    pub fn join(mut self, join: ButtonJoin) -> Self {
+        self.button = self.button.join(join);
+        self
+    }
+
+    pub fn on_click(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
+        self.button = self.button.on_click(handler);
+        self
+    }
+}
+
+impl Disableable for IconButton {
+    fn disabled(mut self, disabled: bool) -> Self {
+        self.button = self.button.disabled(disabled);
+        self
+    }
+}
+
+impl Selectable for IconButton {
+    fn selected(mut self, selected: bool) -> Self {
+        self.button = self.button.selected(selected);
+        self
+    }
+}
+
+impl Sizable for IconButton {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.button = self.button.control_size(size);
+        self
+    }
+}
+
+impl RenderOnce for IconButton {
+    fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
+        self.button
+    }
+}
+
+/// Adjacent related actions sharing one frame.
+///
+/// The group reports nothing: every action still reports itself, and the
+/// group only decides where the corners are. It publishes a `Group` node so
+/// the actions inside it can be addressed as a set, and names each button as
+/// its child.
+#[derive(IntoElement)]
+pub struct ButtonGroup {
+    ident: Ident,
+    buttons: Vec<Button>,
+    size: ControlSize,
+    disabled: bool,
+}
+
+impl std::fmt::Debug for ButtonGroup {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("ButtonGroup")
+            .field("ident", &self.ident)
+            .field("buttons", &self.buttons.len())
+            .field("disabled", &self.disabled)
+            .finish()
+    }
+}
+
+impl ButtonGroup {
+    pub fn new(ident: impl Into<Ident>) -> Self {
+        Self {
+            ident: ident.into(),
+            buttons: Vec::new(),
+            size: ControlSize::default(),
+            disabled: false,
+        }
+    }
+
+    pub fn child(mut self, button: Button) -> Self {
+        self.buttons.push(button);
+        self
+    }
+
+    pub fn children(mut self, buttons: impl IntoIterator<Item = Button>) -> Self {
+        self.buttons.extend(buttons);
+        self
+    }
+}
+
+impl Disableable for ButtonGroup {
+    fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
+    }
+}
+
+impl Sizable for ButtonGroup {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.size = size;
+        self
+    }
+}
+
+impl RenderOnce for ButtonGroup {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let last = self.buttons.len().saturating_sub(1);
+        let parent = self.ident.semantic_id();
+        let group_disabled = self.disabled;
+        let size = self.size;
+        let buttons = self
+            .buttons
+            .into_iter()
+            .enumerate()
+            .map(|(index, button)| {
+                let join = match (index, last) {
+                    (_, 0) => ButtonJoin::Alone,
+                    (0, _) => ButtonJoin::Leading,
+                    (index, last) if index == last => ButtonJoin::Trailing,
+                    _ => ButtonJoin::Middle,
+                };
+                // One frame means one scale: a run of mismatched heights is
+                // not a shared frame, it is a row of buttons.
+                let button = button
+                    .join(join)
+                    .control_size(size)
+                    .semantic_parent(parent.clone());
+                if group_disabled {
+                    button.disabled(true)
+                } else {
+                    button
+                }
+            })
+            .collect::<Vec<_>>();
+
+        div()
+            .row()
+            .flex_none()
+            .children(buttons)
+            .semantic_in(cx, NodeSpec::new(parent, Role::Toolbar))
     }
 }

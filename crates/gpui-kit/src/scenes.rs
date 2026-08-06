@@ -11,8 +11,12 @@ use gpui::{
 use gpui_kit_assets::Icon;
 use gpui_kit_theme::{Radius, Space, Theme};
 
+use crate::controls::combobox::Combobox;
 use crate::controls::input::TextInput;
+use crate::controls::number_input::NumberInput;
 use crate::controls::select::{Select, SelectOption};
+use crate::controls::split_button::SplitButton;
+use crate::controls::tag_input::TagInput;
 use crate::controls::textarea::TextArea;
 use crate::display::badge::Tone;
 use crate::foundation::ActiveTheme;
@@ -68,6 +72,14 @@ pub fn catalog() -> Vec<Scene> {
         Scene {
             name: "textarea",
             build: textarea,
+        },
+        Scene {
+            name: "form",
+            build: form,
+        },
+        Scene {
+            name: "actions",
+            build: actions,
         },
         Scene {
             name: "content",
@@ -847,6 +859,225 @@ fn choice(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .display("0.7")
                 .on_change(|_, _, _| {}),
         )
+        .into_any_element()
+}
+
+/// The form scene's controls, kept across frames.
+///
+/// Every one of these owns editing state — a caret, a query, an open list —
+/// so they are built once. Building them once is also what makes the capture
+/// static.
+struct SceneForm {
+    name: Entity<TextInput>,
+    retention: Entity<NumberInput>,
+    region: Entity<Combobox>,
+    labels: Entity<TagInput>,
+}
+
+impl Global for SceneForm {}
+
+fn ensure_form(window: &mut Window, cx: &mut App) {
+    if cx.has_global::<SceneForm>() {
+        return;
+    }
+    let name = cx.new(|cx| {
+        TextInput::new("scene.form.name", window, cx)
+            .text("Runs 2024")
+            .required(true)
+            .invalid(true)
+    });
+    let retention = cx.new(|cx| {
+        // The host holds ninety days while its own limit is sixty. The field
+        // shows the number that is actually set and says it is out of range,
+        // rather than quietly drawing a number nobody chose.
+        NumberInput::new("scene.form.retention", window, cx)
+            .value(90.0)
+            .range(1.0, 60.0)
+            .step(5.0)
+            .unit("days")
+            .required(true)
+    });
+    let region = cx.new(|cx| {
+        Combobox::new("scene.form.region", window, cx)
+            .options([
+                SelectOption::new("eu-west", "Europe (Ireland)"),
+                SelectOption::new("eu-north", "Europe (Stockholm)"),
+                SelectOption::new("us-east", "United States (Virginia)"),
+                SelectOption::new("ap-south", "Asia Pacific (Mumbai)").disabled(true),
+            ])
+            .selected("eu-west")
+            .placeholder("Choose a region")
+    });
+    let labels = cx.new(|cx| {
+        TagInput::new("scene.form.labels", window, cx)
+            .tags(["indexing", "nightly", "verified"])
+            .placeholder("Add a label")
+            .max(5)
+    });
+    region.update(cx, |combobox, cx| {
+        combobox.set_query("eu", cx);
+    });
+    cx.set_global(SceneForm {
+        name,
+        retention,
+        region,
+        labels,
+    });
+}
+
+fn form(window: &mut Window, cx: &mut App) -> AnyElement {
+    ensure_form(window, cx);
+    let form = cx.global::<SceneForm>();
+    let (name, retention, region, labels) = (
+        form.name.clone(),
+        form.retention.clone(),
+        form.region.clone(),
+        form.labels.clone(),
+    );
+    let theme = cx.theme().clone();
+
+    stack(&theme)
+        .w(px(420.0))
+        .h(px(720.0))
+        .child(
+            FormField::new("scene.form.name.field", "Workspace name")
+                .control("scene.form.name")
+                .required(true)
+                // The description says what the field is for and the error
+                // says what went wrong; neither answers for the other.
+                .description("Shown wherever this workspace appears.")
+                .error("A workspace with this name already exists.")
+                .child(name),
+        )
+        .child(
+            FormField::new("scene.form.retention.field", "Retention")
+                .control("scene.form.retention")
+                .required(true)
+                .description("How long a finished run is kept.")
+                .error("This workspace allows at most 60 days.")
+                .child(retention),
+        )
+        .child(
+            FormField::new("scene.form.visibility.field", "Visibility")
+                .control("scene.form.visibility")
+                .description("Who can open the runs in this workspace.")
+                .child(
+                    SegmentedControl::new("scene.form.visibility")
+                        .label("Visibility")
+                        .segments([
+                            Segment::new("private", "Private"),
+                            Segment::new("team", "Team"),
+                            Segment::new("public", "Public").disabled(true),
+                        ])
+                        .selected("team")
+                        .on_select(|_, _, _| {}),
+                ),
+        )
+        .child(
+            FormField::new("scene.form.labels.field", "Labels")
+                .control("scene.form.labels")
+                .description("Enter or comma adds one; backspace targets the last.")
+                .hint("enter")
+                .child(labels),
+        )
+        .child(
+            FormField::new("scene.form.region.field", "Region")
+                .control("scene.form.region")
+                .description("Where runs in this workspace are executed.")
+                .child(region),
+        )
+        .into_any_element()
+}
+
+/// The split button the actions scene shows, kept across frames.
+struct SceneActions {
+    split: Entity<SplitButton>,
+}
+
+impl Global for SceneActions {}
+
+fn ensure_actions(window: &mut Window, cx: &mut App) {
+    if cx.has_global::<SceneActions>() {
+        return;
+    }
+    let split = cx.new(|cx| {
+        SplitButton::new("scene.actions.publish", window, cx)
+            .label("Publish")
+            .primary()
+            .on_click(|_, _| {})
+            .items(
+                [
+                    MenuItem::command("publish.draft", "Save as draft"),
+                    MenuItem::command("publish.schedule", "Schedule…").shortcut("cmd-shift-s"),
+                    MenuItem::separator("publish.rule"),
+                    MenuItem::command("publish.export", "Export without publishing"),
+                ],
+                cx,
+            )
+    });
+    split.update(cx, |split, cx| split.open_menu(window, cx));
+    cx.set_global(SceneActions { split });
+}
+
+fn actions(window: &mut Window, cx: &mut App) -> AnyElement {
+    ensure_actions(window, cx);
+    let split = cx.global::<SceneActions>().split.clone();
+    let theme = cx.theme().clone();
+
+    stack(&theme)
+        .w(px(560.0))
+        .h(px(360.0))
+        .child(
+            row(&theme)
+                .child(
+                    IconButton::new("scene.actions.copy", Icon::Copy, "Copy run id")
+                        .on_click(|_, _| {}),
+                )
+                .child(
+                    IconButton::new("scene.actions.rename", Icon::Pen, "Rename run")
+                        .secondary()
+                        .on_click(|_, _| {}),
+                )
+                .child(
+                    IconButton::new("scene.actions.refresh", Icon::Refresh, "Refresh")
+                        .secondary()
+                        .loading(true)
+                        .on_click(|_, _| {}),
+                )
+                .child(
+                    IconButton::new("scene.actions.delete", Icon::Trash, "Delete run")
+                        .danger()
+                        .on_click(|_, _| {}),
+                )
+                .child(
+                    IconButton::new("scene.actions.archive", Icon::Archive, "Archive run")
+                        .secondary()
+                        .disabled(true)
+                        .on_click(|_, _| {}),
+                ),
+        )
+        .child(
+            row(&theme).child(
+                ButtonGroup::new("scene.actions.range")
+                    .children([
+                        Button::new("scene.actions.range.day")
+                            .label("Day")
+                            .secondary()
+                            .on_click(|_, _| {}),
+                        Button::new("scene.actions.range.week")
+                            .label("Week")
+                            .secondary()
+                            .selected(true)
+                            .on_click(|_, _| {}),
+                        Button::new("scene.actions.range.month")
+                            .label("Month")
+                            .secondary()
+                            .on_click(|_, _| {}),
+                    ])
+                    .small(),
+            ),
+        )
+        .child(row(&theme).child(split))
         .into_any_element()
 }
 

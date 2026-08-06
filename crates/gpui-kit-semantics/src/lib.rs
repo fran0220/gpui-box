@@ -90,6 +90,10 @@ pub struct Node {
     pub id: String,
     pub role: Role,
     pub parent: Option<String>,
+    /// The control this node names, for a label that belongs to a field it is
+    /// not the parent of. A test finds the field by reading its label.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub labels: Option<String>,
     pub text: Option<String>,
     pub bounds: Rect,
     pub visible: bool,
@@ -292,6 +296,7 @@ pub struct NodeSpec {
     id: SharedString,
     role: Role,
     parent: Option<SharedString>,
+    labels: Option<SharedString>,
     text: Option<SharedString>,
     focus: Option<FocusHandle>,
     disabled: bool,
@@ -315,6 +320,7 @@ impl NodeSpec {
             id: id.into(),
             role,
             parent: None,
+            labels: None,
             text: None,
             focus: None,
             disabled: false,
@@ -397,6 +403,15 @@ impl NodeSpec {
         self
     }
 
+    /// Names the control this node labels.
+    ///
+    /// A label is rarely an ancestor of the field it names, so the
+    /// association is published rather than inferred from the tree.
+    pub fn labels(mut self, control: impl Into<SharedString>) -> Self {
+        self.labels = Some(control.into());
+        self
+    }
+
     pub fn focus(mut self, focus: &FocusHandle) -> Self {
         self.focus = Some(focus.clone());
         self
@@ -467,6 +482,7 @@ fn probe(registry: &SemanticRegistry, spec: NodeSpec) -> impl IntoElement {
                 id: spec.id.to_string(),
                 role: spec.role,
                 parent: spec.parent.as_ref().map(ToString::to_string),
+                labels: spec.labels.as_ref().map(ToString::to_string),
                 text: spec.text.as_ref().map(|text| redact_sensitive_text(text)),
                 bounds: rect,
                 visible: rect.area() > 0.0,

@@ -11,7 +11,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space};
 
 use crate::display::badge::Tone;
-use crate::foundation::{Disableable, Ident, StyledExt};
+use crate::foundation::{Disableable, Ident, Selectable, StyledExt};
 
 type RemoveHandler = Rc<dyn Fn(&mut Window, &mut App)>;
 
@@ -25,6 +25,7 @@ pub struct Tag {
     label: SharedString,
     tone: Tone,
     disabled: bool,
+    selected: bool,
     on_remove: Option<RemoveHandler>,
 }
 
@@ -47,6 +48,7 @@ impl Tag {
             label: label.into(),
             tone: Tone::Neutral,
             disabled: false,
+            selected: false,
             on_remove: None,
         }
     }
@@ -65,6 +67,15 @@ impl Tag {
 impl Disableable for Tag {
     fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
+        self
+    }
+}
+
+/// A tag the keyboard has singled out, which is not the same as a tag that is
+/// gone: the selection is what the next keystroke would act on.
+impl Selectable for Tag {
+    fn selected(mut self, selected: bool) -> Self {
+        self.selected = selected;
         self
     }
 }
@@ -117,8 +128,11 @@ impl RenderOnce for Tag {
             .py(px(2.0))
             .radius(&theme, Radius::Pill)
             .border(px(theme.borders.hairline))
-            .border_color(color.opacity(0.4))
-            .bg(color.opacity(0.12))
+            .border_color(color.opacity(if self.selected { 1.0 } else { 0.4 }))
+            .bg(color.opacity(if self.selected { 0.28 } else { 0.12 }))
+            .when(self.selected, |element| {
+                element.shadow(theme.selected_ring())
+            })
             .text_size(px(theme.typography.caption.size))
             .text_color(color)
             .when(self.disabled, |element| {
@@ -130,6 +144,7 @@ impl RenderOnce for Tag {
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::Text)
                     .disabled(self.disabled)
+                    .selected(self.selected)
                     .text(self.label.clone()),
             )
     }

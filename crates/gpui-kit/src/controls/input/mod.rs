@@ -36,11 +36,12 @@ use gpui::{
     prelude::FluentBuilder as _, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius};
+use gpui_kit_theme::{ActiveTheme, ControlSize};
 use unicode_segmentation::UnicodeSegmentation;
 
+use crate::controls::field::{FieldState, field_shell};
 use crate::controls::text_edit;
-use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
+use crate::foundation::{Disableable, Ident, Sizable};
 use element::TextElement;
 
 actions!(
@@ -170,6 +171,12 @@ pub enum TextInputEvent {
     Submit,
     /// Editing was abandoned with the cancel key.
     Cancel,
+    /// Backspace was pressed with nothing before the caret to delete.
+    ///
+    /// A bound key never reaches an ancestor listener, so a control that
+    /// composes an input — a tag field, where backspace reaches past the
+    /// start of the text — is told here instead.
+    BackspaceAtStart,
     Focus,
     Blur,
 }
@@ -192,6 +199,8 @@ pub struct TextInput {
     invalid: bool,
     required: bool,
     secret: bool,
+    /// Set when a composing control supplies the frame itself.
+    bare: bool,
     max_length: Option<usize>,
     scroll_offset: Pixels,
     is_selecting: bool,
@@ -225,6 +234,7 @@ impl TextInput {
             invalid: false,
             required: false,
             secret: false,
+            bare: false,
             max_length: None,
             scroll_offset: px(0.0),
             is_selecting: false,
@@ -262,6 +272,16 @@ impl TextInput {
         self
     }
 
+    /// Drops the input's own border and background.
+    ///
+    /// For a control that composes the input with something else — a step
+    /// button, a token list — and draws one [`crate::controls::field::field_shell`]
+    /// around the lot, so a composed field is not two nested frames.
+    pub fn bare(mut self, bare: bool) -> Self {
+        self.bare = bare;
+        self
+    }
+
     /// Refuses input past a length in bytes of UTF-8.
     pub fn max_length(mut self, max_length: usize) -> Self {
         self.max_length = Some(max_length);
@@ -284,6 +304,29 @@ impl TextInput {
         self.marked_range = None;
         self.scroll_offset = px(0.0);
         cx.emit(TextInputEvent::Change(self.content.clone()));
+        cx.notify();
+    }
+
+    pub fn set_placeholder(
+        &mut self,
+        placeholder: impl Into<SharedString>,
+        cx: &mut Context<Self>,
+    ) {
+        self.placeholder = placeholder.into();
+        cx.notify();
+    }
+
+    /// Replaces the text without reporting a change.
+    ///
+    /// For a composing control that is putting its owner's value on screen:
+    /// nobody asked for that text, so reporting it as an edit would send the
+    /// host a change it made itself.
+    pub fn set_text_quietly(&mut self, value: impl Into<SharedString>, cx: &mut Context<Self>) {
+        self.content = value.into();
+        let end = self.content.len();
+        self.selected_range = end..end;
+        self.marked_range = None;
+        self.scroll_offset = px(0.0);
         cx.notify();
     }
 
@@ -499,6 +542,10 @@ impl TextInput {
 
     fn backspace(&mut self, _: &Backspace, window: &mut Window, cx: &mut Context<Self>) {
         if self.selected_range.is_empty() {
+            if self.cursor_offset() == 0 {
+                cx.emit(TextInputEvent::BackspaceAtStart);
+                return;
+            }
             self.select_to(self.previous_boundary(self.cursor_offset()), cx);
         }
         self.replace_text_in_range(None, "", window, cx);
@@ -836,8 +883,20 @@ impl Render for TextInput {
         let metrics = theme.control.get(self.size);
         let focused = self.focus_handle.is_focused(window);
         let spec = self.semantics(window);
+        let shell = if self.bare {
+            div().w_full().flex().flex_row().items_center()
+        } else {
+            field_shell(
+                &theme,
+                self.size,
+                FieldState::default()
+                    .focused(focused)
+                    .invalid(self.invalid)
+                    .disabled(self.disabled),
+            )
+        };
 
-        div()
+        shell
             .id(self.ident.element_id())
             .key_context(KEY_CONTEXT)
             .track_focus(&self.focus_handle)
@@ -873,34 +932,7 @@ impl Render for TextInput {
                     .on_mouse_up_out(MouseButton::Left, cx.listener(Self::on_mouse_up))
                     .cursor(CursorStyle::IBeam)
             })
-            .w_full()
-            .flex()
-            .items_center()
             .h(px(metrics.height))
-            .px(px(metrics.padding_x))
-            .radius(&theme, Radius::Control)
-            .border(px(if focused {
-                theme.borders.thick
-            } else {
-                theme.borders.hairline
-            }))
-            .border_color(if self.invalid {
-                theme.colors.danger
-            } else if focused {
-                theme.colors.focus
-            } else {
-                theme.colors.hairline
-            })
-            .bg(theme
-                .colors
-                .hover
-                .opacity(if self.disabled { 0.12 } else { 0.25 }))
-            .text_size(px(metrics.font_size))
-            .text_color(if self.disabled {
-                theme.colors.text_faint
-            } else {
-                theme.colors.text
-            })
             .child(TextElement::new(cx.entity()))
             .semantic_in(cx, spec)
     }

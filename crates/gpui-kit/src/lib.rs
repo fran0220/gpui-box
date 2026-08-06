@@ -34,11 +34,19 @@ use gpui::App;
 
 /// Everything a view needs to build with this library.
 pub mod prelude {
-    pub use crate::controls::button::{Button, ButtonVariant, IconPosition};
-    pub use crate::controls::field::{FieldFrame, SearchFrame};
+    pub use crate::controls::button::{
+        Button, ButtonGroup, ButtonJoin, ButtonVariant, IconButton, IconPosition,
+    };
+    pub use crate::controls::combobox::{Combobox, ComboboxEvent};
+    pub use crate::controls::field::{FieldFrame, FieldState, SearchFrame, field_shell};
+    pub use crate::controls::form_field::FormField;
     pub use crate::controls::input::{TextInput, TextInputEvent};
+    pub use crate::controls::number_input::{NumberInput, NumberInputEvent};
+    pub use crate::controls::segmented::{Segment, SegmentedControl};
     pub use crate::controls::select::{Select, SelectEvent, SelectOption};
     pub use crate::controls::slider::Slider;
+    pub use crate::controls::split_button::SplitButton;
+    pub use crate::controls::tag_input::{TagInput, TagInputEvent};
     pub use crate::controls::textarea::{TextArea, TextAreaEvent};
     pub use crate::controls::toggle::{Checkbox, Radio, Switch};
     pub use crate::data::{
