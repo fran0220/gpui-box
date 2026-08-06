@@ -41,6 +41,8 @@ pub mod prelude {
         ActiveTheme, ControlSize, Density, Disableable, Elevation, Ident, Layer, Selectable,
         Sizable, StyledExt, ThemeRegistry, activate_theme, set_density,
     };
+    pub use crate::motion::{Presence, Transition};
+    pub use crate::overlay::{FocusTrap, Kbd, Overlay, Placement};
     pub use crate::state::{AsyncStatus, AsyncValue, Loadable};
 }
 
