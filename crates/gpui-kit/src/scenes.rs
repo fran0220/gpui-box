@@ -4,12 +4,13 @@
 //! gallery and the audit tests consume, so a component cannot be reviewed
 //! visually in one arrangement and tested in another.
 
-use gpui::{AnyElement, App, Entity, Global, IntoElement, Window, div, prelude::*, px};
+use gpui::{AnyElement, App, Entity, Focusable, Global, IntoElement, Window, div, prelude::*, px};
 use gpui_kit_assets::Icon;
 use gpui_kit_theme::{Space, Theme};
 
 use crate::controls::input::TextInput;
 use crate::controls::select::{Select, SelectOption};
+use crate::controls::textarea::TextArea;
 use crate::display::badge::Tone;
 use crate::foundation::ActiveTheme;
 use crate::overlay::{Kbd, Overlay, Placement, Tooltip, Tooltipped};
@@ -59,6 +60,10 @@ pub fn catalog() -> Vec<Scene> {
         Scene {
             name: "input",
             build: input,
+        },
+        Scene {
+            name: "textarea",
+            build: textarea,
         },
         Scene {
             name: "content",
@@ -574,11 +579,14 @@ struct SceneInputs {
     disabled: Entity<TextInput>,
     invalid: Entity<TextInput>,
     provider: Entity<Select>,
+    notes: Entity<TextArea>,
+    review: Entity<TextArea>,
+    frozen: Entity<TextArea>,
 }
 
 impl Global for SceneInputs {}
 
-fn input(window: &mut Window, cx: &mut App) -> AnyElement {
+fn ensure_inputs(window: &mut Window, cx: &mut App) {
     if !cx.has_global::<SceneInputs>() {
         let inputs = SceneInputs {
             token: cx.new(|cx| {
@@ -607,9 +615,36 @@ fn input(window: &mut Window, cx: &mut App) -> AnyElement {
                     .selected("anthropic")
                     .placeholder("Choose a provider")
             }),
+            notes: cx.new(|cx| {
+                TextArea::new("scene.textarea.notes", window, cx)
+                    .text(
+                        "The refusal is shown exactly as the host worded it, and the last \
+                         verified value stays on screen.",
+                    )
+                    .rows(3)
+                    .max_rows(6)
+            }),
+            review: cx.new(|cx| {
+                TextArea::new("scene.textarea.review", window, cx)
+                    .placeholder("What changed, and why")
+                    .rows(3)
+            }),
+            frozen: cx.new(|cx| {
+                TextArea::new("scene.textarea.frozen", window, cx)
+                    .text("Set by the administrator.\nThis machine cannot change it.")
+                    .rows(2)
+                    .disabled(true)
+            }),
         };
+        // A caret only paints where the keyboard is, so one area takes it:
+        // otherwise a capture cannot show a caret at all.
+        window.focus(&inputs.review.read(cx).focus_handle(cx), cx);
         cx.set_global(inputs);
     }
+}
+
+fn input(window: &mut Window, cx: &mut App) -> AnyElement {
+    ensure_inputs(window, cx);
     let inputs = cx.global::<SceneInputs>();
     let (token, disabled, invalid, provider) = (
         inputs.token.clone(),
@@ -629,6 +664,28 @@ fn input(window: &mut Window, cx: &mut App) -> AnyElement {
         .child(disabled)
         .child(invalid)
         .child(provider)
+        .into_any_element()
+}
+
+fn textarea(window: &mut Window, cx: &mut App) -> AnyElement {
+    ensure_inputs(window, cx);
+    let inputs = cx.global::<SceneInputs>();
+    let (notes, review, frozen) = (
+        inputs.notes.clone(),
+        inputs.review.clone(),
+        inputs.frozen.clone(),
+    );
+    let theme = cx.theme().clone();
+
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(theme.space(Space::Md)))
+        .p(px(theme.space(Space::Lg)))
+        .w(px(360.0))
+        .child(notes)
+        .child(review)
+        .child(frozen)
         .into_any_element()
 }
 

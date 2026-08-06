@@ -38,6 +38,7 @@ pub mod prelude {
     pub use crate::controls::input::{TextInput, TextInputEvent};
     pub use crate::controls::select::{Select, SelectEvent, SelectOption};
     pub use crate::controls::slider::Slider;
+    pub use crate::controls::textarea::{TextArea, TextAreaEvent};
     pub use crate::controls::toggle::{Checkbox, Radio, Switch};
     pub use crate::display::avatar::Avatar;
     pub use crate::display::badge::{Badge, Tone};
@@ -65,4 +66,5 @@ pub fn install(cx: &mut App) {
     gpui_kit_theme::Theme::install(cx);
     gpui_kit_semantics::install(cx);
     controls::input::install(cx);
+    controls::textarea::install(cx);
 }

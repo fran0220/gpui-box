@@ -11,6 +11,7 @@ that must survive a frame is a view.
 |---|---|---|---|
 | `Button` | builder | click | No handler is installed while disabled or loading |
 | `TextInput` | view | change, submit, cancel, focus, blur | Grapheme-aware editing, input-method composition, masking, length limit |
+| `TextArea` | view | change, submit, cancel, focus, blur | Wrapped multi-line editing. Enter inserts a line and the primary modifier plus enter submits. Motion follows visual rows with a preserved goal column, and the frame grows from `rows` to `max_rows` before it scrolls |
 | `Select` | view | selected, opened, closed | Owns only whether the menu is open |
 | `Checkbox` | builder | next state | Supports a mixed state for a group that disagrees |
 | `Radio` | builder | selection | The group is owned by the caller |
@@ -62,7 +63,6 @@ of moving its own checkmark.
 
 These are known gaps rather than deliberate omissions:
 
-- `TextArea`: multi-line editing with wrapped shaping and vertical motion.
 - `Table`, `Tree`, virtualized `List`: large data surfaces.
 - `Toast`: transient notifications with a stack and a timer.
 

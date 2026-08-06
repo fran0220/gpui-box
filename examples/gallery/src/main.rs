@@ -50,6 +50,7 @@ struct Gallery {
     provider: Entity<Select>,
     token: Entity<TextInput>,
     rejected: Entity<TextInput>,
+    notes: Entity<TextArea>,
     confirm: Entity<Dialog>,
 }
 
@@ -157,7 +158,8 @@ impl Render for Gallery {
                             .child(self.search.clone())
                             .child(self.token.clone())
                             .child(self.rejected.clone())
-                            .child(self.provider.clone()),
+                            .child(self.provider.clone())
+                            .child(self.notes.clone()),
                     )
                     .child(recipes::section_title(&theme, "Choices"))
                     .child(
@@ -643,6 +645,12 @@ fn main() {
                                 .text("not an email")
                                 .invalid(true)
                                 .required(true)
+                        }),
+                        notes: cx.new(|cx| {
+                            TextArea::new("gallery.notes", window, cx)
+                                .placeholder("What changed, and why")
+                                .rows(3)
+                                .max_rows(8)
                         }),
                         confirm: cx.new(|cx| {
                             Dialog::new("gallery.confirm", window, cx)
