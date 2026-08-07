@@ -4482,6 +4482,7 @@ fn server_list(_window: &mut Window, cx: &mut App) -> AnyElement {
 struct SceneOrdinary {
     menubar: Entity<Menubar>,
     hover_card: Entity<HoverCard>,
+    copy_idle: Entity<CopyButton>,
     copy: Entity<CopyButton>,
     copy_refused: Entity<CopyButton>,
 }
@@ -4562,9 +4563,21 @@ fn ensure_ordinary(window: &mut Window, cx: &mut App) {
     });
     hover_card.update(cx, |card, cx| card.open(cx));
 
+    // Nobody has pressed this one. It is the state a reader sees almost all
+    // of the time, and it was the one state of the three no image held.
+    let copy_idle = cx.new(|cx| {
+        CopyButton::new("scene.copy-idle", window, cx)
+            .text("run-4821-9f3a")
+            .copier(|_, _| Ok(()))
+    });
+
+    // The confirmation outlives the capture. At its ordinary length it expires
+    // partway through a run, so which of the two states this scene showed
+    // depended on how long the run took to reach it.
     let copy = cx.new(|cx| {
         CopyButton::new("scene.copy", window, cx)
             .text("run-4821-9f3a")
+            .confirmation(std::time::Duration::from_secs(60 * 60))
             .copier(|_, _| Ok(()))
     });
     copy.update(cx, |button, cx| button.copy(cx));
@@ -4579,6 +4592,7 @@ fn ensure_ordinary(window: &mut Window, cx: &mut App) {
     cx.set_global(SceneOrdinary {
         menubar,
         hover_card,
+        copy_idle,
         copy,
         copy_refused,
     });
@@ -4698,10 +4712,13 @@ fn menubar(window: &mut Window, cx: &mut App) -> AnyElement {
 fn copy_button(window: &mut Window, cx: &mut App) -> AnyElement {
     ensure_ordinary(window, cx);
     let scene = cx.global::<SceneOrdinary>();
+    let idle = scene.copy_idle.clone();
     let copied = scene.copy.clone();
     let refused = scene.copy_refused.clone();
     let theme = cx.theme().clone();
     stack(&theme)
+        .child(caption(&theme, "Nobody has pressed it yet"))
+        .child(idle)
         .child(caption(&theme, "The clipboard took it"))
         .child(copied)
         .child(caption(&theme, "It did not go through, and says so"))
