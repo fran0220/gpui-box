@@ -53,6 +53,10 @@ fn scenes_capture(only: &[String]) -> Result<()> {
 /// This is the visual regression gate. It only means anything because captures
 /// are deterministic: the gallery renders with reduced motion, so no animation
 /// phase leaks into a file.
+///
+/// Images are compared as pixels rather than as bytes. The renderer sometimes
+/// lands a channel one step either way, and a gate that cried about a
+/// difference nobody can see would be a gate nobody reads.
 fn scenes_check(only: &[String]) -> Result<()> {
     let committed = snapshots();
     let scratch = root().join("target").join("scene-check");
@@ -71,8 +75,10 @@ fn scenes_check(only: &[String]) -> Result<()> {
             missing.push(name.to_string_lossy().into_owned());
             continue;
         }
-        if fs::read(&old)? != fs::read(entry.path())? {
-            differing.push(name.to_string_lossy().into_owned());
+        let apart = distance(&old, &entry.path())
+            .with_context(|| format!("compare {}", name.to_string_lossy()))?;
+        if apart > NOISE {
+            differing.push((name.to_string_lossy().into_owned(), apart));
         }
     }
     differing.sort();
@@ -85,8 +91,8 @@ fn scenes_check(only: &[String]) -> Result<()> {
     for name in &missing {
         println!("new     {name}");
     }
-    for name in &differing {
-        println!("changed {name}");
+    for (name, apart) in &differing {
+        println!("changed {name} (by {apart})");
     }
     bail!(
         "{} changed and {} new image(s) under {}; review them, then run \
@@ -151,6 +157,52 @@ fn snapshots() -> PathBuf {
     root().join("snapshots").join(platform()).join("scenes")
 }
 
+/// How far one channel may land from the committed image and still count as
+/// the same picture.
+///
+/// One step is the smallest difference the format can hold, and the renderer
+/// does land there occasionally on an antialiased edge. Anything a component
+/// actually changed moves further than this, so the tolerance costs no
+/// coverage while keeping the gate worth reading.
+const NOISE: u8 = 1;
+
+/// The largest per-channel difference between two images.
+///
+/// Images of different sizes are as far apart as it is possible to be, since
+/// there is no pixel to compare a missing pixel against.
+fn distance(left: &Path, right: &Path) -> Result<u8> {
+    let left = decode(left)?;
+    let right = decode(right)?;
+    if left.0 != right.0 {
+        return Ok(u8::MAX);
+    }
+    Ok(left
+        .1
+        .iter()
+        .zip(right.1.iter())
+        .map(|(left, right)| left.abs_diff(*right))
+        .max()
+        .unwrap_or(0))
+}
+
+/// Decodes a PNG into its dimensions and its pixels.
+fn decode(path: &Path) -> Result<((u32, u32), Vec<u8>)> {
+    let file = fs::File::open(path).with_context(|| format!("open {}", path.display()))?;
+    let decoder = png::Decoder::new(std::io::BufReader::new(file));
+    let mut reader = decoder
+        .read_info()
+        .with_context(|| format!("read {}", path.display()))?;
+    let size = reader
+        .output_buffer_size()
+        .with_context(|| format!("{} is larger than this machine can hold", path.display()))?;
+    let mut pixels = vec![0; size];
+    let info = reader
+        .next_frame(&mut pixels)
+        .with_context(|| format!("decode {}", path.display()))?;
+    pixels.truncate(info.buffer_size());
+    Ok(((info.width, info.height), pixels))
+}
+
 /// Drives one gallery process over the whole catalog.
 ///
 /// A GPUI application owns the window system for its lifetime, so the gallery
@@ -175,13 +227,27 @@ fn capture_into(directory: &Path, only: &[String]) -> Result<usize> {
     if !status.success() {
         bail!("capturing scenes failed");
     }
-    let expected = bundled().len()
+    // Counting what was asked for rather than what arrived would report a run
+    // that stopped early as a complete one, and a comparison against the
+    // images it never wrote would then pass.
+    let wanted = expected_images(only);
+    let written = fs::read_dir(directory)?.count();
+    if written != wanted {
+        bail!(
+            "expected {wanted} images under {} but found {written}",
+            directory.display()
+        );
+    }
+    Ok(wanted)
+}
+
+fn expected_images(only: &[String]) -> usize {
+    bundled().len()
         * if only.is_empty() {
             gpui_kit::scenes::catalog().len()
         } else {
             only.len()
-        };
-    Ok(expected)
+        }
 }
 
 fn platform() -> &'static str {

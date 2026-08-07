@@ -1644,7 +1644,13 @@ fn main() {
             cx.spawn(async move |cx| {
                 match capture_catalog(window, &directory, only.as_deref(), cx).await {
                     Ok(count) => println!("captured {count} images into {}", directory.display()),
-                    Err(error) => eprintln!("gallery capture failed: {error:#}"),
+                    Err(error) => {
+                        // Quitting on its own would leave a zero exit status,
+                        // and a caller comparing images would then read a run
+                        // that stopped early as a run that agreed.
+                        eprintln!("gallery capture failed: {error:#}");
+                        std::process::exit(1);
+                    }
                 }
                 cx.update(|cx| cx.quit())
             })
@@ -1680,7 +1686,11 @@ const SETTLE_POLL: Duration = Duration::from_millis(80);
 const SETTLE_FLOOR: Duration = Duration::from_millis(500);
 
 /// How long a single image may take to settle before the run gives up.
-const SETTLE_LIMIT: Duration = Duration::from_millis(4000);
+///
+/// Generous on purpose: giving up writes no file and fails the run, so the
+/// cost of waiting too long is a slow capture and the cost of not waiting long
+/// enough is a red gate on a machine that was merely busy.
+const SETTLE_LIMIT: Duration = Duration::from_millis(15_000);
 
 /// Moves the tracked pointer off the window before a capture.
 ///
@@ -1726,6 +1736,10 @@ async fn settled_frame(
             gpui_kit_testkit::capture::capture_window(window)
         })??;
         if previous.is_some_and(|previous| *previous == frame) {
+            // Still showing the image just written. Ask for the frame again
+            // rather than only waiting: a single redraw request that did not
+            // land would otherwise wedge this loop until it gave up.
+            window.update(cx, |_, window, _| window.refresh())?;
             last = None;
             continue;
         }
@@ -1754,6 +1768,11 @@ async fn capture_catalog(
     cx: &mut gpui::AsyncApp,
 ) -> Result<usize> {
     std::fs::create_dir_all(directory)?;
+    // A window the platform is not compositing keeps handing the window server
+    // the frame it drew last, so a capture reads the previous scene for as long
+    // as the application sits in the background. Being frontmost is a
+    // precondition for grabbing anything, not a preference.
+    cx.update(|cx| cx.activate(true));
     let wanted = |name: &str| only.is_none_or(|only| only.iter().any(|only| only == name));
     if let Some(only) = only {
         for name in only {

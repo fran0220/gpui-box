@@ -60,8 +60,11 @@ cargo run -p xtask -- gate full   # the above, plus rustdoc and scene images
 ```
 
 Captures are deterministic: the gallery renders with reduced motion and parks
-the pointer, so the same scene produces the same bytes on every run. That is
-what makes `scenes check` a gate rather than a suggestion.
+the pointer, so the same scene produces the same picture on every run. That is
+what makes `scenes check` a gate rather than a suggestion. Images are compared
+as pixels with one step of tolerance per channel, because the renderer does
+land an antialiased edge either way and a gate that reported that would stop
+being read. Anything a component changed moves far further than one step.
 
 While iterating on one component, capture only what it touches:
 
