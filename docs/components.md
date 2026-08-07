@@ -264,6 +264,30 @@ marks it with `Cell::published`, under the id `<row id>.<column key>`. A
 sortable header publishes a `Button` carrying its current direction in `value`;
 a header that does not sort publishes a `Cell` and installs no handler.
 
+## Date and time
+
+| Component | Kind | Reports | Notes |
+|---|---|---|---|
+| `Calendar` | view | the day that was picked, the month now shown, and the day under the pointer | A month grid over a host-supplied `DateAdapter`. Every weekday heading, month name, day label, block reason, and the notion of today comes from the adapter. Arrows, page up and page down, and a step off the edge of the grid all move the month through `shift_month`, so a host that refuses a month refuses every route into it |
+| `DateInput` | view | a day the adapter read, text it would not read, opened, closed, submit | A field with that calendar in a popover. Text the adapter refuses stays exactly where the typist left it, the field publishes `invalid`, and the adapter's message is shown word for word |
+| `RangePicker` | view | a day picked as a start, and a day picked as an end | Two ends over one calendar. Unset, incomplete, complete, and end-before-start are four states rather than three and an error, and a blocked day inside a range is named in the host's own words |
+| `TimeInput` | view | the time as it now stands | Hour, minute, optionally second, and a meridiem only when the host's `Clock` has one. Segments step within the clock's bounds and stop there rather than rolling over |
+
+### This crate owns no calendar
+
+There is no calendar system, no time-zone database, no locale, and no notion of
+today anywhere in these four components. `Day` and `MonthKey` are opaque
+integers the adapter mints; the components carry them, compare them, and hand
+them back, and nothing here ever adds a day to a date. An adapter that answers
+`None` to `today`, to `shift_month`, or to `days_in` is answering, not failing,
+and each of those has a rendered consequence rather than a guess: a calendar
+with no month to show says so instead of opening on one it chose. The trait a
+host implements, method by method, is in `docs/datetime.md`.
+
+The reference calendar the scenes and tests run on is behind the `fixtures`
+cargo feature, off by default, so a host cannot reach a half-correct calendar
+from the component path.
+
 ## Interaction
 
 | Component | Kind | Reports | Notes |
@@ -331,11 +355,12 @@ section states the reason once above its rows rather than once per row.
 ### The timeline does not know what time it is
 
 `Timeline` takes times and day headings as finished strings. Turning an instant
-into words is calendar, time-zone and locale work — the same reason
-`docs/coverage.md` puts date pickers out of scope — so whoever owns the clock
-owns the wording. An entry with no known time is neither floated to the top nor
-dropped to the bottom: it says its time is unknown and publishes `time unknown`
-as its value.
+into words is calendar, time-zone and locale work, which this crate does not
+do: the date components push the same work out to a `DateAdapter` rather than
+guessing at it, and a timeline entry's wording is pushed out one step further,
+to whoever already holds the clock. An entry with no known time is neither
+floated to the top nor dropped to the bottom: it says its time is unknown and
+publishes `time unknown` as its value.
 
 ## What every component agrees on
 

@@ -16,6 +16,9 @@
 //! - [`display`] — status, grouping, and waiting vocabulary.
 //! - [`navigation`] — tabs, accordions, trails, rails, and pages.
 //! - [`data`] — list, table, and tree.
+//! - [`datetime`] — calendar, date field, range, and time, over a
+//!   host-supplied [`DateAdapter`](datetime::DateAdapter). This crate owns no
+//!   calendar.
 //! - [`layout`] — split panes, scroll areas, and toolbars.
 //! - [`overlay`] — anchored and modal surfaces, menus, notifications.
 //! - [`interaction`] — drag and drop, the one gesture that starts in one
@@ -47,6 +50,7 @@
 
 pub mod controls;
 pub mod data;
+pub mod datetime;
 pub mod display;
 pub mod effects;
 pub mod foundation;
@@ -91,6 +95,12 @@ pub mod prelude {
         Align, BulkBar, Cell, Column, ColumnWidth, DataGrid, EditIntent, EditOutcome, EditingCell,
         Expanded, GridColumn, GridRow, List, ListItem, Row, SelectionChange, SelectionMode,
         SortDirection, Table, Tree, TreeNode,
+    };
+    pub use crate::datetime::{
+        BlockedDay, BlockedReport, Calendar, CalendarEvent, Clock, DateAdapter, DateInput,
+        DateInputEvent, Day, DayMark, DayRange, MonthCell, MonthGrid, MonthKey, RangePicker,
+        RangePickerEvent, RangeState, Selectability, SharedDateAdapter, TimeInput, TimeInputEvent,
+        TimeOfDay, TimeSegment,
     };
     pub use crate::display::animated_number::{AnimatedNumber, grouped};
     pub use crate::display::avatar::Avatar;

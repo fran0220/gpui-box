@@ -19,6 +19,7 @@ input, and an entry in `docs/components.md`.
 | Form | `FormField`, `SettingsRow`, `SettingsSection` |
 | Navigation | `Tabs`, `Accordion`, `Breadcrumb`, `Sidebar`, `Pagination`, `Wizard` |
 | Data | `List` (virtualized), `Table`, `DataGrid` (virtualized), `BulkBar`, `Tree` |
+| Date and time | `Calendar`, `DateInput`, `RangePicker`, `TimeInput` |
 | Display | `Badge`, `Tag`, `Avatar`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `StatusDot`, `StatusLine`, `Callout`, `PulseLoader`, `GradientSpinner`, `Skeleton`, `ProgressCircle`, `DescriptionList`, `Timeline` |
 | Overlay | `Overlay`, `Dialog`, `Drawer`, `Popover`, `Menu`, `ContextMenu`, `CommandPalette`, `Tooltip`, `Toast`, `ToastLayer`, `Kbd` |
 | Layout | `SplitPane`, `SplitTree`, `ScrollArea`, `Toolbar` |
@@ -79,15 +80,20 @@ own; both are exercised through every control and overlay that uses them.
 
 ## Out of scope, and why
 
+- **The calendar itself.** `Calendar`, `DateInput`, `RangePicker`, and
+  `TimeInput` are covered; the calendar system, the time-zone database, the
+  locale, and the notion of today underneath them are not, and never will be.
+  Correctness there is calendar, time-zone and locale work, not UI work, and a
+  library that shipped a half-correct calendar would be worse than one that
+  shipped none. So the components own no date arithmetic at all and read every
+  fact from a host-implemented `DateAdapter`; `docs/datetime.md` is the
+  contract. The reference calendar the scenes and tests run on is behind the
+  `fixtures` feature, off by default, so it cannot be mistaken for a default.
 - **Time formatting.** `Timeline` displays times and day headings, and
   formats neither: it takes strings the host has already put into words. The
-  same reasoning that keeps calendars out of this crate keeps
+  same reasoning that keeps the calendar out of this crate keeps
   “two minutes ago” out of it, and the seam is the adapter above the
   component.
-- **Date, time, and calendar pickers.** Correctness here is calendar,
-  time-zone and locale work, not UI work. A library that ships a half-correct
-  calendar is worse than one that ships none, and the honest form of it belongs
-  next to a date library this crate does not have.
 - **Judging a keybinding.** `KeybindingRecorder` captures a keystroke and
   reports it. Whether it clashes with something, and what to do about it, needs
   the keymap, which the host owns; the recorder renders the conflict the host
@@ -111,10 +117,18 @@ own; both are exercised through every control and overlay that uses them.
 1. The answer belongs to the caller. A component holds hover, focus, open, and
    animation state; a value, a selection, a sort, and an expansion belong to
    the host, which is why every one of them reports an intent instead of
-   applying it.
+   applying it. Where a component needs a fact it cannot hold either — what
+   day it is, what a month is called, whether a range's days can be listed —
+   it takes an injected reader for that fact rather than deriving one, and a
+   reader that answers "I don't know" is answering.
 2. A refused or disabled control installs no handler at all.
 3. Loading, empty, unstarted, unavailable, and failed are distinct, and a
-   refusal is never rendered as an absence of data.
+   refusal is never rendered as an absence of data. A question nobody could
+   answer is distinct again: a calendar with no month to show renders
+   unavailable rather than blank, and a range whose days could not be
+   enumerated reports unchecked rather than clear.
 4. Ids come from business identity, never from list position.
-5. Anything visible comes from tokens.
+5. Anything visible comes from tokens. Wording that belongs to the host — a
+   refusal's reason, a month's name, a message saying why text could not be
+   read — is shown verbatim and never authored by a component.
 6. A component that can carry a credential publishes its shape, never its text.

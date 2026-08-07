@@ -7,6 +7,11 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+# The reference calendar the datetime scenes and tests run on. Off by default,
+# so a host cannot reach a fixture calendar from the component path.
+fixtures = []
+
 [dependencies]
 unicode-segmentation.workspace = true
 gpui.workspace = true
@@ -18,6 +23,9 @@ web-time.workspace = true
 
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }
+# The tests drive the datetime scenes, which only exist with the reference
+# calendar compiled in.
+gpui-kit = { path = ".", features = ["fixtures"] }
 gpui-kit-testkit = { workspace = true, features = ["test-support"] }
 
 [lints]

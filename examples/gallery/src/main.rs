@@ -2,6 +2,7 @@ mod recipes;
 
 use std::env;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::sync::OnceLock;
 use std::time::Duration;
 
@@ -11,6 +12,7 @@ use gpui::{
     WindowOptions, div, prelude::*, px, size,
 };
 use gpui_kit::assets::{Icon, icon};
+use gpui_kit::datetime::fixture::FixtureDateAdapter;
 use gpui_kit::overlay::{popover, toast};
 use gpui_kit::prelude::*;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic, SemanticRegistry};
@@ -946,6 +948,8 @@ impl Render for Gallery {
                     .child(detail_section(&theme, window, cx))
                     .child(recipes::section_title(&theme, "Compact progress"))
                     .child(progress_circle_section(&theme))
+                    .child(recipes::section_title(&theme, "Date and time"))
+                    .child(datetime_section(&theme, window, cx))
                     .child(recipes::section_title(&theme, "Drawer"))
                     .child({
                         let drawer = self.filter_drawer.clone();
@@ -2185,6 +2189,118 @@ fn progress_circle_section(theme: &Theme) -> gpui::AnyElement {
             theme,
             "The ring with no extent is tinted whole rather than part-filled, because a part-\
              filled ring would be read as a position.",
+        ))
+        .into_any_element()
+}
+
+/// The four date components, and the window's half of their contract.
+#[derive(Clone)]
+struct GalleryDates {
+    calendar: Entity<Calendar>,
+    field: Entity<DateInput>,
+    range: Entity<RangePicker>,
+    time: Entity<TimeInput>,
+}
+
+impl Global for GalleryDates {}
+
+/// The calendar the date section runs on.
+///
+/// This crate owns no calendar, so the gallery supplies one: the reference
+/// adapter, with its today pinned so the section shows the same March whatever
+/// day the gallery is opened on.
+fn gallery_calendar() -> FixtureDateAdapter {
+    FixtureDateAdapter::pinned(2024, 3, 14)
+        .blocking(2024, 3, 8, "The workspace is frozen for the release.")
+        .blocking(2024, 3, 20, "Nobody is on call that day.")
+}
+
+fn datetime_section(theme: &Theme, window: &mut Window, cx: &mut App) -> gpui::AnyElement {
+    if !cx.has_global::<GalleryDates>() {
+        let host = gallery_calendar();
+        let adapter: SharedDateAdapter = Rc::new(host.clone());
+
+        let calendar = cx.new(|cx| {
+            Calendar::new("gallery.calendar", adapter.clone(), window, cx)
+                .selected([host.day(2024, 3, 14)])
+        });
+        let field = cx.new(|cx| {
+            DateInput::new("gallery.date.field", adapter.clone(), window, cx)
+                .value(host.day(2024, 3, 14))
+        });
+        let range = cx.new(|cx| {
+            RangePicker::new("gallery.date.range", adapter.clone(), window, cx)
+                .range(DayRange::starting(host.day(2024, 3, 11)))
+        });
+        let time = cx.new(|cx| {
+            TimeInput::new("gallery.date.time", adapter, window, cx)
+                .value(TimeOfDay::new(9, 30).with_second(0))
+                .seconds(true)
+        });
+
+        // Neither component moves its own answer, so the selection and the
+        // range below change only because this window applied what was
+        // reported.
+        cx.subscribe(&calendar, |calendar, event: &CalendarEvent, cx| {
+            if let CalendarEvent::Picked(day) = event {
+                let day = *day;
+                calendar.update(cx, |calendar, cx| calendar.set_selection(vec![day], cx));
+            }
+        })
+        .detach();
+        cx.subscribe(&range, |picker, event: &RangePickerEvent, cx| {
+            let event = event.clone();
+            picker.update(cx, |picker, cx| match event {
+                RangePickerEvent::StartPicked(day) => {
+                    picker.set_range(Some(DayRange::starting(day)), cx)
+                }
+                RangePickerEvent::EndPicked(day) => {
+                    if let RangeState::Incomplete { start } = picker.state() {
+                        picker.set_range(Some(DayRange::new(start, day)), cx);
+                    }
+                }
+            });
+        })
+        .detach();
+
+        cx.set_global(GalleryDates {
+            calendar,
+            field,
+            range,
+            time,
+        });
+    }
+    let dates = cx.global::<GalleryDates>().clone();
+
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(theme.spacing.lg))
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .items_start()
+                .flex_wrap()
+                .gap(px(theme.spacing.lg))
+                .child(dates.calendar)
+                .child(dates.range),
+        )
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .items_start()
+                .gap(px(theme.spacing.lg))
+                .child(div().w(px(280.0)).child(dates.field))
+                .child(dates.time),
+        )
+        .child(recipes::footnote(
+            theme,
+            "Every weekday name, month name, block reason, and the notion of today came from the \
+             adapter this window supplied. Pick a second day on the right to close the range; \
+             type something the adapter cannot read into the field and it stays there with the \
+             adapter's own sentence under it.",
         ))
         .into_any_element()
 }

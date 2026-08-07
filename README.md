@@ -127,6 +127,7 @@ effects. See [`docs/compatibility.md`](docs/compatibility.md).
 - [GPUI recipes](docs/gpui-recipes.md)
 - [Motion](docs/motion.md)
 - [Drag and drop](docs/interaction.md)
+- [Date and time](docs/datetime.md)
 - [Migration guide](docs/migration-guide.md)
 - [Agent Skill](skills/building-gpui-product-ui/SKILL.md)
 
