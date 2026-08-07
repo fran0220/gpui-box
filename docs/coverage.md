@@ -138,6 +138,77 @@ own; both are exercised through every control and overlay that uses them.
 - **Carousel, rating, and other marketing patterns.** Not desktop-application
   vocabulary.
 
+## Known gaps, in the order they are being closed
+
+Out of scope above means "will not be built, and here is why". This section is
+the opposite: things a general-purpose library is expected to have that this
+one does not have yet. They are recorded here so that the difference between a
+decision and a debt stays visible.
+
+### Motion, which is where the largest gap is
+
+The primitives in `docs/motion.md` cover a value moving from one state to
+another. They do not yet cover motion that is interrupted, composed, or
+driven by a gesture.
+
+| Gap | Why it matters |
+|---|---|
+| Velocity handover | `Transition::set` restarts from rest when the target changes mid-flight, so a redirected animation visibly stalls. Everything else in this table is easier once a spring carries its own velocity. |
+| Keyframes | Only two endpoints exist, so a value cannot overshoot and return, and there is no way to draw attention without moving something permanently. |
+| Size and shape in `flip` | `flip` records an origin and corrects position only, so an expansion, a collapse, and a card growing into a dialog cannot be continuous. |
+| Shared element transition | Nothing carries identity across two component trees, so a row opening into a detail view is a cut. |
+| Gesture velocity | Drag and drop reports positions and no speed, so there is no inertia, no rubber band, and no flick to dismiss. |
+| Scroll-linked value | Nothing reads scroll offset as an animation input, so a header cannot collapse and a shadow cannot appear on scroll. |
+| Sequencing | `Stagger` applies one delay per index. There is no "after this finishes", and no reverse order on exit. |
+| Interruption and reversal | `Presence` moves between phases but cannot play an entrance backwards when it is cancelled part way. |
+| Perceptual spring parameters | A spring takes stiffness, damping, and mass. Duration and bounce are what a design decision is actually expressed in. |
+
+### Components
+
+Ordinary applications, roughly in the order they are wanted: `Toggle` and
+`ToggleGroup`, `Collapsible`, `HoverCard`, `Menubar`, document-tab vocabulary
+on `Tabs` (dirty, close, overflow), a search field with in-place hit
+highlighting, find and replace, a notification centre holding what `Toast`
+showed, an error boundary for a panel that failed to render, `CopyButton`,
+a read-only code view, an upload list over `Dropzone`, and `AspectRatio`.
+
+Then: mentions in a text field, a segmented one-time-code field, a password
+reveal, `Cascader`, an in-page anchor list, a diagnostics list, search within
+settings, a keymap editor showing conflicts, undo history, and `Sparkline` —
+the one exception worth making to charts being out of scope, because a token
+count over time is a reading, not a chart.
+
+Agent applications need a family this library has none of. A conversation is
+not the unit; a run made of steps is. `ToolCallCard`, `StepList`,
+`ThinkingBlock` — with provider-hidden reasoning distinct from absent
+reasoning — `ApprovalPrompt` and `PermissionMatrix` where the default is
+refusal and the scope of "always" is stated, `CostMeter` and a context gauge
+that says when a number is an estimate, `JsonView`, `SchemaForm`, `ServerList`,
+`ToolCatalog` with per-server attribution because two servers may offer the
+same tool name, `SkillCard`, `LogStream`, and `DiffView`.
+
+### Capabilities that are not components
+
+| Gap | Why it matters |
+|---|---|
+| Text selection | Nothing here can be selected or copied. Reading a rendered answer and keeping it is table stakes, and GPUI does not offer the primitive. |
+| Text range highlighting | No API marks a substring of already-rendered text, which blocks search hits, log filtering, diff, and find-in-page at once. |
+| Writing direction | Nothing reads right-to-left. Every inset is left and right rather than start and end, so this is whole-library work that gets more expensive every batch. |
+| Built-in wording | `Copy`, `Try again`, and `Loading` are English literals inside components. There is no string table, and the same cost curve applies. |
+| Assistive technology | `gpui_kit_semantics` addresses tests, not screen readers. What GPUI can carry to an accessibility API has not been established, and pretending otherwise would be worse than the gap. |
+| Validation vocabulary | `FormField` shows an error it is handed. When to validate, field against form, and validation still in flight have no shared shape. |
+| Composition | There is no `Slot`: a caller cannot replace a node inside a component, only configure it. |
+| Size response | No breakpoint or container query. `Toolbar` overflow is declared rather than measured, which is the same gap seen from one component. |
+| Style escape hatch | Beyond tokens there is no supported way to override one instance. |
+| Non-virtualized `Table` and `Tree` | `List`, `DataGrid`, and `MessageList` virtualize. These two lay out every row. |
+
+### Delivery
+
+No changelog and no stated version policy. No performance budget, so nothing
+fails when a virtualized list gets slower. No published documentation; the
+gallery is local. Publishing to a registry is impossible while GPUI is a git
+dependency.
+
 ## Rules every covered component follows
 
 1. The answer belongs to the caller. A component holds hover, focus, open, and
