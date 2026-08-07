@@ -163,3 +163,111 @@ one of ten costs, and the price is stated rather than hidden:
 that says how many lines it left out — through `Markdown::max_lines` for a
 Markdown body, and through the same wording for a plain one. There is no second
 virtualization in this library and there will not be one.
+
+## Media
+
+`ImageViewer` and `TransportBar` are the same posture from the other side. The
+two surfaces above draw content nobody in the application wrote; these two
+frame content this crate cannot produce at all. **Nothing is fetched and
+nothing is played.**
+
+### An image arrives from the host or not at all
+
+There is no network here and no asset resolution, which is exactly why
+`Markdown` names an image instead of drawing it. `ImageViewer` keeps that rule
+over a whole frame: the picture comes back from `ImageViewer::image`, and a
+host that answers `None` gets a frame naming the image and its source, plus one
+`ImageViewerEvent::ImageRequested`. The request is made once per image for as
+long as the viewer is on screen, so answering it does not provoke another.
+
+Four states are four renderings, and each fails differently:
+
+| State | Means | Drawn as |
+|---|---|---|
+| `Loading` | the host is still fetching | the name, `Loading`, published `busy` |
+| `Unavailable(reason)` | the host could not supply it, and here is why | the name and the host's own sentence, in the warning tone |
+| `Failed(reason)` | the bytes arrived and could not be read | the name and the host's own sentence, published `invalid` |
+| `Ready` | the host has it | the picture, or a frame naming what was not supplied |
+
+A refusal is never an empty frame. A reader shown a blank rectangle cannot tell
+a refusal from an image of nothing, which is the same failure `Markdown`'s
+placeholder exists to avoid.
+
+### A size nobody stated is not the size of the box it was drawn in
+
+Natural dimensions are a caller input. `Contain`, `Cover` and `Actual` are all
+ratios between the source and the frame, and `Actual` in particular claims one
+image pixel per frame pixel — a claim nobody can make about an image whose
+pixel count the host never gave. So a viewer with no dimensions reads
+`Size unknown`, refuses the fit and zoom controls, and hands the picture the
+frame without saying how much of the source that shows. Reporting the rendered
+size as though it were the source's would invent the one fact the host declined
+to give.
+
+The frame's own extent comes from the measurement taken during prepaint, the
+same `layout::measure` cell the slider and the split divider read, because zoom
+at a point and a clamped pan are both arithmetic against a box only layout
+knows. A frame that has not been measured yet states no scale rather than
+stating zero.
+
+Zoom is anchored at the pointer by recording the *image* point that was under
+it and the *frame* point it was under, both normalized. That pair survives a
+zoom the caller has not applied yet: a host that refuses the new scale renders
+at the old one, and the same arithmetic puts the picture back exactly where it
+was. A pan is clamped so the picture cannot be dragged past its own edge, and
+is offered at all only while the picture is larger than the frame.
+
+Stepping never wraps. Past the last image the control is refused — it installs
+no handler at all — and the position is published as `2 of 2`, because a reader
+returned silently to the first image has been told the gallery is endless.
+
+### A duration nobody knows is a state
+
+This is `PageTotal::Unknown` for a timeline, and for the same reason: a page
+count nobody counted is a number nobody can trust, and a live stream has a
+position and no total. `TransportDuration::Unknown` therefore draws **no track
+fraction at all** — no fill, no head, no buffered band — states
+`Duration unknown` where a remaining time would be, and publishes the scrubber
+as a status rather than a slider, because there is no range to slide along. A
+half-filled bar over an unknown total would be reporting a number nobody has.
+
+Scrubbing is refused there too. The forward end of a stream nobody measured is
+the host's to clamp, so an arrow key still reports the position it was asked
+for and the host decides whether that is past the live edge.
+
+### Everything reports, and nothing is applied
+
+`TransportEvent` is the whole vocabulary: `PlayRequested`, `PauseRequested`,
+`SeekPreview`, `SeekRequested`, `VolumeRequested`, `MuteToggled`,
+`SpeedRequested`, `Stepped`. The head is drawn where the caller says it is, so
+a refused seek keeps the position that still holds — the rule every value in
+this library follows.
+
+A scrub reports `SeekPreview` on every move and `SeekRequested` once, on
+release. That split is what lets a host show a preview frame without seeking
+once per pixel. It is the press-move-release gesture the slider and the split
+divider already use, with the track's measured bounds turning a pointer
+position into seconds; the drag is followed on the whole bar rather than on the
+few pixels of the track, so letting go outside it still commits once.
+
+Buffered ranges are drawn as their own band, never folded into the played fill:
+a reader who cannot tell them apart has been told the media is further along
+than it is. A host that supplies no ranges gets no band and no node, so "no
+buffer reported" stays distinguishable from "buffered to the start".
+
+### Waiting is not paused
+
+`TransportState::Buffering` is playing and stalled. It says `Waiting for data`,
+publishes `busy`, and still offers the control that would *stop* playback,
+because nothing has stopped. A stalled transport drawn as paused sends the
+reader to the control that would resume something that never stopped.
+
+### Times come from the host
+
+The crate formats no durations. `elapsed` and `remaining` are finished strings,
+exactly as `Timeline` and `MessageList` take theirs, because turning seconds
+into words is locale work and whoever owns the clock owns the wording. A
+transport given no strings says `Time unknown` rather than counting for itself.
+The numeric position is a separate input, and it is the one that drives the
+track geometry — the picture and the words never come from the same place, so
+neither can quietly stand in for the other.

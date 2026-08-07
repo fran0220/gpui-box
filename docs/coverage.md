@@ -20,7 +20,7 @@ input, and an entry in `docs/components.md`.
 | Navigation | `Tabs`, `Accordion`, `Breadcrumb`, `Sidebar`, `Pagination`, `Wizard` |
 | Data | `List` (virtualized), `Table`, `DataGrid` (virtualized), `BulkBar`, `Tree` |
 | Date and time | `Calendar`, `DateInput`, `RangePicker`, `TimeInput` |
-| Content | `Markdown`, `MessageList` |
+| Content | `Markdown`, `MessageList`, `ImageViewer`, `TransportBar` |
 | Display | `Badge`, `Tag`, `Avatar`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `StatusDot`, `StatusLine`, `Callout`, `PulseLoader`, `GradientSpinner`, `Skeleton`, `ProgressCircle`, `DescriptionList`, `Timeline` |
 | Overlay | `Overlay`, `Dialog`, `Drawer`, `Popover`, `Menu`, `ContextMenu`, `CommandPalette`, `Tooltip`, `Toast`, `ToastLayer`, `Kbd` |
 | Layout | `SplitPane`, `SplitTree`, `ScrollArea`, `Toolbar` |
@@ -118,6 +118,17 @@ own; both are exercised through every control and overlay that uses them.
   reports a retry. Sending anything, deciding what a resend means, and knowing
   whether a message was really read are the transport's, and this crate has no
   transport.
+- **Fetching or decoding an image.** `ImageViewer` frames, zooms and pans an
+  element the host hands it, and names the source when the host hands it
+  nothing. There is no network here and no decoder, so the pixel size of a
+  source is a caller input like every other fact this library cannot hold;
+  a viewer given none says the size is unknown rather than reporting the box
+  it drew.
+- **Playing media.** `TransportBar` reports play, pause, seek, volume, mute,
+  speed and a track step, and applies none of them. Decoding, a clock that
+  advances by itself, and where the live edge of a stream is belong to the
+  player, and this crate has no player — which is why a duration nobody stated
+  is a state rather than a zero.
 - **Charts.** A chart is a data-visualisation library with its own scales,
   axes and accessibility model.
 - **Colour picker, file picker, print dialog.** Platform surfaces; a host

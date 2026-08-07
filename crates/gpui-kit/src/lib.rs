@@ -78,8 +78,10 @@ use gpui::App;
 /// Everything a view needs to build with this library.
 pub mod prelude {
     pub use crate::content::{
-        Attachment, CodeBlock, CodeSpan, DeliveryState, ImageRequest, Markdown, MarkdownEvent,
-        Message, MessageBody, MessageList, Reaction,
+        Attachment, BufferedRange, CodeBlock, CodeSpan, DeliveryState, FitMode, ImageFrame,
+        ImageRequest, ImageSize, ImageState, ImageViewer, ImageViewerEvent, Markdown,
+        MarkdownEvent, Message, MessageBody, MessageList, Reaction, TrackStep, TransportBar,
+        TransportDuration, TransportEvent, TransportState,
     };
     pub use crate::controls::button::{
         Button, ButtonGroup, ButtonJoin, ButtonVariant, IconButton, IconPosition,

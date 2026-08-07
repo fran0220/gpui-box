@@ -294,6 +294,8 @@ from the component path.
 |---|---|---|---|
 | `Markdown` | builder | a link that was taken, an image it did not fetch, a code block that was copied, and the lines truncation left out | Read-only rendered Markdown: headings, prose, emphasis, code, quotes, nested and task lists, links, images, rules, and tables. It parses to an owned tree first and draws that, so what is rendered is what a test can read |
 | `MessageList` | builder | a failed message that should be tried again, and whatever a Markdown body reported | A conversation over the virtualized `List`. Five delivery states, a streaming mark keyed to the message rather than to its text, caller-declared grouping, and following that happens only while the reader is already at the bottom |
+| `ImageViewer` | builder | the fit that was asked for, the image that was stepped to, and an image the host has not supplied | One image at a time, with contain, cover, 1:1, and zoom; the wheel zooms at the pointer and a drag pans, clamped so the picture cannot leave the frame. Loading, unavailable, failed, and ready are four renderings, and dimensions are a caller input |
+| `TransportBar` | builder | play, pause, a preview while scrubbing and one seek on release, volume, mute, speed, and a track step | Playback controls for media this crate does not play. A duration the host does not know is a state, buffered ranges are drawn apart from the played position, and every readout is a string the host wrote |
 
 ### A document is drawn, never obeyed
 
@@ -331,6 +333,34 @@ count — `3 new messages` for arrivals, `3 more messages` for what has always
 been below — which is `ScrollArea`'s "content continues past the view" rule on
 a surface that grows downward. Times are strings the host already wrote, as in
 `Timeline`, and an unrecorded author is `unknown` rather than blank.
+
+### Nothing is fetched, and nothing is played
+
+`ImageViewer` extends `Markdown`'s posture to a whole frame. The crate has no
+network and no asset resolution, so an image arrives from `ImageViewer::image`
+or not at all; a host that answers `None` gets a frame naming the source rather
+than a grey rectangle, and one `ImageRequested` per image rather than one per
+frame. Natural dimensions are a caller input, and an image nobody measured
+reads `Size unknown` and refuses the fit and zoom controls, because a scale is
+a ratio against a size and reporting the box the picture was drawn in would
+invent the fact the host declined to give. Zooming happens at the pointer,
+against the frame measured during prepaint, and a pan is clamped so the picture
+cannot be dragged off its own edge. Stepping past the last image is refused and
+the position is published — `2 of 2` — rather than wrapping silently.
+
+`TransportBar` plays nothing. Every control reports: `PlayRequested`,
+`PauseRequested`, `SeekPreview` on every move of a scrub and `SeekRequested`
+once on release, `VolumeRequested`, `MuteToggled`, `SpeedRequested`, and
+`Stepped`. The head is drawn where the caller says it is, so a refused seek
+keeps the position that still holds. A duration nobody knows is
+`TransportDuration::Unknown`, which is `PageTotal::Unknown` for a timeline: the
+scrubber then shows elapsed, says the total is unknown, and draws no fraction
+at all. Buffered ranges are the host's and are drawn as their own band; a host
+that supplies none gets no band and no node. Elapsed and remaining are strings
+the host wrote, the rule `Timeline` and `MessageList` keep, and buffering while
+playing is a state of its own — a stalled transport says it is waiting, and
+still offers the control that would stop it, because nothing has stopped.
+`docs/content.md` states the whole posture.
 
 ## Interaction
 

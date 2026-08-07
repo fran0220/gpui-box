@@ -249,6 +249,14 @@ pub fn catalog() -> Vec<Scene> {
             name: "conversation",
             build: conversation,
         },
+        Scene {
+            name: "image-viewer",
+            build: image_viewer,
+        },
+        Scene {
+            name: "transport",
+            build: transport,
+        },
     ];
     #[cfg(feature = "fixtures")]
     scenes.extend([
@@ -3190,6 +3198,144 @@ fn conversation(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .visible_rows(2)
                 .body_lines(2)
                 .on_retry(|_, _, _| {}),
+        )
+        .into_any_element()
+}
+
+/// The element a host hands back for an image this crate did not fetch.
+///
+/// A flat fill rather than a picture, because the crate ships no photographs
+/// and a scene has to photograph the same pixels every run.
+fn scene_picture(label: &'static str, cx: &App) -> AnyElement {
+    let theme = cx.theme().clone();
+    div()
+        .size_full()
+        .flex()
+        .items_center()
+        .justify_center()
+        .bg(theme.colors.accent.opacity(0.35))
+        .border(px(theme.borders.thick))
+        .border_color(theme.colors.accent)
+        .text_color(theme.colors.text)
+        .text_size(px(theme.typography.label.size))
+        .child(SharedString::new_static(label))
+        .into_any_element()
+}
+
+fn image_viewer(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(860.0))
+        .child(
+            div()
+                .row()
+                .items_start()
+                .gap(px(theme.spacing.lg))
+                .child(
+                    div().w(px(396.0)).child(
+                        ImageViewer::new(
+                            "scene.image.ready",
+                            [
+                                ImageFrame::new("graph", "The run graph")
+                                    .source("runs/graph.png")
+                                    .natural(1600, 900),
+                                ImageFrame::new("trace", "The failing trace")
+                                    .source("runs/trace.png")
+                                    .natural(1200, 1200),
+                            ],
+                        )
+                        .showing("graph")
+                        .fit(FitMode::Contain)
+                        .height(200.0)
+                        .image(|_, _, cx| Some(scene_picture("Supplied by the host", cx)))
+                        .on_event(|_, _, _| {}),
+                    ),
+                )
+                .child(
+                    div().w(px(396.0)).child(
+                        ImageViewer::new(
+                            "scene.image.refused",
+                            [ImageFrame::new("scan", "Page 4 of the scan")
+                                .source("scans/page-4.tiff")
+                                .natural(2480, 3508)
+                                .unavailable("The workspace is frozen for the release.")],
+                        )
+                        .height(200.0)
+                        .image(|_, _, cx| Some(scene_picture("Supplied by the host", cx)))
+                        .on_event(|_, _, _| {}),
+                    ),
+                ),
+        )
+        .child(
+            Divider::new()
+                .id("scene.image.rule.unmeasured")
+                .label("A size the host never stated"),
+        )
+        .child(
+            div().w(px(396.0)).child(
+                ImageViewer::new(
+                    "scene.image.unmeasured",
+                    [ImageFrame::new("sketch", "A pasted sketch").source("clipboard")],
+                )
+                .height(200.0)
+                .image(|_, _, cx| Some(scene_picture("Size never stated", cx)))
+                .on_event(|_, _, _| {}),
+            ),
+        )
+        .into_any_element()
+}
+
+fn transport(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(640.0))
+        .child(
+            TransportBar::new("scene.transport.playing")
+                .label("Release walkthrough")
+                .state(TransportState::Playing)
+                .position(72.0)
+                .duration(240.0)
+                .elapsed("01:12")
+                .remaining("-02:48")
+                .buffered([BufferedRange::new(0.0, 156.0)])
+                .volume(0.7)
+                .speeds([1.0, 1.5, 2.0], 1.0)
+                .step_seconds(10.0)
+                .has_next(true)
+                .on_event(|_, _, _| {}),
+        )
+        .child(
+            Divider::new()
+                .id("scene.transport.rule.live")
+                .label("A stream nobody measured"),
+        )
+        .child(
+            TransportBar::new("scene.transport.live")
+                .label("Incident bridge")
+                .state(TransportState::Playing)
+                .position(1543.0)
+                .unknown_duration()
+                .elapsed("25:43")
+                .volume(0.4)
+                .on_event(|_, _, _| {}),
+        )
+        .child(
+            Divider::new()
+                .id("scene.transport.rule.stalled")
+                .label("Playing and waiting"),
+        )
+        .child(
+            TransportBar::new("scene.transport.stalled")
+                .label("Release walkthrough")
+                .state(TransportState::Buffering)
+                .position(158.0)
+                .duration(240.0)
+                .elapsed("02:38")
+                .remaining("-01:22")
+                .buffered([BufferedRange::new(0.0, 160.0)])
+                .volume(0.7)
+                .muted(true)
+                .on_event(|_, _, _| {}),
         )
         .into_any_element()
 }

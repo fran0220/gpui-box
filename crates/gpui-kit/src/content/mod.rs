@@ -11,14 +11,25 @@
 //! report rather than open, images are named rather than fetched, and code is
 //! set plain unless the host supplies the colour. `docs/content.md` states the
 //! whole posture, and the delivery vocabulary a conversation speaks.
+//!
+//! The two media surfaces keep the same posture from the other side. Nothing
+//! is fetched, so [`ImageViewer`] draws what the host handed it and names what
+//! it did not; nothing is played, so [`TransportBar`] reports every control
+//! and moves no head. A duration nobody knows is a state, not a zero.
 
+pub mod image_viewer;
 pub mod markdown;
 pub mod message_list;
+pub mod transport;
 
+pub use image_viewer::{FitMode, ImageFrame, ImageSize, ImageState, ImageViewer, ImageViewerEvent};
 pub use markdown::{
     Block, CellAlign, CodeBlock, CodeSpan, Document, ImageRequest, Inline, ListEntry, Markdown,
     MarkdownEvent,
 };
 pub use message_list::{
     Attachment, DeliveryState, Message, MessageBody, MessageList, Reaction, streaming_since,
+};
+pub use transport::{
+    BufferedRange, TrackStep, TransportBar, TransportDuration, TransportEvent, TransportState,
 };

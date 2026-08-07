@@ -952,6 +952,8 @@ impl Render for Gallery {
                     .child(datetime_section(&theme, window, cx))
                     .child(recipes::section_title(&theme, "Conversation and prose"))
                     .child(conversation_section(&theme, cx))
+                    .child(recipes::section_title(&theme, "Media"))
+                    .child(media_section(&theme, cx))
                     .child(recipes::section_title(&theme, "Drawer"))
                     .child({
                         let drawer = self.filter_drawer.clone();
@@ -2487,4 +2489,224 @@ fn report_markdown(event: &MarkdownEvent, cx: &mut App) {
         cx,
         Toast::new("gallery.markdown.note", SharedString::from(note)).tone(Tone::Info),
     );
+}
+
+/// What the media components are showing, on their behalf.
+///
+/// Neither of them applies anything: the fit, the image on screen, and every
+/// part of the transport below change because this window applied what was
+/// reported.
+#[derive(Debug)]
+struct GalleryMedia {
+    fit: FitMode,
+    showing: SharedString,
+    state: TransportState,
+    position: f32,
+    volume: f32,
+    muted: bool,
+    speed: f32,
+}
+
+impl Global for GalleryMedia {}
+
+/// How long the walkthrough runs, in seconds.
+const WALKTHROUGH: f32 = 240.0;
+
+/// The gallery writes its own clock, because the library writes none.
+fn clock(seconds: f32) -> SharedString {
+    let seconds = seconds.max(0.0).round() as i64;
+    SharedString::from(format!("{:02}:{:02}", seconds / 60, seconds % 60))
+}
+
+fn media_section(theme: &Theme, cx: &mut App) -> gpui::AnyElement {
+    if !cx.has_global::<GalleryMedia>() {
+        cx.set_global(GalleryMedia {
+            fit: FitMode::Contain,
+            showing: SharedString::new_static("graph"),
+            state: TransportState::Paused,
+            position: 72.0,
+            volume: 0.7,
+            muted: false,
+            speed: 1.0,
+        });
+    }
+    let media = cx.global::<GalleryMedia>();
+    let (fit, showing) = (media.fit, media.showing.clone());
+    let (state, position, volume, muted, speed) = (
+        media.state,
+        media.position,
+        media.volume,
+        media.muted,
+        media.speed,
+    );
+
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(theme.spacing.lg))
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .items_start()
+                .flex_wrap()
+                .gap(px(theme.spacing.lg))
+                .child(
+                    div().w(px(400.0)).child(
+                        ImageViewer::new(
+                            "gallery.image",
+                            [
+                                ImageFrame::new("graph", "The run graph")
+                                    .source("runs/graph.png")
+                                    .natural(1600, 900),
+                                ImageFrame::new("trace", "The failing trace")
+                                    .source("runs/trace.png")
+                                    .natural(1200, 1200),
+                                ImageFrame::new("scan", "Page 4 of the scan")
+                                    .source("scans/page-4.tiff")
+                                    .natural(2480, 3508)
+                                    .unavailable("The workspace is frozen for the release."),
+                            ],
+                        )
+                        .showing(showing)
+                        .fit(fit)
+                        .height(240.0)
+                        .image(|frame, _, cx| {
+                            let theme = Theme::get(cx).clone();
+                            Some(
+                                div()
+                                    .size_full()
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .bg(theme.colors.accent.opacity(0.35))
+                                    .border(px(theme.borders.thick))
+                                    .border_color(theme.colors.accent)
+                                    .text_color(theme.colors.text)
+                                    .child(SharedString::from(format!(
+                                        "Fixture image for {}",
+                                        frame.label()
+                                    )))
+                                    .into_any_element(),
+                            )
+                        })
+                        .on_event(|event, _, cx| {
+                            match event {
+                                ImageViewerEvent::FitChanged(fit) => {
+                                    let fit = *fit;
+                                    cx.update_global::<GalleryMedia, ()>(|media, _| {
+                                        media.fit = fit
+                                    });
+                                }
+                                ImageViewerEvent::Stepped { id } => {
+                                    let id = id.clone();
+                                    cx.update_global::<GalleryMedia, ()>(|media, _| {
+                                        media.showing = id;
+                                    });
+                                }
+                                ImageViewerEvent::ImageRequested(request) => {
+                                    toast::push(
+                                        cx,
+                                        Toast::new(
+                                            "gallery.image.requested",
+                                            SharedString::from(format!(
+                                                "The viewer asked for {}",
+                                                request.source
+                                            )),
+                                        )
+                                        .tone(Tone::Info),
+                                    );
+                                }
+                            }
+                            cx.refresh_windows();
+                        }),
+                    ),
+                )
+                .child(
+                    div().w(px(400.0)).child(
+                        ImageViewer::new(
+                            "gallery.image.unmeasured",
+                            [ImageFrame::new("sketch", "A pasted sketch").source("clipboard")],
+                        )
+                        .height(240.0)
+                        .image(|_, _, cx| {
+                            let theme = Theme::get(cx).clone();
+                            Some(
+                                div()
+                                    .size_full()
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .bg(theme.colors.raised)
+                                    .text_color(theme.colors.text_muted)
+                                    .child(SharedString::new_static(
+                                        "The host never stated a pixel size",
+                                    ))
+                                    .into_any_element(),
+                            )
+                        })
+                        .on_event(|_, _, _| {}),
+                    ),
+                ),
+        )
+        .child(recipes::footnote(
+            theme,
+            "Scroll on the picture to zoom at the pointer, and drag it once it is larger than \
+             the frame. Nothing was fetched: this window drew both pictures. The right-hand \
+             viewer was given no dimensions, so it says the size is unknown and refuses to \
+             offer a scale rather than reporting the box it was drawn in.",
+        ))
+        .child(
+            TransportBar::new("gallery.transport")
+                .label("Release walkthrough")
+                .state(state)
+                .position(position)
+                .duration(WALKTHROUGH)
+                .elapsed(clock(position))
+                .remaining(SharedString::from(format!(
+                    "-{}",
+                    clock(WALKTHROUGH - position)
+                )))
+                .buffered([BufferedRange::new(0.0, 156.0)])
+                .volume(volume)
+                .muted(muted)
+                .speeds([1.0, 1.5, 2.0], speed)
+                .step_seconds(10.0)
+                .has_next(true)
+                .on_event(|event, _, cx| {
+                    let event = event.clone();
+                    cx.update_global::<GalleryMedia, ()>(|media, _| match event {
+                        TransportEvent::PlayRequested => media.state = TransportState::Playing,
+                        TransportEvent::PauseRequested => media.state = TransportState::Paused,
+                        // A preview is not a seek, so the head stays where it
+                        // is until the reader lets go.
+                        TransportEvent::SeekPreview(_) => {}
+                        TransportEvent::SeekRequested(seconds) => media.position = seconds,
+                        TransportEvent::VolumeRequested(volume) => media.volume = volume,
+                        TransportEvent::MuteToggled => media.muted = !media.muted,
+                        TransportEvent::SpeedRequested(speed) => media.speed = speed,
+                        TransportEvent::Stepped(_) => {}
+                    });
+                    cx.refresh_windows();
+                }),
+        )
+        .child(
+            TransportBar::new("gallery.transport.live")
+                .label("Incident bridge")
+                .state(TransportState::Buffering)
+                .position(1543.0)
+                .unknown_duration()
+                .elapsed(clock(1543.0))
+                .volume(0.4)
+                .on_event(|_, _, _| {}),
+        )
+        .child(recipes::footnote(
+            theme,
+            "The first transport moves because this window applied what it reported; dragging \
+             the scrubber previews continuously and seeks once, on release. The second is a \
+             live stream: it has a position, nobody stated a total, so no fraction is drawn and \
+             no buffer is implied. It is playing and stalled, which is why it says it is \
+             waiting rather than that it is paused.",
+        ))
+        .into_any_element()
 }

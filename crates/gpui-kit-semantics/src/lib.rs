@@ -453,8 +453,16 @@ pub fn install(cx: &mut App) {
 }
 
 pub trait Semantic: Styled + ParentElement + Sized {
-    fn semantic(self, registry: &SemanticRegistry, spec: NodeSpec) -> Self {
-        self.relative().child(probe(registry, spec))
+    fn semantic(mut self, registry: &SemanticRegistry, spec: NodeSpec) -> Self {
+        // The probe measures its parent, so the parent has to be a positioning
+        // context. Forcing that unconditionally would take an absolutely
+        // positioned element out of its stack and collapse it, which is a
+        // silent disappearance rather than an error, so an element that has
+        // already said where it sits keeps its answer.
+        if self.style().position.is_none() {
+            self = self.relative();
+        }
+        self.child(probe(registry, spec))
     }
 
     /// Registers into the global registry, or does nothing when a host has not
