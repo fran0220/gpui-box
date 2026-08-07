@@ -6,7 +6,7 @@ use std::rc::Rc;
 use std::sync::OnceLock;
 use std::time::Duration;
 
-use anyhow::{Result, bail};
+use anyhow::{Context as _, Result, bail};
 use gpui::{
     App, Bounds, Context, Entity, Global, IntoElement, Render, SharedString, Window, WindowBounds,
     WindowOptions, div, prelude::*, px, size,
@@ -1600,6 +1600,14 @@ fn lower_gallery(theme: &Theme, cx: &mut App) -> gpui::AnyElement {
 
 fn main() {
     let capture_path = capture_path();
+    let capture_all = flag("--capture-all").map(PathBuf::from);
+    let only = flag("--only").map(|names| {
+        names
+            .split(',')
+            .map(|name| name.trim().to_owned())
+            .filter(|name| !name.is_empty())
+            .collect::<Vec<_>>()
+    });
     let lower_scene = env::args().any(|argument| argument == "--scene=lower");
     if env::args().any(|argument| argument == "--list-scenes") {
         for scene in gpui_kit::scenes::catalog() {
@@ -1614,6 +1622,13 @@ fn main() {
     let app = gpui_platform::application().with_assets(gpui_kit::assets::Assets);
     app.run(move |cx: &mut App| {
         gpui_kit::install(cx);
+        // A capture is a still frame, so an animation in flight would put an
+        // arbitrary phase into the file. Reduced motion settles a one-shot at
+        // its end and holds a repeating one at its start, which makes the same
+        // scene produce the same bytes on every run.
+        if capture_path.is_some() || capture_all.is_some() {
+            cx.set_reduce_motion(true);
+        }
         if let Some(id) = theme_id.as_deref()
             && !activate_theme(id, cx)
         {
@@ -1622,214 +1637,22 @@ fn main() {
         if compact {
             set_density(Density::Compact, cx);
         }
-        let bounds = Bounds::centered(None, size(px(920.0), px(1000.0)), cx);
-        let _window = cx
-            .open_window(
-                WindowOptions {
-                    window_bounds: Some(WindowBounds::Windowed(bounds)),
-                    ..Default::default()
-                },
-                |window, cx| {
-                    cx.new(|cx| Gallery {
-                        lower_scene,
-                        scene,
-                        queue: gallery_queue(),
-                        attached: Vec::new(),
-                        provider: cx.new(|cx| {
-                            Select::new("gallery.provider", window, cx)
-                                .options([
-                                    SelectOption::new("anthropic", "Anthropic"),
-                                    SelectOption::new("openai", "OpenAI")
-                                        .description("Requires a key"),
-                                    SelectOption::new("local", "Local runtime").disabled(true),
-                                ])
-                                .selected("anthropic")
-                                .placeholder("Choose a provider")
-                        }),
-                        search: cx.new(|cx| {
-                            TextInput::new("gallery.search", window, cx).placeholder("Search")
-                        }),
-                        token: cx.new(|cx| {
-                            TextInput::new("gallery.token", window, cx)
-                                .placeholder("sk-...")
-                                .secret(true)
-                        }),
-                        rejected: cx.new(|cx| {
-                            TextInput::new("gallery.rejected", window, cx)
-                                .text("not an email")
-                                .invalid(true)
-                                .required(true)
-                        }),
-                        notes: cx.new(|cx| {
-                            TextArea::new("gallery.notes", window, cx)
-                                .placeholder("What changed, and why")
-                                .rows(3)
-                                .max_rows(8)
-                        }),
-                        workspace: cx.new(|cx| {
-                            TextInput::new("gallery.workspace", window, cx).text("Runs 2024")
-                        }),
-                        retention: cx.new(|cx| {
-                            NumberInput::new("gallery.retention", window, cx)
-                                .value(30.0)
-                                .range(1.0, 60.0)
-                                .step(5.0)
-                                .unit("days")
-                        }),
-                        region: cx.new(|cx| {
-                            Combobox::new("gallery.region", window, cx)
-                                .options([
-                                    SelectOption::new("eu-west", "Europe (Ireland)"),
-                                    SelectOption::new("eu-north", "Europe (Stockholm)"),
-                                    SelectOption::new("us-east", "United States (Virginia)"),
-                                    SelectOption::new("ap-south", "Asia Pacific (Mumbai)")
-                                        .disabled(true),
-                                ])
-                                .selected("eu-west")
-                                .placeholder("Choose a region")
-                        }),
-                        labels: cx.new(|cx| {
-                            TagInput::new("gallery.labels", window, cx)
-                                .tags(["indexing", "nightly"])
-                                .placeholder("Add a label")
-                                .max(5)
-                        }),
-                        publish: cx.new(|cx| {
-                            SplitButton::new("gallery.publish", window, cx)
-                                .label("Publish")
-                                .primary()
-                                .on_click(|_, _| {})
-                                .items(
-                                    [
-                                        MenuItem::command("publish.draft", "Save as draft"),
-                                        MenuItem::command("publish.schedule", "Schedule\u{2026}")
-                                            .shortcut("cmd-shift-s"),
-                                        MenuItem::separator("publish.rule"),
-                                        MenuItem::command(
-                                            "publish.export",
-                                            "Export without publishing",
-                                        ),
-                                    ],
-                                    cx,
-                                )
-                        }),
-                        confirm: cx.new(|cx| {
-                            Dialog::new("gallery.confirm", window, cx)
-                                .title("Delete this workspace?")
-                                .description(
-                                    "Everything in it is removed from this machine. \
-                                     The application owns the decision; the dialog reports it.",
-                                )
-                                .destructive(true)
-                                .cancel_label("Keep")
-                                .confirm_label("Delete")
-                        }),
-                        toasts: cx.new(ToastLayer::new),
-                        filters: cx.new(|cx| {
-                            Popover::new("gallery.filters", window, cx)
-                                .trigger("Filters")
-                                .content(|_, cx| {
-                                    let theme = Theme::get(cx).clone();
-                                    div()
-                                        .flex()
-                                        .flex_col()
-                                        .w(px(220.0))
-                                        .gap(px(theme.spacing.sm))
-                                        .child("Anything can live in a popover.")
-                                        .child(
-                                            Checkbox::new("gallery.filters.failing")
-                                                .label("Failing runs only")
-                                                .on_change(|_, _, _| {}),
-                                        )
-                                        .into_any_element()
-                                })
-                        }),
-                        menu: cx.new(|cx| {
-                            Menu::new("gallery.run", window, cx)
-                                .trigger("Run actions")
-                                .items(gallery_menu_items())
-                        }),
-                        records: cx.new(|cx| {
-                            ContextMenu::new("gallery.record", window, cx)
-                                .target("run-a04")
-                                .menu(gallery_menu_items())
-                                .content(|_, cx| {
-                                    let theme = Theme::get(cx).clone();
-                                    div()
-                                        .w(px(360.0))
-                                        .p(px(theme.spacing.md))
-                                        .rounded(px(theme.radii.card))
-                                        .border(px(theme.borders.hairline))
-                                        .border_color(theme.colors.hairline)
-                                        .child("Right-click this fixture row")
-                                        .into_any_element()
-                                })
-                        }),
-                        palette: cx.new(|cx| {
-                            CommandPalette::new("gallery.palette", window, cx)
-                                .commands(gallery_commands())
-                        }),
-                        overflow: cx.new(|cx| {
-                            Menu::new("gallery.toolbar.overflow", window, cx)
-                                .trigger_icon(Icon::List)
-                                .trigger_name("More actions")
-                        }),
-                        page_size: cx.new(|cx| {
-                            Select::new("gallery.pages.size", window, cx)
-                                .options([
-                                    SelectOption::new("25", "25 per page"),
-                                    SelectOption::new("50", "50 per page"),
-                                    SelectOption::new("100", "100 per page"),
-                                ])
-                                .selected("50")
-                        }),
-                        filter_drawer: cx.new(|cx| {
-                            Drawer::new("gallery.drawer", window, cx)
-                                .edge(Edge::Right)
-                                .size(340.0)
-                                .title("Filter runs")
-                                .description(
-                                    "The drawer reports what was chosen. \
-                                     The application decides what it means.",
-                                )
-                                .content(|_, cx| {
-                                    let theme = Theme::get(cx).clone();
-                                    div()
-                                        .flex()
-                                        .flex_col()
-                                        .gap(px(theme.spacing.sm))
-                                        .child(
-                                            Checkbox::new("gallery.drawer.failed")
-                                                .label("Failed runs only")
-                                                .checked(true)
-                                                .on_change(|_, _, _| {}),
-                                        )
-                                        .child(
-                                            Checkbox::new("gallery.drawer.mine")
-                                                .label("Started by me")
-                                                .on_change(|_, _, _| {}),
-                                        )
-                                        .into_any_element()
-                                })
-                                .footer(|_, _| {
-                                    Button::new("gallery.drawer.apply")
-                                        .label("Apply")
-                                        .primary()
-                                        .full_width(true)
-                                        .on_click(|_, _| {})
-                                        .into_any_element()
-                                })
-                        }),
-                    })
-                },
-            )
-            .expect("open gallery window");
+        let window = open_gallery(lower_scene, scene, cx).expect("open gallery window");
 
-        if let Some(path) = capture_path.clone() {
+        if let Some(directory) = capture_all.clone() {
+            let only = only.clone();
             cx.spawn(async move |cx| {
-                cx.background_executor()
-                    .timer(Duration::from_millis(1200))
-                    .await;
+                match capture_catalog(window, &directory, only.as_deref(), cx).await {
+                    Ok(count) => println!("captured {count} images into {}", directory.display()),
+                    Err(error) => eprintln!("gallery capture failed: {error:#}"),
+                }
+                cx.update(|cx| cx.quit())
+            })
+            .detach();
+        } else if let Some(path) = capture_path.clone() {
+            cx.spawn(async move |cx| {
+                let _ = window.update(cx, |_, window, cx| park_pointer(window, cx));
+                cx.background_executor().timer(FIRST_FRAME).await;
                 match capture(&path, cx) {
                     Ok(()) => cx.update(|cx| cx.quit()),
                     Err(error) => {
@@ -1843,6 +1666,344 @@ fn main() {
             cx.activate(true);
         }
     });
+}
+
+/// How long the first frame is given, which is where font loading and the
+/// initial layout are paid for.
+const FIRST_FRAME: Duration = Duration::from_millis(1200);
+
+/// How often a capture is retried while waiting for the window server to catch
+/// up with a scene or theme change.
+const SETTLE_POLL: Duration = Duration::from_millis(80);
+
+/// The least a scene is given before its frames are believed to be settled.
+const SETTLE_FLOOR: Duration = Duration::from_millis(500);
+
+/// How long a single image may take to settle before the run gives up.
+const SETTLE_LIMIT: Duration = Duration::from_millis(4000);
+
+/// Moves the tracked pointer off the window before a capture.
+///
+/// A window inherits the operator's real cursor position when it opens, so a
+/// row happening to sit under the mouse was being captured hovered. That made
+/// the file depend on where someone left the mouse, which is no basis for a
+/// regression gate. This dispatches a move to a point outside the window
+/// instead; the physical cursor is left alone.
+fn park_pointer(window: &mut Window, cx: &mut App) {
+    window.dispatch_event(
+        gpui::PlatformInput::MouseMove(gpui::MouseMoveEvent {
+            position: gpui::point(px(-1.0), px(-1.0)),
+            pressed_button: None,
+            modifiers: gpui::Modifiers::default(),
+        }),
+        cx,
+    );
+}
+
+/// Grabs the window once the change asked for has actually reached the screen.
+///
+/// Capturing reads what the window server last composited, which trails what
+/// GPUI has drawn by an amount nobody gets to know. Sleeping a fixed span and
+/// hoping was writing the previous image into the next file, silently and only
+/// sometimes. A frame counts here once it has stopped changing and is no
+/// longer the image just written, and a run that cannot reach that fails
+/// rather than recording something untrue.
+async fn settled_frame(
+    window: gpui::WindowHandle<Gallery>,
+    previous: Option<&gpui_kit_testkit::capture::Frame>,
+    cx: &mut gpui::AsyncApp,
+) -> Result<gpui_kit_testkit::capture::Frame> {
+    let mut last: Option<gpui_kit_testkit::capture::Frame> = None;
+    let mut waited = Duration::ZERO;
+    // A scene may still be arranging itself when its first two frames already
+    // match, such as an editor that takes focus a frame after it appears, so
+    // stability is only believed once this much has gone by.
+    cx.background_executor().timer(SETTLE_FLOOR).await;
+    while waited < SETTLE_LIMIT {
+        cx.background_executor().timer(SETTLE_POLL).await;
+        waited += SETTLE_POLL;
+        let frame = window.update(cx, |_, window, _| {
+            gpui_kit_testkit::capture::capture_window(window)
+        })??;
+        if previous.is_some_and(|previous| *previous == frame) {
+            last = None;
+            continue;
+        }
+        if last.as_ref() == Some(&frame) {
+            return Ok(frame);
+        }
+        last = Some(frame);
+    }
+    bail!("the window never settled on a new frame within {SETTLE_LIMIT:?}")
+}
+
+/// Renders every scene in every bundled theme from a single process.
+///
+/// A GPUI application owns the window system for its lifetime, so the obvious
+/// shape is one process per image. That pays application startup once per
+/// image and took over twenty minutes. Swapping the scene on the window that
+/// is already open pays it once.
+///
+/// A window opened later is not the one the platform treats as frontmost, and
+/// scenes captured in such a window lost their focus rings and carets, so the
+/// window the application launched with is the one that is reused.
+async fn capture_catalog(
+    window: gpui::WindowHandle<Gallery>,
+    directory: &Path,
+    only: Option<&[String]>,
+    cx: &mut gpui::AsyncApp,
+) -> Result<usize> {
+    std::fs::create_dir_all(directory)?;
+    let wanted = |name: &str| only.is_none_or(|only| only.iter().any(|only| only == name));
+    if let Some(only) = only {
+        for name in only {
+            if gpui_kit::scenes::find(name).is_none() {
+                bail!("unknown scene `{name}`");
+            }
+        }
+    }
+
+    let mut count = 0;
+    let mut first = true;
+    let mut previous: Option<gpui_kit_testkit::capture::Frame> = None;
+    // Scene outside, theme inside. A scene may install state on its first
+    // build that ages, such as a toast that times out, so its two images have
+    // to be taken next to each other rather than a whole catalog apart.
+    for scene in gpui_kit::scenes::catalog() {
+        if !wanted(scene.name) {
+            continue;
+        }
+        for theme in gpui_kit::tokens::bundled() {
+            let id = theme.meta.id.clone();
+            if !cx.update(|cx| activate_theme(&id, cx)) {
+                bail!("unknown theme `{id}`");
+            }
+            window.update(cx, |gallery, window, cx| {
+                gallery.scene = Some(scene.name);
+                park_pointer(window, cx);
+                cx.notify();
+            })?;
+            if first {
+                cx.background_executor().timer(FIRST_FRAME).await;
+                first = false;
+            }
+            let frame = settled_frame(window, previous.as_ref(), cx)
+                .await
+                .with_context(|| format!("capture scene `{}` in `{id}`", scene.name))?;
+            let path = directory.join(format!("{}-{id}.png", scene.name));
+            if frame.write_png(&path)? == 0 {
+                bail!("capturing scene `{}` produced an empty file", scene.name);
+            }
+            previous = Some(frame);
+            count += 1;
+        }
+    }
+    Ok(count)
+}
+
+/// Opens a gallery window.
+///
+/// Capturing the catalog opens one of these per image. A window owns focus
+/// and per-element state, and a scene that was captured after another scene
+/// had focused a field was drawing the wrong thing, so each image gets a
+/// window that has never shown anything else.
+fn open_gallery(
+    lower_scene: bool,
+    scene: Option<&'static str>,
+    cx: &mut App,
+) -> gpui::Result<gpui::WindowHandle<Gallery>> {
+    let bounds = Bounds::centered(None, size(px(920.0), px(1000.0)), cx);
+    cx.open_window(
+        WindowOptions {
+            window_bounds: Some(WindowBounds::Windowed(bounds)),
+            ..Default::default()
+        },
+        |window, cx| {
+            cx.new(|cx| Gallery {
+                lower_scene,
+                scene,
+                queue: gallery_queue(),
+                attached: Vec::new(),
+                provider: cx.new(|cx| {
+                    Select::new("gallery.provider", window, cx)
+                        .options([
+                            SelectOption::new("anthropic", "Anthropic"),
+                            SelectOption::new("openai", "OpenAI").description("Requires a key"),
+                            SelectOption::new("local", "Local runtime").disabled(true),
+                        ])
+                        .selected("anthropic")
+                        .placeholder("Choose a provider")
+                }),
+                search: cx
+                    .new(|cx| TextInput::new("gallery.search", window, cx).placeholder("Search")),
+                token: cx.new(|cx| {
+                    TextInput::new("gallery.token", window, cx)
+                        .placeholder("sk-...")
+                        .secret(true)
+                }),
+                rejected: cx.new(|cx| {
+                    TextInput::new("gallery.rejected", window, cx)
+                        .text("not an email")
+                        .invalid(true)
+                        .required(true)
+                }),
+                notes: cx.new(|cx| {
+                    TextArea::new("gallery.notes", window, cx)
+                        .placeholder("What changed, and why")
+                        .rows(3)
+                        .max_rows(8)
+                }),
+                workspace: cx
+                    .new(|cx| TextInput::new("gallery.workspace", window, cx).text("Runs 2024")),
+                retention: cx.new(|cx| {
+                    NumberInput::new("gallery.retention", window, cx)
+                        .value(30.0)
+                        .range(1.0, 60.0)
+                        .step(5.0)
+                        .unit("days")
+                }),
+                region: cx.new(|cx| {
+                    Combobox::new("gallery.region", window, cx)
+                        .options([
+                            SelectOption::new("eu-west", "Europe (Ireland)"),
+                            SelectOption::new("eu-north", "Europe (Stockholm)"),
+                            SelectOption::new("us-east", "United States (Virginia)"),
+                            SelectOption::new("ap-south", "Asia Pacific (Mumbai)").disabled(true),
+                        ])
+                        .selected("eu-west")
+                        .placeholder("Choose a region")
+                }),
+                labels: cx.new(|cx| {
+                    TagInput::new("gallery.labels", window, cx)
+                        .tags(["indexing", "nightly"])
+                        .placeholder("Add a label")
+                        .max(5)
+                }),
+                publish: cx.new(|cx| {
+                    SplitButton::new("gallery.publish", window, cx)
+                        .label("Publish")
+                        .primary()
+                        .on_click(|_, _| {})
+                        .items(
+                            [
+                                MenuItem::command("publish.draft", "Save as draft"),
+                                MenuItem::command("publish.schedule", "Schedule\u{2026}")
+                                    .shortcut("cmd-shift-s"),
+                                MenuItem::separator("publish.rule"),
+                                MenuItem::command("publish.export", "Export without publishing"),
+                            ],
+                            cx,
+                        )
+                }),
+                confirm: cx.new(|cx| {
+                    Dialog::new("gallery.confirm", window, cx)
+                        .title("Delete this workspace?")
+                        .description(
+                            "Everything in it is removed from this machine. \
+                                     The application owns the decision; the dialog reports it.",
+                        )
+                        .destructive(true)
+                        .cancel_label("Keep")
+                        .confirm_label("Delete")
+                }),
+                toasts: cx.new(ToastLayer::new),
+                filters: cx.new(|cx| {
+                    Popover::new("gallery.filters", window, cx)
+                        .trigger("Filters")
+                        .content(|_, cx| {
+                            let theme = Theme::get(cx).clone();
+                            div()
+                                .flex()
+                                .flex_col()
+                                .w(px(220.0))
+                                .gap(px(theme.spacing.sm))
+                                .child("Anything can live in a popover.")
+                                .child(
+                                    Checkbox::new("gallery.filters.failing")
+                                        .label("Failing runs only")
+                                        .on_change(|_, _, _| {}),
+                                )
+                                .into_any_element()
+                        })
+                }),
+                menu: cx.new(|cx| {
+                    Menu::new("gallery.run", window, cx)
+                        .trigger("Run actions")
+                        .items(gallery_menu_items())
+                }),
+                records: cx.new(|cx| {
+                    ContextMenu::new("gallery.record", window, cx)
+                        .target("run-a04")
+                        .menu(gallery_menu_items())
+                        .content(|_, cx| {
+                            let theme = Theme::get(cx).clone();
+                            div()
+                                .w(px(360.0))
+                                .p(px(theme.spacing.md))
+                                .rounded(px(theme.radii.card))
+                                .border(px(theme.borders.hairline))
+                                .border_color(theme.colors.hairline)
+                                .child("Right-click this fixture row")
+                                .into_any_element()
+                        })
+                }),
+                palette: cx.new(|cx| {
+                    CommandPalette::new("gallery.palette", window, cx).commands(gallery_commands())
+                }),
+                overflow: cx.new(|cx| {
+                    Menu::new("gallery.toolbar.overflow", window, cx)
+                        .trigger_icon(Icon::List)
+                        .trigger_name("More actions")
+                }),
+                page_size: cx.new(|cx| {
+                    Select::new("gallery.pages.size", window, cx)
+                        .options([
+                            SelectOption::new("25", "25 per page"),
+                            SelectOption::new("50", "50 per page"),
+                            SelectOption::new("100", "100 per page"),
+                        ])
+                        .selected("50")
+                }),
+                filter_drawer: cx.new(|cx| {
+                    Drawer::new("gallery.drawer", window, cx)
+                        .edge(Edge::Right)
+                        .size(340.0)
+                        .title("Filter runs")
+                        .description(
+                            "The drawer reports what was chosen. \
+                                     The application decides what it means.",
+                        )
+                        .content(|_, cx| {
+                            let theme = Theme::get(cx).clone();
+                            div()
+                                .flex()
+                                .flex_col()
+                                .gap(px(theme.spacing.sm))
+                                .child(
+                                    Checkbox::new("gallery.drawer.failed")
+                                        .label("Failed runs only")
+                                        .checked(true)
+                                        .on_change(|_, _, _| {}),
+                                )
+                                .child(
+                                    Checkbox::new("gallery.drawer.mine")
+                                        .label("Started by me")
+                                        .on_change(|_, _, _| {}),
+                                )
+                                .into_any_element()
+                        })
+                        .footer(|_, _| {
+                            Button::new("gallery.drawer.apply")
+                                .label("Apply")
+                                .primary()
+                                .full_width(true)
+                                .on_click(|_, _| {})
+                                .into_any_element()
+                        })
+                }),
+            })
+        },
+    )
 }
 
 fn capture_path() -> Option<PathBuf> {

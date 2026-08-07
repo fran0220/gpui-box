@@ -25,3 +25,12 @@ jobs:
       - run: cargo doc --no-deps --workspace
         env:
           RUSTDOCFLAGS: -D warnings
+      # Captures render with reduced motion and a parked pointer, so a scene
+      # produces the same bytes on every machine. A difference here is a real
+      # visual change, not noise.
+      - run: cargo run -p xtask -- scenes check
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scene-check
+          path: target/scene-check

@@ -55,11 +55,36 @@ Do not add product or provider trademarks to the generic asset crate.
 ## Validation
 
 ```bash
-cargo fmt --all -- --check
-cargo check --workspace --all-targets
-cargo test --workspace
-cargo clippy --workspace --all-targets -- -D warnings
-cargo run -p xtask -- tokens check
+cargo run -p xtask -- gate        # fmt, check, test, clippy, tokens
+cargo run -p xtask -- gate full   # the above, plus rustdoc and scene images
 ```
 
-UI changes additionally require a gallery capture and visual inspection.
+Captures are deterministic: the gallery renders with reduced motion and parks
+the pointer, so the same scene produces the same bytes on every run. That is
+what makes `scenes check` a gate rather than a suggestion.
+
+While iterating on one component, capture only what it touches:
+
+```bash
+cargo run -p xtask -- scenes capture list tree   # rewrite these scenes
+cargo run -p xtask -- scenes check list tree     # compare without rewriting
+```
+
+UI changes additionally require visual inspection of the captured images. A
+changed image is a claim about what the component now looks like, so look at
+it before accepting it.
+
+Two things a captured image does not show, both known:
+
+- A repeating animation is held at its first frame and a one-shot at its last,
+  because a still frame of a moving thing is not reproducible. Review motion by
+  running the gallery, not by reading a snapshot.
+- A text caret does not appear once another scene has been rendered in the same
+  run, which is why `data-grid-editing` shows its editor without an insertion
+  point. Rendering that one scene on its own restores it, and that is the way
+  to check it:
+
+  ```bash
+  cargo run -p gpui-kit-gallery -- --scene data-grid-editing \
+      --theme studio-light --capture /tmp/check.png
+  ```

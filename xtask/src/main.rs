@@ -12,12 +12,20 @@ use gpui_kit_tokens::{
 
 fn main() -> Result<()> {
     let mut args = env::args().skip(1);
-    match (args.next().as_deref(), args.next().as_deref()) {
+    let command = (args.next(), args.next());
+    let rest = args.collect::<Vec<_>>();
+    match (command.0.as_deref(), command.1.as_deref()) {
         (Some("tokens"), Some("generate")) => tokens(false),
         (Some("tokens"), Some("check")) => tokens(true),
         (Some("scenes"), Some("list")) => scenes_list(),
-        (Some("scenes"), Some("capture")) => scenes_capture(),
-        _ => bail!("usage: cargo xtask <tokens generate|tokens check|scenes list|scenes capture>"),
+        (Some("scenes"), Some("capture")) => scenes_capture(&rest),
+        (Some("scenes"), Some("check")) => scenes_check(&rest),
+        (Some("gate"), None) => gate(false),
+        (Some("gate"), Some("full")) => gate(true),
+        _ => bail!(
+            "usage: cargo xtask <tokens generate|tokens check|scenes list|\
+             scenes capture [name...]|scenes check [name...]|gate [full]>"
+        ),
     }
 }
 
@@ -28,41 +36,152 @@ fn scenes_list() -> Result<()> {
     Ok(())
 }
 
-/// Renders every scene in every bundled theme to a reviewable image.
+/// Renders scenes in every bundled theme to reviewable images.
 ///
-/// Each capture runs in its own process because a GPUI application owns the
-/// window system for its lifetime.
-fn scenes_capture() -> Result<()> {
-    let directory = root().join("snapshots").join(platform()).join("scenes");
-    fs::create_dir_all(&directory).with_context(|| format!("create {}", directory.display()))?;
+/// Naming scenes captures only those, which is what a change to one component
+/// needs. Naming none captures the catalog.
+fn scenes_capture(only: &[String]) -> Result<()> {
+    let directory = snapshots();
+    let count = capture_into(&directory, only)?;
+    println!("captured {count} images into {}", directory.display());
+    Ok(())
+}
 
-    for theme in bundled() {
-        for scene in gpui_kit::scenes::catalog() {
-            let path = directory.join(format!("{}-{}.png", scene.name, theme.meta.id));
-            let status = Command::new(env!("CARGO"))
-                .args([
-                    "run",
-                    "--quiet",
-                    "-p",
-                    "gpui-kit-gallery",
-                    "--",
-                    "--scene",
-                    scene.name,
-                    "--theme",
-                    &theme.meta.id,
-                    "--capture",
-                ])
-                .arg(&path)
-                .current_dir(root())
-                .status()
-                .with_context(|| format!("capture scene {}", scene.name))?;
-            if !status.success() {
-                bail!("capturing scene `{}` failed", scene.name);
-            }
+/// Captures into a scratch directory and reports every image that differs from
+/// the committed one.
+///
+/// This is the visual regression gate. It only means anything because captures
+/// are deterministic: the gallery renders with reduced motion, so no animation
+/// phase leaks into a file.
+fn scenes_check(only: &[String]) -> Result<()> {
+    let committed = snapshots();
+    let scratch = root().join("target").join("scene-check");
+    if scratch.exists() {
+        fs::remove_dir_all(&scratch).with_context(|| format!("clear {}", scratch.display()))?;
+    }
+    let count = capture_into(&scratch, only)?;
+
+    let mut differing = Vec::new();
+    let mut missing = Vec::new();
+    for entry in fs::read_dir(&scratch)? {
+        let entry = entry?;
+        let name = entry.file_name();
+        let old = committed.join(&name);
+        if !old.exists() {
+            missing.push(name.to_string_lossy().into_owned());
+            continue;
+        }
+        if fs::read(&old)? != fs::read(entry.path())? {
+            differing.push(name.to_string_lossy().into_owned());
         }
     }
-    println!("captured {} scenes", directory.display());
+    differing.sort();
+    missing.sort();
+
+    if differing.is_empty() && missing.is_empty() {
+        println!("{count} images match {}", committed.display());
+        return Ok(());
+    }
+    for name in &missing {
+        println!("new     {name}");
+    }
+    for name in &differing {
+        println!("changed {name}");
+    }
+    bail!(
+        "{} changed and {} new image(s) under {}; review them, then run \
+         `cargo run -p xtask -- scenes capture` to accept",
+        differing.len(),
+        missing.len(),
+        scratch.display()
+    );
+}
+
+/// Runs the checks a change has to pass.
+///
+/// The short form is what a work-in-progress change wants: it answers in about
+/// a minute. The full form adds the two slow proofs, rendered documentation
+/// and the visual regression, and is what a commit wants.
+fn gate(full: bool) -> Result<()> {
+    step("cargo", &["fmt", "--all", "--", "--check"], None)?;
+    step("cargo", &["check", "--workspace", "--all-targets"], None)?;
+    step("cargo", &["test", "--workspace"], None)?;
+    step(
+        "cargo",
+        &[
+            "clippy",
+            "--workspace",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings",
+        ],
+        None,
+    )?;
+    tokens(true)?;
+    if full {
+        step(
+            "cargo",
+            &["doc", "--no-deps", "--workspace"],
+            Some(("RUSTDOCFLAGS", "-D warnings")),
+        )?;
+        scenes_check(&[])?;
+    }
+    println!("gate passed");
     Ok(())
+}
+
+fn step(program: &str, args: &[&str], env: Option<(&str, &str)>) -> Result<()> {
+    println!("== {program} {}", args.join(" "));
+    let mut command = Command::new(program);
+    command.args(args).current_dir(root());
+    if let Some((name, value)) = env {
+        command.env(name, value);
+    }
+    let status = command
+        .status()
+        .with_context(|| format!("run {program} {}", args.join(" ")))?;
+    if !status.success() {
+        bail!("{program} {} failed", args.join(" "));
+    }
+    Ok(())
+}
+
+fn snapshots() -> PathBuf {
+    root().join("snapshots").join(platform()).join("scenes")
+}
+
+/// Drives one gallery process over the whole catalog.
+///
+/// A GPUI application owns the window system for its lifetime, so the gallery
+/// swaps the scene on a live window rather than opening a process per image.
+fn capture_into(directory: &Path, only: &[String]) -> Result<usize> {
+    fs::create_dir_all(directory).with_context(|| format!("create {}", directory.display()))?;
+    let mut command = Command::new(env!("CARGO"));
+    command
+        .args(["run", "--quiet", "-p", "gpui-kit-gallery", "--"])
+        .arg("--capture-all")
+        .arg(directory)
+        .current_dir(root());
+    if !only.is_empty() {
+        for name in only {
+            if gpui_kit::scenes::find(name).is_none() {
+                bail!("unknown scene `{name}`");
+            }
+        }
+        command.arg("--only").arg(only.join(","));
+    }
+    let status = command.status().context("run the gallery")?;
+    if !status.success() {
+        bail!("capturing scenes failed");
+    }
+    let expected = bundled().len()
+        * if only.is_empty() {
+            gpui_kit::scenes::catalog().len()
+        } else {
+            only.len()
+        };
+    Ok(expected)
 }
 
 fn platform() -> &'static str {
