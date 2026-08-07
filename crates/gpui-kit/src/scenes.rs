@@ -868,13 +868,25 @@ fn toast(_window: &mut Window, cx: &mut App) -> AnyElement {
         );
         toast_push(
             cx,
+            // A refusal, so the offer is the thing that could change the
+            // answer. Retrying an unapproved call only gets refused again.
             Toast::new(
                 "scene.toast.refused",
                 "The host refused to publish this run",
             )
-            .tone(Tone::Danger)
+            .tone(Tone::Warning)
             .detail("Approval is required for this workspace.")
-            .action("Try again", |_, _| {}),
+            .action("Request approval", |_, _| {}),
+        );
+        // The failure beside the refusal, so the two tones are on screen
+        // together and the difference between them is a picture rather than a
+        // claim.
+        toast_push(
+            cx,
+            Toast::new("scene.toast.failed", "Publishing this run failed")
+                .tone(Tone::Danger)
+                .detail("The publish service did not respond.")
+                .action("Try again", |_, _| {}),
         );
     }
     let layer = cx.global::<SceneToasts>().layer.clone();
@@ -1123,10 +1135,10 @@ fn notification_center(_window: &mut Window, cx: &mut App) -> AnyElement {
                     "scene.notify.refused",
                     "The host refused to publish this run",
                 )
-                .tone(Tone::Danger)
+                .tone(Tone::Warning)
                 .detail("Approval is required for this workspace.")
                 .at("9:46")
-                .action("Try again", |_, _| {}),
+                .action("Request approval", |_, _| {}),
                 cx,
             );
         });
