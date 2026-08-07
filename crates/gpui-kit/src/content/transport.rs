@@ -45,6 +45,7 @@ use crate::display::status::StatusLine;
 use crate::foundation::{Disableable, FocusRing, Ident, Selectable, Sizable, StyledExt};
 use crate::layout::measure;
 use crate::motion::{self, keyed};
+use crate::strings::{ActiveStrings, StringKey};
 
 /// How tall the scrubber's track is, and how wide the volume control is.
 /// Neither value repeats anywhere else.
@@ -461,7 +462,7 @@ impl RenderOnce for TransportBar {
                             cx,
                             NodeSpec::new(ident.child("buffered").semantic_id(), Role::Status)
                                 .parent(ident.semantic_id())
-                                .text(SharedString::new_static("Buffered"))
+                                .text(cx.strings().text(StringKey::TransportBuffered))
                                 .range(0.0, 1.0, furthest)
                                 .value(format!("{} ranges", self.buffered.len())),
                         ),
@@ -519,24 +520,26 @@ impl RenderOnce for TransportBar {
         let elapsed = self
             .elapsed
             .clone()
-            .unwrap_or(SharedString::new_static("Time unknown"));
+            .unwrap_or_else(|| cx.strings().text(StringKey::TransportTimeUnknown));
         // With no total there is nothing to count down to, so the right-hand
         // readout states the fact rather than a number.
         let trailing = match (self.duration, self.remaining.clone()) {
-            (TransportDuration::Unknown, _) => Some(SharedString::new_static("Duration unknown")),
+            (TransportDuration::Unknown, _) => {
+                Some(cx.strings().text(StringKey::TransportDurationUnknown))
+            }
             (TransportDuration::Known(_), remaining) => remaining,
         };
 
         let scrubber_spec = match total {
             Some(total) => NodeSpec::new(ident.child("scrubber").semantic_id(), Role::Slider)
                 .parent(ident.semantic_id())
-                .text(SharedString::new_static("Playback position"))
+                .text(cx.strings().text(StringKey::TransportPosition))
                 .disabled(!scrubbable)
                 .range(0.0, total, self.position.clamp(0.0, total))
                 .value(elapsed.clone()),
             None => NodeSpec::new(ident.child("scrubber").semantic_id(), Role::Status)
                 .parent(ident.semantic_id())
-                .text(SharedString::new_static("Duration unknown"))
+                .text(cx.strings().text(StringKey::TransportDurationUnknown))
                 .value(elapsed.clone()),
         };
 
@@ -566,7 +569,11 @@ impl RenderOnce for TransportBar {
         let play = {
             let report = Rc::clone(&report);
             let mut control = Button::new(ident.child(if playing { "pause" } else { "play" }))
-                .label(if playing { "Pause" } else { "Play" })
+                .label(cx.strings().text(if playing {
+                    StringKey::TransportPause
+                } else {
+                    StringKey::TransportPlay
+                }))
                 .secondary()
                 .control_size(ControlSize::Sm)
                 .semantic_parent(ident.semantic_id())
@@ -584,34 +591,39 @@ impl RenderOnce for TransportBar {
             control
         };
 
-        let step_control = |name: &'static str,
-                            glyph: Icon,
-                            label: &'static str,
-                            step: TrackStep,
-                            enabled: bool| {
-            let mut control = IconButton::new(ident.child(name), glyph, label)
-                .ghost()
-                .control_size(ControlSize::Sm)
-                .semantic_parent(ident.semantic_id())
-                .disabled(!enabled || !actionable);
-            if enabled && actionable {
-                let report = Rc::clone(&report);
-                control = control
-                    .on_click(move |window, cx| report(TransportEvent::Stepped(step), window, cx));
-            }
-            control
-        };
+        let strings = cx.strings().clone();
+        let step_control =
+            |name: &'static str, glyph: Icon, key: StringKey, step: TrackStep, enabled: bool| {
+                let mut control = IconButton::new(ident.child(name), glyph, strings.text(key))
+                    .ghost()
+                    .control_size(ControlSize::Sm)
+                    .semantic_parent(ident.semantic_id())
+                    .disabled(!enabled || !actionable);
+                if enabled && actionable {
+                    let report = Rc::clone(&report);
+                    control = control.on_click(move |window, cx| {
+                        report(TransportEvent::Stepped(step), window, cx)
+                    });
+                }
+                control
+            };
 
         let status = match self.state {
-            TransportState::Playing => ("Playing", Tone::Success),
-            TransportState::Paused => ("Paused", Tone::Neutral),
-            TransportState::Buffering => ("Waiting for data", Tone::Warning),
+            TransportState::Playing => (strings.text(StringKey::TransportPlaying), Tone::Success),
+            TransportState::Paused => (strings.text(StringKey::TransportPaused), Tone::Neutral),
+            TransportState::Buffering => {
+                (strings.text(StringKey::TransportBuffering), Tone::Warning)
+            }
         };
 
         let mute = {
             let report = Rc::clone(&report);
             let mut control = Button::new(ident.child("mute"))
-                .label(if self.muted { "Unmute" } else { "Mute" })
+                .label(strings.text(if self.muted {
+                    StringKey::TransportUnmute
+                } else {
+                    StringKey::TransportMute
+                }))
                 .ghost()
                 .control_size(ControlSize::Sm)
                 .semantic_parent(ident.semantic_id())
@@ -627,7 +639,7 @@ impl RenderOnce for TransportBar {
         let volume = {
             let report = Rc::clone(&report);
             let mut control = Slider::new(ident.child("volume"))
-                .label("Volume")
+                .label(strings.text(StringKey::TransportVolume))
                 .range(0.0, 1.0)
                 .value(self.volume)
                 .control_size(ControlSize::Sm)
@@ -680,7 +692,7 @@ impl RenderOnce for TransportBar {
                     .child(step_control(
                         "previous",
                         Icon::AltArrowLeft,
-                        "Previous track",
+                        StringKey::TransportPreviousTrack,
                         TrackStep::Previous,
                         self.has_previous,
                     ))
@@ -688,7 +700,7 @@ impl RenderOnce for TransportBar {
                     .child(step_control(
                         "next",
                         Icon::AltArrowRight,
-                        "Next track",
+                        StringKey::TransportNextTrack,
                         TrackStep::Next,
                         self.has_next,
                     ))

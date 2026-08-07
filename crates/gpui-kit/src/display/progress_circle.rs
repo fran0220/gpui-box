@@ -149,7 +149,10 @@ impl RenderOnce for ProgressCircle {
             .size(px(diameter))
             .child(ring)
             .children(centre)
-            .semantic_in(cx, self.value.spec(self.ident.semantic_id(), self.label))
+            .semantic_in(
+                cx,
+                self.value.spec(self.ident.semantic_id(), self.label, cx),
+            )
     }
 }
 

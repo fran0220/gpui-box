@@ -19,6 +19,7 @@ use gpui_kit_theme::ActiveTheme;
 
 use crate::foundation::{Disableable, FocusRing, Ident};
 use crate::layout::measure;
+use crate::strings::{ActiveStrings, StringKey};
 
 /// How wide the grab area of the divider is, and how long the grip drawn
 /// inside it is. Neither value repeats anywhere else.
@@ -69,7 +70,7 @@ pub struct SplitPane {
     min_end: f32,
     step: f32,
     collapsible: bool,
-    handle_label: SharedString,
+    handle_label: Option<SharedString>,
     start: Option<AnyElement>,
     end: Option<AnyElement>,
     disabled: bool,
@@ -102,7 +103,7 @@ impl SplitPane {
             min_end: 0.0,
             step: DEFAULT_STEP,
             collapsible: false,
-            handle_label: SharedString::new_static("Resize panes"),
+            handle_label: None,
             start: None,
             end: None,
             disabled: false,
@@ -153,7 +154,7 @@ impl SplitPane {
 
     /// What the divider is called, for a reader that has only the tree.
     pub fn handle_label(mut self, label: impl Into<SharedString>) -> Self {
-        self.handle_label = label.into();
+        self.handle_label = Some(label.into());
         self
     }
 
@@ -332,7 +333,11 @@ impl RenderOnce for SplitPane {
             NodeSpec::new(divider_ident.semantic_id(), Role::Separator)
                 .parent(self.ident.semantic_id())
                 .disabled(!actionable)
-                .text(self.handle_label.clone())
+                .text(
+                    self.handle_label
+                        .clone()
+                        .unwrap_or_else(|| cx.strings().text(StringKey::SplitResizeHandle)),
+                )
                 .range(low, high, ratio.clamp(low, high)),
         );
 

@@ -21,6 +21,7 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TypeScale};
 use crate::controls::button::{Button, ButtonVariant, IconButton};
 use crate::controls::select::Select;
 use crate::foundation::{Disableable, Ident, Selectable, Sizable, StyledExt};
+use crate::strings::{ActiveStrings, StringKey};
 
 type SelectHandler = Rc<dyn Fn(usize, &mut Window, &mut App)>;
 
@@ -202,7 +203,9 @@ impl RenderOnce for Pagination {
         let ident = self.ident.clone();
         let size = self.size;
 
-        let step = |name: &'static str, glyph: Icon, label: &'static str, target: Option<usize>| {
+        let strings = cx.strings().clone();
+        let step = |name: &'static str, glyph: Icon, key: StringKey, target: Option<usize>| {
+            let label = strings.text(key);
             let enabled = target.is_some();
             let mut control = IconButton::new(ident.child(name), glyph, label)
                 .ghost()
@@ -220,19 +223,19 @@ impl RenderOnce for Pagination {
         let first = step(
             "first",
             Icon::AltArrowLeft,
-            "First page",
+            StringKey::PaginationFirst,
             self.has_previous().then_some(1),
         );
         let previous = step(
             "previous",
             Icon::ArrowLeft,
-            "Previous page",
+            StringKey::PaginationPrevious,
             self.has_previous().then(|| self.page - 1),
         );
         let next = step(
             "next",
             Icon::ArrowRight,
-            "Next page",
+            StringKey::PaginationNext,
             self.has_next().then(|| self.page + 1),
         );
         // An unknown total has no last page to go to, so no control claims one.
@@ -240,7 +243,7 @@ impl RenderOnce for Pagination {
             step(
                 "last",
                 Icon::AltArrowRight,
-                "Last page",
+                StringKey::PaginationLast,
                 (self.page < total).then_some(total),
             )
         });
@@ -283,7 +286,10 @@ impl RenderOnce for Pagination {
                                     NodeSpec::new(gap.semantic_id(), Role::Text)
                                         .parent(ident.semantic_id())
                                         .value(hidden.to_string())
-                                        .text(format!("{hidden} more pages")),
+                                        .text(strings.format(
+                                            StringKey::PaginationMorePages,
+                                            &[&hidden.to_string()],
+                                        )),
                                 ),
                         )
                     }
@@ -295,13 +301,18 @@ impl RenderOnce for Pagination {
         // With no total to state, the copy says where the typist is and stops
         // there rather than inventing an end.
         let status_text = match self.total {
-            PageTotal::Known(total) => format!("Page {} of {total}", self.page),
-            PageTotal::Unknown { .. } => format!("Page {}", self.page),
+            PageTotal::Known(total) => strings.format(
+                StringKey::PaginationPageOfTotal,
+                &[&self.page.to_string(), &total.to_string()],
+            ),
+            PageTotal::Unknown { .. } => {
+                strings.format(StringKey::PaginationPage, &[&self.page.to_string()])
+            }
         };
         let status = div()
             .type_scale(&theme, TypeScale::Caption)
             .text_color(theme.colors.text_muted)
-            .child(SharedString::from(status_text.clone()))
+            .child(status_text.clone())
             .semantic_in(
                 cx,
                 NodeSpec::new(ident.child("status").semantic_id(), Role::Text)

@@ -39,7 +39,14 @@ Visual baselines state:
 - platform and scale factor;
 - reduced-motion setting.
 
-The gallery baseline uses a 920×900 logical viewport.
+The gallery asks for a 920×1000 logical window. What is captured is the content
+area the window server gave it, which the platform clamps to the display, so the
+committed baselines are 1842×1374 device pixels: 921×687 logical at a backing
+scale factor of 2. Those numbers describe the machine the baselines were
+captured on, not a constant. A display of another size or scale produces images
+of another size, and a comparison treats a size difference as maximally
+different — which is the first thing to check when every image is reported as
+changed.
 
 ## Frame comparison
 
@@ -77,8 +84,40 @@ cargo run -p xtask -- scenes capture
 ```
 
 writes one image per scene per bundled theme under
-`snapshots/<platform>/scenes/`. Each capture runs in its own process because a
-GPUI application owns the window system for its lifetime.
+`snapshots/<platform>/scenes/`. One process renders the whole catalog on the
+window it launched with, because a GPUI application owns the window system for
+its lifetime and paying application startup per image cost over twenty minutes.
+A run takes an exclusive lock: two galleries capturing at once take the
+foreground from each other, and a window nobody is compositing hands back the
+frame it drew last, so both runs read each other's scenes.
+
+`cargo run -p xtask -- scenes check` captures into `target/scene-check` and
+compares. Naming scenes captures or checks only those, which is what a change to
+one component needs.
+
+## Where the gate can run
+
+`scenes check` needs three things, and a machine that is missing any of them
+cannot report a visual regression truthfully:
+
+1. **A graphical session that composites windows.** The capture asks the window
+   server for the process's own window by id. There is no offscreen path.
+2. **The ability to be frontmost.** A window nobody is compositing keeps handing
+   back the frame it drew last, so the run reads the previous scene until it
+   gives up. The gallery claims the foreground for the run and reclaims it
+   whenever a poll sees an unchanged frame.
+3. **The display the baselines came from.** See the fixture contract above: size
+   and backing scale factor are part of the baseline.
+
+A GitHub-hosted runner has not been shown to provide the first two, and does not
+provide the third. So CI runs the gate only on a self-hosted macOS runner named
+by the `VISUAL_RUNNER` repository variable, and says in the run summary when it
+ran nowhere. Where there is no such runner, the gate is a step a reviewer
+performs and records in the pull request; the template asks for the output
+rather than for a claim.
+
+Wherever it runs, a failing run's `target/scene-check` is uploaded as an
+artifact, because a difference nobody can look at is not a review.
 
 The same catalog is rendered headlessly by `crates/gpui-kit/tests/scenes.rs`,
 which audits every published tree, so a component cannot be reviewed visually

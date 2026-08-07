@@ -23,6 +23,7 @@ use crate::datetime::adapter::{Day, SharedDateAdapter};
 use crate::datetime::calendar::{Calendar, CalendarEvent};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
 use crate::overlay::popover;
+use crate::strings::{ActiveStrings, StringKey};
 
 /// What a date field reports. The owner decides what any of it means.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -312,7 +313,7 @@ impl Render for DateInput {
         let trigger = IconButton::new(
             self.ident.child("open"),
             Icon::Checklist,
-            SharedString::new_static("Open the calendar"),
+            cx.strings().text(StringKey::DateInputOpen),
         )
         .ghost()
         .control_size(self.size)
@@ -376,7 +377,7 @@ impl Render for DateInput {
                     .invalid(invalid)
                     .expanded(self.open)
                     .value(self.field.read(cx).value().clone())
-                    .placeholder(SharedString::new_static("Date")),
+                    .placeholder(cx.strings().text(StringKey::DateInputPlaceholder)),
             )
     }
 }

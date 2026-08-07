@@ -22,6 +22,7 @@ use crate::motion;
 use crate::overlay::kbd::Kbd;
 use crate::overlay::layer::surface;
 use crate::overlay::popover::{self, MenuKey};
+use crate::strings::{ActiveStrings, StringKey};
 
 /// How wide the palette is. The value occurs once, so it stays here rather
 /// than in the token document.
@@ -170,7 +171,8 @@ impl CommandPalette {
     pub fn new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let ident = ident.into();
         let query = cx.new(|cx| {
-            TextInput::new(ident.child("query"), window, cx).placeholder("Type a command")
+            TextInput::new(ident.child("query"), window, cx)
+                .placeholder(cx.strings().text(StringKey::PalettePlaceholder))
         });
         let subscription = cx.subscribe(&query, |palette, _query, event, cx| match event {
             TextInputEvent::Change(text) => {
@@ -422,10 +424,10 @@ impl Render for CommandPalette {
             // application without commands, so it says which query it was.
             EmptyState::new(
                 self.ident.child("empty"),
-                SharedString::from(format!("No command matches “{query}”")),
+                cx.strings().format(StringKey::PaletteNoMatch, &[&query]),
             )
             .kind(EmptyKind::Empty)
-            .detail("Every command this application was given is listed here.")
+            .detail(cx.strings().text(StringKey::PaletteEmptyDetail))
             .into_any_element()
         } else {
             div()

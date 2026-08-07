@@ -45,6 +45,7 @@ use crate::display::status::StatusDot;
 use crate::display::timeline::EntryTime;
 use crate::foundation::{Ident, Sizable, StyledExt};
 use crate::motion::keyed;
+use crate::strings::{ActiveStrings, StringKey, Strings};
 
 /// What a host said about a message's journey.
 ///
@@ -79,12 +80,12 @@ impl DeliveryState {
         }
     }
 
-    fn label(&self) -> SharedString {
+    fn label(&self, strings: &Strings) -> SharedString {
         match self {
-            Self::Sending => SharedString::new_static("Sending"),
-            Self::Sent => SharedString::new_static("Sent"),
-            Self::Delivered => SharedString::new_static("Delivered"),
-            Self::Read => SharedString::new_static("Read"),
+            Self::Sending => strings.text(StringKey::MessageSending),
+            Self::Sent => strings.text(StringKey::MessageSent),
+            Self::Delivered => strings.text(StringKey::MessageDelivered),
+            Self::Read => strings.text(StringKey::MessageRead),
             Self::Failed { reason } => reason.clone(),
         }
     }
@@ -525,12 +526,13 @@ impl MessageList {
         } else {
             follow.below
         };
-        let label = SharedString::from(match (follow.arrived, counted) {
-            (0, 1) => "1 more message".to_string(),
-            (0, more) => format!("{more} more messages"),
-            (_, 1) => "1 new message".to_string(),
-            (_, new) => format!("{new} new messages"),
-        });
+        let strings = cx.strings();
+        let label = match (follow.arrived, counted) {
+            (0, 1) => strings.text(StringKey::MessageMoreOne),
+            (0, more) => strings.format(StringKey::MessageMoreMany, &[&more.to_string()]),
+            (_, 1) => strings.text(StringKey::MessageNewOne),
+            (_, new) => strings.format(StringKey::MessageNewMany, &[&new.to_string()]),
+        };
         let ident = self.ident.child("pending");
         let list = self.ident.clone();
         let last = self.messages.len().saturating_sub(1);
@@ -658,12 +660,12 @@ fn row(
                 } else {
                     theme.colors.text_faint
                 })
-                .child(message.time.shown())
+                .child(message.time.shown(cx))
                 .semantic_in(
                     cx,
                     NodeSpec::new(ident.child("time").semantic_id(), Role::Text)
                         .parent(ident.semantic_id())
-                        .text(message.time.shown())
+                        .text(message.time.shown(cx))
                         .value(match &message.time {
                             EntryTime::At(time) => time.clone(),
                             EntryTime::Unknown => SharedString::new_static("time unknown"),
@@ -696,7 +698,7 @@ fn row(
         let handler = Rc::clone(handler);
         footer = footer.child(
             Button::new(ident.child("retry"))
-                .label("Try again")
+                .label(cx.strings().text(StringKey::TryAgain))
                 .secondary()
                 .control_size(ControlSize::Xs)
                 .on_click(move |window, cx| handler(id.clone(), window, cx)),
@@ -759,11 +761,12 @@ fn body_element(
                 .text_color(theme.colors.text)
                 .child(SharedString::from(shown))
                 .children((hidden > 0).then(|| {
-                    let label = SharedString::from(if hidden == 1 {
-                        "1 more line".to_string()
+                    let label = if hidden == 1 {
+                        cx.strings().text(StringKey::MessageShowMoreOne)
                     } else {
-                        format!("{hidden} more lines")
-                    });
+                        cx.strings()
+                            .format(StringKey::MessageShowMoreMany, &[&hidden.to_string()])
+                    };
                     div()
                         .type_scale(theme, TypeScale::Caption)
                         .text_color(theme.colors.text_faint)
@@ -782,7 +785,7 @@ fn body_element(
 }
 
 fn streaming_mark(ident: &Ident, theme: &Theme, cx: &mut App) -> AnyElement {
-    let label = SharedString::new_static("Streaming");
+    let label = cx.strings().text(StringKey::MessageStreaming);
     div()
         .row()
         .gap(px(4.0))
@@ -801,7 +804,7 @@ fn streaming_mark(ident: &Ident, theme: &Theme, cx: &mut App) -> AnyElement {
 }
 
 fn delivery_mark(ident: &Ident, state: &DeliveryState, theme: &Theme, cx: &mut App) -> AnyElement {
-    let label = state.label();
+    let label = state.label(cx.strings());
     let tone = state.tone();
     div()
         .row()
@@ -906,7 +909,14 @@ mod tests {
         let state = DeliveryState::Failed {
             reason: "The workspace is read only.".into(),
         };
-        assert_eq!(state.label().as_ref(), "The workspace is read only.");
+        // A host's own reason is passed through untouched, so it needs no
+        // catalogue to read it back.
+        // A host's own reason is passed through untouched, so an empty
+        // catalogue is enough to read it back.
+        assert_eq!(
+            state.label(&Strings::new()).as_ref(),
+            "The workspace is read only."
+        );
         assert!(state.failed());
     }
 

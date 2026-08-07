@@ -13,21 +13,24 @@ input, and an entry in `docs/components.md`.
 
 | Family | Components |
 |---|---|
-| Action | `Button`, `IconButton`, `ButtonGroup`, `SplitButton` |
+| Action | `Button`, `IconButton`, `ButtonGroup`, `SplitButton`, `Toggle`, `ToggleGroup`, `CopyButton` |
 | Text entry | `TextInput`, `TextArea`, `NumberInput`, `TagInput`, `InlineEdit` |
 | Choice | `Select`, `Combobox`, `Checkbox`, `Radio`, `Switch`, `Slider`, `SegmentedControl` |
 | Form | `FormField`, `SettingsRow`, `SettingsSection` |
-| Navigation | `Tabs`, `Accordion`, `Breadcrumb`, `Sidebar`, `Pagination`, `Wizard` |
+| Navigation | `Tabs`, `Accordion`, `Collapsible`, `Breadcrumb`, `Sidebar`, `Pagination`, `Wizard` |
 | Data | `List` (virtualized), `Table`, `DataGrid` (virtualized), `BulkBar`, `Tree` |
 | Date and time | `Calendar`, `DateInput`, `RangePicker`, `TimeInput` |
 | Content | `Markdown`, `MessageList`, `ImageViewer`, `TransportBar` |
 | Display | `Badge`, `Tag`, `Avatar`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `StatusDot`, `StatusLine`, `Callout`, `PulseLoader`, `GradientSpinner`, `Skeleton`, `ProgressCircle`, `DescriptionList`, `Timeline` |
-| Overlay | `Overlay`, `Dialog`, `Drawer`, `Popover`, `Menu`, `ContextMenu`, `CommandPalette`, `Tooltip`, `Toast`, `ToastLayer`, `Kbd` |
-| Layout | `SplitPane`, `SplitTree`, `ScrollArea`, `Toolbar` |
+| Overlay | `Overlay`, `Dialog`, `Drawer`, `Popover`, `Menu`, `ContextMenu`, `Menubar`, `CommandPalette`, `Tooltip`, `HoverCard`, `Toast`, `ToastLayer`, `Kbd` |
+| Layout | `SplitPane`, `SplitTree`, `ScrollArea`, `Toolbar`, `AspectRatio` |
 | Shell | `Dock`, `StatusBar` |
 | Keymap | `KeybindingRecorder` |
 | Interaction | `Dropzone` |
 | Filtering | `FilterBar` |
+| Agent run | `ToolCallCard`, `StepList`, `ThinkingBlock` |
+| Structured data | `JsonView`, `SchemaForm` |
+| Connections | `ServerList` |
 
 `Tooltipped` is an extension trait rather than a component: it attaches a
 `Tooltip` to any element, and is covered wherever that `Tooltip` is.
@@ -158,12 +161,21 @@ springs described as a duration and a bounce. Two things are left.
 
 ### Components
 
-Ordinary applications, roughly in the order they are wanted: `Toggle` and
-`ToggleGroup`, `Collapsible`, `HoverCard`, `Menubar`, document-tab vocabulary
-on `Tabs` (dirty, close, overflow), a search field with in-place hit
+Ordinary applications, roughly in the order they are wanted: document-tab
+vocabulary on `Tabs` (dirty, close, overflow), a search field with in-place hit
 highlighting, find and replace, a notification centre holding what `Toast`
-showed, an error boundary for a panel that failed to render, `CopyButton`,
-a read-only code view, an upload list over `Dropzone`, and `AspectRatio`.
+showed, an error boundary for a panel that failed to render, a read-only code
+view, and an upload list over `Dropzone`.
+
+`Toggle`, `ToggleGroup`, `Collapsible`, `HoverCard`, `Menubar`, `CopyButton`
+and `AspectRatio` are covered above. Three of them were built on top of what
+was already here rather than beside it, which is the whole reason they are
+small: `Collapsible` is an `Accordion` with one section, `Menubar` is a row of
+`Menu` views with the row's own three behaviours added, and `Toggle` is a
+`Button` that publishes a checked state. Two of them state a limit rather than
+inventing an answer, and `docs/components.md` carries both — what `CopyButton`
+can and cannot know about the clipboard, and what a hover card's grace period
+is for.
 
 Then: mentions in a text field, a segmented one-time-code field, a password
 reveal, `Cascader`, an in-page anchor list, a diagnostics list, search within
@@ -171,14 +183,15 @@ settings, a keymap editor showing conflicts, undo history, and `Sparkline` —
 the one exception worth making to charts being out of scope, because a token
 count over time is a reading, not a chart.
 
-Agent applications need a family this library has none of. A conversation is
-not the unit; a run made of steps is. `ToolCallCard`, `StepList`,
-`ThinkingBlock` — with provider-hidden reasoning distinct from absent
-reasoning — `ApprovalPrompt` and `PermissionMatrix` where the default is
+Agent applications need a family this library is still filling in. A
+conversation is not the unit; a run made of steps is, and `ToolCallCard`,
+`StepList` and `ThinkingBlock` are covered above. Still wanted:
+`ApprovalPrompt` and `PermissionMatrix` where the default is
 refusal and the scope of "always" is stated, `CostMeter` and a context gauge
-that says when a number is an estimate, `JsonView`, `SchemaForm`, `ServerList`,
-`ToolCatalog` with per-server attribution because two servers may offer the
-same tool name, `SkillCard`, `LogStream`, and `DiffView`.
+that says when a number is an estimate, `ToolCatalog` with per-server
+attribution because two servers may offer the same tool name, `SkillCard`,
+`LogStream`, and `DiffView`. `JsonView`, `SchemaForm` and `ServerList` are
+covered above.
 
 ### Capabilities that are not components
 
@@ -187,7 +200,7 @@ same tool name, `SkillCard`, `LogStream`, and `DiffView`.
 | Text selection | Nothing here can be selected or copied. Reading a rendered answer and keeping it is table stakes, and GPUI does not offer the primitive. |
 | Text range highlighting | No API marks a substring of already-rendered text, which blocks search hits, log filtering, diff, and find-in-page at once. |
 | Writing direction | Nothing reads right-to-left. Every inset is left and right rather than start and end, so this is whole-library work that gets more expensive every batch. |
-| Built-in wording | `Copy`, `Try again`, and `Loading` are English literals inside components. There is no string table, and the same cost curve applies. |
+| Number, date, and quantity formatting | Every word is now host-replaceable, but every *number* beside one is still formatted by Rust. See "Numbers a catalogue cannot fix" below. |
 | Assistive technology | `gpui_kit_semantics` addresses tests, not screen readers. What GPUI can carry to an accessibility API has not been established, and pretending otherwise would be worse than the gap. |
 | Validation vocabulary | `FormField` shows an error it is handed. When to validate, field against form, and validation still in flight have no shared shape. |
 | Composition | There is no `Slot`: a caller cannot replace a node inside a component, only configure it. |
@@ -195,12 +208,50 @@ same tool name, `SkillCard`, `LogStream`, and `DiffView`.
 | Style escape hatch | Beyond tokens there is no supported way to override one instance. |
 | Non-virtualized `Table` and `Tree` | `List`, `DataGrid`, and `MessageList` virtualize. These two lay out every row. |
 
+### Numbers a catalogue cannot fix
+
+`gpui_kit::strings` closed the wording gap: no component holds a word a reader
+reads, and a host replaces any of them through `StringKey`. It did not close
+the formatting gap, and the two are not the same problem. A catalogue can move
+a value inside a sentence, because a template numbers its placeholders. It
+cannot change what the value looks like, which is decided by
+`usize::to_string` and by `format!` in the component.
+
+What is affected, found while converting the components:
+
+| Where | What is formatted | What a locale would change |
+|---|---|---|
+| `Pagination`, `ImageViewer`, `ProgressBar`, `ProgressCircle`, `TagInput`, `DataGrid` | counts and positions such as `2 of 9` | digits, grouping, and the ordinal form |
+| `Breadcrumb`, `MessageList`, `Markdown`, `DataGrid`, `Dropzone` | plurals, chosen by `if count == 1` at the call site | languages with zero, dual, few, and many forms need more than two keys |
+| `FilterBar`, `NumberInput`, `BulkBar` | `{count} {noun}` and `{number} {unit}` | the order of a number and its noun, and whether a space belongs between them |
+| `ImageViewer` | `1920 × 1080 · 150%` | the multiplication sign, the percent sign, and which side it takes |
+| `TransportBar` | `1.5×` and clock readouts | the speed mark, and a duration's own shape |
+| `DescriptionList` | `51 characters`, from `redacted_from` | the count, and the noun's agreement with it |
+| `Calendar`, `DateInput`, `RangePicker`, `TimeInput` | nothing: dates already come from the host `DateAdapter` | already correct, and the model the rest should follow |
+
+The shape of the answer is visible in the date components, which own no
+calendar and ask a host-supplied `DateAdapter` for every date they show. A
+number reader of the same shape — asked for a count, a plural category, a
+percentage, a duration — would close this without pulling a formatting library
+into product-neutral infrastructure. That is a batch of its own, and none of it
+is started.
+
 ### Delivery
 
-No changelog and no stated version policy. No performance budget, so nothing
-fails when a virtualized list gets slower. No published documentation; the
-gallery is local. Publishing to a registry is impossible while GPUI is a git
+`CHANGELOG.md` and the versioning policy in `README.md` now say what a consumer
+pins and what breaks them, including the two breaks the compiler cannot see: a
+token key and a semantic id. What is still missing is a performance budget, so
+nothing fails when a virtualized list gets slower, and published documentation;
+the gallery is local. Publishing to a registry is impossible while GPUI is a git
 dependency.
+
+The visual regression is a gate everywhere except CI. `scenes check` needs a
+composited, frontmost window and the display the baselines came from, which a
+hosted runner does not give, so it runs on a self-hosted runner if one is
+configured and is otherwise a step a reviewer performs and records.
+`docs/screenshot-testing.md` states the three requirements; a job that ran it
+where it cannot look would report agreement it never established, which has
+happened here once already.
 
 ## Rules every covered component follows
 
@@ -220,5 +271,8 @@ dependency.
 4. Ids come from business identity, never from list position.
 5. Anything visible comes from tokens. Wording that belongs to the host — a
    refusal's reason, a month's name, a message saying why text could not be
-   read — is shown verbatim and never authored by a component.
+   read — is shown verbatim and never authored by a component. Wording the
+   library does author comes from `gpui_kit::strings`, so a host replaces it
+   without forking the component; `cargo run -p xtask -- strings check` fails
+   the build if a component grows a literal a reader could read.
 6. A component that can carry a credential publishes its shape, never its text.

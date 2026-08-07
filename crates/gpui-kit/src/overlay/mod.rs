@@ -15,9 +15,12 @@
 mod dialog;
 mod drawer;
 mod focus;
+pub mod hover_card;
 mod kbd;
 mod layer;
 mod menu;
+pub mod menubar;
+pub mod notification_center;
 mod palette;
 pub mod panel;
 pub mod popover;
@@ -27,9 +30,14 @@ pub mod tooltip;
 pub use dialog::{Dialog, DialogEvent};
 pub use drawer::{Drawer, DrawerEvent};
 pub use focus::FocusTrap;
+pub use hover_card::{HoverCard, HoverCardEvent};
 pub use kbd::{Kbd, caps};
 pub use layer::{Edge, Overlay, Placement, priority, surface};
 pub use menu::{ContextMenu, ContextMenuEvent, Menu, MenuEvent, MenuItem};
+pub use menubar::{Menubar, MenubarEvent, MenubarMenu};
+pub use notification_center::{
+    Notification, NotificationCenter, NotificationCenterEvent, UnreadCount,
+};
 pub use palette::{Command, CommandPalette, CommandPaletteEvent};
 pub use popover::{Popover, PopoverEvent};
 pub use toast::{Toast, ToastCorner, ToastLayer};

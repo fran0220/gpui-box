@@ -17,11 +17,13 @@
 //! it did not; nothing is played, so [`TransportBar`] reports every control
 //! and moves no head. A duration nobody knows is a state, not a zero.
 
+pub mod code_view;
 pub mod image_viewer;
 pub mod markdown;
 pub mod message_list;
 pub mod transport;
 
+pub use code_view::{CodeLine, CodeView, LineMark};
 pub use image_viewer::{FitMode, ImageFrame, ImageSize, ImageState, ImageViewer, ImageViewerEvent};
 pub use markdown::{
     Block, CellAlign, CodeBlock, CodeSpan, Document, ImageRequest, Inline, ListEntry, Markdown,

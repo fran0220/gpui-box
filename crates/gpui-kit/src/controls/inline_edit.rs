@@ -28,6 +28,7 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TypeScale};
 use crate::controls::input::{self, TextInput};
 use crate::controls::textarea::{self, TextArea};
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
+use crate::strings::{ActiveStrings, StringKey};
 
 type EditHandler = Rc<dyn Fn(&mut Window, &mut App)>;
 type CommitHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
@@ -89,7 +90,7 @@ fn memory(id: &SharedString, cx: &mut App) -> Rc<Memory> {
 pub struct InlineEdit {
     ident: Ident,
     value: SharedString,
-    placeholder: SharedString,
+    placeholder: Option<SharedString>,
     editing: bool,
     multiline: bool,
     rows: usize,
@@ -119,7 +120,7 @@ impl InlineEdit {
         Self {
             ident: ident.into(),
             value: value.into(),
-            placeholder: SharedString::new_static("Empty"),
+            placeholder: None,
             editing: false,
             multiline: false,
             rows: 3,
@@ -134,8 +135,16 @@ impl InlineEdit {
 
     /// What to show where an empty value would be, so a blank line is still
     /// something to aim at.
+    /// The placeholder the host gave, or the built-in default word for a
+    /// value that is not there.
+    fn resolved_placeholder(&self, cx: &App) -> SharedString {
+        self.placeholder
+            .clone()
+            .unwrap_or_else(|| cx.strings().text(StringKey::InlineEditPlaceholder))
+    }
+
     pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self {
-        self.placeholder = placeholder.into();
+        self.placeholder = Some(placeholder.into());
         self
     }
 
@@ -203,7 +212,7 @@ impl InlineEdit {
         let editor = if self.multiline {
             let rows = self.rows;
             let value = self.value.clone();
-            let placeholder = self.placeholder.clone();
+            let placeholder = self.resolved_placeholder(cx);
             Editor::Block(cx.new(|cx| {
                 TextArea::new(ident, window, cx)
                     .text(value)
@@ -212,7 +221,7 @@ impl InlineEdit {
             }))
         } else {
             let value = self.value.clone();
-            let placeholder = self.placeholder.clone();
+            let placeholder = self.resolved_placeholder(cx);
             Editor::Line(cx.new(|cx| {
                 TextInput::new(ident, window, cx)
                     .text(value)
@@ -285,7 +294,7 @@ impl RenderOnce for InlineEdit {
                     theme.colors.text
                 })
                 .child(if empty {
-                    self.placeholder.clone()
+                    self.resolved_placeholder(cx)
                 } else {
                     self.value.clone()
                 })
@@ -318,7 +327,7 @@ impl RenderOnce for InlineEdit {
             .invalid(self.failure.is_some())
             .value(if empty { "empty" } else { "reading" });
             if empty {
-                spec = spec.placeholder(self.placeholder.clone());
+                spec = spec.placeholder(self.resolved_placeholder(cx));
             } else {
                 spec = spec.text(self.value.clone());
             }

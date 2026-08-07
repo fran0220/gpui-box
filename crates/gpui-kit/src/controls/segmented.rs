@@ -15,6 +15,7 @@ use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space};
 
+use crate::foundation::direction::ActiveDirection;
 use crate::foundation::stepping::bounded_step;
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
 use crate::motion::{Flipping, flip};
@@ -275,13 +276,21 @@ impl RenderOnce for SegmentedControl {
         if let (true, Some(handler)) = (actionable, self.on_select.clone()) {
             let items = self.segments.clone();
             let current = self.selected_index();
+            // The strip runs in reading order, so the horizontal arrows step
+            // with it. Up and down are the same two moves spelled on an axis
+            // the reading direction does not touch.
+            let direction = cx.layout_direction();
             strip.interactivity().on_key_down(move |event, window, cx| {
-                let next = match event.keystroke.key.as_str() {
-                    "left" | "up" => neighbour(&items, current, -1),
-                    "right" | "down" => neighbour(&items, current, 1),
-                    "home" => edge(&items, true),
-                    "end" => edge(&items, false),
-                    _ => return,
+                let key = event.keystroke.key.as_str();
+                let next = match direction.arrow_step(key) {
+                    Some(step) => neighbour(&items, current, step as isize),
+                    None => match key {
+                        "up" => neighbour(&items, current, -1),
+                        "down" => neighbour(&items, current, 1),
+                        "home" => edge(&items, true),
+                        "end" => edge(&items, false),
+                        _ => return,
+                    },
                 };
                 if let Some(index) = next {
                     handler(items[index].id.clone(), window, cx);

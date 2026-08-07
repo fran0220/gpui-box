@@ -5,11 +5,16 @@
 //! derive both their GPUI element id and their semantic assertion id from a
 //! single caller-supplied [`Ident`].
 
+pub mod direction;
 mod ident;
 mod interaction;
 pub(crate) mod stepping;
 mod styled_ext;
 
+pub use direction::{
+    ActiveDirection, DirectionalExt, LayoutDirection, LogicalSide, PhysicalSide,
+    set_layout_direction,
+};
 pub use ident::Ident;
 pub use interaction::{HoverLift, Pressable};
 pub use styled_ext::{FocusRing, StyledExt};

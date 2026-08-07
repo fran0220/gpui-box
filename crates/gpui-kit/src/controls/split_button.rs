@@ -13,6 +13,7 @@ use gpui_kit_theme::ControlSize;
 use crate::controls::button::{Button, ButtonJoin, ButtonVariant, IconButton};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
 use crate::overlay::{Menu, MenuItem};
+use crate::strings::{ActiveStrings, StringKey};
 
 type ClickHandler = Rc<dyn Fn(&mut Window, &mut App)>;
 
@@ -59,7 +60,7 @@ impl SplitButton {
         let menu = cx.new(|cx| {
             Menu::new(ident.child("menu"), window, cx)
                 .trigger_icon(Icon::AltArrowDown)
-                .trigger_name("More actions")
+                .trigger_name(cx.strings().text(StringKey::MoreActions))
                 .trigger_join(ButtonJoin::Trailing)
         });
         Self {
@@ -198,7 +199,7 @@ impl Render for SplitButton {
             IconButton::new(
                 self.ident.child("menu").child("trigger"),
                 Icon::AltArrowDown,
-                SharedString::from("More actions"),
+                cx.strings().text(StringKey::MoreActions),
             )
             .variant(self.variant)
             .control_size(self.size)

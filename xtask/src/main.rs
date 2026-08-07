@@ -5,6 +5,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
+
+mod strings;
 use gpui_kit_tokens::{
     BorderWeight, ControlSize, Density, Elevation, Layer, MotionEasing, OpacityRole, Radius, Space,
     SpringPreset, TokenDocument, bundled, contrast,
@@ -17,14 +19,17 @@ fn main() -> Result<()> {
     match (command.0.as_deref(), command.1.as_deref()) {
         (Some("tokens"), Some("generate")) => tokens(false),
         (Some("tokens"), Some("check")) => tokens(true),
+        (Some("strings"), Some("check")) => strings::check(&root()),
+        (Some("strings"), Some("generate")) => strings::generate(&root()),
         (Some("scenes"), Some("list")) => scenes_list(),
         (Some("scenes"), Some("capture")) => scenes_capture(&rest),
         (Some("scenes"), Some("check")) => scenes_check(&rest),
         (Some("gate"), None) => gate(false),
         (Some("gate"), Some("full")) => gate(true),
         _ => bail!(
-            "usage: cargo xtask <tokens generate|tokens check|scenes list|\
-             scenes capture [name...]|scenes check [name...]|gate [full]>"
+            "usage: cargo xtask <tokens generate|tokens check|strings check|\
+             strings generate|scenes list|scenes capture [name...]|\
+             scenes check [name...]|gate [full]>"
         ),
     }
 }
@@ -125,6 +130,7 @@ fn gate(full: bool) -> Result<()> {
         None,
     )?;
     tokens(true)?;
+    strings::check(&root())?;
     if full {
         step(
             "cargo",

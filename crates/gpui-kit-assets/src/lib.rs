@@ -6,8 +6,22 @@ use std::borrow::Cow;
 
 use gpui::{App, AssetSource, Result, SharedString, Styled as _, Svg, svg};
 
+/// Whether a glyph's meaning is carried by the direction it reads in.
+///
+/// A chevron that points at the next item points the other way once the
+/// interface reads right to left; a checkmark, a gear, and a globe do not.
+/// The property belongs to the drawing, not to the component that places it,
+/// which is why it lives beside the path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Mirroring {
+    /// Flipped horizontally when the interface reads right to left.
+    Directional,
+    /// Drawn the same way in both reading directions.
+    Fixed,
+}
+
 macro_rules! icons {
-    ($(($variant:ident, $name:literal)),+ $(,)?) => {
+    ($(($variant:ident, $name:literal, $mirroring:ident)),+ $(,)?) => {
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         pub enum Icon {
             $($variant),+
@@ -20,6 +34,18 @@ macro_rules! icons {
                 match self {
                     $(Icon::$variant => concat!("icons/", $name, ".svg")),+,
                 }
+            }
+
+            /// How this glyph behaves when the reading direction reverses.
+            pub const fn mirroring(self) -> Mirroring {
+                match self {
+                    $(Icon::$variant => Mirroring::$mirroring),+,
+                }
+            }
+
+            /// Whether a right-to-left interface draws this glyph flipped.
+            pub const fn mirrors_in_rtl(self) -> bool {
+                matches!(self.mirroring(), Mirroring::Directional)
             }
         }
 
@@ -50,56 +76,62 @@ macro_rules! icons {
     };
 }
 
+// The third column is the reading-direction decision for that drawing. It is
+// a judgement about the artwork itself: a glyph is Directional when flipping
+// it preserves the meaning and leaving it alone reverses it. Radially or
+// bilaterally symmetric glyphs, glyphs whose only axis is vertical, and
+// conventional marks that are read as symbols rather than as pictures — a
+// checkmark, a rotation, a keyboard — stay Fixed.
 icons![
-    (AddCircle, "add-circle"),
-    (AltArrowDown, "alt-arrow-down"),
-    (AltArrowLeft, "alt-arrow-left"),
-    (AltArrowRight, "alt-arrow-right"),
-    (Archive, "archive-minimalistic"),
-    (ArchiveUp, "archive-up-minimalistic"),
-    (ArrowDown, "arrow-down"),
-    (ArrowLeft, "arrow-left"),
-    (ArrowRight, "arrow-right"),
-    (ArrowUp, "arrow-up"),
-    (Chat, "chat-round-line"),
-    (Check, "check"),
-    (Checklist, "checklist"),
-    (Close, "close"),
-    (CloseCircle, "close-circle"),
-    (Command, "command"),
-    (Copy, "copy"),
-    (Danger, "danger-triangle"),
-    (Document, "document"),
-    (DocumentAdd, "document-add"),
-    (Folder, "folder"),
-    (FolderWithFiles, "folder-with-files"),
-    (GitBranch, "git-branch"),
-    (Global, "global"),
-    (Info, "info-circle"),
-    (Key, "key-minimalistic"),
-    (Keyboard, "keyboard"),
-    (Laptop, "laptop"),
-    (List, "list"),
-    (Logout, "logout-2"),
-    (Magnifier, "magnifer"),
-    (Monitor, "monitor"),
-    (Paperclip, "paperclip"),
-    (Pen, "pen"),
-    (PenNew, "pen-new-square"),
-    (Plus, "plus"),
-    (Refresh, "refresh"),
-    (Restart, "restart"),
-    (Return, "return"),
-    (Settings, "settings-minimalistic"),
-    (Sidebar, "sidebar-minimalistic"),
-    (SidebarLeft, "sidebar-minimalistic-left"),
-    (Smartphone, "smartphone"),
-    (SortVertical, "sort-vertical"),
-    (Stop, "stop"),
-    (Terminal, "terminal"),
-    (Trash, "trash-bin-minimalistic"),
-    (Tuning, "tuning"),
-    (Widget, "widget"),
+    (AddCircle, "add-circle", Fixed),
+    (AltArrowDown, "alt-arrow-down", Fixed),
+    (AltArrowLeft, "alt-arrow-left", Directional),
+    (AltArrowRight, "alt-arrow-right", Directional),
+    (Archive, "archive-minimalistic", Fixed),
+    (ArchiveUp, "archive-up-minimalistic", Fixed),
+    (ArrowDown, "arrow-down", Fixed),
+    (ArrowLeft, "arrow-left", Directional),
+    (ArrowRight, "arrow-right", Directional),
+    (ArrowUp, "arrow-up", Fixed),
+    (Chat, "chat-round-line", Directional),
+    (Check, "check", Fixed),
+    (Checklist, "checklist", Directional),
+    (Close, "close", Fixed),
+    (CloseCircle, "close-circle", Fixed),
+    (Command, "command", Fixed),
+    (Copy, "copy", Directional),
+    (Danger, "danger-triangle", Fixed),
+    (Document, "document", Directional),
+    (DocumentAdd, "document-add", Directional),
+    (Folder, "folder", Directional),
+    (FolderWithFiles, "folder-with-files", Directional),
+    (GitBranch, "git-branch", Directional),
+    (Global, "global", Fixed),
+    (Info, "info-circle", Fixed),
+    (Key, "key-minimalistic", Directional),
+    (Keyboard, "keyboard", Fixed),
+    (Laptop, "laptop", Fixed),
+    (List, "list", Directional),
+    (Logout, "logout-2", Directional),
+    (Magnifier, "magnifer", Directional),
+    (Monitor, "monitor", Fixed),
+    (Paperclip, "paperclip", Directional),
+    (Pen, "pen", Directional),
+    (PenNew, "pen-new-square", Directional),
+    (Plus, "plus", Fixed),
+    (Refresh, "refresh", Fixed),
+    (Restart, "restart", Fixed),
+    (Return, "return", Directional),
+    (Settings, "settings-minimalistic", Fixed),
+    (Sidebar, "sidebar-minimalistic", Directional),
+    (SidebarLeft, "sidebar-minimalistic-left", Directional),
+    (Smartphone, "smartphone", Fixed),
+    (SortVertical, "sort-vertical", Fixed),
+    (Stop, "stop", Fixed),
+    (Terminal, "terminal", Directional),
+    (Trash, "trash-bin-minimalistic", Fixed),
+    (Tuning, "tuning", Fixed),
+    (Widget, "widget", Fixed),
 ];
 
 pub fn icon(icon: Icon) -> Svg {
@@ -158,6 +190,31 @@ mod tests {
         ] {
             assert!(assets.load(path).expect("lookup").is_none());
         }
+    }
+
+    #[test]
+    fn a_direction_bearing_glyph_mirrors_and_a_symbol_does_not() {
+        assert!(Icon::AltArrowRight.mirrors_in_rtl());
+        assert!(Icon::ArrowLeft.mirrors_in_rtl());
+        assert!(Icon::Magnifier.mirrors_in_rtl());
+        assert!(!Icon::Check.mirrors_in_rtl());
+        assert!(!Icon::Settings.mirrors_in_rtl());
+        assert!(!Icon::Global.mirrors_in_rtl());
+        // A vertical axis is not a reading axis.
+        assert!(!Icon::AltArrowDown.mirrors_in_rtl());
+        assert!(!Icon::SortVertical.mirrors_in_rtl());
+    }
+
+    #[test]
+    fn every_icon_carries_a_mirroring_decision() {
+        // The macro makes this total, so the check that matters is that the
+        // catalog was actually thought about rather than answered one way.
+        let directional = Icon::ALL
+            .iter()
+            .filter(|icon| icon.mirrors_in_rtl())
+            .count();
+        assert_eq!(Icon::ALL.len(), 49);
+        assert_eq!(directional, 23);
     }
 
     #[test]

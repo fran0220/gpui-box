@@ -41,6 +41,7 @@ use crate::display::badge::Tone;
 use crate::foundation::{Ident, Sizable, StyledExt};
 use crate::motion::keyed;
 use crate::overlay::Tooltipped;
+use crate::strings::{ActiveStrings, StringKey};
 
 pub use parse::{Block, CellAlign, Document, Inline, ListEntry};
 
@@ -544,7 +545,7 @@ impl Painter {
             .as_ref()
             .and_then(|source| source(&request, window, cx));
         let named = if alt.trim().is_empty() {
-            SharedString::new_static("Image")
+            cx.strings().text(StringKey::MarkdownImageAlt)
         } else {
             alt.clone()
         };
@@ -588,7 +589,10 @@ impl Painter {
                     div()
                         .type_scale(&theme, TypeScale::Caption)
                         .text_color(theme.colors.text_faint)
-                        .child(SharedString::from(format!("Not fetched — {src}"))),
+                        .child(
+                            cx.strings()
+                                .format(StringKey::MarkdownImageNotFetched, &[src.as_ref()]),
+                        ),
                 )
                 .semantic_in(cx, spec)
                 .into_any_element(),
@@ -602,10 +606,12 @@ impl Painter {
         cx: &mut App,
     ) -> AnyElement {
         let theme = self.theme.clone();
+        // The id seed stays English on purpose: a semantic id that moved when
+        // the host installed a translation would not be a stable id.
+        let ident = self.ident_for("code", language.as_deref().unwrap_or(PLAIN_TEXT_ID));
         let label = language
             .clone()
-            .unwrap_or_else(|| SharedString::new_static("plain text"));
-        let ident = self.ident_for("code", label.as_ref());
+            .unwrap_or_else(|| cx.strings().text(StringKey::MarkdownPlainText));
         let block = CodeBlock {
             language: language.clone(),
             text: text.clone(),
@@ -651,7 +657,7 @@ impl Painter {
                     .child(label.clone())
                     .child(
                         Button::new(copy_ident)
-                            .label("Copy")
+                            .label(cx.strings().text(StringKey::Copy))
                             .ghost()
                             .control_size(gpui_kit_theme::ControlSize::Xs)
                             .on_click(move |window, cx| {
@@ -768,15 +774,15 @@ impl Painter {
         // state and says it cannot be operated.
         match entry.task {
             Some(checked) => {
-                let text = entry
-                    .blocks
-                    .iter()
-                    .find_map(|block| match block {
-                        Block::Paragraph(inlines) => Some(flatten(inlines)),
-                        _ => None,
-                    })
-                    .unwrap_or_else(|| SharedString::new_static("Task"));
-                let ident = self.ident_for("task", text.as_ref());
+                let stated = entry.blocks.iter().find_map(|block| match block {
+                    Block::Paragraph(inlines) => Some(flatten(inlines)),
+                    _ => None,
+                });
+                // The id is seeded from the task's own words, or from an
+                // English constant when it has none: a semantic id that moved
+                // when the host installed a translation would not be stable.
+                let ident = self.ident_for("task", stated.as_deref().unwrap_or(TASK_ID));
+                let text = stated.unwrap_or_else(|| cx.strings().text(StringKey::MarkdownTask));
                 row.semantic_in(
                     cx,
                     NodeSpec::new(ident.semantic_id(), Role::Checkbox)
@@ -885,7 +891,7 @@ impl Painter {
                 div()
                     .type_scale(&theme, TypeScale::Caption)
                     .text_color(theme.colors.warning)
-                    .child(UNRENDERED),
+                    .child(cx.strings().text(StringKey::MarkdownUnrenderedHtml)),
             )
             .child(
                 div()
@@ -937,11 +943,12 @@ impl Painter {
     fn more(&mut self, hidden: usize, cx: &mut App) -> AnyElement {
         let theme = self.theme.clone();
         let ident = self.ident.child("truncated");
-        let label = SharedString::from(if hidden == 1 {
-            "Show 1 more line".to_string()
+        let label = if hidden == 1 {
+            cx.strings().text(StringKey::MarkdownShowMoreOne)
         } else {
-            format!("Show {hidden} more lines")
-        });
+            cx.strings()
+                .format(StringKey::MarkdownShowMoreMany, &[&hidden.to_string()])
+        };
         let asked = self.report(MarkdownEvent::MoreRequested { lines: hidden });
 
         div()
@@ -969,8 +976,16 @@ impl Painter {
     }
 }
 
-/// What a fragment of HTML that was neither run nor dropped is called.
+/// The published value for a fragment of HTML that was neither run nor
+/// dropped. It is a state name a test asserts, not a word a reader reads;
+/// [`StringKey::MarkdownUnrenderedHtml`](crate::strings::StringKey) is the
+/// reader's copy.
 const UNRENDERED: SharedString = SharedString::new_static("unrendered html");
+
+/// Id seeds for the two blocks whose id would otherwise come from a
+/// translated word.
+const PLAIN_TEXT_ID: &str = "plain text";
+const TASK_ID: &str = "task";
 
 fn run(theme: &Theme, text: SharedString, style: RunStyle) -> AnyElement {
     div()

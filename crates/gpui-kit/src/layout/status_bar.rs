@@ -31,6 +31,7 @@ use crate::display::progress_circle::ProgressCircle;
 use crate::display::status::StatusDot;
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
 use crate::state::{AsyncStatus, AsyncValue};
+use crate::strings::{ActiveStrings, StringKey};
 
 /// How tall the strip is. The value occurs only here.
 const HEIGHT: f32 = 26.0;
@@ -373,7 +374,7 @@ impl StatusBar {
                     .radius(theme, Radius::Small)
                     .bg(theme.colors.warning.opacity(0.16))
                     .text_color(theme.colors.warning)
-                    .child(SharedString::new_static("stale")),
+                    .child(cx.strings().text(StringKey::StatusStale)),
             );
         }
 

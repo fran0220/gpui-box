@@ -11,6 +11,7 @@
 //! arranges panels in regions over that tree, and [`StatusBar`] states what the
 //! host says is true along the bottom.
 
+pub mod aspect_ratio;
 pub mod dock;
 pub(crate) mod measure;
 pub mod scroll;
@@ -19,6 +20,7 @@ pub mod status_bar;
 pub mod toolbar;
 pub mod tree;
 
+pub use aspect_ratio::{AspectFit, AspectRatio};
 pub use dock::{Dock, DockEvent, DockPanel, DockRegion};
 pub use scroll::{ScrollArea, ScrollAxis, scroll_offset, scroll_to};
 pub use split::{SplitAxis, SplitPane, SplitSide};

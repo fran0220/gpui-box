@@ -15,8 +15,10 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TypeScale};
 
 use crate::controls::field::{FieldState, field_shell};
 use crate::datetime::adapter::{Clock, SharedDateAdapter, TimeOfDay};
+use crate::foundation::direction::ActiveDirection;
 use crate::foundation::stepping::bounded_step;
 use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
+use crate::strings::{ActiveStrings, StringKey};
 
 /// Which part of the time the keyboard is on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,12 +39,12 @@ impl Segment {
         }
     }
 
-    fn label(self) -> &'static str {
+    fn label(self) -> StringKey {
         match self {
-            Self::Hour => "Hour",
-            Self::Minute => "Minute",
-            Self::Second => "Second",
-            Self::Meridiem => "Half of the day",
+            Self::Hour => StringKey::TimeHour,
+            Self::Minute => StringKey::TimeMinute,
+            Self::Second => StringKey::TimeSecond,
+            Self::Meridiem => StringKey::TimeMeridiem,
         }
     }
 }
@@ -259,11 +261,17 @@ impl TimeInput {
             return;
         }
         let key = event.keystroke.key.as_str();
+        // The segments are written in reading order, so moving between them
+        // follows the reading direction. Up and down change the value, which
+        // has nothing to do with which way the field reads.
+        if let Some(step) = cx.layout_direction().arrow_step(key) {
+            self.move_segment(step as isize, cx);
+            cx.stop_propagation();
+            return;
+        }
         match key {
             "up" => self.step(1, cx),
             "down" => self.step(-1, cx),
-            "left" => self.move_segment(-1, cx),
-            "right" => self.move_segment(1, cx),
             _ => {
                 let mut characters = key.chars();
                 match (characters.next(), characters.next()) {
@@ -346,7 +354,7 @@ impl Render for TimeInput {
                         cx,
                         NodeSpec::new(ident.semantic_id(), Role::Input)
                             .parent(self.ident.semantic_id())
-                            .text(segment.label())
+                            .text(cx.strings().text(segment.label()))
                             .value(text)
                             .disabled(self.disabled)
                             .range(min as f32, max as f32, self.raw(segment) as f32)

@@ -167,7 +167,7 @@ fn a_dimmed_section_drops_the_heading_action_it_cannot_honour(cx: &mut TestAppCo
 fn facts(cx: &mut TestAppContext) -> (Harness, Calls) {
     let calls: Calls = Rc::new(RefCell::new(Vec::new()));
     let sink = Rc::clone(&calls);
-    let harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+    let harness = Harness::new(cx, gpui_kit::install, move |_, cx| {
         let sink = Rc::clone(&sink);
         DescriptionList::new("run.facts")
             .items([
@@ -177,7 +177,7 @@ fn facts(cx: &mut TestAppContext) -> (Harness, Calls) {
                 DescriptionItem::new(
                     "token",
                     "Access token",
-                    DescriptionValue::redacted_from("s3cr3t"),
+                    DescriptionValue::redacted_from("s3cr3t", cx),
                 )
                 .copyable(true),
             ])

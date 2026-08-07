@@ -17,6 +17,7 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space};
 use crate::foundation::{Disableable, Ident, Pressable, Sizable, StyledExt};
 use crate::motion;
 use crate::overlay::popover::{self, MenuKey};
+use crate::strings::{ActiveStrings, StringKey};
 
 /// One choice, identified by business identity rather than by position.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -69,7 +70,7 @@ pub struct Select {
     focus_handle: FocusHandle,
     options: Vec<SelectOption>,
     selected: Option<SharedString>,
-    placeholder: SharedString,
+    placeholder: Option<SharedString>,
     size: ControlSize,
     disabled: bool,
     invalid: bool,
@@ -98,7 +99,7 @@ impl Select {
             focus_handle: cx.focus_handle(),
             options: Vec::new(),
             selected: None,
-            placeholder: SharedString::from("Select"),
+            placeholder: None,
             size: ControlSize::Md,
             disabled: false,
             invalid: false,
@@ -117,8 +118,15 @@ impl Select {
         self
     }
 
+    /// The placeholder the host gave, or the built-in default.
+    fn resolved_placeholder(&self, cx: &App) -> SharedString {
+        self.placeholder
+            .clone()
+            .unwrap_or_else(|| cx.strings().text(StringKey::SelectPlaceholder))
+    }
+
     pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self {
-        self.placeholder = placeholder.into();
+        self.placeholder = Some(placeholder.into());
         self
     }
 
@@ -405,7 +413,7 @@ impl Render for Select {
         let label = self
             .selected_option()
             .map(|option| option.label.clone())
-            .unwrap_or_else(|| self.placeholder.clone());
+            .unwrap_or_else(|| self.resolved_placeholder(cx));
         let has_choice = self.selected_option().is_some();
 
         let mut spec = NodeSpec::new(self.ident.semantic_id(), Role::Combobox)
@@ -413,7 +421,7 @@ impl Render for Select {
             .invalid(self.invalid)
             .expanded(self.open)
             .focus(&self.focus_handle)
-            .placeholder(self.placeholder.clone());
+            .placeholder(self.resolved_placeholder(cx));
         if let Some(option) = self.selected_option() {
             spec = spec.value(option.label.clone());
         }

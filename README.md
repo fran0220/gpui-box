@@ -28,21 +28,65 @@ project, thread, or workflow domain logic.
 | `gpui-kit-testkit` | Semantic assertions, window capture, PNG output, and frame comparison |
 | `gpui-kit-gallery` | Runnable component gallery and visual fixture |
 
-## Quick start
+## Depend on it
+
+This library is not on crates.io and cannot be, because it depends on GPUI by
+Git revision and a published crate may not. A consumer therefore pins a commit
+of this repository:
 
 ```toml
 [dependencies]
+# One revision of this repository, for every crate you take from it.
 gpui-kit = { git = "https://github.com/fran0220/gpui-kit", rev = "<commit>" }
-gpui-kit-semantics = { git = "https://github.com/fran0220/gpui-kit", rev = "<commit>" }
+
+# Your application writes GPUI views, so it depends on GPUI directly, and the
+# URL and revision must match this workspace's exactly. Cargo treats a
+# different revision as a different crate: two copies of GPUI in one binary
+# means two sets of globals, and the theme and semantic registry this library
+# installs would be invisible to your views.
+gpui = { git = "https://github.com/fran0220/zed", rev = "cb2ce82766e42c55fc8563de3c5c98ac8e1c9fd9" }
 ```
+
+Requires Rust 1.97 and edition 2024. macOS is the supported platform; Windows
+and Linux are compile targets, which is not the same as a validated journey —
+see [`docs/compatibility.md`](docs/compatibility.md) for what each platform
+actually does.
+
+That is usually all: `gpui-kit` re-exports the assets, theme, token and
+semantics crates as `gpui_kit::{assets, theme, tokens, semantics}`, so an
+application does not name them separately. `gpui-kit-testkit` is the exception —
+add it to `[dev-dependencies]` from the same revision, with its `test-support`
+feature, to get the render harness.
+
+`gpui-kit`'s `fixtures` feature compiles the reference calendar the date scenes
+run on. It is off by default and should stay off in an application: it exists so
+the gallery and the tests have a calendar, not so a product has one.
+
+## Quick start
+
+Two things happen at boot, and they happen in different places. The icons are
+SVG assets, so whatever builds your `Application` has to be given this crate's
+asset source — GPUI takes that at construction and no later. Everything else is
+one call:
 
 ```rust
 use gpui_kit::prelude::*;
 
-// Once, during application boot. Installs fonts, the theme, and the
-// semantic registry components publish into.
-gpui_kit::install(cx);
+// This is what the gallery does, through the fork's `gpui_platform` crate.
+// Substitute whatever constructs your own Application; if it already has an
+// asset source, delegate `icons/…` to this one.
+let app = gpui_platform::application().with_assets(gpui_kit::assets::Assets);
 
+app.run(|cx| {
+    // Registers the embedded fonts, the theme global, the semantic registry
+    // components publish into, and the globals and key bindings the text
+    // controls, the drag system and the toasts need. Call it before opening
+    // a window.
+    gpui_kit::install(cx);
+});
+```
+
+```rust
 // In a view. Components read the theme from the context themselves.
 let save = Button::new("settings.save")
     .label("Save")
@@ -53,8 +97,25 @@ let save = Button::new("settings.save")
     });
 ```
 
-`action_button` does not install its click handler while disabled. Disabled is
+`Button` does not install its click handler while disabled. Disabled is
 therefore behavior, not only opacity.
+
+## What the host owns
+
+A component holds hover, focus, open and animation state, and nothing else. The
+value, the selection, the sort, the expansion and the answer belong to the
+caller, which is why every one of them reports an intent instead of applying it:
+a change the host refuses is visible as the control not moving. Where a
+component needs a fact it cannot hold — what day it is, what a month is called,
+whether a message was really read — it takes a host-supplied reader for that
+fact, and a reader that answers "I don't know" is answering.
+
+So a host owns its data, its transports and its refusals, and this library owns
+what is drawn and what is reported.
+[`docs/host-view-boundary.md`](docs/host-view-boundary.md) is the contract;
+[`docs/truthful-ui.md`](docs/truthful-ui.md) is why loading, empty, unstarted,
+unavailable and failed stay distinct;
+[`docs/coverage.md`](docs/coverage.md) is what this library will not do at all.
 
 ## Run the gallery
 
@@ -96,15 +157,100 @@ cargo run -p xtask -- tokens check
 The first command updates `docs/token-reference.md`; the second fails if that
 generated reference has drifted or if a theme falls below its contrast floor.
 
+### Provide your own theme
+
+A theme is a token document, and an application registers one at boot. Every
+theme carries the same key set, so a document that omits a key is rejected
+rather than silently defaulted:
+
+```rust
+use gpui_kit::theme::ThemeRegistry;
+
+cx.update_global::<ThemeRegistry, _>(|registry, _| {
+    registry.register_json(include_str!("../themes/acme-dark.json"))
+})?;
+gpui_kit::theme::activate_theme("acme-dark", cx);
+```
+
+Registering an id that already exists replaces that document, so an application
+can override a bundled theme without shadowing it. `activate_theme` returns
+`false` for an id nobody registered and leaves the active theme where it was.
+[`docs/token-model.md`](docs/token-model.md) describes the key set;
+`docs/token-reference.md` is generated from it.
+
+## Test through the semantic tree
+
+Every user-visible action and assertion target has a stable semantic id derived
+from business identity rather than list position, and the tree is measured
+during prepaint, so a test reads what a frame actually published. Add
+`gpui-kit-testkit` with its `test-support` feature to `[dev-dependencies]` and
+drive a window with `Harness`, which offers `click`, `keystrokes`, a simulated
+pointer and drag, and a frame driver on a simulated clock.
+[`docs/semantic-automation.md`](docs/semantic-automation.md) is the contract for
+what a node reports; [`docs/screenshot-testing.md`](docs/screenshot-testing.md)
+covers window capture and what a screenshot does and does not prove.
+
+## Versioning and compatibility
+
+This library is not published to crates.io and will not be while GPUI is a Git
+dependency: a crates.io release may not depend on a Git revision. That decides
+everything below.
+
+**What you pin is a commit.** There are no tags and no release artifacts, so
+`rev = "<commit>"` of this repository is the unit of consumption. `version` in
+each `Cargo.toml` is what Cargo requires a manifest to carry; it is not a
+version anybody can resolve against, and it will not be bumped for every change.
+Do not use `branch = "main"`: a floating branch means an unannounced upgrade,
+and the same rule applies here as to the GPUI pin.
+
+**What a breaking change means here.** Nothing enforces semver, so the promise
+has to be stated rather than inferred from a number. Three things are
+load-bearing for a consumer, and only one of them is visible to the Rust
+compiler:
+
+- **The Rust API.** Builders, traits, events, and the prelude. A change here
+  fails your build, which is the honest kind of break.
+- **Token keys.** `tokens/*.json` is a schema. A key that is renamed or removed
+  breaks any theme document an application maintains, and that document is only
+  validated at runtime — `register_json` returns an error, and the application
+  starts with no theme rather than the wrong one. Treat a token key rename as a
+  breaking change.
+- **Semantic ids.** A downstream test asserts on ids such as
+  `settings.save`. Renaming one breaks that test and nothing in Rust's type
+  system says so. Treat a semantic id rename as a breaking change, on the same
+  footing as removing a public method.
+
+Scene snapshots under `snapshots/` are this repository's own evidence, not an
+interface. They change whenever a component's appearance legitimately changes,
+and a consumer should not compare against them; capture your own application's
+windows instead.
+
+**Upgrading.** Read `CHANGELOG.md` between the commit you are on and the one you
+are moving to; entries state what a component now does and what it refuses to
+do. [`docs/migration-guide.md`](docs/migration-guide.md) covers the moves that
+need more than a line. When this workspace changes its GPUI revision, your
+application has to change it in the same commit, because the two have to match
+exactly.
+
 ## Validation
 
 ```bash
-cargo fmt --all -- --check
-cargo check --workspace --all-targets
-cargo test --workspace
-cargo clippy --workspace --all-targets -- -D warnings
-cargo run -p xtask -- tokens check
+cargo run -p xtask -- gate        # fmt, check, test, clippy, tokens
+cargo run -p xtask -- gate full   # the above, plus rustdoc and scene images
 ```
+
+The scene images are the visual regression gate:
+
+```bash
+cargo run -p xtask -- scenes check
+```
+
+CI runs everything except that one. The capture needs a composited, frontmost
+window and the display the baselines came from, which a GitHub-hosted runner
+does not give, so it runs on a self-hosted runner where one is configured and is
+otherwise a step a reviewer performs and records.
+[`docs/screenshot-testing.md`](docs/screenshot-testing.md) states what it
+requires and why a job that ran it anyway would be worse than no job.
 
 ## GPUI compatibility
 
@@ -115,6 +261,8 @@ effects. See [`docs/compatibility.md`](docs/compatibility.md).
 
 ## Documentation
 
+- [Changelog](CHANGELOG.md)
+- [Coverage: what is here, what is refused, what is missing](docs/coverage.md)
 - [Design principles](docs/design-principles.md)
 - [Token model](docs/token-model.md)
 - [Components](docs/components.md)

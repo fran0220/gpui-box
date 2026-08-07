@@ -20,11 +20,14 @@ use crate::controls::split_button::SplitButton;
 use crate::controls::tag_input::TagInput;
 use crate::controls::textarea::TextArea;
 use crate::display::badge::Tone;
+use crate::display::icon::{Icon as IconView, IconTone};
 use crate::foundation::ActiveTheme;
+use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
 use crate::interaction::dnd;
 use crate::overlay::toast::push as toast_push;
 use crate::overlay::{Edge, Kbd, Overlay, Placement, Tooltip, Tooltipped};
 use crate::prelude::*;
+use crate::strings::{ActiveStrings, StringKey};
 
 /// One canonical rendering, addressed by name.
 pub struct Scene {
@@ -261,6 +264,98 @@ pub fn catalog() -> Vec<Scene> {
             name: "transport",
             build: transport,
         },
+        Scene {
+            name: "approval",
+            build: approval,
+        },
+        Scene {
+            name: "permission-matrix",
+            build: permission_matrix,
+        },
+        Scene {
+            name: "cost-meter",
+            build: cost_meter,
+        },
+        Scene {
+            name: "tool-call",
+            build: tool_call,
+        },
+        Scene {
+            name: "step-list",
+            build: step_list,
+        },
+        Scene {
+            name: "thinking",
+            build: thinking,
+        },
+        Scene {
+            name: "json-view",
+            build: json_view,
+        },
+        Scene {
+            name: "schema-form",
+            build: schema_form,
+        },
+        Scene {
+            name: "server-list",
+            build: server_list,
+        },
+        Scene {
+            name: "reading-direction",
+            build: reading_direction,
+        },
+        Scene {
+            name: "toggle",
+            build: toggle,
+        },
+        Scene {
+            name: "collapsible",
+            build: collapsible,
+        },
+        Scene {
+            name: "hover-card",
+            build: hover_card,
+        },
+        Scene {
+            name: "menubar",
+            build: menubar,
+        },
+        Scene {
+            name: "copy-button",
+            build: copy_button,
+        },
+        Scene {
+            name: "aspect-ratio",
+            build: aspect_ratio,
+        },
+        Scene {
+            name: "document-tabs",
+            build: document_tabs,
+        },
+        Scene {
+            name: "search-field",
+            build: search_field,
+        },
+        Scene {
+            name: "find-replace",
+            build: find_replace,
+        },
+        Scene {
+            name: "notification-center",
+            build: notification_center,
+        },
+        Scene {
+            name: "failure-panel",
+            build: failure_panel,
+        },
+        Scene {
+            name: "code-view",
+            build: code_view,
+        },
+        Scene {
+            name: "upload-list",
+            build: upload_list,
+        },
     ];
     #[cfg(feature = "fixtures")]
     scenes.extend([
@@ -283,6 +378,20 @@ pub fn catalog() -> Vec<Scene> {
 /// The scene registered under `name`, or `None` when nothing is.
 pub fn find(name: &str) -> Option<Scene> {
     catalog().into_iter().find(|scene| scene.name == name)
+}
+
+/// The reading direction a scene expects.
+///
+/// The direction is a global, like the theme, so a capture run that renders
+/// the whole catalog into one process has to set it per scene the same way it
+/// activates a theme per scene. A scene that changed it while rendering would
+/// leak into whichever scene came next, and the leak would show up as a
+/// changed image somewhere else entirely.
+pub fn direction(name: &str) -> LayoutDirection {
+    match name {
+        "reading-direction" => LayoutDirection::RightToLeft,
+        _ => LayoutDirection::LeftToRight,
+    }
 }
 
 fn stack(theme: &Theme) -> gpui::Div {
@@ -801,6 +910,340 @@ fn tabs(_window: &mut Window, cx: &mut App) -> AnyElement {
         .into_any_element()
 }
 
+/// The overflow menu the document-tab scene hangs off the strip.
+///
+/// The strip does not own it: a menu is an entity with an open state that
+/// outlives a frame, so the caller builds it and the strip fills it.
+struct SceneDocumentTabs {
+    overflow: Entity<Menu>,
+}
+
+impl Global for SceneDocumentTabs {}
+
+fn document_tabs(window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<SceneDocumentTabs>() {
+        // An icon-only trigger still has to be nameable, so it carries the
+        // strip's own word for what moved into it.
+        let name = cx.strings().text(StringKey::TabMoreTabs);
+        let overflow = cx.new(|cx| {
+            Menu::new("scene.document-tabs.overflow", window, cx)
+                .trigger_icon(Icon::AltArrowDown)
+                .trigger_name(name)
+        });
+        cx.set_global(SceneDocumentTabs { overflow });
+    }
+    let overflow = cx.global::<SceneDocumentTabs>().overflow.clone();
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(620.0))
+        .child(caption(
+            &theme,
+            "clean, unsaved, saving, save failed — three marks, and silence for the fourth",
+        ))
+        .child(
+            Tabs::new("scene.document-tabs.editor")
+                .tabs([
+                    TabItem::new("readme", "README.md").closable(true),
+                    TabItem::new("main", "main.rs").dirty().closable(true),
+                    TabItem::new("theme", "theme.json").saving().closable(true),
+                    TabItem::new("notes", "notes.md")
+                        .save_failed("The workspace is read-only.")
+                        .closable(true),
+                ])
+                .selected("main")
+                .on_select(|_, _, _| {})
+                .on_close(|_, _, _| {}),
+        )
+        .child(caption(
+            &theme,
+            "past the declared limit the rest go to a menu, which stays reachable from the keyboard",
+        ))
+        .child(
+            Tabs::new("scene.document-tabs.overflowing")
+                .tabs([
+                    TabItem::new("one", "adapter.rs").closable(true),
+                    TabItem::new("two", "catalog.rs").dirty().closable(true),
+                    TabItem::new("three", "harness.rs").closable(true),
+                    TabItem::new("four", "registry.rs").closable(true),
+                    TabItem::new("five", "transport.rs").dirty().closable(true),
+                ])
+                .selected("two")
+                .overflow_after(3)
+                .overflow_menu(overflow)
+                .on_select(|_, _, _| {})
+                .on_close(|_, _, _| {}),
+        )
+        .into_any_element()
+}
+
+/// The search surfaces the scene shows, kept across frames.
+///
+/// Both hold a [`TextInput`], which owns a caret and a selection that outlive
+/// a frame, so they are built once and driven once.
+struct SceneSearch {
+    field: Entity<SearchField>,
+    replace: Entity<FindReplace>,
+}
+
+impl Global for SceneSearch {}
+
+fn ensure_search(window: &mut Window, cx: &mut App) {
+    if cx.has_global::<SceneSearch>() {
+        return;
+    }
+    let field = cx.new(|cx| SearchField::new("scene.search.field", window, cx));
+    field.update(cx, |field, cx| {
+        field.set_query("transport", cx);
+        field.set_count(
+            HitCount::Known {
+                total: 12,
+                current: Some(2),
+            },
+            cx,
+        );
+    });
+
+    let replace = cx.new(|cx| FindReplace::new("scene.search.replace", window, cx));
+    replace.update(cx, |replace, cx| {
+        replace.search_field().update(cx, |field, cx| {
+            field.set_query("transport", cx);
+        });
+        replace.replacement_input().update(cx, |input, cx| {
+            input.set_value("delivery", cx);
+        });
+        replace.set_count(
+            HitCount::Known {
+                total: 12,
+                current: Some(2),
+            },
+            cx,
+        );
+    });
+
+    cx.set_global(SceneSearch { field, replace });
+}
+
+fn search_field(window: &mut Window, cx: &mut App) -> AnyElement {
+    ensure_search(window, cx);
+    let field = cx.global::<SceneSearch>().field.clone();
+    let theme = cx.theme().clone();
+
+    // The three counts a field must keep apart. No pointer position produces
+    // them at once, so each is stated.
+    stack(&theme)
+        .w(px(620.0))
+        .child(field)
+        .child(caption(
+            &theme,
+            "counting is not none, and too many is not a total",
+        ))
+        .child(
+            row(&theme)
+                .child(hit_count_sample(&theme, "counting", HitCount::Counting))
+                .child(hit_count_sample(&theme, "none", HitCount::None))
+                .child(hit_count_sample(
+                    &theme,
+                    "too many",
+                    HitCount::TooMany { counted: 500 },
+                )),
+        )
+        .child(caption(&theme, "the current hit is not the other hits"))
+        .child(
+            div().child(
+                HighlightedText::new(
+                    "The transport reports what it did; the transport never decides.",
+                )
+                .id("scene.search.line")
+                .hits([4..13, 34..43])
+                .current(1),
+            ),
+        )
+        .into_any_element()
+}
+
+/// One hit count, rendered on its own so the states can be seen side by side.
+fn hit_count_sample(theme: &Theme, label: &'static str, count: HitCount) -> gpui::Div {
+    div()
+        .column()
+        .gap(px(theme.spacing.xs))
+        .child(caption(theme, label))
+        .child(
+            div()
+                .px(px(theme.spacing.sm))
+                .py(px(theme.spacing.xs))
+                .hairline(theme)
+                .radius(theme, Radius::Control)
+                .child(count.name()),
+        )
+}
+
+fn find_replace(window: &mut Window, cx: &mut App) -> AnyElement {
+    ensure_search(window, cx);
+    let replace = cx.global::<SceneSearch>().replace.clone();
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(620.0))
+        // Replace all says how many before it does any, so nobody agrees to a
+        // number they were never shown.
+        .child(caption(
+            &theme,
+            "replace all names its count before it acts",
+        ))
+        .child(replace)
+        .into_any_element()
+}
+
+/// The notification centre the scene shows, kept across frames.
+struct SceneNotifications {
+    centre: Entity<NotificationCenter>,
+}
+
+impl Global for SceneNotifications {}
+
+fn notification_center(_window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<SceneNotifications>() {
+        let centre = cx.new(|cx| NotificationCenter::new("scene.notifications", cx));
+        centre.update(cx, |centre, cx| {
+            centre.record(
+                Notification::new("scene.notify.exported", "Theme exported to disk")
+                    .tone(Tone::Success)
+                    .at("9:41")
+                    .read(true),
+                cx,
+            );
+            centre.record(
+                Notification::new("scene.notify.stale", "Refreshing the model catalog failed")
+                    .tone(Tone::Warning)
+                    .detail("The last verified catalog is still shown.")
+                    .at("9:44"),
+                cx,
+            );
+            centre.record(
+                Notification::new(
+                    "scene.notify.refused",
+                    "The host refused to publish this run",
+                )
+                .tone(Tone::Danger)
+                .detail("Approval is required for this workspace.")
+                .at("9:46")
+                .action("Try again", |_, _| {}),
+                cx,
+            );
+        });
+        cx.set_global(SceneNotifications { centre });
+    }
+    let centre = cx.global::<SceneNotifications>().centre.clone();
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(520.0))
+        // The same three reports the toast scene shows, after their toasts
+        // have gone.
+        .child(caption(
+            &theme,
+            "what the toasts said, still here once they timed out",
+        ))
+        .child(centre)
+        .into_any_element()
+}
+
+fn failure_panel(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    // A failure, not a refusal. Retrying a refusal would only be refused
+    // again, so the retry here is offered against something that can succeed
+    // on a second attempt; refusals are shown by ToolCallCard instead.
+    let failed: Result<(), &str> = Err("The runs service did not respond.");
+    stack(&theme)
+        .w(px(560.0))
+        .child(caption(
+            &theme,
+            "the host's own words, kept on screen; the retry belongs to the host",
+        ))
+        .children(
+            FailurePanel::from_result("scene.failure.query", &failed).map(|panel| {
+                panel
+                    .title("Runs")
+                    .detail("The connection timed out after 30 seconds.")
+                    .attempts(3)
+                    .on_retry(|_, _| {})
+            }),
+        )
+        .into_any_element()
+}
+
+fn code_view(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    // Spans are the caller's, in byte offsets into each line. Nothing here
+    // parses anything.
+    let lines = [
+        CodeLine::new(40, "fn report(&self) -> Outcome {").spans([
+            CodeSpan {
+                range: 0..2,
+                tone: Tone::Accent,
+            },
+            CodeSpan {
+                range: 3..9,
+                tone: Tone::Success,
+            },
+        ]),
+        CodeLine::new(41, "    let verified = self.check();")
+            .spans([CodeSpan {
+                range: 4..7,
+                tone: Tone::Accent,
+            }])
+            .mark(LineMark::Added),
+        CodeLine::new(42, "    let stale = self.cached();").mark(LineMark::Removed),
+        CodeLine::new(43, "    Outcome::from(verified)").mark(LineMark::Changed),
+        CodeLine::new(
+            44,
+            "    // this line runs off the edge rather than wrapping, because a column carries meaning in code",
+        ),
+        CodeLine::new(45, "}").mark(LineMark::Error),
+    ];
+    stack(&theme)
+        .w(px(620.0))
+        .child(caption(
+            &theme,
+            "line numbers are the file's, marks are the host's, colour is the caller's",
+        ))
+        .child(CodeView::new("scene.code.report", lines).language("rust"))
+        .into_any_element()
+}
+
+fn upload_list(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(560.0))
+        .child(caption(
+            &theme,
+            "a refusal is not a failure, and only a failure is offered a retry",
+        ))
+        .child(
+            UploadList::new("scene.uploads")
+                .dropzone(
+                    Dropzone::new("scene.uploads.zone", "Drop files to attach")
+                        .hint("PDF, PNG, or plain text")
+                        .on_files(|_, _, _| {}),
+                )
+                .uploads([
+                    Upload::new("brief", "brief.pdf").size("1.2 MB").done(),
+                    Upload::new("capture", "capture.png")
+                        .size("4.8 MB")
+                        .uploading(0.4),
+                    Upload::new("notes", "notes.txt").size("12 KB"),
+                    Upload::new("archive", "archive.zip")
+                        .size("240 MB")
+                        .failed("The connection dropped."),
+                    Upload::new("installer", "installer.exe")
+                        .size("64 MB")
+                        .refused("This zone does not take programs."),
+                ])
+                .on_retry(|_, _, _| {})
+                .on_cancel(|_, _, _| {})
+                .on_remove(|_, _, _| {}),
+        )
+        .into_any_element()
+}
+
 fn accordion(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)
@@ -1160,6 +1603,120 @@ fn tree(_window: &mut Window, cx: &mut App) -> AnyElement {
                 ])
                 .on_toggle(|_, _, _, _| {})
                 .on_select(|_, _, _| {}),
+        )
+        .into_any_element()
+}
+
+/// The same vocabulary an interface uses everywhere, rendered right to left.
+///
+/// The point of capturing this is that support for another reading direction
+/// is a claim about pixels, and a claim about pixels is only checkable in a
+/// picture. Everything here is a component that already existed; nothing was
+/// drawn specially for the scene. What should have moved: the trail runs from
+/// the right, the tree indents from the right and its shut chevrons point
+/// left, the accordion header reads from the right, and the magnifier's
+/// handle changed corners. What should not have moved: the checkmark, the
+/// gear, and the downward chevron, because none of them mean "forward".
+fn reading_direction(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let direction = cx.layout_direction();
+    stack(&theme)
+        .w(px(560.0))
+        .child(
+            Breadcrumb::new("scene.rtl.trail")
+                .crumbs([
+                    Crumb::new("workspace", "Workspace"),
+                    Crumb::new("runs", "Runs"),
+                    Crumb::new("run-4821", "Indexing"),
+                ])
+                .on_select(|_, _, _| {}),
+        )
+        .child(
+            Tabs::new("scene.rtl.tabs")
+                .tabs([
+                    TabItem::new("overview", "Overview").icon(Icon::Widget),
+                    TabItem::new("runs", "Runs").badge("12"),
+                    TabItem::new("logs", "Logs"),
+                ])
+                .selected("runs")
+                .on_select(|_, _, _| {}),
+        )
+        .child(
+            div()
+                .row_reading(direction)
+                .gap(px(theme.space(Space::Md)))
+                .items_start()
+                .child(
+                    div().w(px(240.0)).child(
+                        Tree::new("scene.rtl.tree")
+                            .expanded_ids(&["workspace"])
+                            .selected("tokens")
+                            .nodes([TreeNode::new("workspace", "workspace")
+                                .icon(Icon::Folder)
+                                .children([
+                                    TreeNode::new("crates", "crates")
+                                        .icon(Icon::Folder)
+                                        .children([
+                                            TreeNode::new("kit", "gpui-kit").icon(Icon::Document)
+                                        ]),
+                                    TreeNode::new("tokens", "tokens").icon(Icon::Document),
+                                ])])
+                            .on_toggle(|_, _, _, _| {})
+                            .on_select(|_, _, _| {}),
+                    ),
+                )
+                .child(
+                    div().flex_1().child(
+                        Accordion::new("scene.rtl.sections")
+                            .expanded_ids(&["network"])
+                            .on_toggle(|_, _, _, _| {})
+                            .section(
+                                AccordionSection::new("network", "Network")
+                                    .description("How this machine reaches a host")
+                                    .body(div().child("Requests go out over the system proxy.")),
+                            )
+                            .section(
+                                AccordionSection::new("storage", "Storage")
+                                    .description("Where verified results are kept"),
+                            ),
+                    ),
+                ),
+        )
+        .child(
+            div()
+                .row_reading(direction)
+                .gap(px(theme.space(Space::Md)))
+                // Directional glyphs on the top row, fixed ones below the
+                // names, so a reviewer can see which turned around.
+                .child(IconView::new(Icon::Magnifier).large().muted())
+                .child(IconView::new(Icon::AltArrowRight).large().muted())
+                .child(IconView::new(Icon::Return).large().muted())
+                .child(IconView::new(Icon::Check).large().tone(IconTone::Success))
+                .child(IconView::new(Icon::Settings).large().muted())
+                .child(IconView::new(Icon::AltArrowDown).large().muted())
+                .child(
+                    IconView::named("scene.rtl.alone", Icon::Danger, "Run failed")
+                        .large()
+                        .tone(IconTone::Danger),
+                ),
+        )
+        .child(
+            div()
+                .row_reading(direction)
+                .gap(px(theme.space(Space::Sm)))
+                .child(
+                    Button::new("scene.rtl.save")
+                        .label("Save")
+                        .primary()
+                        .icon(Icon::Check)
+                        .on_click(|_, _| {}),
+                )
+                .child(
+                    Button::new("scene.rtl.cancel")
+                        .label("Cancel")
+                        .secondary()
+                        .on_click(|_, _| {}),
+                ),
         )
         .into_any_element()
 }
@@ -3363,6 +3920,800 @@ fn transport(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .volume(0.7)
                 .muted(true)
                 .on_event(|_, _, _| {}),
+        )
+        .into_any_element()
+}
+
+struct SceneApprovals {
+    pending: Entity<ApprovalPrompt>,
+    declined: Entity<ApprovalPrompt>,
+    expired: Entity<ApprovalPrompt>,
+    superseded: Entity<ApprovalPrompt>,
+}
+
+impl Global for SceneApprovals {}
+
+fn approval(window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<SceneApprovals>() {
+        let pending = cx.new(|cx| {
+            ApprovalPrompt::new(
+                "scene.approval.pending",
+                "Write to /work/report/summary.md",
+                window,
+                cx,
+            )
+            .details([
+                DescriptionItem::new("tool", "Tool", "write-file"),
+                DescriptionItem::new("path", "Path", "/work/report/summary.md"),
+                DescriptionItem::new("bytes", "Size", "4 KB"),
+            ])
+            .always(AlwaysScope::Session)
+            .always(AlwaysScope::path("/work/report"))
+            .always(AlwaysScope::tool("write-file"))
+        });
+        let declined = cx.new(|cx| {
+            ApprovalPrompt::new(
+                "scene.approval.declined",
+                "Delete /work/report/draft.md",
+                window,
+                cx,
+            )
+            .status(ApprovalStatus::Declined)
+        });
+        let expired = cx.new(|cx| {
+            ApprovalPrompt::new(
+                "scene.approval.expired",
+                "Open a connection to build.internal:8443",
+                window,
+                cx,
+            )
+            .status(ApprovalStatus::Expired)
+        });
+        let superseded = cx.new(|cx| {
+            ApprovalPrompt::new(
+                "scene.approval.superseded",
+                "Run the test suite in /work",
+                window,
+                cx,
+            )
+            .status(ApprovalStatus::Superseded {
+                by: "a later request covering the whole workspace".into(),
+            })
+        });
+        cx.set_global(SceneApprovals {
+            pending,
+            declined,
+            expired,
+            superseded,
+        });
+    }
+    let prompts = cx.global::<SceneApprovals>();
+    let pending = prompts.pending.clone();
+    let declined = prompts.declined.clone();
+    let expired = prompts.expired.clone();
+    let superseded = prompts.superseded.clone();
+    let theme = cx.theme().clone();
+
+    stack(&theme)
+        .w(px(560.0))
+        .child(pending)
+        .child(
+            Divider::new()
+                .id("scene.approval.rule.resolved")
+                .label("Answered, expired, and replaced are three different things"),
+        )
+        .child(declined)
+        .child(expired)
+        .child(superseded)
+        .into_any_element()
+}
+
+fn permission_matrix(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let actions = [
+        PermissionAction::new("read", "Read files"),
+        PermissionAction::new("write", "Write files"),
+        PermissionAction::new("network", "Reach the network"),
+    ];
+    let subjects = [
+        PermissionSubject::new("workspace", "This workspace")
+            .cell("read", PermissionEntry::new(PermissionState::Allowed))
+            .cell("write", PermissionEntry::new(PermissionState::Ask))
+            .cell(
+                "network",
+                PermissionEntry::inherited(PermissionState::Denied, "the organisation policy"),
+            ),
+        PermissionSubject::new("scratch", "The scratch directory")
+            .cell(
+                "read",
+                PermissionEntry::inherited(PermissionState::Allowed, "this workspace"),
+            )
+            .cell("write", PermissionEntry::new(PermissionState::Allowed))
+            .cell(
+                "network",
+                PermissionEntry::inherited(PermissionState::Denied, "the organisation policy"),
+            ),
+        // A calculator has no files to read, which is not the same as being
+        // refused them.
+        PermissionSubject::new("calculator", "The calculator tool")
+            .cell("network", PermissionEntry::new(PermissionState::Denied)),
+    ];
+
+    stack(&theme)
+        .w(px(720.0))
+        .child(
+            PermissionMatrix::new("scene.permission.editable")
+                .actions(actions.clone())
+                .subjects(subjects.clone())
+                .on_change(|_change, _window, _cx| {}),
+        )
+        .child(
+            Divider::new()
+                .id("scene.permission.rule.read-only")
+                .label("The same permissions, shown rather than offered"),
+        )
+        .child(
+            PermissionMatrix::new("scene.permission.read-only")
+                .actions(actions)
+                .subjects(subjects),
+        )
+        .into_any_element()
+}
+
+fn cost_meter(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(520.0))
+        .child(
+            CostMeter::new("scene.cost.meter")
+                .label("This run")
+                .line(CostLine::new(
+                    "spend",
+                    "Spend",
+                    Reading::measured(1.24, "1.24 credits"),
+                ))
+                .line(CostLine::new(
+                    "projected",
+                    "Projected at this rate",
+                    Reading::estimated(4.0, "4.00 credits"),
+                ))
+                .line(
+                    CostLine::new(
+                        "account",
+                        "Account balance",
+                        Reading::measured(112.0, "112.00 credits"),
+                    )
+                    .stale(LastVerified::at("09:41 today")),
+                )
+                .line(CostLine::new(
+                    "storage",
+                    "Storage",
+                    Reading::unavailable_because("The billing host refused the request."),
+                )),
+        )
+        .child(
+            Divider::new()
+                .id("scene.cost.rule.gauge")
+                .label("A limit that is known, and one that is not"),
+        )
+        .child(
+            ContextGauge::new(
+                "scene.cost.context.known",
+                Reading::measured(48_000.0, "48,000 tokens"),
+            )
+            .label("Context used")
+            .limit(Limit::measured(128_000.0, "128,000 tokens")),
+        )
+        .child(
+            ContextGauge::new(
+                "scene.cost.context.unknown",
+                Reading::estimated(48_000.0, "48,000 tokens"),
+            )
+            .label("Context used"),
+        )
+        .child(
+            ContextGauge::new("scene.cost.context.unavailable", Reading::unavailable())
+                .label("Context used")
+                .limit(Limit::measured(128_000.0, "128,000 tokens")),
+        )
+        .into_any_element()
+}
+
+fn scene_arguments() -> ToolBody {
+    ToolBody::new(
+        "{\n  \"path\": \"docs/coverage.md\",\n  \"pattern\": \"unknown\",\n  \"limit\": 20\n}",
+    )
+    .max_lines(2)
+}
+
+/// Every state a call can be in, side by side.
+///
+/// Two columns because a captured image is one screen: stacked, the refusal
+/// fell below the fold, and a state nobody can see in the snapshot is a state
+/// the snapshot does not guard.
+fn tool_call(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    div()
+        .flex()
+        .gap(px(theme.spacing.lg))
+        .child(
+            stack(&theme).w(px(460.0)).child(
+            ToolCallCard::new("scene.tool.pending", "workspace.search")
+                .arguments(scene_arguments())
+                .state(ToolCallState::PendingApproval),
+        )
+        .child(
+            ToolCallCard::new("scene.tool.running", "workspace.index")
+                .arguments("{ \"root\": \"crates\" }")
+                .state(ToolCallState::Running)
+                .elapsed("4.2 s"),
+        )
+        .child(
+            ToolCallCard::new("scene.tool.succeeded", "workspace.read")
+                .arguments("{ \"path\": \"README.md\" }")
+                .state(ToolCallState::succeeded(
+                    ToolBody::new(
+                        "# gpui-kit\n\nProduct-neutral components.\n\nEvery word is replaceable.",
+                    )
+                    .max_lines(2),
+                ))
+                .elapsed("0.3 s"),
+        )
+        .child(
+            ToolCallCard::new("scene.tool.silent", "workspace.touch")
+                .arguments("{ \"path\": \"notes.md\" }")
+                .state(ToolCallState::succeeded_silently())
+                .elapsed("0.1 s"),
+        ),
+        )
+        .child(
+            stack(&theme)
+                .w(px(460.0))
+                .child(
+                    ToolCallCard::new("scene.tool.failed", "workspace.write")
+                        .arguments("{ \"path\": \"/read-only/notes.md\" }")
+                        .state(ToolCallState::failed(
+                            "The file system reported that the path is read only.",
+                        ))
+                        .elapsed("0.2 s")
+                        .on_retry(|_, _| {}),
+                )
+                // A refusal reads as a decision: it is not the failure above
+                // it, and not the silent success in the other column.
+                .child(
+                    ToolCallCard::new("scene.tool.refused", "shell.run")
+                        .arguments("{ \"command\": \"rm -rf build\" }")
+                        .state(ToolCallState::refused(
+                            "This workspace does not allow shell commands.",
+                        )),
+                ),
+        )
+        .into_any_element()
+}
+
+fn step_list(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .child(caption(&theme, "A run somebody counted"))
+        .child(
+            StepList::new("scene.steps.counted")
+                .step(Step::new("read", "Read the brief").state(StepState::Done))
+                .step(
+                    Step::new("search", "Search the workspace")
+                        .state(StepState::Running)
+                        .body(
+                            ToolCallCard::new("scene.steps.search.call", "workspace.search")
+                                .arguments(scene_arguments())
+                                .state(ToolCallState::Running)
+                                .elapsed("1.1 s"),
+                        ),
+                )
+                .step(Step::new("summarise", "Summarise what was found"))
+                .step(
+                    Step::new("publish", "Publish the summary").state(StepState::Skipped(
+                        "Publishing is turned off for this workspace.".into(),
+                    )),
+                )
+                .step(
+                    Step::new("notify", "Notify the reviewers").state(StepState::Failed(
+                        "The notification service refused the request.".into(),
+                    )),
+                ),
+        )
+        .child(caption(&theme, "A run still being decided"))
+        .child(
+            StepList::new("scene.steps.open")
+                .length(RunLength::Unknown)
+                .step(Step::new("read", "Read the brief").state(StepState::Done))
+                .step(Step::new("plan", "Decide what to do next").state(StepState::Running)),
+        )
+        .into_any_element()
+}
+
+fn thinking(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .child(ThinkingBlock::new(
+            "scene.thinking.collapsed",
+            Reasoning::present("The brief asks for two files, so read both before answering."),
+        ))
+        .child(
+            ThinkingBlock::new(
+                "scene.thinking.open",
+                Reasoning::present(
+                    "The brief asks for two files.\nRead both before answering.\nThen summarise.",
+                ),
+            )
+            .expanded(true)
+            .on_toggle(|_, _, _| {}),
+        )
+        // Withheld and absent are two different facts, and neither is the
+        // collapsed block above.
+        .child(ThinkingBlock::new(
+            "scene.thinking.withheld",
+            Reasoning::withheld("This connection does not hand over reasoning."),
+        ))
+        .child(ThinkingBlock::new(
+            "scene.thinking.absent",
+            Reasoning::Absent,
+        ))
+        .into_any_element()
+}
+
+// ------------------------------------------------- structured data and agents
+
+/// A document with the three facts a viewer usually confuses: a key holding
+/// `null`, a key holding an empty object, and a key that is simply not here.
+fn scene_document() -> JsonValue {
+    JsonValue::object([
+        ("id", JsonValue::string("run-4812")),
+        ("attempts", JsonValue::number("3")),
+        ("streaming", JsonValue::Bool(true)),
+        // Nothing has been recorded here yet, which is not the same as the
+        // key being missing: `resumed_from` is missing, and says nothing.
+        ("cursor", JsonValue::Null),
+        ("labels", JsonValue::object(Vec::<(&str, JsonValue)>::new())),
+        (
+            "credentials",
+            JsonValue::object([("token", JsonValue::redacted("51 characters"))]),
+        ),
+        (
+            "request",
+            JsonValue::object([
+                ("method", JsonValue::string("POST")),
+                (
+                    "headers",
+                    JsonValue::object([
+                        ("content-type", JsonValue::string("application/json")),
+                        ("authorization", JsonValue::redacted("a value")),
+                    ]),
+                ),
+            ]),
+        ),
+        (
+            "steps",
+            JsonValue::array([
+                JsonValue::string("plan"),
+                JsonValue::string("apply"),
+                JsonValue::object([("retries", JsonValue::number("0"))]),
+            ]),
+        ),
+    ])
+}
+
+fn json_view(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(520.0))
+        .child(
+            JsonView::new("scene.json", scene_document())
+                .expanded_paths(&["credentials", "request", "request/headers", "steps"])
+                .selected("request/method")
+                .on_toggle(|_, _, _, _| {})
+                .on_select(|_, _, _| {}),
+        )
+        .into_any_element()
+}
+
+/// The form kept across frames.
+///
+/// Its fields own carets, open menus and a selection, so rebuilding it every
+/// frame would throw away whatever had been typed into it.
+struct SceneSchemaForm {
+    form: Entity<SchemaForm>,
+}
+
+impl Global for SceneSchemaForm {}
+
+fn scene_schema() -> Schema {
+    Schema::new()
+        .field(
+            SchemaField::new(
+                "path",
+                SchemaKind::Text {
+                    placeholder: Some("relative to the workspace".into()),
+                    secret: false,
+                },
+            )
+            .label("File")
+            .description("Which file the call reads")
+            .required(true),
+        )
+        .field(
+            SchemaField::new(
+                "max_bytes",
+                SchemaKind::Integer(NumberBounds::new().min(1.0).max(65_536.0).step(1024.0)),
+            )
+            .label("Maximum bytes"),
+        )
+        .field(
+            SchemaField::new("follow_symlinks", SchemaKind::Boolean).label("Follow symbolic links"),
+        )
+        .field(
+            SchemaField::new(
+                "encoding",
+                SchemaKind::Enum(vec![
+                    SchemaChoice::new("utf-8", "UTF-8"),
+                    SchemaChoice::new("latin-1", "Latin-1"),
+                ]),
+            )
+            .label("Encoding")
+            .required(true),
+        )
+        .field(
+            SchemaField::new(
+                "profile",
+                SchemaKind::OpenEnum(vec![
+                    SchemaChoice::new("fast", "Fast"),
+                    SchemaChoice::new("thorough", "Thorough"),
+                ]),
+            )
+            .label("Profile")
+            .description("One of these, or whatever you type"),
+        )
+        .field(SchemaField::new("tags", SchemaKind::TextList { max: Some(4) }).label("Tags"))
+        .field(
+            SchemaField::new(
+                "limits",
+                SchemaKind::Object(vec![
+                    SchemaField::new("timeout_ms", SchemaKind::Integer(NumberBounds::new()))
+                        .label("Timeout in milliseconds"),
+                ]),
+            )
+            .label("Limits"),
+        )
+        .field(
+            SchemaField::new(
+                "matcher",
+                SchemaKind::Unrenderable(
+                    "This argument is one of three shapes at once, and no single control \
+                     stands for that."
+                        .into(),
+                ),
+            )
+            .label("Matcher")
+            .required(true),
+        )
+}
+
+fn schema_form(window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<SceneSchemaForm>() {
+        let form = cx.new(|cx| SchemaForm::new("scene.schema", scene_schema(), window, cx));
+        form.update(cx, |form, cx| {
+            // An error the host returned rather than one the form derived:
+            // only the host knows this path is outside the workspace.
+            form.set_error("path", "That path is outside the workspace.", cx);
+        });
+        cx.set_global(SceneSchemaForm { form });
+    }
+    let form = cx.global::<SceneSchemaForm>().form.clone();
+    let theme = cx.theme().clone();
+    stack(&theme).w(px(520.0)).child(form).into_any_element()
+}
+
+fn server_list(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(560.0))
+        .child(
+            ServerList::new("scene.servers")
+                .expanded_ids(&["workspace", "index", "archive"])
+                .selected("workspace")
+                .servers([
+                    ServerEntry::new("workspace", "Workspace tools")
+                        .detail("Running beside this window")
+                        .state(ServerState::Connected)
+                        .offers([
+                            Offering::tool("read", "Read a file")
+                                .summary("Returns the contents of one file")
+                                .qualifier("path, max_bytes"),
+                            Offering::tool("write", "Write a file")
+                                .summary("Replaces the contents of one file"),
+                            Offering::skill("review", "Review a change")
+                                .summary("Reads a diff and reports what it finds"),
+                            Offering::resource("changelog", "Changelog")
+                                .qualifier("workspace:/CHANGELOG.md"),
+                        ]),
+                    ServerEntry::new("index", "Search index")
+                        .detail("Answered, and the answer was empty")
+                        .state(ServerState::Connected)
+                        .offers([]),
+                    ServerEntry::new("archive", "Archive")
+                        .detail("Nobody has asked it anything yet")
+                        .state(ServerState::Connected),
+                    ServerEntry::new("build", "Build runner")
+                        .state(ServerState::Connecting)
+                        .catalog(Catalog::Asking),
+                    ServerEntry::new("notes", "Notes").state(ServerState::Disconnected),
+                    ServerEntry::new("deploy", "Deployment").state(ServerState::Failed {
+                        reason: "The connection was refused after three attempts.".into(),
+                    }),
+                    ServerEntry::new("telemetry", "Telemetry").state(ServerState::Disabled {
+                        reason: Some("You turned this one off.".into()),
+                    }),
+                ])
+                .on_select(|_, _, _| {})
+                .on_retry(|_, _, _| {})
+                .on_toggle(|_, _, _, _| {}),
+        )
+        .into_any_element()
+}
+
+/// The ordinary-application views that own state across frames.
+struct SceneOrdinary {
+    menubar: Entity<Menubar>,
+    hover_card: Entity<HoverCard>,
+    copy: Entity<CopyButton>,
+    copy_refused: Entity<CopyButton>,
+}
+
+impl Global for SceneOrdinary {}
+
+fn ensure_ordinary(window: &mut Window, cx: &mut App) {
+    if cx.has_global::<SceneOrdinary>() {
+        return;
+    }
+    let menubar = cx.new(|cx| {
+        Menubar::new(
+            "scene.menubar",
+            [
+                MenubarMenu::new(
+                    "file",
+                    "File",
+                    [
+                        MenuItem::command("file.new", "New run").shortcut("cmd-n"),
+                        MenuItem::command("file.open", "Open workspace").shortcut("cmd-o"),
+                        MenuItem::separator("file.rule"),
+                        MenuItem::submenu(
+                            "file.export",
+                            "Export",
+                            [
+                                MenuItem::command("file.export.json", "As JSON"),
+                                MenuItem::command("file.export.text", "As plain text"),
+                            ],
+                        ),
+                    ],
+                ),
+                MenubarMenu::new(
+                    "edit",
+                    "Edit",
+                    [
+                        MenuItem::command("edit.undo", "Undo").shortcut("cmd-z"),
+                        MenuItem::check("edit.wrap", "Wrap lines", true),
+                    ],
+                ),
+                MenubarMenu::new("view", "View", [MenuItem::command("view.zoom", "Zoom in")]),
+                MenubarMenu::new("policy", "Policy", []).disabled(true),
+            ],
+            window,
+            cx,
+        )
+    });
+    menubar.update(cx, |bar, cx| bar.open("file", window, cx));
+
+    let hover_card = cx.new(|cx| {
+        HoverCard::new("scene.hover-card", window, cx)
+            .name("Run 4821")
+            .trigger(|_, cx| {
+                let theme = cx.theme().clone();
+                div()
+                    .text_color(theme.colors.accent)
+                    .child("run 4821")
+                    .into_any_element()
+            })
+            .content(|_, cx| {
+                let theme = cx.theme().clone();
+                div()
+                    .column()
+                    .gap(px(theme.spacing.xs))
+                    .child("Nightly regression sweep")
+                    .child(
+                        div()
+                            .text_size(px(theme.typography.caption.size))
+                            .text_color(theme.colors.text_muted)
+                            .child("Finished in 4 minutes, 12 checks, none failed."),
+                    )
+                    .child(Badge::new("Ready").success())
+                    .into_any_element()
+            })
+    });
+    hover_card.update(cx, |card, cx| card.open(cx));
+
+    let copy = cx.new(|cx| {
+        CopyButton::new("scene.copy", window, cx)
+            .text("run-4821-9f3a")
+            .copier(|_, _| Ok(()))
+    });
+    copy.update(cx, |button, cx| button.copy(cx));
+
+    let copy_refused = cx.new(|cx| {
+        CopyButton::new("scene.copy-refused", window, cx)
+            .text("run-4821-9f3a")
+            .copier(|_, _| Err("The clipboard did not take it.".into()))
+    });
+    copy_refused.update(cx, |button, cx| button.copy(cx));
+
+    cx.set_global(SceneOrdinary {
+        menubar,
+        hover_card,
+        copy,
+        copy_refused,
+    });
+}
+
+fn toggle(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .child(caption(&theme, "A button that stays in"))
+        .child(
+            row(&theme)
+                .child(
+                    Toggle::new("scene.toggle.bold")
+                        .label("Bold")
+                        .pressed(true)
+                        .on_press(|_, _, _| {}),
+                )
+                .child(
+                    Toggle::new("scene.toggle.italic")
+                        .label("Italic")
+                        .on_press(|_, _, _| {}),
+                )
+                .child(
+                    Toggle::new("scene.toggle.review")
+                        .label("Review mode")
+                        .secondary()
+                        .pressed(true)
+                        .on_press(|_, _, _| {}),
+                )
+                .child(
+                    Toggle::new("scene.toggle.locked")
+                        .label("Locked")
+                        .disabled(true),
+                ),
+        )
+        .child(caption(&theme, "Any number in at once"))
+        .child(
+            ToggleGroup::new("scene.toggle-group.format")
+                .label("Formatting")
+                .selection(ToggleSelection::Any)
+                .items([
+                    ToggleItem::new("bold", "Bold"),
+                    ToggleItem::new("italic", "Italic"),
+                    ToggleItem::new("underline", "Underline").disabled(true),
+                ])
+                .pressed_ids(&["bold", "italic"])
+                .on_change(|_, _, _, _| {}),
+        )
+        .child(caption(
+            &theme,
+            "One or none, which a segmented strip cannot say",
+        ))
+        .child(
+            ToggleGroup::new("scene.toggle-group.density")
+                .label("Density")
+                .selection(ToggleSelection::AtMostOne)
+                .items([
+                    ToggleItem::new("compact", "Compact"),
+                    ToggleItem::new("cosy", "Cosy"),
+                    ToggleItem::new("roomy", "Roomy"),
+                ])
+                .pressed_ids(&["cosy"])
+                .on_change(|_, _, _, _| {}),
+        )
+        .into_any_element()
+}
+
+fn collapsible(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(520.0))
+        .child(
+            Collapsible::new("scene.collapsible.open", "Advanced")
+                .description("Settings most runs never touch")
+                .open(true)
+                .body(div().child("Requests go out over the system proxy."))
+                .on_toggle(|_, _, _| {}),
+        )
+        .child(
+            Collapsible::new("scene.collapsible.shut", "Diagnostics")
+                .description("Nothing is collected until this is opened")
+                .body(div().child("This body is absent from the tree while it is shut."))
+                .on_toggle(|_, _, _| {}),
+        )
+        .child(
+            Collapsible::new("scene.collapsible.refused", "Managed by policy")
+                .description("This machine cannot change these")
+                .disabled(true)
+                .body(div().child("Set by the administrator.")),
+        )
+        .into_any_element()
+}
+
+fn hover_card(window: &mut Window, cx: &mut App) -> AnyElement {
+    ensure_ordinary(window, cx);
+    let card = cx.global::<SceneOrdinary>().hover_card.clone();
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(460.0))
+        .h(px(300.0))
+        .child(caption(&theme, "A preview the pointer can travel into"))
+        .child(row(&theme).child("Reported by").child(card))
+        .into_any_element()
+}
+
+fn menubar(window: &mut Window, cx: &mut App) -> AnyElement {
+    ensure_ordinary(window, cx);
+    let bar = cx.global::<SceneOrdinary>().menubar.clone();
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(560.0))
+        .h(px(360.0))
+        .child(bar)
+        .into_any_element()
+}
+
+fn copy_button(window: &mut Window, cx: &mut App) -> AnyElement {
+    ensure_ordinary(window, cx);
+    let scene = cx.global::<SceneOrdinary>();
+    let copied = scene.copy.clone();
+    let refused = scene.copy_refused.clone();
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .child(caption(&theme, "The clipboard took it"))
+        .child(copied)
+        .child(caption(&theme, "It did not go through, and says so"))
+        .child(refused)
+        .into_any_element()
+}
+
+fn aspect_ratio(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let filled = |label: &'static str| {
+        div()
+            .size_full()
+            .flex()
+            .items_center()
+            .justify_center()
+            .bg(theme.colors.hover)
+            .text_color(theme.colors.text_muted)
+            .child(label)
+    };
+    stack(&theme)
+        .child(caption(&theme, "Width given, height from the ratio"))
+        .child(
+            div().w(px(320.0)).child(
+                AspectRatio::of("scene.aspect.wide", 16.0, 9.0)
+                    .width_driven()
+                    .child(filled("16 by 9")),
+            ),
+        )
+        .child(caption(&theme, "Height given, width from the ratio"))
+        .child(
+            div().h(px(120.0)).child(
+                AspectRatio::new("scene.aspect.square", 1.0)
+                    .height_driven()
+                    .child(filled("square")),
+            ),
         )
         .into_any_element()
 }

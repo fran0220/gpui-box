@@ -9,6 +9,7 @@ use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlMetrics, ControlSize, Radius, Theme};
 
+use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Selectable, Sizable, StyledExt};
 
 /// How much weight an action carries. Primary is the one decision a local
@@ -65,6 +66,7 @@ pub struct Button {
     size: ControlSize,
     disabled: bool,
     selected: bool,
+    checked: Option<bool>,
     loading: bool,
     full_width: bool,
     icon_only: bool,
@@ -102,6 +104,7 @@ impl Button {
             size: ControlSize::default(),
             disabled: false,
             selected: false,
+            checked: None,
             loading: false,
             full_width: false,
             icon_only: false,
@@ -209,6 +212,16 @@ impl Button {
         self
     }
 
+    /// Publishes an explicit two-state answer, for a button that stays in.
+    ///
+    /// A selected button publishes `checked` only when it is selected, because
+    /// "this is the current one" has no meaningful false. A toggle does: out
+    /// is a state, not the absence of one, so it says so.
+    pub fn checked_state(mut self, checked: bool) -> Self {
+        self.checked = Some(checked);
+        self
+    }
+
     fn actionable(&self) -> bool {
         !self.disabled && !self.loading && self.on_click.is_some()
     }
@@ -244,6 +257,7 @@ impl RenderOnce for Button {
         let theme = cx.theme().clone();
         let metrics = theme.control.get(self.size);
         let inert = self.disabled || self.loading;
+        let direction = cx.layout_direction();
         let actionable = self.actionable();
 
         let mut content: Vec<AnyElement> = Vec::new();
@@ -270,11 +284,11 @@ impl RenderOnce for Button {
             }
         }
 
-        let mut button = frame(&theme, self.variant, metrics, inert)
+        let mut button = frame(&theme, self.variant, metrics, inert, direction)
             .when(self.icon_only, |element| {
                 element.w(px(metrics.height)).px(px(0.0))
             })
-            .map(|element| joined(element, &theme, self.join))
+            .map(|element| joined(element, &theme, self.join, direction))
             .when(self.selected, |element| {
                 element
                     .bg(theme.colors.selected)
@@ -316,8 +330,10 @@ impl RenderOnce for Button {
         if let Some(parent) = self.semantic_parent.clone() {
             spec = spec.parent(parent);
         }
-        if self.selected {
-            spec = spec.checked(true);
+        match self.checked {
+            Some(checked) => spec = spec.checked(checked),
+            None if self.selected => spec = spec.checked(true),
+            None => {}
         }
         if let Some(handle) = &self.focus_handle {
             spec = spec.focus(handle);
@@ -331,19 +347,31 @@ impl RenderOnce for Button {
 
 /// Flattens the edges a joined button shares with its neighbour, and pulls it
 /// onto that neighbour's border so the run carries one hairline, not two.
-fn joined(element: Div, theme: &Theme, join: ButtonJoin) -> Div {
+fn joined(element: Div, theme: &Theme, join: ButtonJoin, direction: LayoutDirection) -> Div {
     let flat = px(0.0);
     let overlap = px(-theme.borders.hairline);
+    // Leading and trailing name places in a run, and a run is read rather
+    // than measured: the first button keeps the corners on the side reading
+    // starts at and gives up the ones it shares with the next.
+    let start_flat = |element: Div| {
+        if direction.is_rtl() {
+            element.rounded_tr(flat).rounded_br(flat)
+        } else {
+            element.rounded_tl(flat).rounded_bl(flat)
+        }
+    };
+    let end_flat = |element: Div| {
+        if direction.is_rtl() {
+            element.rounded_tl(flat).rounded_bl(flat)
+        } else {
+            element.rounded_tr(flat).rounded_br(flat)
+        }
+    };
     match join {
         ButtonJoin::Alone => element,
-        ButtonJoin::Leading => element.rounded_tr(flat).rounded_br(flat),
-        ButtonJoin::Middle => element
-            .ml(overlap)
-            .rounded_tl(flat)
-            .rounded_bl(flat)
-            .rounded_tr(flat)
-            .rounded_br(flat),
-        ButtonJoin::Trailing => element.ml(overlap).rounded_tl(flat).rounded_bl(flat),
+        ButtonJoin::Leading => end_flat(element),
+        ButtonJoin::Middle => end_flat(start_flat(element.ms(direction, overlap))),
+        ButtonJoin::Trailing => start_flat(element.ms(direction, overlap)),
     }
 }
 
@@ -357,9 +385,18 @@ fn foreground(theme: &Theme, variant: ButtonVariant) -> Hsla {
     }
 }
 
-fn frame(theme: &Theme, variant: ButtonVariant, metrics: ControlMetrics, inert: bool) -> Div {
+fn frame(
+    theme: &Theme,
+    variant: ButtonVariant,
+    metrics: ControlMetrics,
+    inert: bool,
+    direction: LayoutDirection,
+) -> Div {
+    // Leading and trailing are named for reading order, not for the screen,
+    // so the frame runs the way the label does and the glyph stays on the
+    // side of the label the caller asked for.
     let base = div()
-        .row()
+        .row_reading(direction)
         .justify_center()
         .flex_none()
         .h(px(metrics.height))
@@ -599,7 +636,7 @@ impl RenderOnce for ButtonGroup {
             .collect::<Vec<_>>();
 
         div()
-            .row()
+            .row_reading(cx.layout_direction())
             .flex_none()
             .children(buttons)
             .semantic_in(cx, NodeSpec::new(parent, Role::Toolbar))

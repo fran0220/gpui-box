@@ -12,6 +12,7 @@ use gpui_kit_theme::{ActiveTheme, Radius, Space};
 
 use crate::display::badge::Tone;
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Selectable, StyledExt};
+use crate::strings::{ActiveStrings, StringKey};
 
 type RemoveHandler = Rc<dyn Fn(&mut Window, &mut App)>;
 
@@ -103,7 +104,7 @@ impl RenderOnce for Tag {
                     cx,
                     NodeSpec::new(remove_ident.semantic_id(), Role::Button)
                         .parent(self.ident.semantic_id())
-                        .text(SharedString::from(format!("Remove {}", self.label))),
+                        .text(cx.strings().format(StringKey::TagRemove, &[&self.label])),
                 );
             let click = Rc::clone(&handler);
             button

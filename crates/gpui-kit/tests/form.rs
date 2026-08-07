@@ -179,7 +179,7 @@ fn a_step_reports_the_next_number_and_never_applies_it(cx: &mut TestAppContext) 
         let entity = entity.clone();
         move |_, cx| entity.read(cx).current()
     });
-    assert_eq!(held, 3.0, "the host still holds the value it started with");
+    assert_eq!(held, Some(3.0), "the host still holds the value it started with");
 }
 
 #[gpui::test]
@@ -262,6 +262,31 @@ fn text_that_is_not_a_number_is_reported_and_published_as_invalid(cx: &mut TestA
             .expect("published")
             .invalid
     );
+}
+
+#[gpui::test]
+fn a_number_drawn_as_wrong_can_say_what_is_wrong_with_it(cx: &mut TestAppContext) {
+    let (mut harness, entity) = number(cx, |input| input.value(4.0).range(1.0, 100.0));
+
+    harness.update(|_, cx| {
+        let input = entity.read(cx);
+        assert!(!input.is_invalid(cx));
+        assert_eq!(input.invalid_reason(cx), None, "nothing is wrong yet");
+    });
+
+    harness.click("workspace.retention.field");
+    harness.keystrokes("cmd-a 0");
+    harness.frame();
+
+    harness.update(|_, cx| {
+        let input = entity.read(cx);
+        assert!(input.is_invalid(cx));
+        assert_eq!(
+            input.invalid_reason(cx).as_deref(),
+            Some("The smallest accepted value is 1."),
+            "the border and the sentence come from the same range"
+        );
+    });
 }
 
 // -- SegmentedControl -----------------------------------------------------

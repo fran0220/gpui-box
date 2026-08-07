@@ -6,8 +6,21 @@
 4. Cover pure reducers and state transitions with unit tests.
 5. Register gallery controls in the semantic tree.
 6. Update the gallery when a component gains a visual state.
-7. Run the full validation suite from `README.md`.
-8. Capture the gallery at 920×900 after UI changes.
+7. Run `cargo run -p xtask -- gate`, and `gate full` before committing.
+8. After a UI change, run `cargo run -p xtask -- scenes check`, look at every
+   image it reports, and accept them with `scenes capture` only once you have.
+   CI cannot do this for you; see `docs/screenshot-testing.md` for why, and
+   record the result in the pull request.
+9. Add a `CHANGELOG.md` entry for anything a reader of the library would
+   notice. Say what it now does and what it refuses to do, not which files
+   moved.
+
+A rename is a breaking change when it breaks a consumer, and two of the three
+things that break one are invisible to the compiler: a token key, which a
+host's own theme document is validated against at runtime, and a semantic id,
+which a host's tests assert on. Both are covered by "Versioning and
+compatibility" in `README.md`, and both belong under a breaking heading in the
+changelog.
 
 Public API changes should document:
 

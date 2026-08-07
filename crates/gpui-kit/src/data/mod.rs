@@ -1,6 +1,8 @@
 //! Large-data surfaces: a virtualized list, two tables, and a tree.
 //!
-//! [`Table`] takes materialized rows and lays every one of them out.
+//! [`Table`] lays out every row it is given as [`Table::rows`], because the
+//! caller built those elements already; handed a count and a closure through
+//! [`Table::rows_from`], it lays out only the ones its viewport holds.
 //! [`DataGrid`] takes a render closure and lays out only the rows its viewport
 //! holds, which is what buys it column resizing and reordering, a pinned
 //! group, selection over an incompletely loaded set, opened rows, and cell
@@ -12,15 +14,24 @@
 //! the state that still holds.
 //!
 //! The rule that separates these from the rest of the library: **only rendered
-//! rows publish semantics.** A virtualized list holds a viewport, not a data
-//! set, so a test can assert only what is on screen. The container node
+//! rows publish semantics.** A virtualized surface holds a viewport, not a
+//! data set, so a test can assert only what is on screen. The container node
 //! carries the total in `value`, which is how a snapshot stays honest about
-//! the difference between a thousand items and the twelve that are drawn.
+//! the difference between a thousand items and the twelve that are drawn. A
+//! [`Tree`] counts the rows it disclosed, so a node under a shut branch, a
+//! disclosed node that scrolled past the edge, and a node that is not in the
+//! data at all remain three different things.
+//!
+//! Virtualization needs a bounded viewport. Every surface here takes a
+//! `visible_rows` bound, and without one it sizes itself to its content and
+//! lays every row out — which is the right answer for a settings summary and
+//! the wrong one for a hundred thousand log lines.
 
 pub mod grid;
 pub mod list;
 pub mod table;
 pub mod tree;
+pub mod viewport;
 
 pub use grid::{
     BulkBar, DataGrid, EditIntent, EditOutcome, EditingCell, Expanded, GridColumn, GridRow,
@@ -29,3 +40,4 @@ pub use grid::{
 pub use list::{List, ListItem};
 pub use table::{Align, Cell, Column, ColumnWidth, Row, SortDirection, Table};
 pub use tree::{Tree, TreeNode};
+pub use viewport::{reveal_row, scroll_to_row};

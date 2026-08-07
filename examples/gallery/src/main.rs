@@ -14,6 +14,7 @@ use gpui::{
 use gpui_kit::assets::{Icon, icon};
 use gpui_kit::datetime::fixture::FixtureDateAdapter;
 use gpui_kit::overlay::{popover, toast};
+use gpui_kit::prelude::set_layout_direction;
 use gpui_kit::prelude::*;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic, SemanticRegistry};
 use gpui_kit_theme::{Theme, ThemeRegistry, activate_theme, set_density};
@@ -1637,6 +1638,9 @@ fn main() {
         if compact {
             set_density(Density::Compact, cx);
         }
+        if let Some(name) = scene {
+            set_layout_direction(gpui_kit::scenes::direction(name), cx);
+        }
         let window = open_gallery(lower_scene, scene, cx).expect("open gallery window");
 
         if let Some(directory) = capture_all.clone() {
@@ -1803,6 +1807,10 @@ async fn capture_catalog(
             }
             window.update(cx, |gallery, window, cx| {
                 gallery.scene = Some(scene.name);
+                // Set beside the theme, and for the same reason: both are
+                // globals a scene reads while rendering, so both belong in
+                // the update that precedes the frame rather than inside it.
+                set_layout_direction(gpui_kit::scenes::direction(scene.name), cx);
                 park_pointer(window, cx);
                 cx.notify();
             })?;

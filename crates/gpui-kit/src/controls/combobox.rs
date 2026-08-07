@@ -22,6 +22,7 @@ use crate::display::empty::{EmptyKind, EmptyState};
 use crate::foundation::{Disableable, Ident, Pressable, Sizable, StyledExt};
 use crate::motion;
 use crate::overlay::popover::{self, MenuKey};
+use crate::strings::{ActiveStrings, StringKey};
 
 /// How wide the list gets before it stops growing, and how tall before it
 /// scrolls. Both occur once, so they stay next to the component.
@@ -53,7 +54,7 @@ pub struct Combobox {
     query: Entity<TextInput>,
     options: Vec<SelectOption>,
     selected: Option<SharedString>,
-    placeholder: SharedString,
+    placeholder: Option<SharedString>,
     size: ControlSize,
     disabled: bool,
     invalid: bool,
@@ -99,7 +100,7 @@ impl Combobox {
             query,
             options: Vec::new(),
             selected: None,
-            placeholder: SharedString::from("Select"),
+            placeholder: None,
             size: ControlSize::Md,
             disabled: false,
             invalid: false,
@@ -122,7 +123,7 @@ impl Combobox {
     }
 
     pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self {
-        self.placeholder = placeholder.into();
+        self.placeholder = Some(placeholder.into());
         self
     }
 
@@ -368,6 +369,14 @@ impl Combobox {
         }
     }
 
+    /// The placeholder the host gave, or the shared default word for a field
+    /// that has not been answered yet.
+    fn resolved_placeholder(&self, cx: &App) -> SharedString {
+        self.placeholder
+            .clone()
+            .unwrap_or_else(|| cx.strings().text(StringKey::SelectPlaceholder))
+    }
+
     fn menu(&self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let matches = self.matches(cx);
@@ -378,14 +387,15 @@ impl Combobox {
             let query = self.filter(cx);
             EmptyState::new(
                 self.ident.child("empty"),
-                SharedString::from(format!("Nothing here answers “{query}”")),
+                cx.strings()
+                    .format(StringKey::ComboboxNoMatch, &[query.as_ref()]),
             )
             .kind(EmptyKind::Empty)
-            .detail(if self.allow_custom {
-                "Press enter to add it as a new value."
+            .detail(cx.strings().text(if self.allow_custom {
+                StringKey::ComboboxCreateHint
             } else {
-                "This field only accepts one of the options offered."
-            })
+                StringKey::ComboboxClosedHint
+            }))
             .into_any_element()
         } else {
             div()
@@ -515,7 +525,7 @@ impl Render for Combobox {
             }
         }
         if self.query.read(cx).placeholder_text().is_empty() {
-            let placeholder = self.placeholder.clone();
+            let placeholder = self.resolved_placeholder(cx);
             self.query
                 .update(cx, |query, cx| query.set_placeholder(placeholder, cx));
         }
@@ -532,7 +542,7 @@ impl Render for Combobox {
             .invalid(self.invalid)
             .expanded(self.open)
             .focus(&self.query.read(cx).focus_handle(cx))
-            .placeholder(self.placeholder.clone());
+            .placeholder(self.resolved_placeholder(cx));
         if let Some(label) = self.selected_label() {
             spec = spec.value(label);
         }

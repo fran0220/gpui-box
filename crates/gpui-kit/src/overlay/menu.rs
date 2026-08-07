@@ -14,13 +14,15 @@ use std::rc::Rc;
 use gpui::{
     AnyElement, App, Context, EventEmitter, FocusHandle, Focusable, InteractiveElement,
     IntoElement, KeyDownEvent, MouseButton, MouseDownEvent, ParentElement, Pixels, Point, Render,
-    SharedString, Styled, Window, div, prelude::FluentBuilder, px,
+    SharedString, Styled, Transformation, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Space, Theme};
 
 use crate::controls::button::{Button, ButtonJoin, ButtonVariant};
+use crate::display::icon::flips;
+use crate::foundation::direction::ActiveDirection;
 use crate::foundation::{Ident, Pressable, Sizable, StyledExt};
 use crate::motion;
 use crate::overlay::focus::FocusTrap;
@@ -488,10 +490,18 @@ fn row<V: 'static>(
                             .map(|keystroke| Kbd::new(keystroke).into_any_element()),
                     )
                     .when(submenu, |element| {
+                        // The chevron says "there is more this way", and this
+                        // way is the way the menu reads.
+                        let flipped = flips(Icon::AltArrowRight, cx.layout_direction());
                         element.child(
                             icon(Icon::AltArrowRight)
                                 .size(px(12.0))
-                                .text_color(theme.colors.text_muted),
+                                .text_color(theme.colors.text_muted)
+                                .when(flipped, |glyph| {
+                                    glyph.with_transformation(Transformation::scale(gpui::size(
+                                        -1.0, 1.0,
+                                    )))
+                                }),
                         )
                     })
                     .when(!item.disabled, |element| {
@@ -778,13 +788,23 @@ fn handle_key(state: &mut MenuState, items: &[MenuItem], event: &KeyDownEvent) -
             state.step(items, -1);
             Handled::Moved
         }
+        // A sideways key that entered or left a submenu is this menu's; one
+        // that found no submenu to move through did nothing, and saying so is
+        // what lets a container the menu sits in — a menubar — take the same
+        // key and step to the next menu instead.
         MenuKey::Right => {
-            state.enter(items);
-            Handled::Moved
+            if state.enter(items) {
+                Handled::Moved
+            } else {
+                Handled::None
+            }
         }
         MenuKey::Left => {
-            state.leave();
-            Handled::Moved
+            if state.leave() {
+                Handled::Moved
+            } else {
+                Handled::None
+            }
         }
         MenuKey::Enter => match state.active {
             Some(active) => {

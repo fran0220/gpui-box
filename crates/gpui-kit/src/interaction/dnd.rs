@@ -61,13 +61,16 @@ use gpui::{
     InteractiveElement, IntoElement, LayoutId, ParentElement, Pixels, Point, Render, SharedString,
     StatefulInteractiveElement, Styled, Window, div, px,
 };
-use gpui_kit_assets::{Icon, icon};
+use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, SpringPreset};
 use web_time::Instant;
 
+use crate::display::icon::Icon as IconView;
+use crate::foundation::Sizable;
 use crate::foundation::StyledExt;
 use crate::motion::{Interpolate, Spring, Velocity, VelocityTracker, keyed};
+use crate::strings::{ActiveStrings, StringKey};
 
 /// The semantic id of the node a drag publishes while it is in flight.
 pub const DRAG_NODE_ID: &str = "dnd.drag";
@@ -296,9 +299,10 @@ pub(crate) fn finish(cx: &mut App) {
 /// user-generated content and the label is published in the semantic tree.
 pub(crate) fn adopt_external(count: usize, cx: &mut App) {
     let label = if count == 1 {
-        "1 file".to_string()
+        cx.strings().text(StringKey::DragFileOne)
     } else {
-        format!("{count} files")
+        cx.strings()
+            .format(StringKey::DragFileMany, &[&count.to_string()])
     };
     let carried = read(cx, |state| state.item.clone()).flatten();
     if carried.is_some_and(|item| item.kind.as_ref() == FILE_KIND && item.label == label) {
@@ -796,11 +800,9 @@ fn ghost_element(item: &DragItem, landing: Option<&Landing>, cx: &mut App) -> gp
         .text_color(theme.colors.text)
         .type_scale(&theme, gpui_kit_theme::TypeScale::Body)
         .opacity(theme.opacity.muted)
-        .children(item.icon.map(|glyph| {
-            icon(glyph)
-                .size(px(theme.control.md.icon_size))
-                .text_color(theme.colors.text_muted)
-        }))
+        // The same glyph, the same token step, the same role: this is what
+        // hand-drawing an icon was already spelling out.
+        .children(item.icon.map(|glyph| IconView::new(glyph).medium().muted()))
         .child(item.label.clone())
         .semantic_in(
             cx,

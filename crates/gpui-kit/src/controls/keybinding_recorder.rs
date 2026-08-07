@@ -40,6 +40,7 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TypeScale};
 
 use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
 use crate::overlay::Kbd;
+use crate::strings::{ActiveStrings, StringKey};
 
 /// The key context the recorder claims while it is capturing, so a host can
 /// see in the inspector which element is eating its keys.
@@ -68,7 +69,7 @@ pub struct KeybindingRecorder {
     ident: Ident,
     focus_handle: FocusHandle,
     label: Option<SharedString>,
-    placeholder: SharedString,
+    placeholder: Option<SharedString>,
     binding: Option<SharedString>,
     conflict: Option<SharedString>,
     allow_escape: bool,
@@ -96,7 +97,7 @@ impl KeybindingRecorder {
             ident: ident.into(),
             focus_handle: cx.focus_handle(),
             label: None,
-            placeholder: SharedString::new_static("Not bound"),
+            placeholder: None,
             binding: None,
             conflict: None,
             allow_escape: false,
@@ -113,8 +114,16 @@ impl KeybindingRecorder {
     }
 
     /// What to show where a binding would be, when there is none.
+    /// The placeholder the host gave, or the built-in default word for a
+    /// value that is not there.
+    fn resolved_placeholder(&self, cx: &App) -> SharedString {
+        self.placeholder
+            .clone()
+            .unwrap_or_else(|| cx.strings().text(StringKey::KeybindingUnbound))
+    }
+
     pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self {
-        self.placeholder = placeholder.into();
+        self.placeholder = Some(placeholder.into());
         self
     }
 
@@ -277,7 +286,7 @@ impl Render for KeybindingRecorder {
                         .size(px(metrics.icon_size))
                         .text_color(theme.colors.accent),
                 )
-                .child(SharedString::new_static("Press a shortcut"))
+                .child(cx.strings().text(StringKey::KeybindingPrompt))
                 .into_any_element()
         } else {
             match self.binding.clone() {
@@ -288,7 +297,7 @@ impl Render for KeybindingRecorder {
                     .into_any_element(),
                 None => div()
                     .text_color(theme.colors.text_faint)
-                    .child(self.placeholder.clone())
+                    .child(self.resolved_placeholder(cx))
                     .into_any_element(),
             }
         };
@@ -349,7 +358,7 @@ impl Render for KeybindingRecorder {
             .disabled(self.disabled)
             .busy(recording)
             .invalid(conflicted)
-            .placeholder(self.placeholder.clone());
+            .placeholder(self.resolved_placeholder(cx));
         if let Some(label) = self.label.clone() {
             spec = spec.text(label);
         }
@@ -433,7 +442,8 @@ mod tests {
     #[test]
     fn what_the_recorder_reports_is_what_kbd_draws() {
         let keystroke = Keystroke::parse("cmd-shift-p").expect("parses");
-        let caps = crate::overlay::caps(&keystroke.unparse(), true);
+        let caps =
+            crate::overlay::caps(&keystroke.unparse(), true, &crate::strings::Strings::new());
         assert_eq!(caps, vec![SharedString::from("⌘⇧P")]);
     }
 

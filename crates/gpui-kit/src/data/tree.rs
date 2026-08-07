@@ -6,19 +6,45 @@
 //!
 //! A collapsed node renders none of its children, and publishes none of them
 //! either, so asserting that a child is absent means something.
+//!
+//! # What a large hierarchy costs
+//!
+//! What is on screen depends on what is open, so the tree first flattens the
+//! hierarchy to the rows a reader could see and then draws from that. With
+//! [`Tree::visible_rows`] it draws only the ones that fit, so a hierarchy with
+//! ten thousand disclosed rows lays out a viewport's worth. Without it the
+//! tree sizes itself to its content and every disclosed row is laid out.
+//!
+//! Flattening still walks the whole hierarchy each frame, because the caller
+//! hands the tree the nodes rather than a way to ask for one. That is data,
+//! not elements: a [`TreeNode`] holds two strings, an element holds a layout.
+//!
+//! The tree's semantic node carries the number of disclosed rows in `value`,
+//! which is what keeps three different absences apart: a node under a shut
+//! branch is not disclosed, a disclosed node outside the viewport is counted
+//! but not published, and a node that is not in the data at all is neither.
+//!
+//! A bounded tree can draw a node whose parent has scrolled off the top. The
+//! node still reports the parent it has, because that is what is true of it,
+//! so a walk down from the tree's own node will not reach it and a test that
+//! wants it should name it. Its `level` says how deep it sits either way.
 
 use std::f32::consts::FRAC_PI_2;
+use std::ops::Range;
 use std::rc::Rc;
 
 use gpui::{
-    App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
-    StatefulInteractiveElement, Styled, Transformation, Window, div, point, prelude::FluentBuilder,
-    px, radians,
+    App, InteractiveElement, IntoElement, ListSizingBehavior, ParentElement, RenderOnce,
+    ScrollStrategy, SharedString, StatefulInteractiveElement, Styled, Transformation, Window, div,
+    point, prelude::FluentBuilder, px, radians, uniform_list,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Theme};
 
+use crate::data::viewport::scroll_handle;
+use crate::display::icon::flips;
+use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
 use crate::interaction::dnd::{
     self, DragItem, DropAxis, DropIntent, DropPosition, MakingWay, RowTarget, SurfaceDrag,
@@ -79,6 +105,7 @@ pub struct Tree {
     nodes: Vec<TreeNode>,
     expanded: Vec<SharedString>,
     selected: Option<SharedString>,
+    visible_rows: Option<usize>,
     size: ControlSize,
     disabled: bool,
     on_toggle: Option<ToggleHandler>,
@@ -108,6 +135,7 @@ impl Tree {
             nodes: Vec::new(),
             expanded: Vec::new(),
             selected: None,
+            visible_rows: None,
             size: ControlSize::Md,
             disabled: false,
             on_toggle: None,
@@ -143,6 +171,17 @@ impl Tree {
 
     pub fn selected(mut self, id: impl Into<SharedString>) -> Self {
         self.selected = Some(id.into());
+        self
+    }
+
+    /// Bounds the viewport to `rows` rows, which is what lets the tree skip
+    /// the disclosed rows it does not show.
+    ///
+    /// Without it the tree sizes itself to its content, which is the right
+    /// answer for a hierarchy a reader takes in whole and the wrong one for a
+    /// workspace with ten thousand files open.
+    pub fn visible_rows(mut self, rows: usize) -> Self {
+        self.visible_rows = Some(rows);
         self
     }
 
@@ -258,11 +297,26 @@ enum Move {
     Toggle(SharedString, bool),
 }
 
-fn keystroke_move(key: &str, visible: &[Visible], selected: Option<&SharedString>) -> Option<Move> {
+/// A horizontal arrow in a tree means "toward the children" or "toward the
+/// parent", not "toward an edge of the screen": a branch opens in the
+/// direction the indent grows, and the indent grows the way the tree reads. So
+/// the two arrows swap once the interface reads right to left, while up, down,
+/// home and end mean the same thing either way.
+fn keystroke_move(
+    key: &str,
+    direction: LayoutDirection,
+    visible: &[Visible],
+    selected: Option<&SharedString>,
+) -> Option<Move> {
     let at = visible
         .iter()
         .position(|node| Some(&node.id) == selected)
         .filter(|_| selected.is_some());
+    let key = match direction.arrow_step(key) {
+        Some(1) => "toward-children",
+        Some(_) => "toward-parent",
+        None => key,
+    };
     match key {
         "up" | "down" => {
             let delta: isize = if key == "down" { 1 } else { -1 };
@@ -277,7 +331,7 @@ fn keystroke_move(key: &str, visible: &[Visible], selected: Option<&SharedString
         }
         "home" => step(visible, 0, 1).map(Move::Select),
         "end" => step(visible, visible.len() as isize - 1, -1).map(Move::Select),
-        "right" => {
+        "toward-children" => {
             let node = visible.get(at?)?;
             if node.has_children && !node.open {
                 Some(Move::Toggle(node.id.clone(), true))
@@ -288,7 +342,7 @@ fn keystroke_move(key: &str, visible: &[Visible], selected: Option<&SharedString
                     .map(Move::Select)
             }
         }
-        "left" => {
+        "toward-parent" => {
             let node = visible.get(at?)?;
             if node.has_children && node.open {
                 Some(Move::Toggle(node.id.clone(), false))
@@ -398,19 +452,37 @@ impl RenderOnce for Tree {
             .w_full()
             .text_size(px(metrics.font_size));
 
+        // A tree that draws only its viewport can still be walked end to end,
+        // because the keyboard moves over the flattened rows rather than over
+        // the ones that happen to be built. A move that lands off screen
+        // brings the row it named into view.
+        let rows_ident = self.ident.child("rows");
+        let scroll = self.visible_rows.map(|_| scroll_handle(&rows_ident, cx));
+
         if !self.disabled && (self.on_select.is_some() || self.on_toggle.is_some()) {
             let nodes = visible.clone();
             let selected = self.selected.clone();
             let select = self.on_select.clone();
             let toggle = self.on_toggle.clone();
+            let direction = cx.layout_direction();
+            let scroll = scroll.clone();
             stack = stack.on_key_down(move |event, window, cx| {
-                let Some(next) =
-                    keystroke_move(event.keystroke.key.as_str(), &nodes, selected.as_ref())
-                else {
+                let Some(next) = keystroke_move(
+                    event.keystroke.key.as_str(),
+                    direction,
+                    &nodes,
+                    selected.as_ref(),
+                ) else {
                     return;
                 };
                 match next {
                     Move::Select(id) => {
+                        if let (Some(scroll), Some(at)) =
+                            (scroll.as_ref(), nodes.iter().position(|node| node.id == id))
+                        {
+                            scroll.scroll_to_item(at, ScrollStrategy::Nearest);
+                            window.refresh();
+                        }
                         if Some(&id) == selected.as_ref() {
                             return;
                         }
@@ -430,23 +502,88 @@ impl RenderOnce for Tree {
             });
         }
 
-        for (index, node) in visible.iter().enumerate() {
-            stack = stack.child(self.node_element(
-                node,
-                index,
-                &theme,
-                metrics.icon_size,
-                reorder.as_ref(),
-                window,
-                cx,
-            ));
+        let rows = Rows {
+            ident: self.ident.clone(),
+            selected: self.selected.clone(),
+            disabled: self.disabled,
+            size: self.size,
+            on_select: self.on_select.clone(),
+            on_toggle: self.on_toggle.clone(),
+        };
+        let count = visible.len();
+
+        match (self.visible_rows, scroll) {
+            (Some(bound), Some(scroll)) => {
+                let theme = theme.clone();
+                let icon_size = metrics.icon_size;
+                let height = theme.control.get(self.size).height;
+                stack = stack.child(
+                    uniform_list(
+                        rows_ident.element_id(),
+                        count,
+                        move |range: Range<usize>, window, cx| {
+                            range
+                                .map(|index| {
+                                    rows.node_element(
+                                        &visible[index],
+                                        index,
+                                        &theme,
+                                        icon_size,
+                                        reorder.as_ref(),
+                                        window,
+                                        cx,
+                                    )
+                                })
+                                .collect::<Vec<_>>()
+                        },
+                    )
+                    .track_scroll(&scroll)
+                    .w_full()
+                    .with_sizing_behavior(ListSizingBehavior::Auto)
+                    // A hierarchy shorter than the bound ends where its last
+                    // row ends, so a cap is not a claim about how much there
+                    // is to disclose.
+                    .h(px(height * count.min(bound) as f32)),
+                );
+            }
+            _ => {
+                for (index, node) in visible.iter().enumerate() {
+                    stack = stack.child(rows.node_element(
+                        node,
+                        index,
+                        &theme,
+                        metrics.icon_size,
+                        reorder.as_ref(),
+                        window,
+                        cx,
+                    ));
+                }
+            }
         }
 
-        stack.semantic_in(cx, NodeSpec::new(self.ident.semantic_id(), Role::Tree))
+        stack.semantic_in(
+            cx,
+            NodeSpec::new(self.ident.semantic_id(), Role::Tree).value(count.to_string()),
+        )
     }
 }
 
-impl Tree {
+/// Everything a node needs that does not come from the node itself.
+///
+/// A virtualized tree builds its rows inside a `'static` closure, which cannot
+/// borrow the tree, so the few fields a row reads travel into the closure by
+/// value and the unbounded path reads the same ones.
+#[derive(Clone)]
+struct Rows {
+    ident: Ident,
+    selected: Option<SharedString>,
+    disabled: bool,
+    size: ControlSize,
+    on_select: Option<SelectHandler>,
+    on_toggle: Option<ToggleHandler>,
+}
+
+impl Rows {
     #[allow(clippy::too_many_arguments)]
     fn node_element(
         &self,
@@ -472,6 +609,7 @@ impl Tree {
         } else {
             theme.colors.text
         };
+        let direction = cx.layout_direction();
 
         let chevron = node.has_children.then(|| {
             let toggle = ident.child("toggle");
@@ -486,7 +624,18 @@ impl Tree {
                         .text_color(theme.colors.text_muted)
                         .when(node.open, |glyph| {
                             glyph.with_transformation(Transformation::rotate(radians(FRAC_PI_2)))
-                        }),
+                        })
+                        // An open chevron already points down, which is the
+                        // same way down in either reading direction, so only
+                        // the shut one turns around.
+                        .when(
+                            !node.open && flips(Icon::AltArrowRight, direction),
+                            |glyph| {
+                                glyph.with_transformation(Transformation::scale(gpui::size(
+                                    -1.0, 1.0,
+                                )))
+                            },
+                        ),
                 )
                 .when(toggleable, |element| {
                     element
@@ -527,15 +676,17 @@ impl Tree {
 
         let mut row = div()
             .id(ident.element_id())
-            .row()
+            .row_reading(direction)
             .w_full()
             .h(px(theme.control.get(self.size).height))
-            .pr(px(theme.space(Space::Sm)))
+            .pe(direction, px(theme.space(Space::Sm)))
             // The indent is the only thing that says how deep a node sits, so
-            // it steps once per level from the left edge.
-            .pl(px(theme.space(Space::Sm)
-                + node.level.saturating_sub(1) as f32
-                    * theme.space(Space::Md)))
+            // it steps once per level from the edge reading starts at.
+            .ps(
+                direction,
+                px(theme.space(Space::Sm)
+                    + node.level.saturating_sub(1) as f32 * theme.space(Space::Md)),
+            )
             .gap(px(theme.space(Space::Xs)))
             .text_color(color)
             .when(selected, |element| element.bg(theme.colors.selected))
@@ -673,14 +824,21 @@ mod tests {
         let from = SharedString::from("docs");
         // `target` refuses selection and is the last node, so the move lands
         // nowhere rather than wrapping.
-        assert!(keystroke_move("down", &nodes, Some(&from)).is_none());
+        assert!(
+            keystroke_move("down", LayoutDirection::LeftToRight, &nodes, Some(&from)).is_none()
+        );
     }
 
     #[test]
     fn right_opens_a_shut_branch_and_then_descends() {
         let shut = visible(&[]);
         let workspace = SharedString::from("workspace");
-        match keystroke_move("right", &shut, Some(&workspace)) {
+        match keystroke_move(
+            "right",
+            LayoutDirection::LeftToRight,
+            &shut,
+            Some(&workspace),
+        ) {
             Some(Move::Toggle(id, next)) => {
                 assert_eq!(id.as_ref(), "workspace");
                 assert!(next);
@@ -689,7 +847,12 @@ mod tests {
         }
 
         let open = visible(&["workspace"]);
-        match keystroke_move("right", &open, Some(&workspace)) {
+        match keystroke_move(
+            "right",
+            LayoutDirection::LeftToRight,
+            &open,
+            Some(&workspace),
+        ) {
             Some(Move::Select(id)) => assert_eq!(id.as_ref(), "src"),
             _ => panic!("right must descend into an open branch"),
         }
@@ -699,13 +862,13 @@ mod tests {
     fn left_shuts_an_open_branch_and_otherwise_ascends() {
         let open = visible(&["workspace"]);
         let src = SharedString::from("src");
-        match keystroke_move("left", &open, Some(&src)) {
+        match keystroke_move("left", LayoutDirection::LeftToRight, &open, Some(&src)) {
             Some(Move::Select(id)) => assert_eq!(id.as_ref(), "workspace"),
             _ => panic!("left must ascend from a leaf"),
         }
 
         let deeper = visible(&["workspace", "src"]);
-        match keystroke_move("left", &deeper, Some(&src)) {
+        match keystroke_move("left", LayoutDirection::LeftToRight, &deeper, Some(&src)) {
             Some(Move::Toggle(id, next)) => {
                 assert_eq!(id.as_ref(), "src");
                 assert!(!next);

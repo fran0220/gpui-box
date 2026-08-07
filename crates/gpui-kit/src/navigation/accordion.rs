@@ -17,6 +17,8 @@ use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TypeScale};
 
+use crate::display::icon::flips;
+use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{FocusRing, Ident, Pressable, Sizable, StyledExt};
 use crate::layout::measure;
 use crate::motion;
@@ -166,6 +168,7 @@ impl RenderOnce for Accordion {
         let metrics = theme.control.get(self.size);
         let last = self.sections.len().saturating_sub(1);
         let expanded_ids = self.expanded.clone();
+        let direction = cx.layout_direction();
 
         let mut stack = div()
             .column()
@@ -185,7 +188,7 @@ impl RenderOnce for Accordion {
 
             let mut header = div()
                 .id(ident.element_id())
-                .row()
+                .row_reading(direction)
                 .w_full()
                 .gap(px(theme.space(Space::Sm)))
                 .px(px(metrics.padding_x))
@@ -198,6 +201,10 @@ impl RenderOnce for Accordion {
                         .text_color(theme.colors.text_muted)
                         .when(open, |glyph| {
                             glyph.with_transformation(Transformation::rotate(radians(FRAC_PI_2)))
+                        })
+                        // Open, it points down, and down is down either way.
+                        .when(!open && flips(Icon::AltArrowRight, direction), |glyph| {
+                            glyph.with_transformation(Transformation::scale(gpui::size(-1.0, 1.0)))
                         }),
                 )
                 .child(

@@ -18,6 +18,7 @@ use crate::controls::button::Button;
 use crate::display::badge::Tone;
 use crate::display::tag::Tag;
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
+use crate::strings::{ActiveStrings, StringKey};
 
 type RemoveHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 type ClearHandler = Rc<dyn Fn(&mut Window, &mut App)>;
@@ -93,10 +94,10 @@ impl ResultCount {
     }
 
     /// The words the bar shows, and the value it publishes.
-    fn sentence(&self, noun: &SharedString) -> Option<SharedString> {
+    fn sentence(&self, noun: &SharedString, cx: &App) -> Option<SharedString> {
         match self {
             Self::Unknown => None,
-            Self::Counting => Some(SharedString::new_static("Counting…")),
+            Self::Counting => Some(cx.strings().text(StringKey::FilterBarCounting)),
             Self::Known(count) => Some(SharedString::from(format!("{count} {noun}"))),
             Self::Unavailable(reason) => Some(reason.clone()),
         }
@@ -109,10 +110,10 @@ pub struct FilterBar {
     ident: Ident,
     conditions: Vec<FilterCondition>,
     count: ResultCount,
-    noun: SharedString,
+    noun: Option<SharedString>,
     add_control: Option<AnyElement>,
-    add_label: SharedString,
-    clear_label: SharedString,
+    add_label: Option<SharedString>,
+    clear_label: Option<SharedString>,
     size: gpui_kit_theme::ControlSize,
     disabled: bool,
     on_add: Option<AddHandler>,
@@ -138,10 +139,10 @@ impl FilterBar {
             ident: ident.into(),
             conditions: Vec::new(),
             count: ResultCount::default(),
-            noun: SharedString::new_static("results"),
+            noun: None,
             add_control: None,
-            add_label: SharedString::new_static("Add filter"),
-            clear_label: SharedString::new_static("Clear all"),
+            add_label: None,
+            clear_label: None,
             size: gpui_kit_theme::ControlSize::Sm,
             disabled: false,
             on_add: None,
@@ -168,7 +169,7 @@ impl FilterBar {
 
     /// What is being counted, for the sentence beside the number.
     pub fn noun(mut self, noun: impl Into<SharedString>) -> Self {
-        self.noun = noun.into();
+        self.noun = Some(noun.into());
         self
     }
 
@@ -181,12 +182,12 @@ impl FilterBar {
     }
 
     pub fn add_label(mut self, label: impl Into<SharedString>) -> Self {
-        self.add_label = label.into();
+        self.add_label = Some(label.into());
         self
     }
 
     pub fn clear_label(mut self, label: impl Into<SharedString>) -> Self {
-        self.clear_label = label.into();
+        self.clear_label = Some(label.into());
         self
     }
 
@@ -252,7 +253,11 @@ impl RenderOnce for FilterBar {
                 .filter(|_| !self.disabled)
                 .map(|handler| {
                     Button::new(self.ident.child("add"))
-                        .label(self.add_label.clone())
+                        .label(
+                            self.add_label
+                                .clone()
+                                .unwrap_or_else(|| cx.strings().text(StringKey::FilterBarAdd)),
+                        )
                         .ghost()
                         .control_size(self.size)
                         .semantic_parent(self.ident.semantic_id())
@@ -268,7 +273,11 @@ impl RenderOnce for FilterBar {
             .filter(|_| !self.disabled && active > 0)
             .map(|handler| {
                 Button::new(self.ident.child("clear"))
-                    .label(self.clear_label.clone())
+                    .label(
+                        self.clear_label
+                            .clone()
+                            .unwrap_or_else(|| cx.strings().text(StringKey::FilterBarClear)),
+                    )
                     .ghost()
                     .control_size(self.size)
                     .semantic_parent(self.ident.semantic_id())
@@ -276,7 +285,11 @@ impl RenderOnce for FilterBar {
             });
 
         let count_ident = self.ident.child("count");
-        let count = self.count.sentence(&self.noun).map(|sentence| {
+        let noun = self
+            .noun
+            .clone()
+            .unwrap_or_else(|| cx.strings().text(StringKey::FilterBarResultsNoun));
+        let count = self.count.sentence(&noun, cx).map(|sentence| {
             div()
                 .flex_none()
                 .type_scale(&theme, TypeScale::Caption)
@@ -318,7 +331,7 @@ impl RenderOnce for FilterBar {
             .semantic_in(
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::Toolbar)
-                    .text("Filters")
+                    .text(cx.strings().text(StringKey::FilterBarLabel))
                     .disabled(self.disabled)
                     .value(active.to_string()),
             )

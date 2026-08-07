@@ -17,6 +17,7 @@ use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, Theme, TypeScale};
 
 use crate::display::badge::Badge;
 use crate::foundation::{Ident, StyledExt};
+use crate::strings::{ActiveStrings, StringKey};
 
 /// Why a row is showing its value instead of its control.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -40,10 +41,12 @@ impl Withheld {
     /// An inapplicable row says only that it does not apply: the reason
     /// belongs to the whole section, which states it once above the rows
     /// rather than once per row.
-    fn sentence(&self) -> SharedString {
+    fn sentence(&self, cx: &App) -> SharedString {
         match self {
-            Self::Managed(controller) => SharedString::from(format!("Managed by {controller}")),
-            Self::Inapplicable(_) => SharedString::new_static("Not available here"),
+            Self::Managed(controller) => cx
+                .strings()
+                .format(StringKey::SettingsManagedBy, &[controller.as_ref()]),
+            Self::Inapplicable(_) => cx.strings().text(StringKey::SettingsInapplicable),
         }
     }
 
@@ -197,12 +200,12 @@ impl SettingsRow {
                                 .size(px(theme.control.xs.icon_size))
                                 .text_color(theme.colors.text_faint),
                         )
-                        .child(withheld.sentence())
+                        .child(withheld.sentence(cx))
                         .semantic_in(
                             cx,
                             NodeSpec::new(ident.child("managed").semantic_id(), Role::Status)
                                 .parent(ident.semantic_id())
-                                .text(withheld.sentence())
+                                .text(withheld.sentence(cx))
                                 .value(withheld.as_str()),
                         ),
                 )

@@ -23,6 +23,7 @@ use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
 use crate::foundation::{Disableable, Ident, StyledExt};
 use crate::interaction::dnd::{self, DragItem, FILE_KIND};
 use crate::layout::measure;
+use crate::strings::{ActiveStrings, StringKey};
 
 type DropHandler = Rc<dyn Fn(&DragItem, &mut Window, &mut App)>;
 type FilesHandler = Rc<dyn Fn(&ExternalPaths, &mut Window, &mut App)>;
@@ -52,7 +53,7 @@ pub struct Dropzone {
     label: SharedString,
     hint: Option<SharedString>,
     /// Why a payload this zone does not handle is refused.
-    refusal: SharedString,
+    refusal: Option<SharedString>,
     kinds: Vec<SharedString>,
     pinned: Option<DropzoneState>,
     disabled: bool,
@@ -83,7 +84,7 @@ impl Dropzone {
             ident: ident.into(),
             label: label.into(),
             hint: None,
-            refusal: SharedString::new_static("This zone does not take that."),
+            refusal: None,
             kinds: vec![SharedString::new_static(FILE_KIND)],
             pinned: None,
             disabled: false,
@@ -101,7 +102,7 @@ impl Dropzone {
 
     /// What the zone says when it refuses a payload.
     pub fn refusal(mut self, refusal: impl Into<SharedString>) -> Self {
-        self.refusal = refusal.into();
+        self.refusal = Some(refusal.into());
         self
     }
 
@@ -186,7 +187,9 @@ impl RenderOnce for Dropzone {
             DropzoneState::Refusing => (
                 theme.colors.danger,
                 theme.colors.danger,
-                self.refusal.clone(),
+                self.refusal
+                    .clone()
+                    .unwrap_or_else(|| cx.strings().text(StringKey::DropzoneRefusal)),
             ),
         };
 

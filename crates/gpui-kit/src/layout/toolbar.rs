@@ -27,6 +27,7 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Theme};
 
 use crate::foundation::{Ident, Sizable, StyledExt};
 use crate::overlay::{Menu, MenuItem};
+use crate::strings::{ActiveStrings, StringKey};
 
 /// One action in the bar.
 ///
@@ -308,7 +309,7 @@ impl RenderOnce for Toolbar {
                         cx,
                         NodeSpec::new(overflow_ident.semantic_id(), Role::Group)
                             .parent(ident.semantic_id())
-                            .text("More actions")
+                            .text(cx.strings().text(StringKey::MoreActions))
                             .value(hidden.to_string()),
                     )
             }))

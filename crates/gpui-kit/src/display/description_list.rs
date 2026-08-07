@@ -17,6 +17,7 @@ use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::foundation::{FocusRing, Ident, Pressable, StyledExt};
+use crate::strings::{ActiveStrings, StringKey};
 
 type CopyHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 
@@ -48,11 +49,14 @@ impl DescriptionValue {
     }
 
     /// Measures a secret and keeps only the measurement.
-    pub fn redacted_from(secret: &str) -> Self {
-        Self::Redacted(SharedString::from(format!(
-            "{} characters",
-            secret.graphemes(true).count()
-        )))
+    ///
+    /// The measurement is a sentence a reader reads, so it comes from the
+    /// installed catalogue rather than from this file.
+    pub fn redacted_from(secret: &str, cx: &App) -> Self {
+        Self::Redacted(cx.strings().format(
+            StringKey::DescriptionCharacters,
+            &[&secret.graphemes(true).count().to_string()],
+        ))
     }
 
     /// The name a semantic node publishes for the kind of value this is.
@@ -213,11 +217,11 @@ impl RenderOnce for DescriptionList {
                 DescriptionValue::Unknown => div()
                     .type_scale(&theme, TypeScale::Label)
                     .text_color(theme.colors.text_faint)
-                    .child(SharedString::new_static("Unknown")),
+                    .child(cx.strings().text(StringKey::DescriptionUnknown)),
                 DescriptionValue::NotApplicable => div()
                     .type_scale(&theme, TypeScale::Label)
                     .text_color(theme.colors.text_faint)
-                    .child(SharedString::new_static("Not applicable")),
+                    .child(cx.strings().text(StringKey::DescriptionNotApplicable)),
                 // The dots are the value: the text is not here to draw, and a
                 // masked rendering of the real thing would still be the real
                 // thing one screenshot away.
@@ -238,7 +242,9 @@ impl RenderOnce for DescriptionList {
             let copy = self.on_copy.clone().filter(|_| copyable).map(|handler| {
                 let copy_ident = ident.child("copy");
                 let id = item.id.clone();
-                let name = SharedString::from(format!("Copy {}", item.term));
+                let name = cx
+                    .strings()
+                    .format(StringKey::DescriptionCopy, &[&item.term]);
                 div()
                     .id(copy_ident.element_id())
                     .flex_none()

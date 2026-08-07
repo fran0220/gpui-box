@@ -19,6 +19,7 @@ use crate::controls::button::IconButton;
 use crate::controls::field::{FieldState, field_shell};
 use crate::controls::input::{TextInput, TextInputEvent};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
+use crate::strings::{ActiveStrings, StringKey};
 
 /// How much larger a page step is than a single step.
 const PAGE_FACTOR: f64 = 10.0;
@@ -46,7 +47,7 @@ pub struct NumberInput {
     ident: Ident,
     focus_handle: FocusHandle,
     field: Entity<TextInput>,
-    value: f64,
+    value: Option<f64>,
     min: Option<f64>,
     max: Option<f64>,
     step: f64,
@@ -56,8 +57,12 @@ pub struct NumberInput {
     size: ControlSize,
     disabled: bool,
     required: bool,
-    /// Whether the seeded number has been put on screen. The text belongs to
-    /// the typist afterwards, so it is written once.
+    /// The number the caller seeded, once it has been put on screen. The text
+    /// belongs to the typist afterwards, so it is written once.
+    ///
+    /// A control nobody gave a number to starts empty rather than at zero: a
+    /// zero would be a number nobody entered, and against a range that
+    /// excludes it the control would open already marked wrong.
     seeded: bool,
     /// Held so the field subscription lives as long as the control does.
     _subscriptions: Vec<Subscription>,
@@ -92,7 +97,7 @@ impl NumberInput {
             ident,
             focus_handle: cx.focus_handle(),
             field,
-            value: 0.0,
+            value: None,
             min: None,
             max: None,
             step: 1.0,
@@ -109,7 +114,7 @@ impl NumberInput {
 
     /// Seeds the number the control draws. The caller keeps owning it.
     pub fn value(mut self, value: f64) -> Self {
-        self.value = value;
+        self.value = Some(value);
         self
     }
 
@@ -169,7 +174,7 @@ impl NumberInput {
     /// The host already knows the number it just set, so this reports
     /// nothing; only what a typist asks for is reported.
     pub fn set_value(&mut self, value: f64, cx: &mut Context<Self>) {
-        self.value = value;
+        self.value = Some(value);
         self.seeded = true;
         self.write(value, cx);
         cx.notify();
@@ -188,7 +193,9 @@ impl NumberInput {
         cx.notify();
     }
 
-    pub fn current(&self) -> f64 {
+    /// The number the control last held, or `None` when nobody has given it
+    /// one and nobody has typed one.
+    pub fn current(&self) -> Option<f64> {
         self.value
     }
 
@@ -223,6 +230,32 @@ impl NumberInput {
         }
     }
 
+    /// Why the field is invalid, in words, or `None` when it is not. This and
+    /// [`Self::is_invalid`] read the same range, so a control cannot be drawn
+    /// as wrong without being able to say what is wrong with it.
+    pub fn invalid_reason(&self, cx: &App) -> Option<SharedString> {
+        if self.is_empty(cx) {
+            return None;
+        }
+        let strings = cx.strings();
+        let Some(value) = self.shown(cx) else {
+            return Some(strings.text(StringKey::NumberNotANumber));
+        };
+        if let Some(min) = self.min.filter(|min| value < *min) {
+            return Some(strings.format(
+                StringKey::NumberBelowMinimum,
+                &[self.formatted(min).as_ref()],
+            ));
+        }
+        if let Some(max) = self.max.filter(|max| value > *max) {
+            return Some(strings.format(
+                StringKey::NumberAboveMaximum,
+                &[self.formatted(max).as_ref()],
+            ));
+        }
+        None
+    }
+
     fn out_of_range(&self, value: f64) -> bool {
         self.min.is_some_and(|min| value < min) || self.max.is_some_and(|max| value > max)
     }
@@ -248,7 +281,9 @@ impl NumberInput {
         if self.disabled {
             return false;
         }
-        let from = self.shown(cx).unwrap_or(self.value);
+        let Some(from) = self.current_number(cx) else {
+            return true;
+        };
         if delta > 0.0 {
             self.max.is_none_or(|max| from < max)
         } else {
@@ -256,11 +291,29 @@ impl NumberInput {
         }
     }
 
+    /// The number the control holds: what is on screen, or what it was seeded
+    /// with before anyone typed. `None` when it holds no number at all.
+    fn current_number(&self, cx: &App) -> Option<f64> {
+        if self.is_empty(cx) {
+            return None;
+        }
+        self.shown(cx).or(self.value)
+    }
+
     fn stepped(&self, amount: f64, cx: &App) -> Option<f64> {
         if !self.can_step(amount, cx) {
             return None;
         }
-        let from = self.shown(cx).unwrap_or(self.value);
+        // Stepping an empty field lands on the near bound rather than on a
+        // step away from a zero nobody entered.
+        let Some(from) = self.current_number(cx) else {
+            let first = if amount > 0.0 {
+                self.min.unwrap_or(amount)
+            } else {
+                self.max.unwrap_or(amount)
+            };
+            return Some(round_to(first, self.precision));
+        };
         let mut next = from + amount;
         if let Some(max) = self.max {
             next = next.min(max);
@@ -340,8 +393,9 @@ impl Render for NumberInput {
         let theme = cx.theme().clone();
         if !self.seeded {
             self.seeded = true;
-            let value = self.value;
-            self.write(value, cx);
+            if let Some(value) = self.value {
+                self.write(value, cx);
+            }
         }
         let focused = self.field.read(cx).focus_handle(cx).is_focused(window);
         let invalid = self.is_invalid(cx);
@@ -361,15 +415,15 @@ impl Render for NumberInput {
             .required(self.required)
             .focus(&self.field.read(cx).focus_handle(cx))
             .value(self.display(cx));
-        if let (Some(min), Some(max)) = (self.min, self.max) {
-            spec = spec.range(min as f32, max as f32, self.value as f32);
+        if let (Some(min), Some(max), Some(value)) = (self.min, self.max, self.current_number(cx)) {
+            spec = spec.range(min as f32, max as f32, value as f32);
         }
 
         let control = cx.entity().downgrade();
         let decrement = IconButton::new(
             self.ident.child("decrement"),
             Icon::ArrowDown,
-            SharedString::from("Decrease"),
+            cx.strings().text(StringKey::NumberDecrease),
         )
         .control_size(self.size)
         .semantic_parent(self.ident.semantic_id())
@@ -386,7 +440,7 @@ impl Render for NumberInput {
         let increment = IconButton::new(
             self.ident.child("increment"),
             Icon::ArrowUp,
-            SharedString::from("Increase"),
+            cx.strings().text(StringKey::NumberIncrease),
         )
         .control_size(self.size)
         .semantic_parent(self.ident.semantic_id())

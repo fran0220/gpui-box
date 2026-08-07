@@ -13,13 +13,30 @@
 //! publishes a [`Role::Cell`] node only where the caller marks it with
 //! [`Cell::published`], and its id is `<row id>.<column key>`.
 //!
-//! # Why the body is not virtualized
+//! # Materialized rows are not virtualized; a row source is
 //!
-//! `Table` takes materialized rows, so the caller has already built every cell
-//! element by the time the table sees them, and an element can be laid out
-//! once. Virtualization needs a row it can build on demand. The table
-//! therefore renders every row it is given, under a header that stays put
-//! while the body scrolls.
+//! [`Table::rows`] takes materialized rows, so the caller has already built
+//! every cell element by the time the table sees them, and an element can be
+//! laid out once. Virtualization needs a row it can build on demand, and it
+//! needs to build it more than once per frame — a `uniform_list` measures one
+//! row to learn the height before it builds the range it shows. A vector
+//! cannot answer that twice. So the materialized body renders every row it is
+//! given, under a header that stays put while the body scrolls.
+//!
+//! [`Table::rows_from`] is the way in for a collection larger than the
+//! viewport: a count and a closure, the same shape [`crate::data::List`] takes.
+//! A table built that way lays out only the rows [`Table::visible_rows`]
+//! admits, and asks the caller for those and no others. It is offered
+//! alongside [`Table::rows`] rather than replacing it, because a table of six
+//! settings should not have to be written as a closure over an index.
+//!
+//! A table has no keyboard navigation of its own — a click is its only way to
+//! report a row — so a caller that moves the selection somewhere the viewport
+//! has never drawn brings it into view with
+//! [`crate::data::reveal_row`], naming the table's body as
+//! `<table ident>.body`. A surface that wants the keyboard to walk a
+//! collection larger than its viewport wants [`crate::data::DataGrid`], which
+//! does that itself.
 //!
 //! # Table or DataGrid
 //!
@@ -36,19 +53,23 @@
 //! any of the above. If a surface would work as either, pick `Table`: it is
 //! smaller, and a grid's machinery costs something even when nothing uses it.
 
+use std::ops::Range;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
-    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    AnyElement, App, InteractiveElement, IntoElement, ListSizingBehavior, ParentElement,
+    RenderOnce, SharedString, StatefulInteractiveElement, Styled, Window, div,
+    prelude::FluentBuilder, px, uniform_list,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Theme, TypeScale};
 
+use crate::data::viewport::scroll_handle;
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
 
 type SortHandler = Rc<dyn Fn(SharedString, SortDirection, &mut Window, &mut App)>;
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
+type RenderRow = Rc<dyn Fn(usize, &mut Window, &mut App) -> Row>;
 
 /// Which way a sorted column runs. The table reports a direction and renders
 /// whatever order it is handed; it never sorts the rows itself.
@@ -248,12 +269,34 @@ impl Row {
     }
 }
 
+/// A row set the table builds one row at a time.
+#[derive(Clone)]
+struct RowSource {
+    count: usize,
+    render_row: RenderRow,
+}
+
+/// Everything a row needs that does not come from the row itself.
+///
+/// A virtualized body builds its rows inside a `'static` closure, which cannot
+/// borrow the table, so the few fields a row reads travel into the closure by
+/// value and the materialized body reads the same ones.
+#[derive(Clone)]
+struct Body {
+    ident: Ident,
+    columns: Vec<Column>,
+    selected: Option<SharedString>,
+    disabled: bool,
+    on_select: Option<SelectHandler>,
+}
+
 /// A table with a header that stays put while the body scrolls.
 #[derive(IntoElement)]
 pub struct Table {
     ident: Ident,
     columns: Vec<Column>,
     rows: Vec<Row>,
+    source: Option<RowSource>,
     sort: Option<(SharedString, SortDirection)>,
     selected: Option<SharedString>,
     row_height: Option<f32>,
@@ -270,7 +313,7 @@ impl std::fmt::Debug for Table {
             .debug_struct("Table")
             .field("ident", &self.ident)
             .field("columns", &self.columns.len())
-            .field("rows", &self.rows.len())
+            .field("rows", &self.count())
             .field("sort", &self.sort)
             .field("selected", &self.selected)
             .field("disabled", &self.disabled)
@@ -284,6 +327,7 @@ impl Table {
             ident: ident.into(),
             columns: Vec::new(),
             rows: Vec::new(),
+            source: None,
             sort: None,
             selected: None,
             row_height: None,
@@ -308,6 +352,31 @@ impl Table {
     pub fn rows(mut self, rows: impl IntoIterator<Item = Row>) -> Self {
         self.rows.extend(rows);
         self
+    }
+
+    /// Takes a count and a closure instead of a vector, so the table can build
+    /// only the rows its viewport holds.
+    ///
+    /// Pair it with [`Table::visible_rows`]: without a bounded viewport there
+    /// is no window to skip rows outside of, and the table lays out the whole
+    /// collection just as a materialized one does. A source supersedes
+    /// anything passed to [`Table::rows`].
+    pub fn rows_from(
+        mut self,
+        count: usize,
+        render_row: impl Fn(usize, &mut Window, &mut App) -> Row + 'static,
+    ) -> Self {
+        self.source = Some(RowSource {
+            count,
+            render_row: Rc::new(render_row),
+        });
+        self
+    }
+
+    fn count(&self) -> usize {
+        self.source
+            .as_ref()
+            .map_or(self.rows.len(), |source| source.count)
     }
 
     /// The sort the caller applied, which is the only sort the table shows.
@@ -433,6 +502,18 @@ impl Table {
         header.into_any_element()
     }
 
+    fn body(&self) -> Body {
+        Body {
+            ident: self.ident.clone(),
+            columns: self.columns.clone(),
+            selected: self.selected.clone(),
+            disabled: self.disabled,
+            on_select: self.on_select.clone(),
+        }
+    }
+}
+
+impl Body {
     fn row_element(
         &self,
         theme: &Theme,
@@ -530,26 +611,63 @@ impl RenderOnce for Table {
         let theme = cx.theme().clone();
         let metrics = theme.control.get(self.size);
         let height = self.row_height.unwrap_or(metrics.height);
-        let count = self.rows.len();
+        let count = self.count();
         let header = self.header(&theme, height, cx);
+        let context = self.body();
 
-        let rows = std::mem::take(&mut self.rows);
-        let body = div()
-            .id(self.ident.child("body").element_id())
-            .column()
-            .w_full()
-            .overflow_y_scroll()
-            .when_some(self.visible_rows, |element, rows| {
-                element.max_h(px(height * rows as f32))
-            })
-            .children(
-                rows.into_iter()
-                    .enumerate()
-                    .map(|(index, row)| {
-                        self.row_element(&theme, height, row, index + 1 == count, cx)
+        let body = match self.source.take() {
+            Some(source) => {
+                let ident = self.ident.child("body");
+                let scroll = scroll_handle(&ident, cx);
+                let theme = theme.clone();
+                uniform_list(
+                    ident.element_id(),
+                    count,
+                    move |range: Range<usize>, window, cx| {
+                        range
+                            .map(|index| {
+                                let row = (source.render_row)(index, window, cx);
+                                context.row_element(&theme, height, row, index + 1 == count, cx)
+                            })
+                            .collect::<Vec<_>>()
+                    },
+                )
+                .track_scroll(&scroll)
+                .w_full()
+                .with_sizing_behavior(if self.visible_rows.is_some() {
+                    ListSizingBehavior::Auto
+                } else {
+                    ListSizingBehavior::Infer
+                })
+                // A short collection still ends where its last row ends, the
+                // way a materialized body capped by `max_h` does, so a cap is
+                // not a claim about how much data there is.
+                .when_some(self.visible_rows, |element, rows| {
+                    element.h(px(height * count.min(rows) as f32))
+                })
+                .into_any_element()
+            }
+            None => {
+                let rows = std::mem::take(&mut self.rows);
+                div()
+                    .id(self.ident.child("body").element_id())
+                    .column()
+                    .w_full()
+                    .overflow_y_scroll()
+                    .when_some(self.visible_rows, |element, rows| {
+                        element.max_h(px(height * rows as f32))
                     })
-                    .collect::<Vec<_>>(),
-            );
+                    .children(
+                        rows.into_iter()
+                            .enumerate()
+                            .map(|(index, row)| {
+                                context.row_element(&theme, height, row, index + 1 == count, cx)
+                            })
+                            .collect::<Vec<_>>(),
+                    )
+                    .into_any_element()
+            }
+        };
 
         div()
             .id(self.ident.element_id())

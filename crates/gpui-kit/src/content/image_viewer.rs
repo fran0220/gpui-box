@@ -41,6 +41,7 @@ use crate::controls::segmented::{Segment, SegmentedControl};
 use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
 use crate::layout::measure;
 use crate::motion::keyed;
+use crate::strings::{ActiveStrings, StringKey};
 
 /// How tall the frame is when the caller says nothing. The value occurs once.
 const DEFAULT_HEIGHT: f32 = 320.0;
@@ -477,7 +478,10 @@ impl RenderOnce for ImageViewer {
 
         let index = self.index();
         let count = self.frames.len();
-        let position = SharedString::from(format!("{} of {count}", index + 1));
+        let position = cx.strings().format(
+            StringKey::CountOfTotal,
+            &[&(index + 1).to_string(), &count.to_string()],
+        );
 
         let measured = measure::cell(&ident.child("frame").semantic_id(), cx);
         let state = keyed::slot::<Viewport>(&ident.semantic_id(), cx);
@@ -543,13 +547,14 @@ impl RenderOnce for ImageViewer {
                 &theme,
                 theme.colors.text_muted,
                 frame.label.clone(),
-                SharedString::from(format!("Not supplied — {}", frame.source)),
+                cx.strings()
+                    .format(StringKey::ImageViewerNotSupplied, &[frame.source.as_ref()]),
             ),
             (ImageState::Loading, _) => notice(
                 &theme,
                 theme.colors.text_muted,
                 frame.label.clone(),
-                SharedString::new_static("Loading"),
+                cx.strings().text(StringKey::Loading),
             ),
             (ImageState::Unavailable(reason), _) => notice(
                 &theme,
@@ -665,8 +670,10 @@ impl RenderOnce for ImageViewer {
             }
         }
 
+        let strings = cx.strings().clone();
         let step =
-            |name: &'static str, glyph: Icon, label: &'static str, target: Option<&ImageFrame>| {
+            |name: &'static str, glyph: Icon, key: StringKey, target: Option<&ImageFrame>| {
+                let label = strings.text(key);
                 let id = target.map(|frame| frame.id.clone());
                 let mut control = IconButton::new(ident.child(name), glyph, label)
                     .ghost()
@@ -687,7 +694,7 @@ impl RenderOnce for ImageViewer {
         let previous = step(
             "previous",
             Icon::ArrowLeft,
-            "Previous image",
+            StringKey::ImageViewerPrevious,
             index
                 .checked_sub(1)
                 .and_then(|index| self.frames.get(index)),
@@ -695,7 +702,7 @@ impl RenderOnce for ImageViewer {
         let next = step(
             "next",
             Icon::ArrowRight,
-            "Next image",
+            StringKey::ImageViewerNext,
             self.frames.get(index + 1),
         );
 
@@ -704,8 +711,8 @@ impl RenderOnce for ImageViewer {
             let mut control = SegmentedControl::new(ident.child("fit"))
                 .control_size(ControlSize::Sm)
                 .segments([
-                    Segment::new("contain", "Contain"),
-                    Segment::new("cover", "Cover"),
+                    Segment::new("contain", strings.text(StringKey::ImageViewerContain)),
+                    Segment::new("cover", strings.text(StringKey::ImageViewerCover)),
                     Segment::new("actual", "1:1"),
                 ])
                 .disabled(!zoomable);
@@ -737,7 +744,7 @@ impl RenderOnce for ImageViewer {
             (Some(natural), None) => {
                 SharedString::from(format!("{} × {}", natural.width, natural.height))
             }
-            _ => SharedString::new_static("Size unknown"),
+            _ => strings.text(StringKey::ImageViewerSizeUnknown),
         };
 
         let caption = div()
@@ -946,7 +953,7 @@ fn empty_viewer(ident: &Ident, theme: &Theme, height: f32, cx: &mut App) -> AnyE
         .bg(theme.colors.raised)
         .type_scale(theme, TypeScale::Label)
         .text_color(theme.colors.text_muted)
-        .child(SharedString::new_static("No images"))
+        .child(cx.strings().text(StringKey::ImageViewerEmpty))
         .semantic_in(
             cx,
             NodeSpec::new(ident.semantic_id(), Role::Group).value("empty"),

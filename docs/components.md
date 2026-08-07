@@ -5,6 +5,19 @@ one caller-supplied `Ident`, reads the theme from the application context, and
 publishes a semantic node during prepaint. Builders are `RenderOnce`; anything
 that must survive a frame is a view.
 
+No component holds a word a reader reads. Text this library authors — `Copy`,
+`Try again`, `No rows`, `Next page` — is named by a
+`gpui_kit::strings::StringKey` and read from the installed catalogue at render
+time, the same way a colour is read from the theme. A host that installs
+nothing gets the English compiled into the binary; a host that installs some
+entries gets its own words for those and English for the rest, so a label is
+never blank. Text the *caller* supplied is shown verbatim and outranks the
+catalogue: a refusal's reason, a column header, a month's name, and an
+explicit `handle_label` are the host's, not the library's.
+
+`cargo run -p xtask -- strings check`, which runs inside `gate`, fails when a
+component grows a literal a reader could read.
+
 ## Controls
 
 | Component | Kind | Reports | Notes |
@@ -23,12 +36,18 @@ that must survive a frame is a view.
 | `FormField` | builder | — | Label, description, and error around a caller-supplied control. The label carries `labels` so a test that knows only the wording can reach the control |
 | `NumberInput` | view | change, unparsable text, submit | Typing, arrow and page keys, and step buttons. It never clamps: a value outside the range is shown as it is and published `invalid` |
 | `SegmentedControl` | builder | the segment that was picked | A single-choice strip. Left, right, home, and end move over refused segments and stop at the ends, because a strip has ends |
+| `Toggle` | builder | the state pressing asks for | A button that stays in, published as a `Button` carrying a checked state where out is `false` rather than absent. Distinct from `Switch`: a switch is a setting that applies, a toggle changes what the next thing you do means |
+| `ToggleGroup`, `ToggleItem` | builder | the whole set the group should hold next, and which toggle was acted on | `ToggleSelection::Any` takes several; `AtMostOne` takes one or **none**. It does not reimplement `SegmentedControl`, which covers the case where exactly one is required and there is no move that empties it. Every toggle is its own tab stop |
+| `CopyButton` | view | copied, or failed with a reason | Copies caller-supplied text and confirms truthfully. It never publishes its payload, the confirmation times out and the refusal does not, and what it can and cannot know about the clipboard is stated below |
 | `Combobox` | view | selected, custom, opened, closed | A `Select` you can type into. Escape puts the query back to the current answer and reports nothing. A query nothing answers reports nothing unless `allow_custom` |
 | `TagInput` | view | added, removed, duplicate, refused | Enter or comma commits a token. The first backspace in an empty field singles out the last tag and the second removes it. A duplicate and a full field are refusals shown where the typist is looking |
 | `SettingsRow`, `SettingsSection` | builder | — | One setting per row: name and description on the left, the caller's control on the right. A row that is managed elsewhere, or that belongs to a section which does not apply here, never renders the control at all |
 | `FilterBar` | builder | add, remove one condition, clear them all | The conditions are the caller's, and so is the result count. Counting, a known count, a count nobody established, and a count the host refused are four different things |
 | `InlineEdit` | view | edit requested, commit, cancel | Text that becomes a field where it stands. The component never opens itself, never applies a commit, and a refused save keeps what was typed |
 | `KeybindingRecorder` | view | recording started, a captured keystroke, cancelled | Captures the next keystroke instead of acting on it, and reports it in GPUI's own syntax so it goes straight into a keymap. A modifier alone is not a keystroke, escape ends recording rather than being captured, and a conflict is the reason the host found |
+| `SearchField` | view | the query, next, previous, cancelled, and the two match rules | A find field over `TextInput` with a hit count beside it. Unsearched, counting, none, a known total, a count that stopped early, and a host that could not search are six different things, and a step with nowhere to go installs no handler |
+| `FindReplace` | view | replace one, and replace all with the number it stated | `SearchField` with a replacement field under it. Replace all carries its count on the control before it is taken, and a count nobody established — too many, still counting, unavailable — leaves it refused with the reason beside it |
+| `UploadList`, `Upload` | builder | a file to retry, one to stop, one to take off the list | Files on their way somewhere, over the `Dropzone` that took them. A refusal is not a failure and is offered no retry; overall progress is claimed only when every file still in flight declared an extent |
 | `field_shell`, `FieldState` | helper | — | The one border, background, and focus treatment every editable control draws. A composed field — `NumberInput`, `Combobox`, `TagInput` — wraps a bare input in one of these rather than nesting two frames |
 
 ## Display
@@ -47,13 +66,17 @@ that must survive a frame is a view.
 | `ProgressCircle` | builder | The ring form of `ProgressBar`, over the same state. A position only when the extent is known; an unknown extent tints the whole ring rather than part of it |
 | `DescriptionList` | builder | Term and value pairs for a detail page. Unknown, not applicable, and redacted are three different facts, and a redacted value carries only its shape |
 | `Timeline` | builder | A chronological feed. Every time and every day heading is a string the caller already formatted, and an entry whose time nobody knows says so |
+| `HighlightedText` | builder | Marks caller-given byte ranges in caller-given text. It searches nothing: the ranges are the caller's, the current one is drawn differently from the others rather than more strongly, and a range naming no real slice costs its mark and not the line |
+| `FailurePanel` | builder | A region the host could not produce, in the host's own words. Not an error boundary and deliberately not named one: GPUI has no fallible render and no catchable render panic, so this takes a failure the host is already holding, through `from_result`. It publishes `failed`, never empty |
+| `Icon` | builder | A glyph from the bundled catalog, sized from the `control.*` glyph step and coloured from a semantic role rather than an `Hsla`. Emits nothing: a glyph that can be clicked is `IconButton`. Decorative by default and published only when named, so a glyph that repeats the label beside it is not announced twice |
 
 ## Navigation
 
 | Component | Kind | Reports | Notes |
 |---|---|---|---|
-| `Tabs` | builder | the tab that was picked | Renders the strip only, never a panel, so no `TabPanel` node is published; the caller renders the body. Left, right, home, and end move between tabs, skipping disabled ones and stopping at the ends |
+| `Tabs`, `TabItem` | builder | the tab that was picked, and the tab that should be put away | Renders the strip only, never a panel, so no `TabPanel` node is published; the caller renders the body. Left, right, home, and end move between tabs, skipping disabled ones and stopping at the ends. A document tab carries `SaveState`: clean draws nothing, dirty, saving, and a save that failed are three marks. The close control is its own hit target and stops the click travelling, a middle click means the same thing, and `overflow_after` with an `overflow_menu` moves the rest into a menu while the keyboard still reaches them |
 | `Accordion` | builder | a section id and the state it should take | A closed section does not render its body at all. `exclusive` changes only what is reported: opening a section also reports a close for every other open one |
+| `Collapsible` | builder | the state activating the header asks for | The one-region case, built by handing a single section to an `Accordion` rather than by writing the disclosure again. The header lands at `{ident}.header` |
 | `Breadcrumb` | builder | the crumb that was picked, and the ids an ellipsis hides | The last crumb is the current place: it publishes `Text` rather than `Link` and installs no handler. `max_visible` collapses the middle of a long trail and publishes the hidden count |
 | `Sidebar` | builder | the place that was picked | Sections, badges, and one level of nesting. Collapsing narrows the drawing, never the substance: a glyph-only rail reaches each label through a `Tooltip` and every item still publishes its full name and its depth |
 | `Wizard` | builder | a step to jump to, back, next, or finish | A step strip with the caller's body under it, horizontal or vertical. A step is complete, current, upcoming, blocked, or failed, and the last two say why |
@@ -81,6 +104,7 @@ page would be a number nobody counted.
 | Component | Kind | Reports | Notes |
 |---|---|---|---|
 | `SplitPane` | builder | the ratio a drag or a keystroke asked for, and the side a double-click would collapse | Minimum sizes become a travel range published on the divider, and a drag past a minimum reports the minimum rather than a value the caller would have to clamp. A pane at ratio 0 or 1 drops its content instead of drawing it at zero size |
+| `AspectRatio` | builder | — | A frame that keeps a ratio. `AspectFit` names which dimension the parent decides and the ratio computes the other; when the parent constrains both, `fit` still wins and the overflow is visible rather than silently switched to a contain box |
 | `ScrollArea` | builder | — | Scroll position is transient view state, held per identity like `List`. A gutter is reserved for every enabled axis whether or not a thumb is drawn, so turning a scrollbar on never reflows the content that decided it was needed. A hairline shadow fades in at the top once the content is off the top, read straight off the offset rather than animated |
 | `Toolbar` | builder | — | Groups separated by rules, a spacer, and an overflow menu. Every action inside still reports itself |
 | `SplitTree` | builder | the ratio a divider asked for, and the pane a double-click would collapse | However many nested splits the caller declares, as a `SplitLayout` the caller owns. Minimums propagate up the tree, so a divider stops where a leaf far below it would run out of room, and a collapsed leaf is drawn at its rail with no divider beside it |
@@ -187,23 +211,48 @@ carries the total in `value`: a test asserts that the list holds a thousand
 items and drew twelve, rather than pretending the other nine hundred and
 eighty-eight are addressable.
 
-Virtualization needs a bounded viewport. With `List::visible_rows` the list
-draws only the rows that fit; without it the list sizes itself to its content
-and every row is laid out.
+Virtualization needs a bounded viewport. `List`, `Table`, `Tree` and
+`DataGrid` each take a `visible_rows` bound and draw only the rows that fit;
+without one they size themselves to their content and every row is laid out.
+That is the right answer for a settings summary and the wrong one for a
+hundred thousand log lines.
 
-`Table` is the exception, and deliberately: it takes materialized rows, so
-every cell element already exists by the time the table sees it and every row
-it is given is rendered. Reach for `List` when the data set is large.
+Two of the four have a second condition. `Table` virtualizes only when it is
+given a row source — `Table::rows_from(count, closure)` — because
+`Table::rows` hands it elements the caller has already built, and an element
+can be laid out once while a `uniform_list` needs to build a row twice in a
+frame: once to measure the height, once to draw. `rows_from` is offered
+alongside `rows` rather than replacing it, so a table of six settings does not
+have to be written as a closure over an index. `Tree` flattens the hierarchy
+to the rows a reader could see and virtualizes that, so what it draws follows
+what is open; flattening still walks the whole hierarchy each frame, which is
+data rather than elements.
+
+A `Tree` reports the number of rows it disclosed in `value`, which keeps three
+absences apart: a node under a shut branch is not disclosed, a disclosed node
+past the edge of the viewport is counted but not drawn, and a node that is not
+in the data at all is neither. A bounded tree can draw a node whose parent has
+scrolled off the top; the node still names the parent it has, so a walk down
+from the tree will not reach it and a test should name it instead.
+
+`List`, `Tree` and `DataGrid` move the selection with the keyboard over the
+whole collection, not over the rows that happen to be drawn, and scroll what
+they report into view. `Table` reports only what is clicked, so a caller that
+moves the selection somewhere the viewport has never drawn brings it into view
+itself with `data::reveal_row`, naming the table's body as
+`<table ident>.body`.
 
 ### Table or DataGrid
 
 Both are column-oriented and both report rather than apply. The difference is
 what they are handed:
 
-- **`Table` takes rows.** The caller builds every cell before the table sees
-  it, which is why the whole set is laid out and why a table stays readable at
-  a few dozen rows and stops being sensible at a few thousand. Reach for it for
-  a settings summary, a short run list, a preview of a result set.
+- **`Table` takes rows, or a source.** Handed rows, the caller builds every
+  cell before the table sees it and the whole set is laid out. Handed a source
+  through `rows_from`, it survives a large collection but gains nothing else:
+  no selection over an incompletely loaded set, no opened rows, no editing, and
+  no keyboard. Reach for it for a settings summary, a short run list, a preview
+  of a result set.
 - **`DataGrid` takes a closure.** It asks for one row at a time and only for
   the rows the viewport holds, which is what lets it carry twelve thousand rows
   and also what makes column resizing, reordering, selection over an
@@ -295,6 +344,7 @@ from the component path.
 | `Markdown` | builder | a link that was taken, an image it did not fetch, a code block that was copied, and the lines truncation left out | Read-only rendered Markdown: headings, prose, emphasis, code, quotes, nested and task lists, links, images, rules, and tables. It parses to an owned tree first and draws that, so what is rendered is what a test can read |
 | `MessageList` | builder | a failed message that should be tried again, and whatever a Markdown body reported | A conversation over the virtualized `List`. Five delivery states, a streaming mark keyed to the message rather than to its text, caller-declared grouping, and following that happens only while the reader is already at the bottom |
 | `ImageViewer` | builder | the fit that was asked for, the image that was stepped to, and an image the host has not supplied | One image at a time, with contain, cover, 1:1, and zoom; the wheel zooms at the pointer and a drag pans, clamped so the picture cannot leave the frame. Loading, unavailable, failed, and ready are four renderings, and dimensions are a caller input |
+| `CodeView`, `CodeLine` | builder | a copy of the whole text | Read-only code with a gutter. No grammar and no new dependency: spans are pre-classified by the caller, exactly as a Markdown fenced block. A long line scrolls rather than wrapping, because a column carries meaning in code and a wrap would break the gutter's claim that one line is one row. Line numbers are the file's, not the slice's, and only a marked line publishes a node |
 | `TransportBar` | builder | play, pause, a preview while scrubbing and one seek on release, volume, mute, speed, and a track step | Playback controls for media this crate does not play. A duration the host does not know is a state, buffered ranges are drawn apart from the played position, and every readout is a string the host wrote |
 
 ### A document is drawn, never obeyed
@@ -386,10 +436,46 @@ is in `docs/interaction.md`.
 | `MenuItem` | builder | One row: `command`, `check`, `separator`, `section`, or `submenu`, with an optional shortcut hint and icon. A checkable row draws the state the host holds and reports the intent to change it |
 | `CommandPalette`, `Command` | view, builder | A query field over a command list, filtered by `popover::match_rank` — prefix, then word start, then substring, then subsequence — with sections kept contiguous behind their best match. Nothing matching shows an `EmptyState` naming the query that answered nothing, and a command the host marked unavailable stays listed with its reason rather than being hidden |
 | `Tooltip`, `Tooltipped` | builder, trait | Hover-delayed help on GPUI's hover machinery. Never actionable, and never the only copy of what is needed to act. `Tooltipped` attaches one to any element |
+| `HoverCard` | view | opened, closed | A preview that opens on hover and holds content worth reaching, so it tracks the pointer over the trigger and over the card separately and keeps a grace period between them. Anchoring is `Popover`'s. The trigger is a tab stop, and escape closes and hands the keyboard back |
+| `Menubar`, `MenubarMenu` | view, builder | opened, invoked with the menu it came from, closed | A row of `Menu` views. It adds only what the row implies: at most one open, hover switching once one is open and not before, and the reading-order arrows stepping between titles. A refused title has no menu behind it at all |
+| `NotificationCenter`, `Notification` | view, builder | Where a notification goes after the toast that showed it has gone. One record and two surfaces: `show` files it here and pushes the toast built from it, sharing the id, the wording, and the severity. Dismissing one and clearing them all are separate reports, and a centre that has dropped records to stay bounded stops claiming an exact unread count |
 | `ToastLayer`, `Toast` | view, builder | Transient notifications. The host mounts the layer in the window it wants them drawn in; `overlay::toast::push` reaches it from any call site and reports whether a layer was mounted to deliver to. One action at most, an optional dismiss control, entry and exit through `Presence` |
 | `FocusTrap` | helper | Keeps the keyboard inside an open overlay and restores focus |
 | `Kbd` | builder | Platform-specific keystroke caps |
 | `popover` | helpers | Anchoring, menu rows, cursor movement, type-ahead, filtering, and key classification |
+
+### What a copy button can honestly claim
+
+`gpui::App::write_to_clipboard` returns `()`. There is no `Result`, no error,
+and no callback, so a tick shown because that call returned would be a tick
+shown because a function with no failure mode did not fail. The one piece of
+evidence GPUI offers is `read_from_clipboard`, so `CopyButton` writes, reads
+back, and compares; a read that comes back empty or holding something else is
+reported as a failure with `invalid` set on a published `Status` node.
+
+The gap that leaves is stated rather than papered over: a platform where the
+write lands in a clipboard this process can read but no other application can
+see would be indistinguishable from success. Nothing in GPUI's surface can tell
+those apart. A host that knows better supplies its own `copier`, which returns
+a `Result`, and whose failure text is shown verbatim.
+
+The confirmation times out; the refusal does not, for the same reason a
+`Toast` reporting a failure does not.
+
+### A hover card the pointer can reach
+
+A tooltip may vanish the instant the pointer leaves, because nobody was ever
+going to point at it. A hover card holds a link, a button, or text to read, and
+between the trigger and the card there is a gap the surface does not cover. So
+the card tracks two facts rather than one — pointer over the trigger, pointer
+over the card — and leaving *both* starts a countdown that entering *either*
+cancels. Only a countdown that runs out closes it, which is what makes the
+diagonal trip across the gap winnable.
+
+Opening has its own countdown for the opposite reason: a pointer crossing a row
+of triggers on its way somewhere else opens none of them. Both durations are
+caller-settable and neither is a token, because they are reaction times rather
+than paint.
 
 ### Failures do not time out
 
@@ -436,6 +522,226 @@ to whoever already holds the clock. An entry with no known time is neither
 floated to the top nor dropped to the bottom: it says its time is unknown and
 publishes `time unknown` as its value.
 
+## Agent run
+
+A conversation is not the unit an agent application shows; a run made of steps
+is. These three are that vocabulary, and every one of them exists because a
+plainer component would have to collapse two facts into one.
+
+| Component | Kind | Reports | Notes |
+|---|---|---|---|
+| `ToolCallCard` | builder | a failed call that should be tried again | One invocation of one tool: what it was called with, which of its five states holds, its result or its error, and how long it took. Arguments and results publish their shape and never their text |
+| `StepList` | builder | — | An ordered run of steps, each with its own state, each able to hold a `ToolCallCard`. A run whose length nobody knows gets an indeterminate summary rather than an invented fraction |
+| `ThinkingBlock` | builder | the state the disclosure should take | Model reasoning, collapsed by default. Withheld, absent, and collapsed are three states and three presentations |
+
+### A refusal is not an absence and not an error
+
+`ToolCallState` is five states, not a flag beside a result: `PendingApproval`,
+`Running`, `Succeeded`, `Failed`, and `Refused`. The last two are the pair that
+gets collapsed everywhere else, and they say different things. A failure blames
+the tool for something it did and carries the host's error; a refusal is a
+decision somebody made before anything ran, and carries the host's reason. A
+third thing is neither: `ToolOutput::Silent` is a call that ran, succeeded, and
+returned nothing. Each publishes its own name in `value` and renders its own
+consequence, and a refused card publishes no elapsed time at all, because
+nothing ran to take any.
+
+An elapsed time is a string the caller already wrote — the rule `Timeline` and
+`TransportBar` keep — and a duration nobody stated is `Elapsed::Unknown`, which
+says so rather than reading as zero.
+
+### A body publishes its shape, never its text
+
+Arguments and results are somebody else's data and may be a credential, so a
+`ToolBody` node carries only the measurement: `2 of 4 lines shown` when the
+caller set `max_lines`, and `4 lines` when it did not. The same sentence is
+drawn beside the block, so the cut is stated where it happens rather than
+implied by a fade, and it is stated whether or not anything was cut, so
+"there is more" is read off the same line every time.
+
+### A run nobody counted has no progress
+
+`RunLength::Known` and `RunLength::Unknown` are `PageTotal`'s distinction for a
+run. With a known length the summary is `ProgressBar::count`, which publishes a
+position; with an unknown one the bar is indeterminate, publishes no fraction,
+and states only what has finished — `1 step done`. A bar crawling toward a
+total nobody established would be a number this library invented.
+
+A step's state is `Pending`, `Running`, `Done`, `Failed`, or `Skipped`, and the
+last two carry the host's own words: a step that never ran and a step that ran
+and failed are different sentences, published under different names.
+
+### Three states, and no `Option` to lose one in
+
+`Reasoning::Present`, `Reasoning::Withheld`, and `Reasoning::Absent`.
+An `Option<String>` cannot hold this: its `None` would have to stand for both
+"the provider withheld it" and "there was none", and a block that says nothing
+was produced when in fact it was withheld states something nobody established.
+So the type has three variants, no conversion from `Option`, and a required
+reason on `Withheld` — whoever withheld it has to say so, and the words are
+shown verbatim. Only `Present` can be opened: the other two install no toggle
+handler at all and publish `Text` rather than `Button`, and an open block
+renders its body while a closed one renders none, the rule `Accordion` keeps.
+Reasoning that exists and is empty is still `Present`.
+
+## Permission and cost
+
+The two places in an agent application where a careless interface misleads
+somebody about something that matters: what it is allowed to do, and what it is
+spending.
+
+| Component | Kind | Reports | Notes |
+|---|---|---|---|
+| `ApprovalPrompt` | view | approved, with how far the approval reaches, and declined | One request for permission to do one specific thing. The keyboard lands on decline, return acts only on the control that holds it, escape declines, and a resolved prompt installs no handler at all |
+| `PermissionMatrix` | builder | the state a cell would take next | Subjects against actions. Allowed, denied, ask every time, and not applicable are four states, and every cell that has a state says whether it was set here or inherited, in the host's words |
+| `CostMeter` | builder | — | What a run has cost, line by line. Measured, estimated, and unavailable are three different readings, and a stale line keeps its last verified value and says when it was from |
+| `ContextGauge` | builder | — | How much of a context window has been used. A proportion only when both the reading and the limit are known |
+
+### The default is refusal
+
+`ApprovalPrompt` is arranged so that nothing makes approving easier than
+declining by accident. The keyboard lands on decline when the prompt appears,
+the way `Dialog` opens a destructive confirmation on cancel; return acts on
+whichever control holds the keyboard, so a return key pressed at rest declines
+and approving with the keyboard costs a deliberate tab first; and escape
+declines, which is both what escape does everywhere else here and the safe
+direction. The request is stated specifically — the constructor takes what is
+about to happen, and there is no way to describe it as a category — with the
+exact path, command, or host beside it in a `DescriptionList`.
+
+`Declined`, `Expired`, and `Superseded` are three states, not one. Nobody
+answering in time is not a refusal, and a request a later one replaced is
+neither; each publishes its own name and its own sentence, and a host that
+supersedes a prompt says so through the component rather than by removing it,
+so the reader finds out why the controls went away.
+
+### An unscoped "always" does not exist
+
+`AlwaysScope` has no variant meaning "always, everywhere". It is the session,
+or one named tool, one named path, or one named host, and the wording on the
+control is derived from the variant — so a control offering a standing
+permission without saying what the permission covers is not something a caller
+can construct.
+
+### Not applicable is not denied
+
+A `PermissionMatrix` cell is `Allowed`, `Denied`, `Ask`, or `NotApplicable`.
+"This tool has no network to reach" and "this tool is refused the network" are
+different sentences, and collapsing the first into the second invents a refusal
+nobody made. `NotApplicable` has no next state, so it installs no handler even
+in an editable matrix; a matrix given no `on_change` is read-only, publishes
+`Cell` rather than `Button`, and installs nothing anywhere.
+
+Provenance is carried, never derived. Deciding which rule won is policy
+evaluation over a rule set the host owns — the same kind of fact the date
+components take from a `DateAdapter` — so a cell renders the
+`PermissionSource` it was handed, either naming the broader rule it came from
+in the host's own words or saying it was set here, and computes nothing.
+
+### An estimate says so wherever it appears
+
+`Quantity` has no constructor that takes a bare number: `Quantity::measured`
+and `Quantity::estimated` name the basis in the same call, so a number reaches
+a screen with the fact that it was estimated attached or it does not reach a
+screen. The label is in the drawn text, in the mark beside it, and in the
+node's published value, because a reader who saw the number labelled on one
+surface and bare on another would trust the wrong one.
+
+`Reading::Unavailable` is a state rather than a quantity: nothing about it is
+drawn as a number and no proportion is computed from it. `Limit::Unknown` is
+the same refusal one level up — a proportion of an unknown total is invented,
+so `ContextGauge` draws no fill and publishes no range, exactly as
+`ProgressBar` refuses to claim a position for work whose extent is unknown. It
+does not fall back to the indeterminate sweep either: the sweep means "in
+flight", and a reading of what has been used so far is not in flight.
+
+A refresh that failed keeps its value: `CostLine::stale` takes a
+`LastVerified` rather than a flag, so a value cannot be marked stale without
+saying when it was from.
+
+Numbers are the caller's. Currency, token counts, grouping, and where a unit
+sits are locale work this crate does not do, so a `Quantity` carries the
+caller's already-formatted wording and, separately, the bare number — which is
+used for one thing only, the proportion against a known limit. Nothing here
+turns a number into text.
+
+## Structured data
+
+| Component | Kind | Reports | Notes |
+|---|---|---|---|
+| `JsonView` | builder | a path and the disclosure state it should take, and the row that was picked | A structured value over a caller-supplied `JsonValue`. Virtualized, so only the rows the viewport holds are laid out or published. `null`, an empty container, and a key the document does not hold are three presentations, and a withheld subtree reads as withheld |
+| `SchemaForm` | view | a field that changed, and a submit | A form built from a caller-supplied `Schema` over the existing controls. A field it cannot draw states so where the control would have been and is still reported by `values` |
+| `ServerList` | builder | a server that was picked, a failed one that should be tried again, and a server whose offerings should be shown | What is connected and what each connection offers. Five states, none of them a shade of another, and an empty answer that is not an unasked question |
+
+### This crate parses nothing
+
+`JsonValue` and `Schema` are plain shapes a host converts into, for the same
+reason `SplitLayout` converts to records instead of deriving `Serialize`:
+product-neutral infrastructure must not decide which parsing crate an
+application depends on. A number is carried as the text the document wrote,
+because `f64` cannot hold every integer JSON can write and cannot tell `1.10`
+from `1.1`, and this crate formats no numbers. An object is a list of pairs,
+because JSON documents have an order and may repeat a key, and a map would
+silently reorder the first and drop the second.
+
+`JsonView` does not build on `Tree`. A tree node is one label; a JSON row is a
+key and a typed value with different treatments, and there is no `Slot` here to
+put a second column into one. It virtualizes over the same `uniform_list`
+primitive `List` and `DataGrid` use, so it inherits the rule rather than the
+component: only rendered rows publish nodes, and the container carries how many
+rows are currently disclosed.
+
+### Withheld, null, empty, and absent
+
+Four facts, four renderings. A key the document does not hold produces no row.
+`null` is a row reading `null`. An empty object is a row reading `{}` that
+offers no disclosure, so it can never be mistaken for a branch that is merely
+shut. A subtree the caller withheld is a row marked `withheld` beside a
+description of its shape.
+
+The secret never reaches the component: a caller replaces the subtree with
+`JsonValue::Redacted`, which carries a shape and no content, so no rendering
+path and no export can leak it. The published `value` is `withheld` and nothing
+else — not even the shape, which is drawn and never recorded.
+
+### A form that cannot draw a field says so
+
+This is the rule `SchemaForm` exists to keep. A host converting a schema it does
+not fully understand puts `SchemaKind::Unrenderable` in place of the field with
+its own reason; the form refuses a few shapes itself, such as a choice among no
+choices. Either way the field keeps its place, its label, and its required mark,
+states the reason where the control would have been, and is still reported by
+`SchemaForm::values` as `FieldValue::Unrenderable`. A required one publishes
+`unrenderable, required` and makes `validate` answer no however much else is
+filled in.
+
+A form that quietly dropped an argument it did not understand would send an
+invalid call and let the reader be blamed for it.
+
+Errors come from two places and stay apart. `validate` marks required fields
+nobody filled in, which is all the form can judge on its own; `set_error` shows
+what the host returned, in the host's words, and outranks the form's own on the
+same field. Both are drawn by `FormField`, next to the control they are about.
+
+### Five connection states, and an answer that was empty
+
+`ServerState` is `Connected`, `Connecting`, `Disconnected`, `Failed`, and
+`Disabled`. The last two are the pair that gets collapsed elsewhere and they
+say different things: something broke, against nobody wanted it. A failure keeps
+the host's reason on screen and offers exactly one control, which reports a
+retry and retries nothing. A connection the reader turned off is refused rather
+than dimmed — nothing on its row installs a handler.
+
+`Catalog::Offers` holding an empty list is an answer; `Catalog::Unasked` is the
+absence of a question. Rendering the second as the first tells somebody their
+server is useless when the truth is that the application has not asked yet.
+`Asking` and `Unavailable` are the two remaining states, and each is drawn as
+itself.
+
+Nothing here names a protocol or a vendor. A connected thing is a *server*,
+what it offers are *tools*, *skills* and *resources*, and an offering's id
+carries the server that offers it, because two servers may offer the same name.
+
 ## What every component agrees on
 
 These hold across the families above, so a habit learned on one component
@@ -462,6 +768,20 @@ height beside it.
 
 **Selection.** Anything that can present itself as the current choice
 implements `Selectable`.
+
+**Reading direction.** `LayoutDirection` is a global a host sets with
+`set_layout_direction`, and components read it during render through
+`ActiveDirection` exactly as they read the theme. It defaults to left to right,
+so a host that never sets one renders what it always did. Components spell
+edges logically — `row_reading`, `ps`/`pe`, `ms`/`me`, `border_s`/`border_e`,
+`text_start`/`text_end` — wherever the edge means "where reading begins", and
+keep saying left and right where the edge is genuinely about the screen: the
+gutter of a vertical scroll region, a dock region, a split pane's axis. A
+horizontal arrow key that means previous or next swaps with the direction; one
+that means "toward an edge", and every vertical arrow, does not. Whether a
+glyph turns around is a property of the drawing, carried by
+`Icon::mirroring` in the asset catalog, so a chevron flips and a checkmark
+does not.
 
 **Focus.** Every interactive element is reachable with tab and wears the same
 ring, from `effect.focusRingWidth` and `effect.focusRingAlpha` in the focus

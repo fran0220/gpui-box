@@ -606,10 +606,12 @@ fn the_recorder_captures_a_keystroke_in_gpui_syntax(cx: &mut TestAppContext) {
     let parsed = gpui::Keystroke::parse(binding.as_ref()).expect("gpui parses its own syntax");
     assert_eq!(parsed.key, "p");
     assert!(parsed.modifiers.platform && parsed.modifiers.shift);
-    assert!(
-        !Kbd::new(binding).caps().is_empty(),
-        "Kbd draws the same string"
-    );
+    case.harness.context().update(|_, cx| {
+        assert!(
+            !Kbd::new(binding.clone()).caps(cx).is_empty(),
+            "Kbd draws the same string"
+        );
+    });
 
     // A captured binding is reported, not applied.
     case.harness.context().update(|_, cx| {

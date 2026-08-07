@@ -7,8 +7,8 @@ use std::time::Duration;
 
 use gpui::{
     AnyElement, AnyWindowHandle, App, Bounds, Context, IntoElement, Modifiers, MouseButton, Pixels,
-    Point, Render, TestAppContext, VisualTestContext, Window, WindowBounds, WindowOptions, div,
-    point, prelude::*, px, size,
+    Point, Render, ScrollDelta, ScrollWheelEvent, TestAppContext, TouchPhase, VisualTestContext,
+    Window, WindowBounds, WindowOptions, div, point, prelude::*, px, size,
 };
 use gpui_kit_semantics::{Node, SemanticRegistry, Snapshot};
 
@@ -133,6 +133,23 @@ impl Harness {
         self.cx.executor().advance_clock(delta);
         self.cx.update(|window, cx| {
             window.simulate_next_frame(cx);
+        });
+        self.cx.run_until_parked();
+    }
+
+    /// Turns a wheel over the centre of a node. A positive `pixels` scrolls
+    /// toward the end of the content, the way a reader moves down a list.
+    ///
+    /// A virtualized surface decides what to build from where it is scrolled
+    /// to, so a test that wants to assert what is on screen has to move it the
+    /// way a reader would rather than by reaching into the element.
+    pub fn scroll(&mut self, id: &str, pixels: f32) {
+        let at = self.point_in(id);
+        self.cx.simulate_event(ScrollWheelEvent {
+            position: at,
+            delta: ScrollDelta::Pixels(point(px(0.0), px(-pixels))),
+            modifiers: Modifiers::none(),
+            touch_phase: TouchPhase::Moved,
         });
         self.cx.run_until_parked();
     }

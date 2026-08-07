@@ -63,6 +63,7 @@ use crate::interaction::dnd::{
 };
 use crate::layout::measure;
 use crate::motion::{Flipping, Presence, entrance, flip, state_change};
+use crate::strings::{ActiveStrings, StringKey};
 
 /// How wide the grab area of a column edge is. The value occurs only here.
 const RESIZE_HANDLE: f32 = 7.0;
@@ -1033,7 +1034,7 @@ impl DataGrid {
                     cx,
                     NodeSpec::new(ident.semantic_id(), Role::Checkbox)
                         .parent(self.ident.semantic_id())
-                        .text("Select all loaded rows")
+                        .text(cx.strings().text(StringKey::GridSelectAllLoaded))
                         .disabled(!actionable)
                         .tristate(if mixed { None } else { Some(all) })
                         // A box in a virtualized grid can only ever speak for
@@ -1250,7 +1251,10 @@ impl DataGrid {
                     cx,
                     NodeSpec::new(ident.semantic_id(), Role::Separator)
                         .parent(self.ident.semantic_id())
-                        .text(format!("Resize {}", column.header))
+                        .text(
+                            cx.strings()
+                                .format(StringKey::GridResizeColumn, &[&column.header]),
+                        )
                         .value(format!("{width:.0}")),
                 )
                 // `semantic_in` makes its host relative so the probe measures
@@ -1485,7 +1489,7 @@ impl DataGrid {
                     cx,
                     NodeSpec::new(ident.semantic_id(), Role::Status)
                         .parent(self.ident.semantic_id())
-                        .text("Loading rows")
+                        .text(cx.strings().text(StringKey::GridLoadingRows))
                         .value("loading")
                         .busy(true),
                 )
@@ -1493,17 +1497,23 @@ impl DataGrid {
         }
 
         if let Some(failure) = self.failure.clone() {
-            return EmptyState::new(self.ident.child("empty"), "Could not load rows")
-                .kind(EmptyKind::Failed)
-                .detail(failure)
-                .into_any_element();
+            return EmptyState::new(
+                self.ident.child("empty"),
+                cx.strings().text(StringKey::GridLoadFailed),
+            )
+            .kind(EmptyKind::Failed)
+            .detail(failure)
+            .into_any_element();
         }
 
         match vacancy {
             Some(empty) => empty.into_any_element(),
-            None => EmptyState::new(self.ident.child("empty"), "No rows")
-                .kind(EmptyKind::Empty)
-                .into_any_element(),
+            None => EmptyState::new(
+                self.ident.child("empty"),
+                cx.strings().text(StringKey::GridEmpty),
+            )
+            .kind(EmptyKind::Empty)
+            .into_any_element(),
         }
     }
 }
@@ -1759,7 +1769,11 @@ fn disclosure(
                 .parent(ident.semantic_id())
                 .text(format!(
                     "{} {}",
-                    if open { "Collapse" } else { "Expand" },
+                    cx.strings().text(if open {
+                        StringKey::Collapse
+                    } else {
+                        StringKey::Expand
+                    }),
                     row.text.clone().unwrap_or_else(|| row.id.clone())
                 ))
                 .expanded(open),
@@ -2040,7 +2054,7 @@ pub struct BulkBar {
     ident: Ident,
     count: usize,
     total: Option<usize>,
-    noun: SharedString,
+    noun: Option<SharedString>,
     actions: Vec<AnyElement>,
     on_select_all: Option<BulkHandler>,
     on_dismiss: Option<BulkHandler>,
@@ -2064,7 +2078,7 @@ impl BulkBar {
             ident: ident.into(),
             count,
             total: None,
-            noun: SharedString::new_static("selected"),
+            noun: None,
             actions: Vec::new(),
             on_select_all: None,
             on_dismiss: None,
@@ -2080,7 +2094,7 @@ impl BulkBar {
 
     /// What the count is counting, for a surface whose rows are not "rows".
     pub fn noun(mut self, noun: impl Into<SharedString>) -> Self {
-        self.noun = noun.into();
+        self.noun = Some(noun.into());
         self
     }
 
@@ -2130,7 +2144,11 @@ impl RenderOnce for BulkBar {
         }
 
         let total = self.total.unwrap_or(self.count);
-        let label = SharedString::from(format!("{} {}", self.count, self.noun));
+        let noun = self
+            .noun
+            .clone()
+            .unwrap_or_else(|| cx.strings().text(StringKey::GridSelectedNoun));
+        let label = SharedString::from(format!("{} {}", self.count, noun));
         let wider = self
             .on_select_all
             .clone()
@@ -2162,13 +2180,19 @@ impl RenderOnce for BulkBar {
                     .tab_index(0)
                     .text_color(theme.colors.accent)
                     .focus_ring(&theme)
-                    .child(SharedString::from(format!("Select all {total}")))
+                    .child(
+                        cx.strings()
+                            .format(StringKey::GridSelectAllTotal, &[&total.to_string()]),
+                    )
                     .on_click(move |_, window, cx| handler(window, cx))
                     .semantic_in(
                         cx,
                         NodeSpec::new(ident.semantic_id(), Role::Button)
                             .parent(self.ident.semantic_id())
-                            .text(format!("Select all {total}"))
+                            .text(
+                                cx.strings()
+                                    .format(StringKey::GridSelectAllTotal, &[&total.to_string()]),
+                            )
                             .value(total.to_string()),
                     ),
             );
@@ -2185,7 +2209,7 @@ impl RenderOnce for BulkBar {
                 crate::controls::button::IconButton::new(
                     self.ident.child("dismiss"),
                     Icon::Close,
-                    "Clear selection",
+                    cx.strings().text(StringKey::GridClearSelection),
                 )
                 .semantic_parent(self.ident.semantic_id())
                 .on_click(move |window, cx| handler(window, cx)),

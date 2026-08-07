@@ -22,13 +22,15 @@ use std::ops::Range;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, Global, InteractiveElement, IntoElement, ListSizingBehavior, ParentElement,
-    RenderOnce, ScrollStrategy, SharedString, StatefulInteractiveElement, Styled,
-    UniformListScrollHandle, Window, div, point, prelude::FluentBuilder, px, uniform_list,
+    AnyElement, App, InteractiveElement, IntoElement, ListSizingBehavior, ParentElement,
+    RenderOnce, ScrollStrategy, SharedString, StatefulInteractiveElement, Styled, Window, div,
+    point, prelude::FluentBuilder, px, uniform_list,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Theme};
 
+use crate::data::viewport::scroll_handle;
+pub use crate::data::viewport::scroll_to_row;
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
 use crate::interaction::dnd::{
     self, DragItem, DropAxis, DropIntent, DropPosition, MakingWay, RowTarget, SurfaceDrag,
@@ -529,34 +531,6 @@ fn selectable(
         index += delta;
     }
     None
-}
-
-#[derive(Default)]
-struct ScrollHandles(RefCell<HashMap<SharedString, UniformListScrollHandle>>);
-
-impl Global for ScrollHandles {}
-
-/// Brings row `index` of the list with this identity into view.
-///
-/// Scroll position belongs to the list, not to whoever draws over it, so a
-/// surface built on a list — a conversation that follows its newest message —
-/// moves it by naming the list rather than by owning a GPUI handle of its own.
-pub fn scroll_to_row(ident: &Ident, index: usize, cx: &mut App) {
-    scroll_handle(ident, cx).scroll_to_item(index, ScrollStrategy::Bottom);
-}
-
-/// The scroll position of the list with this identity.
-///
-/// Where a list is scrolled is transient view state, but a `RenderOnce`
-/// builder is rebuilt every frame and cannot carry it. Keying the handle by
-/// identity keeps the position across rebuilds without making every caller own
-/// a GPUI handle.
-fn scroll_handle(ident: &Ident, cx: &mut App) -> UniformListScrollHandle {
-    if !cx.has_global::<ScrollHandles>() {
-        cx.set_global(ScrollHandles::default());
-    }
-    let mut handles = cx.global::<ScrollHandles>().0.borrow_mut();
-    handles.entry(ident.semantic_id()).or_default().clone()
 }
 
 #[cfg(test)]

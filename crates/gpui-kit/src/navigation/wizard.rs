@@ -24,6 +24,7 @@ use crate::display::badge::Tone;
 use crate::foundation::stepping::bounded_step;
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
 use crate::motion;
+use crate::strings::{ActiveStrings, StringKey};
 
 /// How wide the marker beside a step is.
 const MARKER: f32 = 20.0;
@@ -205,9 +206,9 @@ pub struct Wizard {
     back_to: Option<SharedString>,
     finish: bool,
     can_advance: bool,
-    back_label: SharedString,
-    next_label: SharedString,
-    finish_label: SharedString,
+    back_label: Option<SharedString>,
+    next_label: Option<SharedString>,
+    finish_label: Option<SharedString>,
     size: ControlSize,
     disabled: bool,
     on_navigate: Option<NavigateHandler>,
@@ -238,9 +239,9 @@ impl Wizard {
             back_to: None,
             finish: false,
             can_advance: true,
-            back_label: SharedString::new_static("Back"),
-            next_label: SharedString::new_static("Next"),
-            finish_label: SharedString::new_static("Finish"),
+            back_label: None,
+            next_label: None,
+            finish_label: None,
             size: ControlSize::Md,
             disabled: false,
             on_navigate: None,
@@ -293,17 +294,17 @@ impl Wizard {
     }
 
     pub fn back_label(mut self, label: impl Into<SharedString>) -> Self {
-        self.back_label = label.into();
+        self.back_label = Some(label.into());
         self
     }
 
     pub fn next_label(mut self, label: impl Into<SharedString>) -> Self {
-        self.next_label = label.into();
+        self.next_label = Some(label.into());
         self
     }
 
     pub fn finish_label(mut self, label: impl Into<SharedString>) -> Self {
-        self.finish_label = label.into();
+        self.finish_label = Some(label.into());
         self
     }
 
@@ -536,7 +537,11 @@ impl RenderOnce for Wizard {
                 div()
                     .child(
                         Button::new(ident.child("back"))
-                            .label(self.back_label.clone())
+                            .label(
+                                self.back_label
+                                    .clone()
+                                    .unwrap_or_else(|| cx.strings().text(StringKey::WizardBack)),
+                            )
                             .secondary()
                             .control_size(self.size)
                             .semantic_parent(ident.semantic_id())
@@ -546,7 +551,7 @@ impl RenderOnce for Wizard {
                         cx,
                         NodeSpec::new(ident.child("back-target").semantic_id(), Role::Status)
                             .parent(ident.semantic_id())
-                            .text("Returns to")
+                            .text(cx.strings().text(StringKey::WizardReturnsTo))
                             .value(target),
                     )
             });
@@ -556,9 +561,13 @@ impl RenderOnce for Wizard {
             let finish = self.finish;
             let button = ident.child(if finish { "finish" } else { "next" });
             let label = if finish {
-                self.finish_label.clone()
+                self.finish_label
+                    .clone()
+                    .unwrap_or_else(|| cx.strings().text(StringKey::WizardFinish))
             } else {
-                self.next_label.clone()
+                self.next_label
+                    .clone()
+                    .unwrap_or_else(|| cx.strings().text(StringKey::WizardNext))
             };
             Button::new(button)
                 .label(label)

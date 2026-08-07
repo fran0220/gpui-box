@@ -7,6 +7,7 @@
 
 pub mod accordion;
 pub mod breadcrumb;
+pub mod collapsible;
 pub mod pagination;
 pub mod sidebar;
 pub mod tabs;
@@ -14,7 +15,8 @@ pub mod wizard;
 
 pub use accordion::{Accordion, AccordionSection};
 pub use breadcrumb::{Breadcrumb, Crumb};
+pub use collapsible::Collapsible;
 pub use pagination::{PageTotal, Pagination};
 pub use sidebar::{Sidebar, SidebarItem, SidebarSection};
-pub use tabs::{TabItem, Tabs};
+pub use tabs::{SaveState, TabItem, Tabs};
 pub use wizard::{StepStatus, Wizard, WizardIntent, WizardLayout, WizardStep};

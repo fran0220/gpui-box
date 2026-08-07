@@ -18,6 +18,7 @@ use crate::controls::field::{FieldState, field_shell};
 use crate::controls::input::{TextInput, TextInputEvent};
 use crate::display::tag::Tag;
 use crate::foundation::{Disableable, Ident, Selectable, Sizable, StyledExt};
+use crate::strings::{ActiveStrings, StringKey};
 
 /// What a tag field reports. The owner decides what any of it means.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -45,7 +46,7 @@ pub struct TagInput {
     focus_handle: FocusHandle,
     field: Entity<TextInput>,
     tags: Vec<SharedString>,
-    placeholder: SharedString,
+    placeholder: Option<SharedString>,
     max: Option<usize>,
     size: ControlSize,
     disabled: bool,
@@ -88,7 +89,7 @@ impl TagInput {
             focus_handle: cx.focus_handle(),
             field,
             tags: Vec::new(),
-            placeholder: SharedString::from("Add"),
+            placeholder: None,
             max: None,
             size: ControlSize::Md,
             disabled: false,
@@ -105,7 +106,7 @@ impl TagInput {
     }
 
     pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self {
-        self.placeholder = placeholder.into();
+        self.placeholder = Some(placeholder.into());
         self
     }
 
@@ -195,16 +196,17 @@ impl TagInput {
         let value = SharedString::from(trimmed.to_string());
 
         if self.tags.iter().any(|tag| tag == &value) {
-            self.refusal = Some(SharedString::from(format!("“{value}” is already here")));
+            self.refusal = Some(cx.strings().format(StringKey::TagInputDuplicate, &[&value]));
             cx.emit(TagInputEvent::Duplicate(value));
             cx.notify();
             return;
         }
         if self.is_full() {
             let max = self.max.unwrap_or_default();
-            self.refusal = Some(SharedString::from(format!(
-                "This field holds at most {max}; “{value}” was not added"
-            )));
+            self.refusal = Some(
+                cx.strings()
+                    .format(StringKey::TagInputFull, &[&max.to_string(), &value]),
+            );
             cx.emit(TagInputEvent::Refused(value));
             cx.notify();
             return;
@@ -271,7 +273,10 @@ impl Render for TagInput {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         if self.field.read(cx).placeholder_text().is_empty() {
-            let placeholder = self.placeholder.clone();
+            let placeholder = self
+                .placeholder
+                .clone()
+                .unwrap_or_else(|| cx.strings().text(StringKey::TagInputPlaceholder));
             self.field
                 .update(cx, |field, cx| field.set_placeholder(placeholder, cx));
         }
@@ -356,10 +361,13 @@ impl Render for TagInput {
                     div()
                         .type_scale(&theme, TypeScale::Caption)
                         .text_color(theme.colors.text_muted)
-                        .child(SharedString::from(format!(
-                            "{count} of {} used",
-                            self.max.unwrap_or_default()
-                        ))),
+                        .child(cx.strings().format(
+                            StringKey::TagInputUsed,
+                            &[
+                                &count.to_string(),
+                                &self.max.unwrap_or_default().to_string(),
+                            ],
+                        )),
                 )
             })
             .semantic_in(cx, spec)

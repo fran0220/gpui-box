@@ -28,6 +28,8 @@
 //!   component and finishes in another.
 //! - [`motion`] and [`effects`] — token-driven animation and paint.
 //! - [`state`] — the explicit async states a truthful surface distinguishes.
+//! - [`strings`] — every word this library shows, and the host's right to
+//!   replace any of them without losing the English behind the rest.
 //! - [`scenes`] — one canonical rendering per component, shared by the gallery,
 //!   the capture task, and the headless audit.
 //!
@@ -53,6 +55,7 @@
 //! # }
 //! ```
 
+pub mod agent;
 pub mod content;
 pub mod controls;
 pub mod data;
@@ -67,6 +70,8 @@ pub mod navigation;
 pub mod overlay;
 pub mod scenes;
 pub mod state;
+pub mod strings;
+pub mod structured;
 
 pub use gpui_kit_assets as assets;
 pub use gpui_kit_semantics as semantics;
@@ -77,16 +82,33 @@ use gpui::App;
 
 /// Everything a view needs to build with this library.
 pub mod prelude {
+    pub use crate::agent::approval::{
+        AlwaysScope, ApprovalDecision, ApprovalEvent, ApprovalPrompt, ApprovalStatus,
+    };
+    pub use crate::agent::cost::{
+        Basis, ContextGauge, CostLine, CostMeter, LastVerified, Limit, Quantity, Reading,
+    };
+    pub use crate::agent::permission::{
+        PermissionAction, PermissionChange, PermissionEntry, PermissionMatrix, PermissionSource,
+        PermissionState, PermissionSubject,
+    };
+    pub use crate::agent::server_list::{
+        Catalog, Offering, OfferingKind, ServerEntry, ServerList, ServerState,
+    };
+    pub use crate::agent::step_list::{RunLength, Step, StepList, StepState};
+    pub use crate::agent::thinking::{Reasoning, ThinkingBlock};
+    pub use crate::agent::tool_call::{Elapsed, ToolBody, ToolCallCard, ToolCallState, ToolOutput};
     pub use crate::content::{
-        Attachment, BufferedRange, CodeBlock, CodeSpan, DeliveryState, FitMode, ImageFrame,
-        ImageRequest, ImageSize, ImageState, ImageViewer, ImageViewerEvent, Markdown,
-        MarkdownEvent, Message, MessageBody, MessageList, Reaction, TrackStep, TransportBar,
-        TransportDuration, TransportEvent, TransportState,
+        Attachment, BufferedRange, CodeBlock, CodeLine, CodeSpan, CodeView, DeliveryState, FitMode,
+        ImageFrame, ImageRequest, ImageSize, ImageState, ImageViewer, ImageViewerEvent, LineMark,
+        Markdown, MarkdownEvent, Message, MessageBody, MessageList, Reaction, TrackStep,
+        TransportBar, TransportDuration, TransportEvent, TransportState,
     };
     pub use crate::controls::button::{
         Button, ButtonGroup, ButtonJoin, ButtonVariant, IconButton, IconPosition,
     };
     pub use crate::controls::combobox::{Combobox, ComboboxEvent};
+    pub use crate::controls::copy_button::{CopyButton, CopyEvent, CopyState};
     pub use crate::controls::dropzone::{Dropzone, DropzoneState};
     pub use crate::controls::field::{FieldState, field_shell};
     pub use crate::controls::filter_bar::{FilterBar, FilterCondition, ResultCount};
@@ -95,6 +117,9 @@ pub mod prelude {
     pub use crate::controls::input::{TextInput, TextInputEvent};
     pub use crate::controls::keybinding_recorder::{KeybindingRecorder, KeybindingRecorderEvent};
     pub use crate::controls::number_input::{NumberInput, NumberInputEvent};
+    pub use crate::controls::search::{
+        FindReplace, FindReplaceEvent, HitCount, SearchField, SearchFieldEvent,
+    };
     pub use crate::controls::segmented::{Segment, SegmentedControl};
     pub use crate::controls::select::{Select, SelectEvent, SelectOption};
     pub use crate::controls::settings_row::{SettingsRow, SettingsSection};
@@ -103,6 +128,8 @@ pub mod prelude {
     pub use crate::controls::tag_input::{TagInput, TagInputEvent};
     pub use crate::controls::textarea::{TextArea, TextAreaEvent};
     pub use crate::controls::toggle::{Checkbox, Radio, Switch};
+    pub use crate::controls::toggle_button::{Toggle, ToggleGroup, ToggleItem, ToggleSelection};
+    pub use crate::controls::upload_list::{OverallProgress, Upload, UploadList, UploadState};
     pub use crate::data::{
         Align, BulkBar, Cell, Column, ColumnWidth, DataGrid, EditIntent, EditOutcome, EditingCell,
         Expanded, GridColumn, GridRow, List, ListItem, Row, SelectionChange, SelectionMode,
@@ -122,12 +149,19 @@ pub mod prelude {
         DescriptionItem, DescriptionList, DescriptionValue,
     };
     pub use crate::display::empty::{Divider, EmptyKind, EmptyState};
+    pub use crate::display::failure_panel::FailurePanel;
+    pub use crate::display::highlight::HighlightedText;
+    pub use crate::display::icon::{Icon, IconTone};
     pub use crate::display::loading::{GradientSpinner, PulseLoader, Skeleton};
     pub use crate::display::progress::ProgressBar;
     pub use crate::display::progress_circle::ProgressCircle;
     pub use crate::display::status::{Callout, StatusDot, StatusLine};
     pub use crate::display::tag::Tag;
     pub use crate::display::timeline::{EntryTime, Timeline, TimelineEntry, TimelineGroup};
+    pub use crate::foundation::direction::{
+        ActiveDirection, DirectionalExt, LayoutDirection, LogicalSide, PhysicalSide,
+        set_layout_direction,
+    };
     pub use crate::foundation::{
         ActiveTheme, ControlSize, Density, Disableable, Elevation, FocusRing, HoverLift, Ident,
         Layer, Pressable, Selectable, Sizable, StyledExt, ThemeRegistry, activate_theme,
@@ -137,24 +171,32 @@ pub mod prelude {
         ActiveDrag, DragItem, DropAxis, DropIntent, DropPosition, StagedDrag,
     };
     pub use crate::layout::{
-        Dock, DockEvent, DockPanel, DockRegion, ScrollArea, ScrollAxis, SplitAxis, SplitChange,
-        SplitKind, SplitLayout, SplitPane, SplitPaneSpec, SplitRecord, SplitRecordError, SplitSide,
-        SplitTree, StatusBar, StatusGroup, StatusItem, Toolbar, ToolbarItem, scroll_offset,
+        AspectFit, AspectRatio, Dock, DockEvent, DockPanel, DockRegion, ScrollArea, ScrollAxis,
+        SplitAxis, SplitChange, SplitKind, SplitLayout, SplitPane, SplitPaneSpec, SplitRecord,
+        SplitRecordError, SplitSide, SplitTree, StatusBar, StatusGroup, StatusItem, Toolbar,
+        ToolbarItem, scroll_offset,
     };
     pub use crate::motion::{
         Flip, Flipping, Keyframe, Keyframes, Presence, ScrollLink, Transition, Velocity, flip,
     };
     pub use crate::navigation::{
-        Accordion, AccordionSection, Breadcrumb, Crumb, PageTotal, Pagination, Sidebar,
-        SidebarItem, SidebarSection, StepStatus, TabItem, Tabs, Wizard, WizardIntent, WizardLayout,
-        WizardStep,
+        Accordion, AccordionSection, Breadcrumb, Collapsible, Crumb, PageTotal, Pagination,
+        SaveState, Sidebar, SidebarItem, SidebarSection, StepStatus, TabItem, Tabs, Wizard,
+        WizardIntent, WizardLayout, WizardStep,
     };
     pub use crate::overlay::{
         Command, CommandPalette, CommandPaletteEvent, ContextMenu, ContextMenuEvent, Dialog,
-        DialogEvent, Drawer, DrawerEvent, Edge, FocusTrap, Kbd, Menu, MenuEvent, MenuItem, Overlay,
-        Placement, Popover, PopoverEvent, Toast, ToastCorner, ToastLayer, Tooltip, Tooltipped,
+        DialogEvent, Drawer, DrawerEvent, Edge, FocusTrap, HoverCard, HoverCardEvent, Kbd, Menu,
+        MenuEvent, MenuItem, Menubar, MenubarEvent, MenubarMenu, Notification, NotificationCenter,
+        NotificationCenterEvent, Overlay, Placement, Popover, PopoverEvent, Toast, ToastCorner,
+        ToastLayer, Tooltip, Tooltipped, UnreadCount,
     };
     pub use crate::state::{AsyncStatus, AsyncValue, Loadable};
+    pub use crate::strings::{ActiveStrings, StringKey, Strings, reset_strings, set_strings};
+    pub use crate::structured::{
+        FieldValue, JsonValue, JsonView, NumberBounds, Schema, SchemaChoice, SchemaField,
+        SchemaForm, SchemaFormEvent, SchemaKind, UnrenderableField, ValueKind,
+    };
 }
 
 /// Installs fonts, the theme global, and the semantic registry.
@@ -162,6 +204,8 @@ pub fn install(cx: &mut App) {
     gpui_kit_assets::register_fonts(cx);
     gpui_kit_theme::Theme::install(cx);
     gpui_kit_semantics::install(cx);
+    strings::install(cx);
+    foundation::direction::install(cx);
     interaction::install(cx);
     controls::input::install(cx);
     controls::textarea::install(cx);

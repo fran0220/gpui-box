@@ -4,6 +4,7 @@ use gpui::{App, IntoElement, RenderOnce, SharedString, Window, div, prelude::*, 
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 
 use crate::foundation::{ActiveTheme, Ident, StyledExt};
+use crate::strings::{ActiveStrings, StringKey, Strings};
 
 /// A keyboard shortcut, written the way the current platform writes it.
 ///
@@ -32,8 +33,12 @@ impl Kbd {
         self
     }
 
-    pub fn caps(&self) -> Vec<SharedString> {
-        caps(self.keystroke.as_ref(), cfg!(target_os = "macos"))
+    pub fn caps(&self, cx: &App) -> Vec<SharedString> {
+        caps(
+            self.keystroke.as_ref(),
+            cfg!(target_os = "macos"),
+            cx.strings(),
+        )
     }
 }
 
@@ -46,7 +51,7 @@ impl RenderOnce for Kbd {
         div()
             .row()
             .gap(px(theme.spacing.xs / 2.0))
-            .children(self.caps().into_iter().map(|cap| {
+            .children(self.caps(cx).into_iter().map(|cap| {
                 div()
                     .h(px(theme
                         .control
@@ -74,7 +79,7 @@ impl RenderOnce for Kbd {
 /// Splits a keystroke into the caps to draw.
 ///
 /// Written as a free function so the platform choice can be tested on any host.
-pub fn caps(keystroke: &str, macos: bool) -> Vec<SharedString> {
+pub fn caps(keystroke: &str, macos: bool, strings: &Strings) -> Vec<SharedString> {
     let mut modifiers = String::new();
     let mut caps: Vec<SharedString> = Vec::new();
     let parts: Vec<&str> = keystroke
@@ -86,7 +91,7 @@ pub fn caps(keystroke: &str, macos: bool) -> Vec<SharedString> {
     };
 
     for modifier in modifier_parts {
-        let label = modifier_label(modifier, macos);
+        let label = modifier_label(modifier, macos, strings);
         if macos {
             modifiers.push_str(&label);
         } else {
@@ -105,16 +110,16 @@ pub fn caps(keystroke: &str, macos: bool) -> Vec<SharedString> {
 
 /// The bundled faces carry none of the modifier symbols; the platform's own
 /// fallback draws them, which is why they are only ever reached under macOS.
-fn modifier_label(modifier: &str, macos: bool) -> String {
+fn modifier_label(modifier: &str, macos: bool, strings: &Strings) -> String {
     match (modifier, macos) {
         ("cmd" | "super" | "win", true) => "⌘".into(),
-        ("cmd" | "super" | "win", false) => "Win".into(),
+        ("cmd" | "super" | "win", false) => strings.text(StringKey::KbdSuper).to_string(),
         ("ctrl" | "control", true) => "⌃".into(),
-        ("ctrl" | "control", false) => "Ctrl".into(),
+        ("ctrl" | "control", false) => strings.text(StringKey::KbdControl).to_string(),
         ("alt" | "option", true) => "⌥".into(),
-        ("alt" | "option", false) => "Alt".into(),
+        ("alt" | "option", false) => strings.text(StringKey::KbdAlt).to_string(),
         ("shift", true) => "⇧".into(),
-        ("shift", false) => "Shift".into(),
+        ("shift", false) => strings.text(StringKey::KbdShift).to_string(),
         (other, _) => capitalize(other),
     }
 }
@@ -152,13 +157,16 @@ mod tests {
 
     #[test]
     fn macos_composes_modifiers_into_one_cap() {
-        assert_eq!(caps("cmd-shift-p", true), vec![SharedString::from("⌘⇧P")]);
+        assert_eq!(
+            caps("cmd-shift-p", true, &Strings::new()),
+            vec![SharedString::from("⌘⇧P")]
+        );
     }
 
     #[test]
     fn other_platforms_spell_each_modifier_out() {
         assert_eq!(
-            caps("ctrl-shift-p", false),
+            caps("ctrl-shift-p", false, &Strings::new()),
             vec![
                 SharedString::from("Ctrl"),
                 SharedString::from("Shift"),
@@ -169,13 +177,22 @@ mod tests {
 
     #[test]
     fn named_keys_use_their_symbols_where_the_platform_expects_them() {
-        assert_eq!(caps("enter", true), vec![SharedString::from("⏎")]);
-        assert_eq!(caps("enter", false), vec![SharedString::from("Enter")]);
-        assert_eq!(caps("up", false), vec![SharedString::from("↑")]);
+        assert_eq!(
+            caps("enter", true, &Strings::new()),
+            vec![SharedString::from("⏎")]
+        );
+        assert_eq!(
+            caps("enter", false, &Strings::new()),
+            vec![SharedString::from("Enter")]
+        );
+        assert_eq!(
+            caps("up", false, &Strings::new()),
+            vec![SharedString::from("↑")]
+        );
     }
 
     #[test]
     fn an_empty_keystroke_draws_nothing() {
-        assert!(caps("", true).is_empty());
+        assert!(caps("", true, &Strings::new()).is_empty());
     }
 }

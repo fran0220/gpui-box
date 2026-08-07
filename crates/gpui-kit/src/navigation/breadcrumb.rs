@@ -14,7 +14,9 @@ use gpui::{
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Space, TypeScale};
 
+use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{FocusRing, Ident, Pressable, StyledExt};
+use crate::strings::{ActiveStrings, StringKey};
 
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 type RevealHandler = Rc<dyn Fn(Vec<SharedString>, &mut Window, &mut App)>;
@@ -130,8 +132,11 @@ impl RenderOnce for Breadcrumb {
         let theme = cx.theme().clone();
         let (head, hidden, tail) = self.split();
         let shown = head.len() + tail.len();
+        // The trail runs from the root to here, and "from" is where reading
+        // starts, so the strip follows the reading direction rather than the
+        // left edge.
         let mut trail = div()
-            .row()
+            .row_reading(cx.layout_direction())
             .flex_wrap()
             .gap(px(theme.space(Space::Xs)))
             .type_scale(&theme, TypeScale::Label);
@@ -213,11 +218,12 @@ impl Breadcrumb {
         let ident = self.ident.child("collapsed");
         let ids: Vec<SharedString> = hidden.iter().map(|crumb| crumb.id.clone()).collect();
         let count = ids.len();
-        let label = SharedString::from(if count == 1 {
-            "1 hidden level".to_string()
+        let label = if count == 1 {
+            cx.strings().text(StringKey::BreadcrumbHiddenOne)
         } else {
-            format!("{count} hidden levels")
-        });
+            cx.strings()
+                .format(StringKey::BreadcrumbHiddenMany, &[&count.to_string()])
+        };
         let actionable = self.on_reveal.is_some();
 
         let mut element = div()

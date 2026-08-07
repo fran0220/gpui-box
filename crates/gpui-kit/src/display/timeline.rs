@@ -23,6 +23,7 @@ use gpui_kit_theme::{ActiveTheme, Space, Theme, TypeScale};
 use crate::display::badge::Tone;
 use crate::display::status::StatusDot;
 use crate::foundation::{Ident, StyledExt};
+use crate::strings::{ActiveStrings, StringKey};
 
 /// How wide the column holding the rail and its dots is.
 const RAIL: f32 = 16.0;
@@ -46,10 +47,10 @@ impl EntryTime {
     }
 
     /// The words a reader sees, including the ones for a time nobody knows.
-    pub(crate) fn shown(&self) -> SharedString {
+    pub(crate) fn shown(&self, cx: &App) -> SharedString {
         match self {
             Self::At(time) => time.clone(),
-            Self::Unknown => SharedString::new_static("Time unknown"),
+            Self::Unknown => cx.strings().text(StringKey::TimeUnknown),
         }
     }
 }
@@ -331,7 +332,7 @@ fn entry_element(
                 } else {
                     theme.colors.text_muted
                 })
-                .child(entry.time.shown()),
+                .child(entry.time.shown(cx)),
         )
         .children(entry.actor.clone().map(|actor| {
             div()

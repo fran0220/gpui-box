@@ -50,6 +50,7 @@ use crate::layout::tree::{SplitChange, SplitLayout, SplitPaneSpec, SplitTree};
 use crate::motion::{Flipping, flip};
 use crate::navigation::tabs::{TabItem, Tabs};
 use crate::overlay::Tooltipped;
+use crate::strings::{ActiveStrings, StringKey};
 
 /// How wide a collapsed region's rail is, and how deep a collapsed bottom
 /// region's is. The value occurs only here.
@@ -435,7 +436,7 @@ impl Dock {
             .filter(|_| !self.disabled)
             .map(|handler| {
                 let button = ident.child("collapse");
-                let name = SharedString::new_static("Collapse region");
+                let name = cx.strings().text(StringKey::DockCollapseRegion);
                 div()
                     .id(button.element_id())
                     .flex_none()

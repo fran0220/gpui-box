@@ -17,11 +17,14 @@ use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, Theme, TypeScale};
 
+use crate::strings::{ActiveStrings, StringKey};
+
 use crate::controls::button::IconButton;
 use crate::datetime::adapter::{Day, MonthCell, MonthGrid, MonthKey, SharedDateAdapter};
 use crate::datetime::range::DayRange;
 use crate::display::badge::Tone;
 use crate::display::empty::{EmptyKind, EmptyState};
+use crate::foundation::direction::ActiveDirection;
 use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
 use crate::motion;
 use crate::overlay::Tooltipped;
@@ -358,36 +361,44 @@ impl Calendar {
         if self.disabled {
             return;
         }
-        let motion = match event.keystroke.key.as_str() {
-            "left" => Motion::PreviousDay,
-            "right" => Motion::NextDay,
-            "up" => Motion::PreviousWeek,
-            "down" => Motion::NextWeek,
-            "home" => Motion::WeekStart,
-            "end" => Motion::WeekEnd,
-            "pageup" => {
-                self.shift(-1, cx);
-                cx.stop_propagation();
-                return;
-            }
-            "pagedown" => {
-                self.shift(1, cx);
-                cx.stop_propagation();
-                return;
-            }
-            "enter" | "space" => {
-                if let Some(day) = self.cursor {
-                    self.pick(day, cx);
-                } else if let Some(grid) = self.grid()
-                    && let Some(day) = self.anchor(&grid)
-                {
-                    self.cursor = Some(day);
-                    cx.notify();
+        // A month grid is laid out in reading order, so the horizontal arrows
+        // step through the calendar, not across the screen: the arrow that
+        // reaches yesterday is the one pointing back the way the row was
+        // written.
+        let direction = cx.layout_direction();
+        let key = event.keystroke.key.as_str();
+        let motion = match direction.arrow_step(key) {
+            Some(1) => Motion::NextDay,
+            Some(_) => Motion::PreviousDay,
+            None => match key {
+                "up" => Motion::PreviousWeek,
+                "down" => Motion::NextWeek,
+                "home" => Motion::WeekStart,
+                "end" => Motion::WeekEnd,
+                "pageup" => {
+                    self.shift(-1, cx);
+                    cx.stop_propagation();
+                    return;
                 }
-                cx.stop_propagation();
-                return;
-            }
-            _ => return,
+                "pagedown" => {
+                    self.shift(1, cx);
+                    cx.stop_propagation();
+                    return;
+                }
+                "enter" | "space" => {
+                    if let Some(day) = self.cursor {
+                        self.pick(day, cx);
+                    } else if let Some(grid) = self.grid()
+                        && let Some(day) = self.anchor(&grid)
+                    {
+                        self.cursor = Some(day);
+                        cx.notify();
+                    }
+                    cx.stop_propagation();
+                    return;
+                }
+                _ => return,
+            },
         };
         self.move_cursor(motion, cx);
         cx.stop_propagation();
@@ -397,7 +408,7 @@ impl Calendar {
         let theme = cx.theme().clone();
         let label = month
             .map(|month| self.adapter.month_label(month))
-            .unwrap_or_else(|| SharedString::new_static("No month to show"));
+            .unwrap_or_else(|| cx.strings().text(StringKey::CalendarNoMonth));
         let can_move = month.is_some() && !self.disabled;
         let calendar = cx.entity().downgrade();
         let backward = calendar.clone();
@@ -410,7 +421,7 @@ impl Calendar {
                 IconButton::new(
                     self.ident.child("previous"),
                     Icon::AltArrowLeft,
-                    SharedString::new_static("Previous month"),
+                    cx.strings().text(StringKey::CalendarPreviousMonth),
                 )
                 .ghost()
                 .small()
@@ -434,7 +445,7 @@ impl Calendar {
                 IconButton::new(
                     self.ident.child("next"),
                     Icon::AltArrowRight,
-                    SharedString::new_static("Next month"),
+                    cx.strings().text(StringKey::CalendarNextMonth),
                 )
                 .ghost()
                 .small()
@@ -661,13 +672,10 @@ impl Render for Calendar {
             }
             _ => EmptyState::new(
                 self.ident.child("unknown-month"),
-                "This calendar does not know which month to show",
+                cx.strings().text(StringKey::CalendarUnknownMonth),
             )
             .kind(EmptyKind::Unavailable)
-            .detail(
-                "Nothing is selected, the host has not said what day it is, and no month was \
-                 given.",
-            )
+            .detail(cx.strings().text(StringKey::CalendarUnknownMonthDetail))
             .into_any_element(),
         };
 

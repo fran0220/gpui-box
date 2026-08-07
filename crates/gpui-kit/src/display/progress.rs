@@ -9,6 +9,7 @@ use gpui_kit_theme::{ActiveTheme, Space};
 
 use crate::foundation::Ident;
 use crate::motion::{self, AnimationExt as _, MotionSpec};
+use crate::strings::{ActiveStrings, StringKey};
 
 /// What a progress surface knows about the work, and how it says so.
 ///
@@ -19,8 +20,13 @@ use crate::motion::{self, AnimationExt as _, MotionSpec};
 pub(crate) struct ProgressValue {
     /// `None` means the extent of the work is unknown.
     pub fraction: Option<f32>,
-    /// What to show beside the label, such as `"3 of 12"`.
+    /// What to show beside the label, such as `"3 of 12"`, when the caller
+    /// worded it itself.
     pub display: Option<SharedString>,
+    /// The work counted, when the caller gave a count rather than a wording.
+    /// It stays a pair of numbers until render, because the sentence around
+    /// them belongs to the installed catalogue and not to this struct.
+    pub count: Option<(usize, usize)>,
 }
 
 impl ProgressValue {
@@ -32,7 +38,7 @@ impl ProgressValue {
     /// is zero, because no fraction exists to report.
     pub(crate) fn set_count(&mut self, done: usize, total: usize) {
         self.fraction = (total > 0).then(|| (done as f32 / total as f32).clamp(0.0, 1.0));
-        self.display = Some(SharedString::from(format!("{done} of {total}")));
+        self.count = Some((done, total));
     }
 
     pub(crate) fn is_indeterminate(&self) -> bool {
@@ -41,7 +47,20 @@ impl ProgressValue {
 
     /// The node both surfaces publish: busy always, a position only when the
     /// extent is known.
-    pub(crate) fn spec(&self, id: SharedString, label: Option<SharedString>) -> NodeSpec {
+    /// What a reader sees beside the label: the caller's own wording first,
+    /// then a counted position worded by the catalogue.
+    pub(crate) fn shown(&self, cx: &App) -> Option<SharedString> {
+        self.display.clone().or_else(|| {
+            self.count.map(|(done, total)| {
+                cx.strings().format(
+                    StringKey::CountOfTotal,
+                    &[&done.to_string(), &total.to_string()],
+                )
+            })
+        })
+    }
+
+    pub(crate) fn spec(&self, id: SharedString, label: Option<SharedString>, cx: &App) -> NodeSpec {
         let mut spec = NodeSpec::new(id, Role::Progress).busy(true);
         if let Some(fraction) = self.fraction {
             spec = spec.range(0.0, 1.0, fraction);
@@ -49,7 +68,7 @@ impl ProgressValue {
         if let Some(label) = label {
             spec = spec.text(label);
         }
-        if let Some(display) = self.display.clone() {
+        if let Some(display) = self.shown(cx) {
             spec = spec.value(display);
         }
         spec
@@ -118,8 +137,8 @@ impl RenderOnce for ProgressBar {
 
         let spec = self
             .value
-            .spec(self.ident.semantic_id(), self.label.clone());
-        let display = self.value.display.clone();
+            .spec(self.ident.semantic_id(), self.label.clone(), cx);
+        let display = self.value.shown(cx);
 
         div()
             .flex()

@@ -39,6 +39,7 @@ use crate::display::status::StatusDot;
 use crate::foundation::{FocusRing, Ident, Sizable, StyledExt};
 use crate::motion::{Easing, Flipping, MotionSpec, Phase, Presence, flip};
 use crate::overlay::layer::{pinned, priority, surface};
+use crate::strings::{ActiveStrings, StringKey};
 
 /// How many toasts stand in the stack before one is evicted to make room.
 const DEFAULT_CAPACITY: usize = 3;
@@ -465,7 +466,7 @@ impl ToastLayer {
                     cx,
                     NodeSpec::new(dismiss_ident.semantic_id(), Role::Button)
                         .parent(id.clone())
-                        .text("Dismiss"),
+                        .text(cx.strings().text(StringKey::Dismiss)),
                 );
             let clicked = {
                 let layer = layer.clone();

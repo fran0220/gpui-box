@@ -18,6 +18,7 @@ use crate::datetime::calendar::{Calendar, CalendarEvent, DayMark};
 use crate::display::badge::Tone;
 use crate::display::status::StatusLine;
 use crate::foundation::{Disableable, Ident, StyledExt};
+use crate::strings::{ActiveStrings, StringKey};
 
 /// A range as the caller holds it: a start, and an end once there is one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -251,33 +252,35 @@ impl RangePicker {
         }
     }
 
-    fn summary(&self) -> (SharedString, Tone) {
+    fn summary(&self, cx: &App) -> (SharedString, Tone) {
+        let strings = cx.strings();
         match self.state() {
-            RangeState::Unset => (
-                SharedString::new_static("No range chosen yet."),
-                Tone::Neutral,
-            ),
+            RangeState::Unset => (strings.text(StringKey::RangeUnset), Tone::Neutral),
             RangeState::Incomplete { start } => (
-                SharedString::from(format!(
-                    "{} to an end that has not been chosen yet.",
-                    self.adapter.format_day(start)
-                )),
+                strings.format(
+                    StringKey::RangeIncomplete,
+                    &[self.adapter.format_day(start).as_ref()],
+                ),
                 Tone::Info,
             ),
             RangeState::Complete { start, end } => (
-                SharedString::from(format!(
-                    "{} to {}.",
-                    self.adapter.format_day(start),
-                    self.adapter.format_day(end)
-                )),
+                strings.format(
+                    StringKey::RangeComplete,
+                    &[
+                        self.adapter.format_day(start).as_ref(),
+                        self.adapter.format_day(end).as_ref(),
+                    ],
+                ),
                 Tone::Success,
             ),
             RangeState::Inverted { start, end } => (
-                SharedString::from(format!(
-                    "The end, {}, comes before the start, {}.",
-                    self.adapter.format_day(end),
-                    self.adapter.format_day(start)
-                )),
+                strings.format(
+                    StringKey::RangeInverted,
+                    &[
+                        self.adapter.format_day(end).as_ref(),
+                        self.adapter.format_day(start).as_ref(),
+                    ],
+                ),
                 Tone::Warning,
             ),
         }
@@ -303,7 +306,7 @@ impl Render for RangePicker {
         let range = self.range;
         self.calendar
             .update(cx, |calendar, cx| calendar.set_range(range, cx));
-        let (summary, tone) = self.summary();
+        let (summary, tone) = self.summary(cx);
         let state = self.state();
         let blocked = self.blocked();
 
@@ -312,19 +315,13 @@ impl Render for RangePicker {
                 div()
                     .type_scale(&theme, TypeScale::Caption)
                     .text_color(theme.colors.text_muted)
-                    .child(SharedString::new_static(
-                        "The host cannot list the days in this range, so none of them were \
-                         checked.",
-                    ))
+                    .child(cx.strings().text(StringKey::RangeUncheckable))
                     .semantic_in(
                         cx,
-                        NodeSpec::new(
-                            self.ident.child("blocked").semantic_id(),
-                            Role::Status,
-                        )
-                        .parent(self.ident.semantic_id())
-                        .value("unchecked")
-                        .text("The host cannot list the days in this range, so none of them were checked."),
+                        NodeSpec::new(self.ident.child("blocked").semantic_id(), Role::Status)
+                            .parent(self.ident.semantic_id())
+                            .value("unchecked")
+                            .text(cx.strings().text(StringKey::RangeUncheckable)),
                     ),
             ),
             _ => None,
@@ -335,11 +332,13 @@ impl Render for RangePicker {
                 .iter()
                 .map(|blocked| {
                     let ident = self.ident.child(format!("blocked-{}", blocked.day.0));
-                    let text = SharedString::from(format!(
-                        "{}: {}",
-                        self.adapter.format_day(blocked.day),
-                        blocked.reason
-                    ));
+                    let text = cx.strings().format(
+                        StringKey::RangeBlockedDay,
+                        &[
+                            self.adapter.format_day(blocked.day).as_ref(),
+                            blocked.reason.as_ref(),
+                        ],
+                    );
                     div()
                         .type_scale(&theme, TypeScale::Caption)
                         .text_color(theme.colors.warning)
