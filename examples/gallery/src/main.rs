@@ -1738,7 +1738,11 @@ async fn settled_frame(
         if previous.is_some_and(|previous| *previous == frame) {
             // Still showing the image just written. Ask for the frame again
             // rather than only waiting: a single redraw request that did not
-            // land would otherwise wedge this loop until it gave up.
+            // land would otherwise wedge this loop until it gave up. Claiming
+            // the foreground again belongs here too, because anything that
+            // took it during the run stops the window being composited, and
+            // this is the only symptom that has.
+            cx.update(|cx| cx.activate(true));
             window.update(cx, |_, window, _| window.refresh())?;
             last = None;
             continue;
