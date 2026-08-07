@@ -536,6 +536,15 @@ struct ScrollHandles(RefCell<HashMap<SharedString, UniformListScrollHandle>>);
 
 impl Global for ScrollHandles {}
 
+/// Brings row `index` of the list with this identity into view.
+///
+/// Scroll position belongs to the list, not to whoever draws over it, so a
+/// surface built on a list — a conversation that follows its newest message —
+/// moves it by naming the list rather than by owning a GPUI handle of its own.
+pub fn scroll_to_row(ident: &Ident, index: usize, cx: &mut App) {
+    scroll_handle(ident, cx).scroll_to_item(index, ScrollStrategy::Bottom);
+}
+
 /// The scroll position of the list with this identity.
 ///
 /// Where a list is scrolled is transient view state, but a `RenderOnce`

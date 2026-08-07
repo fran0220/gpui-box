@@ -128,6 +128,7 @@ effects. See [`docs/compatibility.md`](docs/compatibility.md).
 - [Motion](docs/motion.md)
 - [Drag and drop](docs/interaction.md)
 - [Date and time](docs/datetime.md)
+- [Markdown and conversation](docs/content.md)
 - [Migration guide](docs/migration-guide.md)
 - [Agent Skill](skills/building-gpui-product-ui/SKILL.md)
 

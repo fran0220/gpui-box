@@ -12,6 +12,9 @@
 //!   [`Ident`](foundation::Ident), [`Disableable`](foundation::Disableable),
 //!   [`Sizable`](foundation::Sizable), [`Selectable`](foundation::Selectable),
 //!   and the one focus ring, [`FocusRing`](foundation::FocusRing).
+//! - [`content`] — rendered Markdown and a conversation, the two surfaces that
+//!   draw text nobody in this crate wrote. Nothing here executes HTML, opens a
+//!   link, or fetches an image.
 //! - [`controls`] — actions and editable fields.
 //! - [`display`] — status, grouping, and waiting vocabulary.
 //! - [`navigation`] — tabs, accordions, trails, rails, and pages.
@@ -37,6 +40,8 @@
 //! - `docs/token-model.md` — where visible values come from.
 //! - `docs/interaction.md` — the drag contract: what a drop reports, what a
 //!   drag publishes, and what the host has to do with it.
+//! - `docs/content.md` — what a rendered document is not allowed to do, and
+//!   what a conversation's five delivery states mean.
 //!
 //! ```no_run
 //! # use gpui_kit::prelude::*;
@@ -48,6 +53,7 @@
 //! # }
 //! ```
 
+pub mod content;
 pub mod controls;
 pub mod data;
 pub mod datetime;
@@ -71,6 +77,10 @@ use gpui::App;
 
 /// Everything a view needs to build with this library.
 pub mod prelude {
+    pub use crate::content::{
+        Attachment, CodeBlock, CodeSpan, DeliveryState, ImageRequest, Markdown, MarkdownEvent,
+        Message, MessageBody, MessageList, Reaction,
+    };
     pub use crate::controls::button::{
         Button, ButtonGroup, ButtonJoin, ButtonVariant, IconButton, IconPosition,
     };

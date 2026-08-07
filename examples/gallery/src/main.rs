@@ -950,6 +950,8 @@ impl Render for Gallery {
                     .child(progress_circle_section(&theme))
                     .child(recipes::section_title(&theme, "Date and time"))
                     .child(datetime_section(&theme, window, cx))
+                    .child(recipes::section_title(&theme, "Conversation and prose"))
+                    .child(conversation_section(&theme, cx))
                     .child(recipes::section_title(&theme, "Drawer"))
                     .child({
                         let drawer = self.filter_drawer.clone();
@@ -2303,4 +2305,186 @@ fn datetime_section(theme: &Theme, window: &mut Window, cx: &mut App) -> gpui::A
              adapter's own sentence under it.",
         ))
         .into_any_element()
+}
+
+/// The document the prose section renders.
+const GALLERY_DOCUMENT: &str = r#"## What the run reported
+
+The build is **green** again, with *one* caveat and a ~~withdrawn~~ fix. The
+full output is in [the run log](https://example.test/runs/4821 "run 4821").
+
+- [x] Bounded retries
+- [ ] Bounded backoff
+
+> A refused request is displayed as a refusal.
+
+```rust
+fn main() {
+    println!("still green");
+}
+```
+
+| Stage | Result |
+|:------|-------:|
+| Build | passed |
+| Test  | passed |
+
+<div onclick="steal()">This was written as HTML by whoever wrote the document.</div>
+
+![The run graph](runs/graph.png)"#;
+
+/// The conversation the window holds on the components' behalf.
+///
+/// A message list moves nothing: a retry is a request, so the state below
+/// changes only because this window applied what was reported.
+#[derive(Debug)]
+struct GalleryThread {
+    messages: Vec<Message>,
+}
+
+impl Global for GalleryThread {}
+
+fn gallery_thread() -> Vec<Message> {
+    vec![
+        Message::new("msg-open", "Is the release still blocked?")
+            .author("Ada")
+            .time("09:14")
+            .delivery(DeliveryState::Read),
+        Message::markdown(
+            "msg-answer",
+            "It is not. The **retry bound** landed, so the last failure is gone.",
+        )
+        .author("Grace")
+        .time("09:15")
+        .delivery(DeliveryState::Delivered)
+        .reaction(Reaction::new("thumbs", "👍", 2)),
+        Message::new("msg-log", "Attaching the run log.")
+            .author("Grace")
+            .time("09:15")
+            .delivery(DeliveryState::Sent)
+            .attachment(Attachment::new("run-4821", "run-4821.log").detail("12 KB")),
+        Message::new("msg-queued", "Then I will publish the artifacts.")
+            .author("Ada")
+            .delivery(DeliveryState::Sending),
+        Message::new("msg-refused", "Publishing the artifacts now.")
+            .author("Ada")
+            .time("09:16")
+            .failed("The workspace is frozen for the release."),
+        Message::markdown("msg-stream", "Checking the freeze window")
+            .author("Assistant")
+            .time("09:16")
+            .streaming(true)
+            .delivery(DeliveryState::Sending),
+    ]
+}
+
+fn conversation_section(theme: &Theme, cx: &mut App) -> gpui::AnyElement {
+    if !cx.has_global::<GalleryThread>() {
+        cx.set_global(GalleryThread {
+            messages: gallery_thread(),
+        });
+    }
+    let messages = cx.global::<GalleryThread>().messages.clone();
+
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(theme.spacing.lg))
+        .child(
+            MessageList::new("gallery.thread", messages.clone())
+                .group_consecutive(true)
+                .body_lines(2)
+                .on_retry(|id, _, cx| {
+                    // The window applies the retry; the list only asked for it.
+                    cx.update_global::<GalleryThread, ()>(|thread, _| {
+                        for message in &mut thread.messages {
+                            if message.id() == &id {
+                                *message = message.clone().delivery(DeliveryState::Sending);
+                            }
+                        }
+                    });
+                    toast::push(
+                        cx,
+                        Toast::new("gallery.thread.retried", "Asked the host to try again")
+                            .tone(Tone::Info),
+                    );
+                    cx.refresh_windows();
+                })
+                .on_markdown(|_, event, _, cx| report_markdown(event, cx)),
+        )
+        .child(recipes::footnote(
+            theme,
+            "The failed message keeps its text and its reason, and offers a retry that only \
+             reports. Retrying above changes what is drawn because this window applied it.",
+        ))
+        .child(
+            div().h(px(220.0)).child(
+                MessageList::new("gallery.thread.behind", messages)
+                    .visible_rows(2)
+                    .body_lines(2)
+                    .on_retry(|_, _, _| {}),
+            ),
+        )
+        .child(recipes::footnote(
+            theme,
+            "A viewport shorter than the thread opens at its top, so the list says how many \
+             messages are past the view rather than letting them be discovered by scrolling.",
+        ))
+        .child(
+            Markdown::new("gallery.markdown", GALLERY_DOCUMENT)
+                .image(|request, _, cx| {
+                    let theme = Theme::get(cx).clone();
+                    Some(
+                        div()
+                            .w(px(220.0))
+                            .h(px(64.0))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .rounded(px(theme.radii.card))
+                            .bg(theme.colors.raised)
+                            .text_color(theme.colors.text_muted)
+                            .child(SharedString::from(format!(
+                                "Fixture image for {}",
+                                request.alt
+                            )))
+                            .into_any_element(),
+                    )
+                })
+                .on_event(|event, _, cx| report_markdown(event, cx)),
+        )
+        .child(recipes::footnote(
+            theme,
+            "The HTML above was rendered as the characters somebody wrote, not run. The link \
+             shows where it goes before it is taken and reports the click; this window decides \
+             what opening it means. The image was drawn by this window, because the library \
+             fetches nothing.",
+        ))
+        .child(
+            Markdown::new("gallery.markdown.short", GALLERY_DOCUMENT)
+                .max_lines(4)
+                .on_event(|event, _, cx| report_markdown(event, cx)),
+        )
+        .child(recipes::footnote(
+            theme,
+            "The same document cut to four lines states how many it left out, and offers them \
+             by name rather than fading them away.",
+        ))
+        .into_any_element()
+}
+
+/// What the window does with a report from a rendered document.
+fn report_markdown(event: &MarkdownEvent, cx: &mut App) {
+    let note = match event {
+        MarkdownEvent::LinkClicked { href } => {
+            format!("The document asked to open {href}")
+        }
+        MarkdownEvent::ImageRequested { src, .. } => format!("The document referred to {src}"),
+        MarkdownEvent::CodeCopied { .. } => "The code block is on the clipboard".to_string(),
+        MarkdownEvent::MoreRequested { lines } => format!("{lines} more lines were asked for"),
+    };
+    toast::push(
+        cx,
+        Toast::new("gallery.markdown.note", SharedString::from(note)).tone(Tone::Info),
+    );
 }

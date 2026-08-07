@@ -45,7 +45,8 @@ impl EntryTime {
         }
     }
 
-    fn shown(&self) -> SharedString {
+    /// The words a reader sees, including the ones for a time nobody knows.
+    pub(crate) fn shown(&self) -> SharedString {
         match self {
             Self::At(time) => time.clone(),
             Self::Unknown => SharedString::new_static("Time unknown"),

@@ -288,6 +288,50 @@ The reference calendar the scenes and tests run on is behind the `fixtures`
 cargo feature, off by default, so a host cannot reach a half-correct calendar
 from the component path.
 
+## Content
+
+| Component | Kind | Reports | Notes |
+|---|---|---|---|
+| `Markdown` | builder | a link that was taken, an image it did not fetch, a code block that was copied, and the lines truncation left out | Read-only rendered Markdown: headings, prose, emphasis, code, quotes, nested and task lists, links, images, rules, and tables. It parses to an owned tree first and draws that, so what is rendered is what a test can read |
+| `MessageList` | builder | a failed message that should be tried again, and whatever a Markdown body reported | A conversation over the virtualized `List`. Five delivery states, a streaming mark keyed to the message rather than to its text, caller-declared grouping, and following that happens only while the reader is already at the bottom |
+
+### A document is drawn, never obeyed
+
+`Markdown` renders text nobody in the application wrote, so it does nothing
+that text asks for. Raw HTML is drawn as the literal characters somebody typed,
+marked `unrendered html`, because interpreting it would let a document reach
+outside its own text and dropping it would let a document hide its own contents
+from the reader. A link states its destination in hover help and in its node's
+`value` before it is taken, and taking it reports `LinkClicked`; this crate
+opens nothing. An image is never fetched — the crate has no network — so it is
+drawn as a placeholder naming its alt text and its source and reported once as
+`ImageRequested`, and a host that holds the bytes supplies an element through
+`Markdown::image`. A fenced block publishes its info string exactly as written,
+`plain text` when there is none, and is coloured only from spans the host
+computed. `docs/content.md` is the whole posture.
+
+`max_lines` cuts to a line count and says how many lines it left out, offering
+them by name rather than behind a fade: a gradient over the last line says
+something was cut without saying how much.
+
+### A failure stays on screen
+
+`MessageList` keeps `Sending`, `Sent`, `Delivered`, `Read`, and
+`Failed { reason }` apart as five renderings, because collapsing the middle
+three into one tick says less than the host knows and folding the last into any
+of them says something untrue. A failed message keeps its place and its full
+text, states the host's reason word for word, and gains one control that
+reports the retry. Nothing is resent and nothing is removed.
+
+Whether consecutive messages from one author are one turn is
+`group_consecutive`, declared by the caller for the same reason
+`Toolbar::overflow_after` is. Following a new message happens only while the
+reader is already at the bottom; when it does not follow it publishes the
+count — `3 new messages` for arrivals, `3 more messages` for what has always
+been below — which is `ScrollArea`'s "content continues past the view" rule on
+a surface that grows downward. Times are strings the host already wrote, as in
+`Timeline`, and an unrecorded author is `unknown` rather than blank.
+
 ## Interaction
 
 | Component | Kind | Reports | Notes |

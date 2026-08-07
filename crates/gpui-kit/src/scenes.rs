@@ -241,6 +241,14 @@ pub fn catalog() -> Vec<Scene> {
             name: "keybinding",
             build: keybinding,
         },
+        Scene {
+            name: "markdown",
+            build: markdown,
+        },
+        Scene {
+            name: "conversation",
+            build: conversation,
+        },
     ];
     #[cfg(feature = "fixtures")]
     scenes.extend([
@@ -3069,6 +3077,122 @@ mod dates {
 
 #[cfg(feature = "fixtures")]
 use dates::{calendar, date_range, date_time};
+
+/// A document with one of every block kind in it, including a tag nobody ran.
+const SCENE_DOCUMENT: &str = r#"# Release notes
+
+The build is **green** again, with *one* caveat and a ~~withdrawn~~ fix.
+Details are in [the run log](https://example.test/runs/4821 "the failing run").
+
+## What changed
+
+- Retries are bounded
+  - and the bound is stated
+- Refusals keep their reason
+
+1. Verify the workspace
+2. Publish the artifacts
+
+- [x] Bounded retries
+- [ ] Bounded backoff
+
+> A refused request is displayed as a refusal.
+
+```rust
+fn main() {
+    println!("still green");
+}
+```
+
+| Stage | Result |
+|:------|-------:|
+| Build | passed |
+| Test  | passed |
+
+<div onclick="steal()">This was written as HTML.</div>
+
+![The run graph](runs/graph.png "yesterday's run")
+
+---
+
+Everything below this line is what truncation leaves out."#;
+
+fn markdown(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(640.0))
+        .child(Markdown::new("scene.markdown.document", SCENE_DOCUMENT).on_event(|_, _, _| {}))
+        .child(Divider::new().id("scene.markdown.rule").label("Truncated"))
+        .child(
+            Markdown::new("scene.markdown.short", SCENE_DOCUMENT)
+                .max_lines(4)
+                .on_event(|_, _, _| {}),
+        )
+        .into_any_element()
+}
+
+/// The thread the conversation scene shows, one message per delivery state.
+fn scene_thread() -> Vec<Message> {
+    vec![
+        Message::new("msg-open", "Is the release still blocked?")
+            .author("Ada")
+            .time("09:14")
+            .delivery(DeliveryState::Read),
+        Message::markdown(
+            "msg-answer",
+            "It is not. The **retry bound** landed, so the last failure is gone.",
+        )
+        .author("Grace")
+        .time("09:15")
+        .delivery(DeliveryState::Delivered)
+        .reaction(Reaction::new("thumbs", "👍", 2)),
+        Message::new("msg-log", "Attaching the run log.")
+            .author("Grace")
+            .time("09:15")
+            .delivery(DeliveryState::Sent)
+            .attachment(Attachment::new("run-4821", "run-4821.log").detail("12 KB")),
+        Message::new("msg-queued", "Then I will publish the artifacts.")
+            .author("Ada")
+            .delivery(DeliveryState::Sending),
+        Message::new("msg-refused", "Publishing the artifacts now.")
+            .author("Ada")
+            .time("09:16")
+            .failed("The workspace is frozen for the release."),
+        Message::markdown("msg-stream", "Checking the freeze window")
+            .author("Assistant")
+            .time("09:16")
+            .streaming(true)
+            .delivery(DeliveryState::Sending),
+    ]
+}
+
+fn conversation(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(560.0))
+        .child(
+            MessageList::new("scene.conversation.thread", scene_thread())
+                .group_consecutive(true)
+                .body_lines(2)
+                .on_retry(|_, _, _| {})
+                .on_markdown(|_, _, _, _| {}),
+        )
+        .child(
+            Divider::new()
+                .id("scene.conversation.rule")
+                .label("Scrolled away from the newest message"),
+        )
+        .child(
+            // A viewport shorter than the thread opens at its top, so the
+            // messages below it have never been on screen and the list says
+            // how many there are rather than letting them be discovered.
+            MessageList::new("scene.conversation.behind", scene_thread())
+                .visible_rows(2)
+                .body_lines(2)
+                .on_retry(|_, _, _| {}),
+        )
+        .into_any_element()
+}
 
 #[cfg(test)]
 mod tests {

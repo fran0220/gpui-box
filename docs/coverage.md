@@ -20,6 +20,7 @@ input, and an entry in `docs/components.md`.
 | Navigation | `Tabs`, `Accordion`, `Breadcrumb`, `Sidebar`, `Pagination`, `Wizard` |
 | Data | `List` (virtualized), `Table`, `DataGrid` (virtualized), `BulkBar`, `Tree` |
 | Date and time | `Calendar`, `DateInput`, `RangePicker`, `TimeInput` |
+| Content | `Markdown`, `MessageList` |
 | Display | `Badge`, `Tag`, `Avatar`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `StatusDot`, `StatusLine`, `Callout`, `PulseLoader`, `GradientSpinner`, `Skeleton`, `ProgressCircle`, `DescriptionList`, `Timeline` |
 | Overlay | `Overlay`, `Dialog`, `Drawer`, `Popover`, `Menu`, `ContextMenu`, `CommandPalette`, `Tooltip`, `Toast`, `ToastLayer`, `Kbd` |
 | Layout | `SplitPane`, `SplitTree`, `ScrollArea`, `Toolbar` |
@@ -101,8 +102,22 @@ own; both are exercised through every control and overlay that uses them.
 - **Persisting a layout.** `SplitLayout` converts to and from plain records so
   a host can write it out, and this crate takes no serialization dependency to
   do it for them.
-- **Rich text and code editing.** `TextArea` edits plain text. Syntax
-  highlighting, folding, and multi-caret editing are an editor, not a control.
+- **Rich text and code editing.** `TextArea` edits plain text and `Markdown`
+  renders it read-only; neither edits rich text. Syntax highlighting, folding,
+  and multi-caret editing are an editor, not a control. `Markdown` will colour
+  a code block from spans a host computed and will not compute them: deciding
+  that a word is a keyword needs a grammar, which is the same kind of fact the
+  calendar is — answered correctly only by the library the application already
+  depends on.
+- **Doing what a document says.** `Markdown` draws HTML as the characters
+  somebody wrote, reports a link rather than opening it, and names an image
+  rather than fetching it. There is no HTML renderer here, no URL policy, and
+  no network; `docs/content.md` states why each of those is a refusal rather
+  than a gap, and what a host has to supply instead.
+- **Delivering a message.** `MessageList` renders five delivery states and
+  reports a retry. Sending anything, deciding what a resend means, and knowing
+  whether a message was really read are the transport's, and this crate has no
+  transport.
 - **Charts.** A chart is a data-visualisation library with its own scales,
   axes and accessibility model.
 - **Colour picker, file picker, print dialog.** Platform surfaces; a host

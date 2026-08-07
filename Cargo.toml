@@ -27,6 +27,9 @@ gpui = { git = "https://github.com/fran0220/zed", rev = "cb2ce82766e42c55fc8563d
 web-time = "1"
 gpui_platform = { git = "https://github.com/fran0220/zed", rev = "cb2ce82766e42c55fc8563de3c5c98ac8e1c9fd9", features = ["font-kit"] }
 png = "=0.18.1"
+# Parsing only. The html feature is off: this crate renders Markdown to GPUI
+# elements and never produces or executes HTML.
+pulldown-cmark = { version = "0.13", default-features = false }
 raw-window-handle = "=0.6.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
