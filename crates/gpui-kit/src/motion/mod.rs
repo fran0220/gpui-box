@@ -12,7 +12,8 @@
 //!   carrying the speed it already had across a retarget;
 //! - [`Presence`] keeps an element alive long enough to animate out;
 //! - [`Stagger`] spreads one specification across a group;
-//! - [`Flipping::flip`] slides an element from where it was to where it is.
+//! - [`Flipping::flip`] slides an element from where it was to where it is,
+//!   and [`Flipping::flip_size`] additionally resizes it.
 //!
 //! Motion never changes what a surface publishes. A slide, a press response
 //! and a counting number are all painted over a layout, a hit target and a
@@ -34,7 +35,7 @@ mod stagger;
 mod transition;
 
 pub use easing::{CubicBezier, Easing};
-pub use flip::{Flip, Flipped, Flipping, flip, tracked_ids};
+pub use flip::{Flip, Flipped, Flipping, flip, shared_flip, tracked_ids};
 pub use interpolate::Interpolate;
 pub use keyframes::{Keyframe, Keyframes};
 pub use presence::{Phase, Presence};

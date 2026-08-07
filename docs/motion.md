@@ -14,6 +14,7 @@ without a window.
 | Lifecycle | `Presence` | Keeps an element alive long enough to animate out. |
 | Group | `Stagger` | Spreads one specification across a list. |
 | Position | `Flipping::flip` | Slides an element from where it was to where it is. |
+| Rectangle | `Flipping::flip_size` | The same, and resizes it too — which, unlike the slide, is a real layout change. |
 | Pointer | `Pressable`, `HoverLift` | The two responses a control gives a pointer. |
 | Value | `AnimatedNumber` | Counts to a new number while publishing the target. |
 
@@ -73,6 +74,13 @@ A test that reads the semantic tree therefore reads the settled truth, and
 motion cannot make it flaky. Where a value in flight has to be observable —
 watching a slide, for instance — it is exposed as an explicit accessor
 (`Flip::offset`) rather than published as a fact about the interface.
+
+The one exception is `Flipping::flip_size`, and it is an exception because
+GPUI cannot make it anything else: an element really is a different size on
+every frame of a size animation, so the box it occupies is the box in flight
+and its siblings move with it. Nothing else in the library animates a size,
+and no component uses `flip_size`. The section on FLIP below says what the
+difference costs.
 
 ## Reduced motion
 
@@ -211,6 +219,87 @@ bumps at the top of every root render.
 
 Under reduced motion the offset is zero from the first frame: the element is
 simply at its new place.
+
+### Position is free, size is not
+
+`flip` and `flip_size` are two different promises and choosing between them is
+choosing which one you want:
+
+| | `flip` | `flip_size` |
+|---|---|---|
+| What animates | Position | Position and size |
+| Effect on siblings | None, ever | They move with it |
+| Layout node | The wrapped element's own | One the wrapper owns |
+| Cost per frame | An offset | An extra measurement |
+| What the semantic tree publishes | The settled box | The box in flight |
+
+The asymmetry is not a design choice. The pinned GPUI revision has no
+transform for an element subtree — `TransformationMatrix` reaches sprites
+alone — so a size change cannot be faked with a scale the way a browser does
+it. An element that grows is genuinely laid out larger, and everything after
+it in its container is genuinely pushed. `flip` is therefore the default and
+`flip_size` is opt-in: a row that only changes place must not start owning a
+layout node because something else in the library grew.
+
+```rust
+let handle = flip("card.7", cx);
+card.flip_size(&handle, window, cx)
+```
+
+What `flip_size` animates is the box the element is given. An element that
+sizes itself from that box — `size_full`, a percentage, a flex child — is
+therefore drawn at the animated size. An element with a fixed size of its own
+keeps it, and what animates is the space it sits in. There is no third option
+without a transform.
+
+Two consequences worth knowing before choosing it:
+
+- The first frame an id is ever seen on is passed straight through to the
+  parent, because the constraints the element will be measured against are not
+  known until the parent has laid it out once. That frame is the correct one;
+  animation starts from the second.
+- A change that comes from the *container* rather than from the element takes
+  a frame to be noticed, for the same reason: the new constraints arrive
+  during layout, and the natural size is measured against them on the frame
+  after. A frame is requested for it, so nothing waits on unrelated work.
+
+`Flip::size` reports the size being painted and `Flip::target_size` the size
+layout would give the element if nothing were animating. Under reduced motion
+the element is at its new size from the first frame, siblings included.
+
+### Shared elements
+
+A row in a list and the detail panel it opens into are two elements in two
+trees with one identity. Because flip state is keyed by semantic id rather
+than by element, the panel inverts from the rectangle the row last recorded
+and travels there instead of cutting:
+
+```rust
+let handle = shared_flip("item.7", cx);
+panel.flip_size(&handle, window, cx)
+```
+
+`shared_flip` differs from `flip` in one respect only: patience. The
+rectangle survives the frames in which neither tree renders the id — 30
+frames, or 500ms of wall clock, whichever runs out first. Two bounds because
+an idle window advances the clock without drawing and a busy one draws faster
+than the clock moves; past either, the arriving element is simply already in
+place, because flying in from where something stood a minute ago is worse than
+not animating at all.
+
+Both trees rendering the same id in one frame is a collision, and a collision
+does not animate. Two elements sharing one slot would each read the other's
+rectangle as its own previous one and throw the other across the window, every
+frame, for as long as both were on screen. Instead neither moves, and the
+refusal outlasts the collision by one frame, because the frame after is the
+first that can record a rectangle nothing else is writing to. `Flip::is_contended`
+reports it. The rule is deliberate rather than emergent: the alternative,
+letting the last element rendered win, is the oscillation itself.
+
+A shared element transition cannot be captured as a scene. A still frame of it
+is either the list or the panel, and the arrangement that would show both — two
+trees rendering one id at once — is exactly the collision case above. Run it,
+or read the tests in `crates/gpui-kit/tests/motion.rs`.
 
 ## Pointer responses
 

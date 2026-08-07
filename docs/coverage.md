@@ -153,10 +153,7 @@ driven by a gesture.
 
 | Gap | Why it matters |
 |---|---|
-| Velocity handover | `Transition::set` restarts from rest when the target changes mid-flight, so a redirected animation visibly stalls. Everything else in this table is easier once a spring carries its own velocity. |
-| Keyframes | Only two endpoints exist, so a value cannot overshoot and return, and there is no way to draw attention without moving something permanently. |
-| Size and shape in `flip` | `flip` records an origin and corrects position only, so an expansion, a collapse, and a card growing into a dialog cannot be continuous. |
-| Shared element transition | Nothing carries identity across two component trees, so a row opening into a detail view is a cut. |
+| Shape in `flip` | `flip_size` records a rectangle, so position and size are continuous, but a radius, a border and a colour are not: a pill that becomes a card changes shape on the frame it changes kind. |
 | Gesture velocity | Drag and drop reports positions and no speed, so there is no inertia, no rubber band, and no flick to dismiss. |
 | Scroll-linked value | Nothing reads scroll offset as an animation input, so a header cannot collapse and a shadow cannot appear on scroll. |
 | Sequencing | `Stagger` applies one delay per index. There is no "after this finishes", and no reverse order on exit. |

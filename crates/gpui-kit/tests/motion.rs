@@ -8,7 +8,7 @@ use std::time::Duration;
 use gpui::{TestAppContext, div, prelude::*, px};
 use gpui_kit::motion::{
     CubicBezier, Easing, Flipping, Keyframe, Keyframes, MotionSpec, Presence, Spring, Transition,
-    flip, tracked_ids,
+    flip, shared_flip, tracked_ids,
 };
 use gpui_kit::prelude::*;
 use gpui_kit::prelude::{AnimatedNumber, grouped};
@@ -410,6 +410,444 @@ fn the_flip_global_drops_ids_that_stopped_rendering(cx: &mut TestAppContext) {
     assert!(
         !tracked.contains(&"row.b".into()),
         "a row that stopped rendering must not be retained forever"
+    );
+}
+
+/// A flexible row wrapped in a position-only flip.
+///
+/// `flex_1` only reaches layout if the wrapper hands layout the row's own
+/// node, so a row that fills the strip is the witness that `flip` took no
+/// layout node of its own.
+#[gpui::test]
+fn a_position_flip_takes_no_layout_node_of_its_own(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        let handle = flip("stretch.row", cx);
+        div()
+            .flex()
+            .flex_row()
+            .w(px(300.0))
+            .child(
+                div()
+                    .flex_1()
+                    .h(px(20.0))
+                    .semantic_in(cx, NodeSpec::new("stretch.row", Role::Group))
+                    .flip(&handle, window, cx),
+            )
+            .into_any_element()
+    });
+
+    assert_eq!(
+        harness.bounds("stretch.row").expect("laid out").size.width,
+        px(300.0),
+        "a wrapper with a box of its own would have swallowed flex_1"
+    );
+    assert_eq!(
+        harness.update(|_, cx| flip("stretch.row", cx).size()),
+        None,
+        "a position-only flip never measures a size"
+    );
+}
+
+/// A box whose size the test changes, above a marker that is not flipped.
+///
+/// The marker is the witness for the other half of the bargain: unlike a
+/// slide, a size animation is a real layout change, so the marker does move
+/// with it.
+fn resize_scene(cx: &mut TestAppContext, grown: Rc<Cell<bool>>, pushed: Rc<Cell<bool>>) -> Harness {
+    Harness::new(cx, gpui_kit::install, move |window, cx| {
+        let handle = flip("panel", cx);
+        let (width, height) = if grown.get() {
+            (200.0, 80.0)
+        } else {
+            (100.0, 40.0)
+        };
+        let mut column = div().flex().flex_col().items_start();
+        if pushed.get() {
+            column = column.child(div().w(px(10.0)).h(px(30.0)));
+        }
+        column
+            .child(
+                div()
+                    .w(px(width))
+                    .h(px(height))
+                    .semantic_in(cx, NodeSpec::new("panel", Role::Group))
+                    .flip_size(&handle, window, cx),
+            )
+            .child(
+                div()
+                    .w(px(100.0))
+                    .h(px(20.0))
+                    .semantic_in(cx, NodeSpec::new("marker", Role::Group)),
+            )
+            .into_any_element()
+    })
+}
+
+fn grow(harness: &mut Harness, grown: &Rc<Cell<bool>>) {
+    let grown = grown.clone();
+    harness.update(move |_, cx| {
+        grown.set(true);
+        cx.refresh_windows();
+    });
+}
+
+#[gpui::test]
+fn a_resized_element_starts_at_its_old_size_and_lands_on_the_new_one(cx: &mut TestAppContext) {
+    let grown = Rc::new(Cell::new(false));
+    let mut harness = resize_scene(cx, grown.clone(), Rc::new(Cell::new(false)));
+    assert_eq!(
+        harness.update(|_, cx| flip("panel", cx).size()),
+        Some(gpui::size(px(100.0), px(40.0))),
+        "a first measurement is drawn at once"
+    );
+
+    grow(&mut harness, &grown);
+    assert_eq!(
+        harness.update(|_, cx| flip("panel", cx).size()),
+        Some(gpui::size(px(100.0), px(40.0))),
+        "the box starts the frame at the size it had"
+    );
+    assert_eq!(
+        harness.update(|_, cx| flip("panel", cx).target_size()),
+        Some(gpui::size(px(200.0), px(80.0))),
+        "and it already knows where it is going"
+    );
+
+    harness.advance(Duration::from_millis(500));
+    assert_eq!(
+        harness.update(|_, cx| flip("panel", cx).size()),
+        Some(gpui::size(px(200.0), px(80.0))),
+        "a resize lands exactly on the new size"
+    );
+}
+
+#[gpui::test]
+fn a_resize_moves_the_siblings_a_slide_would_not(cx: &mut TestAppContext) {
+    let grown = Rc::new(Cell::new(false));
+    let mut harness = resize_scene(cx, grown.clone(), Rc::new(Cell::new(false)));
+    let before = harness.bounds("marker").expect("laid out").origin.y;
+
+    grow(&mut harness, &grown);
+    let during = harness.bounds("marker").expect("laid out").origin.y;
+    assert_eq!(
+        during, before,
+        "the frame a resize starts on is still the old layout"
+    );
+
+    harness.advance(Duration::from_millis(60));
+    let midway = harness.bounds("marker").expect("laid out").origin.y;
+    assert!(
+        midway > before && midway < before + px(40.0),
+        "a size animation is a real layout change and takes its siblings with \
+         it: the marker was at {before:?} and is at {midway:?}"
+    );
+
+    harness.advance(Duration::from_millis(500));
+    assert_eq!(
+        harness.bounds("marker").expect("laid out").origin.y,
+        before + px(40.0),
+        "the marker ends below the grown box"
+    );
+}
+
+#[gpui::test]
+fn reduced_motion_puts_a_resized_element_straight_at_its_new_size(cx: &mut TestAppContext) {
+    let grown = Rc::new(Cell::new(false));
+    let mut harness = resize_scene(cx, grown.clone(), Rc::new(Cell::new(false)));
+    let before = harness.bounds("marker").expect("laid out").origin.y;
+    harness.update(|_, cx| cx.set_reduce_motion(true));
+
+    grow(&mut harness, &grown);
+    assert_eq!(
+        harness.update(|_, cx| flip("panel", cx).size()),
+        Some(gpui::size(px(200.0), px(80.0))),
+        "reduced motion is at the new size on the first frame"
+    );
+    assert_eq!(
+        harness.bounds("marker").expect("laid out").origin.y,
+        before + px(40.0),
+        "and everything below it is already where it ends up"
+    );
+}
+
+#[gpui::test]
+fn an_element_that_moves_and_grows_does_both(cx: &mut TestAppContext) {
+    let grown = Rc::new(Cell::new(false));
+    let pushed = Rc::new(Cell::new(false));
+    let mut harness = resize_scene(cx, grown.clone(), pushed.clone());
+
+    harness.update({
+        let grown = grown.clone();
+        let pushed = pushed.clone();
+        move |_, cx| {
+            grown.set(true);
+            pushed.set(true);
+            cx.refresh_windows();
+        }
+    });
+
+    assert_eq!(
+        harness.update(|_, cx| flip("panel", cx).offset()).y,
+        px(-30.0),
+        "the box is drawn where it used to be"
+    );
+    assert_eq!(
+        harness.update(|_, cx| flip("panel", cx).size()),
+        Some(gpui::size(px(100.0), px(40.0))),
+        "at the size it used to be"
+    );
+
+    harness.advance(Duration::from_millis(500));
+    assert_eq!(
+        harness.update(|_, cx| flip("panel", cx).offset()),
+        gpui::Point::default()
+    );
+    assert_eq!(
+        harness.update(|_, cx| flip("panel", cx).size()),
+        Some(gpui::size(px(200.0), px(80.0)))
+    );
+}
+
+/// An element that takes its width from the box it is given, inside a strip
+/// the test widens.
+///
+/// The other scenes watch the box a resize animates; this one watches the
+/// element inside it, which is drawn at the animated size because it sizes
+/// itself from what it is handed.
+fn filling_scene(cx: &mut TestAppContext, wide: Rc<Cell<bool>>) -> Harness {
+    Harness::new(cx, gpui_kit::install, move |window, cx| {
+        let handle = flip("filler", cx);
+        div()
+            .flex()
+            .flex_col()
+            .items_start()
+            .w(px(if wide.get() { 300.0 } else { 100.0 }))
+            .child(
+                div()
+                    .w_full()
+                    .h(px(40.0))
+                    .semantic_in(cx, NodeSpec::new("filler", Role::Group))
+                    .flip_size(&handle, window, cx),
+            )
+            .into_any_element()
+    })
+}
+
+#[gpui::test]
+fn an_element_that_fills_its_box_is_drawn_at_the_animated_size(cx: &mut TestAppContext) {
+    let wide = Rc::new(Cell::new(false));
+    let mut harness = filling_scene(cx, wide.clone());
+    assert_eq!(
+        harness.bounds("filler").expect("laid out").size.width,
+        px(100.0)
+    );
+
+    harness.update({
+        let wide = wide.clone();
+        move |_, cx| {
+            wide.set(true);
+            cx.refresh_windows();
+        }
+    });
+    // An element sized from its container learns its new constraints from the
+    // frame that applied them, so this animation starts a frame after the one
+    // that changed the container.
+    harness.advance(Duration::from_millis(16));
+    harness.advance(Duration::from_millis(40));
+    let midway = harness.bounds("filler").expect("laid out").size.width;
+    assert!(
+        midway > px(100.0) && midway < px(300.0),
+        "the element itself is the animated size, not a picture of the \
+         settled one: {midway:?}"
+    );
+
+    harness.advance(Duration::from_millis(500));
+    assert_eq!(
+        harness.bounds("filler").expect("laid out").size.width,
+        px(300.0)
+    );
+}
+
+/// One identity rendered by two different trees.
+///
+/// `stage` picks which tree renders: the list on its own, the detail panel on
+/// its own, both at once, or neither.
+#[derive(Clone, Copy, PartialEq)]
+enum Stage {
+    List,
+    Detail,
+    Both,
+    Neither,
+}
+
+fn shared_scene(cx: &mut TestAppContext, stage: Rc<Cell<Stage>>) -> Harness {
+    Harness::new(cx, gpui_kit::install, move |window, cx| {
+        let mut root = div().flex().flex_col().items_start();
+        if matches!(stage.get(), Stage::List | Stage::Both) {
+            let handle = shared_flip("item.7", cx);
+            root = root.child(
+                div()
+                    .w(px(80.0))
+                    .h(px(20.0))
+                    .semantic_in(cx, NodeSpec::new("row", Role::Group))
+                    .flip_size(&handle, window, cx),
+            );
+        }
+        if matches!(stage.get(), Stage::Detail | Stage::Both) {
+            let handle = shared_flip("item.7", cx);
+            root = root.child(div().w(px(10.0)).h(px(50.0))).child(
+                div()
+                    .w(px(240.0))
+                    .h(px(120.0))
+                    .semantic_in(cx, NodeSpec::new("detail", Role::Group))
+                    .flip_size(&handle, window, cx),
+            );
+        }
+        root.into_any_element()
+    })
+}
+
+fn stage(harness: &mut Harness, stage: &Rc<Cell<Stage>>, next: Stage) {
+    let stage = stage.clone();
+    harness.update(move |_, cx| {
+        stage.set(next);
+        cx.refresh_windows();
+    });
+}
+
+#[gpui::test]
+fn a_shared_id_travels_from_the_tree_that_last_rendered_it(cx: &mut TestAppContext) {
+    let showing = Rc::new(Cell::new(Stage::List));
+    let mut harness = shared_scene(cx, showing.clone());
+    assert_eq!(
+        harness.update(|_, cx| flip("item.7", cx).size()),
+        Some(gpui::size(px(80.0), px(20.0)))
+    );
+
+    stage(&mut harness, &showing, Stage::Detail);
+    assert_eq!(
+        harness.update(|_, cx| flip("item.7", cx).offset()).y,
+        px(-50.0),
+        "the panel is drawn where the row was"
+    );
+    assert_eq!(
+        harness.update(|_, cx| flip("item.7", cx).size()),
+        Some(gpui::size(px(80.0), px(20.0))),
+        "and at the size the row was"
+    );
+
+    harness.advance(Duration::from_millis(500));
+    assert_eq!(
+        harness.update(|_, cx| flip("item.7", cx).offset()),
+        gpui::Point::default()
+    );
+    assert_eq!(
+        harness.update(|_, cx| flip("item.7", cx).size()),
+        Some(gpui::size(px(240.0), px(120.0))),
+        "and arrives as itself"
+    );
+}
+
+#[gpui::test]
+fn two_trees_sharing_an_id_in_one_frame_refuse_to_animate(cx: &mut TestAppContext) {
+    let showing = Rc::new(Cell::new(Stage::List));
+    let mut harness = shared_scene(cx, showing.clone());
+
+    stage(&mut harness, &showing, Stage::Both);
+    assert!(
+        harness.update(|_, cx| flip("item.7", cx).is_contended()),
+        "two elements in one slot is a collision"
+    );
+    assert_eq!(
+        harness.update(|_, cx| flip("item.7", cx).offset()),
+        gpui::Point::default(),
+        "a contested id does not animate rather than oscillating"
+    );
+
+    harness.frame();
+    assert_eq!(
+        harness.update(|_, cx| flip("item.7", cx).offset()),
+        gpui::Point::default(),
+        "and it keeps not animating while the collision lasts"
+    );
+
+    stage(&mut harness, &showing, Stage::Detail);
+    harness.frame();
+    assert!(
+        !harness.update(|_, cx| flip("item.7", cx).is_contended()),
+        "one renderer again is no longer a collision"
+    );
+    assert_eq!(
+        harness.update(|_, cx| flip("item.7", cx).offset()),
+        gpui::Point::default(),
+        "and it resumes from a rectangle nothing else was writing to"
+    );
+}
+
+#[gpui::test]
+fn a_shared_id_survives_the_gap_between_two_trees(cx: &mut TestAppContext) {
+    let showing = Rc::new(Cell::new(Stage::List));
+    let mut harness = shared_scene(cx, showing.clone());
+
+    stage(&mut harness, &showing, Stage::Neither);
+    for _ in 0..5 {
+        harness.frame();
+    }
+    assert!(
+        harness
+            .update(|_, cx| tracked_ids(cx))
+            .contains(&"item.7".into()),
+        "a shared id outlives the frames in which neither tree renders it"
+    );
+
+    stage(&mut harness, &showing, Stage::Detail);
+    assert_eq!(
+        harness.update(|_, cx| flip("item.7", cx).offset()).y,
+        px(-50.0),
+        "the panel still arrives from where the row was"
+    );
+}
+
+#[gpui::test]
+fn a_shared_id_left_too_long_arrives_already_in_place(cx: &mut TestAppContext) {
+    let showing = Rc::new(Cell::new(Stage::List));
+    let mut harness = shared_scene(cx, showing.clone());
+
+    stage(&mut harness, &showing, Stage::Neither);
+    harness.advance(Duration::from_secs(2));
+
+    stage(&mut harness, &showing, Stage::Detail);
+    assert_eq!(
+        harness.update(|_, cx| flip("item.7", cx).offset()),
+        gpui::Point::default(),
+        "a rectangle from long ago is not somewhere to fly in from"
+    );
+    assert_eq!(
+        harness.update(|_, cx| flip("item.7", cx).size()),
+        Some(gpui::size(px(240.0), px(120.0))),
+        "the panel is simply its own size"
+    );
+}
+
+/// The other bound on a handoff. An idle window advances the clock without
+/// drawing and a busy one draws without the clock moving much, so a gap that
+/// runs out of frames ends the handoff just as one that runs out of time does.
+#[gpui::test]
+fn a_shared_id_left_for_too_many_frames_arrives_already_in_place(cx: &mut TestAppContext) {
+    let showing = Rc::new(Cell::new(Stage::List));
+    let mut harness = shared_scene(cx, showing.clone());
+
+    stage(&mut harness, &showing, Stage::Neither);
+    for _ in 0..40 {
+        harness.frame();
+    }
+
+    stage(&mut harness, &showing, Stage::Detail);
+    assert_eq!(
+        harness.update(|_, cx| flip("item.7", cx).offset()),
+        gpui::Point::default(),
+        "the clock never moved, so only the frames the gap took can have \
+         ended the handoff"
     );
 }
 
