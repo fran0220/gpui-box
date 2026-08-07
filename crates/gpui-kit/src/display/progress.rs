@@ -179,35 +179,31 @@ impl RenderOnce for ProgressBar {
                                 .w(relative(fraction)),
                         )
                     })
-                    // An unknown extent fills the whole track faintly and
-                    // sweeps a brighter segment across it. A partly filled bar
-                    // would be read as a position, and there is none.
+                    // An unknown extent sweeps a segment across the track and
+                    // tints nothing behind it. A partly filled bar would be
+                    // read as a position and there is none, and a filled one
+                    // reads as the position at the end: the still frame of a
+                    // held animation showed exactly that, a bar that looked
+                    // finished beside a run that had not started.
                     .when(indeterminate, |element| {
                         let period = MotionSpec::new(
                             theme.motion.pulse_ms * 2,
                             motion::CubicBezier::new(0.4, 0.0, 0.6, 1.0),
                         );
-                        element
-                            .child(
-                                div()
-                                    .absolute()
-                                    .inset_0()
-                                    .bg(theme.colors.accent.opacity(theme.opacity.muted)),
-                            )
-                            .child(
-                                div()
-                                    .absolute()
-                                    .top_0()
-                                    .bottom_0()
-                                    .w(relative(0.3))
-                                    .rounded_full()
-                                    .bg(theme.colors.accent)
-                                    .with_animation(
-                                        self.ident.child("sweep").element_id(),
-                                        period.repeating(),
-                                        |element, delta| element.left(relative(delta * 1.3 - 0.3)),
-                                    ),
-                            )
+                        element.child(
+                            div()
+                                .absolute()
+                                .top_0()
+                                .bottom_0()
+                                .w(relative(0.3))
+                                .rounded_full()
+                                .bg(theme.colors.accent)
+                                .with_animation(
+                                    self.ident.child("sweep").element_id(),
+                                    period.repeating(),
+                                    |element, delta| element.left(relative(delta * 1.3 - 0.3)),
+                                ),
+                        )
                     }),
             )
             .semantic_in(cx, spec)

@@ -4215,8 +4215,11 @@ fn step_list(_window: &mut Window, cx: &mut App) -> AnyElement {
                     )),
                 )
                 .step(
+                    // A failure, not a refusal: the skipped step above is what
+                    // a refusal looks like, and the two must not be worded
+                    // into each other.
                     Step::new("notify", "Notify the reviewers").state(StepState::Failed(
-                        "The notification service refused the request.".into(),
+                        "The notification service did not respond.".into(),
                     )),
                 ),
         )
@@ -4416,8 +4419,12 @@ fn server_list(_window: &mut Window, cx: &mut App) -> AnyElement {
     stack(&theme)
         .w(px(560.0))
         .child(
+            // Only the one with a catalogue is opened. Expanding the two empty
+            // ones as well pushed disconnected, failed, and disabled out of
+            // the captured screen, and a state no image shows is a state no
+            // image guards.
             ServerList::new("scene.servers")
-                .expanded_ids(&["workspace", "index", "archive"])
+                .expanded_ids(&["workspace"])
                 .selected("workspace")
                 .servers([
                     ServerEntry::new("workspace", "Workspace tools")
