@@ -57,6 +57,9 @@ pub struct NumberInput {
     size: ControlSize,
     disabled: bool,
     required: bool,
+    /// What a reader should call this control, when the visible label lives
+    /// outside it.
+    name: Option<SharedString>,
     /// The number the caller seeded, once it has been put on screen. The text
     /// belongs to the typist afterwards, so it is written once.
     ///
@@ -107,6 +110,7 @@ impl NumberInput {
             size: ControlSize::Md,
             disabled: false,
             required: false,
+            name: None,
             seeded: false,
             _subscriptions: vec![subscription],
         }
@@ -132,6 +136,15 @@ impl NumberInput {
 
     pub fn max(mut self, max: f64) -> Self {
         self.max = Some(max);
+        self
+    }
+
+    /// Names the control for a reader. A number field is usually labelled by
+    /// the form around it, and the name is passed to the field that actually
+    /// takes the keystrokes so a reader landing there knows what it is.
+    pub fn name(mut self, name: impl Into<SharedString>) -> Self {
+        let name = name.into();
+        self.name = Some(name);
         self
     }
 
@@ -391,6 +404,9 @@ impl Focusable for NumberInput {
 impl Render for NumberInput {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
+        if let Some(name) = self.name.take() {
+            self.field.update(cx, |field, cx| field.set_name(name, cx));
+        }
         if !self.seeded {
             self.seeded = true;
             if let Some(value) = self.value {

@@ -432,8 +432,11 @@ impl SchemaForm {
                 let integer = matches!(field.kind, SchemaKind::Integer(_));
                 let bounds = *bounds;
                 let required = field.required;
+                let label = field.shown_label();
                 let number = cx.new(|cx| {
-                    let mut number = NumberInput::new(control_ident, window, cx).required(required);
+                    let mut number = NumberInput::new(control_ident, window, cx)
+                        .required(required)
+                        .name(label);
                     if let Some(min) = bounds.min {
                         number = number.min(min);
                     }

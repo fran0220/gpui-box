@@ -194,6 +194,10 @@ pub struct TextInput {
     focus_handle: FocusHandle,
     content: SharedString,
     placeholder: SharedString,
+    /// What to call the field where nothing on screen already does. A control
+    /// that wraps a bare field owns the visible label, so the field it types
+    /// into has to be told its own name or it reaches a reader unnamed.
+    name: SharedString,
     /// A caret is an empty selection, so one range describes both.
     selected_range: Range<usize>,
     selection_reversed: bool,
@@ -232,6 +236,7 @@ impl TextInput {
             focus_handle,
             content: SharedString::default(),
             placeholder: SharedString::default(),
+            name: SharedString::default(),
             selected_range: 0..0,
             selection_reversed: false,
             marked_range: None,
@@ -253,6 +258,19 @@ impl TextInput {
     pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self {
         self.placeholder = placeholder.into();
         self
+    }
+
+    /// Names the field for a reader without drawing anything. Use it when a
+    /// surrounding control carries the visible label.
+    pub fn name(mut self, name: impl Into<SharedString>) -> Self {
+        self.name = name.into();
+        self
+    }
+
+    /// Names the field after it has been built.
+    pub fn set_name(&mut self, name: impl Into<SharedString>, cx: &mut Context<Self>) {
+        self.name = name.into();
+        cx.notify();
     }
 
     /// Seeds the initial text, with the caret at the end.
@@ -698,6 +716,9 @@ impl TextInput {
             .focus(&self.focus_handle);
         if !self.placeholder.is_empty() {
             spec = spec.placeholder(self.placeholder.clone());
+        }
+        if !self.name.is_empty() {
+            spec = spec.text(self.name.clone());
         }
         // A secret publishes its shape, never its text, so a snapshot can
         // assert that something was typed without carrying the credential.

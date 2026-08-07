@@ -71,6 +71,16 @@ fn is_range(role: Role) -> bool {
 pub fn audit(snapshot: &Snapshot) -> Vec<Finding> {
     let mut findings = Vec::new();
     let mut seen: Vec<&str> = Vec::new();
+    // A label is usually a sibling rather than an ancestor, so a control can
+    // be perfectly well named by a node somewhere else in the tree. Collect
+    // those before asking any control whether it has a name, or an empty field
+    // beside its own label would read as nameless.
+    let labelled: Vec<&str> = snapshot
+        .nodes
+        .iter()
+        .filter(|node| name_of(node).is_some())
+        .filter_map(|node| node.labels.as_deref())
+        .collect();
 
     for node in &snapshot.nodes {
         let mut report = |problem: Problem| {
@@ -91,7 +101,10 @@ pub fn audit(snapshot: &Snapshot) -> Vec<Finding> {
         if is_positional(&node.id) {
             report(Problem::PositionalId);
         }
-        if is_actionable(node.role) && name_of(node).is_none() {
+        if is_actionable(node.role)
+            && name_of(node).is_none()
+            && !labelled.contains(&node.id.as_str())
+        {
             report(Problem::Unnamed);
         }
         if is_range(node.role) {
@@ -211,6 +224,26 @@ mod tests {
     fn an_actionable_node_must_be_nameable() {
         assert_eq!(
             problems(&snapshot(vec![node("settings.save", Role::Button)])),
+            vec![Problem::Unnamed]
+        );
+    }
+
+    #[test]
+    fn a_label_elsewhere_in_the_tree_names_the_field_it_points_at() {
+        let field = node("form.max_bytes", Role::Input);
+        let mut label = node("form.max_bytes.label", Role::Text);
+        label.text = Some("Maximum bytes".into());
+        label.labels = Some("form.max_bytes".into());
+        assert!(audit(&snapshot(vec![label, field])).is_empty());
+    }
+
+    #[test]
+    fn a_label_holding_no_words_names_nothing() {
+        let field = node("form.max_bytes", Role::Input);
+        let mut label = node("form.max_bytes.label", Role::Text);
+        label.labels = Some("form.max_bytes".into());
+        assert_eq!(
+            problems(&snapshot(vec![label, field])),
             vec![Problem::Unnamed]
         );
     }

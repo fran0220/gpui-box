@@ -179,7 +179,11 @@ fn a_step_reports_the_next_number_and_never_applies_it(cx: &mut TestAppContext) 
         let entity = entity.clone();
         move |_, cx| entity.read(cx).current()
     });
-    assert_eq!(held, Some(3.0), "the host still holds the value it started with");
+    assert_eq!(
+        held,
+        Some(3.0),
+        "the host still holds the value it started with"
+    );
 }
 
 #[gpui::test]
@@ -261,6 +265,37 @@ fn text_that_is_not_a_number_is_reported_and_published_as_invalid(cx: &mut TestA
             .node("workspace.retention")
             .expect("published")
             .invalid
+    );
+}
+
+#[gpui::test]
+fn a_number_nobody_supplied_starts_empty_rather_than_at_zero(cx: &mut TestAppContext) {
+    let (mut harness, entity) = number(cx, |input| input.min(1.0));
+
+    harness.update(|_, cx| {
+        let input = entity.read(cx);
+        assert_eq!(input.current(), None, "nobody has given it a number");
+        assert!(
+            !input.is_invalid(cx),
+            "a control opens holding nothing, not a zero its own range rejects"
+        );
+    });
+
+    let node = harness.node("workspace.retention").expect("published");
+    assert_eq!(node.value.as_deref(), Some(""));
+}
+
+#[gpui::test]
+fn stepping_an_empty_field_lands_on_the_bound_rather_than_past_a_zero(cx: &mut TestAppContext) {
+    let (mut harness, entity) = number(cx, |input| input.min(1.0).max(10.0).step(1.0));
+    let events = record::<NumberInputEvent, _>(&mut harness, &entity);
+
+    harness.click("workspace.retention.increment");
+
+    assert_eq!(
+        events.borrow().last(),
+        Some(&NumberInputEvent::Changed(1.0)),
+        "the first step offers the smallest accepted number"
     );
 }
 
