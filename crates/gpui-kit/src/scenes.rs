@@ -1066,7 +1066,7 @@ fn search_field(window: &mut Window, cx: &mut App) -> AnyElement {
                     "The transport reports what it did; the transport never decides.",
                 )
                 .id("scene.search.line")
-                .hits([4..13, 34..43])
+                .hits([4..13, 39..48])
                 .current(1),
             ),
         )
@@ -4544,6 +4544,10 @@ fn ensure_ordinary(window: &mut Window, cx: &mut App) {
                 let theme = cx.theme().clone();
                 div()
                     .column()
+                    // A column stretches its children across, and a badge
+                    // stretched that far stops reading as a label and starts
+                    // reading as a filled bar.
+                    .items_start()
                     .gap(px(theme.spacing.xs))
                     .child("Nightly regression sweep")
                     .child(

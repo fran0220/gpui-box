@@ -68,6 +68,9 @@ pub struct ScrollArea {
     label: Option<SharedString>,
     width: Option<f32>,
     height: Option<f32>,
+    /// Whether the area is as tall as what it holds instead of as tall as it
+    /// is offered.
+    fit_height: bool,
     content: Option<AnyElement>,
 }
 
@@ -91,6 +94,7 @@ impl ScrollArea {
             label: None,
             width: None,
             height: None,
+            fit_height: false,
             content: None,
         }
     }
@@ -122,6 +126,19 @@ impl ScrollArea {
     /// grows to its content and never scrolls at all.
     pub fn width(mut self, width: f32) -> Self {
         self.width = Some(width);
+        self
+    }
+
+    /// Makes the area as tall as its content rather than as tall as the space
+    /// around it.
+    ///
+    /// By default the area fills the height it is offered, which is what a
+    /// pane wants. A parent that states no height offers none, and the area
+    /// then has nowhere to draw: it disappears, taking its content with it.
+    /// A caller placing one in a column that grows with its children says so
+    /// here.
+    pub fn fit_height(mut self) -> Self {
+        self.fit_height = true;
         self
     }
 
@@ -159,9 +176,11 @@ impl RenderOnce for ScrollArea {
             )
             .children(self.content);
 
+        let fit_height = self.fit_height;
         let viewport_element = div()
             .id(self.ident.child("viewport").element_id())
-            .size_full()
+            .w_full()
+            .when(!fit_height, |element| element.h_full())
             .when(self.axis.has_vertical(), |element| {
                 element.overflow_y_scroll()
             })
@@ -199,7 +218,7 @@ impl RenderOnce for ScrollArea {
                     }
                 }
             })
-            .flex_1()
+            .when(!self.fit_height, |element| element.flex_1())
             .min_w(px(0.0))
             .min_h(px(0.0))
             // The viewport stays the first child: the prepaint above measures
@@ -252,8 +271,12 @@ impl RenderOnce for ScrollArea {
             .flex_col()
             .when_some(self.width, |element, width| element.w(px(width)))
             .when_some(self.height, |element, height| element.h(px(height)))
-            .when(self.width.is_none() && self.height.is_none(), |element| {
-                element.size_full()
+            .when(
+                self.width.is_none() && self.height.is_none() && !self.fit_height,
+                |element| element.size_full(),
+            )
+            .when(self.fit_height && self.width.is_none(), |element| {
+                element.w_full()
             })
             .child(body)
             .children(horizontal)

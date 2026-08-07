@@ -314,7 +314,12 @@ fn line_element(
                 .when(line.mark.is_some(), |element| element.bg(rail)),
         )
         .child(
+            // The runs sit in a row. Without one they are laid out as blocks
+            // and every run paints from the same left edge, one word over the
+            // next, which is what a line with more than one span looked like.
             div()
+                .row()
+                .items_baseline()
                 .flex_1()
                 .min_w_0()
                 .whitespace_nowrap()
@@ -354,6 +359,11 @@ fn line_id(ident: &Ident, number: usize) -> SharedString {
 
 /// The coloured runs of one line, skipping any span that does not name a slice
 /// this line actually holds.
+///
+/// Each run holds its own width. Inside a row that lays its children out in
+/// one direction, a run that is allowed to shrink is shrunk to nothing, and
+/// every run then paints from the same left edge with one word on top of the
+/// next.
 fn runs(theme: &Theme, line: &CodeLine) -> Vec<AnyElement> {
     let text = line.text.as_ref();
     let mut out: Vec<AnyElement> = Vec::new();
@@ -371,12 +381,14 @@ fn runs(theme: &Theme, line: &CodeLine) -> Vec<AnyElement> {
         if !before.is_empty() {
             out.push(
                 div()
+                    .flex_none()
                     .child(SharedString::from(before.to_string()))
                     .into_any_element(),
             );
         }
         out.push(
             div()
+                .flex_none()
                 .text_color(span.tone.color(theme))
                 .child(SharedString::from(inside.to_string()))
                 .into_any_element(),
@@ -388,6 +400,7 @@ fn runs(theme: &Theme, line: &CodeLine) -> Vec<AnyElement> {
     {
         out.push(
             div()
+                .flex_none()
                 .child(SharedString::from(rest.to_string()))
                 .into_any_element(),
         );
@@ -450,8 +463,13 @@ impl RenderOnce for CodeView {
             .visible_lines(visible)
             .into_any_element()
         } else {
+            // Every line is laid out, so the block is as tall as its code. A
+            // scroll area that filled the height it was offered was offered
+            // none by a column that states no height, and the body collapsed
+            // to an empty strip. Only the horizontal scroll does work here.
             ScrollArea::new(body_ident.clone())
                 .axis(ScrollAxis::Both)
+                .fit_height()
                 .child(
                     div().column().children(
                         self.lines

@@ -600,6 +600,27 @@ fn only_a_marked_line_is_an_assertion_target(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn a_code_view_lays_its_lines_out_one_below_the_next(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        CodeView::new("hunk", code_lines())
+            .language("rust")
+            .into_any_element()
+    });
+
+    let added = harness.bounds("hunk.lines.line-41").expect("laid out");
+    let removed = harness.bounds("hunk.lines.line-42").expect("laid out");
+
+    assert!(
+        added.size.height > gpui::px(0.0),
+        "a line that is on screen occupies space"
+    );
+    assert!(
+        removed.origin.y >= added.origin.y + added.size.height,
+        "line 42 sits below line 41 rather than on top of it"
+    );
+}
+
+#[gpui::test]
 fn a_code_view_with_nothing_in_it_copies_nothing(cx: &mut TestAppContext) {
     let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
         CodeView::new("hunk", []).into_any_element()
