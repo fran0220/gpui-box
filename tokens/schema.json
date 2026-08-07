@@ -238,7 +238,15 @@
     "motion": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["durationMs", "easing", "spring", "pressOffsetPx", "hoverLiftPx"],
+      "required": [
+        "durationMs",
+        "easing",
+        "spring",
+        "pressOffsetPx",
+        "hoverLiftPx",
+        "flickVelocityPxPerSec",
+        "rubberBandTension"
+      ],
       "properties": {
         "durationMs": { "type": "object" },
         "easing": { "type": "object" },
@@ -254,7 +262,9 @@
           }
         },
         "pressOffsetPx": { "$ref": "#/$defs/positiveNumber" },
-        "hoverLiftPx": { "$ref": "#/$defs/positiveNumber" }
+        "hoverLiftPx": { "$ref": "#/$defs/positiveNumber" },
+        "flickVelocityPxPerSec": { "type": "number", "exclusiveMinimum": 0 },
+        "rubberBandTension": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
       }
     },
     "effect": {

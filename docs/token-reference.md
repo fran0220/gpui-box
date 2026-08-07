@@ -148,6 +148,11 @@ Appearance: `Dark`.
 | `motion.pressOffsetPx` | 1 |
 | `motion.hoverLiftPx` | 1 |
 
+| Gesture | Value |
+|---|---:|
+| `motion.flickVelocityPxPerSec` | 420 |
+| `motion.rubberBandTension` | 0.55 |
+
 ### Border and opacity
 
 | Token | Value |
@@ -350,6 +355,11 @@ Appearance: `Light`.
 |---|---:|
 | `motion.pressOffsetPx` | 1 |
 | `motion.hoverLiftPx` | 1 |
+
+| Gesture | Value |
+|---|---:|
+| `motion.flickVelocityPxPerSec` | 420 |
+| `motion.rubberBandTension` | 0.55 |
 
 ### Border and opacity
 

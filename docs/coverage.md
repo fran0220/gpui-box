@@ -148,17 +148,13 @@ decision and a debt stays visible.
 ### Motion, which is where the largest gap is
 
 The primitives in `docs/motion.md` cover a value moving from one state to
-another. They do not yet cover motion that is interrupted, composed, or
-driven by a gesture.
+another, motion that is interrupted, composed or driven by a gesture, and
+springs described as a duration and a bounce. Two things are left.
 
 | Gap | Why it matters |
 |---|---|
 | Shape in `flip` | `flip_size` records a rectangle, so position and size are continuous, but a radius, a border and a colour are not: a pill that becomes a card changes shape on the frame it changes kind. |
-| Gesture velocity | Drag and drop reports positions and no speed, so there is no inertia, no rubber band, and no flick to dismiss. |
-| Scroll-linked value | Nothing reads scroll offset as an animation input, so a header cannot collapse and a shadow cannot appear on scroll. |
-| Sequencing | `Stagger` applies one delay per index. There is no "after this finishes", and no reverse order on exit. |
-| Interruption and reversal | `Presence` moves between phases but cannot play an entrance backwards when it is cancelled part way. |
-| Perceptual spring parameters | A spring takes stiffness, damping, and mass. Duration and bounce are what a design decision is actually expressed in. |
+| Overscroll | `motion::rubber_band` damps a pull past a boundary, but nothing in the library overscrolls: a `ScrollArea` stops dead at its end, so the band is available to a caller and used by no component here. |
 
 ### Components
 

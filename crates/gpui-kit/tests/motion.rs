@@ -7,8 +7,8 @@ use std::time::Duration;
 
 use gpui::{TestAppContext, div, prelude::*, px};
 use gpui_kit::motion::{
-    CubicBezier, Easing, Flipping, Keyframe, Keyframes, MotionSpec, Presence, Spring, Transition,
-    flip, shared_flip, tracked_ids,
+    CubicBezier, Easing, Flipping, Keyframe, Keyframes, MotionSpec, Presence, Sequence, Spring,
+    Transition, flip, shared_flip, tracked_ids,
 };
 use gpui_kit::prelude::*;
 use gpui_kit::prelude::{AnimatedNumber, grouped};
@@ -1248,6 +1248,222 @@ fn reduced_motion_holds_one_frame_across_the_overlay_family(cx: &mut TestAppCont
         assert!(snapshot.contains(id), "`{id}` must be published at once");
     }
     holds_one_frame(&mut harness);
+}
+
+/// Publishes the presence progress as a width, so a test reads how far in or
+/// out the element actually is rather than trusting the state machine.
+fn presence_scene(cx: &mut TestAppContext, presence: Rc<RefCell<Presence>>) -> Harness {
+    Harness::new(cx, gpui_kit::install, move |window, cx| {
+        let mut presence = presence.borrow_mut();
+        let progress = presence.animate(window, cx);
+        let mut root = div();
+        if presence.is_rendered() {
+            root = root.child(
+                div()
+                    .w(px(100.0 * progress))
+                    .h(px(10.0))
+                    .semantic_in(cx, NodeSpec::new("panel", Role::Group)),
+            );
+        }
+        root.into_any_element()
+    })
+}
+
+/// Enter and exit on a curve that is nowhere near linear, so a reversal that
+/// assumed the two timelines were proportional would show up as a jump.
+fn curved(duration_ms: u64) -> MotionSpec {
+    MotionSpec::new(duration_ms, CubicBezier::new(0.42, 0.0, 0.58, 1.0))
+}
+
+#[gpui::test]
+fn an_entrance_cancelled_part_way_leaves_from_where_it_was(cx: &mut TestAppContext) {
+    let presence = Rc::new(RefCell::new(Presence::hidden(curved(200), curved(100))));
+    let mut harness = presence_scene(cx, presence.clone());
+
+    harness.update(|_, cx| {
+        presence.borrow_mut().show();
+        cx.refresh_windows();
+    });
+    harness.advance(Duration::from_millis(60));
+    let interrupted = harness.bounds("panel").expect("laid out").size.width;
+    assert!(
+        interrupted > px(2.0) && interrupted < px(40.0),
+        "expected an entrance barely under way, got {interrupted:?}"
+    );
+
+    harness.update(|_, cx| {
+        presence.borrow_mut().hide();
+        cx.refresh_windows();
+    });
+    let reversed = harness.bounds("panel").expect("still rendered").size.width;
+    assert!(
+        (reversed - interrupted).abs() < px(4.0),
+        "the element jumped from {interrupted:?} to {reversed:?} on being cancelled"
+    );
+
+    // A full exit is 100ms, and this one had only a fifth of the way to come
+    // back: it is gone well before a full exit would have been.
+    harness.advance(Duration::from_millis(60));
+    assert!(
+        present(&harness.snapshot(), "panel").is_err(),
+        "a barely started entrance took longer to leave than a full exit"
+    );
+}
+
+#[gpui::test]
+fn a_full_exit_still_takes_the_whole_exit(cx: &mut TestAppContext) {
+    let presence = Rc::new(RefCell::new(Presence::visible(curved(200), curved(100))));
+    let mut harness = presence_scene(cx, presence.clone());
+
+    harness.update(|_, cx| {
+        presence.borrow_mut().hide();
+        cx.refresh_windows();
+    });
+    harness.advance(Duration::from_millis(60));
+    assert!(
+        present(&harness.snapshot(), "panel").is_ok(),
+        "an exit from fully present must use its whole span"
+    );
+    harness.advance(Duration::from_millis(60));
+    assert!(present(&harness.snapshot(), "panel").is_err());
+}
+
+#[gpui::test]
+fn an_exit_cancelled_part_way_comes_back_the_way_it_went(cx: &mut TestAppContext) {
+    let presence = Rc::new(RefCell::new(Presence::visible(curved(200), curved(100))));
+    let mut harness = presence_scene(cx, presence.clone());
+
+    harness.update(|_, cx| {
+        presence.borrow_mut().hide();
+        cx.refresh_windows();
+    });
+    harness.advance(Duration::from_millis(40));
+    let interrupted = harness.bounds("panel").expect("still rendered").size.width;
+    assert!(interrupted < px(100.0), "the exit has not started");
+
+    harness.update(|_, cx| {
+        presence.borrow_mut().show();
+        cx.refresh_windows();
+    });
+    let reversed = harness.bounds("panel").expect("still rendered").size.width;
+    assert!(
+        (reversed - interrupted).abs() < px(4.0),
+        "the element jumped from {interrupted:?} to {reversed:?} on being cancelled"
+    );
+
+    harness.advance(Duration::from_millis(200));
+    assert_eq!(
+        harness.bounds("panel").expect("present").size.width,
+        px(100.0)
+    );
+}
+
+#[gpui::test]
+fn reduced_motion_lands_both_phases_on_the_frame_they_are_asked_for(cx: &mut TestAppContext) {
+    let presence = Rc::new(RefCell::new(Presence::hidden(curved(200), curved(100))));
+    let mut harness = presence_scene(cx, presence.clone());
+    harness.update(|_, cx| cx.set_reduce_motion(true));
+
+    harness.update(|_, cx| {
+        presence.borrow_mut().show();
+        cx.refresh_windows();
+    });
+    harness.advance(Duration::ZERO);
+    assert_eq!(
+        harness.bounds("panel").expect("present at once").size.width,
+        px(100.0),
+        "an entrance under reduced motion is over before it is drawn"
+    );
+
+    harness.update(|_, cx| {
+        presence.borrow_mut().hide();
+        cx.refresh_windows();
+    });
+    harness.advance(Duration::ZERO);
+    assert!(present(&harness.snapshot(), "panel").is_err());
+}
+
+#[gpui::test]
+fn a_sequenced_motion_starts_when_its_predecessor_ends(_cx: &mut TestAppContext) {
+    let sequence = Sequence::new([linear(200)]).then(linear(100));
+
+    assert_eq!(sequence.start(1), Duration::from_millis(200));
+    assert_eq!(sequence.total(), Duration::from_millis(300));
+    assert_eq!(
+        sequence.step(1).expect("two steps").delay_ms,
+        200,
+        "the second step waits out the first"
+    );
+
+    // Halfway through the group the first step is over and the second has not
+    // begun to move.
+    assert_eq!(sequence.progress(0, 200.0 / 300.0), 1.0);
+    assert!(sequence.progress(1, 200.0 / 300.0) < 1e-6);
+    assert!((sequence.progress(1, 250.0 / 300.0) - 0.5).abs() < 0.01);
+
+    // The same composition written on the specification itself.
+    assert_eq!(
+        linear(100).after(linear(200)).total(),
+        sequence.total(),
+        "a chained spec and a sequence describe the same run"
+    );
+}
+
+#[gpui::test]
+fn a_reversed_stagger_gives_the_last_item_the_shortest_delay(_cx: &mut TestAppContext) {
+    let forward = gpui_kit::motion::Stagger::from_millis(20);
+    let backward = forward.reversed();
+
+    assert_eq!(forward.delay(0, 4), Duration::ZERO);
+    assert_eq!(backward.delay(3, 4), Duration::ZERO);
+    assert!(backward.delay(0, 4) > backward.delay(3, 4));
+    assert_eq!(
+        backward.total(4, linear(100)),
+        forward.total(4, linear(100)),
+        "reversing changes who waits, not how long the group takes"
+    );
+}
+
+#[gpui::test]
+fn a_spring_can_be_asked_for_as_a_duration_and_a_bounce(_cx: &mut TestAppContext) {
+    let asked = Duration::from_millis(400);
+    let critical = Spring::perceptual(asked, 0.0);
+    assert!((critical.damping_ratio() - 1.0).abs() < 1e-3);
+    assert!(
+        critical.perceptual_duration().abs_diff(asked) < Duration::from_millis(1),
+        "it reported {:?} for {asked:?}",
+        critical.perceptual_duration()
+    );
+
+    let peak = |spring: Spring| {
+        let settle = spring.settle_time();
+        (0..=200)
+            .map(|step| spring.value(settle.mul_f32(step as f32 / 200.0)))
+            .fold(f32::MIN, f32::max)
+    };
+    assert!(
+        peak(critical) <= 1.001,
+        "a bounce of zero must not overshoot"
+    );
+    assert!(peak(Spring::perceptual(asked, 0.4)) > 1.0);
+    assert!(peak(Spring::perceptual(asked, -0.4)) <= 1.001);
+}
+
+#[gpui::test]
+fn a_token_spring_preset_is_what_it_always_was(_cx: &mut TestAppContext) {
+    let theme = Theme::studio_dark();
+    for preset in [
+        gpui_kit::theme::SpringPreset::Snappy,
+        gpui_kit::theme::SpringPreset::Smooth,
+        gpui_kit::theme::SpringPreset::Bouncy,
+        gpui_kit::theme::SpringPreset::Grab,
+    ] {
+        let tokens = theme.spring(preset);
+        let spring = Spring::preset(&theme, preset);
+        assert_eq!(spring.stiffness, tokens.stiffness);
+        assert_eq!(spring.damping, tokens.damping);
+        assert_eq!(spring.mass, tokens.mass);
+    }
 }
 
 #[gpui::test]

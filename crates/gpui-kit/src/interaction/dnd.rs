@@ -21,8 +21,10 @@
 //!
 //! What GPUI does not have, and this module adds: a vocabulary for where a
 //! drop lands ([`DropPosition`]), one payload type every surface in the
-//! library agrees on ([`DragItem`]), a published record of the drag so a test
-//! can read what is being carried and where it would land, escape as a cancel,
+//! library agrees on ([`DragItem`]), the speed the gesture was moving at as
+//! well as where it was ([`DropIntent::velocity`]), a published record of the
+//! drag so a test can read what is being carried and where it would land,
+//! escape as a cancel,
 //! a ghost that follows the pointer on a spring instead of snapping to it, and
 //! the make-way slide that opens the slot the drop would land in.
 //!
@@ -65,7 +67,7 @@ use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, SpringPreset};
 use web_time::Instant;
 
 use crate::foundation::StyledExt;
-use crate::motion::{Interpolate, Spring, keyed};
+use crate::motion::{Interpolate, Spring, Velocity, VelocityTracker, keyed};
 
 /// The semantic id of the node a drag publishes while it is in flight.
 pub const DRAG_NODE_ID: &str = "dnd.drag";
@@ -159,10 +161,16 @@ impl std::fmt::Display for DropPosition {
 }
 
 /// One drop, as it is reported to the host.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct DropIntent {
     pub item: DragItem,
     pub position: DropPosition,
+    /// How fast the pointer was moving when it let go, in pixels a second.
+    ///
+    /// A gesture that stopped before it was released reports
+    /// [`Velocity::ZERO`], which is the difference between a flick and a
+    /// deliberate placement. See [`crate::motion::flick`].
+    pub velocity: Velocity,
 }
 
 /// Which way a target's slots are laid out.
@@ -173,9 +181,12 @@ pub enum DropAxis {
 }
 
 /// The drag as anything outside the module can see it.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ActiveDrag {
     pub item: DragItem,
+    /// How fast the pointer is moving right now, in pixels a second. A drag
+    /// the user has paused reports [`Velocity::ZERO`].
+    pub velocity: Velocity,
     /// The surface the pointer is currently over, when it offers a slot.
     pub surface: Option<SharedString>,
     /// Where the drop would land right now.
@@ -211,6 +222,13 @@ struct Session {
     /// Set by [`stage`]. A staged drag has no pointer and no gesture, so it
     /// neither expires with the pointer nor settles over time.
     staged: bool,
+    /// How fast the pointer is travelling, so a drop reports the speed it was
+    /// let go at and not only where.
+    speed: VelocityTracker,
+    /// The last position and instant handed to the tracker. Every registered
+    /// target hears the same move, so without this one gesture would be
+    /// sampled once per target.
+    sampled: Option<(Instant, Point<Pixels>)>,
 }
 
 #[derive(Default)]
@@ -255,6 +273,10 @@ fn begin(item: DragItem, cx: &mut App) {
         state.item = Some(item);
         state.landing = None;
         state.staged = false;
+        // A new gesture starts from rest: the speed of the one before it is
+        // not this one's.
+        state.speed.clear();
+        state.sampled = None;
     });
 }
 
@@ -316,6 +338,7 @@ pub fn active(window: &Window, cx: &App) -> Option<ActiveDrag> {
             .filter(|landing| landing.at.is_none_or(|at| at == pointer));
         Some(ActiveDrag {
             item,
+            velocity: state.speed.velocity_at(cx.background_executor().now()),
             surface: landing.map(|landing| landing.surface.clone()),
             position: landing.map(|landing| landing.position.clone()),
             accepted: landing.is_some_and(|landing| landing.accepted),
@@ -358,6 +381,29 @@ fn clear_landing(cx: &mut App) {
 
 fn is_staged(cx: &App) -> bool {
     read(cx, |state| state.staged).unwrap_or(false)
+}
+
+/// Feeds one pointer move to the gesture's velocity tracker.
+fn record_pointer(pointer: Point<Pixels>, at: Instant, cx: &mut App) {
+    session(cx, |state| {
+        if state.sampled == Some((at, pointer)) {
+            return;
+        }
+        state.sampled = Some((at, pointer));
+        state.speed.sample(pointer, at);
+    });
+}
+
+/// How fast the drag in flight is moving.
+///
+/// The clock is passed in rather than read from the samples, because a pointer
+/// that has stopped sends nothing at all and a pause is only visible against a
+/// clock.
+fn velocity(cx: &App) -> Velocity {
+    read(cx, |state| {
+        state.speed.velocity_at(cx.background_executor().now())
+    })
+    .unwrap_or(Velocity::ZERO)
 }
 
 /// What a surface needs to know to draw a drag it is taking part in.
@@ -579,6 +625,9 @@ where
         let accepts = Rc::clone(&accepts);
         move |event, _window, cx| {
             let pointer = event.event.position;
+            // Sampled before the bounds check: the speed of the gesture is a
+            // property of the hand, not of whatever it happens to be over.
+            record_pointer(pointer, cx.background_executor().now(), cx);
             if !event.bounds.contains(&pointer) {
                 return;
             }
@@ -624,6 +673,7 @@ where
         let intent = DropIntent {
             item: item.clone(),
             position: landing.position.clone(),
+            velocity: velocity(cx),
         };
         clear(cx);
         on_drop(&intent, window, cx);

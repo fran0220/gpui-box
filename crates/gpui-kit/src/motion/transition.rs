@@ -152,6 +152,36 @@ impl<T: Interpolate> Transition<T> {
         self.duration = Self::run_time(self.spec, self.carried);
     }
 
+    /// Aims at a new target with a speed the value did not get from an
+    /// animation, which is what a value let go of by the hand has.
+    ///
+    /// This is inertia. The gesture reports its speed — see
+    /// [`VelocityTracker`](super::VelocityTracker) — and the spring is
+    /// released with it rather than from a standstill, so a flicked thing
+    /// carries on and settles instead of stopping dead the instant the finger
+    /// leaves it. It is the same handover a retarget performs, with the speed
+    /// coming from outside instead of from the motion being interrupted.
+    ///
+    /// `velocity` is in value units a second and positive toward `target`. A
+    /// release always restarts the motion, including at the current target: a
+    /// value thrown at where it already is has somewhere to go and come back
+    /// from.
+    ///
+    /// Only a sprung specification can carry it. A curve has no momentum, so a
+    /// released curve is an ordinary [`Transition::set`].
+    pub fn release(&mut self, target: T, velocity: f32) {
+        self.from = self.value();
+        self.to = target;
+        self.elapsed = Duration::ZERO;
+        let distance = self.from.distance(self.to);
+        self.carried = if distance > 0.0 {
+            velocity / distance
+        } else {
+            0.0
+        };
+        self.duration = Self::run_time(self.spec, self.carried);
+    }
+
     /// Jumps to `target` without animating, for state changes the user did not
     /// cause, such as a theme switch.
     pub fn snap(&mut self, target: T) {

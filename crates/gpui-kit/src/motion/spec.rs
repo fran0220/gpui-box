@@ -90,6 +90,40 @@ impl MotionSpec {
         }
     }
 
+    /// The earliest point in the run at which the specification has reached
+    /// `value`: the inverse of [`MotionSpec::progress`], on the same clock.
+    ///
+    /// Sampled at a millisecond rather than solved, because a cubic bezier has
+    /// no closed-form inverse and a spring is not even monotonic — an
+    /// underdamped one passes its target and comes back, so "the earliest time
+    /// it was there" is the only well-defined answer. A millisecond is the
+    /// granularity a specification is written in anyway.
+    ///
+    /// A value never reached returns the whole run.
+    pub fn time_at(self, value: f32) -> Duration {
+        let total_ms = self.duration_ms + self.delay_ms;
+        if value <= 0.0 || total_ms == 0 {
+            return Duration::ZERO;
+        }
+        for ms in 0..=total_ms {
+            if self.progress(ms as f32 / total_ms as f32) >= value {
+                return Duration::from_millis(ms);
+            }
+        }
+        Duration::from_millis(total_ms)
+    }
+
+    /// The specification moved to start when `previous` has finished.
+    ///
+    /// Its own delay is kept and counted from there, so "80ms after the panel
+    /// has opened" is `content.with_delay(80).after(panel)` and the caller
+    /// never adds two numbers together. [`Sequence`](super::Sequence) is the
+    /// same composition for more than two, and can report the total.
+    pub fn after(mut self, previous: MotionSpec) -> Self {
+        self.delay_ms += previous.total().as_millis() as u64;
+        self
+    }
+
     /// Adapts the specification to GPUI's animation driver.
     ///
     /// GPUI requires an eased delta inside 0..1, so an overshooting curve or
@@ -272,6 +306,50 @@ mod tests {
         assert_eq!(menu(&theme).duration_ms, theme.motion.menu_ms);
         assert_eq!(dialog(&theme).duration_ms, theme.motion.dialog_ms);
         assert_eq!(entrance(&theme).duration_ms, theme.motion.entrance_ms);
+    }
+
+    #[test]
+    fn a_time_inverts_the_progress_that_produced_it() {
+        let spec = MotionSpec::new(200, Easing::Standard.curve(&Theme::studio_dark()));
+        for step in 1..10 {
+            let value = step as f32 / 10.0;
+            let reached = spec.time_at(value);
+            let there = spec.progress(reached.as_secs_f32() / spec.total().as_secs_f32());
+            assert!(
+                (there - value).abs() < 0.02,
+                "{value} was found at {reached:?}, which is {there}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_ends_of_a_run_are_where_they_belong() {
+        let spec = MotionSpec::new(200, CubicBezier::new(0.0, 0.0, 1.0, 1.0)).with_delay(100);
+        assert_eq!(spec.time_at(0.0), Duration::ZERO);
+        assert_eq!(spec.time_at(1.0), spec.total());
+        // Nothing has moved until the delay is over.
+        assert!(spec.time_at(0.001) > Duration::from_millis(100));
+        assert_eq!(spec.time_at(0.5), Duration::from_millis(200));
+    }
+
+    #[test]
+    fn a_sprung_time_finds_the_first_crossing_rather_than_the_last() {
+        let spec = MotionSpec::sprung(Spring::new(400.0, 28.0, 1.0));
+        let crossed = spec.time_at(1.0);
+        assert!(
+            crossed < spec.total(),
+            "an underdamped spring reaches its target before it settles on it"
+        );
+    }
+
+    #[test]
+    fn a_spec_that_follows_another_starts_when_it_ends() {
+        let first = MotionSpec::new(200, CubicBezier::new(0.0, 0.0, 1.0, 1.0));
+        let second = MotionSpec::new(100, CubicBezier::new(0.0, 0.0, 1.0, 1.0))
+            .with_delay(50)
+            .after(first);
+        assert_eq!(second.delay_ms, 250);
+        assert_eq!(second.total(), Duration::from_millis(350));
     }
 
     #[test]

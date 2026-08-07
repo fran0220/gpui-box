@@ -20,7 +20,7 @@ pub mod toolbar;
 pub mod tree;
 
 pub use dock::{Dock, DockEvent, DockPanel, DockRegion};
-pub use scroll::{ScrollArea, ScrollAxis};
+pub use scroll::{ScrollArea, ScrollAxis, scroll_offset, scroll_to};
 pub use split::{SplitAxis, SplitPane, SplitSide};
 pub use status_bar::{StatusBar, StatusGroup, StatusItem};
 pub use toolbar::{Toolbar, ToolbarItem};

@@ -29,6 +29,7 @@ use gpui_kit_theme::{ActiveTheme, Theme};
 
 use crate::foundation::Ident;
 use crate::layout::measure;
+use crate::motion::ScrollLink;
 
 /// How wide the reserved gutter is and how thick the thumb inside it is drawn.
 /// Neither value repeats anywhere else.
@@ -169,7 +170,26 @@ impl RenderOnce for ScrollArea {
             .track_scroll(&handle)
             .child(content);
 
+        // The shadow is a function of the offset and nothing else: it does not
+        // animate, it does not ask for a frame, and scrolling back up takes it
+        // away again because the offset went back. It is also information —
+        // there is content above the fold — so it is not suppressed under
+        // reduced motion.
+        let shade = self.axis.has_vertical().then(|| {
+            ScrollLink::over(px(theme.effects.edge_fade_band)).progress(px(-f32::from(offset.y)))
+        });
+        let top_shadow = shade.filter(|shade| *shade > 0.0).map(|shade| {
+            div()
+                .absolute()
+                .top_0()
+                .left_0()
+                .right_0()
+                .h(px(theme.borders.hairline))
+                .bg(theme.colors.hairline_strong.opacity(shade))
+        });
+
         let viewport_frame = div()
+            .relative()
             .on_children_prepainted({
                 let measured = Rc::clone(&measured);
                 move |bounds, window, _| {
@@ -181,7 +201,11 @@ impl RenderOnce for ScrollArea {
             .flex_1()
             .min_w(px(0.0))
             .min_h(px(0.0))
-            .child(viewport_element);
+            // The viewport stays the first child: the prepaint above measures
+            // whichever child comes first, and it is the viewport that decides
+            // whether a scrollbar is needed.
+            .child(viewport_element)
+            .children(top_shadow);
 
         let vertical = self.axis.has_vertical().then(|| {
             bar(
@@ -375,6 +399,29 @@ fn bar(
 struct ScrollHandles(RefCell<HashMap<SharedString, ScrollHandle>>);
 
 impl Global for ScrollHandles {}
+
+/// How far the region with this identity has been scrolled, in pixels down
+/// and across from the start of its content.
+///
+/// This is what a scroll-linked value reads: pair it with
+/// [`ScrollLink`](crate::motion::ScrollLink) to collapse a header or fade a
+/// heading as the content moves under it. A region that has never rendered
+/// reports zero, which is where it will be when it does.
+pub fn scroll_offset(ident: impl Into<Ident>, cx: &mut App) -> Point<Pixels> {
+    let offset = scroll_handle(&ident.into(), cx).offset();
+    gpui::point(-offset.x, -offset.y)
+}
+
+/// Puts the region with this identity at `offset`, measured the same way
+/// [`scroll_offset`] reports it.
+///
+/// The counterpart to reading, for a host restoring where the user was: a
+/// reopened document belongs where they left it, not at the top. It takes
+/// effect on the next frame, and a region that has never rendered remembers
+/// the position until it does.
+pub fn scroll_to(ident: impl Into<Ident>, offset: Point<Pixels>, cx: &mut App) {
+    scroll_handle(&ident.into(), cx).set_offset(gpui::point(-offset.x, -offset.y));
+}
 
 /// The scroll position of the region with this identity.
 fn scroll_handle(ident: &Ident, cx: &mut App) -> ScrollHandle {

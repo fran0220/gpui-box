@@ -11,8 +11,11 @@ without a window.
 | Value | `Interpolate` | Moves `f32`, `Pixels`, `Rems`, `Hsla`, `Point` and `Size`, and measures how far apart two of them are. |
 | Path | `Keyframes` | Takes a value through named stops rather than straight across. |
 | State | `Transition` | Animates a value whose target can change mid-flight, carrying the speed it already had. |
-| Lifecycle | `Presence` | Keeps an element alive long enough to animate out. |
-| Group | `Stagger` | Spreads one specification across a list. |
+| Gesture | `VelocityTracker` | Measures how fast a gesture is moving, so `flick`, `rubber_band` and `Transition::release` have a speed to work from. |
+| Offset | `ScrollLink` | Reads a scroll offset as a progress, with no clock and no frames. |
+| Lifecycle | `Presence` | Keeps an element alive long enough to animate out, and plays a cancelled phase backwards. |
+| Group | `Stagger` | Spreads one specification across a list, forwards or in reverse. |
+| Order | `Sequence` | Runs specifications one after another and reports how long they take together. |
 | Position | `Flipping::flip` | Slides an element from where it was to where it is. |
 | Rectangle | `Flipping::flip_size` | The same, and resizes it too — which, unlike the slide, is a real layout change. |
 | Pointer | `Pressable`, `HoverLift` | The two responses a control gives a pointer. |
@@ -44,6 +47,7 @@ component. Anything not listed here does not move.
 | `Dialog`, `Drawer` | Arrive on a spring, leave on a curve | `Presence` + `spring.smooth` | Arriving has weight; being dismissed is just gone. |
 | `Toast` | Slot slides when the stack reflows | `Flipping::flip` | The slot slides, not the card, because the card is already carrying its own arrival. |
 | `AnimatedNumber` | Glyphs count | `Transition<f32>` | The target is published from the frame it changes. |
+| `ScrollArea` | Top shadow fades in once the content is off the top | `ScrollLink` | A function of the offset rather than of a clock, so it never animates on its own and asks for no frames. |
 
 Deliberately still: `Tooltip`, `Badge`, `Tag` (the body of it), `Breadcrumb`,
 `Divider`, `Avatar`, `Kbd`, the split divider, and every scrim. A drag handle
@@ -56,6 +60,44 @@ pointer would fight the drag it exists to serve.
 lasts longer than `ROW_STAGGER_CAP` — 112ms — however many rows there are.
 Past eight rows the step shrinks rather than the window growing, so a fifty-row
 menu is fully drawn in about a sixth of a second instead of most of a second.
+
+### Which end a wave starts from
+
+`Stagger::reversed` runs the same wave from the last item to the first. A list
+that arrived from the top down should leave from the bottom up: the row the
+user is looking at, the one they just acted on, should be the last to go rather
+than the first, so the group empties away from them rather than out from under
+them. Reversing changes which item waits longest and nothing else — the step,
+the cap and `Stagger::total` are the same either way, which is what lets a
+caller hold the group on screen for one duration whichever direction it runs
+in.
+
+## And then
+
+`MotionSpec::after` moves a specification to start when another has finished,
+keeping its own delay as the gap between the two:
+
+```rust
+let panel = motion::dialog(theme);
+let content = motion::entrance(theme).with_delay(40).after(panel);
+```
+
+`Sequence` is the same composition for more than two, and exists for what a
+chain of `after` cannot answer: it keeps the steps, so `Sequence::step(i)`
+hands one of them to anything that runs a single specification and
+`Sequence::progress(i, raw)` drives every step from one clock over the whole
+run; and it reports `Sequence::total`, which is what a caller holding an
+element on screen — `Presence` included — needs and cannot otherwise get
+without adding the durations up by hand.
+
+```rust
+let run = Sequence::new([header]).then(body.with_delay(40)).then(footer);
+let total = run.total();
+```
+
+A step that has not started reports 0 and a step that is over reports 1, so
+painting all of them from one progress leaves the finished ones where they
+landed.
 
 ## Motion never changes what is published
 
@@ -131,6 +173,104 @@ the spot would be the same stall this exists to remove, wearing a different
 shape. The same test reads a spring that has overshot correctly, where the
 value is past its target and already travelling back toward it.
 
+## Gesture velocity
+
+A gesture reports where the pointer is. How fast it was going is a
+measurement, and `VelocityTracker` is that measurement:
+
+```rust
+tracker.sample(pointer, cx.background_executor().now());
+let velocity = tracker.velocity_at(cx.background_executor().now());
+```
+
+Two decisions in it matter more than the arithmetic.
+
+The speed is measured over a short trailing window — `VELOCITY_WINDOW`, 100ms
+— rather than over the last two events. Platforms deliver moves at whatever
+rate they please, and the last pair can be a millisecond apart, which divides
+two pixels by almost nothing and reports a speed no hand ever moved at. A span
+shorter than 8ms is therefore not believed at all and reports nothing, because
+"not measurable" is the honest answer and a made-up number would be flung.
+
+Samples older than the window are discarded against the clock passed to
+`velocity_at`, not against the last sample, because a pointer that has stopped
+sends nothing at all. **A drag that stops before release has no velocity.**
+That is the whole reason the window exists: a tracker that reported the speed
+from before the pause would fling away the thing the user deliberately parked.
+
+A drop carries it. `DropIntent::velocity` is the speed the pointer was moving
+at when it let go, and `ActiveDrag::velocity` is the speed it is moving at now.
+A staged drag has no pointer, so it reports `Velocity::ZERO`.
+
+Three effects are built on it:
+
+- `flick(travel, velocity, theme)` answers whether a gesture was a flick and
+  which way. It takes both the distance and the speed, because speed alone
+  calls a twitch a flick and distance alone calls a slow deliberate drag one,
+  and those are exactly the two gestures a dismissal has to tell apart. The
+  travel has to agree with the direction of the speed, so a gesture that was
+  already coming back was not flicked out. The threshold is
+  `motion.flickVelocityPxPerSec`.
+- Inertia is `Transition::release(target, velocity)`: the same handover a
+  retarget performs, with the speed coming from the hand instead of from the
+  motion being interrupted. A flicked value carries on and settles under its
+  spring rather than stopping dead the instant the finger leaves it. Only a
+  sprung specification can carry it, for the reason above: a curve has no
+  momentum.
+- `rubber_band(overscroll, extent, tension)` maps a pull past a boundary to
+  the distance actually shown. `motion.rubberBandTension` is the fraction of
+  the first pixel that shows; every pixel after it shows less, so the band
+  tightens smoothly rather than at a point the hand can feel. The result
+  approaches `extent` and never reaches it, so a boundary can be stretched but
+  not crossed. It is a pure function of the pull — no clock, no state, no
+  frame — because the band is where the hand is holding it.
+
+Nothing in this library overscrolls, so `rubber_band` is provided for a caller
+and used by no component here. That is recorded in `docs/coverage.md`.
+
+## Scroll-linked values
+
+`ScrollLink` maps a range of scroll offsets onto progress from 0 to 1:
+
+```rust
+let header = ScrollLink::new(px(0.0), px(64.0));
+let height = header.sample(scroll_offset("inbox", cx).y, px(96.0), px(40.0));
+```
+
+It has no duration, no start and no end, it never requests an animation frame,
+and there is no such thing as interrupting it. Scrolling back up runs it
+backwards because the offset went backwards. That is why it is a plain value
+with no `animate` and no `Window`: there is nothing to drive. Anything that
+takes a progress can be driven from it, `Keyframes::sample` included.
+
+`layout::scroll_offset(ident, cx)` reads how far a `ScrollArea` has been
+scrolled, which is the input side of the same pair.
+
+`ScrollArea` uses it for the second of the two motivating cases: a hairline
+shadow at the top of the viewport, faded in over the first `effect.edgeFadeBand`
+pixels of scrolling. It says there is content above the fold, it is not drawn
+at all while the content is at the top, and it moves only because the user
+moved the content.
+
+### Reduced motion, and whose decision it is
+
+A link makes no decision of its own, deliberately. A header that collapses as
+the content scrolls under it, or a shadow that appears once there is something
+above the fold, is not gratuitous motion: it is a one-to-one response to a
+movement the user is making with their own hand, and suppressing it would
+remove information rather than calm — the header would jump between two heights
+and the shadow would blink. A decorative parallax, a background drifting at a
+different rate to say nothing at all, is the opposite.
+
+Only the caller knows which of those it is building, so the caller says so:
+
+```rust
+ScrollLink::over(px(300.0)).decorative(motion::reduce_motion(cx))
+```
+
+A decorative link under reduced motion reports 0 at every offset, which is the
+resting end of the effect: the layer simply sits where it belongs.
+
 ## Keyframes
 
 `Keyframes` is a path through stops instead of a straight line between two
@@ -170,6 +310,34 @@ if self.presence.is_rendered() {
 `is_rendered` stays true through the whole exit and turns false only once the
 element is gone, which is also what the semantic snapshot reports.
 
+### A phase that is cancelled plays backwards
+
+An entrance cancelled at 30% leaves from 30%. It does not restart a full exit
+from a state the element never reached, and it does not jump to a different
+opacity on the frame it is cancelled.
+
+The two phases are separate specifications with separate durations and separate
+curves, so "where it had got to" is a position, not a time. The visible
+progress is looked up in the other specification — `MotionSpec::time_at`, the
+inverse of `MotionSpec::progress` — and the reversal starts at the point that
+produces it. The element therefore leaves through the exit's own curve, using
+the part of the exit's time that is left once the rest of it is already behind:
+roughly 30% of it for a 30% entrance, and exactly that when both curves are
+linear. Reading the position back rather than scaling the elapsed time is what
+makes it true for a curve that is not linear and for a sprung phase.
+
+`time_at` is sampled at a millisecond rather than solved. A cubic bezier has no
+closed-form inverse, and a spring is not even monotonic — an underdamped one
+passes its target and comes back — so the earliest time the value was there is
+the only well-defined answer, and a millisecond is the granularity a
+specification is written in anyway.
+
+This is deliberately not the velocity handover a `Transition` retarget
+performs. A value aimed somewhere new is still going the way it was going; a
+phase that is cancelled has been told to go back. Carrying the speed across
+would mean an element on its way in overshooting past being present, and that
+is not a state a lifecycle has.
+
 ## Springs
 
 `Spring` is evaluated analytically, so a value at any instant costs the same
@@ -185,6 +353,37 @@ matching settle time, bounded by the same four seconds.
 
 Only an underdamped spring (damping ratio below one) overshoots. `bouncy` does,
 `smooth` and `snappy` do not.
+
+### Duration and bounce
+
+Stiffness, damping and mass are three numbers for two decisions, and neither
+decision is any of the three. `Spring::perceptual(duration, bounce)` is the way
+in for a design decision, and it is a change of variables rather than an
+approximation — the same parameterisation as SwiftUI's
+`Spring(duration:bounce:)`:
+
+- mass is fixed at 1, because a spring depends on stiffness and damping only
+  through `k/m` and `c/m`;
+- `duration` is the period of the undamped oscillation, `omega = 2π/duration`,
+  so `stiffness = omega² · mass`;
+- `bounce` is the damping ratio turned inside out so that 0 is critical damping
+  from either side: `zeta = 1 - bounce` for a positive bounce, reaching the
+  undamped `zeta = 0` at 1, and `zeta = 1/(1 + bounce)` for a negative one,
+  growing without bound toward -1. Damping follows:
+  `damping = 2·zeta·sqrt(stiffness·mass)`, which is `4π·zeta·mass/duration`.
+
+So a bounce of 0 settles without passing its target, a positive bounce
+overshoots and comes back, and a negative one crawls in. The bounce is held
+inside `-0.99..=0.99`, because both ends of the mapping describe a spring that
+never arrives.
+
+`Spring::perceptual_duration` and `Spring::bounce` read the same two numbers
+back off a spring built any other way. The duration is not the settle time: at
+a bounce of 0 a spring is about 99% of the way there when its perceptual
+duration is up, and a bouncier one is still visibly moving. `settle_time` is
+the honest end of the motion.
+
+`Spring::new` is unchanged, and the token presets still come through it.
 
 ## FLIP
 
@@ -348,3 +547,8 @@ clamps; overshoot survives in `Transition` and `Presence`, which sample
 `MotionSpec::progress` directly. `motion.pressOffsetPx` and `motion.hoverLiftPx` are the two
 pointer responses, both validated to stay within a hairline so a response can
 never be mistaken for a layout change.
+
+`motion.flickVelocityPxPerSec` and `motion.rubberBandTension` are the two
+gesture decisions. A flick threshold is a judgement about intent and a band
+tension is a judgement about how much a boundary should give, so neither is a
+number a component gets to invent.

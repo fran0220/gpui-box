@@ -208,6 +208,7 @@ fn decode(path: &Path) -> Result<((u32, u32), Vec<u8>)> {
 /// A GPUI application owns the window system for its lifetime, so the gallery
 /// swaps the scene on a live window rather than opening a process per image.
 fn capture_into(directory: &Path, only: &[String]) -> Result<usize> {
+    let _held = Capturing::claim()?;
     fs::create_dir_all(directory).with_context(|| format!("create {}", directory.display()))?;
     let mut command = Command::new(env!("CARGO"));
     command
@@ -227,27 +228,88 @@ fn capture_into(directory: &Path, only: &[String]) -> Result<usize> {
     if !status.success() {
         bail!("capturing scenes failed");
     }
-    // Counting what was asked for rather than what arrived would report a run
-    // that stopped early as a complete one, and a comparison against the
-    // images it never wrote would then pass.
+    // Naming every image the run owed rather than counting what is there:
+    // a run that stopped early would otherwise report as a complete one, and
+    // a comparison against images it never wrote would pass. Counting alone
+    // cannot tell the difference when the destination already holds the rest
+    // of the catalog.
     let wanted = expected_images(only);
-    let written = fs::read_dir(directory)?.count();
-    if written != wanted {
+    let absent: Vec<&String> = wanted
+        .iter()
+        .filter(|name| !directory.join(name).exists())
+        .collect();
+    if !absent.is_empty() {
         bail!(
-            "expected {wanted} images under {} but found {written}",
-            directory.display()
+            "the capture owed {} images and {} never arrived under {}: {}",
+            wanted.len(),
+            absent.len(),
+            directory.display(),
+            absent
+                .iter()
+                .map(|name| name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
         );
     }
-    Ok(wanted)
+    Ok(wanted.len())
 }
 
-fn expected_images(only: &[String]) -> usize {
-    bundled().len()
-        * if only.is_empty() {
-            gpui_kit::scenes::catalog().len()
-        } else {
-            only.len()
+/// The right to be the only capture running on this machine.
+///
+/// Two galleries cannot capture at once. They take the foreground from each
+/// other, and a window nobody is compositing hands back the frame it drew
+/// last, so both runs read each other's scenes. That failure looks exactly
+/// like a component having changed, which is the one thing this tool exists
+/// to report truthfully.
+struct Capturing(PathBuf);
+
+impl Capturing {
+    fn claim() -> Result<Self> {
+        let path = root().join("target").join("capturing.lock");
+        fs::create_dir_all(path.parent().expect("target has a parent"))?;
+        match fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+        {
+            Ok(_) => Ok(Self(path)),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => bail!(
+                "another capture is running. Wait for it, or delete {} if nothing is.",
+                path.display()
+            ),
+            Err(error) => Err(error).with_context(|| format!("claim {}", path.display())),
         }
+    }
+}
+
+impl Drop for Capturing {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.0);
+    }
+}
+
+/// Every file name a capture of `only` owes, or of the catalog when empty.
+fn expected_images(only: &[String]) -> Vec<String> {
+    let scenes: Vec<String> = if only.is_empty() {
+        gpui_kit::scenes::catalog()
+            .iter()
+            .map(|scene| scene.name.to_owned())
+            .collect()
+    } else {
+        only.to_vec()
+    };
+    let themes: Vec<String> = bundled()
+        .iter()
+        .map(|theme| theme.meta.id.clone())
+        .collect();
+    scenes
+        .iter()
+        .flat_map(|scene| {
+            themes
+                .iter()
+                .map(move |theme| format!("{scene}-{theme}.png"))
+        })
+        .collect()
 }
 
 fn platform() -> &'static str {
@@ -517,6 +579,14 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
     for (name, value) in [
         ("motion.pressOffsetPx", tokens.press_offset()),
         ("motion.hoverLiftPx", tokens.hover_lift()),
+    ] {
+        writeln!(output, "| `{name}` | {value} |")?;
+    }
+
+    output.push_str("\n| Gesture | Value |\n|---|---:|\n");
+    for (name, value) in [
+        ("motion.flickVelocityPxPerSec", tokens.flick_velocity()),
+        ("motion.rubberBandTension", tokens.rubber_band_tension()),
     ] {
         writeln!(output, "| `{name}` | {value} |")?;
     }

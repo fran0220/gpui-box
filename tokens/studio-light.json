@@ -177,7 +177,9 @@
       "grab": { "stiffness": 520, "damping": 42, "mass": 1 }
     },
     "pressOffsetPx": 1,
-    "hoverLiftPx": 1
+    "hoverLiftPx": 1,
+    "flickVelocityPxPerSec": 420,
+    "rubberBandTension": 0.55
   },
   "effect": {
     "glassAlphaMacos": 0.95,

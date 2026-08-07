@@ -139,9 +139,11 @@ pub mod prelude {
     pub use crate::layout::{
         Dock, DockEvent, DockPanel, DockRegion, ScrollArea, ScrollAxis, SplitAxis, SplitChange,
         SplitKind, SplitLayout, SplitPane, SplitPaneSpec, SplitRecord, SplitRecordError, SplitSide,
-        SplitTree, StatusBar, StatusGroup, StatusItem, Toolbar, ToolbarItem,
+        SplitTree, StatusBar, StatusGroup, StatusItem, Toolbar, ToolbarItem, scroll_offset,
     };
-    pub use crate::motion::{Flip, Flipping, Keyframe, Keyframes, Presence, Transition, flip};
+    pub use crate::motion::{
+        Flip, Flipping, Keyframe, Keyframes, Presence, ScrollLink, Transition, Velocity, flip,
+    };
     pub use crate::navigation::{
         Accordion, AccordionSection, Breadcrumb, Crumb, PageTotal, Pagination, Sidebar,
         SidebarItem, SidebarSection, StepStatus, TabItem, Tabs, Wizard, WizardIntent, WizardLayout,

@@ -166,6 +166,10 @@ pub fn catalog() -> Vec<Scene> {
             build: scroll_area,
         },
         Scene {
+            name: "scroll-shadow",
+            build: scroll_shadow,
+        },
+        Scene {
             name: "toolbar",
             build: toolbar,
         },
@@ -1660,6 +1664,29 @@ fn split_pane(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .end(filler(&theme, "Editor", 8))
                         .on_resize(|_, _, _| {})
                         .on_collapse(|_, _, _| {}),
+                ),
+        )
+        .into_any_element()
+}
+
+/// The same region, already scrolled, so the shadow that says there is content
+/// above the fold is in a captured image rather than only in a test.
+fn scroll_shadow(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    crate::layout::scroll_to("scene.scroll.scrolled", gpui::point(px(0.0), px(120.0)), cx);
+    stack(&theme)
+        .w(px(480.0))
+        .child(
+            div()
+                .hairline(&theme)
+                .radius(&theme, Radius::Card)
+                .overflow_hidden()
+                .child(
+                    ScrollArea::new("scene.scroll.scrolled")
+                        .label("Run output")
+                        .vertical()
+                        .height(200.0)
+                        .child(filler(&theme, "Output", 20)),
                 ),
         )
         .into_any_element()

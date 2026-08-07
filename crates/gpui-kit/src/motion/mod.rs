@@ -10,8 +10,16 @@
 //!   across;
 //! - [`Transition`] animates a value whose target can change mid-flight,
 //!   carrying the speed it already had across a retarget;
-//! - [`Presence`] keeps an element alive long enough to animate out;
-//! - [`Stagger`] spreads one specification across a group;
+//! - [`VelocityTracker`] measures how fast a gesture is moving, which is what
+//!   [`flick`], [`rubber_band`] and [`Transition::release`] need;
+//! - [`ScrollLink`] reads a scroll offset as a progress, which is motion with
+//!   no clock in it at all;
+//! - [`Presence`] keeps an element alive long enough to animate out, and plays
+//!   a phase backwards from where it had got to when the other cancels it;
+//! - [`Stagger`] spreads one specification across a group, forwards or in
+//!   reverse;
+//! - [`Sequence`] runs specifications one after another and knows how long
+//!   they take together;
 //! - [`Flipping::flip`] slides an element from where it was to where it is,
 //!   and [`Flipping::flip_size`] additionally resizes it.
 //!
@@ -25,10 +33,13 @@
 
 mod easing;
 mod flip;
+mod gesture;
 mod interpolate;
 pub(crate) mod keyed;
 mod keyframes;
 mod presence;
+mod scroll_link;
+mod sequence;
 mod spec;
 mod spring;
 mod stagger;
@@ -36,9 +47,12 @@ mod transition;
 
 pub use easing::{CubicBezier, Easing};
 pub use flip::{Flip, Flipped, Flipping, flip, shared_flip, tracked_ids};
+pub use gesture::{Flick, VELOCITY_WINDOW, Velocity, VelocityTracker, flick, rubber_band};
 pub use interpolate::Interpolate;
 pub use keyframes::{Keyframe, Keyframes};
 pub use presence::{Phase, Presence};
+pub use scroll_link::ScrollLink;
+pub use sequence::Sequence;
 pub use spec::{
     MotionSpec, content_in, dialog, dialog_arrival, dialog_in, entrance, fade_in, gradient_opacity,
     menu, menu_in, pulse_wave, resize, row_in, shimmer_offset, state_change, tracking,

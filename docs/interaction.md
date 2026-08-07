@@ -60,6 +60,31 @@ pub struct DragItem {
 `source` is what lets a surface tell its own rows from somebody else's.
 `kind` is what lets a target refuse a payload it does not handle.
 
+## How fast it was going
+
+A drop reports a speed as well as a place:
+
+```rust
+pub struct DropIntent {
+    pub item: DragItem,
+    pub position: DropPosition,
+    pub velocity: Velocity,  // pixels a second, at the moment it was let go
+}
+```
+
+`ActiveDrag::velocity` is the same measurement while the drag is still in
+flight. Both come from a trailing window over the pointer moves, so a gesture
+that stopped before it was released reports `Velocity::ZERO` rather than the
+speed it had before the pause — the difference between a flick and a
+deliberate placement, and the reason a host can tell them apart with
+`motion::flick`. A staged drag has no pointer and no gesture, so it reports
+zero too. `docs/motion.md` says how the measurement is taken and what can be
+built on it.
+
+The library does nothing with the speed on its own. Reordering is not a
+gesture that has momentum: the row goes where the drop said, at the moment the
+host says so.
+
 ## What a drag publishes
 
 While a drag is in flight the semantic tree carries one extra node, id

@@ -180,6 +180,10 @@ pub struct Motion {
     pub press_offset: f32,
     /// How far a hovered control rises, in pixels.
     pub hover_lift: f32,
+    /// The speed past which a released gesture is a flick, in pixels a second.
+    pub flick_velocity: f32,
+    /// How much of an overscroll is shown at the boundary.
+    pub rubber_band_tension: f32,
 }
 
 /// Shadows for each elevation step. Flat is intentionally empty rather than a
@@ -378,6 +382,8 @@ impl Theme {
                 grab: tokens.spring(SpringPreset::Grab),
                 press_offset: tokens.press_offset(),
                 hover_lift: tokens.hover_lift(),
+                flick_velocity: tokens.flick_velocity(),
+                rubber_band_tension: tokens.rubber_band_tension(),
             },
             elevation: Elevations {
                 flat: shadow(tokens, Elevation::Flat),

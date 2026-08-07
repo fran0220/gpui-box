@@ -188,6 +188,17 @@ impl TokenDocument {
                 return invalid(path, "must be between 0 and 4 pixels");
             }
         }
+
+        if self.motion.flick_velocity_px_per_sec <= 0.0 {
+            return invalid("motion.flickVelocityPxPerSec", "must be positive");
+        }
+        // A tension of one passes the whole pull through and is no band at
+        // all; a tension of zero refuses to move and reads as a stuck view.
+        if !(0.0..=1.0).contains(&self.motion.rubber_band_tension)
+            || self.motion.rubber_band_tension == 0.0
+        {
+            return invalid("motion.rubberBandTension", "must be above 0 and at most 1");
+        }
         Ok(())
     }
 
@@ -396,6 +407,17 @@ impl TokenDocument {
     /// How far a hovered control rises, in pixels.
     pub fn hover_lift(&self) -> f32 {
         self.motion.hover_lift_px
+    }
+
+    /// The speed past which a released gesture counts as a flick, in pixels a
+    /// second.
+    pub fn flick_velocity(&self) -> f32 {
+        self.motion.flick_velocity_px_per_sec
+    }
+
+    /// How much of an overscroll is shown at the boundary.
+    pub fn rubber_band_tension(&self) -> f32 {
+        self.motion.rubber_band_tension
     }
 
     pub fn easing(&self, step: MotionEasing) -> [f32; 4] {
@@ -987,6 +1009,12 @@ pub struct MotionTokens {
     pub press_offset_px: f32,
     /// How far a control rises under the pointer.
     pub hover_lift_px: f32,
+    /// The speed, in pixels a second, past which a released gesture is a
+    /// flick rather than a drag that happened to end.
+    pub flick_velocity_px_per_sec: f32,
+    /// The fraction of an overscroll that is shown at the boundary, before
+    /// the band starts tightening.
+    pub rubber_band_tension: f32,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

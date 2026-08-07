@@ -20,6 +20,24 @@ pub enum Phase {
     Gone,
 }
 
+/// An element's arrival and departure, either of which can be cancelled by the
+/// other while it is still running.
+///
+/// A cancelled phase is played backwards from where it had got to rather than
+/// restarted. The two phases are separate specifications with separate
+/// durations and separate curves, so "where it had got to" is a position and
+/// not a time: the visible progress is looked up in the other specification —
+/// [`MotionSpec::time_at`] — and the reversal starts from the point that
+/// produces it. An entrance cancelled at 30% therefore leaves from 30%,
+/// through the exit's own curve, in the part of the exit's time that is left
+/// once 70% of it is already behind.
+///
+/// This is deliberately not the velocity handover
+/// [`Transition`](super::Transition) performs on a retarget. A value aimed
+/// somewhere new is still going the way it was going; a phase that is
+/// cancelled has been told to go back, and carrying the speed across would
+/// mean an element on its way in overshooting past being present, which is not
+/// a state a lifecycle has.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Presence {
     phase: Phase,
@@ -93,11 +111,9 @@ impl Presence {
                 self.elapsed = Duration::ZERO;
             }
             Phase::Exiting => {
-                // Resume the entrance from the opacity currently on screen
-                // instead of restarting it.
-                let remaining = self.progress();
+                let visible = self.progress();
                 self.phase = Phase::Entering;
-                self.elapsed = self.enter.total().mul_f32(remaining);
+                self.elapsed = self.enter.time_at(visible);
             }
         }
     }
@@ -110,9 +126,11 @@ impl Presence {
                 self.elapsed = Duration::ZERO;
             }
             Phase::Entering => {
-                let shown = self.progress();
+                let visible = self.progress();
                 self.phase = Phase::Exiting;
-                self.elapsed = self.exit.total().mul_f32(1.0 - shown);
+                // An exit runs from present to gone, so being `visible` at all
+                // means it has already covered the rest of its path.
+                self.elapsed = self.exit.time_at(1.0 - visible);
             }
         }
     }
@@ -244,6 +262,124 @@ mod tests {
         presence.hide();
         assert_eq!(presence.phase(), Phase::Exiting);
         assert!((presence.progress() - interrupted).abs() < 0.05);
+    }
+
+    /// Enter and exit on a curve that is nowhere near linear, so a reversal
+    /// that assumed the two timelines were proportional would be caught.
+    fn curved() -> Presence {
+        let curve = CubicBezier::new(0.42, 0.0, 0.58, 1.0);
+        Presence::hidden(MotionSpec::new(200, curve), MotionSpec::new(100, curve))
+    }
+
+    /// Runs the current phase out a millisecond at a time and reports how long
+    /// it took.
+    fn run_out(presence: &mut Presence) -> Duration {
+        let mut elapsed = Duration::ZERO;
+        while presence.is_animating() {
+            presence.advance(Duration::from_millis(1));
+            elapsed += Duration::from_millis(1);
+        }
+        elapsed
+    }
+
+    #[test]
+    fn a_cancelled_entrance_leaves_from_the_opacity_it_reached() {
+        let mut presence = curved();
+        presence.show();
+        presence.advance(Duration::from_millis(60));
+        let interrupted = presence.progress();
+        assert!(interrupted < 0.25, "the curve starts slowly: {interrupted}");
+
+        presence.hide();
+        assert!(
+            (presence.progress() - interrupted).abs() < 0.01,
+            "the element jumped from {interrupted} to {} on being cancelled",
+            presence.progress()
+        );
+        let took = run_out(&mut presence);
+        assert_eq!(presence.phase(), Phase::Gone);
+        assert!(
+            took < Duration::from_millis(40),
+            "leaving from {interrupted} took {took:?} of a 100ms exit"
+        );
+    }
+
+    #[test]
+    fn a_cancelled_exit_comes_back_the_way_it_went() {
+        let mut presence = curved();
+        presence.show();
+        presence.advance(Duration::from_millis(200));
+        presence.hide();
+        presence.advance(Duration::from_millis(40));
+        let interrupted = presence.progress();
+
+        presence.show();
+        assert!(
+            (presence.progress() - interrupted).abs() < 0.01,
+            "the element jumped from {interrupted} to {}",
+            presence.progress()
+        );
+        let took = run_out(&mut presence);
+        assert_eq!(presence.phase(), Phase::Present);
+        assert!(
+            took < Duration::from_millis(200),
+            "returning from {interrupted} took the whole {took:?} entrance"
+        );
+    }
+
+    #[test]
+    fn the_earlier_a_phase_is_cancelled_the_less_of_the_other_it_costs() {
+        let took = |after_ms| {
+            let mut presence = curved();
+            presence.show();
+            presence.advance(Duration::from_millis(after_ms));
+            presence.hide();
+            run_out(&mut presence)
+        };
+        assert!(
+            took(40) < took(100) && took(100) < took(180),
+            "{:?}, {:?}, {:?}",
+            took(40),
+            took(100),
+            took(180)
+        );
+    }
+
+    #[test]
+    fn a_delayed_entrance_reverses_from_what_is_on_screen() {
+        let linear = |ms| MotionSpec::new(ms, CubicBezier::new(0.0, 0.0, 1.0, 1.0));
+        let mut presence = Presence::hidden(linear(100).with_delay(100), linear(100));
+        presence.show();
+        presence.advance(Duration::from_millis(150));
+        let interrupted = presence.progress();
+        assert!((interrupted - 0.5).abs() < 0.02);
+
+        presence.hide();
+        assert!((presence.progress() - interrupted).abs() < 0.02);
+        let took = run_out(&mut presence);
+        assert!(
+            took.abs_diff(Duration::from_millis(50)) <= Duration::from_millis(2),
+            "half an exit is 50ms, not {took:?}"
+        );
+    }
+
+    #[test]
+    fn a_sprung_entrance_reverses_from_what_is_on_screen() {
+        let spring = MotionSpec::sprung(crate::motion::Spring::perceptual(
+            Duration::from_millis(300),
+            0.4,
+        ));
+        let mut presence = Presence::hidden(spring, spring);
+        presence.show();
+        presence.advance(Duration::from_millis(80));
+        let interrupted = presence.progress();
+
+        presence.hide();
+        assert!(
+            (presence.progress() - interrupted).abs() < 0.02,
+            "a sprung entrance jumped from {interrupted} to {}",
+            presence.progress()
+        );
     }
 
     #[test]

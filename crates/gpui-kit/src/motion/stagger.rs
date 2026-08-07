@@ -20,6 +20,7 @@ pub const ROW_STAGGER_CAP: Duration = Duration::from_millis(ROW_STEP_MS * (ROW_W
 pub struct Stagger {
     step: Duration,
     max_items: usize,
+    reversed: bool,
 }
 
 impl Stagger {
@@ -27,6 +28,7 @@ impl Stagger {
         Self {
             step,
             max_items: max_items.max(2),
+            reversed: false,
         }
     }
 
@@ -48,23 +50,52 @@ impl Stagger {
         self
     }
 
-    pub fn delay(&self, index: usize, count: usize) -> Duration {
-        if count <= 1 {
-            return Duration::ZERO;
-        }
-        // Past max_items the window is fixed, so the step shrinks to fit it.
-        let step = if count > self.max_items {
+    /// Runs the wave from the last item to the first.
+    ///
+    /// This is the order a list leaves on. A list that arrived from the top
+    /// down should depart from the bottom up, so the row the user is looking
+    /// at — the one they just acted on, at the top — is the last to go rather
+    /// than the first, and the group empties away from them instead of out
+    /// from under them.
+    pub fn reversed(mut self) -> Self {
+        self.reversed = true;
+        self
+    }
+
+    pub fn is_reversed(&self) -> bool {
+        self.reversed
+    }
+
+    /// How far apart two neighbours start, for a group of `count`.
+    ///
+    /// Past `max_items` the window is fixed, so the step shrinks to fit it.
+    fn step_for(&self, count: usize) -> Duration {
+        if count > self.max_items {
             self.step
                 .mul_f32((self.max_items - 1) as f32 / (count - 1) as f32)
         } else {
             self.step
-        };
-        step.mul_f32(index.min(count.saturating_sub(1)) as f32)
+        }
+    }
+
+    pub fn delay(&self, index: usize, count: usize) -> Duration {
+        if count <= 1 {
+            return Duration::ZERO;
+        }
+        let last = count - 1;
+        let place = index.min(last);
+        let place = if self.reversed { last - place } else { place };
+        self.step_for(count).mul_f32(place as f32)
     }
 
     /// The window the whole group occupies, including the last item's span.
+    ///
+    /// Reversing changes which item waits longest, not how long the group
+    /// takes, so the window is measured from the furthest place rather than
+    /// from the last index.
     pub fn total(&self, count: usize, spec: MotionSpec) -> Duration {
-        self.delay(count.saturating_sub(1), count) + spec.total()
+        let furthest = self.step_for(count).mul_f32(count.saturating_sub(1) as f32);
+        furthest + spec.total()
     }
 
     /// Applies the delay for one item to a spec.
@@ -136,6 +167,41 @@ mod tests {
             );
         }
         assert_eq!(stagger.delay(7, 8), ROW_STAGGER_CAP);
+    }
+
+    #[test]
+    fn a_reversed_wave_starts_at_the_far_end() {
+        let stagger = Stagger::from_millis(30).reversed();
+        assert!(stagger.is_reversed());
+        assert_eq!(stagger.delay(4, 5), Duration::ZERO);
+        assert_eq!(stagger.delay(3, 5), Duration::from_millis(30));
+        assert_eq!(stagger.delay(0, 5), Duration::from_millis(120));
+    }
+
+    #[test]
+    fn reversing_does_not_change_how_long_the_group_takes() {
+        let forward = Stagger::from_millis(30);
+        for count in [1, 2, 5, 200] {
+            assert_eq!(
+                forward.total(count, spec()),
+                forward.reversed().total(count, spec()),
+                "{count} items"
+            );
+        }
+    }
+
+    #[test]
+    fn a_reversed_wave_compresses_the_same_way_a_forward_one_does() {
+        let stagger = Stagger::rows().reversed();
+        for count in [2, 8, 50, 500] {
+            let waited = stagger.delay(0, count);
+            assert!(
+                waited.as_millis() <= ROW_STAGGER_CAP.as_millis(),
+                "{count} rows waited {waited:?}"
+            );
+        }
+        assert_eq!(stagger.delay(7, 8), Duration::ZERO);
+        assert_eq!(stagger.delay(0, 8), ROW_STAGGER_CAP);
     }
 
     #[test]
