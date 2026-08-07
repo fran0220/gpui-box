@@ -6784,6 +6784,7 @@ dependencies = [
  "anyhow",
  "gpui-kit",
  "gpui-kit-tokens",
+ "png 0.18.1",
 ]
 
 [[package]]

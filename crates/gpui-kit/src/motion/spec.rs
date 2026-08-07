@@ -59,6 +59,12 @@ impl MotionSpec {
         self.spring.is_some()
     }
 
+    /// The spring behind a sprung specification, for callers that need more of
+    /// it than an eased fraction — velocity across a retarget, for one.
+    pub fn spring(self) -> Option<Spring> {
+        self.spring
+    }
+
     pub fn total(self) -> Duration {
         Duration::from_millis(self.duration_ms + self.delay_ms)
     }

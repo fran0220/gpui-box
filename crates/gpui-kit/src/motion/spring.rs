@@ -49,35 +49,73 @@ impl Spring {
 
     /// Normalized step response: 0 at rest, approaching 1 as it settles.
     pub fn value(self, elapsed: Duration) -> f32 {
+        self.value_at(elapsed, 0.0).0
+    }
+
+    /// Normalized step response for a spring that was already moving when it
+    /// was aimed here.
+    ///
+    /// `velocity` is the speed carried into the motion, in units of the full
+    /// distance per second and positive toward the target. The pair is the
+    /// value and its own velocity, so a caller that retargets again can hand
+    /// the motion on rather than restarting it.
+    pub fn value_at(self, elapsed: Duration, velocity: f32) -> (f32, f32) {
+        // Distance still to travel starts at the whole of it, and closing that
+        // distance is what a positive carried velocity does.
+        let (error, error_rate) = self.error(elapsed, 1.0, -velocity);
+        (1.0 - error, -error_rate)
+    }
+
+    /// The remaining distance and its rate of change at `elapsed`, for a
+    /// spring released with error `initial` changing at `initial_rate`.
+    fn error(self, elapsed: Duration, initial: f32, initial_rate: f32) -> (f32, f32) {
         let t = elapsed.as_secs_f32();
         if t <= 0.0 {
-            return 0.0;
+            return (initial, initial_rate);
         }
         let omega = self.omega();
         let zeta = self.damping_ratio();
-        let displacement = if zeta < 1.0 {
+        if zeta < 1.0 {
             let damped = omega * (1.0 - zeta * zeta).sqrt();
-            (-zeta * omega * t).exp()
-                * ((damped * t).cos() + (zeta * omega / damped) * (damped * t).sin())
+            let a = initial;
+            let b = (initial_rate + zeta * omega * initial) / damped;
+            let decay = (-zeta * omega * t).exp();
+            let (sin, cos) = (damped * t).sin_cos();
+            (
+                decay * (a * cos + b * sin),
+                decay
+                    * ((-zeta * omega * a + damped * b) * cos
+                        + (-zeta * omega * b - damped * a) * sin),
+            )
         } else if (zeta - 1.0).abs() < f32::EPSILON {
-            (-omega * t).exp() * (1.0 + omega * t)
+            let slope = initial_rate + omega * initial;
+            let decay = (-omega * t).exp();
+            let error = initial + slope * t;
+            (decay * error, decay * (slope - omega * error))
         } else {
             let root = omega * (zeta * zeta - 1.0).sqrt();
             let first = -zeta * omega + root;
             let second = -zeta * omega - root;
-            (second * (first * t).exp() - first * (second * t).exp()) / (second - first)
-        };
-        1.0 - displacement
+            let c1 = (initial_rate - second * initial) / (first - second);
+            let c2 = initial - c1;
+            let (a, b) = (c1 * (first * t).exp(), c2 * (second * t).exp());
+            (a + b, a * first + b * second)
+        }
     }
 
     /// How long until the spring stays within one part in a thousand of its target.
     pub fn settle_time(self) -> Duration {
+        self.settle_time_at(0.0)
+    }
+
+    /// The same, for a spring released with `velocity` already carried into
+    /// the motion: one that is travelling fast needs longer to come to rest.
+    pub fn settle_time_at(self, velocity: f32) -> Duration {
         let step = Duration::from_millis(4);
+        let settled = |elapsed| (1.0 - self.value_at(elapsed, velocity).0).abs() < SETTLE_EPSILON;
         let mut elapsed = step;
         while elapsed < MAX_SETTLE {
-            if (1.0 - self.value(elapsed)).abs() < SETTLE_EPSILON
-                && (1.0 - self.value(elapsed + step)).abs() < SETTLE_EPSILON
-            {
+            if settled(elapsed) && settled(elapsed + step) {
                 return elapsed;
             }
             elapsed += step;
@@ -156,5 +194,70 @@ mod tests {
     #[test]
     fn settle_time_is_bounded_for_a_nearly_static_spring() {
         assert_eq!(Spring::new(1.0, 1000.0, 50.0).settle_time(), MAX_SETTLE);
+    }
+
+    /// The three damping regimes, so a claim about the solver is a claim about
+    /// all of it.
+    fn regimes() -> [Spring; 3] {
+        [
+            spring(SpringPreset::Bouncy),
+            Spring::new(400.0, 40.0, 1.0),
+            Spring::new(200.0, 80.0, 1.0),
+        ]
+    }
+
+    #[test]
+    fn released_from_rest_the_general_solution_is_the_step_response() {
+        for spring in regimes() {
+            for step in 0..200 {
+                let elapsed = Duration::from_millis(step * 5);
+                let (value, _) = spring.value_at(elapsed, 0.0);
+                assert!(
+                    (value - spring.value(elapsed)).abs() < 1e-4,
+                    "{spring:?} diverged at {elapsed:?}: {value}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_carried_velocity_is_the_starting_velocity() {
+        for spring in regimes() {
+            let (value, velocity) = spring.value_at(Duration::ZERO, 3.0);
+            assert_eq!(value, 0.0);
+            assert!((velocity - 3.0).abs() < 1e-5, "{spring:?} lost its speed");
+        }
+    }
+
+    #[test]
+    fn a_spring_released_with_speed_is_further_along_at_once() {
+        for spring in regimes() {
+            let early = Duration::from_millis(10);
+            assert!(
+                spring.value_at(early, 4.0).0 > spring.value(early),
+                "{spring:?} did not carry its velocity"
+            );
+        }
+    }
+
+    #[test]
+    fn every_regime_still_settles_from_a_carried_velocity() {
+        for spring in regimes() {
+            for velocity in [-4.0, 0.0, 6.0] {
+                let settle = spring.settle_time_at(velocity);
+                assert!(settle <= MAX_SETTLE);
+                let settled = spring.value_at(settle, velocity).0;
+                assert!(
+                    (settled - 1.0).abs() < 0.01,
+                    "{spring:?} at {velocity} settled on {settled}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_spring_thrown_the_wrong_way_takes_longer_to_come_to_rest() {
+        let spring = spring(SpringPreset::Smooth);
+        assert!(spring.settle_time_at(-6.0) > spring.settle_time());
     }
 }

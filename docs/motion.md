@@ -8,8 +8,9 @@ without a window.
 | Curve | `CubicBezier`, `Easing` | Names a shape; `Easing` resolves against the theme. |
 | Physics | `Spring` | Closed-form damped spring from stiffness, damping and mass. |
 | Specification | `MotionSpec` | A curve — or a spring, via `MotionSpec::sprung` — plus duration and delay. |
-| Value | `Interpolate` | Moves `f32`, `Pixels`, `Rems`, `Hsla`, `Point` and `Size`. |
-| State | `Transition` | Animates a value whose target can change mid-flight. |
+| Value | `Interpolate` | Moves `f32`, `Pixels`, `Rems`, `Hsla`, `Point` and `Size`, and measures how far apart two of them are. |
+| Path | `Keyframes` | Takes a value through named stops rather than straight across. |
+| State | `Transition` | Animates a value whose target can change mid-flight, carrying the speed it already had. |
 | Lifecycle | `Presence` | Keeps an element alive long enough to animate out. |
 | Group | `Stagger` | Spreads one specification across a list. |
 | Position | `Flipping::flip` | Slides an element from where it was to where it is. |
@@ -97,6 +98,55 @@ because those survive interruption:
   restarting from the old target;
 - reversing a `Presence` mid-flight resumes from what is currently visible.
 
+## Velocity handover
+
+Continuing from the value on screen is not enough on its own: a value that was
+travelling and is then aimed somewhere else would still leave from a standing
+start, which reads as a stall for the first few frames.
+
+A retarget therefore measures the speed the value already had, rescales it into
+the new distance — that is what `Interpolate::distance` is for — and releases
+the new motion with it. A sprung transition is then given
+`Spring::settle_time_at` rather than its resting settle time, because a spring
+that is already moving needs longer to come to rest.
+
+Only a spring carries velocity. A cubic bezier is a shape read off a clock and
+has no state to hand on, so a curve-based transition hands over nothing and
+restarts its curve from zero.
+
+The speed keeps its direction. `Interpolate::distance` is a length with no
+sign, so the direction is recovered by stepping a little further along the path
+the value is already on and asking whether that landed nearer the new target.
+Reversing a target therefore throws the value on the way it was already going
+before it comes back, which is what a moving thing does; turning it round on
+the spot would be the same stall this exists to remove, wearing a different
+shape. The same test reads a spring that has overshot correctly, where the
+value is past its target and already travelling back toward it.
+
+## Keyframes
+
+`Keyframes` is a path through stops instead of a straight line between two
+ends:
+
+```rust
+let path = Keyframes::new(theme, spec, [
+    Keyframe::new(0.0, 0.0),
+    Keyframe::new(0.5, 12.0).eased(Easing::EaseOut),
+    Keyframe::new(1.0, 0.0),
+])
+.expect("a path needs at least one stop");
+let value = path.sample(progress);
+```
+
+Stops may be given in any order and are sorted; offsets are clamped into
+`0..=1`. A stop may name the `Easing` it is reached on, which is resolved
+against the theme when the path is built, because `sample` has no theme to
+resolve one against; stops without one use the specification's curve. If the
+author wrote no stop at `0.0` or at `1.0`, the nearest stop extends to that
+end. Sampling outside `0..=1` clamps: a keyframe list is an explicit path, and
+what lies past the last place the author put a value is not something to guess.
+An empty list is not a path, so the constructor returns `None`.
+
 ## Exit animations
 
 An element cannot animate out after it has been dropped, so `Presence` owns the
@@ -119,6 +169,11 @@ regardless of frame rate and cannot drift. `Spring::settle_time` finds when the
 motion is within one part in a thousand of its target, capped at four seconds so
 an over-soft configuration cannot animate forever. `Spring::animation` adapts a
 spring to GPUI's `Animation`, so it can drive `with_animation` like any curve.
+
+`Spring::value_at` is the same solution released with a velocity already
+carried into the motion, and returns the value with its own velocity so a
+caller that retargets can hand the motion on. `Spring::settle_time_at` is the
+matching settle time, bounded by the same four seconds.
 
 Only an underdamped spring (damping ratio below one) overshoots. `bouncy` does,
 `smooth` and `snappy` do not.

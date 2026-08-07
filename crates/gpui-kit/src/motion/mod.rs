@@ -6,7 +6,10 @@
 //! - [`Spring`] solves physical motion in closed form;
 //! - [`MotionSpec`] pairs a curve with a duration and delay;
 //! - [`Interpolate`] moves a value between two states;
-//! - [`Transition`] animates a value whose target can change mid-flight;
+//! - [`Keyframes`] takes a value through named stops rather than straight
+//!   across;
+//! - [`Transition`] animates a value whose target can change mid-flight,
+//!   carrying the speed it already had across a retarget;
 //! - [`Presence`] keeps an element alive long enough to animate out;
 //! - [`Stagger`] spreads one specification across a group;
 //! - [`Flipping::flip`] slides an element from where it was to where it is.
@@ -23,6 +26,7 @@ mod easing;
 mod flip;
 mod interpolate;
 pub(crate) mod keyed;
+mod keyframes;
 mod presence;
 mod spec;
 mod spring;
@@ -32,6 +36,7 @@ mod transition;
 pub use easing::{CubicBezier, Easing};
 pub use flip::{Flip, Flipped, Flipping, flip, tracked_ids};
 pub use interpolate::Interpolate;
+pub use keyframes::{Keyframe, Keyframes};
 pub use presence::{Phase, Presence};
 pub use spec::{
     MotionSpec, content_in, dialog, dialog_arrival, dialog_in, entrance, fade_in, gradient_opacity,

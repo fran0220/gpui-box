@@ -7,16 +7,23 @@ use std::time::Duration;
 
 use gpui::{TestAppContext, div, prelude::*, px};
 use gpui_kit::motion::{
-    CubicBezier, Flipping, MotionSpec, Presence, Transition, flip, tracked_ids,
+    CubicBezier, Easing, Flipping, Keyframe, Keyframes, MotionSpec, Presence, Spring, Transition,
+    flip, tracked_ids,
 };
 use gpui_kit::prelude::*;
 use gpui_kit::prelude::{AnimatedNumber, grouped};
+use gpui_kit::theme::Theme;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_testkit::harness::Harness;
 use gpui_kit_testkit::present;
 
 fn linear(duration_ms: u64) -> MotionSpec {
     MotionSpec::new(duration_ms, CubicBezier::new(0.0, 0.0, 1.0, 1.0))
+}
+
+/// An underdamped spring, so overshoot and carried speed are both observable.
+fn sprung() -> MotionSpec {
+    MotionSpec::sprung(Spring::new(400.0, 28.0, 1.0))
 }
 
 /// Publishes the animated width as a semantic value, so the test reads what the
@@ -59,6 +66,119 @@ fn a_transition_animates_across_frames_and_settles(cx: &mut TestAppContext) {
         px(100.0)
     );
     assert!(!transition.borrow().is_animating());
+}
+
+#[gpui::test]
+fn a_sprung_width_retargeted_mid_flight_keeps_moving(cx: &mut TestAppContext) {
+    let transition = Rc::new(RefCell::new(Transition::new(0.0_f32, sprung())));
+    let mut harness = width_scene(cx, transition.clone());
+
+    harness.update(|_, cx| {
+        transition.borrow_mut().set(100.0);
+        cx.refresh_windows();
+    });
+    harness.advance(Duration::from_millis(40));
+    let interrupted = harness.bounds("panel").expect("laid out").size.width;
+    assert!(interrupted > px(0.0) && interrupted < px(100.0));
+
+    harness.update(|_, cx| {
+        transition.borrow_mut().set(200.0);
+        cx.refresh_windows();
+    });
+    // The same retarget from a standing start, to have something to be faster
+    // than.
+    let mut from_rest = Transition::new(f32::from(interrupted), sprung());
+    from_rest.set(200.0);
+    from_rest.advance(Duration::from_millis(32));
+
+    harness.advance(Duration::from_millis(32));
+    let moved = harness.bounds("panel").expect("laid out").size.width;
+    assert!(
+        moved > interrupted,
+        "the width stalled at {interrupted:?} instead of continuing"
+    );
+    assert!(
+        moved > px(from_rest.value()),
+        "a retarget threw away the speed the width had: {moved:?} against {:?}",
+        px(from_rest.value())
+    );
+
+    harness.advance(Duration::from_secs(2));
+    assert_eq!(
+        harness.bounds("panel").expect("laid out").size.width,
+        px(200.0)
+    );
+}
+
+#[gpui::test]
+fn reduced_motion_lands_a_retargeted_spring_at_once(cx: &mut TestAppContext) {
+    let transition = Rc::new(RefCell::new(Transition::new(0.0_f32, sprung())));
+    let mut harness = width_scene(cx, transition.clone());
+    harness.update(|_, cx| cx.set_reduce_motion(true));
+
+    harness.update(|_, cx| {
+        transition.borrow_mut().set(100.0);
+        cx.refresh_windows();
+    });
+    harness.advance(Duration::ZERO);
+    harness.update(|_, cx| {
+        transition.borrow_mut().set(200.0);
+        cx.refresh_windows();
+    });
+    harness.advance(Duration::ZERO);
+
+    assert_eq!(
+        harness.bounds("panel").expect("laid out").size.width,
+        px(200.0)
+    );
+}
+
+#[gpui::test]
+fn a_keyframed_path_passes_through_the_stops_it_was_given(_cx: &mut TestAppContext) {
+    let theme = Theme::studio_dark();
+    let path = Keyframes::new(
+        &theme,
+        linear(200),
+        [
+            Keyframe::new(1.0, 0.0),
+            Keyframe::new(0.5, 12.0),
+            Keyframe::new(0.0, 0.0),
+        ],
+    )
+    .expect("stops were given");
+
+    assert_eq!(path.offsets(), vec![0.0, 0.5, 1.0]);
+    assert_eq!(path.sample(0.0), 0.0);
+    assert!((path.sample(0.5) - 12.0).abs() < 1e-4, "the peak is a stop");
+    assert_eq!(path.sample(1.0), 0.0);
+    assert_eq!(path.sample(4.0), 0.0, "a path does not extrapolate");
+}
+
+#[gpui::test]
+fn a_keyframe_can_be_reached_on_a_curve_of_its_own(_cx: &mut TestAppContext) {
+    let theme = Theme::studio_dark();
+    let path = |easing: Option<Easing>| {
+        let reached = Keyframe::new(1.0, 10.0);
+        Keyframes::new(
+            &theme,
+            linear(200),
+            [
+                Keyframe::new(0.0, 0.0),
+                match easing {
+                    Some(easing) => reached.eased(easing),
+                    None => reached,
+                },
+            ],
+        )
+        .expect("stops were given")
+    };
+
+    let straight = path(None).sample(0.5);
+    let held_back = path(Some(Easing::EaseIn)).sample(0.5);
+    assert!(
+        held_back < straight,
+        "a slow-starting stop must lag the specification's curve, {held_back} against {straight}"
+    );
 }
 
 #[gpui::test]

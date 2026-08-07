@@ -141,7 +141,7 @@ pub mod prelude {
         SplitKind, SplitLayout, SplitPane, SplitPaneSpec, SplitRecord, SplitRecordError, SplitSide,
         SplitTree, StatusBar, StatusGroup, StatusItem, Toolbar, ToolbarItem,
     };
-    pub use crate::motion::{Flip, Flipping, Presence, Transition, flip};
+    pub use crate::motion::{Flip, Flipping, Keyframe, Keyframes, Presence, Transition, flip};
     pub use crate::navigation::{
         Accordion, AccordionSection, Breadcrumb, Crumb, PageTotal, Pagination, Sidebar,
         SidebarItem, SidebarSection, StepStatus, TabItem, Tabs, Wizard, WizardIntent, WizardLayout,
