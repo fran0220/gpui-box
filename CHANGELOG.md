@@ -196,7 +196,9 @@ and `xtask gate [full]`. `scenes check` is the visual regression gate; see
   renderer draws into offscreen textures on a software adapter (llvmpipe,
   WARP), text is shaped by cosmic-text from the bundled Geist fonts only, and
   time is simulated — so a headless VM holds a baseline in
-  `snapshots/headless/scenes` and compares it exactly, byte for byte.
+  `snapshots/headless/scenes`. The comparison permits one 8-bit channel step
+  so the same baseline remains valid across llvmpipe and WARP; a larger
+  difference still fails.
   `cargo run -p xtask -- headless check` runs it. The harness is its own
   workspace with renderer-specific dependencies and a separate lockfile, but
   directly pins the same integration revision as the root. The offscreen WGPU

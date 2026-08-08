@@ -5,8 +5,9 @@
 //! and the pixels are read straight back, so no GPU hardware, compositor, or
 //! display server takes part. Text is shaped by cosmic-text from the fonts
 //! this repository bundles, and time is simulated, which together make the
-//! same scene produce the same bytes on every machine. The comparison is
-//! therefore exact: a single differing byte is a real change.
+//! same scene reproducible on every machine. The comparison permits one 8-bit
+//! channel step because llvmpipe and WARP can land an antialiased edge one
+//! step apart; anything a component changes moves further than that.
 //!
 //! The baseline lives in `snapshots/headless/scenes`, beside but distinct
 //! from the macOS baseline: CoreText and Metal land antialiased edges
@@ -71,11 +72,9 @@ mod imp {
     /// Captures into a scratch directory and reports every image that differs
     /// from the committed one.
     ///
-    /// The comparison is exact, unlike the macOS gate's one channel step of
-    /// tolerance. That gate absorbs another Mac's GPU landing an antialiased
-    /// edge differently; here every machine runs the same software rasterizer
-    /// over the same bundled fonts, so there is no such machine to absorb, and
-    /// tolerance would only hide a real change.
+    /// Linux and Windows shape the same bundled fonts, but their software
+    /// adapters can still land an antialiased edge one channel step apart.
+    /// The gate absorbs only that smallest representable difference.
     pub fn check(only: &[String]) -> Result<()> {
         let committed = snapshots();
         let scratch = repo_root().join("target").join("headless-scene-check");
@@ -135,10 +134,17 @@ mod imp {
             .join("scenes")
     }
 
+    const CHANNEL_TOLERANCE: u8 = 1;
+
     fn same_pixels(left: &Path, right: &Path) -> Result<bool> {
         let left = image::open(left)?.into_rgba8();
         let right = image::open(right)?.into_rgba8();
-        Ok(left.dimensions() == right.dimensions() && left.as_raw() == right.as_raw())
+        Ok(left.dimensions() == right.dimensions()
+            && left
+                .as_raw()
+                .iter()
+                .zip(right.as_raw())
+                .all(|(left, right)| left.abs_diff(*right) <= CHANNEL_TOLERANCE))
     }
 
     /// Which scene the host shows.
@@ -172,8 +178,8 @@ mod imp {
         fs::create_dir_all(directory).with_context(|| format!("create {}", directory.display()))?;
 
         // Only the bundled fonts take part. Loading the machine's own fonts
-        // would shape text differently from one machine to the next, and the
-        // exact comparison above depends on there being no such difference.
+        // would shape text differently from one machine to the next, far beyond
+        // the one-channel renderer tolerance above.
         let text_system = Arc::new(gpui_wgpu::CosmicTextSystem::new_without_system_fonts(
             "Geist",
         ));

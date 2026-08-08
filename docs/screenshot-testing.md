@@ -149,10 +149,9 @@ window system at all: GPUI's wgpu renderer draws each scene into an offscreen
 texture and the pixels are read straight back. A software adapter — llvmpipe
 on Linux, WARP on Windows — is enough, so the gate runs on a headless VM or a
 CI box with no GPU. Text is shaped by cosmic-text from the bundled Geist
-fonts only, and time is simulated, which makes the output identical from one
-machine to the next; the comparison is exact rather than tolerant of one
-channel step, because there is no foreign GPU whose antialiasing needs
-absorbing.
+fonts only, and time is simulated. Linux llvmpipe and Windows WARP can still
+land an antialiased edge one 8-bit channel step apart, so the comparison
+permits that smallest representable difference and nothing larger.
 
 ```bash
 cargo run -p xtask -- headless check     # compare against the baseline
