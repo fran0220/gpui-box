@@ -47,6 +47,10 @@ struct SplitCase {
 }
 
 fn split(cx: &mut TestAppContext, ratio: f32, frozen: bool) -> SplitCase {
+    split_axis(cx, ratio, frozen, SplitAxis::Horizontal)
+}
+
+fn split_axis(cx: &mut TestAppContext, ratio: f32, frozen: bool, axis: SplitAxis) -> SplitCase {
     let (resizes, resize_sink) = recorder::<f32>();
     let (collapses, collapse_sink) = recorder::<SplitSide>();
     let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
@@ -57,7 +61,7 @@ fn split(cx: &mut TestAppContext, ratio: f32, frozen: bool) -> SplitCase {
             .h(px(400.0))
             .child(
                 SplitPane::new("workspace.split")
-                    .horizontal()
+                    .axis(axis)
                     .ratio(ratio)
                     .min_sizes(150.0, 150.0)
                     .collapsible(true)
@@ -138,7 +142,7 @@ fn the_divider_publishes_the_room_the_minimums_leave(cx: &mut TestAppContext) {
         .node("workspace.split.divider")
         .expect("published");
 
-    assert_eq!(divider.role, Role::Separator);
+    assert_eq!(divider.role, Role::Splitter);
     assert_eq!(divider.parent.as_deref(), Some("workspace.split"));
     let low = divider.value_min.expect("a separator carries its range");
     let high = divider.value_max.expect("a separator carries its range");
@@ -146,6 +150,50 @@ fn the_divider_publishes_the_room_the_minimums_leave(cx: &mut TestAppContext) {
     assert!((low - 0.25).abs() < 0.01, "low was {low}");
     assert!((high - 0.75).abs() < 0.01, "high was {high}");
     assert!((now - 0.5).abs() < 0.01, "now was {now}");
+}
+
+#[gpui::test]
+fn native_splitter_contract_matches_axis_and_dispatches_resize(cx: &mut TestAppContext) {
+    for (axis, expected, low, high, next) in [
+        (SplitAxis::Horizontal, "Vertical", 0.25, 0.75, 0.6),
+        (SplitAxis::Vertical, "Horizontal", 0.375, 0.625, 0.625),
+    ] {
+        let mut case = split_axis(cx, 0.5, false, axis);
+        let tree = case.harness.accessibility_tree();
+        let splitter = tree["nodes"]
+            .as_object()
+            .and_then(|nodes| {
+                nodes
+                    .values()
+                    .find(|node| node["element_id"] == "Name(\"workspace.split.divider\")")
+            })
+            .unwrap_or_else(|| panic!("stable native splitter id: {tree}"));
+        assert_eq!(splitter["aria"]["role"], "Splitter");
+        assert_eq!(splitter["aria"]["orientation"], expected);
+        assert_eq!(splitter["aria"]["min_numeric_value"], low);
+        assert_eq!(splitter["aria"]["max_numeric_value"], high);
+        assert_eq!(splitter["aria"]["numeric_value"], 0.5);
+        let actions = splitter["aria"]["on_action"].as_array().expect("actions");
+        assert!(actions.iter().any(|action| action == "Increment"));
+        assert!(actions.iter().any(|action| action == "Decrement"));
+        let node_id = splitter["accesskit_id"]
+            .as_str()
+            .expect("raw node id")
+            .parse()
+            .expect("numeric node id");
+        let window = case.harness.window();
+        case.harness.context().dispatch_accessibility_action(
+            window,
+            gpui::accesskit::ActionRequest {
+                action: gpui::accesskit::Action::Increment,
+                target_tree: gpui::accesskit::TreeId::ROOT,
+                target_node: gpui::accesskit::NodeId(node_id),
+                data: None,
+            },
+        );
+        let reported = *case.resizes.borrow().last().expect("resize report");
+        assert!((reported - next).abs() < 0.01, "reported {reported}");
+    }
 }
 
 #[gpui::test]

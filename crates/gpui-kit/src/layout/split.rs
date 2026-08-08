@@ -374,9 +374,9 @@ impl RenderOnce for SplitPane {
                         .unwrap_or_else(|| cx.strings().text(StringKey::SplitResizeHandle)),
                 )
                 .orientation(if horizontal {
-                    gpui::accesskit::Orientation::Horizontal
-                } else {
                     gpui::accesskit::Orientation::Vertical
+                } else {
+                    gpui::accesskit::Orientation::Horizontal
                 })
                 .range(low, high, ratio.clamp(low, high)),
         );

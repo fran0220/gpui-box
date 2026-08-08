@@ -55,6 +55,7 @@ impl Harness {
         let handle = cx.add_window(|_, _| Scene {
             build: Box::new(build),
         });
+        cx.activate_accessibility(handle.into());
         let visual = VisualTestContext::from_window(handle.into(), cx);
         visual.run_until_parked();
         Self {
@@ -81,6 +82,19 @@ impl Harness {
 
     pub fn node(&mut self, id: &str) -> Option<Node> {
         self.snapshot().find(id).cloned()
+    }
+
+    /// Draws and returns GPUI's deterministic AccessKit tree.
+    pub fn accessibility_tree(&mut self) -> serde_json::Value {
+        self.cx.update(|window, cx| {
+            window.draw(cx).clear(cx);
+            serde_json::from_str(
+                &window
+                    .debug_a11y_tree_json()
+                    .expect("accessibility adapter is active"),
+            )
+            .expect("valid accessibility tree JSON")
+        })
     }
 
     /// Clicks the center of a semantic node.
