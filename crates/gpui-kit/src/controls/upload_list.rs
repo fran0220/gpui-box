@@ -407,12 +407,15 @@ impl UploadList {
             .gap_token(&theme, Space::Sm)
             .px_token(&theme, Space::Sm)
             .py_token(&theme, Space::Xs)
-            .child(
-                div()
-                    .flex_none()
-                    .mt(px(5.0))
-                    .child(StatusDot::new(upload.state.tone())),
-            )
+            .child(div().flex_none().mt(px(5.0)).child({
+                let dot = StatusDot::new(upload.state.tone());
+                // Only a file actually on its way moves. A queued one is
+                // waiting for a turn, which is not the same as working.
+                match upload.state {
+                    UploadState::Uploading { .. } => dot.busy(ident.child("mark")),
+                    _ => dot,
+                }
+            }))
             .child(
                 div()
                     .column()

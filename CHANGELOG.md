@@ -219,6 +219,19 @@ and `xtask gate [full]`. `scenes check` is the visual regression gate; see
   barely used: `Presence` appeared in three files out of a hundred and eight.
   Reduced motion still resolves to the settled frame, so an entrance is an
   entrance and never a requirement.
+- Work in progress has one vocabulary instead of one improvisation per
+  component. `Activity` splits it by what the component actually knows:
+  `Advancing` sweeps when there is measured progress, `Working` spins when
+  something is running but its end is unknown, and `Deliberating` breathes when
+  a model is thinking. `Icon::spinning`, `Icon::breathing` and `StatusDot::busy`
+  are the one-line spellings, and `motion.durationMs.spin` backs the period.
+  Six places that had been reporting work with a still glyph or with colour
+  alone now move: `ToolCallCard`, `StepList`, `ThinkingBlock`, `UploadList`,
+  `MessageList` and `ProgressCircle`, whose indeterminate ring now travels an
+  arc instead of tinting the whole circle and standing still.
+  Motion is never the only carrier: a thinking block says "Thinking" where a
+  settled one says "Reasoning", so reduced motion loses the movement and keeps
+  the state.
 
 - The workspace depends on upstream `zed-industries/zed` at a pinned revision
   instead of a patched fork. `effects::frosted` and `effects::edge_faded` were

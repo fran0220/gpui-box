@@ -393,6 +393,7 @@ impl TokenDocument {
             MotionDuration::Dialog => self.motion.duration_ms.dialog,
             MotionDuration::Resize => self.motion.duration_ms.resize,
             MotionDuration::Entrance => self.motion.duration_ms.entrance,
+            MotionDuration::Spin => self.motion.duration_ms.spin,
             MotionDuration::Slow => self.motion.duration_ms.slow,
             MotionDuration::StaggerStep => self.motion.duration_ms.stagger_step,
             MotionDuration::Pulse => self.motion.duration_ms.pulse,
@@ -651,6 +652,8 @@ pub enum MotionDuration {
     Dialog,
     Resize,
     Entrance,
+    /// One turn of a mark that reports work nobody can size.
+    Spin,
     Slow,
     /// The gap between one member of a staggered group and the next.
     StaggerStep,
@@ -1038,6 +1041,8 @@ pub struct DurationTokens {
     pub dialog: u64,
     pub resize: u64,
     pub entrance: u64,
+    /// How long one full turn of a spinning mark takes.
+    pub spin: u64,
     /// The longest step a user waits through deliberately: a panel taking a
     /// region over, or a graph laying itself out.
     pub slow: u64,

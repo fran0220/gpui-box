@@ -386,11 +386,17 @@ impl RenderOnce for ToolCallCard {
             .row()
             .w_full()
             .gap_token(&theme, Space::Sm)
-            .child(
-                IconView::new(self.state.glyph())
+            .child({
+                let mark = IconView::new(self.state.glyph())
                     .small()
-                    .tone(icon_tone(tone)),
-            )
+                    .tone(icon_tone(tone));
+                // A running call turns. The glyph is a rotation arrow, and
+                // a still one reads as a call that has jammed.
+                match self.state {
+                    ToolCallState::Running => mark.spinning(ident.child("state.mark")),
+                    _ => mark,
+                }
+            })
             .child(
                 div()
                     .flex_1()

@@ -7,15 +7,15 @@
 use std::f32::consts::{FRAC_PI_2, TAU};
 
 use gpui::{
-    App, Hsla, IntoElement, ParentElement, PathBuilder, Pixels, Point, RenderOnce, SharedString,
-    Styled, Window, canvas, div, point, px,
+    AnimationExt as _, AnyElement, App, Hsla, IntoElement, ParentElement, PathBuilder, Pixels,
+    Point, RenderOnce, SharedString, Styled, Window, canvas, div, point, px,
 };
 use gpui_kit_semantics::Semantic;
 use gpui_kit_theme::{ActiveTheme, ControlSize, TypeScale};
 
 use crate::display::progress::ProgressValue;
 use crate::foundation::{Ident, Sizable, StyledExt};
-use crate::motion;
+use crate::motion::{self, MotionSpec};
 
 /// How much larger the ring is than the control step it is sized from.
 const RING_SCALE: f32 = 1.4;
@@ -104,32 +104,42 @@ impl RenderOnce for ProgressCircle {
             )
         });
 
-        let ring = canvas(
-            |_, _, _| {},
-            move |bounds, _, window, _| {
-                let centre = bounds.center();
-                arc(window, centre, radius, stroke, 0.0, 1.0, track);
-                match drawn {
-                    Some(fraction) if fraction > 0.0 => {
-                        arc(window, centre, radius, stroke, 0.0, fraction, accent)
-                    }
-                    // An unknown extent tints the whole ring faintly. A part
-                    // of the ring, moving or still, would be read as a
-                    // position, and there is none to read.
-                    None => arc(
-                        window,
-                        centre,
-                        radius,
-                        stroke,
-                        0.0,
-                        1.0,
-                        accent.opacity(theme.opacity.muted),
-                    ),
-                    _ => {}
-                }
-            },
-        )
-        .size(px(diameter));
+        let muted = accent.opacity(theme.opacity.muted);
+        // An unknown extent turns a short arc around the ring. A *still* part
+        // of a ring would be read as a position, and there is none to read —
+        // but a part that travels at a constant rate is the one shape nobody
+        // reads as a position, because a position does not lap itself. Under
+        // reduced motion there is no travel to rely on, so it falls back to
+        // tinting the whole ring, which claims nothing either.
+        let still = motion::reduce_motion(cx);
+        let ring: AnyElement = if drawn.is_none() && !still {
+            let period = MotionSpec::new(
+                motion::Activity::Working.period_ms(&theme),
+                motion::Activity::Working.curve(&theme),
+            );
+            div()
+                .size(px(diameter))
+                .with_animation(
+                    self.ident.child("turn").element_id(),
+                    period.repeating(),
+                    move |element, phase| {
+                        element.child(ring_canvas(
+                            diameter,
+                            radius,
+                            stroke,
+                            track,
+                            accent,
+                            muted,
+                            None,
+                            Some(phase),
+                        ))
+                    },
+                )
+                .into_any_element()
+        } else {
+            ring_canvas(diameter, radius, stroke, track, accent, muted, drawn, None)
+                .into_any_element()
+        };
 
         let centre = self.centre.clone().map(|reading| {
             div()
@@ -154,6 +164,55 @@ impl RenderOnce for ProgressCircle {
                 self.value.spec(self.ident.semantic_id(), self.label, cx),
             )
     }
+}
+
+/// How much of the ring the travelling arc covers when the extent is unknown.
+///
+/// Short enough that the gap is unmistakable — a nearly closed ring would read
+/// as work nearly done — and long enough to be seen moving.
+const TRAVELLING_ARC: f32 = 0.25;
+
+/// The ring itself, at one phase of its travel.
+///
+/// Built per frame rather than once, because the arc's position is what
+/// carries "still going" and this renderer's transforms do not reach a canvas.
+#[allow(clippy::too_many_arguments)]
+fn ring_canvas(
+    diameter: f32,
+    radius: f32,
+    stroke: f32,
+    track: Hsla,
+    accent: Hsla,
+    muted: Hsla,
+    drawn: Option<f32>,
+    // Where the travelling arc has got to, or `None` for the still ring that
+    // reduced motion falls back to.
+    phase: Option<f32>,
+) -> impl IntoElement {
+    canvas(
+        |_, _, _| {},
+        move |bounds, _, window, _| {
+            let centre = bounds.center();
+            arc(window, centre, radius, stroke, 0.0, 1.0, track);
+            match (drawn, phase) {
+                (Some(fraction), _) if fraction > 0.0 => {
+                    arc(window, centre, radius, stroke, 0.0, fraction, accent)
+                }
+                (Some(_), _) => {}
+                (None, Some(phase)) => arc(
+                    window,
+                    centre,
+                    radius,
+                    stroke,
+                    phase,
+                    phase + TRAVELLING_ARC,
+                    accent,
+                ),
+                (None, None) => arc(window, centre, radius, stroke, 0.0, 1.0, muted),
+            }
+        },
+    )
+    .size(px(diameter))
 }
 
 /// Strokes the part of a circle between two turns, clockwise from the top.

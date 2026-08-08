@@ -161,6 +161,7 @@ pub struct Motion {
     pub dialog_ms: u64,
     pub resize_ms: u64,
     pub entrance_ms: u64,
+    pub spin_ms: u64,
     pub slow_ms: u64,
     /// The gap between one member of a staggered group and the next.
     pub stagger_step_ms: u64,
@@ -369,6 +370,7 @@ impl Theme {
                 dialog_ms: millis(tokens, MotionDuration::Dialog),
                 resize_ms: millis(tokens, MotionDuration::Resize),
                 entrance_ms: millis(tokens, MotionDuration::Entrance),
+                spin_ms: millis(tokens, MotionDuration::Spin),
                 slow_ms: millis(tokens, MotionDuration::Slow),
                 stagger_step_ms: millis(tokens, MotionDuration::StaggerStep),
                 pulse_ms: millis(tokens, MotionDuration::Pulse),

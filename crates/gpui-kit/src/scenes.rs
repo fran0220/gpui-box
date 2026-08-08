@@ -4344,6 +4344,15 @@ fn thinking(_window: &mut Window, cx: &mut App) -> AnyElement {
             "scene.thinking.collapsed",
             Reasoning::present("The brief asks for two files, so read both before answering."),
         ))
+        // Reasoning that has finished and reasoning still arriving are the
+        // same words in the same place, so the difference has to be shown.
+        .child(
+            ThinkingBlock::new(
+                "scene.thinking.working",
+                Reasoning::present("Reading the second file before answering."),
+            )
+            .thinking(true),
+        )
         .child(
             ThinkingBlock::new(
                 "scene.thinking.open",

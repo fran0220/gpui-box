@@ -13,22 +13,39 @@ use crate::motion;
 #[derive(Debug, IntoElement)]
 pub struct StatusDot {
     tone: Tone,
+    /// The identity a breathing dot animates under, when it is reporting
+    /// work that is still going.
+    busy: Option<Ident>,
 }
 
 impl StatusDot {
     pub fn new(tone: Tone) -> Self {
-        Self { tone }
+        Self { tone, busy: None }
+    }
+
+    /// Breathes the dot, for a state that is still running.
+    ///
+    /// A dot breathes where a glyph would turn, because there is nothing in a
+    /// circle for a rotation to be visible against. It is the same claim made
+    /// with the only motion this shape can carry.
+    pub fn busy(mut self, ident: impl Into<Ident>) -> Self {
+        self.busy = Some(ident.into());
+        self
     }
 }
 
 impl RenderOnce for StatusDot {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let theme = cx.theme();
-        div()
+        let theme = cx.theme().clone();
+        let dot = div()
             .flex_none()
             .size(px(7.0))
             .rounded_full()
-            .bg(self.tone.color(theme))
+            .bg(self.tone.color(&theme));
+        match self.busy {
+            Some(ident) => motion::breathe(dot, ident.element_id(), &theme, cx),
+            None => dot.into_any_element(),
+        }
     }
 }
 

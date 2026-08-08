@@ -369,6 +369,7 @@ string_keys! {
     AgentStepsDoneMany => "agent.steps-done-many", "{0} steps done";
     AgentReasoning => "agent.reasoning", "Reasoning";
     AgentReasoningWithheld => "agent.reasoning-withheld", "Withheld";
+    AgentReasoningThinking => "agent.reasoning-thinking", "Thinking";
     AgentReasoningAbsent => "agent.reasoning-absent", "No reasoning was returned";
 
     // Document tabs. A clean tab carries no wording at all, which is why

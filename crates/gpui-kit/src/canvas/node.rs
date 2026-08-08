@@ -9,9 +9,8 @@
 use std::rc::Rc;
 
 use gpui::{
-    AnimationExt, AnyElement, App, Hsla, InteractiveElement, IntoElement, ParentElement,
-    RenderOnce, SharedString, Styled, Transformation, Window, div, percentage,
-    prelude::FluentBuilder, px,
+    AnyElement, App, Hsla, InteractiveElement, IntoElement, ParentElement, RenderOnce,
+    SharedString, Styled, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -252,31 +251,18 @@ impl RenderOnce for GraphNode {
         let theme = cx.theme().clone();
         let color = self.state.color(&theme);
 
-        // The spinner is the one part of a node that moves, and it moves
-        // because the step is still running. Under reduced motion it holds
-        // still and the state is carried by the colour and the glyph, which
-        // were already carrying it.
+        // The mark is the one part of a node that moves, and it moves because
+        // the step is still running. It turns through the shared vocabulary,
+        // so a running node and a running tool call turn at one rate.
         let mark = self.state.glyph().map(|glyph| {
             let element = icon(glyph)
                 .size(px(theme.control.sm.icon_size))
                 .text_color(color);
-            if self.state == NodeState::Running && !motion::reduce_motion(cx) {
-                element
-                    .with_animation(
-                        self.ident.child("mark").element_id(),
-                        motion::MotionSpec::new(
-                            theme.motion.pulse_ms / 2,
-                            motion::Easing::Linear.curve(&theme),
-                        )
-                        .repeating(),
-                        |element, progress| {
-                            element
-                                .with_transformation(Transformation::rotate(percentage(progress)))
-                        },
-                    )
-                    .into_any_element()
-            } else {
-                element.into_any_element()
+            match self.state {
+                NodeState::Running => {
+                    motion::spin(element, self.ident.child("mark").element_id(), &theme, cx)
+                }
+                _ => element.into_any_element(),
             }
         });
 

@@ -104,6 +104,10 @@ pub struct ThinkingBlock {
     ident: Ident,
     reasoning: Reasoning,
     expanded: bool,
+    /// Whether the reasoning is still arriving. Separate from the reasoning
+    /// itself, because text that has stopped growing and text that is still
+    /// growing look identical and mean different things.
+    thinking: bool,
     on_toggle: Option<ToggleHandler>,
 }
 
@@ -127,6 +131,7 @@ impl ThinkingBlock {
             ident: ident.into(),
             reasoning,
             expanded: false,
+            thinking: false,
             on_toggle: None,
         }
     }
@@ -135,6 +140,17 @@ impl ThinkingBlock {
     /// be disclosed stays shut whatever the caller says.
     pub fn expanded(mut self, expanded: bool) -> Self {
         self.expanded = expanded;
+        self
+    }
+
+    /// Reports that the reasoning is still being produced.
+    ///
+    /// Nothing else on the block says this. Reasoning that has finished and
+    /// reasoning still being written are the same words in the same place, so
+    /// without this a reader watching a stalled run and a reader watching a
+    /// working one see the same picture.
+    pub fn thinking(mut self, thinking: bool) -> Self {
+        self.thinking = thinking;
         self
     }
 
@@ -162,6 +178,13 @@ impl RenderOnce for ThinkingBlock {
         let label = cx.strings().text(StringKey::AgentReasoning);
 
         let (mark, tone) = match self.reasoning {
+            // Still arriving outranks the settled word, because the breathing
+            // glyph that also reports it is not there for a reader who has
+            // animation turned off, and two states that look identical are
+            // one state as far as that reader is concerned.
+            Reasoning::Present(_) if self.thinking => {
+                (StringKey::AgentReasoningThinking, IconTone::Accent)
+            }
             Reasoning::Present(_) => (StringKey::AgentReasoning, IconTone::Muted),
             Reasoning::Withheld(_) => (StringKey::AgentReasoningWithheld, IconTone::Warning),
             Reasoning::Absent => (StringKey::AgentReasoningAbsent, IconTone::Faint),
@@ -177,7 +200,17 @@ impl RenderOnce for ThinkingBlock {
             .py(px(theme.space(Space::Xs)))
             .type_scale(&theme, TypeScale::Caption)
             .text_color(theme.colors.text_muted)
-            .child(IconView::new(Glyph::Chat).small().tone(tone))
+            .child({
+                let mark = IconView::new(Glyph::Chat).small().tone(tone);
+                // Deliberation breathes rather than turns: a turn claims work
+                // is being got through, and this one has nothing to report
+                // beyond that it is still going.
+                if self.thinking {
+                    mark.breathing(ident.child("mark"))
+                } else {
+                    mark
+                }
+            })
             .child(div().flex_1().min_w_0().child(label.clone()))
             // Which of the three states holds is on screen without opening
             // anything, because two of them can never be opened.
@@ -186,6 +219,7 @@ impl RenderOnce for ThinkingBlock {
                     .flex_none()
                     .text_color(match self.reasoning {
                         Reasoning::Withheld(_) => theme.colors.warning,
+                        _ if self.thinking => theme.colors.accent,
                         _ => theme.colors.text_faint,
                     })
                     .child(mark),
@@ -221,6 +255,7 @@ impl RenderOnce for ThinkingBlock {
             )
             .text(label)
             .value(self.reasoning.as_str())
+            .busy(self.thinking)
             .expanded(open),
         );
 

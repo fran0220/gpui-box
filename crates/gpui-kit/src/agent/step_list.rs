@@ -273,7 +273,16 @@ fn step_element(
         .flex_none()
         .column()
         .items_center()
-        .child(div().mt(px(4.0)).child(StatusDot::new(step.state.tone())))
+        .child(div().mt(px(4.0)).child({
+            let dot = StatusDot::new(step.state.tone());
+            // The step that is running is the one a reader is looking for, so
+            // it is the one that moves.
+            if running {
+                dot.busy(ident.child("mark"))
+            } else {
+                dot
+            }
+        }))
         .when(continues, |element| {
             element.child(
                 div()

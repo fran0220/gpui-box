@@ -37,6 +37,7 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, SemanticColor, TextTone, Theme};
 
 use crate::foundation::direction::{ActiveDirection, LayoutDirection};
 use crate::foundation::{Ident, Sizable};
+use crate::motion;
 
 /// The semantic colour role a glyph paints in.
 ///
@@ -91,6 +92,9 @@ pub struct Icon {
     tone: IconTone,
     announcement: Announcement,
     follow_direction: bool,
+    /// How this glyph reports work in progress, and the identity that
+    /// animation runs under. `None` is a glyph reporting a settled state.
+    activity: Option<(motion::Activity, Ident)>,
 }
 
 impl Icon {
@@ -102,7 +106,30 @@ impl Icon {
             tone: IconTone::default(),
             announcement: Announcement::Decorative,
             follow_direction: true,
+            activity: None,
         }
+    }
+
+    /// Turns the glyph, for a state that is still running.
+    ///
+    /// This exists because the alternative kept being chosen by accident: a
+    /// rotation glyph is the obvious drawing for "working", and a rotation
+    /// glyph that does not rotate reads as one that has jammed. Whichever
+    /// component reports running work, it reports it the same way through
+    /// here.
+    ///
+    /// The identity is asked for rather than derived because a decorative
+    /// glyph has none, and an animation needs something stable to run under.
+    pub fn spinning(mut self, ident: impl Into<Ident>) -> Self {
+        self.activity = Some((motion::Activity::Working, ident.into()));
+        self
+    }
+
+    /// Breathes the glyph, for a state that is deliberating rather than
+    /// getting through work. The quieter of the two claims.
+    pub fn breathing(mut self, ident: impl Into<Ident>) -> Self {
+        self.activity = Some((motion::Activity::Deliberating, ident.into()));
+        self
     }
 
     /// A glyph that is the only thing saying what it means.
@@ -202,12 +229,19 @@ impl RenderOnce for Icon {
             self.resolved_color(&theme),
             self.flips_in(direction),
         );
+        let drawing = match self.activity {
+            Some((motion::Activity::Working, ident)) => {
+                motion::spin(drawing, ident.element_id(), &theme, cx)
+            }
+            Some((_, ident)) => motion::breathe(drawing, ident.element_id(), &theme, cx),
+            None => drawing.into_any_element(),
+        };
 
         match self.announcement {
             // A decorative glyph is the bare drawing: no wrapper, no node, and
             // therefore nothing for a reader to stop on and nothing extra in
             // the layout either.
-            Announcement::Decorative => drawing.into_any_element(),
+            Announcement::Decorative => drawing,
             Announcement::Named { ident, name } => div()
                 .flex()
                 .flex_none()

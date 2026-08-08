@@ -159,6 +159,7 @@
       "entrance": 500,
       "slow": 320,
       "staggerStep": 28,
+      "spin": 900,
       "pulse": 2400,
       "shimmer": 1400,
       "toast": 6000

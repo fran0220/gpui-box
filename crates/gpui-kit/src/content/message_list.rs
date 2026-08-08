@@ -790,7 +790,9 @@ fn streaming_mark(ident: &Ident, theme: &Theme, cx: &mut App) -> AnyElement {
         .row()
         .gap(px(4.0))
         .text_color(theme.colors.accent)
-        .child(StatusDot::new(Tone::Accent))
+        // The mark already published `busy`; a still dot meant a reader
+        // watching the screen had to take the word for it.
+        .child(StatusDot::new(Tone::Accent).busy(ident.child("streaming.mark")))
         .child(label.clone())
         .semantic_in(
             cx,

@@ -34,6 +34,7 @@
 //! [`Presence::animate`] honor the same preference by finishing immediately.
 
 mod animated;
+mod busy;
 mod easing;
 mod flip;
 mod gesture;
@@ -49,6 +50,7 @@ mod stagger;
 mod transition;
 
 pub use animated::{Animated, Entrance};
+pub use busy::{Activity, breathe, breathing_dot, spin, sweep};
 pub use easing::{CubicBezier, Easing};
 pub use flip::{Flip, Flipped, Flipping, flip, shared_flip, tracked_ids};
 pub use gesture::{Flick, VELOCITY_WINDOW, Velocity, VelocityTracker, flick, rubber_band};
