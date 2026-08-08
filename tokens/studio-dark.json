@@ -9,11 +9,12 @@
     "palette": {
       "neutral": {
         "0": "#000000",
-        "50": "#060606",
-        "100": "#0d0d0d",
-        "150": "#161616",
-        "200": "#1b1b1b",
-        "300": "#2a2a2a",
+        "25": "#050505",
+        "50": "#0a0a0a",
+        "100": "#151515",
+        "150": "#1c1c1c",
+        "200": "#242424",
+        "300": "#303030",
         "500": "#565656",
         "600": "#737373",
         "700": "#a1a1a1",
@@ -46,6 +47,7 @@
     },
     "surface": {
       "canvas": "{neutral.50}",
+      "sunken": "{neutral.25}",
       "panel": "{neutral.100}",
       "raised": "{neutral.200}",
       "overlay": "{neutral.150}"
@@ -109,7 +111,7 @@
   },
   "elevation": {
     "flat": { "y": 0, "blur": 0, "spread": 0, "color": "{neutral.0}/00" },
-    "raised": { "y": 1, "blur": 3, "spread": 0, "color": "{neutral.0}/40" },
+    "raised": { "y": 2, "blur": 6, "spread": -1, "color": "{neutral.0}/59" },
     "overlay": { "y": 8, "blur": 24, "spread": -4, "color": "{neutral.0}/66" },
     "modal": { "y": 16, "blur": 48, "spread": -8, "color": "{neutral.0}/8c" }
   },
@@ -155,6 +157,8 @@
       "dialog": 180,
       "resize": 200,
       "entrance": 500,
+      "slow": 320,
+      "staggerStep": 28,
       "pulse": 2400,
       "shimmer": 1400,
       "toast": 6000
@@ -185,6 +189,8 @@
     "edgeFadeBand": 20,
     "selectedRingAlpha": 0.09,
     "focusRingWidth": 2,
-    "focusRingAlpha": 0.55
+    "focusRingAlpha": 0.55,
+    "glowAlpha": 0.38,
+    "glowBlur": 12
   }
 }

@@ -34,7 +34,7 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, Theme, TypeScale};
 
 use crate::foundation::{FocusRing, Ident, StyledExt};
 use crate::strings::{ActiveStrings, StringKey};
@@ -358,7 +358,7 @@ impl RenderOnce for PermissionMatrix {
             .column()
             .w_full()
             .radius(&theme, Radius::Card)
-            .hairline(&theme)
+            .frame(&theme, Surface::Panel, Elevation::Raised)
             .child(heading)
             .children(rows)
             .semantic_in(

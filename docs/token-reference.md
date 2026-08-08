@@ -21,11 +21,12 @@ Appearance: `Dark`.
 | `color.palette.loader.orange` | `#edb185` |
 | `color.palette.loader.pink` | `#f888a0` |
 | `color.palette.neutral.0` | `#000000` |
-| `color.palette.neutral.100` | `#0d0d0d` |
-| `color.palette.neutral.150` | `#161616` |
-| `color.palette.neutral.200` | `#1b1b1b` |
-| `color.palette.neutral.300` | `#2a2a2a` |
-| `color.palette.neutral.50` | `#060606` |
+| `color.palette.neutral.100` | `#151515` |
+| `color.palette.neutral.150` | `#1c1c1c` |
+| `color.palette.neutral.200` | `#242424` |
+| `color.palette.neutral.25` | `#050505` |
+| `color.palette.neutral.300` | `#303030` |
+| `color.palette.neutral.50` | `#0a0a0a` |
 | `color.palette.neutral.500` | `#565656` |
 | `color.palette.neutral.600` | `#737373` |
 | `color.palette.neutral.700` | `#a1a1a1` |
@@ -39,10 +40,10 @@ Appearance: `Dark`.
 
 | Token | Source | Resolved |
 |---|---|---|
-| `color.surface.canvas` | `{neutral.50}` | `#060606` |
-| `color.surface.panel` | `{neutral.100}` | `#0d0d0d` |
-| `color.surface.raised` | `{neutral.200}` | `#1b1b1b` |
-| `color.surface.overlay` | `{neutral.150}` | `#161616` |
+| `color.surface.canvas` | `{neutral.50}` | `#0a0a0a` |
+| `color.surface.panel` | `{neutral.100}` | `#151515` |
+| `color.surface.raised` | `{neutral.200}` | `#242424` |
+| `color.surface.overlay` | `{neutral.150}` | `#1c1c1c` |
 | `color.text.primary` | `{neutral.800}` | `#e9e9e9` |
 | `color.text.muted` | `{neutral.700}` | `#a1a1a1` |
 | `color.text.faint` | `{neutral.600}` | `#737373` |
@@ -106,7 +107,7 @@ Appearance: `Dark`.
 | Step | Y | Blur | Spread | Color |
 |---|---:|---:|---:|---|
 | `flat` | 0 | 0 | 0 | `#00000000` |
-| `raised` | 1 | 3 | 0 | `#00000040` |
+| `raised` | 2 | 6 | -1 | `#00000059` |
 | `overlay` | 8 | 24 | -4 | `#00000066` |
 | `modal` | 16 | 48 | -8 | `#0000008c` |
 
@@ -176,38 +177,38 @@ Appearance: `Dark`.
 
 | Foreground | Background | Ratio | Minimum |
 |---|---|---:|---:|
-| `text.primary` | `surface.canvas` | 16.69 | 4.5 |
-| `text.muted` | `surface.canvas` | 7.84 | 4.5 |
-| `text.faint` | `surface.canvas` | 4.27 | 3.0 |
-| `semantic.danger` | `surface.canvas` | 7.02 | 3.0 |
-| `semantic.warning` | `surface.canvas` | 11.76 | 3.0 |
-| `semantic.success` | `surface.canvas` | 9.27 | 3.0 |
-| `semantic.info` | `surface.canvas` | 8.93 | 3.0 |
-| `semantic.accent` | `surface.canvas` | 6.48 | 3.0 |
-| `text.primary` | `surface.panel` | 16.01 | 4.5 |
-| `text.muted` | `surface.panel` | 7.52 | 4.5 |
-| `text.faint` | `surface.panel` | 4.10 | 3.0 |
-| `semantic.danger` | `surface.panel` | 6.73 | 3.0 |
-| `semantic.warning` | `surface.panel` | 11.28 | 3.0 |
-| `semantic.success` | `surface.panel` | 8.89 | 3.0 |
-| `semantic.info` | `surface.panel` | 8.56 | 3.0 |
-| `semantic.accent` | `surface.panel` | 6.21 | 3.0 |
-| `text.primary` | `surface.raised` | 14.19 | 4.5 |
-| `text.muted` | `surface.raised` | 6.67 | 4.5 |
-| `text.faint` | `surface.raised` | 3.63 | 3.0 |
-| `semantic.danger` | `surface.raised` | 5.96 | 3.0 |
-| `semantic.warning` | `surface.raised` | 10.00 | 3.0 |
-| `semantic.success` | `surface.raised` | 7.88 | 3.0 |
-| `semantic.info` | `surface.raised` | 7.59 | 3.0 |
-| `semantic.accent` | `surface.raised` | 5.50 | 3.0 |
-| `text.primary` | `surface.overlay` | 14.91 | 4.5 |
-| `text.muted` | `surface.overlay` | 7.00 | 4.5 |
-| `text.faint` | `surface.overlay` | 3.82 | 3.0 |
-| `semantic.danger` | `surface.overlay` | 6.27 | 3.0 |
-| `semantic.warning` | `surface.overlay` | 10.51 | 3.0 |
-| `semantic.success` | `surface.overlay` | 8.28 | 3.0 |
-| `semantic.info` | `surface.overlay` | 7.97 | 3.0 |
-| `semantic.accent` | `surface.overlay` | 5.78 | 3.0 |
+| `text.primary` | `surface.canvas` | 16.31 | 4.5 |
+| `text.muted` | `surface.canvas` | 7.66 | 4.5 |
+| `text.faint` | `surface.canvas` | 4.18 | 3.0 |
+| `semantic.danger` | `surface.canvas` | 6.85 | 3.0 |
+| `semantic.warning` | `surface.canvas` | 11.49 | 3.0 |
+| `semantic.success` | `surface.canvas` | 9.06 | 3.0 |
+| `semantic.info` | `surface.canvas` | 8.72 | 3.0 |
+| `semantic.accent` | `surface.canvas` | 6.33 | 3.0 |
+| `text.primary` | `surface.panel` | 15.04 | 4.5 |
+| `text.muted` | `surface.panel` | 7.07 | 4.5 |
+| `text.faint` | `surface.panel` | 3.85 | 3.0 |
+| `semantic.danger` | `surface.panel` | 6.32 | 3.0 |
+| `semantic.warning` | `surface.panel` | 10.60 | 3.0 |
+| `semantic.success` | `surface.panel` | 8.35 | 3.0 |
+| `semantic.info` | `surface.panel` | 8.04 | 3.0 |
+| `semantic.accent` | `surface.panel` | 5.84 | 3.0 |
+| `text.primary` | `surface.raised` | 12.79 | 4.5 |
+| `text.muted` | `surface.raised` | 6.01 | 4.5 |
+| `text.faint` | `surface.raised` | 3.27 | 3.0 |
+| `semantic.danger` | `surface.raised` | 5.37 | 3.0 |
+| `semantic.warning` | `surface.raised` | 9.01 | 3.0 |
+| `semantic.success` | `surface.raised` | 7.10 | 3.0 |
+| `semantic.info` | `surface.raised` | 6.84 | 3.0 |
+| `semantic.accent` | `surface.raised` | 4.96 | 3.0 |
+| `text.primary` | `surface.overlay` | 14.04 | 4.5 |
+| `text.muted` | `surface.overlay` | 6.60 | 4.5 |
+| `text.faint` | `surface.overlay` | 3.59 | 3.0 |
+| `semantic.danger` | `surface.overlay` | 5.90 | 3.0 |
+| `semantic.warning` | `surface.overlay` | 9.89 | 3.0 |
+| `semantic.success` | `surface.overlay` | 7.80 | 3.0 |
+| `semantic.info` | `surface.overlay` | 7.51 | 3.0 |
+| `semantic.accent` | `surface.overlay` | 5.45 | 3.0 |
 | `text.onAccent` | `semantic.accent` | 6.17 | 4.5 |
 
 ## Studio Light (`studio-light`)
@@ -227,11 +228,12 @@ Appearance: `Light`.
 | `color.palette.loader.orange` | `#d98442` |
 | `color.palette.loader.pink` | `#e2557a` |
 | `color.palette.neutral.0` | `#000000` |
-| `color.palette.neutral.100` | `#fafafb` |
+| `color.palette.neutral.100` | `#ffffff` |
 | `color.palette.neutral.150` | `#ffffff` |
 | `color.palette.neutral.200` | `#ffffff` |
-| `color.palette.neutral.300` | `#e4e4e8` |
-| `color.palette.neutral.50` | `#f2f2f4` |
+| `color.palette.neutral.25` | `#e6e6ea` |
+| `color.palette.neutral.300` | `#e0e0e5` |
+| `color.palette.neutral.50` | `#eeeef1` |
 | `color.palette.neutral.500` | `#a3a3a9` |
 | `color.palette.neutral.600` | `#86868c` |
 | `color.palette.neutral.700` | `#55555c` |
@@ -245,8 +247,8 @@ Appearance: `Light`.
 
 | Token | Source | Resolved |
 |---|---|---|
-| `color.surface.canvas` | `{neutral.50}` | `#f2f2f4` |
-| `color.surface.panel` | `{neutral.100}` | `#fafafb` |
+| `color.surface.canvas` | `{neutral.50}` | `#eeeef1` |
+| `color.surface.panel` | `{neutral.100}` | `#ffffff` |
 | `color.surface.raised` | `{neutral.200}` | `#ffffff` |
 | `color.surface.overlay` | `{neutral.150}` | `#ffffff` |
 | `color.text.primary` | `{neutral.800}` | `#17171a` |
@@ -312,7 +314,7 @@ Appearance: `Light`.
 | Step | Y | Blur | Spread | Color |
 |---|---:|---:|---:|---|
 | `flat` | 0 | 0 | 0 | `#00000000` |
-| `raised` | 1 | 3 | 0 | `#00000014` |
+| `raised` | 2 | 6 | -1 | `#0000001f` |
 | `overlay` | 8 | 24 | -4 | `#0000001f` |
 | `modal` | 16 | 48 | -8 | `#00000029` |
 
@@ -382,22 +384,22 @@ Appearance: `Light`.
 
 | Foreground | Background | Ratio | Minimum |
 |---|---|---:|---:|
-| `text.primary` | `surface.canvas` | 16.00 | 4.5 |
-| `text.muted` | `surface.canvas` | 6.61 | 4.5 |
-| `text.faint` | `surface.canvas` | 3.24 | 3.0 |
-| `semantic.danger` | `surface.canvas` | 4.34 | 3.0 |
-| `semantic.warning` | `surface.canvas` | 3.99 | 3.0 |
-| `semantic.success` | `surface.canvas` | 4.76 | 3.0 |
-| `semantic.info` | `surface.canvas` | 4.98 | 3.0 |
-| `semantic.accent` | `surface.canvas` | 4.96 | 3.0 |
-| `text.primary` | `surface.panel` | 17.15 | 4.5 |
-| `text.muted` | `surface.panel` | 7.09 | 4.5 |
-| `text.faint` | `surface.panel` | 3.47 | 3.0 |
-| `semantic.danger` | `surface.panel` | 4.65 | 3.0 |
-| `semantic.warning` | `surface.panel` | 4.28 | 3.0 |
-| `semantic.success` | `surface.panel` | 5.10 | 3.0 |
-| `semantic.info` | `surface.panel` | 5.34 | 3.0 |
-| `semantic.accent` | `surface.panel` | 5.31 | 3.0 |
+| `text.primary` | `surface.canvas` | 15.45 | 4.5 |
+| `text.muted` | `surface.canvas` | 6.39 | 4.5 |
+| `text.faint` | `surface.canvas` | 3.13 | 3.0 |
+| `semantic.danger` | `surface.canvas` | 4.19 | 3.0 |
+| `semantic.warning` | `surface.canvas` | 3.85 | 3.0 |
+| `semantic.success` | `surface.canvas` | 4.59 | 3.0 |
+| `semantic.info` | `surface.canvas` | 4.81 | 3.0 |
+| `semantic.accent` | `surface.canvas` | 4.79 | 3.0 |
+| `text.primary` | `surface.panel` | 17.89 | 4.5 |
+| `text.muted` | `surface.panel` | 7.39 | 4.5 |
+| `text.faint` | `surface.panel` | 3.62 | 3.0 |
+| `semantic.danger` | `surface.panel` | 4.85 | 3.0 |
+| `semantic.warning` | `surface.panel` | 4.46 | 3.0 |
+| `semantic.success` | `surface.panel` | 5.32 | 3.0 |
+| `semantic.info` | `surface.panel` | 5.57 | 3.0 |
+| `semantic.accent` | `surface.panel` | 5.54 | 3.0 |
 | `text.primary` | `surface.raised` | 17.89 | 4.5 |
 | `text.muted` | `surface.raised` | 7.39 | 4.5 |
 | `text.faint` | `surface.raised` | 3.62 | 3.0 |

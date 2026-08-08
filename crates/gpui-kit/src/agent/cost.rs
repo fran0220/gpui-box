@@ -21,7 +21,7 @@
 //!
 //! [`Limit::Unknown`] means nobody stated a ceiling. A proportion of an
 //! unknown total is invented, so [`ContextGauge`] draws no fill and publishes
-//! no range, exactly as [`ProgressBar`](crate::display::ProgressBar) refuses
+//! no range, exactly as [`ProgressBar`](crate::display::progress::ProgressBar) refuses
 //! to claim a position for work whose extent is unknown. It does not fall back
 //! to the indeterminate sweep either: that sweep means "in flight", and a
 //! reading of what has been used so far is not in flight.
@@ -30,7 +30,7 @@
 //!
 //! Currency, token counts, grouping and the position of a unit are locale
 //! work, which this crate does not do — the same reason
-//! [`Timeline`](crate::display::Timeline) takes times as finished strings. A
+//! [`Timeline`](crate::display::timeline::Timeline) takes times as finished strings. A
 //! [`Quantity`] therefore carries both the caller's already-formatted wording
 //! *and*, separately, the bare number, which is used for one thing only:
 //! working out the proportion of a known limit. Nothing here ever turns a
@@ -41,7 +41,7 @@ use gpui::{
     prelude::FluentBuilder, px, relative,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
 
 use crate::display::badge::{Badge, Tone};
 use crate::foundation::{Ident, StyledExt};
@@ -224,7 +224,7 @@ impl Limit {
 /// Marking a value stale and saying when it was from is one call, because a
 /// value marked stale without a date is a warning nobody can act on. The
 /// wording of the date is the caller's, as in
-/// [`Timeline`](crate::display::Timeline).
+/// [`Timeline`](crate::display::timeline::Timeline).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LastVerified(SharedString);
 
@@ -376,7 +376,7 @@ impl RenderOnce for CostMeter {
             .gap_token(&theme, Space::Sm)
             .p_token(&theme, Space::Md)
             .radius(&theme, Radius::Card)
-            .hairline(&theme)
+            .frame(&theme, Surface::Panel, Elevation::Raised)
             .when_some(self.label.clone(), |element, label| {
                 element.child(
                     div()

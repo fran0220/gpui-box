@@ -56,6 +56,7 @@
 //! ```
 
 pub mod agent;
+pub mod canvas;
 pub mod content;
 pub mod controls;
 pub mod data;
@@ -97,11 +98,15 @@ pub mod prelude {
     pub use crate::agent::step_list::{RunLength, Step, StepList, StepState};
     pub use crate::agent::thinking::{Reasoning, ThinkingBlock};
     pub use crate::agent::tool_call::{Elapsed, ToolBody, ToolCallCard, ToolCallState, ToolOutput};
+    pub use crate::canvas::{
+        Diff, EdgeKind, GraphEdge, GraphNode, GraphState, NodeGraph, NodeMetric, NodeState, Placed,
+    };
     pub use crate::content::{
-        Attachment, BufferedRange, CodeBlock, CodeLine, CodeSpan, CodeView, DeliveryState, FitMode,
-        ImageFrame, ImageRequest, ImageSize, ImageState, ImageViewer, ImageViewerEvent, LineMark,
-        Markdown, MarkdownEvent, Message, MessageBody, MessageList, Reaction, TrackStep,
-        TransportBar, TransportDuration, TransportEvent, TransportState,
+        Attachment, BrowserPanel, BufferedRange, CodeBlock, CodeLine, CodeSpan, CodeView,
+        DeliveryState, FitMode, ImageFrame, ImageRequest, ImageSize, ImageState, ImageViewer,
+        ImageViewerEvent, LineMark, Markdown, MarkdownEvent, Message, MessageBody, MessageList,
+        Reaction, TrackStep, TransportBar, TransportDuration, TransportEvent, TransportState,
+        ViewportState,
     };
     pub use crate::controls::button::{
         Button, ButtonGroup, ButtonJoin, ButtonVariant, IconButton, IconPosition,
@@ -131,8 +136,8 @@ pub mod prelude {
     pub use crate::controls::upload_list::{OverallProgress, Upload, UploadList, UploadState};
     pub use crate::data::{
         Align, BulkBar, Cell, Column, ColumnWidth, DataGrid, EditIntent, EditOutcome, EditingCell,
-        Expanded, GridColumn, GridRow, List, ListItem, Row, SelectionChange, SelectionMode,
-        SortDirection, Table, Tree, TreeNode,
+        Expanded, GridColumn, GridLines, GridRow, List, ListItem, Row, SelectionChange,
+        SelectionMode, SortDirection, Table, Tree, TreeNode,
     };
     pub use crate::datetime::{
         BlockedDay, BlockedReport, Calendar, CalendarEvent, Clock, DateAdapter, DateInput,

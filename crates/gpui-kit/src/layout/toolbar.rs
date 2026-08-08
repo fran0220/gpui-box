@@ -23,7 +23,7 @@ use gpui::{
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Theme};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Space, Surface, Theme};
 
 use crate::foundation::{Ident, Sizable, StyledExt};
 use crate::overlay::{Menu, MenuItem};
@@ -295,8 +295,7 @@ impl RenderOnce for Toolbar {
             .gap(px(theme.space(Space::Sm)))
             .px(px(theme.space(Space::Sm)))
             .py(px(theme.space(Space::Xs)))
-            .bg(theme.colors.panel)
-            .hairline(&theme)
+            .frame(&theme, Surface::Panel, Elevation::Raised)
             .children(drawn)
             .children(overflow.map(|menu| {
                 div()

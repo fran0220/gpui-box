@@ -33,7 +33,9 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Theme, TypeScale};
+use gpui_kit_theme::{
+    ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, Theme, TypeScale,
+};
 
 use crate::controls::button::Button;
 use crate::display::badge::{Badge, Tone};
@@ -588,7 +590,7 @@ impl ServerList {
             .w_full()
             .gap_token(theme, Space::Xs)
             .radius(theme, Radius::Card)
-            .hairline(theme)
+            .frame(theme, Surface::Panel, Elevation::Raised)
             .child(header)
             .children(reason)
             .children(retry)

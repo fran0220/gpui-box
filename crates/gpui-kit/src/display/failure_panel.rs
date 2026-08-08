@@ -203,9 +203,11 @@ impl RenderOnce for FailurePanel {
             .gap_token(&theme, Space::Sm)
             .p_token(&theme, Space::Lg)
             .radius(&theme, Radius::Card)
-            .border(px(theme.borders.hairline))
-            .border_color(theme.colors.danger.opacity(0.4))
+            // A failure reports itself by bleeding its colour into the pixels
+            // around the panel, which says the same thing an outline said and
+            // says it without a line.
             .bg(theme.colors.panel)
+            .glow(&theme, theme.colors.danger)
             .child(
                 div()
                     .row()

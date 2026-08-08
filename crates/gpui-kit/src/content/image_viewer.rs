@@ -34,7 +34,9 @@ use gpui::{
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Theme, TypeScale};
+use gpui_kit_theme::{
+    ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, Theme, TypeScale,
+};
 
 use crate::controls::button::IconButton;
 use crate::controls::segmented::{Segment, SegmentedControl};
@@ -587,8 +589,7 @@ impl RenderOnce for ImageViewer {
             .h(px(self.height))
             .overflow_hidden()
             .radius(&theme, Radius::Card)
-            .hairline(&theme)
-            .bg(theme.colors.raised)
+            .frame(&theme, Surface::Raised, Elevation::Raised)
             .child(body);
 
         if let (true, Some(geometry)) = (zoomable, geometry) {
@@ -949,8 +950,7 @@ fn empty_viewer(ident: &Ident, theme: &Theme, height: f32, cx: &mut App) -> AnyE
         .items_center()
         .justify_center()
         .radius(theme, Radius::Card)
-        .hairline(theme)
-        .bg(theme.colors.raised)
+        .frame(theme, Surface::Raised, Elevation::Raised)
         .type_scale(theme, TypeScale::Label)
         .text_color(theme.colors.text_muted)
         .child(cx.strings().text(StringKey::ImageViewerEmpty))

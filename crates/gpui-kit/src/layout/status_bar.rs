@@ -424,9 +424,7 @@ impl RenderOnce for StatusBar {
             .items_center()
             .px_token(&theme, Space::Sm)
             .gap_token(&theme, Space::Sm)
-            .bg(theme.colors.panel)
-            .border_t(px(theme.borders.hairline))
-            .border_color(theme.colors.hairline);
+            .bg(theme.colors.panel);
 
         for (position, items) in groups.into_iter().enumerate() {
             let elements: Vec<AnyElement> = items

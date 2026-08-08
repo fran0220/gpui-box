@@ -12,7 +12,7 @@ use gpui::{
     prelude::FluentBuilder,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
 
 use crate::controls::button::Button;
 use crate::display::badge::Tone;
@@ -319,7 +319,7 @@ impl RenderOnce for FilterBar {
             .px_token(&theme, Space::Sm)
             .py_token(&theme, Space::Xs)
             .radius(&theme, Radius::Card)
-            .hairline(&theme)
+            .frame(&theme, Surface::Panel, Elevation::Raised)
             .when(self.disabled, |element| {
                 element.opacity(theme.opacity.disabled)
             })

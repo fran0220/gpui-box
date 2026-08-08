@@ -25,7 +25,7 @@ use gpui::{
     IntoElement, ParentElement, Render, SharedString, Styled, Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TypeScale};
 
 use crate::controls::button::{Button, IconButton};
 use crate::display::badge::{Badge, Tone};
@@ -560,8 +560,7 @@ impl Render for NotificationCenter {
             .column()
             .w_full()
             .radius(&theme, Radius::Card)
-            .hairline(&theme)
-            .bg(theme.colors.panel)
+            .frame(&theme, Surface::Panel, Elevation::Raised)
             .child(
                 div()
                     .row()
@@ -569,8 +568,7 @@ impl Render for NotificationCenter {
                     .gap_token(&theme, Space::Sm)
                     .px_token(&theme, Space::Sm)
                     .py_token(&theme, Space::Xs)
-                    .border_b(px(theme.borders.hairline))
-                    .border_color(theme.colors.hairline)
+                    .surface(&theme, Surface::Raised)
                     .child(
                         div()
                             .type_scale(&theme, TypeScale::Label)

@@ -516,7 +516,10 @@ impl ToastLayer {
             .w(px(CARD_WIDTH))
             .gap_token(theme, Space::Sm)
             .p_token(theme, Space::Md)
-            .border_color(color.opacity(0.35))
+            // The tone washes the whole surface instead of outlining it, so a
+            // toast that is a failure is a different colour rather than the
+            // same colour inside a different line.
+            .bg(color.opacity(0.12))
             .opacity(entry.progress)
             .top(px(if self.corner.is_top() {
                 -travel

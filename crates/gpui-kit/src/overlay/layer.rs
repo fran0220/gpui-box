@@ -221,7 +221,6 @@ pub fn surface(theme: &Theme, elevation: Elevation) -> Div {
     div()
         .column()
         .bg(theme.colors.overlay)
-        .hairline_strong(theme)
         .radius(theme, gpui_kit_theme::Radius::Card)
         .elevation(theme, elevation)
         .overflow_hidden()

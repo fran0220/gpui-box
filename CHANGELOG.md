@@ -136,12 +136,71 @@ reviewed visually in one arrangement and tested in another. In-process window
 capture asks the window server for the process's own window and never the
 desktop.
 
+**Node graph.** `NodeGraph`, `GraphNode` and `GraphEdge` draw a run as connected
+steps rather than as a list, which is the shape a run takes once anything is
+retried. A node reports what it is, what it is doing now, how it ended and what
+it cost, and the five endings stay five: pending, running, succeeded, failed and
+refused are separate colours, separate glyphs and separate published values, so
+a host that declined to run a step is never drawn as a step that broke. Forward
+work is a solid path and a retry is a dashed one in the danger colour, dipping
+below the nodes it returns under, because a loop drawn like a flow would report
+a run that went cleanly in a circle. There is no layout algorithm: the caller
+places every node, since where a step belongs is a claim about the run. An edge
+naming a node the canvas does not have is dropped rather than pointed at the
+nearest box.
+
+**Web view shell.** `BrowserPanel` is the chrome around an embedded web view and
+draws no web pages, because rendering one means an engine and no component
+library should charge every host that wanted a button for a browser. The host
+owns the engine and hands the panel a `ViewportState`. The default state is
+`Unavailable`, not `Ready`: a build with no engine says so instead of showing a
+blank page, and "the site served nothing" and "this build cannot ask" are the
+two failures a reader most needs told apart. Refused and failed stay separate
+for the same reason, and a history control with nowhere to go is disabled and
+installs no handler.
+
 **Tooling.** `xtask tokens generate|check`, `xtask scenes list|capture|check`
 and `xtask gate [full]`. `scenes check` is the visual regression gate; see
 `docs/screenshot-testing.md` for where it can and cannot run.
 
 ### Changed
 
+- The design system stopped drawing hairlines to say what a colour could say.
+  Borders were doing the work of grouping because the surface ramp was too flat
+  to do it — canvas, panel and raised sat within about three percent lightness
+  of each other — so a line was the only thing separating a card from what it
+  sat on. The ramp was widened first and the lines came out afterwards:
+  structural borders became `frame()`, which is a surface plus the elevation
+  shadow that belongs to it; dividers between rows, between a header and its
+  body, and inside menus and grids were deleted, because adjacent surfaces
+  already report the boundary; and input borders became `well()`, a sunken
+  surface that reads as somewhere to put something. Lines that carry meaning
+  stayed: the column resize handle, the pinned-column edge, and the red border
+  an invalid field wears. `DataGrid` row lines are now an option that defaults
+  to off. Selection, focus and tone are carried by fill and shadow rather than
+  outline, so a badge, a tag and a callout are colour blocks.
+- New tokens back that change rather than hard-coded values: `color.surface.
+  sunken` for wells, `effect.glowAlpha` and `effect.glowBlur` for the state
+  bleed a node or a failure panel uses instead of a coloured border, and
+  `motion.durationMs.slow` and `motion.staggerStep` for entrances. A test
+  asserts the surface ramp keeps at least two percent between steps, so the
+  flatness that made the borders load-bearing cannot come back unnoticed.
+- Motion became something a component opts into in one line. The `Animated`
+  trait and its four `Entrance` presets — fade, rise, menu, dialog — sit on top
+  of the existing spring and easing machinery, which was already complete and
+  barely used: `Presence` appeared in three files out of a hundred and eight.
+  Reduced motion still resolves to the settled frame, so an entrance is an
+  entrance and never a requirement.
+
+- The workspace depends on upstream `zed-industries/zed` at a pinned revision
+  instead of a patched fork. `effects::frosted` and `effects::edge_faded` were
+  removed with it: upstream GPUI has no per-element backdrop blur and no
+  alpha-mask primitive, and a wrapper that silently stopped doing what its name
+  claims would be worse than its absence. Anchored overlays and modals draw the
+  opaque overlay surface on every platform, which is what non-macOS platforms
+  already showed. The `effect.glassAlphaMacos` and `effect.backdropBlur` tokens
+  left with the elements that read them; `effect.edgeFadeBand` stays because
+  scroll-linked toolbar motion uses it as a distance.
 - Components are `RenderOnce` builders that read the theme from the application
   context and derive their element and semantic id from one `Ident`, replacing
   free functions that took a `&Theme` and positional flags. This was a breaking

@@ -15,7 +15,7 @@ use gpui::{
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, Theme, TypeScale};
 
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -712,8 +712,7 @@ impl Render for Calendar {
             .gap_token(&theme, Space::Sm)
             .p_token(&theme, Space::Sm)
             .radius(&theme, Radius::Card)
-            .hairline(&theme)
-            .bg(theme.colors.panel)
+            .frame(&theme, Surface::Panel, Elevation::Raised)
             .track_focus(&self.focus_handle)
             .when(!self.disabled, |element| {
                 element.tab_index(0).focus_ring(&theme)

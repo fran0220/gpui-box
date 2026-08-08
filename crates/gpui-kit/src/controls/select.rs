@@ -441,18 +441,11 @@ impl Render for Select {
             .h(px(metrics.height))
             .px(px(metrics.padding_x))
             .radius(&theme, Radius::Control)
-            .border(px(theme.borders.hairline))
-            .border_color(if self.invalid {
-                theme.colors.danger
-            } else if focused {
-                theme.colors.focus
-            } else {
-                theme.colors.hairline
+            .well(&theme)
+            .when(self.invalid, |element| {
+                element.border_color(theme.colors.danger)
             })
-            .bg(theme
-                .colors
-                .hover
-                .opacity(if self.disabled { 0.12 } else { 0.25 }))
+            .when(focused, |element| element.shadow(theme.focus_ring()))
             .text_size(px(metrics.font_size))
             .text_color(if self.disabled || !has_choice {
                 theme.colors.text_faint

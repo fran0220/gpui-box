@@ -70,9 +70,10 @@
     "surfaceColors": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["canvas", "panel", "raised", "overlay"],
+      "required": ["canvas", "sunken", "panel", "raised", "overlay"],
       "properties": {
         "canvas": { "$ref": "#/$defs/color" },
+        "sunken": { "$ref": "#/$defs/color" },
         "panel": { "$ref": "#/$defs/color" },
         "raised": { "$ref": "#/$defs/color" },
         "overlay": { "$ref": "#/$defs/color" }
@@ -274,13 +275,17 @@
         "edgeFadeBand",
         "selectedRingAlpha",
         "focusRingWidth",
-        "focusRingAlpha"
+        "focusRingAlpha",
+        "glowAlpha",
+        "glowBlur"
       ],
       "properties": {
         "edgeFadeBand": { "$ref": "#/$defs/positiveNumber" },
         "selectedRingAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
         "focusRingWidth": { "$ref": "#/$defs/positiveNumber" },
-        "focusRingAlpha": { "type": "number", "minimum": 0, "maximum": 1 }
+        "focusRingAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "glowAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "glowBlur": { "$ref": "#/$defs/positiveNumber" }
       }
     }
   }

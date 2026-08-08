@@ -28,7 +28,7 @@ use gpui::{
 };
 use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
 
 use crate::display::icon::{Icon as IconView, IconTone};
 use crate::foundation::{FocusRing, Ident, Pressable, Sizable, StyledExt};
@@ -272,8 +272,7 @@ impl RenderOnce for ThinkingBlock {
             .w_full()
             .column()
             .radius(&theme, Radius::Card)
-            .hairline(&theme)
-            .surface(&theme, Surface::Panel)
+            .frame(&theme, Surface::Panel, Elevation::Raised)
             .overflow_hidden()
             .child(header)
             .children(body)

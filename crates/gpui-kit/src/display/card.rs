@@ -5,13 +5,13 @@ use gpui::{
     div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface};
 
 use crate::foundation::{FocusRing, HoverLift, Ident, Pressable, Selectable, StyledExt};
 
 type ClickHandler = Rc<dyn Fn(&mut Window, &mut App)>;
 
-/// A bordered panel that groups related rows or content.
+/// A raised panel that groups related rows or content.
 #[derive(IntoElement)]
 pub struct Card {
     ident: Option<Ident>,
@@ -51,8 +51,8 @@ impl Card {
         self
     }
 
-    /// Adds interior padding. Row-based cards leave this off so dividers can
-    /// reach the card edge.
+    /// Adds interior padding. Row-based cards leave this off so a row's own
+    /// hover wash can reach the card edge.
     pub fn padded(mut self, padded: bool) -> Self {
         self.padded = padded;
         self
@@ -86,8 +86,7 @@ impl RenderOnce for Card {
         let frame = div()
             .w_full()
             .radius(&theme, Radius::Card)
-            .hairline(&theme)
-            .surface(&theme, Surface::Panel)
+            .frame(&theme, Surface::Panel, Elevation::Raised)
             .overflow_hidden()
             .column()
             .when(self.padded, |element| element.p_token(&theme, Space::Lg))
@@ -132,7 +131,6 @@ impl RenderOnce for Card {
 #[derive(IntoElement)]
 pub struct ListRow {
     ident: Option<Ident>,
-    first: bool,
     selected: bool,
     children: Vec<AnyElement>,
     on_click: Option<ClickHandler>,
@@ -143,7 +141,6 @@ impl std::fmt::Debug for ListRow {
         formatter
             .debug_struct("ListRow")
             .field("ident", &self.ident)
-            .field("first", &self.first)
             .field("selected", &self.selected)
             .finish()
     }
@@ -159,7 +156,6 @@ impl ListRow {
     pub fn new() -> Self {
         Self {
             ident: None,
-            first: false,
             selected: false,
             children: Vec::new(),
             on_click: None,
@@ -168,12 +164,6 @@ impl ListRow {
 
     pub fn id(mut self, ident: impl Into<Ident>) -> Self {
         self.ident = Some(ident.into());
-        self
-    }
-
-    /// Suppresses the top divider on the first row of a card.
-    pub fn first(mut self, first: bool) -> Self {
-        self.first = first;
         self
     }
 
@@ -210,11 +200,6 @@ impl RenderOnce for ListRow {
             .w_full()
             .px(px(theme.spacing.lg + theme.spacing.xs))
             .py(px(theme.spacing.md + 2.0))
-            .when(!self.first, |element| {
-                element
-                    .border_t(px(theme.borders.hairline))
-                    .border_color(theme.colors.hairline)
-            })
             .when(selected, |element| element.bg(theme.colors.selected))
             .when(!selected, |element| {
                 element.hover(|style| style.bg(theme.colors.hover.opacity(0.3)))

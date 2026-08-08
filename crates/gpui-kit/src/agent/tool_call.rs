@@ -30,7 +30,7 @@ use std::rc::Rc;
 use gpui::{App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div, px};
 use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, Theme, TypeScale};
 
 use crate::controls::button::Button;
 use crate::display::badge::{Badge, Tone};
@@ -495,8 +495,7 @@ impl RenderOnce for ToolCallCard {
             .gap_token(&theme, Space::Sm)
             .p_token(&theme, Space::Md)
             .radius(&theme, Radius::Card)
-            .hairline(&theme)
-            .surface(&theme, Surface::Panel)
+            .frame(&theme, Surface::Panel, Elevation::Raised)
             .child(header)
             .children(arguments)
             .children(outcome)

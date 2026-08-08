@@ -132,7 +132,6 @@ fn rows_report_selection_and_keep_business_ids(cx: &mut TestAppContext) {
             .child(
                 ListRow::new()
                     .id("providers.anthropic")
-                    .first(true)
                     .child(div().child("Anthropic")),
             )
             .child(
@@ -314,7 +313,6 @@ fn an_actionable_row_reports_itself_and_stays_a_row(cx: &mut TestAppContext) {
             .child(
                 ListRow::new()
                     .id("providers.anthropic")
-                    .first(true)
                     .on_click(move |_, _| sink.set(sink.get() + 1))
                     .child(div().child("Anthropic")),
             )

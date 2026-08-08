@@ -20,7 +20,7 @@ input, and an entry in `docs/components.md`.
 | Navigation | `Tabs`, `Accordion`, `Collapsible`, `Breadcrumb`, `Sidebar`, `Pagination`, `Wizard` |
 | Data | `List` (virtualized), `Table`, `DataGrid` (virtualized), `BulkBar`, `Tree` |
 | Date and time | `Calendar`, `DateInput`, `RangePicker`, `TimeInput` |
-| Content | `Markdown`, `MessageList`, `ImageViewer`, `TransportBar` |
+| Content | `Markdown`, `MessageList`, `ImageViewer`, `TransportBar`, `BrowserPanel` (shell only) |
 | Display | `Badge`, `Tag`, `Avatar`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `StatusDot`, `StatusLine`, `Callout`, `PulseLoader`, `GradientSpinner`, `Skeleton`, `ProgressCircle`, `DescriptionList`, `Timeline` |
 | Overlay | `Overlay`, `Dialog`, `Drawer`, `Popover`, `Menu`, `ContextMenu`, `Menubar`, `CommandPalette`, `Tooltip`, `HoverCard`, `Toast`, `ToastLayer`, `Kbd` |
 | Layout | `SplitPane`, `SplitTree`, `ScrollArea`, `Toolbar`, `AspectRatio` |
@@ -28,12 +28,25 @@ input, and an entry in `docs/components.md`.
 | Keymap | `KeybindingRecorder` |
 | Interaction | `Dropzone` |
 | Filtering | `FilterBar` |
-| Agent run | `ToolCallCard`, `StepList`, `ThinkingBlock` |
+| Agent run | `ToolCallCard`, `StepList`, `ThinkingBlock`, `NodeGraph` |
 | Structured data | `JsonView`, `SchemaForm` |
 | Connections | `ServerList` |
 
 `Tooltipped` is an extension trait rather than a component: it attaches a
 `Tooltip` to any element, and is covered wherever that `Tooltip` is.
+
+`BrowserPanel` is listed with a qualification because it is one. It is the
+chrome and the states around an embedded web view and it renders no web
+content: that needs an engine, and a component library that pulled one into
+every binary would be charging every host for a feature almost none of them
+use. The host supplies the engine and the surface. What the panel does own is
+the part hosts otherwise each get wrong — a build with no engine says so
+instead of drawing a blank page, and refused, failed and unavailable stay three
+answers.
+
+`NodeGraph` places nothing. The caller positions every node, because where a
+step belongs is a claim about the run rather than a fact about the component,
+and a layout algorithm here would make that claim for every host at once.
 
 ## Systems, which span more than one component
 
@@ -190,8 +203,13 @@ conversation is not the unit; a run made of steps is, and `ToolCallCard`,
 refusal and the scope of "always" is stated, `CostMeter` and a context gauge
 that says when a number is an estimate, `ToolCatalog` with per-server
 attribution because two servers may offer the same tool name, `SkillCard`,
-`LogStream`, and `DiffView`. `JsonView`, `SchemaForm` and `ServerList` are
-covered above.
+`LogStream`, and `DiffView`. `JsonView`, `SchemaForm`, `ServerList` and
+`NodeGraph` are covered above.
+
+`NodeGraph` covers drawing a run that branched or was retried; it does not
+cover arranging one. A caller with a topology and no coordinates needs a layout
+pass, and a layered or force-directed one is a plausible future addition here
+precisely because it is separable from the drawing.
 
 ### Capabilities that are not components
 

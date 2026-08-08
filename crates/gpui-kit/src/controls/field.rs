@@ -1,9 +1,9 @@
 //! Field chrome.
 //!
-//! One frame carries the border, background and focus treatment every editable
+//! One frame carries the surface, focus and invalid treatment every editable
 //! control wears. The editable surface itself arrives with `TextInput`.
 
-use gpui::{Styled, div, px};
+use gpui::{Styled, div, prelude::FluentBuilder, px};
 use gpui_kit_theme::{ControlSize, Radius, Space, Theme};
 
 use crate::foundation::StyledExt;
@@ -11,7 +11,7 @@ use crate::foundation::StyledExt;
 /// What an editable surface currently reports about itself.
 ///
 /// The chrome is drawn from this alone, so every field in the library says
-/// the same thing with the same border.
+/// the same thing the same way.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct FieldState {
     pub focused: bool,
@@ -36,7 +36,7 @@ impl FieldState {
     }
 }
 
-/// The border, background and focus treatment every editable control wears.
+/// The surface, focus and invalid treatment every editable control wears.
 ///
 /// `TextInput` renders inside it, and the composed fields — `NumberInput`,
 /// `Combobox`, `TagInput` — wrap a bare input in one of these so a composed
@@ -52,22 +52,19 @@ pub fn field_shell(theme: &Theme, size: ControlSize, state: FieldState) -> gpui:
         .min_h(px(metrics.height))
         .px(px(metrics.padding_x))
         .radius(theme, Radius::Control)
-        .border(px(if state.focused {
-            theme.borders.thick
-        } else {
-            theme.borders.hairline
-        }))
-        .border_color(if state.invalid {
-            theme.colors.danger
-        } else if state.focused {
-            theme.colors.focus
-        } else {
-            theme.colors.hairline
+        .well(theme)
+        // Invalidity is the one thing a field says with a line, because it is
+        // the one thing no amount of surface colour can say: a well that is
+        // wrong looks exactly like a well that is right. Focus stays a ring,
+        // which is the same ring every other focusable thing in the library
+        // wears and costs the layout nothing.
+        .when(state.invalid, |field| {
+            field.border_color(theme.colors.danger)
         })
-        .bg(theme
-            .colors
-            .hover
-            .opacity(if state.disabled { 0.12 } else { 0.25 }))
+        .when(state.focused, |field| field.shadow(theme.focus_ring()))
+        .when(state.disabled, |field| {
+            field.opacity(theme.opacity.disabled)
+        })
         .text_size(px(metrics.font_size))
         .text_color(if state.disabled {
             theme.colors.text_faint

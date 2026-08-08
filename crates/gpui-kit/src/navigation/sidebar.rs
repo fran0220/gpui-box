@@ -403,8 +403,6 @@ impl RenderOnce for Sidebar {
             .gap(px(theme.space(Space::Md)))
             .p(px(theme.space(Space::Sm)))
             .bg(theme.colors.panel)
-            .border_r(px(theme.borders.hairline))
-            .border_color(theme.colors.hairline)
             .children(self.header)
             .child(body)
             .children(self.footer)

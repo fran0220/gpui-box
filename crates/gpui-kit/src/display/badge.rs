@@ -106,15 +106,16 @@ impl Badge {
 impl RenderOnce for Badge {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let (foreground, background, border) = match self.tone {
-            Tone::Neutral => (
-                theme.colors.text_muted,
-                theme.colors.raised,
-                theme.colors.hairline,
-            ),
+        // A badge is the tone itself, as a block. The tint is carried far
+        // enough that the block reads on any surface the badge can land on,
+        // which is what lets the outline go: an outline around a shape that
+        // is already a colour was only ever compensating for a tint too weak
+        // to see.
+        let (foreground, background) = match self.tone {
+            Tone::Neutral => (theme.colors.text_muted, theme.colors.raised),
             tone => {
                 let color = tone.color(&theme);
-                (color, color.opacity(0.12), color.opacity(0.2))
+                (color, color.opacity(0.18))
             }
         };
 
@@ -123,8 +124,6 @@ impl RenderOnce for Badge {
             .px_token(&theme, gpui_kit_theme::Space::Sm)
             .py(px(2.0))
             .rounded_full()
-            .border(px(theme.borders.hairline))
-            .border_color(border)
             .bg(background)
             .type_scale(&theme, TypeScale::Caption)
             .text_color(foreground)

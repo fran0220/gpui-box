@@ -204,6 +204,7 @@ impl TokenDocument {
     pub fn surface(&self, role: Surface) -> Color {
         let (path, value) = match role {
             Surface::Canvas => ("color.surface.canvas", self.color.surface.canvas.as_str()),
+            Surface::Sunken => ("color.surface.sunken", self.color.surface.sunken.as_str()),
             Surface::Panel => ("color.surface.panel", self.color.surface.panel.as_str()),
             Surface::Raised => ("color.surface.raised", self.color.surface.raised.as_str()),
             Surface::Overlay => ("color.surface.overlay", self.color.surface.overlay.as_str()),
@@ -392,6 +393,8 @@ impl TokenDocument {
             MotionDuration::Dialog => self.motion.duration_ms.dialog,
             MotionDuration::Resize => self.motion.duration_ms.resize,
             MotionDuration::Entrance => self.motion.duration_ms.entrance,
+            MotionDuration::Slow => self.motion.duration_ms.slow,
+            MotionDuration::StaggerStep => self.motion.duration_ms.stagger_step,
             MotionDuration::Pulse => self.motion.duration_ms.pulse,
             MotionDuration::Shimmer => self.motion.duration_ms.shimmer,
             MotionDuration::Toast => self.motion.duration_ms.toast,
@@ -477,6 +480,8 @@ pub fn bundled_json() -> [&'static str; 2] {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Surface {
     Canvas,
+    /// Recessed below whatever carries it: the well an editable value sits in.
+    Sunken,
     Panel,
     Raised,
     Overlay,
@@ -646,6 +651,9 @@ pub enum MotionDuration {
     Dialog,
     Resize,
     Entrance,
+    Slow,
+    /// The gap between one member of a staggered group and the next.
+    StaggerStep,
     Pulse,
     /// How long a loading placeholder's highlight takes to cross it.
     Shimmer,
@@ -803,9 +811,10 @@ pub struct ColorTokens {
 }
 
 impl ColorTokens {
-    fn entries(&self) -> [(&'static str, &str); 23] {
+    fn entries(&self) -> [(&'static str, &str); 24] {
         [
             ("color.surface.canvas", &self.surface.canvas),
+            ("color.surface.sunken", &self.surface.sunken),
             ("color.surface.panel", &self.surface.panel),
             ("color.surface.raised", &self.surface.raised),
             ("color.surface.overlay", &self.surface.overlay),
@@ -838,6 +847,10 @@ impl ColorTokens {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SurfaceColors {
     pub canvas: String,
+    /// The well an editable value sits in, recessed below the surface that
+    /// carries it. It is what a text field is made of once the field has no
+    /// border to be made of instead.
+    pub sunken: String,
     pub panel: String,
     pub raised: String,
     pub overlay: String,
@@ -1017,6 +1030,7 @@ pub struct MotionTokens {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DurationTokens {
     pub instant: u64,
     pub quick: u64,
@@ -1024,6 +1038,11 @@ pub struct DurationTokens {
     pub dialog: u64,
     pub resize: u64,
     pub entrance: u64,
+    /// The longest step a user waits through deliberately: a panel taking a
+    /// region over, or a graph laying itself out.
+    pub slow: u64,
+    /// The gap between one member of a staggered group and the next.
+    pub stagger_step: u64,
     pub pulse: u64,
     /// How long a loading placeholder's highlight takes to cross it.
     pub shimmer: u64,
@@ -1052,6 +1071,11 @@ pub struct EffectTokens {
     /// How wide the ring around the focused control is drawn, in pixels.
     pub focus_ring_width: f32,
     pub focus_ring_alpha: f32,
+    /// How strongly a surface that carries a state colour bleeds it into the
+    /// pixels around its edge.
+    pub glow_alpha: f32,
+    /// How far that bleed reaches, in pixels.
+    pub glow_blur: f32,
 }
 
 #[cfg(test)]
@@ -1076,7 +1100,7 @@ mod tests {
         let tokens = studio_dark();
         assert_eq!(
             tokens.surface(Surface::Canvas),
-            Color::parse("literal", "#060606").expect("literal")
+            Color::parse("literal", "#0a0a0a").expect("literal")
         );
         assert_eq!(
             tokens.interactive(InteractiveColor::Hover),

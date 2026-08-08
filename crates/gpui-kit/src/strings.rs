@@ -432,6 +432,21 @@ string_keys! {
     UploadRemove => "upload.remove", "Remove {0}";
     UploadOverall => "upload.overall", "Uploading";
     UploadEmpty => "upload.empty", "No files yet";
+
+    // The web view shell. The four things that are not a page each say a
+    // different thing, so each of them is its own key rather than one
+    // "cannot show" a host would have to disambiguate by guessing.
+    BrowserBack => "browser.back", "Back";
+    BrowserForward => "browser.forward", "Forward";
+    BrowserReload => "browser.reload", "Reload";
+    BrowserNoAddress => "browser.no-address", "No address";
+    BrowserNoEngine => "browser.no-engine", "No web engine";
+    BrowserNoEngineDetail => "browser.no-engine-detail", "This build cannot display web content.";
+    BrowserRefused => "browser.refused", "Address not opened";
+    BrowserFailed => "browser.failed", "Could not load";
+    BrowserNoViewport => "browser.no-viewport", "No page surface";
+    BrowserNoViewportDetail => "browser.no-viewport-detail",
+        "The host reported a ready page but supplied no viewport.";
 }
 
 /// The catalogue a host installs, and the one components read.

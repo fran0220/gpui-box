@@ -34,8 +34,8 @@ pub mod tree;
 pub mod viewport;
 
 pub use grid::{
-    BulkBar, DataGrid, EditIntent, EditOutcome, EditingCell, Expanded, GridColumn, GridRow,
-    SelectionChange, SelectionMode,
+    BulkBar, DataGrid, EditIntent, EditOutcome, EditingCell, Expanded, GridColumn, GridLines,
+    GridRow, SelectionChange, SelectionMode,
 };
 pub use list::{List, ListItem};
 pub use table::{Align, Cell, Column, ColumnWidth, Row, SortDirection, Table};

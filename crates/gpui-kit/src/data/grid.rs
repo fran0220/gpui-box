@@ -52,7 +52,9 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Theme, TypeScale};
+use gpui_kit_theme::{
+    ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, Theme, TypeScale,
+};
 
 use crate::controls::input::{Cancel, Submit, TextInput};
 use crate::data::table::{Align, Cell, ColumnWidth, SortDirection};
@@ -369,6 +371,20 @@ impl EditingCell {
     }
 }
 
+/// Whether a grid draws rules between its rows.
+///
+/// A grid groups with alignment and with the wash a row takes under the
+/// pointer, which is enough at the row heights this library ships. Rules are
+/// the answer to one specific problem — a dense grid whose rows are short
+/// enough that the eye loses which cell belongs to which record — and they
+/// stay off until a caller says that is the problem they have.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum GridLines {
+    #[default]
+    None,
+    Rows,
+}
+
 /// A grid that renders only the rows its viewport holds.
 #[derive(IntoElement)]
 pub struct DataGrid {
@@ -378,6 +394,7 @@ pub struct DataGrid {
     render_row: RenderRow,
     render_detail: Option<RenderDetail>,
     columns: Vec<GridColumn>,
+    lines: GridLines,
     sort: Option<(SharedString, SortDirection)>,
     selection_mode: SelectionMode,
     selected: BTreeSet<SharedString>,
@@ -435,6 +452,7 @@ impl DataGrid {
             render_row: Rc::new(render_row),
             render_detail: None,
             columns: Vec::new(),
+            lines: GridLines::default(),
             sort: None,
             selection_mode: SelectionMode::None,
             selected: BTreeSet::new(),
@@ -473,6 +491,12 @@ impl DataGrid {
 
     pub fn columns(mut self, columns: impl IntoIterator<Item = GridColumn>) -> Self {
         self.columns.extend(columns);
+        self
+    }
+
+    /// Draws rules between rows, for a grid dense enough to need them.
+    pub fn lines(mut self, lines: GridLines) -> Self {
+        self.lines = lines;
         self
     }
 
@@ -785,7 +809,7 @@ impl RenderOnce for DataGrid {
             .column()
             .w_full()
             .radius(&theme, Radius::Card)
-            .hairline(&theme)
+            .frame(&theme, Surface::Panel, Elevation::Raised)
             .overflow_hidden()
             .text_size(px(metrics.font_size))
             .children(self.banner(&theme, cx))
@@ -821,8 +845,6 @@ impl DataGrid {
                     .colors
                     .danger
                     .opacity(theme.effects.selected_ring_alpha))
-                .border_b(px(theme.borders.hairline))
-                .border_color(theme.colors.hairline)
                 .type_scale(theme, TypeScale::Caption)
                 .text_color(theme.colors.text)
                 .child(
@@ -939,9 +961,7 @@ impl DataGrid {
             .flex_none()
             .px_token(theme, Space::Sm)
             .gap_token(theme, Space::Sm)
-            .bg(theme.colors.panel)
-            .border_b(px(theme.borders.hairline))
-            .border_color(theme.colors.hairline)
+            .surface(theme, Surface::Raised)
             .type_scale(theme, TypeScale::Caption)
             .text_color(theme.colors.text_muted);
 
@@ -1400,6 +1420,7 @@ impl DataGrid {
         let drawn = Rc::clone(drawn);
         let opened: Vec<SharedString> = self.expanded.iter().map(|row| row.id.clone()).collect();
         let context = Rc::new(RowContext {
+            lines: self.lines,
             selected: self.selected.clone(),
             selection_mode: self.selection_mode,
             disabled: self.disabled,
@@ -1520,6 +1541,7 @@ impl DataGrid {
 
 /// Everything a row needs that does not come from the row itself.
 struct RowContext {
+    lines: GridLines,
     selected: BTreeSet<SharedString>,
     selection_mode: SelectionMode,
     disabled: bool,
@@ -1561,8 +1583,11 @@ fn row_element(
         .h(px(height))
         .px_token(theme, Space::Sm)
         .gap_token(theme, Space::Sm)
-        .border_b(px(theme.borders.hairline))
-        .border_color(theme.colors.hairline)
+        .when(context.lines == GridLines::Rows, |element| {
+            element
+                .border_b(px(theme.borders.hairline))
+                .border_color(theme.colors.hairline)
+        })
         .when(selected, |element| element.bg(theme.colors.selected))
         .when(row.disabled, |element| {
             element.opacity(theme.opacity.disabled)
@@ -1662,8 +1687,6 @@ fn row_element(
                 .h(px(height * detail_rows as f32))
                 .overflow_hidden()
                 .bg(theme.colors.panel)
-                .border_b(px(theme.borders.hairline))
-                .border_color(theme.colors.hairline)
                 .p_token(theme, Space::Sm)
                 .child(render(row.id.clone(), window, cx))
                 .semantic_in(
@@ -1867,9 +1890,8 @@ fn editor_cell(
         .overflow_hidden()
         .px(px(theme.spacing.xs))
         .radius(theme, Radius::Small)
-        .bg(theme.colors.raised)
-        .border(px(theme.borders.hairline))
-        .border_color(theme.colors.focus);
+        .well(theme)
+        .shadow(theme.focus_ring());
 
     let Some(handler) = context.on_edit.clone() else {
         return frame.child(field).into_any_element();
@@ -2163,8 +2185,7 @@ impl RenderOnce for BulkBar {
             .px_token(&theme, Space::Sm)
             .py_token(&theme, Space::Xs)
             .radius(&theme, Radius::Control)
-            .bg(theme.colors.raised)
-            .hairline(&theme)
+            .frame(&theme, Surface::Raised, Elevation::Raised)
             .opacity(progress)
             .type_scale(&theme, TypeScale::Label)
             .text_color(theme.colors.text)

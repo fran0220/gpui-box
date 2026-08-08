@@ -33,7 +33,7 @@ use gpui::{
     div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Surface, Theme, TypeScale};
 use web_time::Instant;
 
 use crate::content::markdown::{Markdown, MarkdownEvent};
@@ -839,7 +839,7 @@ fn attachment_chip(
     div()
         .px_token(theme, Space::Xs)
         .radius(theme, Radius::Small)
-        .hairline(theme)
+        .surface(theme, Surface::Raised)
         .type_scale(theme, TypeScale::Caption)
         .text_color(theme.colors.text_muted)
         .child(text.clone())

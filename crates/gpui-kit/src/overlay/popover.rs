@@ -172,11 +172,9 @@ pub fn filter_indices<S: AsRef<str>>(query: &str, labels: &[S]) -> Vec<usize> {
     ranked.into_iter().map(|(_, index)| index).collect()
 }
 
-/// The bordered, elevated surface every anchored overlay draws.
+/// The elevated surface every anchored overlay draws.
 pub fn card(theme: &Theme) -> gpui::Div {
     div()
-        .border_1()
-        .border_color(theme.colors.hairline_strong)
         .rounded(px(theme.radii.card))
         .elevation(theme, Elevation::Overlay)
         .p(px(theme.spacing.xs))
@@ -362,8 +360,6 @@ pub fn dialog_card(theme: &Theme) -> gpui::Div {
         .p(px(theme.spacing.xl - theme.spacing.xs))
         .rounded(px(theme.radii.dialog))
         .bg(theme.colors.overlay)
-        .border_1()
-        .border_color(theme.colors.hairline_strong)
         .elevation(theme, Elevation::Modal)
         .flex()
         .flex_col()

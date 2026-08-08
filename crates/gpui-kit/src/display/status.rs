@@ -118,9 +118,7 @@ impl RenderOnce for Callout {
             .px_token(&theme, Space::Lg)
             .py_token(&theme, Space::Md)
             .radius(&theme, Radius::Card)
-            .border(px(theme.borders.hairline))
-            .border_color(color.opacity(0.2))
-            .bg(color.opacity(0.06))
+            .bg(color.opacity(0.14))
             .type_scale(&theme, TypeScale::Label)
             .line_height(px(theme.typography.body.line_height))
             .text_color(color.opacity(0.92));

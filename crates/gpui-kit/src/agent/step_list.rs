@@ -2,7 +2,7 @@
 //!
 //! # A run of unknown length has no progress
 //!
-//! [`ProgressBar`](crate::display::progress::ProgressBar) already draws the
+//! [`ProgressBar`] already draws the
 //! line this component has to keep: a bar reports a position only when the
 //! extent of the work is known, and an unknown extent is drawn as an unknown
 //! extent rather than as a bar that happens to be part full. A run whose steps

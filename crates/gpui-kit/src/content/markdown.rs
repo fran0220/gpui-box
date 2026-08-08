@@ -34,7 +34,7 @@ use gpui::{
     prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, Theme, TypeScale};
 
 use crate::controls::button::Button;
 use crate::display::badge::Tone;
@@ -577,8 +577,7 @@ impl Painter {
                 .px_token(&theme, Space::Sm)
                 .py_token(&theme, Space::Xs)
                 .radius(&theme, Radius::Small)
-                .hairline(&theme)
-                .bg(theme.colors.raised)
+                .frame(&theme, Surface::Raised, Elevation::Raised)
                 .child(
                     div()
                         .type_scale(&theme, TypeScale::Label)
@@ -645,8 +644,7 @@ impl Painter {
             .gap_token(&theme, Space::Xs)
             .p_token(&theme, Space::Sm)
             .radius(&theme, Radius::Card)
-            .hairline(&theme)
-            .bg(theme.colors.raised)
+            .frame(&theme, Surface::Raised, Elevation::Raised)
             .child(
                 div()
                     .row()
@@ -828,7 +826,7 @@ impl Painter {
             .column()
             .w_full()
             .radius(&theme, Radius::Card)
-            .hairline(&theme)
+            .frame(&theme, Surface::Panel, Elevation::Raised)
             .overflow_hidden();
 
         if !head.is_empty() {
@@ -852,8 +850,6 @@ impl Painter {
                 .row()
                 .items_stretch()
                 .w_full()
-                .border_t(px(theme.borders.hairline))
-                .border_color(theme.colors.hairline)
                 .type_scale(&theme, TypeScale::Label)
                 .text_color(theme.colors.text);
             for (column, cell) in row.iter().enumerate() {

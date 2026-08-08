@@ -130,9 +130,10 @@ impl RenderOnce for Tag {
             .px(px(theme.space(Space::Sm)))
             .py(px(2.0))
             .radius(&theme, Radius::Pill)
-            .border(px(theme.borders.hairline))
-            .border_color(color.opacity(if self.selected { 1.0 } else { 0.4 }))
-            .bg(color.opacity(if self.selected { 0.28 } else { 0.12 }))
+            // Selection is carried by the depth of the block rather than by an
+            // outline drawn round it, so the two states differ by more than a
+            // line a reader has to look for.
+            .bg(color.opacity(if self.selected { 0.34 } else { 0.14 }))
             .when(self.selected, |element| {
                 element.shadow(theme.selected_ring())
             })

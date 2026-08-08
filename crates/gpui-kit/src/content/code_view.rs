@@ -34,7 +34,7 @@
 //! # Size, and what virtualization costs here
 //!
 //! With no [`CodeView::visible_lines`] every line is laid out inside a
-//! [`ScrollArea`](crate::layout::ScrollArea) that scrolls both ways, which is
+//! [`ScrollArea`] that scrolls both ways, which is
 //! the mode that keeps the horizontal scroll above.
 //!
 //! With `visible_lines` the body becomes the virtualized [`List`], which draws
@@ -57,7 +57,9 @@ use gpui::{
     SharedString, Styled, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Theme, TypeScale};
+use gpui_kit_theme::{
+    ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, Theme, TypeScale,
+};
 
 use crate::content::markdown::CodeSpan;
 use crate::controls::button::Button;
@@ -490,8 +492,7 @@ impl RenderOnce for CodeView {
             .gap_token(&theme, Space::Xs)
             .p_token(&theme, Space::Sm)
             .radius(&theme, Radius::Card)
-            .hairline(&theme)
-            .bg(theme.colors.raised)
+            .frame(&theme, Surface::Raised, Elevation::Raised)
             .when(self.language.is_some() || copy.is_some(), |element| {
                 element.child(
                     div()

@@ -13,7 +13,7 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, Theme, TypeScale};
 
 use crate::display::badge::Badge;
 use crate::foundation::{Ident, StyledExt};
@@ -138,7 +138,7 @@ impl SettingsRow {
         self
     }
 
-    fn render_in(self, theme: &Theme, first: bool, cx: &mut App) -> AnyElement {
+    fn render_in(self, theme: &Theme, cx: &mut App) -> AnyElement {
         let withheld = self.withheld.clone();
         let ident = self.ident.clone();
 
@@ -229,11 +229,6 @@ impl SettingsRow {
             .gap_token(theme, Space::Md)
             .px_token(theme, Space::Lg)
             .py_token(theme, Space::Md)
-            .when(!first, |element| {
-                element
-                    .border_t(px(theme.borders.hairline))
-                    .border_color(theme.colors.hairline)
-            })
             .child(names)
             .child(right)
             .semantic_in(cx, spec)
@@ -244,7 +239,7 @@ impl SettingsRow {
 impl RenderOnce for SettingsRow {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        self.render_in(&theme, true, cx)
+        self.render_in(&theme, cx)
     }
 }
 
@@ -378,12 +373,12 @@ impl RenderOnce for SettingsSection {
                 )
         });
 
-        let rows = self.rows.into_iter().enumerate().map(|(index, row)| {
+        let rows = self.rows.into_iter().map(|row| {
             let row = match dimmed.clone() {
                 Some(reason) => row.inapplicable(reason),
                 None => row,
             };
-            row.render_in(&theme, index == 0, cx)
+            row.render_in(&theme, cx)
         });
 
         div()
@@ -397,8 +392,7 @@ impl RenderOnce for SettingsSection {
                     .column()
                     .w_full()
                     .radius(&theme, Radius::Card)
-                    .hairline(&theme)
-                    .surface(&theme, Surface::Panel)
+                    .frame(&theme, Surface::Panel, Elevation::Raised)
                     .overflow_hidden()
                     .when(dimmed.is_some(), |element| {
                         element.opacity(theme.opacity.disabled)

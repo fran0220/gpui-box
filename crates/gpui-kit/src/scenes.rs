@@ -285,6 +285,14 @@ pub fn catalog() -> Vec<Scene> {
             build: step_list,
         },
         Scene {
+            name: "node-graph",
+            build: node_graph,
+        },
+        Scene {
+            name: "browser-panel",
+            build: browser_panel,
+        },
+        Scene {
             name: "thinking",
             build: thinking,
         },
@@ -506,7 +514,6 @@ fn card(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .child(
                     ListRow::new()
                         .id("scene.card.runtime")
-                        .first(true)
                         .child(div().flex_1().child("Native runtime"))
                         .child(Badge::new("Ready").success()),
                 )
@@ -515,6 +522,92 @@ fn card(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .id("scene.card.catalog")
                         .child(div().flex_1().child("Model catalog"))
                         .child(Badge::new("Stale").warning()),
+                ),
+        )
+        .into_any_element()
+}
+
+/// A run that failed and was sent back, which is the case the canvas exists
+/// for: every node state appears once, and the retry loop is drawn as a loop
+/// rather than as another step in the forward order.
+fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .child(
+            div().w(px(860.0)).h(px(300.0)).child(
+                NodeGraph::new("scene.graph")
+                    .node(
+                        GraphNode::new("scene.graph.plan", "Plan")
+                            .state(NodeState::Succeeded)
+                            .metric("tokens", "4.1k")
+                            .metric("took", "2.4s"),
+                        24.0,
+                        24.0,
+                    )
+                    .node(
+                        GraphNode::new("scene.graph.edit", "Edit files")
+                            .state(NodeState::Failed)
+                            .action("write crates/gpui-kit/src/lib.rs")
+                            .metric("tokens", "12.7k")
+                            .diff(Diff::new(48, 12)),
+                        300.0,
+                        24.0,
+                    )
+                    .node(
+                        GraphNode::new("scene.graph.test", "Run tests")
+                            .state(NodeState::Running)
+                            .action("cargo test --workspace")
+                            .metric("took", "18s"),
+                        576.0,
+                        24.0,
+                    )
+                    .node(
+                        GraphNode::new("scene.graph.publish", "Publish").state(NodeState::Pending),
+                        576.0,
+                        170.0,
+                    )
+                    .node(
+                        GraphNode::new("scene.graph.deploy", "Deploy")
+                            .state(NodeState::Refused)
+                            .action("host declined: no credentials"),
+                        300.0,
+                        170.0,
+                    )
+                    .edge(GraphEdge::new("scene.graph.plan", "scene.graph.edit"))
+                    .edge(GraphEdge::new("scene.graph.edit", "scene.graph.test"))
+                    .edge(GraphEdge::new("scene.graph.publish", "scene.graph.deploy"))
+                    .edge(GraphEdge::new("scene.graph.test", "scene.graph.edit").feedback()),
+            ),
+        )
+        .into_any_element()
+}
+
+/// The shell, in the two states a host without an engine will actually see
+/// beside the one it wants: no engine at all, and a page it was not allowed
+/// to open.
+fn browser_panel(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .child(
+            row(&theme)
+                .items_start()
+                .child(
+                    div().w(px(360.0)).h(px(220.0)).child(
+                        BrowserPanel::new("scene.browser.unavailable")
+                            .url("https://docs.example.com/guide")
+                            .on_reload(|_, _| {}),
+                    ),
+                )
+                .child(
+                    div().w(px(360.0)).h(px(220.0)).child(
+                        BrowserPanel::new("scene.browser.refused")
+                            .url("https://internal.example.com/admin")
+                            .state(ViewportState::Refused(
+                                "The workspace policy does not allow this host.".into(),
+                            ))
+                            .on_back(|_, _| {})
+                            .on_reload(|_, _| {}),
+                    ),
                 ),
         )
         .into_any_element()
@@ -2595,7 +2688,6 @@ fn motion_flip(window: &mut Window, cx: &mut App) -> AnyElement {
         queue = queue.child(
             ListRow::new()
                 .id(ident)
-                .first(index == 0)
                 .child(div().flex_1().child(*label))
                 .child(Badge::new(format!("{}", index + 1)).neutral())
                 .flip(&handle, window, cx),

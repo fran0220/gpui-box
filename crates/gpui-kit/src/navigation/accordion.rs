@@ -15,7 +15,7 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TypeScale};
 
 use crate::display::icon::flips;
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
@@ -166,17 +166,16 @@ impl RenderOnce for Accordion {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let metrics = theme.control.get(self.size);
-        let last = self.sections.len().saturating_sub(1);
         let expanded_ids = self.expanded.clone();
         let direction = cx.layout_direction();
 
         let mut stack = div()
             .column()
             .radius(&theme, Radius::Card)
-            .hairline(&theme)
+            .frame(&theme, Surface::Panel, Elevation::Raised)
             .overflow_hidden();
 
-        for (index, section) in self.sections.into_iter().enumerate() {
+        for section in self.sections.into_iter() {
             let open = expanded_ids.contains(&section.id);
             let actionable = !section.disabled && self.on_toggle.is_some();
             let ident = self.ident.child(section.id.as_ref());
@@ -278,59 +277,49 @@ impl RenderOnce for Accordion {
             let measured = measure::cell(&body_id, cx);
             let height = px(f32::from(measured.get().size.height) * disclosed);
 
-            stack = stack.child(
-                div()
-                    .column()
-                    .when(index != last, |element| {
-                        element
-                            .border_b(px(theme.borders.hairline))
-                            .border_color(theme.colors.hairline)
-                    })
-                    .child(header)
-                    .children(body.map(|body| {
-                        let content = div()
-                            // Indented to the title rather than to the
-                            // chevron, so the body reads as belonging to the
-                            // section it hangs under.
-                            .pl(px(metrics.padding_x
-                                + metrics.icon_size
-                                + theme.space(Space::Sm)))
-                            .pr(px(metrics.padding_x))
-                            .pb(px(theme.space(Space::Sm)))
-                            .text_size(px(metrics.font_size))
-                            .text_color(theme.colors.text_muted)
-                            .child(body);
-                        let record = {
-                            let measured = Rc::clone(&measured);
-                            move |bounds: Vec<gpui::Bounds<gpui::Pixels>>,
-                                  window: &mut Window,
-                                  _: &mut App| {
-                                if let Some(first) = bounds.first() {
-                                    measure::record(&measured, *first, window);
-                                }
-                            }
-                        };
-
-                        // A settled section is laid out exactly as it was
-                        // before there was any motion here: the body sits in
-                        // the flow and its own height is the section's height.
-                        // Only a section in flight uses the driven height, and
-                        // it takes the body out of the flow to get one, so the
-                        // measurement stays the body's natural height instead
-                        // of chasing the frame being animated around it.
-                        if disclosed >= 1.0 {
-                            div().w_full().on_children_prepainted(record).child(content)
-                        } else {
-                            div()
-                                .relative()
-                                .w_full()
-                                .h(height)
-                                .overflow_hidden()
-                                .on_children_prepainted(record)
-                                .child(content.absolute().top_0().left_0().right_0())
+            stack = stack.child(div().column().child(header).children(body.map(|body| {
+                let content = div()
+                    // Indented to the title rather than to the
+                    // chevron, so the body reads as belonging to the
+                    // section it hangs under.
+                    .pl(px(metrics.padding_x
+                        + metrics.icon_size
+                        + theme.space(Space::Sm)))
+                    .pr(px(metrics.padding_x))
+                    .pb(px(theme.space(Space::Sm)))
+                    .text_size(px(metrics.font_size))
+                    .text_color(theme.colors.text_muted)
+                    .child(body);
+                let record = {
+                    let measured = Rc::clone(&measured);
+                    move |bounds: Vec<gpui::Bounds<gpui::Pixels>>,
+                          window: &mut Window,
+                          _: &mut App| {
+                        if let Some(first) = bounds.first() {
+                            measure::record(&measured, *first, window);
                         }
-                    })),
-            );
+                    }
+                };
+
+                // A settled section is laid out exactly as it was
+                // before there was any motion here: the body sits in
+                // the flow and its own height is the section's height.
+                // Only a section in flight uses the driven height, and
+                // it takes the body out of the flow to get one, so the
+                // measurement stays the body's natural height instead
+                // of chasing the frame being animated around it.
+                if disclosed >= 1.0 {
+                    div().w_full().on_children_prepainted(record).child(content)
+                } else {
+                    div()
+                        .relative()
+                        .w_full()
+                        .h(height)
+                        .overflow_hidden()
+                        .on_children_prepainted(record)
+                        .child(content.absolute().top_0().left_0().right_0())
+                }
+            })));
         }
 
         stack.semantic_in(cx, NodeSpec::new(self.ident.semantic_id(), Role::Group))

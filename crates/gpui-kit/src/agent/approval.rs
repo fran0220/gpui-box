@@ -35,7 +35,7 @@ use gpui::{
     KeyDownEvent, ParentElement, Render, SharedString, Styled, Window, div, prelude::FluentBuilder,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, TypeScale};
 
 use crate::controls::button::{Button, ButtonVariant};
 use crate::display::badge::Tone;
@@ -465,8 +465,7 @@ impl Render for ApprovalPrompt {
             .gap_token(&theme, Space::Md)
             .p_token(&theme, Space::Lg)
             .radius(&theme, Radius::Card)
-            .hairline(&theme)
-            .surface(&theme, gpui_kit_theme::Surface::Raised)
+            .frame(&theme, gpui_kit_theme::Surface::Raised, Elevation::Raised)
             .track_focus(&self.focus_handle)
             .when(pending, |element| {
                 element.on_key_down(cx.listener(Self::on_key))

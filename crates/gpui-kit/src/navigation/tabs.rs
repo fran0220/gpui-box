@@ -685,9 +685,7 @@ impl RenderOnce for Tabs {
             .row_reading(direction)
             .items_end()
             .flex_wrap()
-            .gap(px(theme.space(Space::Xs)))
-            .border_b(px(theme.borders.hairline))
-            .border_color(theme.colors.hairline);
+            .gap(px(theme.space(Space::Xs)));
 
         if let (false, Some(handler)) = (self.disabled, self.on_select.clone()) {
             let tabs = self.tabs.clone();

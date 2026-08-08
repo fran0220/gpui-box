@@ -13,7 +13,7 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Surface};
 
 use crate::foundation::direction::ActiveDirection;
 use crate::foundation::stepping::bounded_step;
@@ -262,9 +262,7 @@ impl RenderOnce for SegmentedControl {
             .gap(px(2.0))
             .p(px(2.0))
             .radius(&theme, Radius::Control)
-            .border(px(theme.borders.hairline))
-            .border_color(theme.colors.hairline)
-            .bg(theme.colors.hover.opacity(0.25))
+            .surface(&theme, Surface::Sunken)
             .when(self.disabled, |element| {
                 element.opacity(theme.opacity.disabled)
             })

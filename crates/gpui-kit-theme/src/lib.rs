@@ -49,6 +49,7 @@ pub struct Theme {
 #[derive(Debug, Clone)]
 pub struct Colors {
     pub canvas: Hsla,
+    pub sunken: Hsla,
     pub panel: Hsla,
     pub raised: Hsla,
     pub overlay: Hsla,
@@ -160,6 +161,9 @@ pub struct Motion {
     pub dialog_ms: u64,
     pub resize_ms: u64,
     pub entrance_ms: u64,
+    pub slow_ms: u64,
+    /// The gap between one member of a staggered group and the next.
+    pub stagger_step_ms: u64,
     pub pulse_ms: u64,
     pub shimmer_ms: u64,
     pub toast_ms: u64,
@@ -238,6 +242,8 @@ pub struct Effects {
     pub selected_ring_alpha: f32,
     pub focus_ring_width: f32,
     pub focus_ring_alpha: f32,
+    pub glow_alpha: f32,
+    pub glow_blur: f32,
 }
 
 impl Theme {
@@ -270,6 +276,7 @@ impl Theme {
             density,
             colors: Colors {
                 canvas: color(tokens.surface(Surface::Canvas)),
+                sunken: color(tokens.surface(Surface::Sunken)),
                 panel: color(tokens.surface(Surface::Panel)),
                 raised: color(tokens.surface(Surface::Raised)),
                 overlay: color(tokens.surface(Surface::Overlay)),
@@ -362,6 +369,8 @@ impl Theme {
                 dialog_ms: millis(tokens, MotionDuration::Dialog),
                 resize_ms: millis(tokens, MotionDuration::Resize),
                 entrance_ms: millis(tokens, MotionDuration::Entrance),
+                slow_ms: millis(tokens, MotionDuration::Slow),
+                stagger_step_ms: millis(tokens, MotionDuration::StaggerStep),
                 pulse_ms: millis(tokens, MotionDuration::Pulse),
                 shimmer_ms: millis(tokens, MotionDuration::Shimmer),
                 toast_ms: millis(tokens, MotionDuration::Toast),
@@ -403,6 +412,8 @@ impl Theme {
                 selected_ring_alpha: tokens.effect.selected_ring_alpha,
                 focus_ring_width: tokens.effect.focus_ring_width,
                 focus_ring_alpha: tokens.effect.focus_ring_alpha,
+                glow_alpha: tokens.effect.glow_alpha,
+                glow_blur: tokens.effect.glow_blur,
             },
         }
     }
@@ -410,6 +421,7 @@ impl Theme {
     pub fn surface(&self, surface: Surface) -> Hsla {
         match surface {
             Surface::Canvas => self.colors.canvas,
+            Surface::Sunken => self.colors.sunken,
             Surface::Panel => self.colors.panel,
             Surface::Raised => self.colors.raised,
             Surface::Overlay => self.colors.overlay,
@@ -533,6 +545,21 @@ impl Theme {
             blur_radius: px(0.0),
             spread_radius: px(1.0),
             inset: true,
+        }]
+    }
+
+    /// The colour a surface in a named state bleeds into the pixels around it.
+    ///
+    /// It is the state itself made visible at the edge, which is what lets a
+    /// surface report "running" or "failed" without a border drawn round it.
+    /// Blurred and unoffset, so nothing about it reads as a line.
+    pub fn glow(&self, color: Hsla) -> Vec<BoxShadow> {
+        vec![BoxShadow {
+            color: color.opacity(self.effects.glow_alpha),
+            offset: point(px(0.0), px(0.0)),
+            blur_radius: px(self.effects.glow_blur),
+            spread_radius: px(0.0),
+            inset: false,
         }]
     }
 }
@@ -690,9 +717,37 @@ fn color(value: Color) -> Hsla {
 mod tests {
     use super::*;
 
+    /// The library groups content with colour rather than with a line drawn
+    /// round it, so a step between two surfaces has to be visible on its own.
+    /// Below this the step stops reading and a border is doing the work
+    /// instead, which is the arrangement this threshold exists to prevent
+    /// anyone drifting back into.
+    const MIN_SURFACE_STEP: f32 = 0.02;
+
+    #[test]
+    fn a_surface_step_is_visible_without_a_border_to_help_it() {
+        for theme in [Theme::studio_dark(), Theme::studio_light()] {
+            let steps = [
+                ("sunken to panel", theme.colors.sunken, theme.colors.panel),
+                ("canvas to panel", theme.colors.canvas, theme.colors.panel),
+            ];
+            for (name, lower, upper) in steps {
+                assert!(
+                    (upper.l - lower.l).abs() >= MIN_SURFACE_STEP,
+                    "{} in {}: {} is too close to {} to group anything",
+                    name,
+                    theme.id,
+                    lower.l,
+                    upper.l
+                );
+            }
+        }
+    }
+
     #[test]
     fn every_theme_separates_surfaces_and_text_emphasis() {
         for theme in [Theme::studio_dark(), Theme::studio_light()] {
+            assert!(theme.colors.sunken.l < theme.colors.panel.l);
             assert!(theme.colors.canvas.l < theme.colors.panel.l);
             assert!(theme.colors.panel.l <= theme.colors.raised.l);
 

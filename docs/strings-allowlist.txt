@@ -22,6 +22,7 @@ AnimatedNumber
 ApprovalPrompt
 AspectRatio
 Breadcrumb
+BrowserPanel
 BulkBar
 Button
 ButtonGroup
@@ -43,7 +44,6 @@ Dock
 DockPanel
 Drawer
 Dropzone
-EdgeFaded
 EmptyState
 FailurePanel
 FilterBar
@@ -52,7 +52,7 @@ Flip
 Flipped
 Follow
 FormField
-Frosted
+GraphNode
 GridRow
 HoverCard
 IconButton
@@ -69,12 +69,14 @@ Markdown
 Menu
 Menubar
 MessageList
+NodeGraph
 Notification
 NotificationCenter
 NumberInput
 Overlay
 Pagination
 PermissionMatrix
+Placed
 Popover
 Radio
 RangePicker

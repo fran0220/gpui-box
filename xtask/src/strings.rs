@@ -53,7 +53,7 @@ use anyhow::{Result, bail};
 ///
 /// - `strings.rs` is the catalogue: the English lives there by definition.
 /// - `scenes.rs` is fixture content for the gallery and the capture task.
-/// - `datetime/fixture.rs` is a stand-in [`DateAdapter`] host. This crate owns
+/// - `datetime/fixture.rs` is a stand-in `DateAdapter` host. This crate owns
 ///   no calendar, so month and weekday names come from the host adapter; the
 ///   fixture is what a host would supply, not what a component says.
 const EXEMPT: &[&str] = &["strings.rs", "scenes.rs", "datetime/fixture.rs"];

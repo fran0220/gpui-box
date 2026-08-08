@@ -17,7 +17,7 @@
 //!    After that, the row behaves as one surface and moving along it moves the
 //!    open menu, with no second click.
 //! 3. **The reading-order arrows step between titles.** Left and right are
-//!    read through [`LayoutDirection::arrow_step`], so in a right-to-left
+//!    read through [`LayoutDirection::arrow_step`](crate::foundation::direction::LayoutDirection::arrow_step), so in a right-to-left
 //!    layout the arrow that points at the next title is the one that opens it.
 //!
 //! Escape needs nothing added: [`Menu`] already closes and hands the keyboard

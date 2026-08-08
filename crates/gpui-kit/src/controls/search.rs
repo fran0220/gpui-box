@@ -17,7 +17,7 @@ use gpui::{
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TypeScale};
 
 use crate::controls::button::{Button, IconButton};
 use crate::controls::input::{TextInput, TextInputEvent};
@@ -332,8 +332,7 @@ impl Render for SearchField {
             .px_token(&theme, Space::Sm)
             .py_token(&theme, Space::Xs)
             .radius(&theme, Radius::Card)
-            .hairline(&theme)
-            .bg(theme.colors.panel)
+            .frame(&theme, Surface::Panel, Elevation::Raised)
             .child(
                 div().flex_1().min_w_0().child(self.query.clone()).child(
                     div().absolute().size_0().semantic_in(
@@ -606,8 +605,7 @@ impl Render for FindReplace {
                             .px_token(&theme, Space::Sm)
                             .py_token(&theme, Space::Xs)
                             .radius(&theme, Radius::Card)
-                            .hairline(&theme)
-                            .bg(theme.colors.panel)
+                            .frame(&theme, Surface::Panel, Elevation::Raised)
                             .child(self.replacement.clone()),
                     )
                     .child(replace_one)

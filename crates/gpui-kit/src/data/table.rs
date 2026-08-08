@@ -62,7 +62,9 @@ use gpui::{
     prelude::FluentBuilder, px, uniform_list,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Theme, TypeScale};
+use gpui_kit_theme::{
+    ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, Theme, TypeScale,
+};
 
 use crate::data::viewport::scroll_handle;
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
@@ -429,8 +431,7 @@ impl Table {
             .h(px(height))
             .px(px(theme.space(Space::Sm)))
             .gap(px(theme.space(Space::Sm)))
-            .border_b(px(theme.borders.hairline))
-            .border_color(theme.colors.hairline)
+            .surface(theme, Surface::Raised)
             .type_scale(theme, TypeScale::Caption)
             .text_color(theme.colors.text_muted);
 
@@ -514,14 +515,7 @@ impl Table {
 }
 
 impl Body {
-    fn row_element(
-        &self,
-        theme: &Theme,
-        height: f32,
-        mut row: Row,
-        last: bool,
-        cx: &mut App,
-    ) -> AnyElement {
+    fn row_element(&self, theme: &Theme, height: f32, mut row: Row, cx: &mut App) -> AnyElement {
         let ident = self.ident.child(row.id.as_ref());
         let selected = self.selected.as_ref() == Some(&row.id);
         let actionable = !row.disabled && !self.disabled && self.on_select.is_some();
@@ -533,13 +527,6 @@ impl Body {
             .h(px(height))
             .px(px(theme.space(Space::Sm)))
             .gap(px(theme.space(Space::Sm)))
-            // The last row leans on the table's own edge instead of drawing a
-            // second line beside it.
-            .when(!last, |element| {
-                element
-                    .border_b(px(theme.borders.hairline))
-                    .border_color(theme.colors.hairline)
-            })
             .when(selected, |element| element.bg(theme.colors.selected))
             .when(row.disabled, |element| {
                 element.opacity(theme.opacity.disabled)
@@ -627,7 +614,7 @@ impl RenderOnce for Table {
                         range
                             .map(|index| {
                                 let row = (source.render_row)(index, window, cx);
-                                context.row_element(&theme, height, row, index + 1 == count, cx)
+                                context.row_element(&theme, height, row, cx)
                             })
                             .collect::<Vec<_>>()
                     },
@@ -659,10 +646,7 @@ impl RenderOnce for Table {
                     })
                     .children(
                         rows.into_iter()
-                            .enumerate()
-                            .map(|(index, row)| {
-                                context.row_element(&theme, height, row, index + 1 == count, cx)
-                            })
+                            .map(|row| context.row_element(&theme, height, row, cx))
                             .collect::<Vec<_>>(),
                     )
                     .into_any_element()
@@ -674,7 +658,7 @@ impl RenderOnce for Table {
             .column()
             .w_full()
             .radius(&theme, Radius::Card)
-            .hairline(&theme)
+            .frame(&theme, Surface::Panel, Elevation::Raised)
             .overflow_hidden()
             .text_size(px(metrics.font_size))
             .child(header)

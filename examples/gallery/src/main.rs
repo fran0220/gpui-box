@@ -1171,7 +1171,7 @@ fn fixture_settings_card(theme: &Theme) -> Card {
         "gallery data must identify itself as fixture"
     );
     let mut card = Card::new();
-    for (index, row) in fixture.rows.iter().enumerate() {
+    for row in fixture.rows.iter() {
         let (glyph, label, tone) = match row.state {
             FixtureState::Ready => (Icon::Monitor, "Ready", Tone::Success),
             FixtureState::Stale => (Icon::Global, "Stale", Tone::Warning),
@@ -1180,7 +1180,6 @@ fn fixture_settings_card(theme: &Theme) -> Card {
         card = card.child(
             ListRow::new()
                 .id(format!("fixture.settings.{}", row.id))
-                .first(index == 0)
                 .child(recipes::identity_tile(theme, glyph))
                 .child(recipes::row_content(
                     theme,
@@ -1318,7 +1317,6 @@ fn motion_section(theme: &Theme, window: &mut Window, cx: &mut App) -> gpui::Any
         queue = queue.child(
             ListRow::new()
                 .id(ident)
-                .first(index == 0)
                 .child(div().flex_1().child(*label))
                 .child(Badge::new(format!("{}", index + 1)).neutral())
                 .flip(&handle, window, cx),
@@ -1593,7 +1591,7 @@ fn lower_gallery(theme: &Theme, cx: &mut App) -> gpui::AnyElement {
                 )
                 .child(recipes::footnote(
                     theme,
-                    "Frost uses the pinned BackdropBlur patch on macOS and an opaque fallback elsewhere.",
+                    "Floating surfaces render an opaque background on every platform.",
                 )),
         )
         .into_any_element()
@@ -1680,14 +1678,19 @@ fn main() {
 
 /// How long the first frame is given, which is where font loading and the
 /// initial layout are paid for.
-const FIRST_FRAME: Duration = Duration::from_millis(1200);
+const FIRST_FRAME: Duration = Duration::from_millis(300);
 
-/// How often a capture is retried while waiting for the window server to catch
-/// up with a scene or theme change.
-const SETTLE_POLL: Duration = Duration::from_millis(80);
+/// How often a capture is retried while waiting for a redraw to land after a
+/// scene or theme change.
+const SETTLE_POLL: Duration = Duration::from_millis(40);
 
 /// The least a scene is given before its frames are believed to be settled.
-const SETTLE_FLOOR: Duration = Duration::from_millis(500);
+///
+/// A read is taken from the frame GPUI drew last, so it is never torn, but a
+/// scene may still be arranging itself across its first few draws, such as an
+/// editor that takes focus a frame after it appears. This floor gives those
+/// follow-up draws time to land before stability is believed.
+const SETTLE_FLOOR: Duration = Duration::from_millis(150);
 
 /// How long a single image may take to settle before the run gives up.
 ///
@@ -1714,14 +1717,15 @@ fn park_pointer(window: &mut Window, cx: &mut App) {
     );
 }
 
-/// Grabs the window once the change asked for has actually reached the screen.
+/// Grabs the window once the change asked for has actually been drawn.
 ///
-/// Capturing reads what the window server last composited, which trails what
-/// GPUI has drawn by an amount nobody gets to know. Sleeping a fixed span and
-/// hoping was writing the previous image into the next file, silently and only
-/// sometimes. A frame counts here once it has stopped changing and is no
-/// longer the image just written, and a run that cannot reach that fails
-/// rather than recording something untrue.
+/// A read comes from the frame GPUI drew last, rendered again by the GPU and
+/// read straight back, so the window server and its compositing latency are
+/// not part of this loop. What remains uncertain is whether the redraw a
+/// scene or theme change asked for has landed yet, and whether the scene is
+/// still arranging itself across its first few draws. A frame counts here
+/// once it has stopped changing and is no longer the image just written, and
+/// a run that cannot reach that fails rather than recording something untrue.
 async fn settled_frame(
     window: gpui::WindowHandle<Gallery>,
     previous: Option<&gpui_kit_testkit::capture::Frame>,
@@ -1729,23 +1733,20 @@ async fn settled_frame(
 ) -> Result<gpui_kit_testkit::capture::Frame> {
     let mut last: Option<gpui_kit_testkit::capture::Frame> = None;
     let mut waited = Duration::ZERO;
-    // A scene may still be arranging itself when its first two frames already
-    // match, such as an editor that takes focus a frame after it appears, so
-    // stability is only believed once this much has gone by.
     cx.background_executor().timer(SETTLE_FLOOR).await;
     while waited < SETTLE_LIMIT {
         cx.background_executor().timer(SETTLE_POLL).await;
         waited += SETTLE_POLL;
         let frame = window.update(cx, |_, window, _| {
-            gpui_kit_testkit::capture::capture_window(window)
+            gpui_kit_testkit::capture::render_frame(window)
         })??;
         if previous.is_some_and(|previous| *previous == frame) {
             // Still showing the image just written. Ask for the frame again
             // rather than only waiting: a single redraw request that did not
             // land would otherwise wedge this loop until it gave up. Claiming
-            // the foreground again belongs here too, because anything that
-            // took it during the run stops the window being composited, and
-            // this is the only symptom that has.
+            // the foreground again belongs here too, because a window the
+            // platform has put in the background stops being scheduled for
+            // draws, and this is the only symptom that has.
             cx.update(|cx| cx.activate(true));
             window.update(cx, |_, window, _| window.refresh())?;
             last = None;
@@ -1776,10 +1777,10 @@ async fn capture_catalog(
     cx: &mut gpui::AsyncApp,
 ) -> Result<usize> {
     std::fs::create_dir_all(directory)?;
-    // A window the platform is not compositing keeps handing the window server
-    // the frame it drew last, so a capture reads the previous scene for as long
-    // as the application sits in the background. Being frontmost is a
-    // precondition for grabbing anything, not a preference.
+    // A window the platform has put in the background stops being scheduled
+    // for draws, so a capture would read the previous scene for as long as
+    // the application sits there. Being frontmost keeps the redraws coming,
+    // and it is also what lets focus rings and carets render at all.
     cx.update(|cx| cx.activate(true));
     let wanted = |name: &str| only.is_none_or(|only| only.iter().any(|only| only == name));
     if let Some(only) = only {
@@ -2057,7 +2058,7 @@ fn capture(path: &Path, cx: &mut gpui::AsyncApp) -> Result<()> {
             bail!("gallery window is gone");
         };
         let frame = handle.update(cx, |_, window, _| {
-            gpui_kit_testkit::capture::capture_window(window)
+            gpui_kit_testkit::capture::render_frame(window)
         })??;
         Ok(frame)
     })?;

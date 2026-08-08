@@ -67,6 +67,34 @@ pub trait StyledExt: Styled + Sized {
             .border_color(theme.colors.hairline_strong)
     }
 
+    /// A surface that is a distinct thing from the one behind it.
+    ///
+    /// The colour step and the shadow do the separating, which is why a card,
+    /// a popover and a dialog carry no line around them: a line drawn around
+    /// something already legible is decoration, and this library reserves
+    /// lines for what they alone can say — focus, invalidity, a drop target.
+    fn frame(self, theme: &Theme, surface: Surface, level: Elevation) -> Self {
+        self.surface(theme, surface).elevation(theme, level)
+    }
+
+    /// The recess an editable value sits in.
+    ///
+    /// A field is a well rather than an outlined box, so the resting state of
+    /// every editable control in the library is a colour and nothing else.
+    /// The border it still carries is transparent and exists only to hold the
+    /// space that an invalid state will colour, so becoming invalid never
+    /// reflows the row the field is in.
+    fn well(self, theme: &Theme) -> Self {
+        self.surface(theme, Surface::Sunken)
+            .border(px(theme.borders.hairline))
+            .border_color(gpui::transparent_black())
+    }
+
+    /// The colour a surface in a named state bleeds into the pixels around it.
+    fn glow(self, theme: &Theme, color: gpui::Hsla) -> Self {
+        self.shadow(theme.glow(color))
+    }
+
     /// A horizontal flex row, the layout most component frames start from.
     fn row(self) -> Self {
         self.flex().flex_row().items_center()

@@ -21,7 +21,9 @@
 //! - [`Sequence`] runs specifications one after another and knows how long
 //!   they take together;
 //! - [`Flipping::flip`] slides an element from where it was to where it is,
-//!   and [`Flipping::flip_size`] additionally resizes it.
+//!   and [`Flipping::flip_size`] additionally resizes it;
+//! - [`Animated::animate_in`] puts any of this on an element in one call,
+//!   which is the layer most components should reach for.
 //!
 //! Motion never changes what a surface publishes. A slide, a press response
 //! and a counting number are all painted over a layout, a hit target and a
@@ -31,6 +33,7 @@
 //! [`gpui::App::reduce_motion`] is set. [`Transition::animate`] and
 //! [`Presence::animate`] honor the same preference by finishing immediately.
 
+mod animated;
 mod easing;
 mod flip;
 mod gesture;
@@ -45,6 +48,7 @@ mod spring;
 mod stagger;
 mod transition;
 
+pub use animated::{Animated, Entrance};
 pub use easing::{CubicBezier, Easing};
 pub use flip::{Flip, Flipped, Flipping, flip, shared_flip, tracked_ids};
 pub use gesture::{Flick, VELOCITY_WINDOW, Velocity, VelocityTracker, flick, rubber_band};

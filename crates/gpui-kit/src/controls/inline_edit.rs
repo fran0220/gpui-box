@@ -399,13 +399,11 @@ impl RenderOnce for InlineEdit {
                 .min_h(px(metrics.height))
                 .px(px(theme.space(Space::Xs)))
                 .radius(&theme, Radius::Control)
-                .border(px(theme.borders.hairline))
-                .border_color(if self.failure.is_some() {
-                    theme.colors.danger
-                } else {
-                    theme.colors.focus
+                .well(&theme)
+                .when(self.failure.is_some(), |element| {
+                    element.border_color(theme.colors.danger)
                 })
-                .bg(theme.colors.raised)
+                .shadow(theme.focus_ring())
                 .text_size(px(metrics.font_size))
                 .child(field),
             Editor::Block(field) => div().w_full().child(field),
