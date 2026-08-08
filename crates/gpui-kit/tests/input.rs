@@ -4,7 +4,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use gpui::{App, AppContext as _, Entity, IntoElement, TestAppContext, Window};
+use gpui::{App, AppContext as _, Entity, Focusable, IntoElement, TestAppContext, Window};
 use gpui_kit::controls::input::{TextInput, TextInputEvent};
 use gpui_kit::prelude::*;
 use gpui_kit_testkit::harness::Harness;
@@ -155,6 +155,31 @@ fn a_host_can_replace_the_value(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn caller_values_preserve_the_single_line_native_contract(cx: &mut TestAppContext) {
+    let (mut harness, slot) = input(cx, |input| input.text("a\r\nאב"));
+    assert_eq!(value(&mut harness, &slot), "a אב");
+
+    let entity = slot.borrow().clone().expect("input entity");
+    harness.update(|_, cx| entity.update(cx, |input, cx| input.set_value("b\nc", cx)));
+    assert_eq!(value(&mut harness, &slot), "b c");
+
+    let tree = harness.accessibility_tree();
+    let nodes = tree["nodes"].as_object().expect("nodes");
+    let field = nodes
+        .values()
+        .find(|node| {
+            node["element_id"] == "Name(\"form.token\")" && node["aria"]["role"] == "TextInput"
+        })
+        .expect("native text input");
+    let runs = field["children"].as_array().expect("runs");
+    assert_eq!(runs.len(), 1);
+    assert_eq!(
+        nodes[runs[0].as_str().expect("run")]["aria"]["value"],
+        "b c"
+    );
+}
+
+#[gpui::test]
 fn editable_text_reaches_the_accesskit_text_pattern(cx: &mut TestAppContext) {
     let (mut harness, slot) = input(cx, |input| input.name("Token").text("a😀é"));
     let tree = harness.accessibility_tree();
@@ -298,6 +323,172 @@ fn password_and_read_only_native_contracts_are_explicit(cx: &mut TestAppContext)
             "disabled input advertised {unsupported}"
         );
     }
+}
+
+#[gpui::test]
+fn mixed_bidi_text_publishes_logical_resolved_runs(cx: &mut TestAppContext) {
+    let (mut harness, _slot) = input(cx, |input| input.text("abc אב"));
+    let tree = harness.accessibility_tree();
+    let nodes = tree["nodes"].as_object().expect("nodes");
+    let field = nodes
+        .values()
+        .find(|node| {
+            node["element_id"] == "Name(\"form.token\")" && node["aria"]["role"] == "TextInput"
+        })
+        .expect("field");
+    let children = field["children"].as_array().expect("directional runs");
+    assert_eq!(children.len(), 2);
+    let left = &nodes[children[0].as_str().expect("left run")];
+    let right = &nodes[children[1].as_str().expect("right run")];
+    assert_eq!(left["aria"]["value"], "abc ");
+    assert_eq!(left["aria"]["text_direction"], "LeftToRight");
+    assert_eq!(right["aria"]["value"], "אב");
+    assert_eq!(right["aria"]["text_direction"], "RightToLeft");
+    assert_eq!(left["aria"]["next_on_line"], children[1]);
+    assert_eq!(right["aria"]["previous_on_line"], children[0]);
+}
+
+#[gpui::test]
+fn disabling_a_focused_input_clears_focus_and_rejects_stale_native_actions(
+    cx: &mut TestAppContext,
+) {
+    let (mut harness, slot) = input(cx, |input| input.text("held"));
+    harness.click("form.token");
+    let entity = slot.borrow().clone().expect("input entity");
+    assert!(harness.update(|window, cx| entity.focus_handle(cx).is_focused(window)));
+
+    let tree = harness.accessibility_tree();
+    let field = tree["nodes"]
+        .as_object()
+        .and_then(|nodes| {
+            nodes.values().find(|node| {
+                node["element_id"] == "Name(\"form.token\")" && node["aria"]["role"] == "TextInput"
+            })
+        })
+        .expect("field");
+    let field_id = gpui::accesskit::NodeId(
+        field["accesskit_id"]
+            .as_str()
+            .expect("field id")
+            .parse()
+            .expect("numeric id"),
+    );
+    let run_id =
+        gpui::accesskit::NodeId(
+            tree["nodes"].as_object().expect("nodes")[field["children"][0].as_str().expect("run")]
+                ["accesskit_id"]
+                .as_str()
+                .expect("run id")
+                .parse()
+                .expect("numeric id"),
+        );
+
+    harness
+        .context()
+        .update(|_, cx| entity.update(cx, |input, cx| input.set_read_only(true, cx)));
+    let window = harness.window();
+    harness.context().dispatch_accessibility_action(
+        window,
+        gpui::accesskit::ActionRequest {
+            action: gpui::accesskit::Action::SetValue,
+            target_tree: gpui::accesskit::TreeId::ROOT,
+            target_node: field_id,
+            data: Some(gpui::accesskit::ActionData::Value("changed".into())),
+        },
+    );
+    assert_eq!(
+        harness
+            .context()
+            .update(|_, cx| entity.read(cx).value().to_string()),
+        "held"
+    );
+
+    harness.update(|_, cx| entity.update(cx, |input, cx| input.set_disabled(true, cx)));
+    assert!(!harness.update(|window, cx| entity.focus_handle(cx).is_focused(window)));
+    harness.keystrokes("x");
+    let window = harness.window();
+    harness.context().dispatch_accessibility_action(
+        window,
+        gpui::accesskit::ActionRequest {
+            action: gpui::accesskit::Action::SetValue,
+            target_tree: gpui::accesskit::TreeId::ROOT,
+            target_node: field_id,
+            data: Some(gpui::accesskit::ActionData::Value("changed".into())),
+        },
+    );
+    harness.context().dispatch_accessibility_action(
+        window,
+        gpui::accesskit::ActionRequest {
+            action: gpui::accesskit::Action::SetTextSelection,
+            target_tree: gpui::accesskit::TreeId::ROOT,
+            target_node: field_id,
+            data: Some(gpui::accesskit::ActionData::SetTextSelection(
+                gpui::accesskit::TextSelection {
+                    anchor: gpui::accesskit::TextPosition {
+                        node: run_id,
+                        character_index: 0,
+                    },
+                    focus: gpui::accesskit::TextPosition {
+                        node: run_id,
+                        character_index: 2,
+                    },
+                },
+            )),
+        },
+    );
+    assert_eq!(value(&mut harness, &slot), "held");
+    assert_eq!(
+        harness.update(|_, cx| entity.read(cx).selected_range()),
+        4..4
+    );
+    let tree = harness.accessibility_tree();
+    let field = tree["nodes"]
+        .as_object()
+        .and_then(|nodes| {
+            nodes.values().find(|node| {
+                node["element_id"] == "Name(\"form.token\")" && node["aria"]["role"] == "TextInput"
+            })
+        })
+        .expect("disabled field");
+    let actions = field["aria"]["on_action"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    for action in ["Focus", "SetValue", "SetTextSelection"] {
+        assert!(!actions.iter().any(|candidate| candidate == action));
+    }
+}
+
+#[gpui::test]
+fn native_set_value_uses_single_line_and_length_constraints(cx: &mut TestAppContext) {
+    let (mut harness, slot) = input(cx, |input| input.text("old").max_length(4));
+    let tree = harness.accessibility_tree();
+    let field = tree["nodes"]
+        .as_object()
+        .and_then(|nodes| {
+            nodes.values().find(|node| {
+                node["element_id"] == "Name(\"form.token\")" && node["aria"]["role"] == "TextInput"
+            })
+        })
+        .expect("field");
+    let field_id = gpui::accesskit::NodeId(
+        field["accesskit_id"]
+            .as_str()
+            .expect("field id")
+            .parse()
+            .expect("numeric id"),
+    );
+    let window = harness.window();
+    harness.context().dispatch_accessibility_action(
+        window,
+        gpui::accesskit::ActionRequest {
+            action: gpui::accesskit::Action::SetValue,
+            target_tree: gpui::accesskit::TreeId::ROOT,
+            target_node: field_id,
+            data: Some(gpui::accesskit::ActionData::Value("ab\ncdef".into())),
+        },
+    );
+    assert_eq!(value(&mut harness, &slot), "ab c");
 }
 
 fn _unused(_: &mut Window, _: &mut App) {}

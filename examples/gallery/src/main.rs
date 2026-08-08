@@ -1867,6 +1867,7 @@ fn open_gallery(
                 attached: Vec::new(),
                 provider: cx.new(|cx| {
                     Select::new("gallery.provider", window, cx)
+                        .name("Provider")
                         .options([
                             SelectOption::new("anthropic", "Anthropic"),
                             SelectOption::new("openai", "OpenAI").description("Requires a key"),
@@ -1905,6 +1906,7 @@ fn open_gallery(
                 }),
                 region: cx.new(|cx| {
                     Combobox::new("gallery.region", window, cx)
+                        .name("Region")
                         .options([
                             SelectOption::new("eu-west", "Europe (Ireland)"),
                             SelectOption::new("eu-north", "Europe (Stockholm)"),
@@ -1998,6 +2000,7 @@ fn open_gallery(
                 }),
                 page_size: cx.new(|cx| {
                     Select::new("gallery.pages.size", window, cx)
+                        .name("Rows per page")
                         .options([
                             SelectOption::new("25", "25 per page"),
                             SelectOption::new("50", "50 per page"),

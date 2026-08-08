@@ -517,11 +517,13 @@
       "options": [
         "options(options: impl IntoIterator<Item = SelectOption>) -> Self",
         "selected(id: impl Into<SharedString>) -> Self",
+        "name(name: impl Into<SharedString>) -> Self",
         "placeholder(placeholder: impl Into<SharedString>) -> Self",
         "invalid(invalid: bool) -> Self",
         "allow_custom(allow_custom: bool) -> Self"
       ],
       "commands": [
+        "set_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_options(options: Vec<SelectOption>, cx: &mut Context<Self>)",
         "set_selected(id: Option<SharedString>, cx: &mut Context<Self>)",
         "set_query(text: impl Into<SharedString>, cx: &mut Context<Self>)",
@@ -2208,10 +2210,12 @@
       "options": [
         "options(options: impl IntoIterator<Item = SelectOption>) -> Self",
         "selected(id: impl Into<SharedString>) -> Self",
+        "name(name: impl Into<SharedString>) -> Self",
         "placeholder(placeholder: impl Into<SharedString>) -> Self",
         "invalid(invalid: bool) -> Self"
       ],
       "commands": [
+        "set_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_options(options: Vec<SelectOption>, cx: &mut Context<Self>)",
         "set_selected(id: Option<SharedString>, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)"
@@ -6743,7 +6747,7 @@
         "Pagination",
         "Select"
       ],
-      "example": "fn pagination(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<ScenePagination>() {\n        let page_size = cx.new(|cx| {\n            Select::new(\"scene.pagination.size\", window, cx)\n                .options([\n                    SelectOption::new(\"25\", \"25 per page\"),\n                    SelectOption::new(\"50\", \"50 per page\"),\n                    SelectOption::new(\"100\", \"100 per page\"),\n                ])\n                .selected(\"50\")\n        });\n        cx.set_global(ScenePagination { page_size });\n    }\n    let page_size = cx.global::<ScenePagination>().page_size.clone();\n    let theme = cx.theme().clone();\n\n    stack(&theme)\n        .w(px(620.0))\n        .child(\n            Pagination::new(\"scene.pagination.known\")\n                .page(9)\n                .total_pages(20)\n                .page_size(page_size)\n                .on_select(|_, _, _| {}),\n        )\n        // A host that only knows there is another page says exactly that: no\n        // last-page control, no numbers, and no total.\n        .child(\n            Pagination::new(\"scene.pagination.unknown\")\n                .page(3)\n                .unknown_total(true)\n                .on_select(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
+      "example": "fn pagination(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<ScenePagination>() {\n        let page_size = cx.new(|cx| {\n            Select::new(\"scene.pagination.size\", window, cx)\n                .name(\"Rows per page\")\n                .options([\n                    SelectOption::new(\"25\", \"25 per page\"),\n                    SelectOption::new(\"50\", \"50 per page\"),\n                    SelectOption::new(\"100\", \"100 per page\"),\n                ])\n                .selected(\"50\")\n        });\n        cx.set_global(ScenePagination { page_size });\n    }\n    let page_size = cx.global::<ScenePagination>().page_size.clone();\n    let theme = cx.theme().clone();\n\n    stack(&theme)\n        .w(px(620.0))\n        .child(\n            Pagination::new(\"scene.pagination.known\")\n                .page(9)\n                .total_pages(20)\n                .page_size(page_size)\n                .on_select(|_, _, _| {}),\n        )\n        // A host that only knows there is another page says exactly that: no\n        // last-page control, no numbers, and no total.\n        .child(\n            Pagination::new(\"scene.pagination.unknown\")\n                .page(3)\n                .unknown_total(true)\n                .on_select(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "drawer",

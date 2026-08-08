@@ -50,10 +50,10 @@ impl EventEmitter<ComboboxEvent> for Combobox {}
 /// caller's answer, so escape puts the query back to it and reports nothing.
 pub struct Combobox {
     ident: Ident,
-    focus_handle: FocusHandle,
     query: Entity<TextInput>,
     options: Vec<SelectOption>,
     selected: Option<SharedString>,
+    name: SharedString,
     placeholder: Option<SharedString>,
     size: ControlSize,
     disabled: bool,
@@ -96,10 +96,10 @@ impl Combobox {
 
         Self {
             ident,
-            focus_handle: cx.focus_handle(),
             query,
             options: Vec::new(),
             selected: None,
+            name: SharedString::default(),
             placeholder: None,
             size: ControlSize::Md,
             disabled: false,
@@ -120,6 +120,19 @@ impl Combobox {
     pub fn selected(mut self, id: impl Into<SharedString>) -> Self {
         self.selected = Some(id.into());
         self
+    }
+
+    /// Names both the combobox and its editable query target.
+    pub fn name(mut self, name: impl Into<SharedString>) -> Self {
+        self.name = name.into();
+        self
+    }
+
+    pub fn set_name(&mut self, name: impl Into<SharedString>, cx: &mut Context<Self>) {
+        self.name = name.into();
+        self.query
+            .update(cx, |query, cx| query.set_name(self.name.clone(), cx));
+        cx.notify();
     }
 
     pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self {
@@ -509,8 +522,8 @@ impl Sizable for Combobox {
 }
 
 impl Focusable for Combobox {
-    fn focus_handle(&self, _cx: &App) -> FocusHandle {
-        self.focus_handle.clone()
+    fn focus_handle(&self, cx: &App) -> FocusHandle {
+        self.query.read(cx).focus_handle(cx)
     }
 }
 
@@ -529,6 +542,10 @@ impl Render for Combobox {
             self.query
                 .update(cx, |query, cx| query.set_placeholder(placeholder, cx));
         }
+        if self.query.read(cx).accessible_name() != &self.name {
+            let name = self.name.clone();
+            self.query.update(cx, |query, cx| query.set_name(name, cx));
+        }
         if self.disabled != self.query.read(cx).is_disabled() {
             let disabled = self.disabled;
             self.query
@@ -541,8 +558,11 @@ impl Render for Combobox {
             .disabled(self.disabled)
             .invalid(self.invalid)
             .expanded(self.open)
-            .focus(&self.query.read(cx).focus_handle(cx))
+            .text(self.name.clone())
             .placeholder(self.resolved_placeholder(cx));
+        if !self.disabled {
+            spec = spec.focus(&self.query.read(cx).focus_handle(cx));
+        }
         if let Some(label) = self.selected_label() {
             spec = spec.value(label);
         }
@@ -551,7 +571,6 @@ impl Render for Combobox {
             .id(self.ident.element_id())
             .column()
             .w_full()
-            .track_focus(&self.focus_handle)
             .on_key_down(cx.listener(Self::on_key_down))
             .child(
                 field_shell(

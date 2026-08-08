@@ -169,6 +169,7 @@ fn updating_one_toast_updates_the_explicit_live_node(cx: &mut TestAppContext) {
             })
         })
         .expect("initial explicit live node");
+    let before_id = before["accesskit_id"].clone();
     assert_eq!(before["aria"]["label"], "Uploading one file");
     assert_eq!(before["aria"]["live"], "Polite");
 
@@ -187,6 +188,10 @@ fn updating_one_toast_updates_the_explicit_live_node(cx: &mut TestAppContext) {
         .expect("updated explicit live node");
     assert_eq!(after["aria"]["label"], "Upload complete");
     assert_eq!(after["aria"]["live"], "Polite");
+    assert_eq!(
+        after["accesskit_id"], before_id,
+        "an update keeps node identity"
+    );
 }
 
 #[gpui::test]
@@ -355,6 +360,15 @@ fn reduced_motion_shows_and_removes_a_toast_in_one_frame(cx: &mut TestAppContext
     harness.update(|_, cx| toast::dismiss(cx, "run.published"));
     harness.advance(Duration::ZERO);
     assert!(harness.node("run.published").is_none());
+    let tree = harness.accessibility_tree();
+    assert!(
+        tree["nodes"]
+            .as_object()
+            .is_none_or(|nodes| !nodes.values().any(|node| {
+                node["element_id"] == "Name(\"run.published\")" && node["aria"]["role"] == "Status"
+            })),
+        "the removed toast must leave the activated AccessKit tree"
+    );
 }
 
 #[gpui::test]

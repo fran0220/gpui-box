@@ -7,8 +7,8 @@
 
 use std::ops::Range;
 
-use gpui::{A11ySubtreeBuilder, accesskit};
-use unicode_bidi::{BidiClass, bidi_class};
+use gpui::{A11ySubtreeBuilder, SharedString, accesskit};
+use unicode_bidi::{BidiInfo, Level};
 use unicode_segmentation::UnicodeSegmentation;
 
 const MAX_ACCESSIBLE_RUN_CHARS: usize = 255;
@@ -19,19 +19,39 @@ struct AccessibleRun<'a> {
     start_character: usize,
     character_lengths: Vec<u8>,
     line: usize,
+    direction: accesskit::TextDirection,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct PublishedAccessibleText {
+    pub(crate) source: SharedString,
+    pub(crate) revision: u64,
+    runs: Vec<PublishedRun>,
+}
+
+#[derive(Clone, Debug)]
+struct PublishedRun {
+    node: accesskit::NodeId,
+    start_character: usize,
+    character_count: usize,
 }
 
 fn run_end_character(run: &AccessibleRun<'_>) -> usize {
     run.start_character + run.character_lengths.len()
 }
 
-fn accessible_runs(text: &str) -> Vec<AccessibleRun<'_>> {
+fn accessible_runs<'a>(
+    text: &'a str,
+    visual_rows: &[Range<usize>],
+    fallback_direction: accesskit::TextDirection,
+) -> Vec<AccessibleRun<'a>> {
     if text.is_empty() {
         return vec![AccessibleRun {
             value: "",
             start_character: 0,
             character_lengths: Vec::new(),
             line: 0,
+            direction: fallback_direction,
         }];
     }
 
@@ -47,18 +67,29 @@ fn accessible_runs(text: &str) -> Vec<AccessibleRun<'_>> {
         // publishing lengths whose sum does not match the value.
         return Vec::new();
     }
+    let fallback_level = Some(match fallback_direction {
+        accesskit::TextDirection::RightToLeft => Level::rtl(),
+        _ => Level::ltr(),
+    });
+    let bidi = BidiInfo::new(text, fallback_level);
     let mut runs = Vec::new();
-    let mut start = 0;
-    let mut line = 0;
-    while start < graphemes.len() {
-        let hard_break = graphemes[start..]
-            .iter()
-            .position(|(_, grapheme)| grapheme.ends_with('\n'))
-            .map(|offset| start + offset + 1)
-            .unwrap_or(graphemes.len());
-        let line_end = hard_break;
-        while start < line_end {
-            let end = (start + MAX_ACCESSIBLE_RUN_CHARS).min(line_end);
+    for (line, row) in visual_rows.iter().enumerate() {
+        let mut start =
+            graphemes.partition_point(|(offset, grapheme)| offset + grapheme.len() <= row.start);
+        let row_end = graphemes.partition_point(|(offset, _)| *offset < row.end);
+        while start < row_end {
+            let level = bidi.levels[graphemes[start].0];
+            let direction = if level.is_rtl() {
+                accesskit::TextDirection::RightToLeft
+            } else {
+                accesskit::TextDirection::LeftToRight
+            };
+            let direction_end = graphemes[start + 1..row_end]
+                .iter()
+                .position(|(offset, _)| bidi.levels[*offset].is_rtl() != level.is_rtl())
+                .map(|offset| start + offset + 1)
+                .unwrap_or(row_end);
+            let end = (start + MAX_ACCESSIBLE_RUN_CHARS).min(direction_end);
             let start_byte = graphemes[start].0;
             let end_byte = graphemes
                 .get(end)
@@ -72,22 +103,33 @@ fn accessible_runs(text: &str) -> Vec<AccessibleRun<'_>> {
                     .map(|(_, grapheme)| grapheme.len() as u8)
                     .collect(),
                 line,
+                direction,
             });
             start = end;
         }
-        line += 1;
+    }
+    // A terminating hard break introduces another (empty) logical line. It
+    // needs its own position: the position before the break and the caret on
+    // the following empty line must not collapse onto the same TextRun.
+    if graphemes
+        .last()
+        .is_some_and(|(_, grapheme)| grapheme.ends_with('\n'))
+    {
+        runs.push(AccessibleRun {
+            value: "",
+            start_character: graphemes.len(),
+            character_lengths: Vec::new(),
+            line: visual_rows.len(),
+            direction: fallback_direction,
+        });
     }
     runs
 }
 
-fn text_direction(text: &str, fallback: accesskit::TextDirection) -> accesskit::TextDirection {
-    text.chars()
-        .find_map(|character| match bidi_class(character) {
-            BidiClass::L => Some(accesskit::TextDirection::LeftToRight),
-            BidiClass::R | BidiClass::AL => Some(accesskit::TextDirection::RightToLeft),
-            _ => None,
-        })
-        .unwrap_or(fallback)
+pub(crate) fn accessible_text_is_representable(text: &str) -> bool {
+    !text
+        .graphemes(true)
+        .any(|grapheme| grapheme.len() > u8::MAX as usize)
 }
 
 pub(crate) fn previous_boundary(text: &str, offset: usize) -> usize {
@@ -187,19 +229,29 @@ pub(crate) fn publish_accessible_text(
     anchor_byte: usize,
     focus_byte: usize,
     fallback_direction: accesskit::TextDirection,
-) -> Vec<accesskit::NodeId> {
-    let runs = accessible_runs(text);
+    visual_rows: &[Range<usize>],
+    revision: u64,
+) -> Option<PublishedAccessibleText> {
+    let runs = accessible_runs(text, visual_rows, fallback_direction);
     if runs.is_empty() {
-        return Vec::new();
+        return None;
     }
     let run_count = runs.len();
-    let run_ids = (0..run_count)
-        .map(|run| builder.synthetic_node_id(run))
+    let run_ids = runs
+        .iter()
+        .map(|run| {
+            builder.synthetic_node_id((
+                revision,
+                run.line,
+                run.start_character,
+                run.character_lengths.len(),
+            ))
+        })
         .collect::<Vec<_>>();
     for run in 0..run_count {
         let accessible_run = &runs[run];
         let mut node = accesskit::Node::new(accesskit::Role::TextRun);
-        node.set_text_direction(text_direction(accessible_run.value, fallback_direction));
+        node.set_text_direction(accessible_run.direction);
         node.set_value(accessible_run.value);
         node.set_character_lengths(accessible_run.character_lengths.clone());
         if run > 0 && runs[run - 1].line == accessible_run.line {
@@ -215,7 +267,19 @@ pub(crate) fn publish_accessible_text(
     builder
         .parent_node()
         .set_text_selection(accesskit::TextSelection { anchor, focus });
-    run_ids
+    Some(PublishedAccessibleText {
+        source: text.into(),
+        revision,
+        runs: runs
+            .iter()
+            .zip(run_ids)
+            .map(|(run, node)| PublishedRun {
+                node,
+                start_character: run.start_character,
+                character_count: run.character_lengths.len(),
+            })
+            .collect(),
+    })
 }
 
 fn accessible_position(
@@ -249,24 +313,35 @@ fn accessible_position(
     }
 }
 
-pub(crate) fn byte_offset_for_accessible_position(
+fn byte_offset_for_accessible_position(
     text: &str,
     position: accesskit::TextPosition,
-    run_ids: &[accesskit::NodeId],
+    runs: &[PublishedRun],
 ) -> Option<usize> {
-    let runs = accessible_runs(text);
-    let run_count = runs.len();
-    let run = (0..run_count).find(|run| run_ids.get(*run) == Some(&position.node))?;
-    if position.character_index > runs[run].character_lengths.len() {
+    let run = runs.iter().find(|run| run.node == position.node)?;
+    if position.character_index > run.character_count {
         return None;
     }
-    let character = runs[run].start_character + position.character_index;
+    let character = run.start_character + position.character_index;
     Some(
         text.grapheme_indices(true)
             .nth(character)
             .map(|(offset, _)| offset)
             .unwrap_or(text.len()),
     )
+}
+
+/// Resolves a position only against the exact value for which its synthetic
+/// run ids were published. Accessibility actions are asynchronous, so ids
+/// from an older activated tree must not be interpreted against new text.
+pub(crate) fn byte_offset_for_published_position(
+    current_text: &str,
+    current_revision: u64,
+    published: &PublishedAccessibleText,
+    position: accesskit::TextPosition,
+) -> Option<usize> {
+    (current_text == published.source.as_ref() && current_revision == published.revision)
+        .then(|| byte_offset_for_accessible_position(current_text, position, &published.runs))?
 }
 
 /// Truncates an insertion that would push the content past its limit, rather
@@ -292,9 +367,32 @@ pub(crate) fn fit_to_max_length(
         .collect()
 }
 
+pub(crate) fn normalize_single_line(text: &str) -> String {
+    text.replace("\r\n", " ").replace(['\r', '\n'], " ")
+}
+
+pub(crate) fn normalize_multiline(text: &str) -> String {
+    text.replace("\r\n", "\n").replace('\r', "\n")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn hard_rows(text: &str) -> Vec<Range<usize>> {
+        let mut rows = Vec::new();
+        let mut start = 0;
+        for (offset, grapheme) in text.grapheme_indices(true) {
+            if grapheme.ends_with('\n') {
+                rows.push(start..offset + grapheme.len());
+                start = offset + grapheme.len();
+            }
+        }
+        if start < text.len() || rows.is_empty() {
+            rows.push(start..text.len());
+        }
+        rows
+    }
 
     #[test]
     fn boundaries_step_over_a_whole_grapheme() {
@@ -341,12 +439,22 @@ mod tests {
     fn accessible_positions_round_trip_utf8_text() {
         let text = format!("{}e\u{301}👩‍💻\nאב", "x".repeat(255));
         let nodes = |run| accesskit::NodeId(100 + run as u64);
-        let runs = accessible_runs(&text);
+        let rows = hard_rows(&text);
+        let runs = accessible_runs(&text, &rows, accesskit::TextDirection::LeftToRight);
         let run_ids = (0..runs.len()).map(nodes).collect::<Vec<_>>();
+        let published = runs
+            .iter()
+            .zip(&run_ids)
+            .map(|(run, node)| PublishedRun {
+                node: *node,
+                start_character: run.start_character,
+                character_count: run.character_lengths.len(),
+            })
+            .collect::<Vec<_>>();
         for offset in [0, 255, 258, 269, 270, text.len()] {
             let position = accessible_position(&text, offset, &runs, nodes);
             assert_eq!(
-                byte_offset_for_accessible_position(&text, position, &run_ids),
+                byte_offset_for_accessible_position(&text, position, &published),
                 Some(offset)
             );
         }
@@ -355,21 +463,48 @@ mod tests {
     #[test]
     fn accessible_runs_use_graphemes_and_do_not_link_hard_lines() {
         let text = "e\u{301}👩‍💻\nאב";
-        let runs = accessible_runs(text);
+        let rows = hard_rows(text);
+        let runs = accessible_runs(text, &rows, accesskit::TextDirection::LeftToRight);
         assert_eq!(runs.len(), 2);
         assert_eq!(runs[0].value, "e\u{301}👩‍💻\n");
         assert_eq!(runs[0].character_lengths, vec![3, 11, 1]);
         assert_eq!(runs[1].value, "אב");
-        assert_eq!(
-            text_direction(runs[1].value, accesskit::TextDirection::LeftToRight),
-            accesskit::TextDirection::RightToLeft
-        );
+        assert_eq!(runs[1].direction, accesskit::TextDirection::RightToLeft);
+    }
+
+    #[test]
+    fn trailing_lf_and_crlf_publish_a_distinct_empty_line() {
+        for text in ["a\n", "a\r\n"] {
+            let rows = hard_rows(text);
+            let runs = accessible_runs(text, &rows, accesskit::TextDirection::LeftToRight);
+            assert_eq!(runs.len(), 2);
+            assert_eq!(runs[0].value, text);
+            assert_eq!(runs[1].value, "");
+            let ids = [accesskit::NodeId(1), accesskit::NodeId(2)];
+            let published = runs
+                .iter()
+                .zip(ids)
+                .map(|(run, node)| PublishedRun {
+                    node,
+                    start_character: run.start_character,
+                    character_count: run.character_lengths.len(),
+                })
+                .collect::<Vec<_>>();
+            let end = accessible_position(text, text.len(), &runs, |run| ids[run]);
+            assert_eq!(end.node, ids[1]);
+            assert_eq!(end.character_index, 0);
+            assert_eq!(
+                byte_offset_for_accessible_position(text, end, &published),
+                Some(text.len())
+            );
+        }
     }
 
     #[test]
     fn an_unrepresentable_grapheme_omits_runs_instead_of_publishing_false_lengths() {
         let text = format!("a{}", "\u{301}".repeat(128));
         assert!(text.len() > u8::MAX as usize);
-        assert!(accessible_runs(&text).is_empty());
+        let rows = std::iter::once(0..text.len()).collect::<Vec<_>>();
+        assert!(accessible_runs(&text, &rows, accesskit::TextDirection::LeftToRight).is_empty());
     }
 }

@@ -25,7 +25,7 @@ component grows a literal a reader could read.
 | `Button` | builder | click | No handler is installed while disabled or loading |
 | `TextInput` | view | change, submit, cancel, focus, blur | Grapheme-aware editing, input-method composition, masking, length limit |
 | `TextArea` | view | change, submit, cancel, focus, blur | Wrapped multi-line editing. Enter inserts a line and the primary modifier plus enter submits. Motion follows visual rows with a preserved goal column, and the frame grows from `rows` to `max_rows` before it scrolls |
-| `Select` | view | selected, opened, closed | Owns only whether the menu is open |
+| `Select` | view | selected, opened, closed | Owns only whether the menu is open. `name` supplies the caller-owned accessible label independently of the answer or placeholder |
 | `Checkbox` | builder | next state | Supports a mixed state for a group that disagrees |
 | `Radio` | builder | selection | The group is owned by the caller |
 | `Switch` | builder | next state | For changes that take effect at once |
@@ -39,7 +39,7 @@ component grows a literal a reader could read.
 | `Toggle` | builder | the state pressing asks for | A button that stays in, published as a `Button` carrying a checked state where out is `false` rather than absent. Distinct from `Switch`: a switch is a setting that applies, a toggle changes what the next thing you do means |
 | `ToggleGroup`, `ToggleItem` | builder | the whole set the group should hold next, and which toggle was acted on | `ToggleSelection::Any` takes several; `AtMostOne` takes one or **none**. It does not reimplement `SegmentedControl`, which covers the case where exactly one is required and there is no move that empties it. Every toggle is its own tab stop |
 | `CopyButton` | view | copied, or failed with a reason | Copies caller-supplied text and confirms truthfully. It never publishes its payload, the confirmation times out and the refusal does not, and what it can and cannot know about the clipboard is stated below |
-| `Combobox` | view | selected, custom, opened, closed | A `Select` you can type into. Escape puts the query back to the current answer and reports nothing. A query nothing answers reports nothing unless `allow_custom` |
+| `Combobox` | view | selected, custom, opened, closed | A `Select` you can type into. `name` labels both the combobox and its editable query target. Escape puts the query back to the current answer and reports nothing. A query nothing answers reports nothing unless `allow_custom` |
 | `TagInput` | view | added, removed, duplicate, refused | Enter or comma commits a token. The first backspace in an empty field singles out the last tag and the second removes it. A duplicate and a full field are refusals shown where the typist is looking |
 | `SettingsRow`, `SettingsSection` | builder | — | One setting per row: name and description on the left, the caller's control on the right. A row that is managed elsewhere, or that belongs to a section which does not apply here, never renders the control at all |
 | `FilterBar` | builder | add, remove one condition, clear them all | The conditions are the caller's, and so is the result count. Counting, a known count, a count nobody established, and a count the host refused are four different things |

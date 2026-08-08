@@ -44,7 +44,7 @@ gpui-kit = { git = "https://github.com/fran0220/gpui-kit", rev = "<commit>" }
 # different revision as a different crate: two copies of GPUI in one binary
 # means two sets of globals, and the theme and semantic registry this library
 # installs would be invisible to your views.
-gpui = { git = "https://github.com/fran0220/zed", rev = "bbcc88d1f0ae98d2bd8632ea2a4ccede51d9108d" }
+gpui = { git = "https://github.com/fran0220/zed", rev = "b9e434908126d3215c22443b0102093113f8b292" }
 ```
 
 If the application names `gpui_platform` or `gpui_wgpu` too, give every GPUI
@@ -279,7 +279,7 @@ requires and why a job that ran it anyway would be worse than no job.
 ## GPUI compatibility
 
 The workspace pins the `fran0220/zed` integration fork at
-`bbcc88d1f0ae98d2bd8632ea2a4ccede51d9108d`. It combines the runtime
+`b9e434908126d3215c22443b0102093113f8b292`. It combines the runtime
 primitives and native-surface work with the offscreen WGPU renderer on one
 immutable revision; reusable pieces can be proposed upstream independently. See
 [`docs/compatibility.md`](docs/compatibility.md).

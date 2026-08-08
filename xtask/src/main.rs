@@ -136,7 +136,7 @@ fn editable_accessibility_check() -> Result<()> {
         };
         for expected in [
             "API token|AXTextField|true||false",
-            "Read only|AXTextField|false|read only|false",
+            "Disabled|AXTextField|false|disabled|false",
             "Email|AXTextField|true|edited@example.com|true",
         ] {
             if !output.lines().any(|line| line.trim() == expected) {
@@ -242,7 +242,7 @@ tell application "System Events"
     repeat with itemRef in axItems
       try
         set itemName to name of itemRef as text
-        if itemName is "API token" or itemName is "Read only" or itemName is "Email" then
+        if itemName is "API token" or itemName is "Disabled" or itemName is "Email" then
           if itemName is "Email" then
             set focused of itemRef to true
             delay 0.1

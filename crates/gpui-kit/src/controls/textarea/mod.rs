@@ -234,8 +234,10 @@ pub struct TextArea {
     goal_x: Option<Pixels>,
     is_selecting: bool,
     last_layout: Option<Layout>,
+    last_layout_text: SharedString,
     last_bounds: Option<Bounds<Pixels>>,
-    accessible_run_ids: Arc<Mutex<Vec<gpui::accesskit::NodeId>>>,
+    accessibility_revision: u64,
+    accessible_snapshot: Arc<Mutex<Option<text_edit::PublishedAccessibleText>>>,
     /// Held so the focus listeners live as long as the area does.
     _subscriptions: Vec<Subscription>,
 }
@@ -272,8 +274,10 @@ impl TextArea {
             goal_x: None,
             is_selecting: false,
             last_layout: None,
+            last_layout_text: SharedString::default(),
             last_bounds: None,
-            accessible_run_ids: Arc::default(),
+            accessibility_revision: 0,
+            accessible_snapshot: Arc::default(),
             _subscriptions: subscriptions,
         }
     }
@@ -337,6 +341,7 @@ impl TextArea {
     /// Replaces the text from the host side, for example when a form resets.
     pub fn set_value(&mut self, value: impl Into<SharedString>, cx: &mut Context<Self>) {
         self.content = value.into();
+        self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
         let end = self.content.len();
         self.selected_range = end..end;
         self.marked_range = None;
@@ -348,6 +353,11 @@ impl TextArea {
 
     pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
         self.disabled = disabled;
+        if disabled {
+            self.marked_range = None;
+            self.is_selecting = false;
+            self.goal_x = None;
+        }
         cx.notify();
     }
 
@@ -416,9 +426,32 @@ impl TextArea {
         self.scroll_offset = offset;
     }
 
-    pub(crate) fn set_last_layout(&mut self, layout: Layout, bounds: Bounds<Pixels>) {
+    pub(crate) fn set_last_layout(
+        &mut self,
+        layout: Layout,
+        text: SharedString,
+        bounds: Bounds<Pixels>,
+    ) -> bool {
+        let rows = layout.accessible_rows(&text);
+        let changed = self.last_layout_text != text
+            || self
+                .last_layout
+                .as_ref()
+                .map(|layout| layout.accessible_rows(&text))
+                != Some(rows);
         self.last_layout = Some(layout);
+        self.last_layout_text = text;
         self.last_bounds = Some(bounds);
+        changed
+    }
+
+    fn accessible_rows(&self) -> Option<Vec<Range<usize>>> {
+        (self.last_layout_text == self.content).then(|| {
+            self.last_layout
+                .as_ref()
+                .map(|layout| layout.accessible_rows(&self.content))
+                .unwrap_or_else(|| std::iter::once(0..0).collect())
+        })
     }
 
     fn move_to(&mut self, offset: usize, cx: &mut Context<Self>) {
@@ -873,11 +906,13 @@ impl EntityInputHandler for TextArea {
             .or_else(|| self.marked_range.clone())
             .unwrap_or_else(|| self.selected_range.clone());
 
+        let new_text = text_edit::normalize_multiline(new_text);
         let new_text =
-            text_edit::fit_to_max_length(&self.content, self.max_length, &range, new_text);
+            text_edit::fit_to_max_length(&self.content, self.max_length, &range, &new_text);
         self.content =
             (self.content[..range.start].to_owned() + &new_text + &self.content[range.end..])
                 .into();
+        self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
         let caret = range.start + new_text.len();
         self.selected_range = caret..caret;
         self.selection_reversed = false;
@@ -904,8 +939,11 @@ impl EntityInputHandler for TextArea {
             .or_else(|| self.marked_range.clone())
             .unwrap_or_else(|| self.selected_range.clone());
 
+        let new_text = text_edit::normalize_multiline(new_text);
         self.content =
-            (self.content[..range.start].to_owned() + new_text + &self.content[range.end..]).into();
+            (self.content[..range.start].to_owned() + &new_text + &self.content[range.end..])
+                .into();
+        self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
         self.marked_range =
             (!new_text.is_empty()).then(|| range.start..range.start + new_text.len());
         self.selected_range = new_selected_range_utf16
@@ -958,6 +996,9 @@ impl EntityInputHandler for TextArea {
 
 impl Render for TextArea {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if self.disabled && self.focus_handle.is_focused(window) {
+            window.blur();
+        }
         let theme = cx.theme().clone();
         let metrics = theme.control.get(self.size);
         let focused = self.focus_handle.is_focused(window);
@@ -968,7 +1009,10 @@ impl Render for TextArea {
         } else {
             (self.selected_range.start, self.selected_range.end)
         };
-        let accessible_run_ids = self.accessible_run_ids.clone();
+        let accessible_snapshot = self.accessible_snapshot.clone();
+        let selection_representable = text_edit::accessible_text_is_representable(&content);
+        let accessible_rows = self.accessible_rows();
+        let accessibility_revision = self.accessibility_revision;
         let entity = cx.entity().clone();
         let accessible_direction = if cx.layout_direction().is_rtl() {
             gpui::accesskit::TextDirection::RightToLeft
@@ -1023,61 +1067,82 @@ impl Render for TextArea {
                     .on_mouse_up_out(MouseButton::Left, cx.listener(Self::on_mouse_up))
                     .cursor(CursorStyle::IBeam)
             })
-            .a11y_synthetic_children(move |builder| {
-                let ids = text_edit::publish_accessible_text(
-                    builder,
-                    &content,
-                    anchor,
-                    focus,
-                    accessible_direction,
-                );
-                *accessible_run_ids
-                    .lock()
-                    .unwrap_or_else(|poisoned| poisoned.into_inner()) = ids;
+            .when_some(accessible_rows.clone(), move |element, accessible_rows| {
+                element.a11y_synthetic_children(move |builder| {
+                    let snapshot = text_edit::publish_accessible_text(
+                        builder,
+                        &content,
+                        anchor,
+                        focus,
+                        accessible_direction,
+                        &accessible_rows,
+                        accessibility_revision,
+                    );
+                    *accessible_snapshot
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner()) = snapshot;
+                })
             })
-            .when(!self.disabled, |element| {
-                let selection_entity = entity.clone();
-                let selection_ids = self.accessible_run_ids.clone();
-                let element = element.on_a11y_action(
-                    AccessibleAction::SetTextSelection,
-                    move |data, _, cx| {
-                        let Some(ActionData::SetTextSelection(selection)) = data else {
-                            return;
-                        };
-                        let run_ids = selection_ids
-                            .lock()
-                            .unwrap_or_else(|poisoned| poisoned.into_inner())
-                            .clone();
-                        selection_entity.update(cx, |area, cx| {
-                            let Some(anchor) = text_edit::byte_offset_for_accessible_position(
-                                &area.content,
-                                selection.anchor,
-                                &run_ids,
-                            ) else {
+            .when(
+                !self.disabled && selection_representable && accessible_rows.is_some(),
+                |element| {
+                    let selection_entity = entity.clone();
+                    let selection_snapshot = self.accessible_snapshot.clone();
+                    element.on_a11y_action(
+                        AccessibleAction::SetTextSelection,
+                        move |data, _, cx| {
+                            let Some(ActionData::SetTextSelection(selection)) = data else {
                                 return;
                             };
-                            let Some(focus) = text_edit::byte_offset_for_accessible_position(
-                                &area.content,
-                                selection.focus,
-                                &run_ids,
-                            ) else {
-                                return;
-                            };
-                            area.selected_range = anchor.min(focus)..anchor.max(focus);
-                            area.selection_reversed = focus < anchor;
-                            area.marked_range = None;
-                            area.goal_x = None;
-                            cx.notify();
-                        });
-                    },
-                );
-                element.when(!self.read_only, |element| {
-                    element.on_a11y_action(AccessibleAction::SetValue, move |data, _, cx| {
-                        let Some(ActionData::Value(value)) = data else {
+                            let published = selection_snapshot
+                                .lock()
+                                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                                .clone();
+                            selection_entity.update(cx, |area, cx| {
+                                if area.disabled {
+                                    return;
+                                }
+                                let Some(published) = published.as_ref() else {
+                                    return;
+                                };
+                                let Some(anchor) = text_edit::byte_offset_for_published_position(
+                                    &area.content,
+                                    area.accessibility_revision,
+                                    published,
+                                    selection.anchor,
+                                ) else {
+                                    return;
+                                };
+                                let Some(focus) = text_edit::byte_offset_for_published_position(
+                                    &area.content,
+                                    area.accessibility_revision,
+                                    published,
+                                    selection.focus,
+                                ) else {
+                                    return;
+                                };
+                                area.selected_range = anchor.min(focus)..anchor.max(focus);
+                                area.selection_reversed = focus < anchor;
+                                area.marked_range = None;
+                                area.goal_x = None;
+                                cx.notify();
+                            });
+                        },
+                    )
+                },
+            )
+            .when(!self.disabled && !self.read_only, |element| {
+                element.on_a11y_action(AccessibleAction::SetValue, move |data, window, cx| {
+                    let Some(ActionData::Value(value)) = data else {
+                        return;
+                    };
+                    entity.update(cx, |area, cx| {
+                        if area.disabled || area.read_only {
                             return;
-                        };
-                        entity.update(cx, |area, cx| area.set_value(value.to_string(), cx));
-                    })
+                        }
+                        let end = text_edit::offset_to_utf16(&area.content, area.content.len());
+                        area.replace_text_in_range(Some(0..end), value, window, cx);
+                    });
                 })
             })
             .w_full()

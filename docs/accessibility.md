@@ -31,7 +31,10 @@ the next keystroke lands, selection says which answer is current.
 
 Every action and assertion target has a role and stable id. Visible labels
 provide names wherever possible. Icon-only actions need nearby or semantic text
-that identifies the action.
+that identifies the action. `Select` and editable `Combobox` names are explicit
+caller-owned inputs: neither a selected answer nor a placeholder is treated as
+the control's name. A combobox propagates that name to its nested editable query
+target so the shared focus path contains no unnamed competing control.
 
 ## Contrast
 
@@ -75,7 +78,7 @@ evidence that a particular screen reader announces every property correctly.
 | String value and placeholder | Bridged; deterministic tree verified | Bridged; native session unverified | Bridged; native session unverified |
 | Disabled, invalid, required, busy | Disabled native AX smoke verified; other states deterministic only | Bridged; native session unverified | Bridged; native session unverified |
 | Checked, expanded, widget selection | Checked native AX smoke verified; expanded/selection deterministic only | Bridged; native session unverified | Bridged; native session unverified |
-| Focus | GPUI focus is projected and assistive-technology-requested focus has a native AX smoke check | GPUI focus action is routed to its owning handle; native UIA re-verification pending | GPUI focus action is routed to its owning handle; native AT-SPI session unverified |
+| Focus | GPUI focus is projected and assistive-technology-requested focus has a native AX smoke check | Native UIA `SetFocus` verified: keyboard focus, global focused element, and one focus-changed event agree; Tab navigation is not claimed | GPUI focus action is routed to its owning handle; native AT-SPI session unverified |
 | Numeric min, max, current value | Bridged; deterministic tree verified | Bridged; native session unverified | Bridged; native session unverified |
 | Editable text | Native AX name/value/enabled/focus/editing smoke verified; grapheme-based TextRun structure verified deterministically | Same AccessKit structure; native session unverified | Same AccessKit structure; native session unverified |
 | Text selection and caret | Selection/caret structure and actions verified deterministically; native AX interaction unverified | Same AccessKit structure; native UIA interaction unverified | Same AccessKit structure; native AT-SPI interaction unverified |
@@ -87,22 +90,27 @@ evidence that a particular screen reader announces every property correctly.
 `parent` and `labels` associations remain available to tests, while the native
 tree follows GPUI's rendered element nesting; no cross-tree labelled-by or
 reparenting claim is made. Editable controls publish UTF-8 character lengths,
-stable text runs, selection/caret positions, and `SetValue` and
+generation-scoped text runs, selection/caret positions, and `SetValue` and
 `SetTextSelection` actions. AccessKit characters use the same Unicode grapheme
 boundaries as editing, including combining sequences and emoji ZWJ sequences.
-Hard line breaks remain in the preceding run, links never cross a hard line,
-and each run reports its first strong bidirectional direction with the current
-layout direction as fallback. IME offsets are converted between UTF-8 and
-UTF-16, including surrogate pairs. Disabled fields advertise no native focus,
-mutation, or selection actions; read-only fields remain focusable/selectable
-but non-mutating. Password fields use the native password role but publish
-neither plaintext nor text runs. Live regions are explicit opt-in: static
-Status nodes are not live, ordinary toasts are polite, and danger toasts are
-assertive, with the whole toast marked atomic. Announcement speech and timing,
-shaped per-grapheme positions/widths and native caret geometry, and native child
-nodes remain separate platform work. AccessKit defines character geometry as
-optional; gpui-kit omits it rather than inventing measurements that are not yet
-available to the accessibility subtree callback.
+TextArea run boundaries come from its shaped visual rows, hard line breaks
+remain in the preceding row, and line links never cross a shaped wrap or hard
+break. Resolved Unicode bidi levels split mixed-direction text into truthful
+logical-order runs; no whole-chunk first-strong direction is inferred. A final
+line break publishes a distinct empty-line position. IME offsets are converted
+between UTF-8 and UTF-16, including surrogate pairs. Accessibility selection
+requests carry revision-bearing run ids and the exact stored source revision,
+so a request from a stale tree cannot be applied to changed text. Disabled fields clear
+focus and composition/drag transients, install no input handler, and advertise
+no native focus, mutation, or selection actions; read-only fields remain
+focusable/selectable but non-mutating. Password fields use the native password
+role but publish neither plaintext nor text runs. Live regions are explicit
+opt-in: static Status nodes are not live, ordinary toasts are polite, and danger
+toasts are assertive, with the whole toast marked atomic. Announcement speech
+and timing, shaped per-grapheme positions/widths and native caret geometry, and
+native child nodes remain separate platform work. AccessKit defines character
+geometry as optional; gpui-kit omits it rather than inventing measurements that
+are not yet available to the accessibility subtree callback.
 
 The deterministic smoke test activates GPUI's test accessibility adapter,
 renders a real element tree, and asserts role, name, value, range, control

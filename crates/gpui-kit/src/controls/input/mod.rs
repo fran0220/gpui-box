@@ -218,7 +218,8 @@ pub struct TextInput {
     is_selecting: bool,
     last_layout: Option<ShapedLine>,
     last_bounds: Option<Bounds<Pixels>>,
-    accessible_run_ids: Arc<Mutex<Vec<gpui::accesskit::NodeId>>>,
+    accessibility_revision: u64,
+    accessible_snapshot: Arc<Mutex<Option<text_edit::PublishedAccessibleText>>>,
     /// Held so the focus listeners live as long as the input does.
     _subscriptions: Vec<Subscription>,
 }
@@ -255,7 +256,8 @@ impl TextInput {
             is_selecting: false,
             last_layout: None,
             last_bounds: None,
-            accessible_run_ids: Arc::default(),
+            accessibility_revision: 0,
+            accessible_snapshot: Arc::default(),
             _subscriptions: subscriptions,
         }
     }
@@ -280,7 +282,8 @@ impl TextInput {
 
     /// Seeds the initial text, with the caret at the end.
     pub fn text(mut self, text: impl Into<SharedString>) -> Self {
-        self.content = text.into();
+        let text = text.into();
+        self.content = text_edit::normalize_single_line(&text).into();
         self.selected_range = self.content.len()..self.content.len();
         self
     }
@@ -334,7 +337,9 @@ impl TextInput {
 
     /// Replaces the text from the host side, for example when a form resets.
     pub fn set_value(&mut self, value: impl Into<SharedString>, cx: &mut Context<Self>) {
-        self.content = value.into();
+        let value = value.into();
+        self.content = text_edit::normalize_single_line(&value).into();
+        self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
         let end = self.content.len();
         self.selected_range = end..end;
         self.marked_range = None;
@@ -358,7 +363,9 @@ impl TextInput {
     /// nobody asked for that text, so reporting it as an edit would send the
     /// host a change it made itself.
     pub fn set_text_quietly(&mut self, value: impl Into<SharedString>, cx: &mut Context<Self>) {
-        self.content = value.into();
+        let value = value.into();
+        self.content = text_edit::normalize_single_line(&value).into();
+        self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
         let end = self.content.len();
         self.selected_range = end..end;
         self.marked_range = None;
@@ -368,6 +375,10 @@ impl TextInput {
 
     pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
         self.disabled = disabled;
+        if disabled {
+            self.marked_range = None;
+            self.is_selecting = false;
+        }
         cx.notify();
     }
 
@@ -403,6 +414,10 @@ impl TextInput {
 
     pub(crate) fn placeholder_text(&self) -> &SharedString {
         &self.placeholder
+    }
+
+    pub(crate) fn accessible_name(&self) -> &SharedString {
+        &self.name
     }
 
     pub(crate) fn marked_range(&self) -> Option<Range<usize>> {
@@ -850,11 +865,13 @@ impl EntityInputHandler for TextInput {
             .or_else(|| self.marked_range.clone())
             .unwrap_or_else(|| self.selected_range.clone());
 
+        let new_text = text_edit::normalize_single_line(new_text);
         let new_text =
-            text_edit::fit_to_max_length(&self.content, self.max_length, &range, new_text);
+            text_edit::fit_to_max_length(&self.content, self.max_length, &range, &new_text);
         self.content =
             (self.content[..range.start].to_owned() + &new_text + &self.content[range.end..])
                 .into();
+        self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
         let caret = range.start + new_text.len();
         self.selected_range = caret..caret;
         self.marked_range = None;
@@ -879,8 +896,11 @@ impl EntityInputHandler for TextInput {
             .or_else(|| self.marked_range.clone())
             .unwrap_or_else(|| self.selected_range.clone());
 
+        let new_text = text_edit::normalize_single_line(new_text);
         self.content =
-            (self.content[..range.start].to_owned() + new_text + &self.content[range.end..]).into();
+            (self.content[..range.start].to_owned() + &new_text + &self.content[range.end..])
+                .into();
+        self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
         self.marked_range =
             (!new_text.is_empty()).then(|| range.start..range.start + new_text.len());
         self.selected_range = new_selected_range_utf16
@@ -931,6 +951,9 @@ impl EntityInputHandler for TextInput {
 
 impl Render for TextInput {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if self.disabled && self.focus_handle.is_focused(window) {
+            window.blur();
+        }
         let theme = cx.theme().clone();
         let metrics = theme.control.get(self.size);
         let focused = self.focus_handle.is_focused(window);
@@ -954,7 +977,10 @@ impl Render for TextInput {
         } else {
             (self.selected_range.start, self.selected_range.end)
         };
-        let accessible_run_ids = self.accessible_run_ids.clone();
+        let accessible_snapshot = self.accessible_snapshot.clone();
+        let selection_representable = text_edit::accessible_text_is_representable(&content);
+        let accessible_rows = std::iter::once(0..content.len()).collect::<Vec<_>>();
+        let accessibility_revision = self.accessibility_revision;
         let entity = cx.entity().clone();
         let accessible_direction = if cx.layout_direction().is_rtl() {
             gpui::accesskit::TextDirection::RightToLeft
@@ -1009,41 +1035,49 @@ impl Render for TextInput {
                             anchor,
                             focus,
                             accessible_direction,
+                            &accessible_rows,
+                            accessibility_revision,
                         );
-                        *accessible_run_ids
+                        *accessible_snapshot
                             .lock()
                             .unwrap_or_else(|poisoned| poisoned.into_inner()) = ids;
                     })
-                    .when(!self.disabled, |element| {
+                    .when(!self.disabled && selection_representable, |element| {
                         let selection_entity = entity.clone();
-                        let selection_ids = self.accessible_run_ids.clone();
+                        let selection_snapshot = self.accessible_snapshot.clone();
                         element.on_a11y_action(
                             AccessibleAction::SetTextSelection,
                             move |data, _, cx| {
                                 let Some(ActionData::SetTextSelection(selection)) = data else {
                                     return;
                                 };
-                                let run_ids = selection_ids
+                                let published = selection_snapshot
                                     .lock()
                                     .unwrap_or_else(|poisoned| poisoned.into_inner())
                                     .clone();
                                 selection_entity.update(cx, |input, cx| {
+                                    if input.disabled {
+                                        return;
+                                    }
+                                    let Some(published) = published.as_ref() else {
+                                        return;
+                                    };
                                     let Some(anchor) =
-                                        text_edit::byte_offset_for_accessible_position(
+                                        text_edit::byte_offset_for_published_position(
                                             &input.content,
+                                            input.accessibility_revision,
+                                            published,
                                             selection.anchor,
-                                            &run_ids,
                                         )
                                     else {
                                         return;
                                     };
-                                    let Some(focus) =
-                                        text_edit::byte_offset_for_accessible_position(
-                                            &input.content,
-                                            selection.focus,
-                                            &run_ids,
-                                        )
-                                    else {
+                                    let Some(focus) = text_edit::byte_offset_for_published_position(
+                                        &input.content,
+                                        input.accessibility_revision,
+                                        published,
+                                        selection.focus,
+                                    ) else {
                                         return;
                                     };
                                     input.selected_range = anchor.min(focus)..anchor.max(focus);
@@ -1056,11 +1090,17 @@ impl Render for TextInput {
                     })
             })
             .when(!self.disabled && !self.read_only, |element| {
-                element.on_a11y_action(AccessibleAction::SetValue, move |data, _, cx| {
+                element.on_a11y_action(AccessibleAction::SetValue, move |data, window, cx| {
                     let Some(ActionData::Value(value)) = data else {
                         return;
                     };
-                    entity.update(cx, |input, cx| input.set_value(value.to_string(), cx));
+                    entity.update(cx, |input, cx| {
+                        if input.disabled || input.read_only {
+                            return;
+                        }
+                        let end = text_edit::offset_to_utf16(&input.content, input.content.len());
+                        input.replace_text_in_range(Some(0..end), value, window, cx);
+                    });
                 })
             })
             .h(px(metrics.height))

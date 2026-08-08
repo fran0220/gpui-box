@@ -133,6 +133,35 @@ impl Layout {
         self.offset_at_row(row, px(-1.0))..self.offset_at_row(row, PAST_END)
     }
 
+    /// Source byte ranges for the visual rows produced by this shaped layout.
+    ///
+    /// The final row of a hard line owns its line break. GPUI shapes hard
+    /// lines separately, so the break is not part of either `WrappedLine`,
+    /// but AccessKit requires it to remain one selectable character on the
+    /// preceding line.
+    pub(crate) fn accessible_rows(&self, text: &str) -> Vec<Range<usize>> {
+        (0..self.total_rows)
+            .map(|row| {
+                let mut range = self.row_range(row);
+                if range.start > range.end {
+                    std::mem::swap(&mut range.start, &mut range.end);
+                }
+                range.start = range.start.min(text.len());
+                range.end = range.end.min(text.len());
+                if row + 1 == self.total_rows
+                    || self.line_for_row(row + 1) != self.line_for_row(row)
+                {
+                    if text[range.end..].starts_with("\r\n") {
+                        range.end += 2;
+                    } else if text[range.end..].starts_with('\n') {
+                        range.end += 1;
+                    }
+                }
+                range
+            })
+            .collect()
+    }
+
     fn line_for_offset(&self, offset: usize) -> usize {
         self.starts
             .iter()

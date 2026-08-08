@@ -190,12 +190,17 @@ impl Element for TextElement {
         window: &mut Window,
         cx: &mut App,
     ) {
-        let focus_handle = self.input.read(cx).focus_handle.clone();
-        window.handle_input(
-            &focus_handle,
-            ElementInputHandler::new(bounds, self.input.clone()),
-            cx,
-        );
+        let (focus_handle, disabled) = {
+            let input = self.input.read(cx);
+            (input.focus_handle.clone(), input.disabled)
+        };
+        if !disabled {
+            window.handle_input(
+                &focus_handle,
+                ElementInputHandler::new(bounds, self.input.clone()),
+                cx,
+            );
+        }
 
         let scroll_offset = prepaint.scroll_offset;
         window.with_content_mask(Some(gpui::ContentMask { bounds }), |window| {
@@ -217,7 +222,8 @@ impl Element for TextElement {
                     input.set_scroll_offset(scroll_offset);
                 });
             }
-            if focus_handle.is_focused(window)
+            if !disabled
+                && focus_handle.is_focused(window)
                 && let Some(cursor) = prepaint.cursor.take()
             {
                 window.paint_quad(cursor);

@@ -219,7 +219,7 @@ precisely because it is separable from the drawing.
 | Text range highlighting | No API marks a substring of already-rendered text, which blocks search hits, log filtering, diff, and find-in-page at once. |
 | Writing direction | Nothing reads right-to-left. Every inset is left and right rather than start and end, so this is whole-library work that gets more expensive every batch. |
 | Number, date, and quantity formatting | Every word is now host-replaceable, but every *number* beside one is still formatted by Rust. See "Numbers a catalogue cannot fix" below. |
-| Assistive technology gaps | Basic semantics now reach GPUI's AccessKit platform tree. Editable text runs, text selection/caret, live-region announcements, native-child handoff, and native Windows/Linux session verification remain absent; see `docs/accessibility.md`. |
+| Assistive technology gaps | Basic semantics, grapheme-based editable text runs and selection actions, and explicit live-region properties now reach GPUI's AccessKit platform tree. Character geometry/native caret tracking, verified screen-reader announcement timing, native-child handoff, and native Windows/Linux session verification remain absent; see `docs/accessibility.md`. |
 | Validation vocabulary | `FormField` shows an error it is handed. When to validate, field against form, and validation still in flight have no shared shape. |
 | Composition | There is no `Slot`: a caller cannot replace a node inside a component, only configure it. |
 | Size response | No breakpoint or container query. `Toolbar` overflow is declared rather than measured, which is the same gap seen from one component. |

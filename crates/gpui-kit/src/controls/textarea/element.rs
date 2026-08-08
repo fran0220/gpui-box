@@ -28,6 +28,7 @@ impl TextAreaElement {
 
 pub struct PrepaintState {
     layout: Option<Layout>,
+    source_text: gpui::SharedString,
     cursor: Option<PaintQuad>,
     selection: Vec<PaintQuad>,
     scroll_offset: Pixels,
@@ -82,6 +83,7 @@ impl Element for TextAreaElement {
         let theme = cx.theme().clone();
         let area = self.area.read(cx);
         let content = area.value().clone();
+        let source_text = content.clone();
         let selected = area.selected_range();
         let cursor = area.cursor_offset();
         let marked = area.marked_range();
@@ -205,6 +207,7 @@ impl Element for TextAreaElement {
 
         PrepaintState {
             layout: Some(layout),
+            source_text,
             cursor,
             selection,
             scroll_offset,
@@ -222,12 +225,17 @@ impl Element for TextAreaElement {
         window: &mut Window,
         cx: &mut App,
     ) {
-        let focus_handle = self.area.read(cx).focus_handle.clone();
-        window.handle_input(
-            &focus_handle,
-            ElementInputHandler::new(bounds, self.area.clone()),
-            cx,
-        );
+        let (focus_handle, disabled) = {
+            let area = self.area.read(cx);
+            (area.focus_handle.clone(), area.disabled)
+        };
+        if !disabled {
+            window.handle_input(
+                &focus_handle,
+                ElementInputHandler::new(bounds, self.area.clone()),
+                cx,
+            );
+        }
 
         let scroll_offset = prepaint.scroll_offset;
         let visible_rows = prepaint.visible_rows;
@@ -251,15 +259,19 @@ impl Element for TextAreaElement {
                     let grew = area.visible_rows() != visible_rows;
                     area.set_visible_rows(visible_rows);
                     area.set_scroll_offset(scroll_offset);
-                    area.set_last_layout(layout, bounds);
+                    let accessibility_layout_changed =
+                        area.set_last_layout(layout, prepaint.source_text.clone(), bounds);
                     // Only a changed height needs another frame; notifying on
-                    // every frame would redraw forever.
-                    if grew {
+                    // every frame would redraw forever. Accessibility needs
+                    // one more frame when newly shaped visual rows become
+                    // available to the parent node.
+                    if grew || accessibility_layout_changed {
                         cx.notify();
                     }
                 });
             }
-            if focus_handle.is_focused(window)
+            if !disabled
+                && focus_handle.is_focused(window)
                 && let Some(cursor) = prepaint.cursor.take()
             {
                 window.paint_quad(cursor);

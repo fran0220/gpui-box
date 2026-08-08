@@ -4,10 +4,11 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use gpui::{AppContext as _, Entity, IntoElement, TestAppContext, div, prelude::*, px};
+use gpui::{AppContext as _, Entity, Focusable, IntoElement, TestAppContext, div, prelude::*, px};
 use gpui_kit::controls::textarea::{TextArea, TextAreaEvent};
 use gpui_kit::prelude::*;
 use gpui_kit_testkit::harness::Harness;
+use unicode_segmentation::UnicodeSegmentation;
 
 /// The width every area under test is given, narrow enough that a sentence
 /// wraps onto several visual rows.
@@ -53,6 +54,18 @@ fn primary(chord: &str) -> String {
         "ctrl"
     };
     format!("{modifier}-{chord}")
+}
+
+macro_rules! native_id {
+    ($node:expr) => {
+        gpui::accesskit::NodeId(
+            $node["accesskit_id"]
+                .as_str()
+                .expect("native node id")
+                .parse()
+                .expect("numeric native node id"),
+        )
+    };
 }
 
 #[gpui::test]
@@ -323,4 +336,250 @@ fn multiline_text_reaches_the_accesskit_text_pattern(cx: &mut TestAppContext) {
         harness.update(|_, cx| entity.read(cx).selected_range()),
         3..17
     );
+}
+
+#[gpui::test]
+fn wrapped_text_runs_follow_visual_rows_and_keep_logical_order(cx: &mut TestAppContext) {
+    let text = format!("{} אב {}", "alpha ".repeat(80), "omega ".repeat(80));
+    assert!(text.graphemes(true).count() > 255);
+    let (mut harness, _slot) = area(cx, move |area| area.text(text.clone()).rows(20));
+    let tree = harness.accessibility_tree();
+    let nodes = tree["nodes"].as_object().expect("nodes");
+    let field = nodes
+        .values()
+        .find(|node| {
+            node["element_id"] == "Name(\"form.notes\")"
+                && node["aria"]["role"] == "MultilineTextInput"
+        })
+        .expect("area");
+    let children = field["children"].as_array().expect("visual text runs");
+    assert!(children.len() > 2, "narrow text must span visual rows");
+    let published = children
+        .iter()
+        .map(|id| {
+            nodes[id.as_str().expect("run")]["aria"]["value"]
+                .as_str()
+                .expect("text run value")
+        })
+        .collect::<String>();
+    assert_eq!(
+        published,
+        format!("{} אב {}", "alpha ".repeat(80), "omega ".repeat(80))
+    );
+    assert!(children.iter().any(|id| {
+        let run = &nodes[id.as_str().expect("run")];
+        run["aria"]["value"]
+            .as_str()
+            .is_some_and(|value| value.contains("אב"))
+            && run["aria"]["text_direction"] == "RightToLeft"
+    }));
+    let first = &nodes[children[0].as_str().expect("first visual row")];
+    assert!(
+        first["aria"].get("next_on_line").is_none(),
+        "the first wrapped row must not link into the next visual row"
+    );
+}
+
+#[gpui::test]
+fn trailing_line_breaks_have_a_distinct_empty_line_and_round_trip(cx: &mut TestAppContext) {
+    for text in ["a\n", "a\r\n"] {
+        let expected_newline = text.len() - if text.ends_with("\r\n") { 2 } else { 1 };
+        let owned = text.to_string();
+        let (mut harness, slot) = area(cx, move |area| area.text(owned.clone()));
+        let tree = harness.accessibility_tree();
+        let nodes = tree["nodes"].as_object().expect("nodes");
+        let field = nodes
+            .values()
+            .find(|node| {
+                node["element_id"] == "Name(\"form.notes\")"
+                    && node["aria"]["role"] == "MultilineTextInput"
+            })
+            .expect("area");
+        let children = field["children"].as_array().expect("runs");
+        assert_eq!(children.len(), 2);
+        let line = &nodes[children[0].as_str().expect("line")];
+        let empty = &nodes[children[1].as_str().expect("empty line")];
+        assert_eq!(line["aria"]["value"], text);
+        assert_eq!(empty["aria"]["value"], "");
+
+        let field_id = native_id!(field);
+        let line_id = native_id!(line);
+        let empty_id = native_id!(empty);
+        let window = harness.window();
+        harness.context().dispatch_accessibility_action(
+            window,
+            gpui::accesskit::ActionRequest {
+                action: gpui::accesskit::Action::SetTextSelection,
+                target_tree: gpui::accesskit::TreeId::ROOT,
+                target_node: field_id,
+                data: Some(gpui::accesskit::ActionData::SetTextSelection(
+                    gpui::accesskit::TextSelection {
+                        anchor: gpui::accesskit::TextPosition {
+                            node: empty_id,
+                            character_index: 0,
+                        },
+                        focus: gpui::accesskit::TextPosition {
+                            node: line_id,
+                            character_index: 1,
+                        },
+                    },
+                )),
+            },
+        );
+        let entity = slot.borrow().clone().expect("area");
+        assert_eq!(
+            harness.update(|_, cx| entity.read(cx).selected_range()),
+            expected_newline..text.len()
+        );
+    }
+}
+
+#[gpui::test]
+fn stale_selection_and_disabled_state_are_rechecked_at_dispatch(cx: &mut TestAppContext) {
+    let (mut harness, slot) = area(cx, |area| area.text("before"));
+    harness.click("form.notes");
+    let entity = slot.borrow().clone().expect("area");
+    let tree = harness.accessibility_tree();
+    let nodes = tree["nodes"].as_object().expect("nodes");
+    let field = nodes
+        .values()
+        .find(|node| {
+            node["element_id"] == "Name(\"form.notes\")"
+                && node["aria"]["role"] == "MultilineTextInput"
+        })
+        .expect("field");
+    let field_id = native_id!(field);
+    let run = &nodes[field["children"][0].as_str().expect("run")];
+    let run_id = native_id!(run);
+
+    // Change state without allowing a rebuilt accessibility tree. The old
+    // asynchronous request must not be interpreted against the new source.
+    harness
+        .context()
+        .update(|_, cx| entity.update(cx, |area, cx| area.set_value("after", cx)));
+    let window = harness.window();
+    harness.context().dispatch_accessibility_action(
+        window,
+        gpui::accesskit::ActionRequest {
+            action: gpui::accesskit::Action::SetTextSelection,
+            target_tree: gpui::accesskit::TreeId::ROOT,
+            target_node: field_id,
+            data: Some(gpui::accesskit::ActionData::SetTextSelection(
+                gpui::accesskit::TextSelection {
+                    anchor: gpui::accesskit::TextPosition {
+                        node: run_id,
+                        character_index: 0,
+                    },
+                    focus: gpui::accesskit::TextPosition {
+                        node: run_id,
+                        character_index: 2,
+                    },
+                },
+            )),
+        },
+    );
+    assert_eq!(
+        harness.update(|_, cx| entity.read(cx).selected_range()),
+        5..5
+    );
+
+    let tree = harness.accessibility_tree();
+    let nodes = tree["nodes"].as_object().expect("nodes");
+    let field = nodes
+        .values()
+        .find(|node| {
+            node["element_id"] == "Name(\"form.notes\")"
+                && node["aria"]["role"] == "MultilineTextInput"
+        })
+        .expect("rebuilt field");
+    let after_run = &nodes[field["children"][0].as_str().expect("rebuilt run")];
+    let after_run_id = native_id!(after_run);
+    harness.update(|_, cx| entity.update(cx, |area, cx| area.set_value("latest", cx)));
+    harness.context().dispatch_accessibility_action(
+        window,
+        gpui::accesskit::ActionRequest {
+            action: gpui::accesskit::Action::SetTextSelection,
+            target_tree: gpui::accesskit::TreeId::ROOT,
+            target_node: field_id,
+            data: Some(gpui::accesskit::ActionData::SetTextSelection(
+                gpui::accesskit::TextSelection {
+                    anchor: gpui::accesskit::TextPosition {
+                        node: after_run_id,
+                        character_index: 0,
+                    },
+                    focus: gpui::accesskit::TextPosition {
+                        node: after_run_id,
+                        character_index: 2,
+                    },
+                },
+            )),
+        },
+    );
+    assert_eq!(
+        harness.update(|_, cx| entity.read(cx).selected_range()),
+        6..6,
+        "run ids from a superseded activated tree must be rejected"
+    );
+
+    harness.click("form.notes");
+    harness.update(|_, cx| entity.update(cx, |area, cx| area.set_disabled(true, cx)));
+    assert!(!harness.update(|window, cx| entity.focus_handle(cx).is_focused(window)));
+    harness.keystrokes("x");
+    assert_eq!(value(&mut harness, &slot), "latest");
+    let tree = harness.accessibility_tree();
+    let field = tree["nodes"]
+        .as_object()
+        .and_then(|nodes| {
+            nodes.values().find(|node| {
+                node["element_id"] == "Name(\"form.notes\")"
+                    && node["aria"]["role"] == "MultilineTextInput"
+            })
+        })
+        .expect("disabled area");
+    let actions = field["aria"]["on_action"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    for action in ["Focus", "SetValue", "SetTextSelection"] {
+        assert!(!actions.iter().any(|candidate| candidate == action));
+    }
+}
+
+#[gpui::test]
+fn unrepresentable_graphemes_omit_the_native_selection_pattern(cx: &mut TestAppContext) {
+    let text = format!("a{}", "\u{301}".repeat(128));
+    let (mut harness, slot) = area(cx, move |area| area.text(text.clone()).max_length(4));
+    let tree = harness.accessibility_tree();
+    let field = tree["nodes"]
+        .as_object()
+        .and_then(|nodes| {
+            nodes.values().find(|node| {
+                node["element_id"] == "Name(\"form.notes\")"
+                    && node["aria"]["role"] == "MultilineTextInput"
+            })
+        })
+        .expect("area");
+    assert!(field.get("children").is_none());
+    assert!(
+        field["aria"]["on_action"]
+            .as_array()
+            .is_none_or(|actions| !actions.iter().any(|action| action == "SetTextSelection"))
+    );
+    assert!(
+        field["aria"]["on_action"]
+            .as_array()
+            .is_some_and(|actions| actions.iter().any(|action| action == "SetValue"))
+    );
+    let field_id = native_id!(field);
+    let window = harness.window();
+    harness.context().dispatch_accessibility_action(
+        window,
+        gpui::accesskit::ActionRequest {
+            action: gpui::accesskit::Action::SetValue,
+            target_tree: gpui::accesskit::TreeId::ROOT,
+            target_node: field_id,
+            data: Some(gpui::accesskit::ActionData::Value("ab\r\ncd".into())),
+        },
+    );
+    assert_eq!(value(&mut harness, &slot), "ab\nc");
 }

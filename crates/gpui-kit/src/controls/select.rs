@@ -70,6 +70,7 @@ pub struct Select {
     focus_handle: FocusHandle,
     options: Vec<SelectOption>,
     selected: Option<SharedString>,
+    name: SharedString,
     placeholder: Option<SharedString>,
     size: ControlSize,
     disabled: bool,
@@ -99,6 +100,7 @@ impl Select {
             focus_handle: cx.focus_handle(),
             options: Vec::new(),
             selected: None,
+            name: SharedString::default(),
             placeholder: None,
             size: ControlSize::Md,
             disabled: false,
@@ -116,6 +118,17 @@ impl Select {
     pub fn selected(mut self, id: impl Into<SharedString>) -> Self {
         self.selected = Some(id.into());
         self
+    }
+
+    /// Names the control independently of its current answer or placeholder.
+    pub fn name(mut self, name: impl Into<SharedString>) -> Self {
+        self.name = name.into();
+        self
+    }
+
+    pub fn set_name(&mut self, name: impl Into<SharedString>, cx: &mut Context<Self>) {
+        self.name = name.into();
+        cx.notify();
     }
 
     /// The placeholder the host gave, or the built-in default.
@@ -420,8 +433,11 @@ impl Render for Select {
             .disabled(self.disabled)
             .invalid(self.invalid)
             .expanded(self.open)
-            .focus(&self.focus_handle)
+            .text(self.name.clone())
             .placeholder(self.resolved_placeholder(cx));
+        if !self.disabled {
+            spec = spec.focus(&self.focus_handle);
+        }
         if let Some(option) = self.selected_option() {
             spec = spec.value(option.label.clone());
         }
@@ -430,8 +446,11 @@ impl Render for Select {
 
         div()
             .id(self.ident.element_id())
-            .track_focus(&self.focus_handle)
-            .on_key_down(cx.listener(Self::on_key_down))
+            .when(!self.disabled, |element| {
+                element
+                    .track_focus(&self.focus_handle)
+                    .on_key_down(cx.listener(Self::on_key_down))
+            })
             .w_full()
             .flex()
             .flex_row()

@@ -415,6 +415,7 @@ fn combobox(
                 cx.new(|cx| {
                     configure(
                         Combobox::new("workspace.region", window, cx)
+                            .name("Region")
                             .options([
                                 SelectOption::new("eu-west", "Europe (Ireland)"),
                                 SelectOption::new("eu-north", "Europe (Stockholm)"),
@@ -443,6 +444,76 @@ fn a_closed_combobox_shows_the_current_answer(cx: &mut TestAppContext) {
     assert_eq!(node.value.as_deref(), Some("Europe (Ireland)"));
     assert_eq!(node.expanded, Some(false));
     assert!(harness.node("workspace.region.us-east").is_none());
+}
+
+#[gpui::test]
+fn combobox_native_nodes_share_a_name_and_keep_identity(cx: &mut TestAppContext) {
+    let (mut harness, entity) = combobox(cx, |combobox| combobox);
+    let tree = harness.accessibility_tree();
+    let nodes = tree["nodes"].as_object().expect("nodes");
+    let field = nodes
+        .values()
+        .find(|node| {
+            node["element_id"] == "Name(\"workspace.region\")" && node["aria"]["role"] == "ComboBox"
+        })
+        .expect("native combobox");
+    assert_eq!(field["aria"]["label"], "Region");
+    assert_eq!(field["aria"]["value"], "Europe (Ireland)");
+    let native_id = field["accesskit_id"].clone();
+    let query = nodes
+        .values()
+        .find(|node| {
+            node["element_id"] == "Name(\"workspace.region.query\")"
+                && node["aria"]["role"] == "TextInput"
+        })
+        .expect("editable query target");
+    assert_eq!(query["aria"]["label"], "Region");
+
+    harness.update(|_, cx| {
+        entity.update(cx, |combobox, cx| {
+            combobox.set_selected(Some("us-east".into()), cx)
+        });
+    });
+    let tree = harness.accessibility_tree();
+    let field = tree["nodes"]
+        .as_object()
+        .and_then(|nodes| {
+            nodes.values().find(|node| {
+                node["element_id"] == "Name(\"workspace.region\")"
+                    && node["aria"]["role"] == "ComboBox"
+            })
+        })
+        .expect("updated native combobox");
+    assert_eq!(field["accesskit_id"], native_id);
+    assert_eq!(field["aria"]["value"], "United States (Virginia)");
+}
+
+#[gpui::test]
+fn a_disabled_combobox_has_no_unnamed_or_focusable_native_target(cx: &mut TestAppContext) {
+    let (mut harness, _entity) = combobox(cx, |combobox| combobox.disabled(true));
+    let tree = harness.accessibility_tree();
+    let nodes = tree["nodes"].as_object().expect("nodes");
+    for (element_id, role) in [
+        ("Name(\"workspace.region\")", "ComboBox"),
+        ("Name(\"workspace.region.query\")", "TextInput"),
+    ] {
+        let node = nodes
+            .values()
+            .find(|node| node["element_id"] == element_id && node["aria"]["role"] == role)
+            .unwrap_or_else(|| panic!("missing native {role}"));
+        assert_eq!(node["aria"]["label"], "Region");
+        assert_eq!(node["aria"]["disabled"], true);
+        let actions = node["aria"]["on_action"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        for action in ["Focus", "SetValue", "SetTextSelection"] {
+            assert!(
+                !actions.iter().any(|candidate| candidate == action),
+                "disabled {role} advertised {action}: {actions:?}"
+            );
+        }
+    }
 }
 
 #[gpui::test]

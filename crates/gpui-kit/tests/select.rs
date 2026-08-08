@@ -24,6 +24,7 @@ fn select(cx: &mut TestAppContext) -> (Harness, Entity<Select>) {
             .get_or_insert_with(|| {
                 cx.new(|cx| {
                     Select::new("settings.provider", window, cx)
+                        .name("Provider")
                         .options(options())
                         .selected("anthropic")
                         .placeholder("Choose a provider")
@@ -48,6 +49,42 @@ fn a_closed_select_shows_the_current_answer(cx: &mut TestAppContext) {
         harness.node("settings.provider.openai").is_none(),
         "a closed select must not publish its options"
     );
+}
+
+#[gpui::test]
+fn select_native_role_name_value_and_identity_are_stable(cx: &mut TestAppContext) {
+    let (mut harness, entity) = select(cx);
+    let tree = harness.accessibility_tree();
+    let field = tree["nodes"]
+        .as_object()
+        .and_then(|nodes| {
+            nodes.values().find(|node| {
+                node["element_id"] == "Name(\"settings.provider\")"
+                    && node["aria"]["role"] == "ComboBox"
+            })
+        })
+        .expect("native select");
+    assert_eq!(field["aria"]["label"], "Provider");
+    assert_eq!(field["aria"]["value"], "Anthropic");
+    let native_id = field["accesskit_id"].clone();
+
+    harness.update(|_, cx| {
+        entity.update(cx, |select, cx| {
+            select.set_selected(Some("openai".into()), cx)
+        });
+    });
+    let tree = harness.accessibility_tree();
+    let field = tree["nodes"]
+        .as_object()
+        .and_then(|nodes| {
+            nodes.values().find(|node| {
+                node["element_id"] == "Name(\"settings.provider\")"
+                    && node["aria"]["role"] == "ComboBox"
+            })
+        })
+        .expect("updated native select");
+    assert_eq!(field["accesskit_id"], native_id);
+    assert_eq!(field["aria"]["value"], "OpenAI");
 }
 
 #[gpui::test]
@@ -208,6 +245,7 @@ fn a_disabled_select_never_opens(cx: &mut TestAppContext) {
             .get_or_insert_with(|| {
                 cx.new(|cx| {
                     Select::new("settings.provider", window, cx)
+                        .name("Provider")
                         .options(options())
                         .disabled(true)
                 })
@@ -224,6 +262,25 @@ fn a_disabled_select_never_opens(cx: &mut TestAppContext) {
             .expanded,
         Some(false)
     );
+    let tree = harness.accessibility_tree();
+    let field = tree["nodes"]
+        .as_object()
+        .and_then(|nodes| {
+            nodes.values().find(|node| {
+                node["element_id"] == "Name(\"settings.provider\")"
+                    && node["aria"]["role"] == "ComboBox"
+            })
+        })
+        .expect("disabled native select");
+    assert_eq!(field["aria"]["label"], "Provider");
+    assert_eq!(field["aria"]["disabled"], true);
+    let actions = field["aria"]["on_action"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    for action in ["Focus", "Click"] {
+        assert!(!actions.iter().any(|candidate| candidate == action));
+    }
 }
 
 #[gpui::test]

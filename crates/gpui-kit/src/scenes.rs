@@ -1920,6 +1920,7 @@ fn ensure_form(window: &mut Window, cx: &mut App) {
     });
     let region = cx.new(|cx| {
         Combobox::new("scene.form.region", window, cx)
+            .name("Region")
             .options([
                 SelectOption::new("eu-west", "Europe (Ireland)"),
                 SelectOption::new("eu-north", "Europe (Stockholm)"),
@@ -2188,8 +2189,8 @@ fn ensure_inputs(window: &mut Window, cx: &mut App) {
             }),
             disabled: cx.new(|cx| {
                 TextInput::new("scene.input.disabled", window, cx)
-                    .name("Read only")
-                    .text("read only")
+                    .name("Disabled")
+                    .text("disabled")
                     .disabled(true)
             }),
             invalid: cx.new(|cx| {
@@ -2201,6 +2202,7 @@ fn ensure_inputs(window: &mut Window, cx: &mut App) {
             }),
             provider: cx.new(|cx| {
                 Select::new("scene.input.provider", window, cx)
+                    .name("Provider")
                     .options([
                         SelectOption::new("anthropic", "Anthropic"),
                         SelectOption::new("openai", "OpenAI").description("Requires a key"),
@@ -2566,6 +2568,7 @@ fn pagination(window: &mut Window, cx: &mut App) -> AnyElement {
     if !cx.has_global::<ScenePagination>() {
         let page_size = cx.new(|cx| {
             Select::new("scene.pagination.size", window, cx)
+                .name("Rows per page")
                 .options([
                     SelectOption::new("25", "25 per page"),
                     SelectOption::new("50", "50 per page"),

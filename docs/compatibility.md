@@ -4,7 +4,7 @@
 
 | gpui-kit | GPUI source | Revision |
 |---|---|---|
-| 0.1.x | `https://github.com/fran0220/zed` | `bbcc88d1f0ae98d2bd8632ea2a4ccede51d9108d` |
+| 0.1.x | `https://github.com/fran0220/zed` | `b9e434908126d3215c22443b0102093113f8b292` |
 
 The workspace and the standalone headless harness depend on one immutable
 revision of the integration fork. That revision merges three independently

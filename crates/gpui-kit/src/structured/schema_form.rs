@@ -455,14 +455,21 @@ impl SchemaForm {
             SchemaKind::Boolean => Control::Boolean(false),
             SchemaKind::Enum(choices) => {
                 let options: Vec<SelectOption> = choices.iter().map(SchemaChoice::option).collect();
-                let select = cx.new(|cx| Select::new(control_ident, window, cx).options(options));
+                let name = field.shown_label();
+                let select = cx.new(|cx| {
+                    Select::new(control_ident, window, cx)
+                        .name(name)
+                        .options(options)
+                });
                 self.watch_select(&path, &select, cx);
                 Control::Choice(select)
             }
             SchemaKind::OpenEnum(choices) => {
                 let options: Vec<SelectOption> = choices.iter().map(SchemaChoice::option).collect();
+                let name = field.shown_label();
                 let combobox = cx.new(|cx| {
                     Combobox::new(control_ident, window, cx)
+                        .name(name)
                         .options(options)
                         .allow_custom(true)
                 });
