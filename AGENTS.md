@@ -99,9 +99,10 @@ On Linux and Windows the visual gate is `cargo run -p xtask -- headless check`
 (`headless capture` accepts), which renders the same catalog into offscreen
 textures through a software adapter — no window system or GPU — against its
 own baseline in `snapshots/headless/scenes`. The harness lives in
-`tools/headless-visual` as its own workspace because it temporarily patches
-GPUI to the branch of zed-industries/zed#62341; the root workspace must stay
-on unmodified upstream. See `docs/screenshot-testing.md`.
+`tools/headless-visual` as its own workspace with renderer-specific
+dependencies and a separate lockfile. It and the root workspace must pin the
+same immutable `fran0220/zed` integration revision; run `cargo run -p xtask --
+dependencies check` after changing it. See `docs/screenshot-testing.md`.
 
 UI changes additionally require visual inspection of the captured images. A
 changed image is a claim about what the component now looks like, so look at

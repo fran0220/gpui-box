@@ -19,14 +19,14 @@ License text: licenses/COMET-MIT.txt
 GPUI / Zed
 --------------------------------------------------------------------------------
 Source: https://github.com/zed-industries/zed
-Fork: https://github.com/fran0220/zed
-Baseline: a6a23c7b80a5cefa0487b7856335be89ace7e483
-Pinned revision: cb2ce82766e42c55fc8563de3c5c98ac8e1c9fd9
+Integration source: https://github.com/fran0220/zed
+Upstream baseline: a6a23c7b80a5cefa0487b7856335be89ace7e483
+Pinned integration revision: 3d943ed6040b3318e1d8b08f54d74c0b5693173f
 License: Apache-2.0
 Copyright 2022–2024 Zed Industries, Inc.
 
-Scope: linked GPUI, gpui_platform, and the published EdgeFade,
-BackdropBlur/native-surface patch chain.
+Scope: linked GPUI, gpui_platform, gpui_wgpu, EdgeFade, BackdropBlur,
+native-surface integration, and offscreen rendering patch chains.
 License text: licenses/ZED-APACHE-2.0.txt
 
 Geist and Geist Mono

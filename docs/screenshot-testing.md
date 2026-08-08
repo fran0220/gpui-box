@@ -166,12 +166,14 @@ pictures of the same catalog, not one picture captured twice. The macOS
 baseline stays authoritative for what users of native macOS builds see; the
 headless baseline is what every other platform can verify.
 
-The harness is its own Cargo workspace because it temporarily `[patch]`es
-GPUI to the branch of
-[zed-industries/zed#62341](https://github.com/zed-industries/zed/pull/62341),
-which adds the offscreen wgpu renderer. The root workspace and every published
-crate stay on the unmodified upstream revision; when the pull request merges,
-the patch section is deleted and the harness follows upstream directly.
+The harness is its own Cargo workspace because its Linux/Windows renderer
+dependencies and lockfile are platform-specific. It no longer patches one GPUI
+source into another: the root workspace and harness directly pin the same
+immutable `fran0220/zed` integration revision. That revision includes the
+offscreen renderer from
+[zed-industries/zed#62341](https://github.com/zed-industries/zed/pull/62341)
+alongside the runtime primitives the scenes use, and `xtask dependencies check`
+fails if either workspace or lockfile drifts.
 
 ## Audit
 

@@ -165,6 +165,16 @@ and `xtask gate [full]`. `scenes check` is the visual regression gate; see
 
 ### Changed
 
+- GPUI dependency ownership moved to the maintained `fran0220/zed` integration
+  fork. The root workspace and standalone headless harness now pin the same
+  immutable revision instead of combining an upstream pin with a temporary
+  Cargo patch. `xtask dependencies check` treats the root pin as authority and
+  rejects manifest, lockfile, compatibility-document, or cross-repository
+  consumer drift. The fork keeps runtime/native-surface and offscreen-WGPU work
+  on separate topic histories, merges them only on an integration branch, and
+  can validate a gpui-kit ref against the exact fork SHA before either side is
+  promoted.
+
 - The visual regression gate stopped photographing windows and started
   reading frames back from the GPU. `scenes capture` used to ask the macOS
   window server for what it had composited, which meant every image carried
@@ -188,10 +198,9 @@ and `xtask gate [full]`. `scenes check` is the visual regression gate; see
   time is simulated — so a headless VM holds a baseline in
   `snapshots/headless/scenes` and compares it exactly, byte for byte.
   `cargo run -p xtask -- headless check` runs it. The harness is its own
-  workspace because it temporarily patches GPUI to the branch of
-  zed-industries/zed#62341, which adds the offscreen wgpu renderer upstream;
-  the root workspace and the published crates stay on unmodified upstream,
-  and the patch is deleted when the pull request merges.
+  workspace with renderer-specific dependencies and a separate lockfile, but
+  directly pins the same integration revision as the root. The offscreen WGPU
+  topic remains independently traceable to zed-industries/zed#62341.
 
 - The design system stopped drawing hairlines to say what a colour could say.
   Borders were doing the work of grouping because the surface ramp was too flat
@@ -260,15 +269,13 @@ and `xtask gate [full]`. `scenes check` is the visual regression gate; see
   here, which is a tag on a verified commit rather than a registry version,
   and why publishing that crate today would still be premature.
 
-- The workspace depends on upstream `zed-industries/zed` at a pinned revision
-  instead of a patched fork. `effects::frosted` and `effects::edge_faded` were
-  removed with it: upstream GPUI has no per-element backdrop blur and no
-  alpha-mask primitive, and a wrapper that silently stopped doing what its name
-  claims would be worse than its absence. Anchored overlays and modals draw the
-  opaque overlay surface on every platform, which is what non-macOS platforms
-  already showed. The `effect.glassAlphaMacos` and `effect.backdropBlur` tokens
-  left with the elements that read them; `effect.edgeFadeBand` stays because
-  scroll-linked toolbar motion uses it as a distance.
+- The component-level `effects::frosted` and `effects::edge_faded` wrappers
+  remain removed. The integration fork now carries the underlying
+  BackdropBlur and EdgeFade primitives, but a public component does not return
+  until its renderer fallback, tokens, semantics, and scenes make the same
+  truthful promise. Anchored overlays and modals therefore still draw the
+  opaque overlay surface. `effect.edgeFadeBand` remains because scroll-linked
+  toolbar motion uses it as a distance.
 - Components are `RenderOnce` builders that read the theme from the application
   context and derive their element and semantic id from one `Ident`, replacing
   free functions that took a `&Theme` and positional flags. This was a breaking

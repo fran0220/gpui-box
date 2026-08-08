@@ -7,6 +7,7 @@ use std::process::Command;
 use anyhow::{Context, Result, bail};
 
 mod api;
+mod dependencies;
 mod site;
 mod strings;
 use gpui_kit_tokens::{
@@ -25,6 +26,7 @@ fn main() -> Result<()> {
         (Some("strings"), Some("generate")) => strings::generate(&root()),
         (Some("api"), Some("check")) => api::check(&root()),
         (Some("api"), Some("generate")) => api::generate(&root()),
+        (Some("dependencies"), Some("check")) => dependencies::check(&root(), &rest),
         (Some("site"), Some("generate")) => {
             site::generate(&root(), rest.first().map(String::as_str)).map(|_| ())
         }
@@ -37,7 +39,7 @@ fn main() -> Result<()> {
         (Some("gate"), None) => gate(false),
         (Some("gate"), Some("full")) => gate(true),
         _ => bail!(
-            "usage: cargo xtask <tokens generate|tokens check|strings check|\
+            "usage: cargo xtask <dependencies check|tokens generate|tokens check|strings check|\
              strings generate|scenes list|scenes capture [name...]|\
              scenes check [name...]|headless capture [name...]|\
              headless check [name...]|gate [full]>"
@@ -128,6 +130,7 @@ fn scenes_check(only: &[String]) -> Result<()> {
 /// and the visual regression, and is what a commit wants.
 fn gate(full: bool) -> Result<()> {
     step("cargo", &["fmt", "--all", "--", "--check"], None)?;
+    dependencies::check(&root(), &[])?;
     step("cargo", &["check", "--workspace", "--all-targets"], None)?;
     step("cargo", &["test", "--workspace"], None)?;
     step(
@@ -159,7 +162,7 @@ fn gate(full: bool) -> Result<()> {
 }
 
 /// Runs the Linux and Windows visual gate, which lives in its own workspace
-/// so the temporary GPUI [patch] it carries stays out of this one.
+/// with renderer-specific dependencies and an independent lockfile.
 fn headless(command: &str, only: &[String]) -> Result<()> {
     let manifest = root()
         .join("tools")

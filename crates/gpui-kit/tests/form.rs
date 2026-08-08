@@ -310,7 +310,13 @@ fn a_number_drawn_as_wrong_can_say_what_is_wrong_with_it(cx: &mut TestAppContext
     });
 
     harness.click("workspace.retention.field");
-    harness.keystrokes("cmd-a 0");
+    let select_all = if cfg!(target_os = "macos") {
+        "cmd-a"
+    } else {
+        "ctrl-a"
+    };
+    harness.keystrokes(select_all);
+    harness.keystrokes("0");
     harness.frame();
 
     harness.update(|_, cx| {

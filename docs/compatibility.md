@@ -4,36 +4,46 @@
 
 | gpui-kit | GPUI source | Revision |
 |---|---|---|
-| 0.1.x | `https://github.com/zed-industries/zed` | `a6a23c7b80a5cefa0487b7856335be89ace7e483` |
+| 0.1.x | `https://github.com/fran0220/zed` | `3d943ed6040b3318e1d8b08f54d74c0b5693173f` |
 
-The workspace depends on upstream GPUI only. There is no patched fork, and
-every capability the components use is a public upstream API. crates.io is not
-usable yet: the published `gpui` crate stopped at 0.2.2 and `gpui_platform`
-has never been published, so the pin is a Git revision until upstream resumes
-publishing.
+The workspace and the standalone headless harness depend on one immutable
+revision of the integration fork. That revision merges two independently
+reviewable topic stacks on upstream baseline
+`a6a23c7b80a5cefa0487b7856335be89ace7e483`: runtime primitives/native
+surfaces and the offscreen WGPU renderer. crates.io is not usable yet: the
+published `gpui` crate stopped at 0.2.2 and `gpui_platform` has never been
+published, so the pin remains a Git revision.
 
 ## Platform behavior
 
 | Capability | macOS | Windows | Linux |
 |---|---|---|---|
-| Core components | Supported | Compile target | Compile target |
-| In-process capture | Supported | Not implemented | Not implemented |
+| Core components | Supported | Compile + headless visual gate | Compile + headless visual gate |
+| Native frame capture | Supported | Not implemented | Not implemented |
+| Offscreen WGPU capture | Not used | WARP | llvmpipe |
+| Edge fade | Supported | Supported | Supported |
+| Backdrop blur | Metal | Translucent fallback | Translucent fallback |
+| Native child surfaces | Supported | Supported | Not implemented |
 
-“Compile target” is not the same as a validated production journey. Platform
-support claims should be upgraded only with native build and visual evidence.
+Headless rendering verifies deterministic component output but is not a native
+desktop journey. Windows and Linux support claims should be upgraded only with
+native input, accessibility, windowing, and visual evidence.
 
-Overlay surfaces are opaque on every platform. Backdrop frost and scroll-edge
-fading existed only as fork patches and were removed with the fork; if
-upstream GPUI grows a per-element backdrop blur or an alpha-mask primitive,
-they can return as ordinary components with the same tokens.
+Backdrop blur is deliberately renderer-specific: Metal snapshots and blurs the
+scene below it, while other renderers preserve the translucent fill as a
+truthful unblurred fallback. Edge fade is encoded into ordinary painted
+primitives and is exercised by the WGPU integration test.
 
 ## Upgrade process
 
-1. Select the new upstream Zed revision.
-2. Update the workspace Git revision.
-3. Run all workspace gates.
-4. Capture the gallery on each supported platform and inspect text layout:
+1. Rebase each fork topic stack onto the selected upstream Zed revision.
+2. Merge the verified topic heads into a new integration commit without
+   rewriting the topic branches.
+3. Update the root and headless manifests to that exact integration SHA.
+4. Run `cargo run -p xtask -- dependencies check`, both workspace gates, and
+   the fork's `gpui-kit consumer` workflow.
+5. Capture the gallery on each supported native platform and inspect text layout:
    upstream wrapping fixes land continuously and move line breaks.
-5. Update this matrix and `PROVENANCE.md`.
+6. Update this matrix, `PROVENANCE.md`, and `THIRD_PARTY_NOTICES`.
 
 Do not use a floating branch dependency.

@@ -44,8 +44,13 @@ gpui-kit = { git = "https://github.com/fran0220/gpui-kit", rev = "<commit>" }
 # different revision as a different crate: two copies of GPUI in one binary
 # means two sets of globals, and the theme and semantic registry this library
 # installs would be invisible to your views.
-gpui = { git = "https://github.com/fran0220/zed", rev = "cb2ce82766e42c55fc8563de3c5c98ac8e1c9fd9" }
+gpui = { git = "https://github.com/fran0220/zed", rev = "3d943ed6040b3318e1d8b08f54d74c0b5693173f" }
 ```
+
+If the application names `gpui_platform` or `gpui_wgpu` too, give every GPUI
+crate that same URL and revision. `cargo run -p xtask -- dependencies check`
+enforces the equivalent rule across this repository's two workspaces,
+lockfiles, and compatibility declarations.
 
 Requires Rust 1.97 and edition 2024. macOS is the supported platform; Windows
 and Linux are compile targets, which is not the same as a validated journey —
@@ -251,8 +256,10 @@ is fixed and its captures are deterministic — see
 ## Validation
 
 ```bash
-cargo run -p xtask -- gate        # fmt, check, test, clippy, tokens
+cargo run -p xtask -- dependencies check # one immutable Zed source everywhere
+cargo run -p xtask -- gate        # dependencies, fmt, check, test, clippy, generated artifacts
 cargo run -p xtask -- gate full   # the above, plus rustdoc and scene images
+cargo run -p xtask -- headless check # deterministic Linux/Windows visual gate
 ```
 
 The scene images are the visual regression gate:
@@ -261,18 +268,20 @@ The scene images are the visual regression gate:
 cargo run -p xtask -- scenes check
 ```
 
-CI runs everything except that one. The capture needs a composited, frontmost
+CI runs the non-visual gate and the software-rendered headless visual gate on
+Linux and Windows. The native macOS capture needs a composited, frontmost
 window and the display the baselines came from, which a GitHub-hosted runner
-does not give, so it runs on a self-hosted runner where one is configured and is
-otherwise a step a reviewer performs and records.
+does not give, so it runs on a self-hosted runner where one is configured and
+is otherwise a step a reviewer performs and records.
 [`docs/screenshot-testing.md`](docs/screenshot-testing.md) states what it
 requires and why a job that ran it anyway would be worse than no job.
 
 ## GPUI compatibility
 
-The workspace pins upstream `zed-industries/zed` at
-`a6a23c7b80a5cefa0487b7856335be89ace7e483`. No fork and no GPUI patches:
-every capability the components use is a public upstream API. See
+The workspace pins the `fran0220/zed` integration fork at
+`3d943ed6040b3318e1d8b08f54d74c0b5693173f`. It combines the runtime
+primitives and native-surface work with the offscreen WGPU renderer on one
+immutable revision; reusable pieces can be proposed upstream independently. See
 [`docs/compatibility.md`](docs/compatibility.md).
 
 ## Documentation
