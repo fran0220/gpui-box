@@ -8,6 +8,7 @@ members = [
   "crates/gpui-kit-tokens",
   "crates/gpui-kit",
   "examples/gallery",
+  "tools/mcp",
   "xtask",
 ]
 # Its own workspace on purpose: it carries a temporary [patch] on GPUI that

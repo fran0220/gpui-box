@@ -6,6 +6,7 @@ use std::process::Command;
 
 use anyhow::{Context, Result, bail};
 
+mod api;
 mod strings;
 use gpui_kit_tokens::{
     BorderWeight, ControlSize, Density, Elevation, Layer, MotionEasing, OpacityRole, Radius, Space,
@@ -21,6 +22,8 @@ fn main() -> Result<()> {
         (Some("tokens"), Some("check")) => tokens(true),
         (Some("strings"), Some("check")) => strings::check(&root()),
         (Some("strings"), Some("generate")) => strings::generate(&root()),
+        (Some("api"), Some("check")) => api::check(&root()),
+        (Some("api"), Some("generate")) => api::generate(&root()),
         (Some("scenes"), Some("list")) => scenes_list(),
         (Some("scenes"), Some("capture")) => scenes_capture(&rest),
         (Some("scenes"), Some("check")) => scenes_check(&rest),
@@ -136,6 +139,7 @@ fn gate(full: bool) -> Result<()> {
     )?;
     tokens(true)?;
     strings::check(&root())?;
+    api::check(&root())?;
     if full {
         step(
             "cargo",

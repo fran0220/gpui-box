@@ -1,0 +1,16 @@
+[package]
+name = "gpui-kit-mcp"
+description = "Model Context Protocol server exposing the gpui-kit catalog to an agent"
+publish = false
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

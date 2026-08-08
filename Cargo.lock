@@ -2094,6 +2094,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "gpui-kit-mcp"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde_json",
+]
+
+[[package]]
 name = "gpui-kit-semantics"
 version = "0.1.0"
 dependencies = [

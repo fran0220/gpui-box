@@ -1,0 +1,145 @@
+# gpui-kit
+
+> A design system, component library, semantic automation layer, and visual
+> test kit for native desktop applications built with GPUI. 105 components,
+> 82 canonical scenes, one token authority. Rust, GPUI, no web view, no DOM.
+
+This file is the entry point for a program reading this repository. It exists
+because prose drifts and a generated artifact does not: everything linked here
+is regenerated from the source and verified by `cargo run -p xtask -- gate`, so
+a claim in these files is one a gate would fail over.
+
+## Read these first, in this order
+
+- [docs/api-index.json](api-index.json) — every component, the exact signature
+  of every public method, what each one reports, and the scenes that render it.
+  **Generated from source.** Prefer it over any prose in this repository when
+  the two disagree, and prefer it over recall.
+- [AGENTS.md](../AGENTS.md) — the rules this repository enforces. Breaking one
+  is a failed gate, not a review comment.
+- [docs/design-principles.md](design-principles.md) — why the components look
+  the way they do.
+
+## The four rules that fail a build
+
+A change that violates one of these does not merely look wrong, it does not
+land. They are the ones worth knowing before writing a line.
+
+1. **No literal a reader reads.** Text this library authors is named by a
+   `gpui_kit::strings::StringKey` and read from the installed catalogue.
+   `.label("Save")` fails `strings check`. Text the *caller* passes in is
+   different: it is the host's, and it is shown verbatim.
+2. **No hard-coded visual value.** Colour, spacing, radius, type, motion and
+   effect come from `crates/gpui-kit-tokens/tokens/*.json` through the `Theme`. Local geometry that
+   occurs exactly once may sit next to the component.
+3. **States are distinct and truthful.** Loading, Empty, Unavailable, Error and
+   Ready are five things. A refresh failure keeps the last verified value on
+   screen. A host refusal is displayed as a refusal, never as empty data. A
+   disabled control does not install its handler at all.
+4. **Anything actionable carries a stable semantic id**, derived from business
+   identity rather than list position: `project.<project-id>.open`, never
+   `row-7`.
+
+## What a component is
+
+Two shapes, and `kind` in the API index says which:
+
+- a **builder** is `RenderOnce`, derives `IntoElement`, and is constructed and
+  mounted in one expression;
+- a **view** survives a frame, so the caller holds it in an `Entity` and
+  reaches it with `cx.new(...)` and `.update(...)`.
+
+Both derive their element id and their semantic id from one caller-supplied
+`Ident`, read the theme from the application context, and publish a semantic
+node during prepaint. Neither applies its own change: a component reports an
+intent and the host decides, which is why a refused change is visible as the
+control not moving.
+
+In the index, `options` chain onto the value, `commands` need a `Context` and
+therefore a view, `queries` only answer, and `reports` are the variants of the
+event the component emits.
+
+## The loop that tells you whether it worked
+
+This is the part worth using, because it closes without a human in it.
+
+```bash
+cargo run -p xtask -- gate                        # fmt, check, test, clippy, tokens, strings, api
+cargo run -p xtask -- scenes capture <scene>      # render just what changed
+cargo run -p xtask -- scenes check <scene>        # compare against the committed image
+```
+
+Then **look at the PNG in `snapshots/macos/scenes/`.** A captured image is a
+claim about what the component now looks like, and the only way to check a
+claim about appearance is to look. Captures are deterministic — same bytes
+every run, in any order — which is what makes `scenes check` a gate rather
+than a suggestion.
+
+Two things a still frame cannot show, both known and neither a defect:
+
+- a repeating animation is held at its first frame and a one-shot at its last,
+  because a still of a moving thing is not reproducible. Review motion by
+  running the gallery;
+- a text caret does not appear once another scene has rendered in the same run.
+  Render that one scene alone to see it.
+
+There is a matching `headless check` for Linux and Windows, with its own
+baseline, in `tools/headless-visual`.
+
+## If you can call tools
+
+`tools/mcp` serves this catalog over the Model Context Protocol:
+`search_components`, `component`, `scene`, `render_scene` and `rules`. It is
+the same facts as the files above, reached in one call instead of a guess about
+which path to open, and `render_scene` returns the actual image. See
+[docs/mcp.md](mcp.md).
+
+## Writing against it
+
+Every scene in the index carries its own source under `example`. That code
+compiles and renders in this repository's gate, so it is the shape to copy —
+unlike a snippet in a document, which nothing verifies. Find a component in
+`components`, take one of its `scenes`, read that scene's `example`.
+
+To see one:
+
+```bash
+cargo run -p gpui-kit-gallery -- --scene badge --theme studio-dark
+```
+
+## Generated artifacts, and what regenerates them
+
+Do not hand-edit any of these. Each has a `check` that fails when it drifts.
+
+| File | Command |
+|---|---|
+| `docs/api-index.json` | `cargo run -p xtask -- api generate` |
+| `docs/token-reference.md` | `cargo run -p xtask -- tokens generate` |
+| `docs/strings-allowlist.txt` | `cargo run -p xtask -- strings generate` |
+| `snapshots/macos/scenes/*.png` | `cargo run -p xtask -- scenes capture` |
+
+## Reference
+
+- [docs/components.md](components.md) — what each component is for
+- [docs/component-contracts.md](component-contracts.md) — what each one promises
+- [docs/coverage.md](coverage.md) — what exists, and what is deliberately absent
+- [docs/truthful-ui.md](truthful-ui.md) — rule 3, in full
+- [docs/token-model.md](token-model.md) and [docs/token-reference.md](token-reference.md) — rule 2
+- [docs/semantic-automation.md](semantic-automation.md) — rule 4
+- [docs/motion.md](motion.md) — springs, easings, entrances, and the busy vocabulary
+- [docs/accessibility.md](accessibility.md), [docs/interaction.md](interaction.md), [docs/datetime.md](datetime.md)
+- [docs/host-view-boundary.md](host-view-boundary.md) — what belongs to the host
+- [docs/abi-vocabulary.md](abi-vocabulary.md) — what a serialized plugin vocabulary would take
+- [docs/screenshot-testing.md](screenshot-testing.md) — how captures stay reproducible
+- [docs/gpui-recipes.md](gpui-recipes.md) — GPUI patterns this library relies on
+
+## Boundaries
+
+This is product-neutral UI infrastructure. Components depend on GPUI, tokens,
+theme, assets and semantic testability, and must not reach an application host,
+a database, a credential, an RPC transport, or a product model. A component
+reads caller-owned data, emits caller-owned actions, and holds only visual
+transient state such as hover, focus, open, selection and animation.
+
+The library is not on crates.io and cannot be while GPUI is a Git dependency.
+What a consumer pins is a commit or a tag; see [docs/releasing.md](releasing.md).

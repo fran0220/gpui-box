@@ -13,7 +13,7 @@ is what Cargo requires a manifest to carry, not a version anybody can take.
 
 ### Added
 
-**Tokens and theme.** `tokens/studio-dark.json` and `tokens/studio-light.json`
+**Tokens and theme.** `crates/gpui-kit-tokens/tokens/studio-dark.json` and `crates/gpui-kit-tokens/tokens/studio-light.json`
 are the source of truth, expressed as a palette plus references so retuning a
 scale is one edit rather than one per role. Themes carry elevation, z-index and
 density axes, spring presets and the six easing curves, and are built through
@@ -232,6 +232,24 @@ and `xtask gate [full]`. `scenes check` is the visual regression gate; see
   Motion is never the only carrier: a thinking block says "Thinking" where a
   settled one says "Reasoning", so reduced motion loses the movement and keeps
   the state.
+
+- The catalog is readable by a program. `docs/api-index.json` carries all 105
+  components, the exact signature of every public method sorted by what the
+  caller has to hold, the events each one reports, and the scenes that render
+  it — generated from the source by `xtask api generate` and checked by `gate`,
+  so a signature it states is one a compiler agreed to. Each of the 82 scenes
+  carries its own source as an example, which is worth more than a written one
+  because the gate compiles it and `scenes check` renders it. `docs/llms.txt`
+  is the entry point, and `tools/mcp` serves the same catalog as Model Context
+  Protocol tools, one of which renders a scene and returns the image so a
+  caller can look at a component rather than read a description of it.
+- The token documents moved to `crates/gpui-kit-tokens/tokens/`. A package may
+  only carry files under its own directory, so `include_str!` reaching up to a
+  repository-root `tokens/` meant the one crate in this workspace that does not
+  depend on GPUI — and could therefore be published — could not even be
+  packaged. It packages now. `docs/releasing.md` records what a release is
+  here, which is a tag on a verified commit rather than a registry version,
+  and why publishing that crate today would still be premature.
 
 - The workspace depends on upstream `zed-industries/zed` at a pinned revision
   instead of a patched fork. `effects::frosted` and `effects::edge_faded` were

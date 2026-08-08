@@ -15,7 +15,7 @@ Components:
 
 ## Token authority
 
-`tokens/*.json` is the source of truth, and every theme carries the same key
+`crates/gpui-kit-tokens/tokens/*.json` is the source of truth, and every theme carries the same key
 set. Repeated semantic color,
 spacing, radius, typography, motion, and effect values belong there. Local
 geometry that occurs once may stay next to the component.
@@ -51,6 +51,25 @@ Tests assert behavior and generated artifacts, never source text.
 Source ports and translations must update `PROVENANCE.md` and
 `THIRD_PARTY_NOTICES`. Preserve upstream copyright notices and exact revisions.
 Do not add product or provider trademarks to the generic asset crate.
+
+## The generated API index
+
+`docs/api-index.json` carries every component, the exact signature of every
+public method, what each reports, and the scenes that render it. It is
+generated from the source, so it is the answer when it and any prose disagree:
+
+```bash
+cargo run -p xtask -- api generate
+cargo run -p xtask -- api check     # runs inside `gate`
+```
+
+A new component appears there by existing. Adding one and leaving the index
+stale fails the gate, which is the point: a reader who is told a signature that
+does not compile was failed by this file, not by the compiler.
+
+`docs/llms.txt` is the entry point for a program reading this repository, and
+`tools/mcp` serves the same catalog as MCP tools, including one that renders a
+scene and returns the image.
 
 ## Validation
 
