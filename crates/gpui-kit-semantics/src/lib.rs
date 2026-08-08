@@ -338,7 +338,6 @@ pub struct NodeSpec {
 
 impl NodeSpec {
     pub fn new(id: impl Into<SharedString>, role: Role) -> Self {
-        let live = matches!(role, Role::Status | Role::Toast).then_some(LiveRegion::Polite);
         Self {
             id: id.into(),
             role,
@@ -361,7 +360,7 @@ impl NodeSpec {
             busy: false,
             invalid: false,
             required: false,
-            live,
+            live: None,
             live_atomic: false,
         }
     }
@@ -1066,5 +1065,17 @@ mod tests {
     fn stateful_semantics_reject_mismatched_identity() {
         let element = div().id("actual");
         let _ = platform_accessible(element, &NodeSpec::new("claimed", Role::Button));
+    }
+
+    #[test]
+    fn static_status_is_not_a_live_region_without_explicit_ownership() {
+        assert_eq!(NodeSpec::new("count", Role::Status).live, None);
+        assert_eq!(NodeSpec::new("toast", Role::Toast).live, None);
+        assert_eq!(
+            NodeSpec::new("announcement", Role::Status)
+                .live(LiveRegion::Polite)
+                .live,
+            Some(LiveRegion::Polite)
+        );
     }
 }

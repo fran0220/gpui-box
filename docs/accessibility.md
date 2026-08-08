@@ -75,11 +75,11 @@ evidence that a particular screen reader announces every property correctly.
 | String value and placeholder | Bridged; deterministic tree verified | Bridged; native session unverified | Bridged; native session unverified |
 | Disabled, invalid, required, busy | Disabled native AX smoke verified; other states deterministic only | Bridged; native session unverified | Bridged; native session unverified |
 | Checked, expanded, widget selection | Checked native AX smoke verified; expanded/selection deterministic only | Bridged; native session unverified | Bridged; native session unverified |
-| Focus | GPUI focus is projected; deterministic tree verified | GPUI focus is projected; native session unverified | GPUI focus is projected; native session unverified |
+| Focus | GPUI focus is projected and assistive-technology-requested focus has a native AX smoke check | GPUI focus action is routed to its owning handle; native UIA re-verification pending | GPUI focus action is routed to its owning handle; native AT-SPI session unverified |
 | Numeric min, max, current value | Bridged; deterministic tree verified | Bridged; native session unverified | Bridged; native session unverified |
-| Editable text | TextInput/MultilineTextInput parent and TextRun children verified deterministically | Same AccessKit structure; native session unverified | Same AccessKit structure; native session unverified |
+| Editable text | Native AX name/value/enabled/focus/editing smoke verified; grapheme-based TextRun structure verified deterministically | Same AccessKit structure; native session unverified | Same AccessKit structure; native session unverified |
 | Text selection and caret | Selection/caret structure and actions verified deterministically; native AX interaction unverified | Same AccessKit structure; native UIA interaction unverified | Same AccessKit structure; native AT-SPI interaction unverified |
-| Live-region updates | Polite Status and polite/assertive atomic Toast structure verified deterministically; VoiceOver speech/timing unverified | Same AccessKit structure; UIA announcement unverified | Same AccessKit structure; AT-SPI announcement unverified |
+| Live-region updates | Explicit polite/assertive atomic Toast create/update/removal verified deterministically; static Status is non-live; VoiceOver speech/timing unverified | Same AccessKit structure; UIA announcement unverified | Same AccessKit structure; AT-SPI announcement unverified |
 | GPUI overlays | Nodes rendered in the overlay enter the GPUI tree; native announcement and ordering unverified | Same boundary; native session unverified | Same boundary; native session unverified |
 | Native-child handoff | Not implemented | Not implemented | Not implemented |
 
@@ -88,13 +88,21 @@ evidence that a particular screen reader announces every property correctly.
 tree follows GPUI's rendered element nesting; no cross-tree labelled-by or
 reparenting claim is made. Editable controls publish UTF-8 character lengths,
 stable text runs, selection/caret positions, and `SetValue` and
-`SetTextSelection` actions. IME offsets are converted between UTF-8 and UTF-16,
-including surrogate pairs. Disabled and read-only fields omit value-changing
-actions; read-only fields retain selection actions. Password fields use the
-native password role but publish neither plaintext nor text runs. Status nodes
-default to polite updates; ordinary toasts are polite and danger toasts are
+`SetTextSelection` actions. AccessKit characters use the same Unicode grapheme
+boundaries as editing, including combining sequences and emoji ZWJ sequences.
+Hard line breaks remain in the preceding run, links never cross a hard line,
+and each run reports its first strong bidirectional direction with the current
+layout direction as fallback. IME offsets are converted between UTF-8 and
+UTF-16, including surrogate pairs. Disabled fields advertise no native focus,
+mutation, or selection actions; read-only fields remain focusable/selectable
+but non-mutating. Password fields use the native password role but publish
+neither plaintext nor text runs. Live regions are explicit opt-in: static
+Status nodes are not live, ordinary toasts are polite, and danger toasts are
 assertive, with the whole toast marked atomic. Announcement speech and timing,
-native caret geometry, and native child nodes remain separate platform work.
+shaped per-grapheme positions/widths and native caret geometry, and native child
+nodes remain separate platform work. AccessKit defines character geometry as
+optional; gpui-kit omits it rather than inventing measurements that are not yet
+available to the accessibility subtree callback.
 
 The deterministic smoke test activates GPUI's test accessibility adapter,
 renders a real element tree, and asserts role, name, value, range, control
@@ -105,8 +113,11 @@ states, selection, focus, and an inherited click action in
 cargo run -p xtask -- accessibility check
 ```
 
-That command opens the button scene and asks System Events for the AX roles,
-names, disabled state, and checked state. It fails honestly when Accessibility
-permission or an interactive user session is unavailable. VoiceOver speech,
-focus navigation, value/range adjustment, and announcement timing remain
-manual, unverified boundaries.
+That command opens the button and input scenes and asks System Events for AX
+roles, names, enabled/disabled state, checked state, AX-requested focus, and an
+editable value change. It fails honestly when Accessibility permission or an
+interactive user session is unavailable. Native text-selection mutation is not
+claimed: System Events did not provide a reliable selected-range round trip on
+this runner, while the real AccessKit action path is covered deterministically.
+VoiceOver speech, focus navigation order, value/range adjustment, selection,
+and announcement timing remain manual, unverified boundaries.

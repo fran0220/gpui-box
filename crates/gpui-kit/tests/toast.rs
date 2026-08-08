@@ -10,11 +10,35 @@ use gpui::{AppContext as _, Entity, Modifiers, MouseButton, TestAppContext, div,
 use gpui_kit::motion::Phase;
 use gpui_kit::overlay::toast;
 use gpui_kit::prelude::*;
-use gpui_kit_semantics::Role;
+use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_testkit::harness::Harness;
 
 /// Longer than any entry or exit animation in the bundled themes.
 const SETTLE: Duration = Duration::from_millis(400);
+
+#[gpui::test]
+fn a_static_status_is_not_a_live_region(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, cx| {
+        div()
+            .child("3 selected")
+            .semantic_in(
+                cx,
+                NodeSpec::new("selection.count", Role::Status).text("3 selected"),
+            )
+            .into_any_element()
+    });
+    let tree = harness.accessibility_tree();
+    let status = tree["nodes"]
+        .as_object()
+        .and_then(|nodes| {
+            nodes.values().find(|node| {
+                node["element_id"] == "Name(\"selection.count\")"
+                    && node["aria"]["role"] == "Status"
+            })
+        })
+        .expect("static native status");
+    assert!(status["aria"].get("live").is_none());
+}
 
 fn scene(cx: &mut TestAppContext, capacity: usize) -> (Harness, Entity<ToastLayer>) {
     let slot: Rc<RefCell<Option<Entity<ToastLayer>>>> = Rc::new(RefCell::new(None));
@@ -127,6 +151,42 @@ fn a_danger_toast_is_an_assertive_live_region(cx: &mut TestAppContext) {
         })
         .expect("assertive native status");
     assert_eq!(native["aria"]["live"], "Assertive");
+}
+
+#[gpui::test]
+fn updating_one_toast_updates_the_explicit_live_node(cx: &mut TestAppContext) {
+    let (mut harness, _layer) = scene(cx, 3);
+    assert!(push(
+        &mut harness,
+        Toast::new("run.progress", "Uploading one file")
+    ));
+    let before = harness.accessibility_tree();
+    let before = before["nodes"]
+        .as_object()
+        .and_then(|nodes| {
+            nodes.values().find(|node| {
+                node["element_id"] == "Name(\"run.progress\")" && node["aria"]["role"] == "Status"
+            })
+        })
+        .expect("initial explicit live node");
+    assert_eq!(before["aria"]["label"], "Uploading one file");
+    assert_eq!(before["aria"]["live"], "Polite");
+
+    assert!(push(
+        &mut harness,
+        Toast::new("run.progress", "Upload complete")
+    ));
+    let after = harness.accessibility_tree();
+    let after = after["nodes"]
+        .as_object()
+        .and_then(|nodes| {
+            nodes.values().find(|node| {
+                node["element_id"] == "Name(\"run.progress\")" && node["aria"]["role"] == "Status"
+            })
+        })
+        .expect("updated explicit live node");
+    assert_eq!(after["aria"]["label"], "Upload complete");
+    assert_eq!(after["aria"]["live"], "Polite");
 }
 
 #[gpui::test]
