@@ -1,0 +1,76 @@
+[
+  {
+    "name": "search_components",
+    "description": "Find components by name, summary, or module. Returns each match with its kind, path, one-line summary, and the scenes that render it. Start here.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Words to match, or empty for everything"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["builder", "view"],
+          "description": "Optional: builders mount in one expression, views are held in an Entity"
+        }
+      },
+      "required": ["query"]
+    }
+  },
+  {
+    "name": "component",
+    "description": "The exact public API of one component: constructors, chainable options, commands that need a Context, queries, the events it reports, and its scenes. These signatures are generated from the source, so prefer them over recall.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Component name, such as Badge or DataGrid"
+        }
+      },
+      "required": ["name"]
+    }
+  },
+  {
+    "name": "scene",
+    "description": "The source of one canonical scene. This code compiles and renders inside the repository's gate, so it is a verified example rather than a written one.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Scene name, such as badge or data-grid"
+        }
+      },
+      "required": ["name"]
+    }
+  },
+  {
+    "name": "render_scene",
+    "description": "The image of a scene, in one theme. Use it to check what something actually looks like instead of assuming. A still frame holds a repeating animation at its first frame, so review motion by running the gallery.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Scene name"
+        },
+        "theme": {
+          "type": "string",
+          "enum": ["studio-dark", "studio-light"],
+          "description": "Defaults to studio-dark"
+        }
+      },
+      "required": ["name"]
+    }
+  },
+  {
+    "name": "rules",
+    "description": "The conventions this repository enforces through its gate: no literal strings in components, no hard-coded visual values, truthful states, stable semantic ids. Read this before writing a component.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  }
+]

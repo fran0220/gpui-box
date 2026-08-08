@@ -238,6 +238,16 @@ need more than a line. When this workspace changes its GPUI revision, your
 application has to change it in the same commit, because the two have to match
 exactly.
 
+## The catalog, without a checkout
+
+<https://gpui-kit.zhangfan0220.workers.dev> is every component with its exact
+signatures, every scene with the code that drew it, and both captured themes.
+The same address serves an MCP endpoint at `/mcp`, so an agent can search the
+catalog, read a signature and look at a component in one call each. It is one
+Cloudflare Worker over static assets and needs no server, because the scene set
+is fixed and its captures are deterministic — see
+[`docs/deploying.md`](docs/deploying.md).
+
 ## Validation
 
 ```bash

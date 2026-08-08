@@ -1,0 +1,26 @@
+# One Worker serves the site and the MCP endpoint, because they are the same
+# catalog answered twice: `/` for a person, `/mcp` for an agent. Two
+# deployments would let the two drift apart in a way the gate could not see.
+#
+# `public/` is generated, never committed:
+#
+#   cargo run -p xtask -- site generate tools/site/public
+#   cp tools/mcp/tools.json tools/site/worker/tools.json
+#   npx wrangler deploy
+#
+# `tools/site/deploy.sh` does all three, which is the supported way to do it.
+
+name = "gpui-kit"
+main = "worker/index.js"
+compatibility_date = "2025-08-01"
+
+[assets]
+directory = "public"
+binding = "ASSETS"
+# The site's own 404 rather than the Worker's, and a page for a path that was
+# written without `.html`.
+not_found_handling = "404-page"
+html_handling = "auto-trailing-slash"
+
+[observability]
+enabled = true

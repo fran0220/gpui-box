@@ -88,11 +88,15 @@ baseline, in `tools/headless-visual`.
 
 ## If you can call tools
 
-`tools/mcp` serves this catalog over the Model Context Protocol:
+The catalog is hosted at <https://gpui-kit.zhangfan0220.workers.dev>, with an
+MCP endpoint at `/mcp` that needs no checkout, and `tools/mcp` serves the same
+thing from a working copy over stdio. Both expose
 `search_components`, `component`, `scene`, `render_scene` and `rules`. It is
 the same facts as the files above, reached in one call instead of a guess about
-which path to open, and `render_scene` returns the actual image. See
-[docs/mcp.md](mcp.md).
+which path to open, and `render_scene` returns the actual image. The hosted one
+serves the published revision; the local one renders the code as it currently
+stands, so it can show a component you are changing. See [docs/mcp.md](mcp.md)
+and [docs/deploying.md](deploying.md).
 
 ## Writing against it
 
@@ -131,6 +135,8 @@ Do not hand-edit any of these. Each has a `check` that fails when it drifts.
 - [docs/host-view-boundary.md](host-view-boundary.md) — what belongs to the host
 - [docs/abi-vocabulary.md](abi-vocabulary.md) — what a serialized plugin vocabulary would take
 - [docs/screenshot-testing.md](screenshot-testing.md) — how captures stay reproducible
+- [docs/deploying.md](deploying.md) — the site and the hosted catalog
+- [docs/releasing.md](releasing.md) — what a release is here
 - [docs/gpui-recipes.md](gpui-recipes.md) — GPUI patterns this library relies on
 
 ## Boundaries

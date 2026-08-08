@@ -3,3 +3,7 @@
 .DS_Store
 /snapshots/**/*.actual.png
 /snapshots/**/*.diff.png
+tools/site/public/
+tools/site/worker/tools.json
+tools/site/.wrangler/
+/.wrangler/

@@ -243,6 +243,15 @@ and `xtask gate [full]`. `scenes check` is the visual regression gate; see
   is the entry point, and `tools/mcp` serves the same catalog as Model Context
   Protocol tools, one of which renders a scene and returns the image so a
   caller can look at a component rather than read a description of it.
+- The catalog is published. `xtask site generate` builds a static site out of
+  the same index, the same scene sources and the same captured images the gate
+  checks, styled from the token document the components read, and one
+  Cloudflare Worker serves it alongside an MCP endpoint at `/mcp`. It needs no
+  host: `render_scene` can only ever draw catalog scenes, the catalog is 82
+  scenes in two themes, and captures here are deterministic, so the bytes a
+  hosted renderer would produce are the bytes already committed. The hosted
+  server therefore serves the published revision and says so, while the local
+  stdio server renders the working tree and can show a component being changed.
 - The token documents moved to `crates/gpui-kit-tokens/tokens/`. A package may
   only carry files under its own directory, so `include_str!` reaching up to a
   repository-root `tokens/` meant the one crate in this workspace that does not

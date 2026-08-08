@@ -83,11 +83,12 @@ fn dispatch(root: &Path, method: &str, params: &Value) -> Result<Value> {
             "protocolVersion": PROTOCOL,
             "capabilities": { "tools": {} },
             "serverInfo": { "name": "gpui-kit", "version": env!("CARGO_PKG_VERSION") },
-            "instructions": "The gpui-kit component catalog. Call search_components \
-                             to find a component, component to read its exact \
-                             signatures, and render_scene to see one drawn. Prefer \
-                             these over recall: the index is generated from the \
-                             source and the image is the real renderer's output."
+            "instructions": "The gpui-kit component catalog, served from a working \
+                             copy of the repository. Signatures come from an index \
+                             generated out of the source, and render_scene draws the \
+                             scene now, from the code as it currently stands — so it \
+                             shows a component you are in the middle of changing. \
+                             Prefer these over recall."
         })),
         "tools/list" => Ok(json!({ "tools": tools() })),
         "tools/call" => call(root, params),
@@ -96,72 +97,12 @@ fn dispatch(root: &Path, method: &str, params: &Value) -> Result<Value> {
     }
 }
 
+/// The tool surface, shared with the hosted server so the two cannot describe
+/// the same tool differently. What each one *serves* differs, and that is said
+/// in `initialize` rather than smuggled into a description.
 fn tools() -> Value {
-    json!([
-        {
-            "name": "search_components",
-            "description": "Find components by name, summary, or module. Returns \
-                            each match with its kind, path, one-line summary, and \
-                            the scenes that render it. Start here.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "query": { "type": "string", "description": "Words to match, or empty for everything" },
-                    "kind": { "type": "string", "enum": ["builder", "view"], "description": "Optional: builders mount in one expression, views are held in an Entity" }
-                },
-                "required": ["query"]
-            }
-        },
-        {
-            "name": "component",
-            "description": "The exact public API of one component: constructors, \
-                            chainable options, commands that need a Context, \
-                            queries, the events it reports, and its scenes. These \
-                            signatures are generated from the source, so prefer \
-                            them over recall.",
-            "inputSchema": {
-                "type": "object",
-                "properties": { "name": { "type": "string", "description": "Component name, such as Badge or DataGrid" } },
-                "required": ["name"]
-            }
-        },
-        {
-            "name": "scene",
-            "description": "The source of one canonical scene. This code compiles \
-                            and renders inside the repository's gate, so it is a \
-                            verified example rather than a written one.",
-            "inputSchema": {
-                "type": "object",
-                "properties": { "name": { "type": "string", "description": "Scene name, such as badge or data-grid" } },
-                "required": ["name"]
-            }
-        },
-        {
-            "name": "render_scene",
-            "description": "Draw a scene with the real renderer and return the \
-                            image. Use it to check what something actually looks \
-                            like instead of assuming. Takes tens of seconds on a \
-                            cold build.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "name": { "type": "string", "description": "Scene name" },
-                    "theme": { "type": "string", "enum": ["studio-dark", "studio-light"], "description": "Defaults to studio-dark" }
-                },
-                "required": ["name"]
-            }
-        },
-        {
-            "name": "rules",
-            "description": "The conventions this repository enforces through its \
-                            gate: no literal strings in components, no hard-coded \
-                            visual values, truthful states, stable semantic ids. \
-                            Read this before writing a component.",
-            "inputSchema": { "type": "object", "properties": {} }
-        }
-    ])
+    serde_json::from_str(include_str!("../tools.json")).expect("the tool list is valid JSON")
 }
-
 fn call(root: &Path, params: &Value) -> Result<Value> {
     let name = params
         .get("name")
