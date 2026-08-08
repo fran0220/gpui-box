@@ -14,6 +14,7 @@ fixtures = []
 
 [dependencies]
 unicode-segmentation.workspace = true
+unicode-bidi.workspace = true
 gpui.workspace = true
 gpui-kit-assets.workspace = true
 gpui-kit-semantics.workspace = true

@@ -247,7 +247,7 @@ fn the_area_grows_with_the_text_up_to_its_limit(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn multiline_text_reaches_the_accesskit_text_pattern(cx: &mut TestAppContext) {
-    let (mut harness, _slot) = area(cx, |area| area.text("first\n😀"));
+    let (mut harness, slot) = area(cx, |area| area.text("e\u{301}👩‍💻\nאב"));
     let tree = harness.accessibility_tree();
     let nodes = tree["nodes"].as_object().expect("nodes");
     let field = nodes
@@ -261,7 +261,66 @@ fn multiline_text_reaches_the_accesskit_text_pattern(cx: &mut TestAppContext) {
     let actions = field["aria"]["on_action"].as_array().expect("actions");
     assert!(actions.iter().any(|action| action == "SetValue"));
     assert!(actions.iter().any(|action| action == "SetTextSelection"));
-    let run_id = field["children"][0].as_str().expect("text run id");
-    assert_eq!(nodes[run_id]["aria"]["role"], "TextRun");
-    assert_eq!(nodes[run_id]["aria"]["value"], "first\n😀");
+    let first_run_id = field["children"][0].as_str().expect("first text run id");
+    let second_run_id = field["children"][1].as_str().expect("second text run id");
+    let first_run = &nodes[first_run_id];
+    let second_run = &nodes[second_run_id];
+    assert_eq!(first_run["aria"]["role"], "TextRun");
+    assert_eq!(first_run["aria"]["value"], "e\u{301}👩‍💻\n");
+    assert_eq!(first_run["aria"]["character_lengths"][0], 3);
+    assert_eq!(first_run["aria"]["character_lengths"][1], 11);
+    assert_eq!(first_run["aria"]["character_lengths"][2], 1);
+    assert_eq!(first_run["aria"]["text_direction"], "LeftToRight");
+    assert!(first_run["aria"].get("next_on_line").is_none());
+    assert_eq!(second_run["aria"]["value"], "אב");
+    assert_eq!(second_run["aria"]["text_direction"], "RightToLeft");
+    assert!(second_run["aria"].get("previous_on_line").is_none());
+
+    let field_id = gpui::accesskit::NodeId(
+        field["accesskit_id"]
+            .as_str()
+            .expect("field node id")
+            .parse()
+            .expect("numeric field id"),
+    );
+    let first_node_id = gpui::accesskit::NodeId(
+        first_run["accesskit_id"]
+            .as_str()
+            .expect("first run node id")
+            .parse()
+            .expect("numeric first run id"),
+    );
+    let second_node_id = gpui::accesskit::NodeId(
+        second_run["accesskit_id"]
+            .as_str()
+            .expect("second run node id")
+            .parse()
+            .expect("numeric second run id"),
+    );
+    let window = harness.window();
+    harness.context().dispatch_accessibility_action(
+        window,
+        gpui::accesskit::ActionRequest {
+            action: gpui::accesskit::Action::SetTextSelection,
+            target_tree: gpui::accesskit::TreeId::ROOT,
+            target_node: field_id,
+            data: Some(gpui::accesskit::ActionData::SetTextSelection(
+                gpui::accesskit::TextSelection {
+                    anchor: gpui::accesskit::TextPosition {
+                        node: first_node_id,
+                        character_index: 1,
+                    },
+                    focus: gpui::accesskit::TextPosition {
+                        node: second_node_id,
+                        character_index: 1,
+                    },
+                },
+            )),
+        },
+    );
+    let entity = slot.borrow().clone().expect("area entity");
+    assert_eq!(
+        harness.update(|_, cx| entity.read(cx).selected_range()),
+        3..17
+    );
 }

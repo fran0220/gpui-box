@@ -84,16 +84,16 @@ fn accessibility_check() -> Result<()> {
         };
 
         for expected in [
-            "Primary|AXButton|true|",
-            "Unavailable|AXButton|false|",
-            "Saving|AXButton|false|",
-            "Selected|AXCheckBox|true|true",
+            "Primary|AXButton|true||true",
+            "Unavailable|AXButton|false||false",
+            "Saving|AXButton|false||false",
+            "Selected|AXCheckBox|true|true|false",
         ] {
             if !output.lines().any(|line| line.trim() == expected) {
                 bail!("macOS AX tree is missing `{expected}`; received:\n{output}");
             }
         }
-        println!("macOS AX roles, names, disabled state, and checked state match");
+        println!("macOS AX roles, names, disabled state, checked state, and requested focus match");
         Ok(())
     })();
 
@@ -106,6 +106,58 @@ fn accessibility_check() -> Result<()> {
         gallery
             .wait()
             .context("reap the accessibility smoke gallery")?;
+        Ok(())
+    })();
+    result.and(cleanup)?;
+    editable_accessibility_check()
+}
+
+#[cfg(target_os = "macos")]
+fn editable_accessibility_check() -> Result<()> {
+    let executable = root().join("target/debug/gpui-kit-gallery");
+    let mut gallery = Command::new(&executable)
+        .args(["--scene", "input", "--theme", "studio-light"])
+        .current_dir(root())
+        .spawn()
+        .context("launch the editable macOS accessibility smoke gallery")?;
+
+    let result = (|| {
+        let deadline = Instant::now() + Duration::from_secs(15);
+        let output = loop {
+            let script = AX_EDITABLE_SCRIPT.replace("__PID__", &gallery.id().to_string());
+            let output = osascript(&script).unwrap_or_default();
+            if output.contains("Email|AXTextField|true|edited@example.com|true") {
+                break output;
+            }
+            if Instant::now() >= deadline {
+                bail!("the input scene did not expose an editable macOS AX tree within 15 seconds");
+            }
+            thread::sleep(Duration::from_millis(250));
+        };
+        for expected in [
+            "API token|AXTextField|true||false",
+            "Read only|AXTextField|false|read only|false",
+            "Email|AXTextField|true|edited@example.com|true",
+        ] {
+            if !output.lines().any(|line| line.trim() == expected) {
+                bail!("macOS editable AX tree is missing `{expected}`; received:\n{output}");
+            }
+        }
+        println!(
+            "macOS AX editable names, values, enabled state, requested focus, and editing match"
+        );
+        Ok(())
+    })();
+
+    let cleanup = (|| {
+        if gallery.try_wait()?.is_none() {
+            gallery
+                .kill()
+                .context("stop the editable accessibility smoke gallery")?;
+        }
+        gallery
+            .wait()
+            .context("reap the editable accessibility smoke gallery")?;
         Ok(())
     })();
     result.and(cleanup)
@@ -163,7 +215,46 @@ tell application "System Events"
         if itemName is "Primary" or itemName is "Unavailable" or itemName is "Saving" or itemName is "Selected" then
           set itemValue to ""
           if itemName is "Selected" then set itemValue to value of itemRef as text
-          set output to output & itemName & "|" & (role of itemRef as text) & "|" & (enabled of itemRef as text) & "|" & itemValue & linefeed
+          if itemName is "Primary" then
+            set focused of itemRef to true
+            delay 0.1
+          end if
+          set output to output & itemName & "|" & (role of itemRef as text) & "|" & (enabled of itemRef as text) & "|" & itemValue & "|" & (focused of itemRef as text) & linefeed
+        end if
+      end try
+    end repeat
+    return output
+  end tell
+  end timeout
+end tell
+"#;
+
+#[cfg(target_os = "macos")]
+const AX_EDITABLE_SCRIPT: &str = r#"
+tell application "System Events"
+  with timeout of 5 seconds
+  set matches to every process whose unix id is __PID__
+  if (count of matches) is 0 then return ""
+  tell first item of matches
+    set frontmost to true
+    set axItems to entire contents of window 1
+    set output to ""
+    repeat with itemRef in axItems
+      try
+        set itemName to name of itemRef as text
+        if itemName is "API token" or itemName is "Read only" or itemName is "Email" then
+          if itemName is "Email" then
+            set focused of itemRef to true
+            delay 0.1
+            set value of itemRef to "edited@example.com"
+            delay 0.1
+          end if
+          set itemValue to ""
+          try
+            set itemValue to value of itemRef as text
+            if itemValue is "missing value" then set itemValue to ""
+          end try
+          set output to output & itemName & "|" & (role of itemRef as text) & "|" & (enabled of itemRef as text) & "|" & itemValue & "|" & (focused of itemRef as text) & linefeed
         end if
       end try
     end repeat

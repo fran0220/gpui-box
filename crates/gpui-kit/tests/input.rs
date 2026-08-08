@@ -276,6 +276,28 @@ fn password_and_read_only_native_contracts_are_explicit(cx: &mut TestAppContext)
         .expect("selection action");
     assert!(actions.iter().any(|action| action == "SetTextSelection"));
     assert!(!actions.iter().any(|action| action == "SetValue"));
+
+    let (mut disabled, _slot) = input(cx, |input| input.text("held").disabled(true));
+    let tree = disabled.accessibility_tree();
+    let field = tree["nodes"]
+        .as_object()
+        .and_then(|nodes| {
+            nodes.values().find(|node| {
+                node["element_id"] == "Name(\"form.token\")" && node["aria"]["role"] == "TextInput"
+            })
+        })
+        .expect("native disabled input");
+    assert_eq!(field["aria"]["disabled"], true);
+    let actions = field["aria"]["on_action"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    for unsupported in ["Focus", "SetValue", "SetTextSelection"] {
+        assert!(
+            !actions.iter().any(|action| action == unsupported),
+            "disabled input advertised {unsupported}"
+        );
+    }
 }
 
 fn _unused(_: &mut Window, _: &mut App) {}

@@ -2182,16 +2182,19 @@ fn ensure_inputs(window: &mut Window, cx: &mut App) {
         let inputs = SceneInputs {
             token: cx.new(|cx| {
                 TextInput::new("scene.input.token", window, cx)
+                    .name("API token")
                     .placeholder("sk-...")
                     .secret(true)
             }),
             disabled: cx.new(|cx| {
                 TextInput::new("scene.input.disabled", window, cx)
+                    .name("Read only")
                     .text("read only")
                     .disabled(true)
             }),
             invalid: cx.new(|cx| {
                 TextInput::new("scene.input.invalid", window, cx)
+                    .name("Email")
                     .text("not an email")
                     .invalid(true)
                     .required(true)

@@ -43,7 +43,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius};
 
 use crate::controls::text_edit;
-use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
+use crate::foundation::{ActiveDirection, Disableable, Ident, Sizable, StyledExt};
 use element::TextAreaElement;
 use layout::Layout;
 
@@ -768,8 +768,10 @@ impl TextArea {
             .disabled(self.disabled)
             .read_only(self.read_only)
             .invalid(self.invalid)
-            .required(self.required)
-            .focus(&self.focus_handle);
+            .required(self.required);
+        if !self.disabled {
+            spec = spec.focus(&self.focus_handle);
+        }
         if !self.placeholder.is_empty() {
             spec = spec.placeholder(self.placeholder.clone());
         }
@@ -968,11 +970,18 @@ impl Render for TextArea {
         };
         let accessible_run_ids = self.accessible_run_ids.clone();
         let entity = cx.entity().clone();
+        let accessible_direction = if cx.layout_direction().is_rtl() {
+            gpui::accesskit::TextDirection::RightToLeft
+        } else {
+            gpui::accesskit::TextDirection::LeftToRight
+        };
 
         div()
             .id(self.ident.element_id())
             .key_context(KEY_CONTEXT)
-            .track_focus(&self.focus_handle)
+            .when(!self.disabled, |element| {
+                element.track_focus(&self.focus_handle)
+            })
             .when(!self.disabled && !self.read_only, |element| {
                 element
                     .on_action(cx.listener(Self::backspace))
@@ -1015,7 +1024,13 @@ impl Render for TextArea {
                     .cursor(CursorStyle::IBeam)
             })
             .a11y_synthetic_children(move |builder| {
-                let ids = text_edit::publish_accessible_text(builder, &content, anchor, focus);
+                let ids = text_edit::publish_accessible_text(
+                    builder,
+                    &content,
+                    anchor,
+                    focus,
+                    accessible_direction,
+                );
                 *accessible_run_ids
                     .lock()
                     .unwrap_or_else(|poisoned| poisoned.into_inner()) = ids;
