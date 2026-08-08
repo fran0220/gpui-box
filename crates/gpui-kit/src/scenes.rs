@@ -2190,7 +2190,7 @@ fn ensure_inputs(window: &mut Window, cx: &mut App) {
             disabled: cx.new(|cx| {
                 TextInput::new("scene.input.disabled", window, cx)
                     .name("Disabled")
-                    .text("disabled")
+                    .text("read only")
                     .disabled(true)
             }),
             invalid: cx.new(|cx| {

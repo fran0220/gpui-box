@@ -136,7 +136,7 @@ fn editable_accessibility_check() -> Result<()> {
         };
         for expected in [
             "API token|AXTextField|true||false",
-            "Disabled|AXTextField|false|disabled|false",
+            "Disabled|AXTextField|false|read only|false",
             "Email|AXTextField|true|edited@example.com|true",
         ] {
             if !output.lines().any(|line| line.trim() == expected) {
