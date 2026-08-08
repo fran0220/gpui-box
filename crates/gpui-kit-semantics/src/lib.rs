@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use gpui::{
     App, Bounds, FocusHandle, Global, InteractiveElement, IntoElement, ParentElement, Pixels,
-    SharedString, StatefulInteractiveElement, Styled, Toggled, canvas, div,
+    SharedString, StatefulInteractiveElement, Styled, Toggled, canvas,
 };
 use serde::{Deserialize, Serialize};
 
@@ -27,6 +27,8 @@ pub enum Role {
     Tab,
     TabPanel,
     Input,
+    MultilineInput,
+    PasswordInput,
     Text,
     Heading,
     Dialog,
@@ -45,6 +47,7 @@ pub enum Role {
     Toast,
     Tooltip,
     Separator,
+    Splitter,
     Toolbar,
     Scrollbar,
     Combobox,
@@ -101,6 +104,8 @@ pub struct Node {
     pub visible: bool,
     pub focused: bool,
     pub disabled: bool,
+    #[serde(skip_serializing_if = "is_false")]
+    pub read_only: bool,
     pub selected: bool,
     pub hovered: bool,
     pub pressed: bool,
@@ -302,6 +307,7 @@ pub struct NodeSpec {
     text: Option<SharedString>,
     focus: Option<FocusHandle>,
     disabled: bool,
+    read_only: bool,
     selected: bool,
     hovered: bool,
     pressed: bool,
@@ -310,6 +316,7 @@ pub struct NodeSpec {
     value: Option<SharedString>,
     placeholder: Option<SharedString>,
     range: Option<(f32, f32, f32)>,
+    orientation: Option<gpui::accesskit::Orientation>,
     level: Option<u32>,
     busy: bool,
     invalid: bool,
@@ -326,6 +333,7 @@ impl NodeSpec {
             text: None,
             focus: None,
             disabled: false,
+            read_only: false,
             selected: false,
             hovered: false,
             pressed: false,
@@ -334,6 +342,7 @@ impl NodeSpec {
             value: None,
             placeholder: None,
             range: None,
+            orientation: None,
             level: None,
             busy: false,
             invalid: false,
@@ -372,6 +381,11 @@ impl NodeSpec {
 
     pub fn range(mut self, min: f32, max: f32, now: f32) -> Self {
         self.range = Some((min, max, now));
+        self
+    }
+
+    pub fn orientation(mut self, orientation: gpui::accesskit::Orientation) -> Self {
+        self.orientation = Some(orientation);
         self
     }
 
@@ -424,6 +438,11 @@ impl NodeSpec {
         self
     }
 
+    pub fn read_only(mut self, read_only: bool) -> Self {
+        self.read_only = read_only;
+        self
+    }
+
     pub fn selected(mut self, selected: bool) -> Self {
         self.selected = selected;
         self
@@ -453,32 +472,42 @@ pub fn install(cx: &mut App) {
 }
 
 pub trait Semantic: Sized {
-    fn semantic(self, registry: &SemanticRegistry, spec: NodeSpec) -> Self;
+    type Output;
+
+    fn semantic(self, registry: &SemanticRegistry, spec: NodeSpec) -> Self::Output;
 
     /// Registers into the global registry when installed. Platform
     /// accessibility remains active when a host opts out of test semantics.
-    fn semantic_in(self, cx: &App, spec: NodeSpec) -> Self;
+    fn semantic_in(self, cx: &App, spec: NodeSpec) -> Self::Output;
 }
 
 impl Semantic for gpui::Div {
-    fn semantic(mut self, registry: &SemanticRegistry, spec: NodeSpec) -> Self {
-        if self.style().position.is_none() {
-            self = self.relative();
+    type Output = gpui::Stateful<gpui::Div>;
+
+    fn semantic(self, registry: &SemanticRegistry, spec: NodeSpec) -> Self::Output {
+        let mut self_ = self.id(spec.id.clone());
+        if self_.style().position.is_none() {
+            self_ = self_.relative();
         }
-        self.child(accessible_probe(Some(registry), spec))
+        self_ = platform_accessible(self_, &spec);
+        self_.child(diagnostic_probe(Some(registry), spec))
     }
 
-    fn semantic_in(mut self, cx: &App, spec: NodeSpec) -> Self {
-        if self.style().position.is_none() {
-            self = self.relative();
+    fn semantic_in(self, cx: &App, spec: NodeSpec) -> Self::Output {
+        let mut self_ = self.id(spec.id.clone());
+        if self_.style().position.is_none() {
+            self_ = self_.relative();
         }
+        self_ = platform_accessible(self_, &spec);
         let registry = SemanticRegistry::try_global(cx);
-        self.child(accessible_probe(registry.as_ref(), spec))
+        self_.child(diagnostic_probe(registry.as_ref(), spec))
     }
 }
 
 impl Semantic for gpui::Stateful<gpui::Div> {
-    fn semantic(mut self, registry: &SemanticRegistry, spec: NodeSpec) -> Self {
+    type Output = Self;
+
+    fn semantic(mut self, registry: &SemanticRegistry, spec: NodeSpec) -> Self::Output {
         if self.style().position.is_none() {
             self = self.relative();
         }
@@ -486,7 +515,7 @@ impl Semantic for gpui::Stateful<gpui::Div> {
         self.child(diagnostic_probe(Some(registry), spec))
     }
 
-    fn semantic_in(mut self, cx: &App, spec: NodeSpec) -> Self {
+    fn semantic_in(mut self, cx: &App, spec: NodeSpec) -> Self::Output {
         if self.style().position.is_none() {
             self = self.relative();
         }
@@ -500,7 +529,17 @@ fn platform_accessible<E>(mut element: E, spec: &NodeSpec) -> E
 where
     E: StatefulInteractiveElement,
 {
-    element = element.role(platform_role(spec.role));
+    let expected = gpui::ElementId::Name(spec.id.clone());
+    let actual = element.interactivity().element_id.as_ref();
+    assert_eq!(
+        actual,
+        Some(&expected),
+        "semantic and GPUI element ids must match"
+    );
+    let Some(role) = platform_role(spec.role) else {
+        return element;
+    };
+    element = element.role(role);
     if let Some(text) = &spec.text {
         element = element.aria_label(redact_sensitive_text(text));
     }
@@ -532,11 +571,15 @@ where
             .aria_max_numeric_value(max.into())
             .aria_numeric_value(now.into());
     }
+    if let Some(orientation) = spec.orientation {
+        element = element.aria_orientation(orientation);
+    }
     if let Some(level) = spec.level {
         element = element.aria_level(level as usize);
     }
     element
         .aria_disabled(spec.disabled)
+        .aria_read_only(spec.read_only)
         .aria_invalid(spec.invalid)
         .aria_required(spec.required)
         .aria_busy(spec.busy)
@@ -549,8 +592,8 @@ fn supports_selection(role: Role) -> bool {
     )
 }
 
-fn platform_role(role: Role) -> gpui::Role {
-    match role {
+fn platform_role(role: Role) -> Option<gpui::Role> {
+    Some(match role {
         Role::Window => gpui::Role::Window,
         Role::Region => gpui::Role::Region,
         Role::Group | Role::Field | Role::Drag => gpui::Role::Group,
@@ -561,6 +604,8 @@ fn platform_role(role: Role) -> gpui::Role {
         Role::Tab => gpui::Role::Tab,
         Role::TabPanel => gpui::Role::TabPanel,
         Role::Input => gpui::Role::TextInput,
+        Role::MultilineInput => gpui::Role::MultilineTextInput,
+        Role::PasswordInput => gpui::Role::PasswordInput,
         Role::Text => gpui::Role::Label,
         Role::Heading => gpui::Role::Heading,
         Role::Dialog => gpui::Role::Dialog,
@@ -577,19 +622,15 @@ fn platform_role(role: Role) -> gpui::Role {
         Role::TreeItem => gpui::Role::TreeItem,
         Role::Progress => gpui::Role::ProgressIndicator,
         Role::Tooltip => gpui::Role::Tooltip,
-        Role::Separator => gpui::Role::Splitter,
+        Role::Separator => return None,
+        Role::Splitter => gpui::Role::Splitter,
         Role::Toolbar => gpui::Role::Toolbar,
         Role::Scrollbar => gpui::Role::ScrollBar,
         Role::Combobox => gpui::Role::ComboBox,
         Role::Option => gpui::Role::ListBoxOption,
         Role::Form => gpui::Role::Form,
         Role::Image => gpui::Role::Image,
-    }
-}
-
-fn accessible_probe(registry: Option<&SemanticRegistry>, spec: NodeSpec) -> impl IntoElement {
-    let element = div().id(spec.id.clone()).absolute().inset_0();
-    platform_accessible(element, &spec).child(diagnostic_probe(registry, spec))
+    })
 }
 
 fn diagnostic_probe(registry: Option<&SemanticRegistry>, spec: NodeSpec) -> impl IntoElement {
@@ -618,6 +659,7 @@ fn diagnostic_probe(registry: Option<&SemanticRegistry>, spec: NodeSpec) -> impl
                     .as_ref()
                     .is_some_and(|handle| handle.is_focused(window)),
                 disabled: spec.disabled,
+                read_only: spec.read_only,
                 selected: spec.selected,
                 hovered: spec.hovered,
                 pressed: spec.pressed,
@@ -674,6 +716,8 @@ mod tests {
     use gpui::{
         AnyWindowHandle, AppContext as _, Context, Render, TestAppContext, Window, div, px,
     };
+    use std::cell::Cell;
+    use std::rc::Rc;
 
     fn node(id: &str, parent: Option<&str>) -> Node {
         Node {
@@ -843,6 +887,7 @@ mod tests {
 
     struct PlatformTreeFixture {
         focus: FocusHandle,
+        clicks: Rc<Cell<usize>>,
     }
 
     impl Render for PlatformTreeFixture {
@@ -864,16 +909,21 @@ mod tests {
                 )
                 .child(
                     div()
-                        .id("choice")
-                        .on_click(|_, _, _| {})
-                        .w(px(100.0))
-                        .h(px(24.0))
-                        .semantic_in(
-                            cx,
-                            NodeSpec::new("choice", Role::Checkbox)
-                                .text("Use system setting")
-                                .checked(true),
-                        ),
+                        .child({
+                            let clicks = self.clicks.clone();
+                            div()
+                                .id("choice")
+                                .on_click(move |_, _, _| clicks.set(clicks.get() + 1))
+                                .w(px(100.0))
+                                .h(px(24.0))
+                                .semantic_in(
+                                    cx,
+                                    NodeSpec::new("choice", Role::Checkbox)
+                                        .text("Use system setting")
+                                        .checked(true),
+                                )
+                        })
+                        .semantic_in(cx, NodeSpec::new("settings", Role::Group).text("Settings")),
                 )
                 .child(
                     div().w(px(100.0)).h(px(24.0)).semantic_in(
@@ -888,10 +938,15 @@ mod tests {
 
     #[gpui::test]
     fn semantics_reach_the_deterministic_platform_tree(cx: &mut TestAppContext) {
+        let clicks = Rc::new(Cell::new(0));
+        let fixture_clicks = clicks.clone();
         let window = cx.add_window(|window, cx| {
             let focus = cx.focus_handle();
             window.focus(&focus, cx);
-            PlatformTreeFixture { focus }
+            PlatformTreeFixture {
+                focus,
+                clicks: fixture_clicks,
+            }
         });
         let window = AnyWindowHandle::from(window);
 
@@ -930,16 +985,38 @@ mod tests {
 
         let nodes = tree["nodes"].as_object().expect("nodes object");
         let choice = nodes
-            .values()
-            .find(|node| node["aria"]["label"] == "Use system setting")
+            .iter()
+            .find(|(_, node)| node["aria"]["label"] == "Use system setting")
             .expect("stateful checkbox node");
-        assert_eq!(choice["aria"]["role"], "CheckBox");
-        assert_eq!(choice["aria"]["toggled"], "True");
+        assert_eq!(choice.1["aria"]["role"], "CheckBox");
+        assert_eq!(choice.1["aria"]["toggled"], "True");
         assert!(
-            choice["aria"]["on_action"]
+            choice.1["aria"]["on_action"]
                 .as_array()
                 .is_some_and(|actions| actions.iter().any(|action| action == "Click"))
         );
+        let settings = nodes
+            .iter()
+            .find(|(_, node)| node["aria"]["label"] == "Settings")
+            .expect("plain semantic parent is a platform node");
+        assert_eq!(settings.1["children"][0], choice.0.as_str());
+
+        cx.dispatch_accessibility_action(
+            window,
+            gpui::accesskit::ActionRequest {
+                action: gpui::accesskit::Action::Click,
+                target_tree: gpui::accesskit::TreeId::ROOT,
+                target_node: gpui::accesskit::NodeId(
+                    choice.1["accesskit_id"]
+                        .as_str()
+                        .expect("raw AccessKit node id")
+                        .parse()
+                        .expect("numeric node id"),
+                ),
+                data: None,
+            },
+        );
+        assert_eq!(clicks.get(), 1);
 
         let option = nodes
             .values()
@@ -947,5 +1024,12 @@ mod tests {
             .expect("selected option node");
         assert_eq!(option["aria"]["role"], "ListBoxOption");
         assert_eq!(option["aria"]["selected"], true);
+    }
+
+    #[test]
+    #[should_panic(expected = "semantic and GPUI element ids must match")]
+    fn stateful_semantics_reject_mismatched_identity() {
+        let element = div().id("actual");
+        let _ = platform_accessible(element, &NodeSpec::new("claimed", Role::Button));
     }
 }

@@ -48,31 +48,35 @@ impl RenderOnce for Kbd {
         let published = self.ident.as_ref().map(|ident| {
             NodeSpec::new(ident.semantic_id(), Role::Text).text(self.keystroke.clone())
         });
-        div()
-            .row()
-            .gap(px(theme.spacing.xs / 2.0))
-            .children(self.caps(cx).into_iter().map(|cap| {
-                div()
-                    .h(px(theme
-                        .control
-                        .get(gpui_kit_theme::ControlSize::Sm)
-                        .height))
-                    .min_w(px(theme
-                        .control
-                        .get(gpui_kit_theme::ControlSize::Sm)
-                        .height))
-                    .px(px(theme.spacing.xs))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .radius(&theme, gpui_kit_theme::Radius::Small)
-                    .bg(theme.colors.hover)
-                    .font_family(theme.typography.mono.clone())
-                    .text_size(px(theme.typography.caption.size))
-                    .text_color(theme.colors.text_muted)
-                    .child(cap)
-            }))
-            .when_some(published, |element, spec| element.semantic_in(cx, spec))
+        let element =
+            div()
+                .row()
+                .gap(px(theme.spacing.xs / 2.0))
+                .children(self.caps(cx).into_iter().map(|cap| {
+                    div()
+                        .h(px(theme
+                            .control
+                            .get(gpui_kit_theme::ControlSize::Sm)
+                            .height))
+                        .min_w(px(theme
+                            .control
+                            .get(gpui_kit_theme::ControlSize::Sm)
+                            .height))
+                        .px(px(theme.spacing.xs))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .radius(&theme, gpui_kit_theme::Radius::Small)
+                        .bg(theme.colors.hover)
+                        .font_family(theme.typography.mono.clone())
+                        .text_size(px(theme.typography.caption.size))
+                        .text_color(theme.colors.text_muted)
+                        .child(cap)
+                }));
+        match published {
+            Some(spec) => element.semantic_in(cx, spec).into_any_element(),
+            None => element.into_any_element(),
+        }
     }
 }
 

@@ -174,7 +174,7 @@ impl RenderOnce for HighlightedText {
                     .child(SharedString::from(segment.text))
             });
 
-        div()
+        let element = div()
             .flex()
             .flex_row()
             .flex_wrap()
@@ -184,18 +184,23 @@ impl RenderOnce for HighlightedText {
                     .text_size(px(theme.typography.code.size))
                     .line_height(px(theme.typography.code.line_height))
             })
-            .children(runs)
-            .when_some(self.ident, |element, ident| {
+            .children(runs);
+        match self.ident {
+            Some(ident) => {
                 // The text itself is the caller's content and is published as
                 // it is, the way a Markdown paragraph is; the count of marks
                 // is the fact this component adds.
-                element.semantic_in(
-                    cx,
-                    NodeSpec::new(ident.semantic_id(), Role::Text)
-                        .text(self.text.clone())
-                        .value(drawn.to_string()),
-                )
-            })
+                element
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(ident.semantic_id(), Role::Text)
+                            .text(self.text.clone())
+                            .value(drawn.to_string()),
+                    )
+                    .into_any_element()
+            }
+            None => element.into_any_element(),
+        }
     }
 }
 

@@ -10,9 +10,9 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, ClickEvent, Global, InteractiveElement, IntoElement, MouseButton,
-    ParentElement, RenderOnce, SharedString, StatefulInteractiveElement, Styled, Window, div,
-    prelude::FluentBuilder, px, relative,
+    AccessibleAction, AnyElement, App, ClickEvent, Global, InteractiveElement, IntoElement,
+    MouseButton, ParentElement, RenderOnce, SharedString, StatefulInteractiveElement, Styled,
+    Window, div, prelude::FluentBuilder, px, relative,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::ActiveTheme;
@@ -317,6 +317,41 @@ impl RenderOnce for SplitPane {
             });
         }
 
+        if let (true, Some(handler)) = (actionable, self.on_resize.clone()) {
+            let bounds = Rc::clone(&measured);
+            divider = divider.on_a11y_action(AccessibleAction::Increment, move |_, window, cx| {
+                let frame = bounds.get();
+                let extent = if horizontal {
+                    f32::from(frame.size.width)
+                } else {
+                    f32::from(frame.size.height)
+                };
+                let (low, high) = limits(extent, min_start, min_end);
+                let step = if extent > 0.0 { step_px / extent } else { 0.0 };
+                let next = (ratio + step).clamp(low, high);
+                if (next - ratio).abs() >= f32::EPSILON {
+                    handler(next, window, cx);
+                }
+            });
+        }
+        if let (true, Some(handler)) = (actionable, self.on_resize.clone()) {
+            let bounds = Rc::clone(&measured);
+            divider = divider.on_a11y_action(AccessibleAction::Decrement, move |_, window, cx| {
+                let frame = bounds.get();
+                let extent = if horizontal {
+                    f32::from(frame.size.width)
+                } else {
+                    f32::from(frame.size.height)
+                };
+                let (low, high) = limits(extent, min_start, min_end);
+                let step = if extent > 0.0 { step_px / extent } else { 0.0 };
+                let next = (ratio - step).clamp(low, high);
+                if (next - ratio).abs() >= f32::EPSILON {
+                    handler(next, window, cx);
+                }
+            });
+        }
+
         if let (true, true, Some(handler)) =
             (actionable, self.collapsible, self.on_collapse.clone())
         {
@@ -330,7 +365,7 @@ impl RenderOnce for SplitPane {
 
         let divider = divider.semantic_in(
             cx,
-            NodeSpec::new(divider_ident.semantic_id(), Role::Separator)
+            NodeSpec::new(divider_ident.semantic_id(), Role::Splitter)
                 .parent(self.ident.semantic_id())
                 .disabled(!actionable)
                 .text(
@@ -338,6 +373,11 @@ impl RenderOnce for SplitPane {
                         .clone()
                         .unwrap_or_else(|| cx.strings().text(StringKey::SplitResizeHandle)),
                 )
+                .orientation(if horizontal {
+                    gpui::accesskit::Orientation::Horizontal
+                } else {
+                    gpui::accesskit::Orientation::Vertical
+                })
                 .range(low, high, ratio.clamp(low, high)),
         );
 
@@ -441,7 +481,7 @@ fn drag_flag(ident: &Ident, cx: &mut App) -> Rc<Cell<bool>> {
     Rc::clone(flags.entry(ident.semantic_id()).or_default())
 }
 
-fn pane_frame(ident: &Ident, side: &str, cx: &App) -> gpui::Div {
+fn pane_frame(ident: &Ident, side: &str, cx: &App) -> gpui::Stateful<gpui::Div> {
     let pane = ident.child(side);
     div()
         .flex()

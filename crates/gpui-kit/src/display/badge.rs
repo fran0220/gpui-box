@@ -1,6 +1,5 @@
 use gpui::{
-    App, Hsla, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div,
-    prelude::FluentBuilder, px,
+    App, Hsla, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Theme, TypeScale};
@@ -119,7 +118,7 @@ impl RenderOnce for Badge {
             }
         };
 
-        div()
+        let element = div()
             .flex_none()
             .px_token(&theme, gpui_kit_theme::Space::Sm)
             .py(px(2.0))
@@ -127,12 +126,15 @@ impl RenderOnce for Badge {
             .bg(background)
             .type_scale(&theme, TypeScale::Caption)
             .text_color(foreground)
-            .child(self.label.clone())
-            .when_some(self.ident, |element, ident| {
-                element.semantic_in(
+            .child(self.label.clone());
+        match self.ident {
+            Some(ident) => element
+                .semantic_in(
                     cx,
                     NodeSpec::new(ident.semantic_id(), Role::Status).text(self.label.clone()),
                 )
-            })
+                .into_any_element(),
+            None => element.into_any_element(),
+        }
     }
 }

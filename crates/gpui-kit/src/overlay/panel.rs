@@ -6,7 +6,7 @@
 
 use std::rc::Rc;
 
-use gpui::{AnyElement, App, Div, ParentElement, SharedString, Styled, Window, div, px};
+use gpui::{AnyElement, App, ParentElement, SharedString, Styled, Window, div, px};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::Theme;
 
@@ -19,7 +19,12 @@ use crate::foundation::Ident;
 pub type Body = Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>;
 
 /// The title of a surface, published as its first-level heading.
-pub fn heading(ident: &Ident, theme: &Theme, title: SharedString, cx: &App) -> Div {
+pub fn heading(
+    ident: &Ident,
+    theme: &Theme,
+    title: SharedString,
+    cx: &App,
+) -> gpui::Stateful<gpui::Div> {
     div()
         .text_size(px(theme.typography.title.size))
         .line_height(px(theme.typography.title.line_height))
@@ -35,7 +40,12 @@ pub fn heading(ident: &Ident, theme: &Theme, title: SharedString, cx: &App) -> D
 }
 
 /// Secondary copy under the title.
-pub fn description(ident: &Ident, theme: &Theme, description: SharedString, cx: &App) -> Div {
+pub fn description(
+    ident: &Ident,
+    theme: &Theme,
+    description: SharedString,
+    cx: &App,
+) -> gpui::Stateful<gpui::Div> {
     div()
         .text_size(px(theme.typography.body.size))
         .line_height(px(theme.typography.body.line_height))

@@ -552,7 +552,6 @@ impl RenderOnce for TransportBar {
                 div()
                     .flex_1()
                     .min_w_0()
-                    .semantic_in(cx, scrubber_spec)
                     .on_children_prepainted({
                         let measured = Rc::clone(&measured);
                         move |bounds, window, _| {
@@ -561,7 +560,8 @@ impl RenderOnce for TransportBar {
                             }
                         }
                     })
-                    .child(track),
+                    .child(track)
+                    .semantic_in(cx, scrubber_spec),
             )
             .children(trailing.map(|text| readout(text, theme.colors.text_faint)));
 

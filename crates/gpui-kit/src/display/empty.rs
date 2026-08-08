@@ -194,7 +194,7 @@ impl RenderOnce for Divider {
             spec
         });
 
-        div()
+        let element = div()
             .flex()
             .flex_row()
             .items_center()
@@ -210,7 +210,10 @@ impl RenderOnce for Divider {
                         .child(label),
                 )
             })
-            .when(self.label.is_some(), |element| element.child(rule()))
-            .when_some(spec, |element, spec| element.semantic_in(cx, spec))
+            .when(self.label.is_some(), |element| element.child(rule()));
+        match spec {
+            Some(spec) => element.semantic_in(cx, spec).into_any_element(),
+            None => element.into_any_element(),
+        }
     }
 }

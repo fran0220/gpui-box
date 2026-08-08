@@ -23,7 +23,7 @@ license is stored at `licenses/COMET-MIT.txt`.
 - Upstream source: <https://github.com/zed-industries/zed>
 - Integration source: <https://github.com/fran0220/zed>
 - Upstream baseline: `a6a23c7b80a5cefa0487b7856335be89ace7e483`
-- Pinned integration revision: `5436c986b06beacd696e8645a725f014f25d7d36`
+- Pinned integration revision: `92b96f84064108a762e3dd8fa56d8af2dc1b7ce5`
 - Runtime topic head: `ed8643941bd01704e1e2c8d4c606c2dc737d4d9c`
 - Offscreen WGPU topic head: `0bfd4852d83d52aeb8b2d7c4a4ef583a1576f40c`
 - License: Apache-2.0

@@ -809,15 +809,6 @@ impl RenderOnce for ImageViewer {
             .child(
                 div()
                     .w_full()
-                    .semantic_in(
-                        cx,
-                        NodeSpec::new(ident.child("frame").semantic_id(), Role::Image)
-                            .parent(ident.semantic_id())
-                            .text(frame.label.clone())
-                            .busy(matches!(frame.state, ImageState::Loading))
-                            .invalid(matches!(frame.state, ImageState::Failed(_)))
-                            .value(frame.state.name()),
-                    )
                     .on_children_prepainted({
                         let measured = Rc::clone(&measured);
                         move |bounds, window, _| {
@@ -826,7 +817,16 @@ impl RenderOnce for ImageViewer {
                             }
                         }
                     })
-                    .child(viewport),
+                    .child(viewport)
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(ident.child("frame").semantic_id(), Role::Image)
+                            .parent(ident.semantic_id())
+                            .text(frame.label.clone())
+                            .busy(matches!(frame.state, ImageState::Loading))
+                            .invalid(matches!(frame.state, ImageState::Failed(_)))
+                            .value(frame.state.name()),
+                    ),
             )
             .child(caption);
 

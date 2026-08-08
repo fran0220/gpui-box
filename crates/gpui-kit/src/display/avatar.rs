@@ -70,7 +70,7 @@ impl RenderOnce for Avatar {
             .as_ref()
             .map(|ident| NodeSpec::new(ident.semantic_id(), Role::Image).text(self.name.clone()));
 
-        div()
+        let element = div()
             .size(px(self.size))
             .flex_none()
             .flex()
@@ -88,8 +88,11 @@ impl RenderOnce for Avatar {
             })
             .when(self.image.is_none() && !initials.is_empty(), |element| {
                 element.child(initials.clone())
-            })
-            .when_some(spec, |element, spec| element.semantic_in(cx, spec))
+            });
+        match spec {
+            Some(spec) => element.semantic_in(cx, spec).into_any_element(),
+            None => element.into_any_element(),
+        }
     }
 }
 

@@ -550,17 +550,18 @@ impl Body {
                 .overflow_hidden()
                 .children(cell.map(|cell| cell.content));
 
-            element = element.child(if published {
+            let frame = if published {
                 let cell_ident = ident.child(column.key.as_ref());
                 let mut spec =
                     NodeSpec::new(cell_ident.semantic_id(), Role::Cell).parent(ident.semantic_id());
                 if let Some(text) = text {
                     spec = spec.text(text);
                 }
-                frame.semantic_in(cx, spec)
+                frame.semantic_in(cx, spec).into_any_element()
             } else {
-                frame
-            });
+                frame.into_any_element()
+            };
+            element = element.child(frame);
         }
 
         if let (true, Some(handler)) = (actionable, self.on_select.clone()) {

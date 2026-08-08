@@ -291,7 +291,6 @@ impl RenderOnce for Slider {
             .child(
                 div()
                     .w_full()
-                    .semantic_in(cx, spec)
                     .on_children_prepainted({
                         let measured = Rc::clone(&measured);
                         move |bounds, window, _| {
@@ -300,7 +299,8 @@ impl RenderOnce for Slider {
                             }
                         }
                     })
-                    .child(track),
+                    .child(track)
+                    .semantic_in(cx, spec),
             );
 
         if actionable && let Some(handler) = self.on_change.clone() {

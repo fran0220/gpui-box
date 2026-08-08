@@ -72,7 +72,8 @@ fn accessibility_check() -> Result<()> {
 
         let deadline = Instant::now() + Duration::from_secs(15);
         let output = loop {
-            let output = osascript(AX_SMOKE_SCRIPT).unwrap_or_default();
+            let script = AX_SMOKE_SCRIPT.replace("__PID__", &gallery.id().to_string());
+            let output = osascript(&script).unwrap_or_default();
             if output.contains("Primary|AXButton|true") {
                 break output;
             }
@@ -83,10 +84,10 @@ fn accessibility_check() -> Result<()> {
         };
 
         for expected in [
-            "Primary|AXButton|true",
-            "Unavailable|AXButton|false",
-            "Saving|AXButton|false",
-            "Selected|AXCheckBox|true",
+            "Primary|AXButton|true|",
+            "Unavailable|AXButton|false|",
+            "Saving|AXButton|false|",
+            "Selected|AXCheckBox|true|true",
         ] {
             if !output.lines().any(|line| line.trim() == expected) {
                 bail!("macOS AX tree is missing `{expected}`; received:\n{output}");
@@ -96,15 +97,18 @@ fn accessibility_check() -> Result<()> {
         Ok(())
     })();
 
-    if gallery.try_wait()?.is_none() {
+    let cleanup = (|| {
+        if gallery.try_wait()?.is_none() {
+            gallery
+                .kill()
+                .context("stop the accessibility smoke gallery")?;
+        }
         gallery
-            .kill()
-            .context("stop the accessibility smoke gallery")?;
-    }
-    gallery
-        .wait()
-        .context("reap the accessibility smoke gallery")?;
-    result
+            .wait()
+            .context("reap the accessibility smoke gallery")?;
+        Ok(())
+    })();
+    result.and(cleanup)
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -114,10 +118,26 @@ fn accessibility_check() -> Result<()> {
 
 #[cfg(target_os = "macos")]
 fn osascript(script: &str) -> Result<String> {
-    let output = Command::new("osascript")
+    let mut child = Command::new("osascript")
         .args(["-e", script])
-        .output()
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
         .context("query macOS accessibility through System Events")?;
+    let deadline = Instant::now() + Duration::from_secs(7);
+    while child.try_wait()?.is_none() {
+        if Instant::now() >= deadline {
+            child
+                .kill()
+                .context("stop a timed-out macOS accessibility query")?;
+            let _ = child.wait();
+            bail!("macOS accessibility query timed out after 7 seconds");
+        }
+        thread::sleep(Duration::from_millis(50));
+    }
+    let output = child
+        .wait_with_output()
+        .context("collect the macOS accessibility query")?;
     if !output.status.success() {
         bail!(
             "macOS accessibility query failed: {}",
@@ -130,8 +150,10 @@ fn osascript(script: &str) -> Result<String> {
 #[cfg(target_os = "macos")]
 const AX_SMOKE_SCRIPT: &str = r#"
 tell application "System Events"
-  if not (exists process "gpui-kit-gallery") then return ""
-  tell process "gpui-kit-gallery"
+  with timeout of 5 seconds
+  set matches to every process whose unix id is __PID__
+  if (count of matches) is 0 then return ""
+  tell first item of matches
     set frontmost to true
     set axItems to entire contents of window 1
     set output to ""
@@ -139,12 +161,15 @@ tell application "System Events"
       try
         set itemName to name of itemRef as text
         if itemName is "Primary" or itemName is "Unavailable" or itemName is "Saving" or itemName is "Selected" then
-          set output to output & itemName & "|" & (role of itemRef as text) & "|" & (enabled of itemRef as text) & linefeed
+          set itemValue to ""
+          if itemName is "Selected" then set itemValue to value of itemRef as text
+          set output to output & itemName & "|" & (role of itemRef as text) & "|" & (enabled of itemRef as text) & "|" & itemValue & linefeed
         end if
       end try
     end repeat
     return output
   end tell
+  end timeout
 end tell
 "#;
 

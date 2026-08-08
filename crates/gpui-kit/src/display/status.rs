@@ -1,7 +1,4 @@
-use gpui::{
-    App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div,
-    prelude::FluentBuilder, px,
-};
+use gpui::{App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div, px};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
 
@@ -75,19 +72,22 @@ impl StatusLine {
 impl RenderOnce for StatusLine {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        div()
+        let element = div()
             .row()
             .gap_token(&theme, Space::Sm)
             .type_scale(&theme, TypeScale::Label)
             .text_color(theme.colors.text_muted)
             .child(StatusDot::new(self.tone))
-            .child(self.label.clone())
-            .when_some(self.ident, |element, ident| {
-                element.semantic_in(
+            .child(self.label.clone());
+        match self.ident {
+            Some(ident) => element
+                .semantic_in(
                     cx,
                     NodeSpec::new(ident.semantic_id(), Role::Status).text(self.label.clone()),
                 )
-            })
+                .into_any_element(),
+            None => element.into_any_element(),
+        }
     }
 }
 
@@ -154,8 +154,9 @@ impl RenderOnce for Callout {
                 .semantic_in(
                     cx,
                     NodeSpec::new(ident.semantic_id(), Role::Status).text(self.message.clone()),
-                ),
-            None => frame.child(content),
+                )
+                .into_any_element(),
+            None => frame.child(content).into_any_element(),
         }
     }
 }

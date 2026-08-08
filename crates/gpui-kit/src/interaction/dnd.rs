@@ -786,7 +786,7 @@ fn ghost_element(item: &DragItem, landing: Option<&Landing>, cx: &mut App) -> gp
         None => format!("{} none", item.id),
     };
 
-    div()
+    let ghost = div()
         .row()
         .flex_none()
         .gap_token(&theme, Space::Xs)
@@ -810,7 +810,8 @@ fn ghost_element(item: &DragItem, landing: Option<&Landing>, cx: &mut App) -> gp
                 .text(item.label.clone())
                 .value(where_to)
                 .invalid(refused),
-        )
+        );
+    div().child(ghost)
 }
 
 // -- the drop indicator -------------------------------------------------------
