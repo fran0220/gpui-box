@@ -1782,6 +1782,20 @@ async fn capture_catalog(
     // the application sits there. Being frontmost keeps the redraws coming,
     // and it is also what lets focus rings and carets render at all.
     cx.update(|cx| cx.activate(true));
+    // The platform delivers mouse events of its own while the window is
+    // opening and taking the foreground, and one arriving after the pointer
+    // was parked re-hovers whatever row sits under the physical cursor. Those
+    // stragglers land within the first settled frame, so one frame is
+    // rendered and thrown away before anything is recorded; every capture
+    // then starts from the same parked, event-quiet window regardless of
+    // where it falls in the run.
+    window.update(cx, |_, window, cx| {
+        park_pointer(window, cx);
+        cx.notify();
+    })?;
+    settled_frame(window, None, cx)
+        .await
+        .context("warm the capture window up")?;
     let wanted = |name: &str| only.is_none_or(|only| only.iter().any(|only| only == name));
     if let Some(only) = only {
         for name in only {
@@ -1792,7 +1806,6 @@ async fn capture_catalog(
     }
 
     let mut count = 0;
-    let mut first = true;
     let mut previous: Option<gpui_kit_testkit::capture::Frame> = None;
     // Scene outside, theme inside. A scene may install state on its first
     // build that ages, such as a toast that times out, so its two images have
@@ -1815,10 +1828,6 @@ async fn capture_catalog(
                 park_pointer(window, cx);
                 cx.notify();
             })?;
-            if first {
-                cx.background_executor().timer(FIRST_FRAME).await;
-                first = false;
-            }
             let frame = settled_frame(window, previous.as_ref(), cx)
                 .await
                 .with_context(|| format!("capture scene `{}` in `{id}`", scene.name))?;
