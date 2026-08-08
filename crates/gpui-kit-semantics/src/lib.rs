@@ -8,8 +8,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use gpui::{
-    App, Bounds, FocusHandle, Global, IntoElement, ParentElement, Pixels, SharedString, Styled,
-    canvas,
+    App, Bounds, FocusHandle, Global, InteractiveElement, IntoElement, ParentElement, Pixels,
+    SharedString, StatefulInteractiveElement, Styled, Toggled, canvas, div,
 };
 use serde::{Deserialize, Serialize};
 
@@ -452,36 +452,153 @@ pub fn install(cx: &mut App) {
     }
 }
 
-pub trait Semantic: Styled + ParentElement + Sized {
+pub trait Semantic: Sized {
+    fn semantic(self, registry: &SemanticRegistry, spec: NodeSpec) -> Self;
+
+    /// Registers into the global registry when installed. Platform
+    /// accessibility remains active when a host opts out of test semantics.
+    fn semantic_in(self, cx: &App, spec: NodeSpec) -> Self;
+}
+
+impl Semantic for gpui::Div {
     fn semantic(mut self, registry: &SemanticRegistry, spec: NodeSpec) -> Self {
-        // The probe measures its parent, so the parent has to be a positioning
-        // context. Forcing that unconditionally would take an absolutely
-        // positioned element out of its stack and collapse it, which is a
-        // silent disappearance rather than an error, so an element that has
-        // already said where it sits keeps its answer.
         if self.style().position.is_none() {
             self = self.relative();
         }
-        self.child(probe(registry, spec))
+        self.child(accessible_probe(Some(registry), spec))
     }
 
-    /// Registers into the global registry, or does nothing when a host has not
-    /// installed one. Hosts that opt out get no semantic tree, not a panic.
-    fn semantic_in(self, cx: &App, spec: NodeSpec) -> Self {
-        match SemanticRegistry::try_global(cx) {
-            Some(registry) => self.semantic(&registry, spec),
-            None => self,
+    fn semantic_in(mut self, cx: &App, spec: NodeSpec) -> Self {
+        if self.style().position.is_none() {
+            self = self.relative();
         }
+        let registry = SemanticRegistry::try_global(cx);
+        self.child(accessible_probe(registry.as_ref(), spec))
     }
 }
 
-impl Semantic for gpui::Div {}
-impl Semantic for gpui::Stateful<gpui::Div> {}
+impl Semantic for gpui::Stateful<gpui::Div> {
+    fn semantic(mut self, registry: &SemanticRegistry, spec: NodeSpec) -> Self {
+        if self.style().position.is_none() {
+            self = self.relative();
+        }
+        self = platform_accessible(self, &spec);
+        self.child(diagnostic_probe(Some(registry), spec))
+    }
 
-fn probe(registry: &SemanticRegistry, spec: NodeSpec) -> impl IntoElement {
-    let registry = registry.clone();
+    fn semantic_in(mut self, cx: &App, spec: NodeSpec) -> Self {
+        if self.style().position.is_none() {
+            self = self.relative();
+        }
+        self = platform_accessible(self, &spec);
+        let registry = SemanticRegistry::try_global(cx);
+        self.child(diagnostic_probe(registry.as_ref(), spec))
+    }
+}
+
+fn platform_accessible<E>(mut element: E, spec: &NodeSpec) -> E
+where
+    E: StatefulInteractiveElement,
+{
+    element = element.role(platform_role(spec.role));
+    if let Some(text) = &spec.text {
+        element = element.aria_label(redact_sensitive_text(text));
+    }
+    if let Some(focus) = &spec.focus {
+        element = element.track_focus(focus);
+    }
+    if let Some(expanded) = spec.expanded {
+        element = element.aria_expanded(expanded);
+    }
+    if supports_selection(spec.role) {
+        element = element.aria_selected(spec.selected);
+    }
+    if let Some(checked) = spec.checked {
+        element = element.aria_toggled(if checked {
+            Toggled::True
+        } else {
+            Toggled::False
+        });
+    }
+    if let Some(value) = &spec.value {
+        element = element.aria_value(redact_sensitive_text(value));
+    }
+    if let Some(placeholder) = &spec.placeholder {
+        element = element.aria_placeholder(placeholder.clone());
+    }
+    if let Some((min, max, now)) = spec.range {
+        element = element
+            .aria_min_numeric_value(min.into())
+            .aria_max_numeric_value(max.into())
+            .aria_numeric_value(now.into());
+    }
+    if let Some(level) = spec.level {
+        element = element.aria_level(level as usize);
+    }
+    element
+        .aria_disabled(spec.disabled)
+        .aria_invalid(spec.invalid)
+        .aria_required(spec.required)
+        .aria_busy(spec.busy)
+}
+
+fn supports_selection(role: Role) -> bool {
+    matches!(
+        role,
+        Role::Row | Role::Tab | Role::Cell | Role::TreeItem | Role::Option
+    )
+}
+
+fn platform_role(role: Role) -> gpui::Role {
+    match role {
+        Role::Window => gpui::Role::Window,
+        Role::Region => gpui::Role::Region,
+        Role::Group | Role::Field | Role::Drag => gpui::Role::Group,
+        Role::List => gpui::Role::List,
+        Role::Row => gpui::Role::Row,
+        Role::Button => gpui::Role::Button,
+        Role::Link => gpui::Role::Link,
+        Role::Tab => gpui::Role::Tab,
+        Role::TabPanel => gpui::Role::TabPanel,
+        Role::Input => gpui::Role::TextInput,
+        Role::Text => gpui::Role::Label,
+        Role::Heading => gpui::Role::Heading,
+        Role::Dialog => gpui::Role::Dialog,
+        Role::Menu => gpui::Role::Menu,
+        Role::MenuItem => gpui::Role::MenuItem,
+        Role::Status | Role::Toast => gpui::Role::Status,
+        Role::Checkbox => gpui::Role::CheckBox,
+        Role::Radio => gpui::Role::RadioButton,
+        Role::Switch => gpui::Role::Switch,
+        Role::Slider => gpui::Role::Slider,
+        Role::Table => gpui::Role::Table,
+        Role::Cell => gpui::Role::Cell,
+        Role::Tree => gpui::Role::Tree,
+        Role::TreeItem => gpui::Role::TreeItem,
+        Role::Progress => gpui::Role::ProgressIndicator,
+        Role::Tooltip => gpui::Role::Tooltip,
+        Role::Separator => gpui::Role::Splitter,
+        Role::Toolbar => gpui::Role::Toolbar,
+        Role::Scrollbar => gpui::Role::ScrollBar,
+        Role::Combobox => gpui::Role::ComboBox,
+        Role::Option => gpui::Role::ListBoxOption,
+        Role::Form => gpui::Role::Form,
+        Role::Image => gpui::Role::Image,
+    }
+}
+
+fn accessible_probe(registry: Option<&SemanticRegistry>, spec: NodeSpec) -> impl IntoElement {
+    let element = div().id(spec.id.clone()).absolute().inset_0();
+    platform_accessible(element, &spec).child(diagnostic_probe(registry, spec))
+}
+
+fn diagnostic_probe(registry: Option<&SemanticRegistry>, spec: NodeSpec) -> impl IntoElement {
+    let registry = registry.cloned();
     canvas(
         move |bounds: Bounds<Pixels>, window, _| {
+            let Some(registry) = &registry else {
+                return;
+            };
             let rect = Rect {
                 x: f32::from(bounds.origin.x),
                 y: f32::from(bounds.origin.y),
@@ -554,6 +671,9 @@ fn looks_like_secret_assignment(text: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gpui::{
+        AnyWindowHandle, AppContext as _, Context, Render, TestAppContext, Window, div, px,
+    };
 
     fn node(id: &str, parent: Option<&str>) -> Node {
         Node {
@@ -719,5 +839,113 @@ mod tests {
     #[test]
     fn recorded_values_are_redacted_like_text() {
         assert_eq!(redact_sensitive_text("sk-live-value"), "[REDACTED]");
+    }
+
+    struct PlatformTreeFixture {
+        focus: FocusHandle,
+    }
+
+    impl Render for PlatformTreeFixture {
+        fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            div()
+                .child(
+                    div().w(px(160.0)).h(px(24.0)).semantic_in(
+                        cx,
+                        NodeSpec::new("volume", Role::Slider)
+                            .text("Volume")
+                            .value("40 percent")
+                            .range(0.0, 100.0, 40.0)
+                            .focus(&self.focus)
+                            .disabled(true)
+                            .invalid(true)
+                            .required(true)
+                            .busy(true),
+                    ),
+                )
+                .child(
+                    div()
+                        .id("choice")
+                        .on_click(|_, _, _| {})
+                        .w(px(100.0))
+                        .h(px(24.0))
+                        .semantic_in(
+                            cx,
+                            NodeSpec::new("choice", Role::Checkbox)
+                                .text("Use system setting")
+                                .checked(true),
+                        ),
+                )
+                .child(
+                    div().w(px(100.0)).h(px(24.0)).semantic_in(
+                        cx,
+                        NodeSpec::new("quality", Role::Option)
+                            .text("High quality")
+                            .selected(true),
+                    ),
+                )
+        }
+    }
+
+    #[gpui::test]
+    fn semantics_reach_the_deterministic_platform_tree(cx: &mut TestAppContext) {
+        let window = cx.add_window(|window, cx| {
+            let focus = cx.focus_handle();
+            window.focus(&focus, cx);
+            PlatformTreeFixture { focus }
+        });
+        let window = AnyWindowHandle::from(window);
+
+        cx.activate_accessibility(window);
+        let json = cx
+            .update_window(window, |_, window, cx| {
+                window.draw(cx).clear(cx);
+                window
+                    .debug_a11y_tree_json()
+                    .expect("active accessibility tree")
+            })
+            .expect("test window");
+        let tree: serde_json::Value = serde_json::from_str(&json).expect("valid tree JSON");
+        let (node_id, node) = tree["nodes"]
+            .as_object()
+            .and_then(|nodes| {
+                nodes.iter().find(|(_, node)| {
+                    node["element_id"]
+                        .as_str()
+                        .is_some_and(|id| id.contains("volume"))
+                })
+            })
+            .unwrap_or_else(|| panic!("semantic node missing from AccessKit tree: {json}"));
+
+        assert_eq!(tree["gpui_focus"], node_id.as_str());
+        assert_eq!(node["aria"]["role"], "Slider");
+        assert_eq!(node["aria"]["label"], "Volume");
+        assert_eq!(node["aria"]["value"], "40 percent");
+        assert_eq!(node["aria"]["numeric_value"], 40.0);
+        assert_eq!(node["aria"]["min_numeric_value"], 0.0);
+        assert_eq!(node["aria"]["max_numeric_value"], 100.0);
+        assert_eq!(node["aria"]["disabled"], true);
+        assert_eq!(node["aria"]["invalid"], "True");
+        assert_eq!(node["aria"]["required"], true);
+        assert_eq!(node["aria"]["busy"], true);
+
+        let nodes = tree["nodes"].as_object().expect("nodes object");
+        let choice = nodes
+            .values()
+            .find(|node| node["aria"]["label"] == "Use system setting")
+            .expect("stateful checkbox node");
+        assert_eq!(choice["aria"]["role"], "CheckBox");
+        assert_eq!(choice["aria"]["toggled"], "True");
+        assert!(
+            choice["aria"]["on_action"]
+                .as_array()
+                .is_some_and(|actions| actions.iter().any(|action| action == "Click"))
+        );
+
+        let option = nodes
+            .values()
+            .find(|node| node["aria"]["label"] == "High quality")
+            .expect("selected option node");
+        assert_eq!(option["aria"]["role"], "ListBoxOption");
+        assert_eq!(option["aria"]["selected"], true);
     }
 }
