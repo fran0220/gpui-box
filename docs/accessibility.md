@@ -56,9 +56,10 @@ according to the content's purpose.
 `Semantic::semantic` and `Semantic::semantic_in` project the supported part of
 each `NodeSpec` into GPUI's AccessKit tree as well as the deterministic semantic
 registry. A stateful GPUI host keeps its existing click and accessibility action
-handlers. A descriptive `Div` without an id receives a zero-paint, zero-input
-accessible child with the semantic id. Installing the test registry is not a
-condition of platform accessibility.
+handlers. A `Div` without an id becomes the stateful role-bearing host itself,
+so its rendered semantic descendants remain its native descendants. The
+semantic id and GPUI element id are required to match. Installing the test
+registry is not a condition of platform accessibility.
 
 GPUI forwards that AccessKit tree to NSAccessibility on macOS, UI Automation on
 Windows, and AT-SPI on Linux. The macOS, Windows, and Linux rows below describe
@@ -76,8 +77,8 @@ evidence that a particular screen reader announces every property correctly.
 | Checked, expanded, widget selection | Checked native AX smoke verified; expanded/selection deterministic only | Bridged; native session unverified | Bridged; native session unverified |
 | Focus | GPUI focus is projected; deterministic tree verified | GPUI focus is projected; native session unverified | GPUI focus is projected; native session unverified |
 | Numeric min, max, current value | Bridged; deterministic tree verified | Bridged; native session unverified | Bridged; native session unverified |
-| Editable text | Value only; no editable text model | Value only; no editable text model | Value only; no editable text model |
-| Text selection and caret | Not implemented | Not implemented | Not implemented |
+| Editable text | TextInput/MultilineTextInput parent and TextRun children verified deterministically | Same AccessKit structure; native session unverified | Same AccessKit structure; native session unverified |
+| Text selection and caret | Selection/caret structure and actions verified deterministically; native AX interaction unverified | Same AccessKit structure; native UIA interaction unverified | Same AccessKit structure; native AT-SPI interaction unverified |
 | Live-region announcements | Not implemented or claimed | Not implemented or claimed | Not implemented or claimed |
 | GPUI overlays | Nodes rendered in the overlay enter the GPUI tree; native announcement and ordering unverified | Same boundary; native session unverified | Same boundary; native session unverified |
 | Native-child handoff | Not implemented | Not implemented | Not implemented |
@@ -85,9 +86,14 @@ evidence that a particular screen reader announces every property correctly.
 `hovered` and pointer `pressed` remain diagnostic-only transient state. Semantic
 `parent` and `labels` associations remain available to tests, while the native
 tree follows GPUI's rendered element nesting; no cross-tree labelled-by or
-reparenting claim is made. Editable caret geometry, text runs, live politeness,
-and native child nodes require dedicated platform implementations rather than
-being inferred from a string value.
+reparenting claim is made. Editable controls publish UTF-8 character lengths,
+stable text runs, selection/caret positions, and `SetValue` and
+`SetTextSelection` actions. IME offsets are converted between UTF-8 and UTF-16,
+including surrogate pairs. Disabled and read-only fields omit value-changing
+actions; read-only fields retain selection actions. Password fields use the
+native password role but publish neither plaintext nor text runs. Native caret
+geometry, live politeness, and native child nodes remain separate platform
+work rather than being inferred from a string value.
 
 The deterministic smoke test activates GPUI's test accessibility adapter,
 renders a real element tree, and asserts role, name, value, range, control

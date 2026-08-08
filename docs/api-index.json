@@ -2723,6 +2723,7 @@
         "text(text: impl Into<SharedString>) -> Self",
         "invalid(invalid: bool) -> Self",
         "required(required: bool) -> Self",
+        "read_only(read_only: bool) -> Self",
         "rows(rows: usize) -> Self",
         "max_rows(max_rows: usize) -> Self",
         "max_length(max_length: usize) -> Self"
@@ -2730,6 +2731,7 @@
       "commands": [
         "set_value(value: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)",
+        "set_read_only(read_only: bool, cx: &mut Context<Self>)",
         "set_invalid(invalid: bool, cx: &mut Context<Self>)"
       ],
       "queries": [
@@ -2769,6 +2771,7 @@
         "text(text: impl Into<SharedString>) -> Self",
         "invalid(invalid: bool) -> Self",
         "required(required: bool) -> Self",
+        "read_only(read_only: bool) -> Self",
         "secret(secret: bool) -> Self",
         "bare(bare: bool) -> Self",
         "max_length(max_length: usize) -> Self"
@@ -2779,6 +2782,7 @@
         "set_placeholder(placeholder: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_text_quietly(value: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)",
+        "set_read_only(read_only: bool, cx: &mut Context<Self>)",
         "set_invalid(invalid: bool, cx: &mut Context<Self>)"
       ],
       "queries": [

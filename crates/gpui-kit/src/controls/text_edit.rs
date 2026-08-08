@@ -7,7 +7,10 @@
 
 use std::ops::Range;
 
+use gpui::{A11ySubtreeBuilder, accesskit};
 use unicode_segmentation::UnicodeSegmentation;
+
+const MAX_ACCESSIBLE_RUN_CHARS: usize = 255;
 
 pub(crate) fn previous_boundary(text: &str, offset: usize) -> usize {
     text.grapheme_indices(true)
@@ -100,6 +103,88 @@ pub(crate) fn range_from_utf16(text: &str, range_utf16: &Range<usize>) -> Range<
     offset_from_utf16(text, range_utf16.start)..offset_from_utf16(text, range_utf16.end)
 }
 
+pub(crate) fn publish_accessible_text(
+    builder: &mut A11ySubtreeBuilder,
+    text: &str,
+    anchor_byte: usize,
+    focus_byte: usize,
+) -> Vec<accesskit::NodeId> {
+    let chars = text.chars().collect::<Vec<_>>();
+    let run_count = chars.len().div_ceil(MAX_ACCESSIBLE_RUN_CHARS).max(1);
+    let run_ids = (0..run_count)
+        .map(|run| builder.synthetic_node_id(run))
+        .collect::<Vec<_>>();
+    for run in 0..run_count {
+        let start = run * MAX_ACCESSIBLE_RUN_CHARS;
+        let end = (start + MAX_ACCESSIBLE_RUN_CHARS).min(chars.len());
+        let mut node = accesskit::Node::new(accesskit::Role::TextRun);
+        node.set_text_direction(accesskit::TextDirection::LeftToRight);
+        node.set_value(chars[start..end].iter().collect::<String>());
+        node.set_character_lengths(
+            chars[start..end]
+                .iter()
+                .map(|character| character.len_utf8() as u8)
+                .collect::<Vec<_>>(),
+        );
+        if run > 0 {
+            node.set_previous_on_line(run_ids[run - 1]);
+        }
+        if run + 1 < run_count {
+            node.set_next_on_line(run_ids[run + 1]);
+        }
+        builder.push_child(run_ids[run], node);
+    }
+    let anchor = accessible_position(text, anchor_byte, |run| run_ids[run]);
+    let focus = accessible_position(text, focus_byte, |run| run_ids[run]);
+    builder
+        .parent_node()
+        .set_text_selection(accesskit::TextSelection { anchor, focus });
+    run_ids
+}
+
+fn accessible_position(
+    text: &str,
+    byte_offset: usize,
+    node_id: impl Fn(usize) -> accesskit::NodeId,
+) -> accesskit::TextPosition {
+    let character = text
+        .char_indices()
+        .take_while(|(offset, _)| *offset < byte_offset)
+        .count();
+    let run = if character > 0 && character.is_multiple_of(MAX_ACCESSIBLE_RUN_CHARS) {
+        character / MAX_ACCESSIBLE_RUN_CHARS - 1
+    } else {
+        character / MAX_ACCESSIBLE_RUN_CHARS
+    };
+    accesskit::TextPosition {
+        node: node_id(run),
+        character_index: character - run * MAX_ACCESSIBLE_RUN_CHARS,
+    }
+}
+
+pub(crate) fn byte_offset_for_accessible_position(
+    text: &str,
+    position: accesskit::TextPosition,
+    run_ids: &[accesskit::NodeId],
+) -> Option<usize> {
+    let run_count = text
+        .chars()
+        .count()
+        .div_ceil(MAX_ACCESSIBLE_RUN_CHARS)
+        .max(1);
+    let run = (0..run_count).find(|run| run_ids.get(*run) == Some(&position.node))?;
+    let character = run * MAX_ACCESSIBLE_RUN_CHARS + position.character_index;
+    if character > text.chars().count() || position.character_index > MAX_ACCESSIBLE_RUN_CHARS {
+        return None;
+    }
+    Some(
+        text.char_indices()
+            .nth(character)
+            .map(|(offset, _)| offset)
+            .unwrap_or(text.len()),
+    )
+}
+
 /// Truncates an insertion that would push the content past its limit, rather
 /// than rejecting the whole insertion, so a paste that is slightly too long
 /// still delivers what fits.
@@ -156,5 +241,29 @@ mod tests {
         assert_eq!(fit_to_max_length("", Some(4), &(0..0), "héllo"), "hél");
         assert_eq!(fit_to_max_length("ab", Some(3), &(0..0), "cd"), "c");
         assert_eq!(fit_to_max_length("ab", None, &(0..0), "cd"), "cd");
+    }
+
+    #[test]
+    fn utf16_offsets_account_for_surrogate_pairs() {
+        let text = "a😀é";
+        assert_eq!(offset_to_utf16(text, 1), 1);
+        assert_eq!(offset_to_utf16(text, 5), 3);
+        assert_eq!(offset_to_utf16(text, text.len()), 4);
+        assert_eq!(offset_from_utf16(text, 3), 5);
+        assert_eq!(range_from_utf16(text, &(1..3)), 1..5);
+    }
+
+    #[test]
+    fn accessible_positions_round_trip_utf8_text() {
+        let text = format!("{}😀é", "x".repeat(255));
+        let nodes = |run| accesskit::NodeId(100 + run as u64);
+        let run_ids = (0..2).map(nodes).collect::<Vec<_>>();
+        for offset in [0, 255, 259, text.len()] {
+            let position = accessible_position(&text, offset, nodes);
+            assert_eq!(
+                byte_offset_for_accessible_position(&text, position, &run_ids),
+                Some(offset)
+            );
+        }
     }
 }

@@ -244,3 +244,24 @@ fn the_area_grows_with_the_text_up_to_its_limit(cx: &mut TestAppContext) {
         "growth must stop at the row limit rather than follow the text"
     );
 }
+
+#[gpui::test]
+fn multiline_text_reaches_the_accesskit_text_pattern(cx: &mut TestAppContext) {
+    let (mut harness, _slot) = area(cx, |area| area.text("first\n😀"));
+    let tree = harness.accessibility_tree();
+    let nodes = tree["nodes"].as_object().expect("nodes");
+    let field = nodes
+        .values()
+        .find(|node| {
+            node["element_id"] == "Name(\"form.notes\")"
+                && node["aria"]["role"] == "MultilineTextInput"
+        })
+        .expect("native multiline input");
+    assert_eq!(field["aria"]["role"], "MultilineTextInput");
+    let actions = field["aria"]["on_action"].as_array().expect("actions");
+    assert!(actions.iter().any(|action| action == "SetValue"));
+    assert!(actions.iter().any(|action| action == "SetTextSelection"));
+    let run_id = field["children"][0].as_str().expect("text run id");
+    assert_eq!(nodes[run_id]["aria"]["role"], "TextRun");
+    assert_eq!(nodes[run_id]["aria"]["value"], "first\n😀");
+}

@@ -30,13 +30,14 @@ mod element;
 pub(crate) mod layout;
 
 use std::ops::Range;
+use std::sync::{Arc, Mutex};
 
 use gpui::{
-    App, Bounds, ClipboardItem, Context, CursorStyle, EntityInputHandler, EventEmitter,
-    FocusHandle, Focusable, InteractiveElement, IntoElement, KeyBinding, MouseButton,
+    AccessibleAction, App, Bounds, ClipboardItem, Context, CursorStyle, EntityInputHandler,
+    EventEmitter, FocusHandle, Focusable, InteractiveElement, IntoElement, KeyBinding, MouseButton,
     MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement, Pixels, Point, Render,
-    SharedString, Styled, Subscription, UTF16Selection, Window, actions, div, point,
-    prelude::FluentBuilder as _, px,
+    SharedString, StatefulInteractiveElement, Styled, Subscription, UTF16Selection, Window,
+    accesskit::ActionData, actions, div, point, prelude::FluentBuilder as _, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius};
@@ -220,6 +221,7 @@ pub struct TextArea {
     disabled: bool,
     invalid: bool,
     required: bool,
+    read_only: bool,
     max_length: Option<usize>,
     rows: usize,
     max_rows: Option<usize>,
@@ -233,6 +235,7 @@ pub struct TextArea {
     is_selecting: bool,
     last_layout: Option<Layout>,
     last_bounds: Option<Bounds<Pixels>>,
+    accessible_run_ids: Arc<Mutex<Vec<gpui::accesskit::NodeId>>>,
     /// Held so the focus listeners live as long as the area does.
     _subscriptions: Vec<Subscription>,
 }
@@ -260,6 +263,7 @@ impl TextArea {
             disabled: false,
             invalid: false,
             required: false,
+            read_only: false,
             max_length: None,
             rows: DEFAULT_ROWS,
             max_rows: None,
@@ -269,6 +273,7 @@ impl TextArea {
             is_selecting: false,
             last_layout: None,
             last_bounds: None,
+            accessible_run_ids: Arc::default(),
             _subscriptions: subscriptions,
         }
     }
@@ -292,6 +297,13 @@ impl TextArea {
 
     pub fn required(mut self, required: bool) -> Self {
         self.required = required;
+        self
+    }
+
+    /// Keeps the value focusable and exposed while refusing keyboard,
+    /// pointer, IME, and accessibility value changes.
+    pub fn read_only(mut self, read_only: bool) -> Self {
+        self.read_only = read_only;
         self
     }
 
@@ -336,6 +348,11 @@ impl TextArea {
 
     pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
         self.disabled = disabled;
+        cx.notify();
+    }
+
+    pub fn set_read_only(&mut self, read_only: bool, cx: &mut Context<Self>) {
+        self.read_only = read_only;
         cx.notify();
     }
 
@@ -747,8 +764,9 @@ impl TextArea {
     }
 
     fn semantics(&self) -> NodeSpec {
-        let mut spec = NodeSpec::new(self.ident.semantic_id(), Role::Input)
+        let mut spec = NodeSpec::new(self.ident.semantic_id(), Role::MultilineInput)
             .disabled(self.disabled)
+            .read_only(self.read_only)
             .invalid(self.invalid)
             .required(self.required)
             .focus(&self.focus_handle);
@@ -844,7 +862,7 @@ impl EntityInputHandler for TextArea {
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.disabled {
+        if self.disabled || self.read_only {
             return;
         }
         let range = range_utf16
@@ -875,7 +893,7 @@ impl EntityInputHandler for TextArea {
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.disabled {
+        if self.disabled || self.read_only {
             return;
         }
         let range = range_utf16
@@ -942,12 +960,20 @@ impl Render for TextArea {
         let metrics = theme.control.get(self.size);
         let focused = self.focus_handle.is_focused(window);
         let spec = self.semantics();
+        let content = self.content.clone();
+        let (anchor, focus) = if self.selection_reversed {
+            (self.selected_range.end, self.selected_range.start)
+        } else {
+            (self.selected_range.start, self.selected_range.end)
+        };
+        let accessible_run_ids = self.accessible_run_ids.clone();
+        let entity = cx.entity().clone();
 
         div()
             .id(self.ident.element_id())
             .key_context(KEY_CONTEXT)
             .track_focus(&self.focus_handle)
-            .when(!self.disabled, |element| {
+            .when(!self.disabled && !self.read_only, |element| {
                 element
                     .on_action(cx.listener(Self::backspace))
                     .on_action(cx.listener(Self::delete))
@@ -987,6 +1013,57 @@ impl Render for TextArea {
                     .on_mouse_up(MouseButton::Left, cx.listener(Self::on_mouse_up))
                     .on_mouse_up_out(MouseButton::Left, cx.listener(Self::on_mouse_up))
                     .cursor(CursorStyle::IBeam)
+            })
+            .a11y_synthetic_children(move |builder| {
+                let ids = text_edit::publish_accessible_text(builder, &content, anchor, focus);
+                *accessible_run_ids
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner()) = ids;
+            })
+            .when(!self.disabled, |element| {
+                let selection_entity = entity.clone();
+                let selection_ids = self.accessible_run_ids.clone();
+                let element = element.on_a11y_action(
+                    AccessibleAction::SetTextSelection,
+                    move |data, _, cx| {
+                        let Some(ActionData::SetTextSelection(selection)) = data else {
+                            return;
+                        };
+                        let run_ids = selection_ids
+                            .lock()
+                            .unwrap_or_else(|poisoned| poisoned.into_inner())
+                            .clone();
+                        selection_entity.update(cx, |area, cx| {
+                            let Some(anchor) = text_edit::byte_offset_for_accessible_position(
+                                &area.content,
+                                selection.anchor,
+                                &run_ids,
+                            ) else {
+                                return;
+                            };
+                            let Some(focus) = text_edit::byte_offset_for_accessible_position(
+                                &area.content,
+                                selection.focus,
+                                &run_ids,
+                            ) else {
+                                return;
+                            };
+                            area.selected_range = anchor.min(focus)..anchor.max(focus);
+                            area.selection_reversed = focus < anchor;
+                            area.marked_range = None;
+                            area.goal_x = None;
+                            cx.notify();
+                        });
+                    },
+                );
+                element.when(!self.read_only, |element| {
+                    element.on_a11y_action(AccessibleAction::SetValue, move |data, _, cx| {
+                        let Some(ActionData::Value(value)) = data else {
+                            return;
+                        };
+                        entity.update(cx, |area, cx| area.set_value(value.to_string(), cx));
+                    })
+                })
             })
             .w_full()
             .column()

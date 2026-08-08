@@ -154,4 +154,128 @@ fn a_host_can_replace_the_value(cx: &mut TestAppContext) {
     );
 }
 
+#[gpui::test]
+fn editable_text_reaches_the_accesskit_text_pattern(cx: &mut TestAppContext) {
+    let (mut harness, slot) = input(cx, |input| input.name("Token").text("a😀é"));
+    let tree = harness.accessibility_tree();
+    let nodes = tree["nodes"].as_object().expect("nodes");
+    let field = nodes
+        .values()
+        .find(|node| {
+            node["element_id"] == "Name(\"form.token\")" && node["aria"]["role"] == "TextInput"
+        })
+        .expect("native text input");
+    assert_eq!(field["aria"]["role"], "TextInput");
+    assert_eq!(field["aria"]["label"], "Token");
+    let actions = field["aria"]["on_action"].as_array().expect("actions");
+    assert!(actions.iter().any(|action| action == "SetValue"));
+    assert!(actions.iter().any(|action| action == "SetTextSelection"));
+
+    let run_id = field["children"][0].as_str().expect("text run id");
+    let run = &nodes[run_id];
+    assert_eq!(run["aria"]["role"], "TextRun");
+    assert_eq!(run["aria"]["value"], "a😀é");
+    assert_eq!(run["aria"]["character_lengths"][0], 1);
+    assert_eq!(run["aria"]["character_lengths"][1], 4);
+    assert_eq!(run["aria"]["character_lengths"][2], 2);
+    assert_eq!(
+        field["aria"]["text_selection"]["anchor"]["character_index"],
+        3
+    );
+    assert_eq!(
+        field["aria"]["text_selection"]["focus"]["character_index"],
+        3
+    );
+
+    let field_id = gpui::accesskit::NodeId(
+        field["accesskit_id"]
+            .as_str()
+            .expect("field node id")
+            .parse()
+            .expect("numeric field id"),
+    );
+    let run_node_id = gpui::accesskit::NodeId(
+        run["accesskit_id"]
+            .as_str()
+            .expect("run node id")
+            .parse()
+            .expect("numeric run id"),
+    );
+    let window = harness.window();
+    harness.context().dispatch_accessibility_action(
+        window,
+        gpui::accesskit::ActionRequest {
+            action: gpui::accesskit::Action::SetTextSelection,
+            target_tree: gpui::accesskit::TreeId::ROOT,
+            target_node: field_id,
+            data: Some(gpui::accesskit::ActionData::SetTextSelection(
+                gpui::accesskit::TextSelection {
+                    anchor: gpui::accesskit::TextPosition {
+                        node: run_node_id,
+                        character_index: 1,
+                    },
+                    focus: gpui::accesskit::TextPosition {
+                        node: run_node_id,
+                        character_index: 2,
+                    },
+                },
+            )),
+        },
+    );
+    let entity = slot.borrow().clone().expect("input entity");
+    assert_eq!(
+        harness.update(|_, cx| entity.read(cx).selected_range()),
+        1..5
+    );
+    harness.context().dispatch_accessibility_action(
+        window,
+        gpui::accesskit::ActionRequest {
+            action: gpui::accesskit::Action::SetValue,
+            target_tree: gpui::accesskit::TreeId::ROOT,
+            target_node: field_id,
+            data: Some(gpui::accesskit::ActionData::Value("updated".into())),
+        },
+    );
+    assert_eq!(value(&mut harness, &slot), "updated");
+}
+
+#[gpui::test]
+fn password_and_read_only_native_contracts_are_explicit(cx: &mut TestAppContext) {
+    let (mut password, _slot) = input(cx, |input| {
+        input.name("Password").text("secret").secret(true)
+    });
+    let tree = password.accessibility_tree();
+    let field = tree["nodes"]
+        .as_object()
+        .and_then(|nodes| {
+            nodes.values().find(|node| {
+                node["element_id"] == "Name(\"form.token\")"
+                    && node["aria"]["role"] == "PasswordInput"
+            })
+        })
+        .expect("native password input");
+    assert_eq!(field["aria"]["role"], "PasswordInput");
+    assert!(
+        field.get("children").is_none(),
+        "password text must not become text runs"
+    );
+
+    let (mut read_only, _slot) = input(cx, |input| input.text("verified").read_only(true));
+    let tree = read_only.accessibility_tree();
+    let field = tree["nodes"]
+        .as_object()
+        .and_then(|nodes| {
+            nodes.values().find(|node| {
+                node["element_id"] == "Name(\"form.token\")" && node["aria"]["role"] == "TextInput"
+            })
+        })
+        .expect("native read-only input");
+    assert_eq!(field["aria"]["read_only"], true);
+    let actions = field["aria"]["on_action"]
+        .as_array()
+        .expect("selection action");
+    assert!(actions.iter().any(|action| action == "SetTextSelection"));
+    assert!(!actions.iter().any(|action| action == "SetValue"));
+}
+
 fn _unused(_: &mut Window, _: &mut App) {}

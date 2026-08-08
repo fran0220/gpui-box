@@ -27,13 +27,14 @@
 mod element;
 
 use std::ops::Range;
+use std::sync::{Arc, Mutex};
 
 use gpui::{
-    App, Bounds, ClipboardItem, Context, CursorStyle, EntityInputHandler, EventEmitter,
-    FocusHandle, Focusable, InteractiveElement, IntoElement, KeyBinding, MouseButton,
+    AccessibleAction, App, Bounds, ClipboardItem, Context, CursorStyle, EntityInputHandler,
+    EventEmitter, FocusHandle, Focusable, InteractiveElement, IntoElement, KeyBinding, MouseButton,
     MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement, Pixels, Point, Render, ShapedLine,
-    SharedString, Styled, Subscription, UTF16Selection, Window, actions, div,
-    prelude::FluentBuilder as _, px,
+    SharedString, StatefulInteractiveElement, Styled, Subscription, UTF16Selection, Window,
+    accesskit::ActionData, actions, div, prelude::FluentBuilder as _, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize};
@@ -208,6 +209,7 @@ pub struct TextInput {
     disabled: bool,
     invalid: bool,
     required: bool,
+    read_only: bool,
     secret: bool,
     /// Set when a composing control supplies the frame itself.
     bare: bool,
@@ -216,6 +218,7 @@ pub struct TextInput {
     is_selecting: bool,
     last_layout: Option<ShapedLine>,
     last_bounds: Option<Bounds<Pixels>>,
+    accessible_run_ids: Arc<Mutex<Vec<gpui::accesskit::NodeId>>>,
     /// Held so the focus listeners live as long as the input does.
     _subscriptions: Vec<Subscription>,
 }
@@ -244,6 +247,7 @@ impl TextInput {
             disabled: false,
             invalid: false,
             required: false,
+            read_only: false,
             secret: false,
             bare: false,
             max_length: None,
@@ -251,6 +255,7 @@ impl TextInput {
             is_selecting: false,
             last_layout: None,
             last_bounds: None,
+            accessible_run_ids: Arc::default(),
             _subscriptions: subscriptions,
         }
     }
@@ -287,6 +292,13 @@ impl TextInput {
 
     pub fn required(mut self, required: bool) -> Self {
         self.required = required;
+        self
+    }
+
+    /// Keeps the value focusable and exposed while refusing keyboard,
+    /// pointer, IME, and accessibility value changes.
+    pub fn read_only(mut self, read_only: bool) -> Self {
+        self.read_only = read_only;
         self
     }
 
@@ -356,6 +368,11 @@ impl TextInput {
 
     pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
         self.disabled = disabled;
+        cx.notify();
+    }
+
+    pub fn set_read_only(&mut self, read_only: bool, cx: &mut Context<Self>) {
+        self.read_only = read_only;
         cx.notify();
     }
 
@@ -709,8 +726,14 @@ impl TextInput {
     }
 
     fn semantics(&self, window: &Window) -> NodeSpec {
-        let mut spec = NodeSpec::new(self.ident.semantic_id(), Role::Input)
+        let role = if self.secret {
+            Role::PasswordInput
+        } else {
+            Role::Input
+        };
+        let mut spec = NodeSpec::new(self.ident.semantic_id(), role)
             .disabled(self.disabled)
+            .read_only(self.read_only)
             .invalid(self.invalid)
             .required(self.required)
             .focus(&self.focus_handle);
@@ -816,7 +839,7 @@ impl EntityInputHandler for TextInput {
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.disabled {
+        if self.disabled || self.read_only {
             return;
         }
         let range = range_utf16
@@ -845,7 +868,7 @@ impl EntityInputHandler for TextInput {
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.disabled {
+        if self.disabled || self.read_only {
             return;
         }
         let range = range_utf16
@@ -923,11 +946,20 @@ impl Render for TextInput {
             )
         };
 
+        let content = self.content.clone();
+        let (anchor, focus) = if self.selection_reversed {
+            (self.selected_range.end, self.selected_range.start)
+        } else {
+            (self.selected_range.start, self.selected_range.end)
+        };
+        let accessible_run_ids = self.accessible_run_ids.clone();
+        let entity = cx.entity().clone();
+
         shell
             .id(self.ident.element_id())
             .key_context(KEY_CONTEXT)
             .track_focus(&self.focus_handle)
-            .when(!self.disabled, |element| {
+            .when(!self.disabled && !self.read_only, |element| {
                 element
                     .on_action(cx.listener(Self::backspace))
                     .on_action(cx.listener(Self::delete))
@@ -958,6 +990,64 @@ impl Render for TextInput {
                     .on_mouse_up(MouseButton::Left, cx.listener(Self::on_mouse_up))
                     .on_mouse_up_out(MouseButton::Left, cx.listener(Self::on_mouse_up))
                     .cursor(CursorStyle::IBeam)
+            })
+            .when(!self.secret, |element| {
+                element
+                    .a11y_synthetic_children(move |builder| {
+                        let ids =
+                            text_edit::publish_accessible_text(builder, &content, anchor, focus);
+                        *accessible_run_ids
+                            .lock()
+                            .unwrap_or_else(|poisoned| poisoned.into_inner()) = ids;
+                    })
+                    .when(!self.disabled, |element| {
+                        let selection_entity = entity.clone();
+                        let selection_ids = self.accessible_run_ids.clone();
+                        element.on_a11y_action(
+                            AccessibleAction::SetTextSelection,
+                            move |data, _, cx| {
+                                let Some(ActionData::SetTextSelection(selection)) = data else {
+                                    return;
+                                };
+                                let run_ids = selection_ids
+                                    .lock()
+                                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                                    .clone();
+                                selection_entity.update(cx, |input, cx| {
+                                    let Some(anchor) =
+                                        text_edit::byte_offset_for_accessible_position(
+                                            &input.content,
+                                            selection.anchor,
+                                            &run_ids,
+                                        )
+                                    else {
+                                        return;
+                                    };
+                                    let Some(focus) =
+                                        text_edit::byte_offset_for_accessible_position(
+                                            &input.content,
+                                            selection.focus,
+                                            &run_ids,
+                                        )
+                                    else {
+                                        return;
+                                    };
+                                    input.selected_range = anchor.min(focus)..anchor.max(focus);
+                                    input.selection_reversed = focus < anchor;
+                                    input.marked_range = None;
+                                    cx.notify();
+                                });
+                            },
+                        )
+                    })
+            })
+            .when(!self.disabled && !self.read_only, |element| {
+                element.on_a11y_action(AccessibleAction::SetValue, move |data, _, cx| {
+                    let Some(ActionData::Value(value)) = data else {
+                        return;
+                    };
+                    entity.update(cx, |input, cx| input.set_value(value.to_string(), cx));
+                })
             })
             .h(px(metrics.height))
             .child(TextElement::new(cx.entity()))
