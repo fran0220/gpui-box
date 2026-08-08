@@ -9,6 +9,7 @@ permissions:
 
 jobs:
   rust:
+    name: Non-visual gate (macOS)
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v5
@@ -17,11 +18,7 @@ jobs:
           toolchain: 1.97.0
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - run: cargo fmt --all -- --check
-      - run: cargo check --workspace --all-targets
-      - run: cargo test --workspace
-      - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: cargo run -p xtask -- tokens check
+      - run: cargo run -p xtask -- gate
       - run: cargo doc --no-deps --workspace
         env:
           RUSTDOCFLAGS: -D warnings
@@ -40,6 +37,37 @@ jobs:
             echo "No \`VISUAL_RUNNER\` repository variable is set, so no job ran it."
             echo "See docs/screenshot-testing.md for the manual step a reviewer records."
           } >> "$GITHUB_STEP_SUMMARY"
+
+  headless:
+    name: Headless visual gate (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Linux renderer dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang cmake pkg-config libfontconfig1-dev \
+            libwayland-dev libx11-xcb-dev libxkbcommon-x11-dev \
+            libvulkan1 mesa-vulkan-drivers
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo run -p xtask -- dependencies check
+      - run: cargo run -p xtask -- headless check
+      - name: Upload headless render differences
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: headless-scene-check-${{ runner.os }}
+          path: target/headless-scene-check
+          if-no-files-found: ignore
 
   # The visual regression gate, which only runs where it can actually look.
   #

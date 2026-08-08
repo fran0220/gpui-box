@@ -5,6 +5,8 @@
 ## Checks
 
 - [ ] `cargo run -p xtask -- gate` passes.
+- [ ] `cargo run -p xtask -- headless check` passes on Linux or Windows, or the
+      change cannot affect rendering.
 
 ## Visual regression
 
