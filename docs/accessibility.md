@@ -79,7 +79,7 @@ evidence that a particular screen reader announces every property correctly.
 | Numeric min, max, current value | Bridged; deterministic tree verified | Bridged; native session unverified | Bridged; native session unverified |
 | Editable text | TextInput/MultilineTextInput parent and TextRun children verified deterministically | Same AccessKit structure; native session unverified | Same AccessKit structure; native session unverified |
 | Text selection and caret | Selection/caret structure and actions verified deterministically; native AX interaction unverified | Same AccessKit structure; native UIA interaction unverified | Same AccessKit structure; native AT-SPI interaction unverified |
-| Live-region announcements | Not implemented or claimed | Not implemented or claimed | Not implemented or claimed |
+| Live-region updates | Polite Status and polite/assertive atomic Toast structure verified deterministically; VoiceOver speech/timing unverified | Same AccessKit structure; UIA announcement unverified | Same AccessKit structure; AT-SPI announcement unverified |
 | GPUI overlays | Nodes rendered in the overlay enter the GPUI tree; native announcement and ordering unverified | Same boundary; native session unverified | Same boundary; native session unverified |
 | Native-child handoff | Not implemented | Not implemented | Not implemented |
 
@@ -91,9 +91,10 @@ stable text runs, selection/caret positions, and `SetValue` and
 `SetTextSelection` actions. IME offsets are converted between UTF-8 and UTF-16,
 including surrogate pairs. Disabled and read-only fields omit value-changing
 actions; read-only fields retain selection actions. Password fields use the
-native password role but publish neither plaintext nor text runs. Native caret
-geometry, live politeness, and native child nodes remain separate platform
-work rather than being inferred from a string value.
+native password role but publish neither plaintext nor text runs. Status nodes
+default to polite updates; ordinary toasts are polite and danger toasts are
+assertive, with the whole toast marked atomic. Announcement speech and timing,
+native caret geometry, and native child nodes remain separate platform work.
 
 The deterministic smoke test activates GPUI's test accessibility adapter,
 renders a real element tree, and asserts role, name, value, range, control

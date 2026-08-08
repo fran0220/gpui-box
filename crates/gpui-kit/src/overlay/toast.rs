@@ -29,7 +29,7 @@ use gpui::{
     prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::{Icon, icon};
-use gpui_kit_semantics::{NodeSpec, Role, Semantic};
+use gpui_kit_semantics::{LiveRegion, NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Elevation, Layer, Space, Theme, TypeScale};
 use web_time::Instant;
 
@@ -555,6 +555,12 @@ impl ToastLayer {
                 NodeSpec::new(id, Role::Toast)
                     .text(toast.message.clone())
                     .value(toast.tone.name())
+                    .live(if toast.tone == Tone::Danger {
+                        LiveRegion::Assertive
+                    } else {
+                        LiveRegion::Polite
+                    })
+                    .live_atomic(true)
                     .hovered(hovered),
             );
 

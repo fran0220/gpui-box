@@ -59,6 +59,13 @@ pub enum Role {
     Drag,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum LiveRegion {
+    Polite,
+    Assertive,
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub struct Rect {
     pub x: f32,
@@ -131,6 +138,10 @@ pub struct Node {
     pub invalid: bool,
     #[serde(skip_serializing_if = "is_false")]
     pub required: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub live: Option<LiveRegion>,
+    #[serde(skip_serializing_if = "is_false")]
+    pub live_atomic: bool,
 }
 
 fn is_false(value: &bool) -> bool {
@@ -321,10 +332,13 @@ pub struct NodeSpec {
     busy: bool,
     invalid: bool,
     required: bool,
+    live: Option<LiveRegion>,
+    live_atomic: bool,
 }
 
 impl NodeSpec {
     pub fn new(id: impl Into<SharedString>, role: Role) -> Self {
+        let live = matches!(role, Role::Status | Role::Toast).then_some(LiveRegion::Polite);
         Self {
             id: id.into(),
             role,
@@ -347,6 +361,8 @@ impl NodeSpec {
             busy: false,
             invalid: false,
             required: false,
+            live,
+            live_atomic: false,
         }
     }
 
@@ -406,6 +422,16 @@ impl NodeSpec {
 
     pub fn required(mut self, required: bool) -> Self {
         self.required = required;
+        self
+    }
+
+    pub fn live(mut self, live: LiveRegion) -> Self {
+        self.live = Some(live);
+        self
+    }
+
+    pub fn live_atomic(mut self, atomic: bool) -> Self {
+        self.live_atomic = atomic;
         self
     }
 
@@ -577,12 +603,19 @@ where
     if let Some(level) = spec.level {
         element = element.aria_level(level as usize);
     }
+    if let Some(live) = spec.live {
+        element = element.aria_live(match live {
+            LiveRegion::Polite => gpui::accesskit::Live::Polite,
+            LiveRegion::Assertive => gpui::accesskit::Live::Assertive,
+        });
+    }
     element
         .aria_disabled(spec.disabled)
         .aria_read_only(spec.read_only)
         .aria_invalid(spec.invalid)
         .aria_required(spec.required)
         .aria_busy(spec.busy)
+        .aria_live_atomic(spec.live_atomic)
 }
 
 fn supports_selection(role: Role) -> bool {
@@ -677,6 +710,8 @@ fn diagnostic_probe(registry: Option<&SemanticRegistry>, spec: NodeSpec) -> impl
                 busy: spec.busy,
                 invalid: spec.invalid,
                 required: spec.required,
+                live: spec.live,
+                live_atomic: spec.live_atomic,
             });
         },
         |_, _, _, _| {},

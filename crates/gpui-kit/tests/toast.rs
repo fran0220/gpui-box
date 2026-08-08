@@ -74,7 +74,21 @@ fn a_pushed_toast_is_published_with_its_message_and_tone(cx: &mut TestAppContext
     assert_eq!(node.role, Role::Toast);
     assert_eq!(node.text.as_deref(), Some("The run was published"));
     assert_eq!(node.value.as_deref(), Some("success"));
+    assert_eq!(node.live, Some(gpui_kit_semantics::LiveRegion::Polite));
+    assert!(node.live_atomic);
     assert!(node.visible);
+
+    let tree = harness.accessibility_tree();
+    let native = tree["nodes"]
+        .as_object()
+        .and_then(|nodes| {
+            nodes.values().find(|node| {
+                node["element_id"] == "Name(\"run.published\")" && node["aria"]["role"] == "Status"
+            })
+        })
+        .expect("native live status");
+    assert_eq!(native["aria"]["live"], "Polite");
+    assert_eq!(native["aria"]["live_atomic"], true);
 
     let snapshot = harness.snapshot();
     let children: Vec<&str> = snapshot
@@ -92,6 +106,27 @@ fn a_pushed_toast_is_published_with_its_message_and_tone(cx: &mut TestAppContext
             .role,
         Role::Button
     );
+}
+
+#[gpui::test]
+fn a_danger_toast_is_an_assertive_live_region(cx: &mut TestAppContext) {
+    let (mut harness, _layer) = scene(cx, 3);
+    assert!(push(
+        &mut harness,
+        Toast::new("run.failed", "Publishing failed").tone(Tone::Danger)
+    ));
+    let node = harness.node("run.failed").expect("published");
+    assert_eq!(node.live, Some(gpui_kit_semantics::LiveRegion::Assertive));
+    let tree = harness.accessibility_tree();
+    let native = tree["nodes"]
+        .as_object()
+        .and_then(|nodes| {
+            nodes.values().find(|node| {
+                node["element_id"] == "Name(\"run.failed\")" && node["aria"]["role"] == "Status"
+            })
+        })
+        .expect("assertive native status");
+    assert_eq!(native["aria"]["live"], "Assertive");
 }
 
 #[gpui::test]
