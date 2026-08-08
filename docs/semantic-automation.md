@@ -17,7 +17,10 @@ button.semantic(
 ```
 
 The probe stretches over its parent and records bounds during prepaint. It
-paints nothing and does not consume input.
+paints nothing and does not consume input. The same call also projects the
+supported role, name, value, control state, focus, range, and widget selection
+into GPUI's AccessKit tree. See [Accessibility](accessibility.md) for the exact
+platform capability matrix and unsupported boundaries.
 
 ## Frame lifecycle
 
@@ -66,9 +69,10 @@ container holds, the name of a state, or the reason a row was refused. The
 cases are spelled out in `docs/components.md`; a component that publishes
 `value` for anything else is a bug in that component, not a new case.
 
-The tree does not define a network server. Applications may serialize the
-snapshot through a debug-only transport, read it in-process, or use it directly
-in unit tests.
+The deterministic tree does not define a network server and is not itself the
+screen-reader transport. Applications may serialize the snapshot through a
+debug-only transport, read it in-process, or use it directly in unit tests.
+GPUI's AccessKit adapter owns the separate platform tree.
 
 ## Security
 

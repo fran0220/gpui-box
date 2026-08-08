@@ -4,7 +4,7 @@
 
 | gpui-kit | GPUI source | Revision |
 |---|---|---|
-| 0.1.x | `https://github.com/fran0220/zed` | `3d943ed6040b3318e1d8b08f54d74c0b5693173f` |
+| 0.1.x | `https://github.com/fran0220/zed` | `5436c986b06beacd696e8645a725f014f25d7d36` |
 
 The workspace and the standalone headless harness depend on one immutable
 revision of the integration fork. That revision merges two independently
@@ -13,6 +13,11 @@ reviewable topic stacks on upstream baseline
 surfaces and the offscreen WGPU renderer. crates.io is not usable yet: the
 published `gpui` crate stopped at 0.2.2 and `gpui_platform` has never been
 published, so the pin remains a Git revision.
+
+The current integration descendant also carries the product-neutral control
+state projection and deterministic accessibility-adapter activation used by
+gpui-kit. The detailed, evidence-scoped platform matrix lives in
+[`accessibility.md`](accessibility.md).
 
 ## Platform behavior
 

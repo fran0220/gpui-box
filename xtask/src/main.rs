@@ -3,6 +3,10 @@ use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+#[cfg(target_os = "macos")]
+use std::thread;
+#[cfg(target_os = "macos")]
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, bail};
 
@@ -31,6 +35,7 @@ fn main() -> Result<()> {
             site::generate(&root(), rest.first().map(String::as_str)).map(|_| ())
         }
         (Some("site"), Some("check")) => site::check(&root()),
+        (Some("accessibility"), Some("check")) => accessibility_check(),
         (Some("scenes"), Some("list")) => scenes_list(),
         (Some("scenes"), Some("capture")) => scenes_capture(&rest),
         (Some("scenes"), Some("check")) => scenes_check(&rest),
@@ -39,13 +44,109 @@ fn main() -> Result<()> {
         (Some("gate"), None) => gate(false),
         (Some("gate"), Some("full")) => gate(true),
         _ => bail!(
-            "usage: cargo xtask <dependencies check|tokens generate|tokens check|strings check|\
+            "usage: cargo xtask <dependencies check|accessibility check|tokens generate|tokens check|strings check|\
              strings generate|scenes list|scenes capture [name...]|\
              scenes check [name...]|headless capture [name...]|\
              headless check [name...]|gate [full]>"
         ),
     }
 }
+
+#[cfg(target_os = "macos")]
+fn accessibility_check() -> Result<()> {
+    step("cargo", &["build", "-p", "gpui-kit-gallery"], None)?;
+    let executable = root().join("target/debug/gpui-kit-gallery");
+    let mut gallery = Command::new(&executable)
+        .args(["--scene", "button", "--theme", "studio-light"])
+        .current_dir(root())
+        .spawn()
+        .context("launch the gallery for the macOS accessibility smoke check")?;
+
+    let result = (|| {
+        let enabled = osascript("tell application \"System Events\" to get UI elements enabled")?;
+        if enabled.trim() != "true" {
+            bail!(
+                "macOS Accessibility permission is unavailable; enable it for the invoking terminal before rerunning"
+            );
+        }
+
+        let deadline = Instant::now() + Duration::from_secs(15);
+        let output = loop {
+            let output = osascript(AX_SMOKE_SCRIPT).unwrap_or_default();
+            if output.contains("Primary|AXButton|true") {
+                break output;
+            }
+            if Instant::now() >= deadline {
+                bail!("the gallery did not expose its macOS AX tree within 15 seconds");
+            }
+            thread::sleep(Duration::from_millis(250));
+        };
+
+        for expected in [
+            "Primary|AXButton|true",
+            "Unavailable|AXButton|false",
+            "Saving|AXButton|false",
+            "Selected|AXCheckBox|true",
+        ] {
+            if !output.lines().any(|line| line.trim() == expected) {
+                bail!("macOS AX tree is missing `{expected}`; received:\n{output}");
+            }
+        }
+        println!("macOS AX roles, names, disabled state, and checked state match");
+        Ok(())
+    })();
+
+    if gallery.try_wait()?.is_none() {
+        gallery
+            .kill()
+            .context("stop the accessibility smoke gallery")?;
+    }
+    gallery
+        .wait()
+        .context("reap the accessibility smoke gallery")?;
+    result
+}
+
+#[cfg(not(target_os = "macos"))]
+fn accessibility_check() -> Result<()> {
+    bail!("the native accessibility smoke check currently requires macOS")
+}
+
+#[cfg(target_os = "macos")]
+fn osascript(script: &str) -> Result<String> {
+    let output = Command::new("osascript")
+        .args(["-e", script])
+        .output()
+        .context("query macOS accessibility through System Events")?;
+    if !output.status.success() {
+        bail!(
+            "macOS accessibility query failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+#[cfg(target_os = "macos")]
+const AX_SMOKE_SCRIPT: &str = r#"
+tell application "System Events"
+  if not (exists process "gpui-kit-gallery") then return ""
+  tell process "gpui-kit-gallery"
+    set frontmost to true
+    set axItems to entire contents of window 1
+    set output to ""
+    repeat with itemRef in axItems
+      try
+        set itemName to name of itemRef as text
+        if itemName is "Primary" or itemName is "Unavailable" or itemName is "Saving" or itemName is "Selected" then
+          set output to output & itemName & "|" & (role of itemRef as text) & "|" & (enabled of itemRef as text) & linefeed
+        end if
+      end try
+    end repeat
+    return output
+  end tell
+end tell
+"#;
 
 fn scenes_list() -> Result<()> {
     for scene in gpui_kit::scenes::catalog() {

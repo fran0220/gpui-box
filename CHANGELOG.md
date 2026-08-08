@@ -13,6 +13,13 @@ is what Cargo requires a manifest to carry, not a version anybody can take.
 
 ### Added
 
+**Platform accessibility.** Semantic nodes now project supported roles, names,
+values, control states, focus, numeric ranges, and widget selection into GPUI's
+AccessKit tree while retaining the deterministic test registry. The maintained
+fork forwards that tree to macOS AX, Windows UIA, and Linux AT-SPI and exposes a
+deterministic adapter smoke path. Editable caret/selection, live regions, and
+native-child handoff remain explicitly unsupported.
+
 **Tokens and theme.** `crates/gpui-kit-tokens/tokens/studio-dark.json` and `crates/gpui-kit-tokens/tokens/studio-light.json`
 are the source of truth, expressed as a palette plus references so retuning a
 scale is one edit rather than one per role. Themes carry elevation, z-index and

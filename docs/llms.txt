@@ -131,7 +131,8 @@ Do not hand-edit any of these. Each has a `check` that fails when it drifts.
 - [docs/token-model.md](token-model.md) and [docs/token-reference.md](token-reference.md) — rule 2
 - [docs/semantic-automation.md](semantic-automation.md) — rule 4
 - [docs/motion.md](motion.md) — springs, easings, entrances, and the busy vocabulary
-- [docs/accessibility.md](accessibility.md), [docs/interaction.md](interaction.md), [docs/datetime.md](datetime.md)
+- [docs/accessibility.md](accessibility.md) — platform AX/UIA/AT-SPI capability matrix and explicit unsupported boundaries
+- [docs/interaction.md](interaction.md), [docs/datetime.md](datetime.md)
 - [docs/host-view-boundary.md](host-view-boundary.md) — what belongs to the host
 - [docs/abi-vocabulary.md](abi-vocabulary.md) — what a serialized plugin vocabulary would take
 - [docs/screenshot-testing.md](screenshot-testing.md) — how captures stay reproducible

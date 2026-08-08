@@ -44,7 +44,7 @@ gpui-kit = { git = "https://github.com/fran0220/gpui-kit", rev = "<commit>" }
 # different revision as a different crate: two copies of GPUI in one binary
 # means two sets of globals, and the theme and semantic registry this library
 # installs would be invisible to your views.
-gpui = { git = "https://github.com/fran0220/zed", rev = "3d943ed6040b3318e1d8b08f54d74c0b5693173f" }
+gpui = { git = "https://github.com/fran0220/zed", rev = "5436c986b06beacd696e8645a725f014f25d7d36" }
 ```
 
 If the application names `gpui_platform` or `gpui_wgpu` too, give every GPUI
@@ -279,7 +279,7 @@ requires and why a job that ran it anyway would be worse than no job.
 ## GPUI compatibility
 
 The workspace pins the `fran0220/zed` integration fork at
-`3d943ed6040b3318e1d8b08f54d74c0b5693173f`. It combines the runtime
+`5436c986b06beacd696e8645a725f014f25d7d36`. It combines the runtime
 primitives and native-surface work with the offscreen WGPU renderer on one
 immutable revision; reusable pieces can be proposed upstream independently. See
 [`docs/compatibility.md`](docs/compatibility.md).
@@ -296,7 +296,7 @@ immutable revision; reusable pieces can be proposed upstream independently. See
 - [Host/view boundary](docs/host-view-boundary.md)
 - [Semantic automation](docs/semantic-automation.md)
 - [Screenshot testing](docs/screenshot-testing.md)
-- [Accessibility](docs/accessibility.md)
+- [Accessibility and platform capability matrix](docs/accessibility.md)
 - [GPUI recipes](docs/gpui-recipes.md)
 - [Motion](docs/motion.md)
 - [Drag and drop](docs/interaction.md)
