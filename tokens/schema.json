@@ -271,16 +271,12 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "glassAlphaMacos",
-        "backdropBlur",
         "edgeFadeBand",
         "selectedRingAlpha",
         "focusRingWidth",
         "focusRingAlpha"
       ],
       "properties": {
-        "glassAlphaMacos": { "type": "number", "minimum": 0, "maximum": 1 },
-        "backdropBlur": { "$ref": "#/$defs/positiveNumber" },
         "edgeFadeBand": { "$ref": "#/$defs/positiveNumber" },
         "selectedRingAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
         "focusRingWidth": { "$ref": "#/$defs/positiveNumber" },

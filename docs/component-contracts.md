@@ -68,12 +68,6 @@ Use:
 - pulse loader for a neutral wait;
 - gradient spinner for compact active work.
 
-## Effects
-
-`frosted` and `edge_faded` depend on the pinned public GPUI fork. They must wrap
-the complete affected subtree. Applying blur separately to each row creates
-unstable paint ordering and is not supported.
-
 ## Long content
 
 External paths, messages, command descriptions, and user content require an

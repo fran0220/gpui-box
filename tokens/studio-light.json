@@ -182,8 +182,6 @@
     "rubberBandTension": 0.55
   },
   "effect": {
-    "glassAlphaMacos": 0.95,
-    "backdropBlur": 16,
     "edgeFadeBand": 20,
     "selectedRingAlpha": 0.12,
     "focusRingWidth": 2,

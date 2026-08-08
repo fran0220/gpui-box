@@ -72,7 +72,7 @@ one call:
 ```rust
 use gpui_kit::prelude::*;
 
-// This is what the gallery does, through the fork's `gpui_platform` crate.
+// This is what the gallery does, through GPUI's `gpui_platform` crate.
 // Substitute whatever constructs your own Application; if it already has an
 // asset source, delegate `icons/…` to this one.
 let app = gpui_platform::application().with_assets(gpui_kit::assets::Assets);
@@ -254,10 +254,10 @@ requires and why a job that ran it anyway would be worse than no job.
 
 ## GPUI compatibility
 
-The workspace pins the public `fran0220/zed` fork at
-`cb2ce82766e42c55fc8563de3c5c98ac8e1c9fd9`. The fork contains the
-EdgeFade, BackdropBlur, and native overlay patches required by the component
-effects. See [`docs/compatibility.md`](docs/compatibility.md).
+The workspace pins upstream `zed-industries/zed` at
+`a6a23c7b80a5cefa0487b7856335be89ace7e483`. No fork and no GPUI patches:
+every capability the components use is a public upstream API. See
+[`docs/compatibility.md`](docs/compatibility.md).
 
 ## Documentation
 

@@ -14,8 +14,6 @@
 | Known list geometry while loading | `loaders::skeleton_rows` |
 | Neutral active work | `loaders::pulse_loader` |
 | Compact active indicator | `loaders::gradient_spinner` |
-| Frosted floating subtree | `effects::frosted` |
-| Scroll-boundary content fade | `effects::edge_faded` |
 | Async state without stale value | `state::Loadable` |
 | Refresh while preserving data | `state::AsyncValue` |
 

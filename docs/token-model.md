@@ -106,9 +106,8 @@ GPUI text backend applies a variable font's weight axis.
 Motion tokens store duration and cubic-bezier control points. Component motion
 evaluates CSS-compatible curves through the pure `CubicBezier` implementation.
 
-Glass alpha is platform-resolved by `gpui-kit-theme`: macOS may use backdrop
-blur; other platforms receive opaque surfaces unless equivalent compositor
-support is proven.
+Overlay surfaces are opaque on every platform; GPUI has no per-element
+backdrop blur, and gpui-kit does not fake one.
 
 The two rings live here too. `effect.selectedRingAlpha` draws the inset ring on
 the current answer; `effect.focusRingWidth` and `effect.focusRingAlpha` draw the

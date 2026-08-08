@@ -22,7 +22,7 @@ use crate::foundation::{Ident, StyledExt};
 use crate::overlay::focus::FocusTrap;
 use crate::overlay::layer::{Overlay, Placement, surface};
 
-use crate::{effects, motion};
+use crate::motion;
 
 /// What a keystroke means to a menu-like surface, once the platform's
 /// modifier conventions have been applied.
@@ -181,7 +181,7 @@ pub fn card(theme: &Theme) -> gpui::Div {
         .elevation(theme, Elevation::Overlay)
         .p(px(theme.spacing.xs))
         .overflow_hidden()
-        .bg(theme.colors.overlay.opacity(theme.effects.glass_alpha))
+        .bg(theme.colors.overlay)
         .text_size(px(theme.typography.body.size))
         .text_color(theme.colors.text)
 }
@@ -204,7 +204,6 @@ fn pinned(layer: AnyElement) -> AnyElement {
 
 /// Places `content` under `anchor`, flipping above when there is no room.
 pub fn anchored_below(id: impl Into<ElementId>, theme: &Theme, content: AnyElement) -> AnyElement {
-    let content = effects::frosted(theme, theme.radii.card, content).into_any_element();
     pinned(
         gpui::deferred(
             gpui::anchored()
@@ -226,7 +225,6 @@ pub fn anchored_below(id: impl Into<ElementId>, theme: &Theme, content: AnyEleme
 
 /// Places `content` over `anchor`, flipping below when there is no room.
 pub fn anchored_above(id: impl Into<ElementId>, theme: &Theme, content: AnyElement) -> AnyElement {
-    let content = effects::frosted(theme, theme.radii.card, content).into_any_element();
     pinned(
         gpui::deferred(
             gpui::anchored()
@@ -253,7 +251,6 @@ pub fn at(
     position: Point<Pixels>,
     content: AnyElement,
 ) -> AnyElement {
-    let content = effects::frosted(theme, theme.radii.card, content).into_any_element();
     gpui::deferred(
         gpui::anchored()
             .position(position)
@@ -272,7 +269,6 @@ pub fn modal(
     viewport: gpui::Size<Pixels>,
     content: AnyElement,
 ) -> AnyElement {
-    let content = effects::frosted(theme, theme.radii.dialog, content).into_any_element();
     gpui::deferred(
         gpui::anchored()
             .position(gpui::point(px(0.0), px(0.0)))

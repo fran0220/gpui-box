@@ -613,8 +613,6 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
 
     output.push_str("\n### Effects\n\n| Token | Value |\n|---|---:|\n");
     for (name, value) in [
-        ("effect.glassAlphaMacos", tokens.effect.glass_alpha_macos),
-        ("effect.backdropBlur", tokens.effect.backdrop_blur),
         ("effect.edgeFadeBand", tokens.effect.edge_fade_band),
         (
             "effect.selectedRingAlpha",

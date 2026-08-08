@@ -21,11 +21,11 @@ rust-version = "1.97"
 [workspace.dependencies]
 unicode-segmentation = "1"
 anyhow = "1"
-gpui = { git = "https://github.com/fran0220/zed", rev = "cb2ce82766e42c55fc8563de3c5c98ac8e1c9fd9" }
+gpui = { git = "https://github.com/zed-industries/zed", rev = "a6a23c7b80a5cefa0487b7856335be89ace7e483" }
 # Matches the instant type GPUI's executor clock returns, so tests can drive
 # motion through the simulated clock instead of wall time.
 web-time = "1"
-gpui_platform = { git = "https://github.com/fran0220/zed", rev = "cb2ce82766e42c55fc8563de3c5c98ac8e1c9fd9", features = ["font-kit"] }
+gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "a6a23c7b80a5cefa0487b7856335be89ace7e483", features = ["font-kit"] }
 png = "=0.18.1"
 # Parsing only. The html feature is off: this crate renders Markdown to GPUI
 # elements and never produces or executes HTML.
@@ -60,3 +60,18 @@ unwrap_used = "warn"
 lto = "thin"
 codegen-units = 1
 strip = "debuginfo"
+
+# Scene captures encode 160 full-window PNGs per run, and the deflate inside
+# is what a debug build spends most of its time on. Optimizing just the
+# compression crates keeps `scenes capture` fast without giving up debug
+# builds for anything of ours.
+[profile.dev.package.png]
+opt-level = 3
+[profile.dev.package.fdeflate]
+opt-level = 3
+[profile.dev.package.miniz_oxide]
+opt-level = 3
+[profile.dev.package.flate2]
+opt-level = 3
+[profile.dev.package.crc32fast]
+opt-level = 3

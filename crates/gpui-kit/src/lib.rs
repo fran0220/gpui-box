@@ -26,7 +26,7 @@
 //! - [`overlay`] — anchored and modal surfaces, menus, notifications.
 //! - [`interaction`] — drag and drop, the one gesture that starts in one
 //!   component and finishes in another.
-//! - [`motion`] and [`effects`] — token-driven animation and paint.
+//! - [`motion`] — token-driven animation.
 //! - [`state`] — the explicit async states a truthful surface distinguishes.
 //! - [`strings`] — every word this library shows, and the host's right to
 //!   replace any of them without losing the English behind the rest.
@@ -61,7 +61,6 @@ pub mod controls;
 pub mod data;
 pub mod datetime;
 pub mod display;
-pub mod effects;
 pub mod foundation;
 pub mod interaction;
 pub mod layout;

@@ -286,7 +286,7 @@ impl Flip {
 
     /// Whether two elements are currently sharing this id.
     ///
-    /// A contested id does not animate at all: see [`FlipState::claim`].
+    /// A contested id does not animate at all.
     pub fn is_contended(&self) -> bool {
         let state = self.state.borrow();
         match (state.seen_frame, state.contested_through) {
@@ -317,8 +317,8 @@ pub fn flip(id: impl Into<SharedString>, cx: &mut App) -> Flip {
 /// panel inverts from the rectangle the row last recorded and travels there
 /// instead of cutting. What this adds over [`flip`] is only patience: the
 /// rectangle survives the frames in which neither tree renders the id, up to
-/// [`HANDOFF_GRACE`] frames and [`MEMORY`] of wall clock, whichever ends
-/// first. Past that the arriving element is simply already in place.
+/// 30 frames and 500 ms of wall clock, whichever ends first. Past that the
+/// arriving element is simply already in place.
 ///
 /// Both trees rendering the id at once is a collision, and a collision does
 /// not animate; see [`Flip::is_contended`].
@@ -330,10 +330,9 @@ pub fn shared_flip(id: impl Into<SharedString>, cx: &mut App) -> Flip {
 
 /// The ids the flip global currently retains.
 ///
-/// An id that stops rendering is dropped within two frames — or within
-/// [`HANDOFF_GRACE`] frames when it was last asked for through
-/// [`shared_flip`] — so this is the set of elements on screen rather than
-/// every element ever flipped.
+/// An id that stops rendering is dropped within two frames — or within 30
+/// when it was last asked for through [`shared_flip`] — so this is the set
+/// of elements on screen rather than every element ever flipped.
 pub fn tracked_ids(cx: &App) -> Vec<SharedString> {
     keyed::ids::<FlipState>(cx)
 }

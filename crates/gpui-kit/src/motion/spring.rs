@@ -60,7 +60,7 @@ impl Spring {
     ///
     /// So a bounce of 0 settles without passing its target, a positive bounce
     /// overshoots and comes back, and a negative one crawls in. The bounce is
-    /// held inside `-0.99..=0.99`; see [`BOUNCE_LIMIT`].
+    /// held inside `-0.99..=0.99`.
     ///
     /// [`Spring::new`] is unchanged and remains the way in for a spring whose
     /// three constants are already known, a token preset included.

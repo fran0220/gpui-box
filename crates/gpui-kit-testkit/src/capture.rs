@@ -70,6 +70,8 @@ pub enum CaptureError {
     Io(#[from] std::io::Error),
     #[error("the screenshot could not be encoded: {0}")]
     Encode(String),
+    #[error("the renderer could not read the frame back: {0}")]
+    Render(String),
     #[error("in-process window capture is implemented for macOS only")]
     Unsupported,
 }
@@ -77,6 +79,34 @@ pub enum CaptureError {
 /// Grabs the content area of `window`.
 pub fn capture_window(window: &gpui::Window) -> Result<Frame, CaptureError> {
     platform::capture(window)
+}
+
+/// Renders the window's last-drawn frame straight from the GPU and returns
+/// the pixels, without involving the window server.
+///
+/// Where [`capture_window`] asks the compositor what it last put on screen,
+/// this re-renders the scene GPUI drew into a fresh texture and reads it
+/// back. The window's position, occlusion, corner mask, and the compositor's
+/// color handling never touch the result, which is what makes the same scene
+/// produce the same bytes on every run. This is the capture the visual
+/// regression gate uses; `capture_window` remains for grabbing what a real,
+/// composited product window shows.
+#[cfg(feature = "test-support")]
+pub fn render_frame(window: &gpui::Window) -> Result<Frame, CaptureError> {
+    let image = window
+        .render_to_image()
+        .map_err(|error| CaptureError::Render(error.to_string()))?;
+    let scale_factor = window.scale_factor();
+    let width = image.width();
+    let height = image.height();
+    Ok(Frame {
+        width,
+        height,
+        scale_factor,
+        content_width: width as f32 / scale_factor,
+        content_height: height as f32 / scale_factor,
+        rgba: image.into_raw(),
+    })
 }
 
 #[cfg(target_os = "macos")]

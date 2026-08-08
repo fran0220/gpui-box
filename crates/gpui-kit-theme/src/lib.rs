@@ -234,8 +234,6 @@ impl ZIndices {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Effects {
-    pub glass_alpha: f32,
-    pub backdrop_blur: f32,
     pub edge_fade_band: f32,
     pub selected_ring_alpha: f32,
     pub focus_ring_width: f32,
@@ -401,12 +399,6 @@ impl Theme {
                 toast: tokens.z_index(Layer::Toast),
             },
             effects: Effects {
-                glass_alpha: if cfg!(target_os = "macos") {
-                    tokens.effect.glass_alpha_macos
-                } else {
-                    1.0
-                },
-                backdrop_blur: tokens.effect.backdrop_blur,
                 edge_fade_band: tokens.effect.edge_fade_band,
                 selected_ring_alpha: tokens.effect.selected_ring_alpha,
                 focus_ring_width: tokens.effect.focus_ring_width,

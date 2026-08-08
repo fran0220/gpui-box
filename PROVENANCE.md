@@ -21,15 +21,13 @@ license is stored at `licenses/COMET-MIT.txt`.
 ## P02: GPUI / Zed
 
 - Source: <https://github.com/zed-industries/zed>
-- Public fork: <https://github.com/fran0220/zed>
-- Baseline: `a6a23c7b80a5cefa0487b7856335be89ace7e483`
-- Pinned fork revision: `cb2ce82766e42c55fc8563de3c5c98ac8e1c9fd9`
+- Pinned revision: `a6a23c7b80a5cefa0487b7856335be89ace7e483`
 - License: Apache-2.0
 - Copyright: Copyright 2022–2024 Zed Industries, Inc.
 
-The fork revision adds line-wrap corrections, EdgeFade, BackdropBlur,
-three-plane native-surface composition, native focus handoff, and Windows
-native-surface portals. `gpui-kit` links these crates by public Git revision.
+`gpui-kit` links upstream GPUI by public Git revision, unmodified. The fork
+that previously carried EdgeFade, BackdropBlur, and native-surface patches is
+no longer a dependency.
 
 The Apache-2.0 text is stored at `licenses/ZED-APACHE-2.0.txt`.
 

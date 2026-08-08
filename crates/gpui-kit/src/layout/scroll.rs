@@ -432,7 +432,7 @@ impl Global for ScrollHandles {}
 /// and across from the start of its content.
 ///
 /// This is what a scroll-linked value reads: pair it with
-/// [`ScrollLink`](crate::motion::ScrollLink) to collapse a header or fade a
+/// [`ScrollLink`] to collapse a header or fade a
 /// heading as the content moves under it. A region that has never rendered
 /// reports zero, which is where it will be when it does.
 pub fn scroll_offset(ident: impl Into<Ident>, cx: &mut App) -> Point<Pixels> {

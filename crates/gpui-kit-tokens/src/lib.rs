@@ -155,7 +155,6 @@ impl TokenDocument {
         }
 
         for (path, value) in [
-            ("effect.glassAlphaMacos", self.effect.glass_alpha_macos),
             ("effect.selectedRingAlpha", self.effect.selected_ring_alpha),
             ("effect.focusRingAlpha", self.effect.focus_ring_alpha),
             ("opacity.disabled", self.opacity.disabled),
@@ -1048,8 +1047,6 @@ pub struct EasingTokens {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EffectTokens {
-    pub glass_alpha_macos: f32,
-    pub backdrop_blur: f32,
     pub edge_fade_band: f32,
     pub selected_ring_alpha: f32,
     /// How wide the ring around the focused control is drawn, in pixels.

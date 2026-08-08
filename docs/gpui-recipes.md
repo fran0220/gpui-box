@@ -54,16 +54,6 @@ trigger.child(popover::anchored_below(
 The owning view handles focus, keyboard navigation, outside-click dismissal,
 Escape, and action dispatch.
 
-## Frost
-
-Wrap the complete card subtree once:
-
-```rust
-effects::frosted(theme, theme.radii.card, card)
-```
-
-Do not blur each row independently.
-
 ## Capture after settle
 
 In an `AsyncApp` task:
