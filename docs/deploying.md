@@ -1,6 +1,6 @@
 # Deploying the site and the hosted catalog
 
-Live at <https://gpui-kit.zhangfan0220.workers.dev>. One Cloudflare Worker
+Live at <https://gpui-kit.origingame.dev>. One Cloudflare Worker
 serves both halves of the same catalog: a site a person reads at `/`, and an
 MCP endpoint an agent calls at `/mcp`.
 
@@ -50,7 +50,7 @@ rides an unmerged GPUI pull request, which is not a thing to put in production.
 {
   "mcpServers": {
     "gpui-kit": {
-      "url": "https://gpui-kit.zhangfan0220.workers.dev/mcp"
+      "url": "https://gpui-kit.origingame.dev/mcp"
     }
   }
 }
@@ -62,16 +62,45 @@ tool surface is identical to the local server's, because both read
 
 ## Credentials
 
-Deployment uses whatever Cloudflare session `wrangler` already holds, which for
-a person is `wrangler login`. Nothing is stored in this repository and no
-account id is committed — pass one as `CLOUDFLARE_ACCOUNT_ID` when the session
+Local deployment uses the Cloudflare session `wrangler` already holds; a person
+creates one with `wrangler login`. Set `CLOUDFLARE_ACCOUNT_ID` when that session
 can see more than one account.
 
-For CI, mint a **new** API token scoped to `Workers Scripts: Edit` for the one
-account, and store it as a repository secret. Do not copy an existing token
-from another project: a long-lived credential duplicated into a third place is
-a third place it can leak from, and a scoped token can be revoked without
-taking anything else down with it.
+Every Amp orb receives deployment access from the `doufunao/gpui-kit` project
+settings. Configure the account id as an environment variable and the
+OriginGame Cloudflare deployment token as a secret (the commands read values
+from standard input so they do not enter shell history):
+
+```bash
+printf '%s' '<account-id>' |
+  amp secrets set CLOUDFLARE_ACCOUNT_ID --project doufunao/gpui-kit --env --data-file -
+printf '%s' '<new-token>' |
+  amp secrets set CLOUDFLARE_API_TOKEN --project doufunao/gpui-kit --secret --data-file -
+```
+
+Use a token limited to the deployment account with **Account / Workers Scripts /
+Edit** and to the `origingame.dev` zone with **Zone / Workers Routes / Edit**.
+Cloudflare's custom-domain route creates the DNS record and certificate during
+`wrangler deploy`; no DNS credential or manually managed record is needed.
+The current project secret is copied without printing it from the trusted local
+OriginGame environment, because both projects deploy into the same account and
+zone. A future rotation must update both Amp project secrets. Use a dedicated
+token instead if the two projects need independent revocation or permissions.
+
+The Orb lifecycle caches Wrangler during `.agents/setup` and reports whether
+both variables were injected without printing either value. In an Orb,
+`tools/site/deploy.sh` refuses to start unless both are present. There is no
+long-running service to restart in `.agents/resume` because the deployed Worker
+runs on Cloudflare, not inside the Orb.
+
+The custom domain is the only production route (`workers_dev = false`). The
+Worker configuration is authoritative for both DNS and routing:
+
+```toml
+[[routes]]
+pattern = "gpui-kit.origingame.dev"
+custom_domain = true
+```
 
 ## What a deploy publishes
 

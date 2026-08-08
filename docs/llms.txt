@@ -88,7 +88,7 @@ baseline, in `tools/headless-visual`.
 
 ## If you can call tools
 
-The catalog is hosted at <https://gpui-kit.zhangfan0220.workers.dev>, with an
+The catalog is hosted at <https://gpui-kit.origingame.dev>, with an
 MCP endpoint at `/mcp` that needs no checkout, and `tools/mcp` serves the same
 thing from a working copy over stdio. Both expose
 `search_components`, `component`, `scene`, `render_scene` and `rules`. It is

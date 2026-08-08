@@ -66,4 +66,18 @@ rustup toolchain install "$toolchain" --profile minimal --component clippy --com
 echo "Fetching locked Cargo dependencies."
 cargo fetch --locked
 
+if ! command -v npx >/dev/null 2>&1; then
+  echo "npx is required to deploy the hosted site and MCP endpoint." >&2
+  exit 1
+fi
+
+echo "Caching Wrangler for hosted site and MCP deployments."
+npx --yes wrangler@4 --version >/dev/null
+
+if [[ -n "${CLOUDFLARE_ACCOUNT_ID:-}" && -n "${CLOUDFLARE_API_TOKEN:-}" ]]; then
+  echo "Cloudflare deployment credentials are available."
+else
+  echo "Cloudflare deployment is unavailable: configure CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN in Amp project settings." >&2
+fi
+
 echo "Orb setup complete."

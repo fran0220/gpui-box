@@ -240,7 +240,7 @@ exactly.
 
 ## The catalog, without a checkout
 
-<https://gpui-kit.zhangfan0220.workers.dev> is every component with its exact
+<https://gpui-kit.origingame.dev> is every component with its exact
 signatures, every scene with the code that drew it, and both captured themes.
 The same address serves an MCP endpoint at `/mcp`, so an agent can search the
 catalog, read a signature and look at a component in one call each. It is one

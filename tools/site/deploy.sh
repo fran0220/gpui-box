@@ -11,6 +11,11 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$root"
 
+if [[ -n "${AMP_ORB:-}" ]]; then
+  : "${CLOUDFLARE_ACCOUNT_ID:?Set CLOUDFLARE_ACCOUNT_ID as an Amp project environment variable}"
+  : "${CLOUDFLARE_API_TOKEN:?Set CLOUDFLARE_API_TOKEN as an Amp project secret}"
+fi
+
 # The index is what both the pages and the tools answer out of, so a stale one
 # would publish signatures that no longer compile.
 cargo run -q -p xtask -- api check
