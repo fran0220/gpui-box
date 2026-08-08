@@ -14,7 +14,8 @@ use std::rc::Rc;
 use gpui::{
     AnyElement, App, Context, EventEmitter, FocusHandle, Focusable, InteractiveElement,
     IntoElement, KeyDownEvent, MouseButton, MouseDownEvent, ParentElement, Pixels, Point, Render,
-    SharedString, Styled, Transformation, Window, div, prelude::FluentBuilder, px,
+    SharedString, StatefulInteractiveElement, Styled, Transformation, Window, div,
+    prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -467,6 +468,7 @@ fn row<V: 'static>(
             let row =
                 popover::menu_row(theme, false, active || opened)
                     .id(row_ident.element_id())
+                    .when(active, |element| element.aria_active_descendant())
                     .when(!item.disabled, |element| {
                         element.cursor_pointer().pressable(cx)
                     })
@@ -505,12 +507,9 @@ fn row<V: 'static>(
                         )
                     })
                     .when(!item.disabled, |element| {
-                        element.on_mouse_down(
-                            MouseButton::Left,
-                            cx.listener(move |view, _, window, cx| {
-                                activate(view, path.clone(), window, cx);
-                            }),
-                        )
+                        element.on_click(cx.listener(move |view, _, window, cx| {
+                            activate(view, path.clone(), window, cx);
+                        }))
                     })
                     .semantic_in(cx, spec);
 
@@ -877,18 +876,31 @@ impl Render for Menu {
             }
             let activate: Activate<Self> =
                 Rc::new(|menu: &mut Self, path, window, cx| menu.take(path, window, cx));
+            let menu_id = self.ident.child("menu").semantic_id();
+            let menu_name = self
+                .trigger_name
+                .clone()
+                .unwrap_or_else(|| self.trigger.clone());
             let content = panels(
                 &self.ident,
                 &self.items,
                 &self.state,
-                self.ident.semantic_id(),
+                menu_id.clone(),
                 &theme,
                 cx,
                 activate,
             )
             .track_focus(&self.focus_handle)
             .on_key_down(cx.listener(Self::on_key_down))
-            .on_mouse_down_out(cx.listener(|menu, _, window, cx| menu.dismiss(window, cx)));
+            .on_mouse_down_out(cx.listener(|menu, _, window, cx| menu.dismiss(window, cx)))
+            .semantic_in(
+                cx,
+                NodeSpec::new(menu_id, Role::Menu)
+                    .parent(self.ident.semantic_id())
+                    .text(menu_name)
+                    .expanded(true)
+                    .focus(&self.focus_handle),
+            );
 
             Overlay::new(self.ident.child("overlay"))
                 .placement(self.placement)
@@ -898,7 +910,7 @@ impl Render for Menu {
 
         popover::anchored_slot(self.placement, trigger, overlay).semantic_in(
             cx,
-            NodeSpec::new(self.ident.semantic_id(), Role::Menu)
+            NodeSpec::new(self.ident.semantic_id(), Role::Group)
                 .expanded(self.open)
                 .focus(&self.focus_handle),
         )
@@ -927,6 +939,7 @@ type Content = Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>;
 pub struct ContextMenu {
     ident: Ident,
     focus_handle: FocusHandle,
+    name: SharedString,
     target: Option<SharedString>,
     items: Vec<MenuItem>,
     content: Option<Content>,
@@ -954,6 +967,7 @@ impl ContextMenu {
         Self {
             ident: ident.into(),
             focus_handle: cx.focus_handle(),
+            name: SharedString::default(),
             target: None,
             items: Vec::new(),
             content: None,
@@ -968,6 +982,17 @@ impl ContextMenu {
     pub fn menu(mut self, items: impl IntoIterator<Item = MenuItem>) -> Self {
         self.items = items.into_iter().collect();
         self
+    }
+
+    /// Names the command surface independently of the region under it.
+    pub fn name(mut self, name: impl Into<SharedString>) -> Self {
+        self.name = name.into();
+        self
+    }
+
+    pub fn set_name(&mut self, name: impl Into<SharedString>, cx: &mut Context<Self>) {
+        self.name = name.into();
+        cx.notify();
     }
 
     /// What the wrapped region stands for. Reported when the menu opens, so a
@@ -1112,6 +1137,7 @@ impl Render for ContextMenu {
                 cx,
                 NodeSpec::new(menu_id.clone(), Role::Menu)
                     .parent(self.ident.semantic_id())
+                    .text(self.name.clone())
                     .expanded(true)
                     .focus(&self.focus_handle),
             );

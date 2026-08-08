@@ -260,6 +260,7 @@
       "options": [
         "label(label: impl Into<SharedString>) -> Self",
         "accessible_name(name: impl Into<SharedString>) -> Self",
+        "accessible_description(description: impl Into<SharedString>) -> Self",
         "icon_only(glyph: Icon, name: impl Into<SharedString>) -> Self",
         "join(join: ButtonJoin) -> Self",
         "semantic_parent(parent: impl Into<SharedString>) -> Self",
@@ -625,10 +626,12 @@
       ],
       "options": [
         "menu(items: impl IntoIterator<Item = MenuItem>) -> Self",
+        "name(name: impl Into<SharedString>) -> Self",
         "target(target: impl Into<SharedString>) -> Self",
         "content(content: impl Fn(&mut Window, &mut App) -> AnyElement + 'static) -> Self"
       ],
       "commands": [
+        "set_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_items(items: Vec<MenuItem>, cx: &mut Context<Self>)",
         "open_at(position: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>)",
         "close(window: &mut Window, cx: &mut Context<Self>)",
@@ -6496,7 +6499,7 @@
         "Button",
         "Tooltip"
       ],
-      "example": "fn tooltip(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(\n            row(&theme).child(\n                div()\n                    .id(\"scene.tooltip.host\")\n                    .tip(\"scene.tooltip.export\", \"Writes the theme to a file on disk\")\n                    .child(\n                        Button::new(\"scene.tooltip.export\")\n                            .label(\"Export theme\")\n                            .secondary()\n                            .on_click(|_, _| {}),\n                    ),\n            ),\n        )\n        // Hover help only exists while a pointer rests on the control, so the\n        // surface itself is also shown outright, where it can be reviewed.\n        .child(\n            row(&theme).child(\n                Tooltip::new(\"scene.tooltip.help\", \"Writes the theme to a file on disk\")\n                    .describes(\"scene.tooltip.export\"),\n            ),\n        )\n        .into_any_element()\n}"
+      "example": "fn tooltip(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(\n            row(&theme).child(\n                div()\n                    .id(\"scene.tooltip.host\")\n                    .tip(\"scene.tooltip.export\", \"Writes the theme to a file on disk\")\n                    .child(\n                        Button::new(\"scene.tooltip.export\")\n                            .label(\"Export theme\")\n                            .accessible_description(\"Writes the theme to a file on disk\")\n                            .secondary()\n                            .on_click(|_, _| {}),\n                    ),\n            ),\n        )\n        // Hover help only exists while a pointer rests on the control, so the\n        // surface itself is also shown outright, where it can be reviewed.\n        .child(\n            row(&theme).child(\n                Tooltip::new(\"scene.tooltip.help\", \"Writes the theme to a file on disk\")\n                    .describes(\"scene.tooltip.export\"),\n            ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "menu",

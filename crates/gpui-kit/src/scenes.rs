@@ -753,6 +753,7 @@ fn tooltip(_window: &mut Window, cx: &mut App) -> AnyElement {
                     .child(
                         Button::new("scene.tooltip.export")
                             .label("Export theme")
+                            .accessible_description("Writes the theme to a file on disk")
                             .secondary()
                             .on_click(|_, _| {}),
                     ),
@@ -831,6 +832,7 @@ fn ensure_menus(window: &mut Window, cx: &mut App) {
 
     let context = cx.new(|cx| {
         ContextMenu::new("scene.context.run", window, cx)
+            .name("Run actions")
             .target("run-a04")
             .menu(menu_items())
             .content(|_, cx| {

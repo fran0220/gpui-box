@@ -70,18 +70,7 @@ fn accessibility_check() -> Result<()> {
             );
         }
 
-        let deadline = Instant::now() + Duration::from_secs(15);
-        let output = loop {
-            let script = AX_SMOKE_SCRIPT.replace("__PID__", &gallery.id().to_string());
-            let output = osascript(&script).unwrap_or_default();
-            if output.contains("Primary|AXButton|true") {
-                break output;
-            }
-            if Instant::now() >= deadline {
-                bail!("the gallery did not expose its macOS AX tree within 15 seconds");
-            }
-            thread::sleep(Duration::from_millis(250));
-        };
+        let output = swift_ax_check(gallery.id(), "button")?;
 
         for expected in [
             "Primary|AXButton|true||true",
@@ -109,7 +98,16 @@ fn accessibility_check() -> Result<()> {
         Ok(())
     })();
     result.and(cleanup)?;
-    editable_accessibility_check()
+    thread::sleep(Duration::from_secs(1));
+    editable_accessibility_check()?;
+    thread::sleep(Duration::from_secs(1));
+    dialog_accessibility_check()?;
+    thread::sleep(Duration::from_secs(1));
+    menu_accessibility_check()?;
+    thread::sleep(Duration::from_secs(1));
+    tooltip_accessibility_check()?;
+    thread::sleep(Duration::from_secs(1));
+    toast_accessibility_check()
 }
 
 #[cfg(target_os = "macos")]
@@ -122,18 +120,7 @@ fn editable_accessibility_check() -> Result<()> {
         .context("launch the editable macOS accessibility smoke gallery")?;
 
     let result = (|| {
-        let deadline = Instant::now() + Duration::from_secs(15);
-        let output = loop {
-            let script = AX_EDITABLE_SCRIPT.replace("__PID__", &gallery.id().to_string());
-            let output = osascript(&script).unwrap_or_default();
-            if output.contains("Email|AXTextField|true|edited@example.com|true") {
-                break output;
-            }
-            if Instant::now() >= deadline {
-                bail!("the input scene did not expose an editable macOS AX tree within 15 seconds");
-            }
-            thread::sleep(Duration::from_millis(250));
-        };
+        let output = swift_ax_check(gallery.id(), "editable")?;
         for expected in [
             "API token|AXTextField|true||false",
             "Disabled|AXTextField|false|read only|false",
@@ -161,6 +148,151 @@ fn editable_accessibility_check() -> Result<()> {
         Ok(())
     })();
     result.and(cleanup)
+}
+
+#[cfg(target_os = "macos")]
+fn dialog_accessibility_check() -> Result<()> {
+    let executable = root().join("target/debug/gpui-kit-gallery");
+    let mut gallery = Command::new(&executable)
+        .args(["--scene", "dialog", "--theme", "studio-light"])
+        .current_dir(root())
+        .spawn()
+        .context("launch the dialog macOS accessibility smoke gallery")?;
+
+    let result = (|| {
+        let output = swift_ax_check(gallery.id(), "dialog")?;
+        let expected = "Replace the existing theme?|AXWindow|AXDialog|Replace|closed";
+        if !output.lines().any(|line| line.trim() == expected) {
+            bail!("macOS dialog AX tree is missing `{expected}`; received:\n{output}");
+        }
+        println!(
+            "macOS AX dialog name/subrole, initial focused action, and dismissal lifetime match"
+        );
+        Ok(())
+    })();
+
+    let cleanup = (|| {
+        if gallery.try_wait()?.is_none() {
+            gallery
+                .kill()
+                .context("stop the dialog accessibility smoke gallery")?;
+        }
+        gallery
+            .wait()
+            .context("reap the dialog accessibility smoke gallery")?;
+        Ok(())
+    })();
+    result.and(cleanup)
+}
+
+#[cfg(target_os = "macos")]
+fn menu_accessibility_check() -> Result<()> {
+    let executable = root().join("target/debug/gpui-kit-gallery");
+    let mut gallery = Command::new(&executable)
+        .args(["--scene", "menu", "--theme", "studio-light"])
+        .current_dir(root())
+        .spawn()
+        .context("launch the menu macOS accessibility smoke gallery")?;
+
+    let result = (|| {
+        let output = swift_ax_check(gallery.id(), "menu")?;
+        let expected = "Run actions|AXMenu|Copy run id|Copy link|Export as file|closed";
+        if output.trim() != expected {
+            bail!("macOS menu AX check expected `{expected}`; received:\n{output}");
+        }
+        println!("macOS AX menu/name/action, active-item movement, and dismissal lifetime match");
+        Ok(())
+    })();
+    let cleanup = cleanup_gallery(&mut gallery, "menu accessibility smoke gallery");
+    result.and(cleanup)
+}
+
+#[cfg(target_os = "macos")]
+fn tooltip_accessibility_check() -> Result<()> {
+    let executable = root().join("target/debug/gpui-kit-gallery");
+    let mut gallery = Command::new(&executable)
+        .args(["--scene", "tooltip", "--theme", "studio-light"])
+        .current_dir(root())
+        .spawn()
+        .context("launch the tooltip macOS accessibility smoke gallery")?;
+
+    let result = (|| {
+        let output = swift_ax_check(gallery.id(), "tooltip")?;
+        let expected = "Export theme|AXHelp|AXUserInterfaceTooltip|shown|hidden";
+        if output.trim() != expected {
+            bail!("macOS tooltip AX check expected `{expected}`; received:\n{output}");
+        }
+        println!("macOS AX tooltip subrole/lifetime and trigger literal AXHelp match");
+        Ok(())
+    })();
+    let cleanup = cleanup_gallery(&mut gallery, "tooltip accessibility smoke gallery");
+    result.and(cleanup)
+}
+
+#[cfg(target_os = "macos")]
+fn toast_accessibility_check() -> Result<()> {
+    let executable = root().join("target/debug/gpui-kit-gallery");
+    let mut gallery = Command::new(&executable)
+        .args(["--scene", "toast", "--theme", "studio-light"])
+        .current_dir(root())
+        .spawn()
+        .context("launch the toast macOS accessibility smoke gallery")?;
+
+    let result = (|| {
+        let output = swift_ax_check(gallery.id(), "toast")?;
+        let expected = "Refreshing the model catalog failed|AXApplicationStatus|Dismiss|closed";
+        if output.trim() != expected {
+            bail!("macOS status AX check expected `{expected}`; received:\n{output}");
+        }
+        println!("macOS AX status subrole/action and dismissal lifetime match");
+        Ok(())
+    })();
+    let cleanup = cleanup_gallery(&mut gallery, "toast accessibility smoke gallery");
+    result.and(cleanup)
+}
+
+#[cfg(target_os = "macos")]
+fn cleanup_gallery(gallery: &mut std::process::Child, description: &str) -> Result<()> {
+    if gallery.try_wait()?.is_none() {
+        gallery
+            .kill()
+            .with_context(|| format!("stop the {description}"))?;
+    }
+    gallery
+        .wait()
+        .with_context(|| format!("reap the {description}"))?;
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn swift_ax_check(pid: u32, mode: &str) -> Result<String> {
+    let mut child = Command::new("/usr/bin/swift")
+        .args(["-e", AX_NATIVE_SCRIPT])
+        .env("GPUI_KIT_AX_PID", pid.to_string())
+        .env("GPUI_KIT_AX_MODE", mode)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .with_context(|| format!("launch the bounded native macOS AX {mode} check"))?;
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while child.try_wait()?.is_none() {
+        if Instant::now() >= deadline {
+            child.kill().context("stop the timed-out native AX check")?;
+            let _ = child.wait();
+            bail!("native macOS AX {mode} check timed out after 20 seconds");
+        }
+        thread::sleep(Duration::from_millis(50));
+    }
+    let output = child
+        .wait_with_output()
+        .context("reap the native AX check")?;
+    if !output.status.success() {
+        bail!(
+            "native macOS AX {mode} check failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -200,6 +332,7 @@ fn osascript(script: &str) -> Result<String> {
 }
 
 #[cfg(target_os = "macos")]
+#[allow(dead_code)]
 const AX_SMOKE_SCRIPT: &str = r#"
 tell application "System Events"
   with timeout of 5 seconds
@@ -230,6 +363,7 @@ end tell
 "#;
 
 #[cfg(target_os = "macos")]
+#[allow(dead_code)]
 const AX_EDITABLE_SCRIPT: &str = r#"
 tell application "System Events"
   with timeout of 5 seconds
@@ -259,6 +393,482 @@ tell application "System Events"
       end try
     end repeat
     return output
+  end tell
+  end timeout
+end tell
+"#;
+
+#[cfg(target_os = "macos")]
+const AX_NATIVE_SCRIPT: &str = r#"
+import AppKit
+import ApplicationServices
+import Foundation
+
+let environment = ProcessInfo.processInfo.environment
+guard let pidText = environment["GPUI_KIT_AX_PID"], let pid = pid_t(pidText),
+      let mode = environment["GPUI_KIT_AX_MODE"] else { exit(2) }
+let application = AXUIElementCreateApplication(pid)
+NSRunningApplication(processIdentifier: pid)?.activate(options: [])
+
+func attribute(_ element: AXUIElement, _ key: CFString) -> CFTypeRef? {
+    var value: CFTypeRef?
+    return AXUIElementCopyAttributeValue(element, key, &value) == .success ? value : nil
+}
+func string(_ element: AXUIElement, _ key: CFString) -> String {
+    attribute(element, key) as? String ?? ""
+}
+func bool(_ element: AXUIElement, _ key: CFString) -> Bool {
+    attribute(element, key) as? Bool ?? false
+}
+func children(_ element: AXUIElement) -> [AXUIElement] {
+    attribute(element, kAXChildrenAttribute as CFString) as? [AXUIElement] ?? []
+}
+func descendants(_ element: AXUIElement) -> [AXUIElement] {
+    children(element).flatMap { [$0] + descendants($0) }
+}
+func title(_ element: AXUIElement) -> String {
+    let title = string(element, kAXTitleAttribute as CFString)
+    return title.isEmpty ? string(element, kAXDescriptionAttribute as CFString) : title
+}
+func matches(_ role: String, _ subrole: String = "", _ titleText: String = "") -> [AXUIElement] {
+    descendants(application).filter {
+        string($0, kAXRoleAttribute as CFString) == role &&
+        (subrole.isEmpty || string($0, kAXSubroleAttribute as CFString) == subrole) &&
+        (titleText.isEmpty || title($0) == titleText)
+    }
+}
+func pollUntil(_ predicate: () -> Bool, seconds: Double = 10) -> Bool {
+    let deadline = Date().addingTimeInterval(seconds)
+    repeat {
+        if predicate() { return true }
+        Thread.sleep(forTimeInterval: 0.1)
+    } while Date() < deadline
+    return false
+}
+func press(_ element: AXUIElement) -> Bool {
+    AXUIElementPerformAction(element, kAXPressAction as CFString) == .success
+}
+func actions(_ element: AXUIElement) -> [String] {
+    var names: CFArray?
+    guard AXUIElementCopyActionNames(element, &names) == .success else { return [] }
+    return names as? [String] ?? []
+}
+func key(_ code: CGKeyCode) {
+    CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: true)?.post(tap: .cghidEventTap)
+    CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: false)?.post(tap: .cghidEventTap)
+}
+func point(_ element: AXUIElement, _ key: CFString) -> CGPoint? {
+    guard let rawValue = attribute(element, key) else { return nil }
+    let value = rawValue as! AXValue
+    guard AXValueGetType(value) == .cgPoint else { return nil }
+    var point = CGPoint.zero
+    return AXValueGetValue(value, .cgPoint, &point) ? point : nil
+}
+func size(_ element: AXUIElement) -> CGSize? {
+    guard let rawValue = attribute(element, kAXSizeAttribute as CFString) else { return nil }
+    let value = rawValue as! AXValue
+    guard AXValueGetType(value) == .cgSize else { return nil }
+    var size = CGSize.zero
+    return AXValueGetValue(value, .cgSize, &size) ? size : nil
+}
+func moveMouse(_ point: CGPoint) {
+    CGEvent(mouseEventSource: nil, mouseType: .mouseMoved,
+            mouseCursorPosition: point, mouseButton: .left)?.post(tap: .cghidEventTap)
+}
+func fail(_ message: String) -> Never {
+    FileHandle.standardError.write(Data((message + "\n").utf8))
+    exit(1)
+}
+
+switch mode {
+case "button":
+    guard pollUntil({ matches("AXButton", "", "Primary").count == 1 }) else {
+        fail("Primary AXButton did not appear")
+    }
+    guard let primary = matches("AXButton", "", "Primary").first,
+          AXUIElementSetAttributeValue(primary, kAXFocusedAttribute as CFString,
+                                       kCFBooleanTrue) == .success,
+          pollUntil({ bool(primary, kAXFocusedAttribute as CFString) }) else {
+        fail("assistive-technology focus request did not focus Primary")
+    }
+    func buttonLine(_ role: String, _ name: String, _ includeValue: Bool = false) -> String {
+        guard let node = matches(role, "", name).first else { fail("missing \(name) \(role)") }
+        let value: String
+        if includeValue {
+            if let number = attribute(node, kAXValueAttribute as CFString) as? NSNumber {
+                value = number.boolValue ? "true" : "false"
+            } else {
+                value = string(node, kAXValueAttribute as CFString)
+            }
+        } else { value = "" }
+        return "\(name)|\(role)|\(bool(node, kAXEnabledAttribute as CFString))|\(value)|\(bool(node, kAXFocusedAttribute as CFString))"
+    }
+    print(buttonLine("AXButton", "Primary"))
+    print(buttonLine("AXButton", "Unavailable"))
+    print(buttonLine("AXButton", "Saving"))
+    print(buttonLine("AXCheckBox", "Selected", true))
+
+case "editable":
+    guard pollUntil({ matches("AXTextField", "", "Email").count == 1 }) else {
+        fail("Email AXTextField did not appear")
+    }
+    guard let email = matches("AXTextField", "", "Email").first,
+          AXUIElementSetAttributeValue(email, kAXFocusedAttribute as CFString,
+                                       kCFBooleanTrue) == .success,
+          AXUIElementSetAttributeValue(email, kAXValueAttribute as CFString,
+                                       "edited@example.com" as CFString) == .success,
+          pollUntil({ string(email, kAXValueAttribute as CFString) == "edited@example.com" &&
+                      bool(email, kAXFocusedAttribute as CFString) }) else {
+        fail("native requested focus/editing did not update Email")
+    }
+    func editableLine(_ name: String, redactValue: Bool = false) -> String {
+        guard let node = matches("AXTextField", "", name).first else { fail("missing \(name) AXTextField") }
+        let value = redactValue ? "" : string(node, kAXValueAttribute as CFString)
+        return "\(name)|AXTextField|\(bool(node, kAXEnabledAttribute as CFString))|\(value)|\(bool(node, kAXFocusedAttribute as CFString))"
+    }
+    print(editableLine("API token", redactValue: true))
+    print(editableLine("Disabled"))
+    print(editableLine("Email"))
+
+case "dialog":
+    let dialogTitle = "Replace the existing theme?"
+    guard pollUntil({ matches("AXWindow", "AXDialog", dialogTitle).count == 1 }) else {
+        fail("unique named AXDialog did not appear")
+    }
+    guard let replace = matches("AXButton", "", "Replace").first,
+          bool(replace, kAXFocusedAttribute as CFString) else {
+        fail("dialog Replace action was not natively focused")
+    }
+    key(53)
+    guard pollUntil({ matches("AXWindow", "AXDialog", dialogTitle).isEmpty }) else {
+        fail("AXDialog did not disappear after Escape")
+    }
+    print("\(dialogTitle)|AXWindow|AXDialog|Replace|closed")
+
+case "menu":
+    guard pollUntil({ matches("AXMenu", "", "Run actions").count == 1 }) else {
+        fail("unique named AXMenu did not appear")
+    }
+    guard let action = matches("AXMenuItem", "", "Copy run id").first,
+          actions(action).contains(kAXPressAction as String) else {
+        fail("Copy run id did not expose AXPress on its AXMenuItem")
+    }
+    guard pollUntil({ matches("AXMenuItem", "", "Copy link").contains { bool($0, kAXFocusedAttribute as CFString) } }) else {
+        fail("initial active AXMenuItem was not focused")
+    }
+    key(125)
+    guard pollUntil({ matches("AXMenuItem", "", "Export as file").contains { bool($0, kAXFocusedAttribute as CFString) } }) else {
+        fail("ArrowDown did not move native focus to Export as file")
+    }
+    key(53)
+    key(53)
+    guard pollUntil({ matches("AXMenu", "", "Run actions").isEmpty }) else {
+        fail("AXMenu did not disappear after Escape")
+    }
+    print("Run actions|AXMenu|Copy run id|Copy link|Export as file|closed")
+
+case "tooltip":
+    let help = "Writes the theme to a file on disk"
+    guard pollUntil({ matches("AXButton", "", "Export theme").count == 1 }) else {
+        fail("Export theme AXButton did not appear")
+    }
+    guard let trigger = matches("AXButton", "", "Export theme").first,
+          string(trigger, kAXHelpAttribute as CFString) == help,
+          let origin = point(trigger, kAXPositionAttribute as CFString),
+          let dimensions = size(trigger) else {
+        fail("Export theme did not expose its literal AXHelp and geometry")
+    }
+    let tooltips = { matches("AXGroup", "AXUserInterfaceTooltip", help) }
+    guard pollUntil({ tooltips().count == 1 }) else {
+        fail("the scene's named AXUserInterfaceTooltip did not appear")
+    }
+    moveMouse(CGPoint(x: origin.x + dimensions.width / 2, y: origin.y + dimensions.height / 2))
+    guard pollUntil({ tooltips().count == 2 }) else {
+        fail("hover did not show a second AXUserInterfaceTooltip")
+    }
+    guard let window = matches("AXWindow").first,
+          let windowOrigin = point(window, kAXPositionAttribute as CFString),
+          let windowSize = size(window) else { fail("gallery AXWindow had no geometry") }
+    moveMouse(CGPoint(x: windowOrigin.x + windowSize.width - 40,
+                      y: windowOrigin.y + windowSize.height - 40))
+    guard pollUntil({ tooltips().count == 1 }) else {
+        fail("hover tooltip did not disappear while the scene tooltip remained")
+    }
+    print("Export theme|AXHelp|AXUserInterfaceTooltip|shown|hidden")
+
+case "toast":
+    let statusTitle = "Refreshing the model catalog failed"
+    let statusNodes = { matches("AXGroup", "AXApplicationStatus", statusTitle) }
+    guard pollUntil({ statusNodes().count == 1 }) else {
+        fail("unique named AXApplicationStatus did not appear")
+    }
+    guard let status = statusNodes().first,
+          let dismiss = descendants(status).first(where: {
+              string($0, kAXRoleAttribute as CFString) == "AXButton" && title($0) == "Dismiss"
+          }), press(dismiss) else {
+        fail("status Dismiss action did not expose or accept AXPress")
+    }
+    guard pollUntil({ statusNodes().isEmpty }) else {
+        fail("dismissed AXApplicationStatus did not disappear")
+    }
+    guard matches("AXGroup", "AXApplicationStatus", "The host refused to publish this run").count == 1 else {
+        fail("dismissing one status incorrectly removed another")
+    }
+    print("\(statusTitle)|AXApplicationStatus|Dismiss|closed")
+
+default:
+    fail("unsupported native AX check mode: \(mode)")
+}
+"#;
+
+#[cfg(target_os = "macos")]
+#[allow(dead_code)]
+const AX_DIALOG_SCRIPT: &str = r#"
+tell application "System Events"
+  with timeout of 5 seconds
+  set matches to every process whose unix id is __PID__
+  if (count of matches) is 0 then return ""
+  tell first item of matches
+    set frontmost to true
+    set dialogName to ""
+    set dialogRole to ""
+    set dialogSubrole to ""
+    set focusedAction to ""
+    set dialogCount to 0
+    set focusedActionCount to 0
+    repeat with itemRef in entire contents of window 1
+      try
+        if (subrole of itemRef as text) is "AXDialog" and (name of itemRef as text) is "Replace the existing theme?" then
+          set dialogCount to dialogCount + 1
+          set dialogName to name of itemRef as text
+          set dialogRole to role of itemRef as text
+          set dialogSubrole to subrole of itemRef as text
+          set dialogItems to entire contents of itemRef
+          repeat with childRef in dialogItems
+            try
+              if (role of childRef as text) is "AXButton" and (name of childRef as text) is "Replace" and (focused of childRef) is true then
+                set focusedAction to name of childRef as text
+                set focusedActionCount to focusedActionCount + 1
+              end if
+            end try
+          end repeat
+        end if
+      end try
+    end repeat
+    if dialogCount is not 1 or focusedActionCount is not 1 then return ""
+    key code 53
+    set remainsOpen to true
+    repeat 10 times
+      set remainsOpen to false
+      repeat with itemRef in entire contents of window 1
+        try
+          if (subrole of itemRef as text) is "AXDialog" and (name of itemRef as text) is dialogName then
+            set remainsOpen to true
+          end if
+        end try
+      end repeat
+      if not remainsOpen then exit repeat
+      delay 0.1
+    end repeat
+    if remainsOpen then return ""
+    return dialogName & "|" & dialogRole & "|" & dialogSubrole & "|" & focusedAction & "|closed"
+  end tell
+  end timeout
+end tell
+"#;
+
+#[cfg(target_os = "macos")]
+#[allow(dead_code)]
+const AX_MENU_SCRIPT: &str = r#"
+tell application "System Events"
+  with timeout of 5 seconds
+  set matches to every process whose unix id is __PID__
+  if (count of matches) is 0 then return ""
+  tell first item of matches
+    set frontmost to true
+    set axItems to entire contents of window 1
+    set menuCount to 0
+    set actionCount to 0
+    set initialFocusCount to 0
+    repeat 1 times
+      set menuCount to 0
+      set actionCount to 0
+      set initialFocusCount to 0
+      set axItems to entire contents of window 1
+      repeat with itemRef in axItems
+        try
+          if (role of itemRef as text) is "AXMenu" and (name of itemRef as text) is "Run actions" then
+            set menuCount to menuCount + 1
+          end if
+          if (role of itemRef as text) is "AXMenuItem" and (name of itemRef as text) is "Copy run id" then
+            if (name of every action of itemRef) contains "AXPress" then set actionCount to actionCount + 1
+          end if
+          if (role of itemRef as text) is "AXMenuItem" and (name of itemRef as text) is "Copy link" and (focused of itemRef) is true then
+            set initialFocusCount to initialFocusCount + 1
+          end if
+        end try
+      end repeat
+      if menuCount is 1 and actionCount is 1 and initialFocusCount is 1 then exit repeat
+      delay 0.1
+    end repeat
+    if menuCount is not 1 or actionCount is not 1 or initialFocusCount is not 1 then return ""
+    key code 125
+    delay 0.1
+    set movedFocusCount to 0
+    repeat 10 times
+      set movedFocusCount to 0
+      repeat with itemRef in entire contents of window 1
+        try
+          if (role of itemRef as text) is "AXMenuItem" and (name of itemRef as text) is "Export as file" and (focused of itemRef) is true then
+            set movedFocusCount to movedFocusCount + 1
+          end if
+        end try
+      end repeat
+      if movedFocusCount is 1 then exit repeat
+      delay 0.1
+    end repeat
+    if movedFocusCount is not 1 then return ""
+    key code 53
+    key code 53
+    delay 0.2
+    set remainsOpen to false
+    repeat with itemRef in entire contents of window 1
+      try
+        if (role of itemRef as text) is "AXMenu" and (name of itemRef as text) is "Run actions" then set remainsOpen to true
+      end try
+    end repeat
+    if remainsOpen then return ""
+    return "Run actions|AXMenu|Copy run id|Copy link|Export as file|closed"
+  end tell
+  end timeout
+end tell
+"#;
+
+#[cfg(target_os = "macos")]
+#[allow(dead_code)]
+const AX_TOOLTIP_TARGET_SCRIPT: &str = r#"
+tell application "System Events"
+  with timeout of 5 seconds
+  set matches to every process whose unix id is __PID__
+  if (count of matches) is 0 then return ""
+  tell first item of matches
+    set frontmost to true
+    set triggerRef to missing value
+    set staticHelpCount to 0
+    repeat 1 times
+      set triggerRef to missing value
+      set staticHelpCount to 0
+      repeat with itemRef in entire contents of window 1
+        try
+          if (role of itemRef as text) is "AXButton" and (name of itemRef as text) is "Export theme" then
+            if (value of attribute "AXHelp" of itemRef as text) is "Writes the theme to a file on disk" then set triggerRef to itemRef
+          end if
+          if (role of itemRef as text) is "AXGroup" and (subrole of itemRef as text) is "AXUserInterfaceTooltip" and (name of itemRef as text) is "Writes the theme to a file on disk" then
+            set staticHelpCount to staticHelpCount + 1
+          end if
+        end try
+      end repeat
+      if triggerRef is not missing value and staticHelpCount >= 1 then exit repeat
+      delay 0.1
+    end repeat
+    if triggerRef is missing value or staticHelpCount < 1 then return ""
+    set triggerPosition to position of triggerRef
+    set triggerSize to size of triggerRef
+    set windowPosition to position of window 1
+    set windowSize to size of window 1
+    set hoverX to (item 1 of triggerPosition) + ((item 1 of triggerSize) div 2)
+    set hoverY to (item 2 of triggerPosition) + ((item 2 of triggerSize) div 2)
+    set awayX to (item 1 of windowPosition) + (item 1 of windowSize) - 40
+    set awayY to (item 2 of windowPosition) + (item 2 of windowSize) - 40
+    return (hoverX as text) & "|" & (hoverY as text) & "|" & (awayX as text) & "|" & (awayY as text)
+  end tell
+  end timeout
+end tell
+"#;
+
+#[cfg(target_os = "macos")]
+#[allow(dead_code)]
+const AX_TOOLTIP_COUNT_SCRIPT: &str = r#"
+tell application "System Events"
+  with timeout of 5 seconds
+  set matches to every process whose unix id is __PID__
+  if (count of matches) is 0 then return ""
+  tell first item of matches
+    set frontmost to true
+    set helpCount to 0
+    set triggerPresent to false
+    repeat 1 times
+      set helpCount to 0
+      set triggerPresent to false
+      repeat with itemRef in entire contents of window 1
+        try
+          if (role of itemRef as text) is "AXGroup" and (subrole of itemRef as text) is "AXUserInterfaceTooltip" and (name of itemRef as text) is "Writes the theme to a file on disk" then
+            set helpCount to helpCount + 1
+          end if
+          if (role of itemRef as text) is "AXButton" and (name of itemRef as text) is "Export theme" then
+            if (value of attribute "AXHelp" of itemRef as text) is "Writes the theme to a file on disk" then set triggerPresent to true
+          end if
+        end try
+      end repeat
+      if triggerPresent then exit repeat
+      delay 0.1
+    end repeat
+    if triggerPresent then return (helpCount as text) & "|trigger"
+    return (helpCount as text) & "|missing-trigger"
+  end tell
+  end timeout
+end tell
+"#;
+
+#[cfg(target_os = "macos")]
+#[allow(dead_code)]
+const AX_TOAST_SCRIPT: &str = r#"
+tell application "System Events"
+  with timeout of 5 seconds
+  set matches to every process whose unix id is __PID__
+  if (count of matches) is 0 then return ""
+  tell first item of matches
+    set frontmost to true
+    set statusCount to 0
+    set dismissCount to 0
+    set dismissRef to missing value
+    repeat 1 times
+      set statusCount to 0
+      set dismissCount to 0
+      set dismissRef to missing value
+      repeat with itemRef in entire contents of window 1
+        try
+          if (role of itemRef as text) is "AXGroup" and (subrole of itemRef as text) is "AXApplicationStatus" and (name of itemRef as text) is "Refreshing the model catalog failed" then
+            set statusCount to statusCount + 1
+            repeat with childRef in entire contents of itemRef
+              try
+                if (role of childRef as text) is "AXButton" and (name of childRef as text) is "Dismiss" then
+                  if (name of every action of childRef) contains "AXPress" then
+                    set dismissRef to childRef
+                    set dismissCount to dismissCount + 1
+                  end if
+                end if
+              end try
+            end repeat
+          end if
+        end try
+      end repeat
+      if statusCount is 1 and dismissCount is 1 then exit repeat
+      delay 0.1
+    end repeat
+    if statusCount is not 1 or dismissCount is not 1 then return ""
+    perform action "AXPress" of dismissRef
+    delay 1
+    set statusRemains to false
+    set otherStatusRemains to false
+    repeat with itemRef in entire contents of window 1
+      try
+        if (role of itemRef as text) is "AXGroup" and (subrole of itemRef as text) is "AXApplicationStatus" and (name of itemRef as text) is "Refreshing the model catalog failed" then set statusRemains to true
+        if (role of itemRef as text) is "AXGroup" and (subrole of itemRef as text) is "AXApplicationStatus" and (name of itemRef as text) is "The host refused to publish this run" then set otherStatusRemains to true
+      end try
+    end repeat
+    if statusRemains or not otherStatusRemains then return ""
+    return "Refreshing the model catalog failed|AXGroup|Dismiss|closed"
   end tell
   end timeout
 end tell

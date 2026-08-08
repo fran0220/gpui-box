@@ -762,6 +762,9 @@ impl Render for Gallery {
                                     .child(
                                         Button::new("gallery.export")
                                             .label("Export theme")
+                                            .accessible_description(
+                                                "Writes the theme to a file on disk",
+                                            )
                                             .secondary()
                                             .on_click(|_, _| {}),
                                     ),
@@ -1976,6 +1979,7 @@ fn open_gallery(
                 }),
                 records: cx.new(|cx| {
                     ContextMenu::new("gallery.record", window, cx)
+                        .name("Run actions")
                         .target("run-a04")
                         .menu(gallery_menu_items())
                         .content(|_, cx| {

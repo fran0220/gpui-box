@@ -341,6 +341,12 @@ fn a_dismissed_toast_finishes_its_exit_before_it_leaves_the_tree(cx: &mut TestAp
     harness.advance(SETTLE);
     assert_eq!(phase(&mut harness, &layer, "run.published"), None);
     assert!(harness.node("run.published").is_none());
+    let tree = harness.accessibility_tree();
+    assert!(!tree["nodes"].as_object().is_some_and(|nodes| {
+        nodes.values().any(|node| {
+            node["element_id"] == "Name(\"run.published\")" && node["aria"]["role"] == "Status"
+        })
+    }));
 }
 
 #[gpui::test]

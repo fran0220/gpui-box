@@ -111,6 +111,16 @@ fn opening_publishes_every_row_with_the_state_the_host_holds(cx: &mut TestAppCon
         harness.node("workspace.edit").expect("published").expanded,
         Some(true)
     );
+    let tree = harness.accessibility_tree();
+    assert!(tree["nodes"].as_object().is_some_and(|nodes| {
+        nodes.values().any(|node| {
+            node["element_id"] == "Name(\"workspace.edit.menu\")" && node["aria"]["role"] == "Menu"
+        })
+    }));
+    assert_eq!(
+        harness.node("workspace.edit.menu").expect("published").role,
+        gpui_kit_semantics::Role::Menu
+    );
     assert_eq!(
         harness
             .node("workspace.edit.undo")
@@ -148,6 +158,154 @@ fn opening_publishes_every_row_with_the_state_the_host_holds(cx: &mut TestAppCon
             .expanded,
         Some(false)
     );
+}
+
+#[gpui::test]
+fn native_menu_owns_named_rows_actions_and_lifetime(cx: &mut TestAppContext) {
+    let (mut harness, menu) = menu(cx);
+    let seen = events(&mut harness, &menu);
+    open(&mut harness, &menu);
+
+    let tree = harness.accessibility_tree();
+    let nodes = tree["nodes"].as_object().expect("native nodes");
+    let find = |id: &str| {
+        nodes
+            .iter()
+            .find(|(_, node)| node["element_id"] == format!("Name(\"{id}\")"))
+            .unwrap_or_else(|| panic!("native node {id}"))
+    };
+    let (menu_key, native_menu) = find("workspace.edit.menu");
+    let (undo_key, undo) = find("workspace.edit.undo");
+    let (_, paste) = find("workspace.edit.paste");
+    let (_, wrap) = find("workspace.edit.wrap");
+    let (_, share) = find("workspace.edit.share");
+
+    assert_eq!(native_menu["aria"]["role"], "Menu");
+    assert_eq!(native_menu["aria"]["label"], "Edit");
+    assert_eq!(tree["gpui_focus"], menu_key.as_str());
+    assert!(
+        native_menu["children"]
+            .as_array()
+            .is_some_and(|children| children.iter().any(|child| child == undo_key))
+    );
+    assert_eq!(undo["aria"]["role"], "MenuItem");
+    assert_eq!(undo["aria"]["label"], "Undo");
+    assert!(
+        undo["aria"]["on_action"]
+            .as_array()
+            .is_some_and(|actions| actions.iter().any(|action| action == "Click"))
+    );
+    assert_eq!(paste["aria"]["disabled"], true);
+    assert!(
+        !paste["aria"]["on_action"]
+            .as_array()
+            .is_some_and(|actions| actions.iter().any(|action| action == "Click"))
+    );
+    assert_eq!(wrap["aria"]["toggled"], "True");
+    assert_eq!(share["aria"]["expanded"], false);
+
+    let native_id = native_menu["accesskit_id"].clone();
+    let undo_id = gpui::accesskit::NodeId(
+        undo["accesskit_id"]
+            .as_str()
+            .expect("undo native id")
+            .parse()
+            .expect("numeric undo id"),
+    );
+    let window = harness.window();
+    harness.context().dispatch_accessibility_action(
+        window,
+        gpui::accesskit::ActionRequest {
+            action: gpui::accesskit::Action::Click,
+            target_tree: gpui::accesskit::TreeId::ROOT,
+            target_node: undo_id,
+            data: None,
+        },
+    );
+    assert_eq!(taken(&seen), vec!["undo".to_string()]);
+    assert!(harness.node("workspace.edit.menu").is_none());
+    let closed = harness.accessibility_tree();
+    assert!(!closed["nodes"].as_object().is_some_and(|nodes| {
+        nodes
+            .values()
+            .any(|node| node["element_id"] == "Name(\"workspace.edit.menu\")")
+    }));
+
+    open(&mut harness, &menu);
+    let reopened = harness.accessibility_tree();
+    let reopened_menu = reopened["nodes"]
+        .as_object()
+        .and_then(|nodes| {
+            nodes
+                .values()
+                .find(|node| node["element_id"] == "Name(\"workspace.edit.menu\")")
+        })
+        .expect("reopened native menu");
+    assert_eq!(reopened_menu["accesskit_id"], native_id);
+}
+
+#[gpui::test]
+fn native_menu_focus_follows_the_active_stable_item_only_while_the_container_is_focused(
+    cx: &mut TestAppContext,
+) {
+    let (mut harness, menu) = menu(cx);
+    open(&mut harness, &menu);
+
+    let opened = harness.accessibility_tree();
+    let opened_nodes = opened["nodes"].as_object().expect("native nodes");
+    let (menu_key, _) = opened_nodes
+        .iter()
+        .find(|(_, node)| node["element_id"] == "Name(\"workspace.edit.menu\")")
+        .expect("native menu");
+    let (undo_key, undo) = opened_nodes
+        .iter()
+        .find(|(_, node)| node["element_id"] == "Name(\"workspace.edit.undo\")")
+        .expect("native Undo item");
+    let undo_native_id = undo["accesskit_id"].clone();
+    assert_eq!(opened["gpui_focus"], menu_key.as_str());
+    assert_eq!(opened["active_descendant_focus"], undo_key.as_str());
+
+    harness.keystrokes("down");
+    let moved = harness.accessibility_tree();
+    let moved_nodes = moved["nodes"].as_object().expect("moved native nodes");
+    let (moved_undo_key, moved_undo) = moved_nodes
+        .iter()
+        .find(|(_, node)| node["element_id"] == "Name(\"workspace.edit.undo\")")
+        .expect("stable native Undo item");
+    let (wrap_key, _) = moved_nodes
+        .iter()
+        .find(|(_, node)| node["element_id"] == "Name(\"workspace.edit.wrap\")")
+        .expect("native Wrap lines item");
+    assert_eq!(moved_undo_key, undo_key);
+    assert_eq!(moved_undo["accesskit_id"], undo_native_id);
+    assert_eq!(moved["gpui_focus"], menu_key.as_str());
+    assert_eq!(moved["active_descendant_focus"], wrap_key.as_str());
+
+    let (trigger_key, trigger) = moved_nodes
+        .iter()
+        .find(|(_, node)| node["element_id"] == "Name(\"workspace.edit.trigger\")")
+        .expect("native menu trigger");
+    let trigger_id = gpui::accesskit::NodeId(
+        trigger["accesskit_id"]
+            .as_str()
+            .expect("trigger native id")
+            .parse()
+            .expect("numeric trigger id"),
+    );
+    let window = harness.window();
+    harness.context().dispatch_accessibility_action(
+        window,
+        gpui::accesskit::ActionRequest {
+            action: gpui::accesskit::Action::Focus,
+            target_tree: gpui::accesskit::TreeId::ROOT,
+            target_node: trigger_id,
+            data: None,
+        },
+    );
+    let unfocused = harness.accessibility_tree();
+    assert_eq!(unfocused["gpui_focus"], trigger_key.as_str());
+    assert!(unfocused["active_descendant_focus"].is_null());
+    assert!(harness.update(|_, cx| menu.read(cx).is_open()));
 }
 
 #[gpui::test]
@@ -219,6 +377,13 @@ fn escape_closes_without_taking_anything(cx: &mut TestAppContext) {
         harness.node("workspace.edit").expect("published").expanded,
         Some(false)
     );
+    let tree = harness.accessibility_tree();
+    assert!(!tree["nodes"].as_object().is_some_and(|nodes| {
+        nodes.values().any(|node| {
+            node["element_id"] == "Name(\"workspace.edit.menu\")" && node["aria"]["role"] == "Menu"
+        })
+    }));
+    assert!(harness.node("workspace.edit.menu").is_none());
 }
 
 #[gpui::test]
@@ -378,6 +543,7 @@ fn context_menu(cx: &mut TestAppContext) -> (Harness, Entity<ContextMenu>) {
             .get_or_insert_with(|| {
                 cx.new(|cx| {
                     ContextMenu::new("records.row", window, cx)
+                        .name("Record actions")
                         .target("record-a04")
                         .menu(items())
                         .content(|_, _| {
@@ -446,6 +612,16 @@ fn a_right_click_opens_the_menu_at_the_pointer_and_reports_the_target(cx: &mut T
             .expanded,
         Some(true)
     );
+    let tree = harness.accessibility_tree();
+    let native = tree["nodes"]
+        .as_object()
+        .and_then(|nodes| {
+            nodes.values().find(|node| {
+                node["element_id"] == "Name(\"records.row.menu\")" && node["aria"]["role"] == "Menu"
+            })
+        })
+        .expect("native context menu");
+    assert_eq!(native["aria"]["label"], "Record actions");
     let menu_bounds = harness.bounds("records.row.menu").expect("bounds");
     assert!(
         menu_bounds.origin.x >= position.x - px(1.0),

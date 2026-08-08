@@ -68,9 +68,9 @@ GPUI forwards that AccessKit tree to NSAccessibility on macOS, UI Automation on
 Windows, and AT-SPI on Linux. The macOS, Windows, and Linux rows below describe
 the maintained fork's adapter path; only the deterministic AccessKit tree has
 been exercised by this repository's deterministic test. The macOS smoke check
-also queries the running gallery through System Events when the invoking
-terminal has Accessibility permission. A platform adapter existing is not
-evidence that a particular screen reader announces every property correctly.
+queries each running gallery by PID with `AXUIElement` after confirming that the
+invoking terminal has Accessibility permission. A platform adapter existing is
+not evidence that a particular screen reader announces every property correctly.
 
 | Capability | macOS AX | Windows UIA | Linux AT-SPI |
 |---|---|---|---|
@@ -82,15 +82,22 @@ evidence that a particular screen reader announces every property correctly.
 | Numeric min, max, current value | Bridged; deterministic tree verified | Bridged; native session unverified | Bridged; native session unverified |
 | Editable text | Native AX name/value/enabled/focus/editing smoke verified; grapheme-based TextRun structure verified deterministically | Same AccessKit structure; native session unverified | Same AccessKit structure; native session unverified |
 | Text selection and caret | Selection/caret structure and actions verified deterministically; native AX interaction unverified | Same AccessKit structure; native UIA interaction unverified | Same AccessKit structure; native AT-SPI interaction unverified |
-| Live-region updates | Explicit polite/assertive atomic Toast create/update/removal verified deterministically; static Status is non-live; VoiceOver speech/timing unverified | Same AccessKit structure; UIA announcement unverified | Same AccessKit structure; AT-SPI announcement unverified |
-| GPUI overlays | Nodes rendered in the overlay enter the GPUI tree; native announcement and ordering unverified | Same boundary; native session unverified | Same boundary; native session unverified |
+| Live-region updates | Explicit polite/assertive atomic Toast create/update/removal verified deterministically; native `AXApplicationStatus` identity/action/removal verified, but VoiceOver speech/timing unverified; static Status is non-live | Same AccessKit structure; UIA announcement unverified | Same AccessKit structure; AT-SPI announcement unverified |
+| GPUI overlays | Dialog/Menu/Tooltip/Status roles and lifetime native-smoke verified, including exact `AXDialog`, `AXMenu`/`AXMenuItem`, `AXUserInterfaceTooltip`, and `AXApplicationStatus` subroles where applicable; screen-reader ordering, navigation, and announcement remain unverified | Same AccessKit structure; native UIA revalidation pending | Same AccessKit structure; native AT-SPI session unverified |
 | Native-child handoff | Not implemented | Not implemented | Not implemented |
 
 `hovered` and pointer `pressed` remain diagnostic-only transient state. Semantic
-`parent` and `labels` associations remain available to tests, while the native
-tree follows GPUI's rendered element nesting; no cross-tree labelled-by or
-reparenting claim is made. Editable controls publish UTF-8 character lengths,
-generation-scoped text runs, selection/caret positions, and `SetValue` and
+`parent` records actual diagnostic tree parentage; `labels` and `describes`
+record non-topological diagnostic relationships for tests. The native tree
+follows GPUI's rendered element nesting, so no cross-tree labelled-by,
+described-by, or reparenting claim is made. Literal descriptions can be
+published on a native role-bearing node, but GPUI does not yet expose a native
+cross-tree described-by relationship. Tooltip triggers therefore opt into the
+same literal description as their visible tooltip instead of claiming that
+native relationship.
+
+Editable controls publish UTF-8 character lengths, generation-scoped text runs,
+selection/caret positions, and `SetValue` and
 `SetTextSelection` actions. AccessKit characters use the same Unicode grapheme
 boundaries as editing, including combining sequences and emoji ZWJ sequences.
 TextArea run boundaries come from its shaped visual rows, hard line breaks
@@ -112,6 +119,18 @@ native child nodes remain separate platform work. AccessKit defines character
 geometry as optional; gpui-kit omits it rather than inventing measurements that
 are not yet available to the accessibility subtree callback.
 
+Open dialogs publish a modal native Dialog node, and open menus and visible
+tooltips publish separate native Menu and Tooltip nodes; each role-bearing node
+leaves the AccessKit tree when its deferred overlay closes. Focus containment
+and restoration are component behavior, while platform screen-reader ordering
+around deferred overlays remains unverified. Deferred hover-card and popover
+surfaces are non-modal Groups and become siblings of their trigger group under
+the native Window root; no unsupported cross-deferred relationship is claimed.
+Menu keyboard focus remains on the Menu container, while GPUI's active-descendant
+bridge reports the current stable MenuItem as AccessKit focus only while that
+container owns keyboard focus. Moving the menu cursor updates the reported
+descendant without inventing selection state.
+
 The deterministic smoke test activates GPUI's test accessibility adapter,
 renders a real element tree, and asserts role, name, value, range, control
 states, selection, focus, and an inherited click action in
@@ -121,11 +140,16 @@ states, selection, focus, and an inherited click action in
 cargo run -p xtask -- accessibility check
 ```
 
-That command opens the button and input scenes and asks System Events for AX
-roles, names, enabled/disabled state, checked state, AX-requested focus, and an
-editable value change. It fails honestly when Accessibility permission or an
-interactive user session is unavailable. Native text-selection mutation is not
-claimed: System Events did not provide a reliable selected-range round trip on
-this runner, while the real AccessKit action path is covered deterministically.
-VoiceOver speech, focus navigation order, value/range adjustment, selection,
-and announcement timing remain manual, unverified boundaries.
+That command opens the button, input, dialog, menu, tooltip, and toast scenes and
+queries their PID-scoped native trees with `AXUIElement`. It verifies roles,
+names, enabled/disabled and checked state, AX-requested focus and editing, a
+unique named `AXDialog` with its initial focused action, active `AXMenuItem`
+movement and `AXPress`, exact Tooltip/Status subroles, the trigger's literal
+`AXHelp`, and transient dismissal/hide lifetime. It fails honestly when
+Accessibility permission or an interactive user session is unavailable. The
+dialog scene starts open and has no previously focused native trigger, so native
+focus return is covered by the deterministic action tree rather than claimed by
+this smoke check. Native text-selection mutation remains unverified, while the
+real AccessKit action path is covered deterministically. VoiceOver speech,
+navigation order, value/range adjustment, selection, and announcement timing
+remain manual, unverified boundaries.

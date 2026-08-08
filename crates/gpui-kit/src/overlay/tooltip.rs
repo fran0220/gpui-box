@@ -35,8 +35,11 @@ impl Tooltip {
         }
     }
 
-    /// Names the control this explains, which is how a reader knows what the
-    /// floating text belongs to.
+    /// Records the control this explains in deterministic semantic snapshots.
+    ///
+    /// GPUI does not currently expose a native cross-tree described-by
+    /// relation. Callers should also publish this help as a literal accessible
+    /// description on the role-bearing trigger when that association matters.
     pub fn describes(mut self, control: impl Into<SharedString>) -> Self {
         self.describes = Some(control.into());
         self
@@ -54,7 +57,7 @@ impl RenderOnce for Tooltip {
         let mut spec =
             NodeSpec::new(self.ident.semantic_id(), Role::Tooltip).text(self.text.clone());
         if let Some(control) = self.describes.clone() {
-            spec = spec.parent(control);
+            spec = spec.describes(control);
         }
 
         // The surface arrives rather than appearing. It publishes its node
@@ -93,7 +96,7 @@ impl Render for TooltipView {
 /// an id.
 pub trait Tooltipped: gpui::StatefulInteractiveElement + Sized {
     /// Shows `text` after GPUI's hover delay, published as help for the
-    /// control identified by `control`.
+    /// control identified by `control` in deterministic semantic snapshots.
     fn tip(self, control: impl Into<Ident>, text: impl Into<SharedString>) -> Self {
         let control = control.into();
         let text = text.into();

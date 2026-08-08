@@ -19,6 +19,7 @@ fn scene(cx: &mut TestAppContext) -> Harness {
             .child(
                 Button::new("settings.export")
                     .label("Export theme")
+                    .accessible_description("Writes the theme to a file on disk")
                     .secondary()
                     .on_click(|_, _| {}),
             )
@@ -60,12 +61,49 @@ fn resting_on_a_control_publishes_help_linked_to_it(cx: &mut TestAppContext) {
         Some("Writes the theme to a file on disk")
     );
     assert_eq!(
-        node.parent.as_deref(),
+        node.describes.as_deref(),
         Some("settings.export"),
-        "help names the control it explains"
+        "diagnostics record the control this help explains"
+    );
+    assert_eq!(
+        node.parent, None,
+        "description does not invent tree parentage"
     );
     assert!(node.visible);
     assert!(!node.disabled);
+    let tree = harness.accessibility_tree();
+    let nodes = tree["nodes"].as_object().expect("native nodes");
+    let tooltips = nodes
+        .iter()
+        .filter(|(_, node)| {
+            node["element_id"] == "Name(\"settings.export.tooltip\")"
+                && node["aria"]["role"] == "Tooltip"
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(tooltips.len(), 1);
+    assert_eq!(
+        tooltips[0].1["aria"]["label"],
+        "Writes the theme to a file on disk"
+    );
+    let trigger = nodes
+        .iter()
+        .find(|(_, node)| {
+            node["element_id"] == "Name(\"settings.export\")" && node["aria"]["role"] == "Button"
+        })
+        .expect("native trigger button");
+    assert_eq!(
+        trigger.1["aria"]["description"],
+        "Writes the theme to a file on disk"
+    );
+    let native_window = &nodes[tree["root"].as_str().expect("native window root")];
+    assert!(
+        native_window["children"]
+            .as_array()
+            .is_some_and(|children| {
+                children.iter().any(|child| child == trigger.0)
+                    && children.iter().any(|child| child == tooltips[0].0)
+            })
+    );
 }
 
 #[gpui::test]
@@ -95,4 +133,11 @@ fn help_leaves_with_the_pointer(cx: &mut TestAppContext) {
     harness.advance(RESTED);
 
     assert!(harness.node("settings.export.tooltip").is_none());
+    let tree = harness.accessibility_tree();
+    assert!(!tree["nodes"].as_object().is_some_and(|nodes| {
+        nodes.values().any(|node| {
+            node["element_id"] == "Name(\"settings.export.tooltip\")"
+                && node["aria"]["role"] == "Tooltip"
+        })
+    }));
 }

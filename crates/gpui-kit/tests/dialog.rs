@@ -117,8 +117,71 @@ fn opening_publishes_the_dialog_its_body_and_its_actions(cx: &mut TestAppContext
     let node = harness.node("workspace.delete").expect("published");
     assert_eq!(node.role, Role::Dialog);
     assert_eq!(node.text.as_deref(), Some("Delete this workspace?"));
-    assert_eq!(node.expanded, Some(true));
+    assert_eq!(node.expanded, None);
+    assert!(node.modal);
     assert!(node.visible);
+
+    let tree = harness.accessibility_tree();
+    let native_nodes = tree["nodes"].as_object().expect("native nodes");
+    let dialogs = native_nodes
+        .iter()
+        .filter(|(_, node)| {
+            node["element_id"] == "Name(\"workspace.delete\")" && node["aria"]["role"] == "Dialog"
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        dialogs.len(),
+        1,
+        "the deferred card is the only Dialog node"
+    );
+    let (native_key, native) = dialogs[0];
+    assert_eq!(native["aria"]["label"], "Delete this workspace?");
+    assert_eq!(
+        native["aria"]["description"],
+        "Everything in it is removed from this machine."
+    );
+    assert_eq!(native["aria"]["modal"], true);
+    assert!(native["aria"]["expanded"].is_null());
+    let native_actions = native["aria"]["on_action"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    assert!(
+        !native_actions
+            .iter()
+            .any(|action| { action == "Expand" || action == "Collapse" })
+    );
+    let focused_key = tree["gpui_focus"].as_str().expect("native focused node");
+    assert_eq!(
+        native_nodes[focused_key]["element_id"],
+        "Name(\"workspace.delete.confirm\")"
+    );
+
+    let native_id = native["accesskit_id"].clone();
+    harness.update({
+        let dialog = dialog.clone();
+        move |_, cx| {
+            dialog.update(cx, |dialog, cx| {
+                dialog.set_description(Some("Only local files are removed.".into()), cx);
+            });
+        }
+    });
+    let updated = harness.accessibility_tree();
+    let updated_native = updated["nodes"]
+        .as_object()
+        .and_then(|nodes| {
+            nodes.iter().find(|(_, node)| {
+                node["element_id"] == "Name(\"workspace.delete\")"
+                    && node["aria"]["role"] == "Dialog"
+            })
+        })
+        .expect("updated native modal dialog");
+    assert_eq!(updated_native.0, native_key);
+    assert_eq!(updated_native.1["accesskit_id"], native_id);
+    assert_eq!(
+        updated_native.1["aria"]["description"],
+        "Only local files are removed."
+    );
 
     assert_eq!(
         harness
@@ -126,7 +189,7 @@ fn opening_publishes_the_dialog_its_body_and_its_actions(cx: &mut TestAppContext
             .expect("published")
             .text
             .as_deref(),
-        Some("Everything in it is removed from this machine.")
+        Some("Only local files are removed.")
     );
     assert!(harness.node("workspace.delete.body").is_some());
     assert_eq!(
@@ -165,6 +228,12 @@ fn escape_dismisses_a_dismissable_dialog(cx: &mut TestAppContext) {
         ]
     );
     assert!(harness.node("workspace.delete").is_none());
+    let tree = harness.accessibility_tree();
+    assert!(!tree["nodes"].as_object().is_some_and(|nodes| {
+        nodes.values().any(|node| {
+            node["element_id"] == "Name(\"workspace.delete\")" && node["aria"]["role"] == "Dialog"
+        })
+    }));
 }
 
 #[gpui::test]
@@ -176,13 +245,7 @@ fn escape_does_nothing_to_a_dialog_that_cannot_be_dismissed(cx: &mut TestAppCont
     harness.keystrokes("escape");
 
     assert_eq!(*seen.borrow(), vec![DialogEvent::Opened]);
-    assert_eq!(
-        harness
-            .node("workspace.delete")
-            .expect("published")
-            .expanded,
-        Some(true)
-    );
+    assert!(harness.node("workspace.delete").expect("published").modal);
 }
 
 #[gpui::test]

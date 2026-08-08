@@ -328,10 +328,13 @@ impl Render for Dialog {
         let actions = self.actions(cx);
 
         let mut spec = NodeSpec::new(self.ident.semantic_id(), Role::Dialog)
-            .expanded(true)
+            .modal(true)
             .focus(&self.focus_handle);
         if !title.is_empty() {
             spec = spec.text(title.clone());
+        }
+        if let Some(description) = description.clone() {
+            spec = spec.description(description);
         }
 
         let heading = (!title.is_empty()).then(|| panel::heading(&self.ident, &theme, title, cx));

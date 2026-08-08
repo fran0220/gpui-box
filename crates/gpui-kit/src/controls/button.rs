@@ -60,6 +60,7 @@ pub struct Button {
     /// What the button is called when the label is not what it is called, or
     /// when there is no label at all.
     name: Option<SharedString>,
+    description: Option<SharedString>,
     glyph: Option<Icon>,
     icon_position: IconPosition,
     variant: ButtonVariant,
@@ -98,6 +99,7 @@ impl Button {
             focus_handle: None,
             label: None,
             name: None,
+            description: None,
             glyph: None,
             icon_position: IconPosition::Leading,
             variant: ButtonVariant::default(),
@@ -123,6 +125,12 @@ impl Button {
     /// Overrides the label, which a graphic button does not have.
     pub fn accessible_name(mut self, name: impl Into<SharedString>) -> Self {
         self.name = Some(name.into());
+        self
+    }
+
+    /// Adds supplementary literal help to the native button node.
+    pub fn accessible_description(mut self, description: impl Into<SharedString>) -> Self {
+        self.description = Some(description.into());
         self
     }
 
@@ -340,6 +348,9 @@ impl RenderOnce for Button {
         }
         if let Some(name) = self.announced_name() {
             spec = spec.text(name);
+        }
+        if let Some(description) = self.description {
+            spec = spec.description(description);
         }
         button.semantic_in(cx, spec)
     }

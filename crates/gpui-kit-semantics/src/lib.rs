@@ -106,7 +106,13 @@ pub struct Node {
     /// not the parent of. A test finds the field by reading its label.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub labels: Option<String>,
+    /// The diagnostic identity this node describes. This does not imply
+    /// native tree parentage or a platform described-by relationship.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub describes: Option<String>,
     pub text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
     pub bounds: Rect,
     pub visible: bool,
     pub focused: bool,
@@ -142,6 +148,8 @@ pub struct Node {
     pub live: Option<LiveRegion>,
     #[serde(skip_serializing_if = "is_false")]
     pub live_atomic: bool,
+    #[serde(skip_serializing_if = "is_false")]
+    pub modal: bool,
 }
 
 fn is_false(value: &bool) -> bool {
@@ -204,6 +212,12 @@ impl Snapshot {
         for node in &mut self.nodes {
             if let Some(text) = &mut node.text {
                 *text = redact_sensitive_text(text);
+            }
+            if let Some(description) = &mut node.description {
+                *description = redact_sensitive_text(description);
+            }
+            if let Some(value) = &mut node.value {
+                *value = redact_sensitive_text(value);
             }
         }
         self
@@ -315,7 +329,9 @@ pub struct NodeSpec {
     role: Role,
     parent: Option<SharedString>,
     labels: Option<SharedString>,
+    describes: Option<SharedString>,
     text: Option<SharedString>,
+    description: Option<SharedString>,
     focus: Option<FocusHandle>,
     disabled: bool,
     read_only: bool,
@@ -334,6 +350,7 @@ pub struct NodeSpec {
     required: bool,
     live: Option<LiveRegion>,
     live_atomic: bool,
+    modal: bool,
 }
 
 impl NodeSpec {
@@ -343,7 +360,9 @@ impl NodeSpec {
             role,
             parent: None,
             labels: None,
+            describes: None,
             text: None,
+            description: None,
             focus: None,
             disabled: false,
             read_only: false,
@@ -362,6 +381,7 @@ impl NodeSpec {
             required: false,
             live: None,
             live_atomic: false,
+            modal: false,
         }
     }
 
@@ -434,6 +454,11 @@ impl NodeSpec {
         self
     }
 
+    pub fn modal(mut self, modal: bool) -> Self {
+        self.modal = modal;
+        self
+    }
+
     pub fn parent(mut self, parent: impl Into<SharedString>) -> Self {
         self.parent = Some(parent.into());
         self
@@ -444,12 +469,28 @@ impl NodeSpec {
         self
     }
 
+    /// Publishes supplementary literal help on the same native node.
+    ///
+    /// This maps to AccessKit's description property. It does not claim a
+    /// cross-tree described-by relationship.
+    pub fn description(mut self, description: impl Into<SharedString>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+
     /// Names the control this node labels.
     ///
     /// A label is rarely an ancestor of the field it names, so the
     /// association is published rather than inferred from the tree.
     pub fn labels(mut self, control: impl Into<SharedString>) -> Self {
         self.labels = Some(control.into());
+        self
+    }
+
+    /// Records which semantic node this node describes without claiming a
+    /// native relationship or changing actual tree topology.
+    pub fn describes(mut self, control: impl Into<SharedString>) -> Self {
+        self.describes = Some(control.into());
         self
     }
 
@@ -568,6 +609,9 @@ where
     if let Some(text) = &spec.text {
         element = element.aria_label(redact_sensitive_text(text));
     }
+    if let Some(description) = &spec.description {
+        element = element.aria_description(redact_sensitive_text(description));
+    }
     if let Some(focus) = &spec.focus {
         element = element.track_focus(focus);
     }
@@ -615,6 +659,7 @@ where
         .aria_required(spec.required)
         .aria_busy(spec.busy)
         .aria_live_atomic(spec.live_atomic)
+        .aria_modal(spec.modal)
 }
 
 fn supports_selection(role: Role) -> bool {
@@ -683,7 +728,12 @@ fn diagnostic_probe(registry: Option<&SemanticRegistry>, spec: NodeSpec) -> impl
                 role: spec.role,
                 parent: spec.parent.as_ref().map(ToString::to_string),
                 labels: spec.labels.as_ref().map(ToString::to_string),
+                describes: spec.describes.as_ref().map(ToString::to_string),
                 text: spec.text.as_ref().map(|text| redact_sensitive_text(text)),
+                description: spec
+                    .description
+                    .as_ref()
+                    .map(|description| redact_sensitive_text(description)),
                 bounds: rect,
                 visible: rect.area() > 0.0,
                 focused: spec
@@ -711,6 +761,7 @@ fn diagnostic_probe(registry: Option<&SemanticRegistry>, spec: NodeSpec) -> impl
                 required: spec.required,
                 live: spec.live,
                 live_atomic: spec.live_atomic,
+                modal: spec.modal,
             });
         },
         |_, _, _, _| {},
@@ -917,6 +968,24 @@ mod tests {
     #[test]
     fn recorded_values_are_redacted_like_text() {
         assert_eq!(redact_sensitive_text("sk-live-value"), "[REDACTED]");
+    }
+
+    #[test]
+    fn host_constructed_snapshot_text_descriptions_and_values_are_redacted() {
+        let mut exposed = node("credential", None);
+        exposed.text = Some("Bearer text-secret".into());
+        exposed.description = Some("sk-description-secret".into());
+        exposed.value = Some("xai-value-secret".into());
+
+        let snapshot = Snapshot {
+            generation: 1,
+            nodes: vec![exposed],
+        }
+        .redacted();
+        let protected = snapshot.find("credential").expect("protected node");
+        assert_eq!(protected.text.as_deref(), Some("[REDACTED]"));
+        assert_eq!(protected.description.as_deref(), Some("[REDACTED]"));
+        assert_eq!(protected.value.as_deref(), Some("[REDACTED]"));
     }
 
     struct PlatformTreeFixture {

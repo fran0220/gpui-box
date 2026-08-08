@@ -353,6 +353,26 @@ fn resting_on_the_trigger_opens_the_card(cx: &mut TestAppContext) {
 
     assert!(harness.update(|_, cx| card.read(cx).is_open()));
     assert!(harness.snapshot().contains("run.preview.card"));
+    let tree = harness.accessibility_tree();
+    let nodes = tree["nodes"].as_object().expect("native nodes");
+    let root = nodes
+        .iter()
+        .find(|(_, node)| node["element_id"] == "Name(\"run.preview\")")
+        .expect("native hover-card root");
+    let surface = nodes
+        .iter()
+        .find(|(_, node)| node["element_id"] == "Name(\"run.preview.card\")")
+        .expect("native hover-card surface");
+    assert_eq!(surface.1["aria"]["role"], "Group");
+    assert_ne!(surface.1["aria"]["modal"], true);
+    let window = &nodes[tree["root"].as_str().expect("native window root")];
+    assert!(
+        window["children"].as_array().is_some_and(|children| {
+            children.iter().any(|child| child == root.0)
+                && children.iter().any(|child| child == surface.0)
+        }),
+        "the deferred surface and its trigger group are window siblings"
+    );
 }
 
 #[gpui::test]
@@ -396,6 +416,12 @@ fn leaving_both_surfaces_closes_the_card_once_the_grace_runs_out(cx: &mut TestAp
 
     assert!(!harness.update(|_, cx| card.read(cx).is_open()));
     assert!(!harness.snapshot().contains("run.preview.card"));
+    let tree = harness.accessibility_tree();
+    assert!(!tree["nodes"].as_object().is_some_and(|nodes| {
+        nodes
+            .values()
+            .any(|node| node["element_id"] == "Name(\"run.preview.card\")")
+    }));
 }
 
 #[gpui::test]
@@ -418,6 +444,83 @@ fn escape_closes_the_card_and_hands_the_keyboard_back(cx: &mut TestAppContext) {
             .expect("published")
             .focused,
         "the keyboard came back to where it was"
+    );
+}
+
+// ---------------------------------------------------------------- Popover
+
+fn popover(cx: &mut TestAppContext) -> (Harness, Entity<Popover>) {
+    let slot: Rc<RefCell<Option<Entity<Popover>>>> = Rc::new(RefCell::new(None));
+    let build = slot.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        let popover = build
+            .borrow_mut()
+            .get_or_insert_with(|| {
+                cx.new(|cx| {
+                    Popover::new("filters", window, cx)
+                        .trigger("Filters")
+                        .content(|_, _| {
+                            div()
+                                .w(px(160.0))
+                                .h(px(80.0))
+                                .child("Filter choices")
+                                .into_any_element()
+                        })
+                })
+            })
+            .clone();
+        div()
+            .w(px(400.0))
+            .h(px(300.0))
+            .child(popover)
+            .into_any_element()
+    });
+    harness.snapshot();
+    let popover = slot.borrow().clone().expect("built");
+    (harness, popover)
+}
+
+#[gpui::test]
+fn a_popover_publishes_a_non_modal_native_surface_only_while_open(cx: &mut TestAppContext) {
+    let (mut harness, popover) = popover(cx);
+    assert!(harness.node("filters.surface").is_none());
+
+    harness.click("filters.trigger");
+    let tree = harness.accessibility_tree();
+    let nodes = tree["nodes"].as_object().expect("native nodes");
+    let root = nodes
+        .iter()
+        .find(|(_, node)| node["element_id"] == "Name(\"filters\")")
+        .expect("native popover root");
+    let surface = nodes
+        .iter()
+        .find(|(_, node)| node["element_id"] == "Name(\"filters.surface\")")
+        .expect("native popover surface");
+    assert_eq!(surface.1["aria"]["role"], "Group");
+    assert_ne!(surface.1["aria"]["modal"], true);
+    let window = &nodes[tree["root"].as_str().expect("native window root")];
+    assert!(
+        window["children"].as_array().is_some_and(|children| {
+            children.iter().any(|child| child == root.0)
+                && children.iter().any(|child| child == surface.0)
+        }),
+        "the deferred surface and its trigger group are window siblings"
+    );
+
+    harness.keystrokes("escape");
+    assert!(!harness.update(|_, cx| popover.read(cx).is_open()));
+    let closed = harness.accessibility_tree();
+    assert!(!closed["nodes"].as_object().is_some_and(|nodes| {
+        nodes
+            .values()
+            .any(|node| node["element_id"] == "Name(\"filters.surface\")")
+    }));
+    assert!(
+        harness
+            .node("filters.trigger")
+            .expect("native trigger remains")
+            .focused,
+        "dismissal restores trigger focus"
     );
 }
 
