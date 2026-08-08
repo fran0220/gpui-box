@@ -31,7 +31,7 @@
 //! cancels it, so a pointer passing through opens nothing.
 //!
 //! Both durations are caller-settable and neither is a token: they are
-//! reaction times, not paint, and nothing in `tokens/*.json` describes how
+//! reaction times, not paint, and nothing in `crates/gpui-kit-tokens/tokens/*.json` describes how
 //! long a hand takes to cross two centimetres.
 //!
 //! # The keyboard

@@ -4,7 +4,7 @@ use gpui_kit_theme::{Elevation, Radius, Space, Surface, TextTone, Theme, TypeSca
 /// Token-addressed styling helpers.
 ///
 /// These exist so component code names a semantic role instead of repeating a
-/// literal, which keeps `tokens/*.json` the single authority for values that
+/// literal, which keeps `crates/gpui-kit-tokens/tokens/*.json` the single authority for values that
 /// occur more than once.
 pub trait StyledExt: Styled + Sized {
     fn surface(self, theme: &Theme, surface: Surface) -> Self {

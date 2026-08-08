@@ -534,7 +534,7 @@ for the common case. Reduced motion shows the target at once.
 ## Tokens
 
 Durations, the nine easing curves and the four spring presets live in
-`tokens/*.json`. Component code names a role (`Easing::Standard`,
+`crates/gpui-kit-tokens/tokens/*.json`. Component code names a role (`Easing::Standard`,
 `SpringPreset::Snappy`) rather than control points.
 
 `spring.grab` is the tight, quick-settling spring for direct manipulation: it

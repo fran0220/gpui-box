@@ -140,8 +140,10 @@ This uses the owning process and window id. It does not capture the desktop.
 
 ## Tokens
 
-`tokens/studio-dark.json` and `tokens/studio-light.json` are the source of
-truth. Views consume semantic roles through `gpui-kit-tokens` and
+`crates/gpui-kit-tokens/tokens/studio-dark.json` and its light counterpart are
+the source of truth, and they live inside the crate that reads them so that
+crate is publishable on its own. Views consume semantic roles through
+`gpui-kit-tokens` and
 `gpui-kit-theme`, and switch at runtime:
 
 ```rust
@@ -196,12 +198,15 @@ This library is not published to crates.io and will not be while GPUI is a Git
 dependency: a crates.io release may not depend on a Git revision. That decides
 everything below.
 
-**What you pin is a commit.** There are no tags and no release artifacts, so
-`rev = "<commit>"` of this repository is the unit of consumption. `version` in
-each `Cargo.toml` is what Cargo requires a manifest to carry; it is not a
-version anybody can resolve against, and it will not be bumped for every change.
-Do not use `branch = "main"`: a floating branch means an unannounced upgrade,
-and the same rule applies here as to the GPUI pin.
+**What you pin is a revision.** `rev = "<commit>"` of this repository is the
+unit of consumption, and a release tag is a commit somebody has stated is worth
+pinning rather than a different kind of artifact — `rev = "v0.2.0"` and the
+commit it names are the same thing to Cargo. `version` in each `Cargo.toml` is
+what Cargo requires a manifest to carry; it is not a version anybody can
+resolve against. Do not use `branch = "main"`: a floating branch means an
+unannounced upgrade, and the same rule applies here as to the GPUI pin.
+[`docs/releasing.md`](docs/releasing.md) describes how a tag is cut and what it
+promises.
 
 **What a breaking change means here.** Nothing enforces semver, so the promise
 has to be stated rather than inferred from a number. Three things are
@@ -210,7 +215,8 @@ compiler:
 
 - **The Rust API.** Builders, traits, events, and the prelude. A change here
   fails your build, which is the honest kind of break.
-- **Token keys.** `tokens/*.json` is a schema. A key that is renamed or removed
+- **Token keys.** `crates/gpui-kit-tokens/tokens/*.json` is a schema. A key that
+  is renamed or removed
   breaks any theme document an application maintains, and that document is only
   validated at runtime — `register_json` returns an error, and the application
   starts with no theme rather than the wrong one. Treat a token key rename as a

@@ -2,8 +2,9 @@
 
 ## Authority
 
-The documents under `tokens/` are the authority. `gpui-kit-tokens` embeds and
-validates every bundled theme; `gpui-kit-theme` is the only GPUI adapter.
+The documents under `crates/gpui-kit-tokens/tokens/` are the authority, and
+they sit inside the crate that embeds them so that crate can be packaged on its
+own. `gpui-kit-tokens` embeds and validates every bundled theme; `gpui-kit-theme` is the only GPUI adapter.
 `studio-dark` is the default and `studio-light` is its light counterpart.
 
 ```text

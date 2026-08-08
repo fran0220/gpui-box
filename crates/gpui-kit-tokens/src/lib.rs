@@ -15,8 +15,8 @@ pub mod contrast;
 
 pub use color::{Color, Palette, contrast_ratio, over};
 
-const STUDIO_DARK_JSON: &str = include_str!("../../../tokens/studio-dark.json");
-const STUDIO_LIGHT_JSON: &str = include_str!("../../../tokens/studio-light.json");
+const STUDIO_DARK_JSON: &str = include_str!("../tokens/studio-dark.json");
+const STUDIO_LIGHT_JSON: &str = include_str!("../tokens/studio-light.json");
 
 #[derive(Debug, Error)]
 pub enum TokenError {
