@@ -97,9 +97,9 @@ cargo run -p xtask -- scenes check list tree     # compare without rewriting
 
 On Linux and Windows the visual gate is `cargo run -p xtask -- headless check`
 (`headless capture` accepts), which renders the same catalog into offscreen
-textures through a software adapter — no window system or GPU — against its
-own baseline in `snapshots/headless/scenes`. The harness lives in
-`tools/headless-visual` as its own workspace with renderer-specific
+textures through a software adapter — no window system or GPU — against exact
+platform baselines in `snapshots/headless/{linux,windows}/scenes`. The harness
+lives in `tools/headless-visual` as its own workspace with renderer-specific
 dependencies and a separate lockfile. It and the root workspace must pin the
 same immutable `fran0220/zed` integration revision; run `cargo run -p xtask --
 dependencies check` after changing it. See `docs/screenshot-testing.md`.

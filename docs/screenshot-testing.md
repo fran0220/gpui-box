@@ -149,21 +149,23 @@ window system at all: GPUI's wgpu renderer draws each scene into an offscreen
 texture and the pixels are read straight back. A software adapter — llvmpipe
 on Linux, WARP on Windows — is enough, so the gate runs on a headless VM or a
 CI box with no GPU. Text is shaped by cosmic-text from the bundled Geist
-fonts only, and time is simulated. Linux llvmpipe and Windows WARP can still
-land an antialiased edge one 8-bit channel step apart, so the comparison
-permits that smallest representable difference and nothing larger.
+fonts only, and time is simulated. Repeated runs on Linux llvmpipe or Windows
+WARP are byte-stable, but the two adapters land some antialiased edges
+differently. Each therefore compares exactly against its own baseline rather
+than weakening one shared baseline with a cross-adapter tolerance.
 
 ```bash
 cargo run -p xtask -- headless check     # compare against the baseline
 cargo run -p xtask -- headless capture   # accept what check reported
 ```
 
-Its baseline lives in `snapshots/headless/scenes`, beside but distinct from
-the macOS one. CoreText and Metal land antialiased edges differently from
-cosmic-text and a software rasterizer, so the two baselines are two truthful
-pictures of the same catalog, not one picture captured twice. The macOS
-baseline stays authoritative for what users of native macOS builds see; the
-headless baseline is what every other platform can verify.
+Its baselines live in `snapshots/headless/linux/scenes` and
+`snapshots/headless/windows/scenes`, beside but distinct from the macOS one.
+CoreText, llvmpipe, and WARP land antialiased edges differently, so the three
+baselines are truthful pictures of the same catalog, not one picture forced
+through a tolerance large enough to cover every renderer. The macOS baseline
+stays authoritative for native macOS builds; each headless baseline verifies
+its own software adapter exactly.
 
 The harness is its own Cargo workspace because its Linux/Windows renderer
 dependencies and lockfile are platform-specific. It no longer patches one GPUI
