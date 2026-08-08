@@ -21,7 +21,7 @@ GPUI / Zed
 Source: https://github.com/zed-industries/zed
 Integration source: https://github.com/fran0220/zed
 Upstream baseline: a6a23c7b80a5cefa0487b7856335be89ace7e483
-Pinned integration revision: 4ee63c998af934384cb6a6a1e21bee58e258de2f
+Pinned integration revision: bbcc88d1f0ae98d2bd8632ea2a4ccede51d9108d
 License: Apache-2.0
 Copyright 2022–2024 Zed Industries, Inc.
 

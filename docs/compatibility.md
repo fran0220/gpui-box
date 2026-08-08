@@ -4,13 +4,14 @@
 
 | gpui-kit | GPUI source | Revision |
 |---|---|---|
-| 0.1.x | `https://github.com/fran0220/zed` | `4ee63c998af934384cb6a6a1e21bee58e258de2f` |
+| 0.1.x | `https://github.com/fran0220/zed` | `bbcc88d1f0ae98d2bd8632ea2a4ccede51d9108d` |
 
 The workspace and the standalone headless harness depend on one immutable
-revision of the integration fork. That revision merges two independently
+revision of the integration fork. That revision merges three independently
 reviewable topic stacks on upstream baseline
 `a6a23c7b80a5cefa0487b7856335be89ace7e483`: runtime primitives/native
-surfaces and the offscreen WGPU renderer. crates.io is not usable yet: the
+surfaces, the offscreen WGPU renderer, and deterministic software-adapter
+selection confined to headless rendering. crates.io is not usable yet: the
 published `gpui` crate stopped at 0.2.2 and `gpui_platform` has never been
 published, so the pin remains a Git revision.
 

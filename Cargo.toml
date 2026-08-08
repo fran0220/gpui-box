@@ -25,12 +25,13 @@ rust-version = "1.97"
 
 [workspace.dependencies]
 unicode-segmentation = "1"
+unicode-bidi = "0.3"
 anyhow = "1"
-gpui = { git = "https://github.com/fran0220/zed", rev = "4ee63c998af934384cb6a6a1e21bee58e258de2f" }
+gpui = { git = "https://github.com/fran0220/zed", rev = "bbcc88d1f0ae98d2bd8632ea2a4ccede51d9108d" }
 # Matches the instant type GPUI's executor clock returns, so tests can drive
 # motion through the simulated clock instead of wall time.
 web-time = "1"
-gpui_platform = { git = "https://github.com/fran0220/zed", rev = "4ee63c998af934384cb6a6a1e21bee58e258de2f", features = ["font-kit"] }
+gpui_platform = { git = "https://github.com/fran0220/zed", rev = "bbcc88d1f0ae98d2bd8632ea2a4ccede51d9108d", features = ["font-kit"] }
 png = "=0.18.1"
 # Parsing only. The html feature is off: this crate renders Markdown to GPUI
 # elements and never produces or executes HTML.

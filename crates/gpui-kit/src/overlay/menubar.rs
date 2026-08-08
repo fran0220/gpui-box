@@ -360,7 +360,7 @@ impl Render for Menubar {
             .collect::<Vec<_>>();
 
         div()
-            .id(self.ident.child("bar").element_id())
+            .id(self.ident.element_id())
             .row_reading(direction)
             .flex_none()
             .gap_token(&theme, Space::Xs)

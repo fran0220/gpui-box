@@ -233,7 +233,7 @@ impl Render for Gallery {
         }
 
         div()
-            .id("gallery-root")
+            .id("gallery.root")
             .size_full()
             .overflow_y_scroll()
             .bg(theme.colors.canvas)

@@ -55,7 +55,7 @@ fn scene(cx: &mut TestAppContext, state: SharedScene) -> Harness {
                 .h(px(60.0))
                 .children(handles.iter().skip(1).enumerate().map(|(index, handle)| {
                     div()
-                        .id(("dialog.stop", index))
+                        .id(format!("dialog.stop.{index}"))
                         .track_focus(handle)
                         .w(px(20.0))
                         .h(px(10.0))

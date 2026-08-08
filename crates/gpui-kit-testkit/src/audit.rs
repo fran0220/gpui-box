@@ -173,22 +173,7 @@ mod tests {
                 height: 10.0,
             },
             visible: true,
-            focused: false,
-            disabled: false,
-            selected: false,
-            hovered: false,
-            pressed: false,
-            checked: None,
-            expanded: None,
-            value: None,
-            placeholder: None,
-            value_min: None,
-            value_max: None,
-            value_now: None,
-            level: None,
-            busy: false,
-            invalid: false,
-            required: false,
+            ..Node::default()
         }
     }
 

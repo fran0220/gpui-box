@@ -479,7 +479,7 @@ impl ServerList {
         };
 
         let mut header = div()
-            .id(ident.child("header").element_id())
+            .id(ident.element_id())
             .row()
             .w_full()
             .gap_token(theme, Space::Sm)

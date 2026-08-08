@@ -381,7 +381,7 @@ impl Render for TimeInput {
             .collect();
 
         div()
-            .id(self.ident.child("frame").element_id())
+            .id(self.ident.element_id())
             .track_focus(&self.focus_handle)
             .when(!self.disabled, |element| {
                 element.tab_index(0).focus_ring(&theme)

@@ -58,6 +58,13 @@ fn all_five_states_present_differently(cx: &mut TestAppContext) {
     let list = harness.node("servers").expect("published");
     assert_eq!(list.role, Role::List);
     assert_eq!(list.value.as_deref(), Some("5"));
+
+    let tree = harness.accessibility_tree();
+    assert!(tree["nodes"].as_object().is_some_and(|nodes| {
+        nodes.values().any(|node| {
+            node["element_id"] == "Name(\"servers.workspace\")" && node["aria"]["role"] == "Row"
+        })
+    }));
 }
 
 #[gpui::test]
