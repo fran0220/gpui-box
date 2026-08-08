@@ -1,10 +1,19 @@
 # Screenshot testing
 
-## Capture the owned window
+## Two captures, two questions
 
-`gpui-kit-testkit::capture::capture_window` asks the macOS window server for the
-specific window owned by the process. It excludes framing and returns RGBA8
-pixels for the content area.
+`gpui-kit-testkit::capture` answers two different questions with two functions.
+
+`render_frame` (behind the `test-support` feature) re-renders the scene GPUI
+drew last into an offscreen texture and reads the pixels straight back. The
+window server, the window's position, its rounded corners, and whatever else
+the compositor does never touch the result, which is why two captures of the
+same scene agree to the byte. This is what the visual regression gate uses.
+
+`capture_window` asks the macOS window server for the specific window owned by
+the process — what was actually composited to the screen. It excludes framing
+and returns RGBA8 pixels for the content area. Use it when the question is
+about a real product window on a real display, not for regression baselines.
 
 Do not use full-desktop capture for automated evidence:
 
@@ -13,8 +22,12 @@ Do not use full-desktop capture for automated evidence:
 - it depends on z-order;
 - semantic bounds no longer map directly to image pixels.
 
-Non-macOS capture currently returns `Unsupported`. Image writing, semantic
-assertions, and frame comparison remain portable.
+Non-macOS capture currently returns `Unsupported` from `capture_window`, and
+`render_frame` needs a platform window that implements GPUI's
+`render_to_image`, which today is macOS. Linux and Windows hold their own
+visual baseline through the headless gate described below, which renders
+without any window at all. Image writing, semantic assertions, and frame
+comparison remain portable.
 
 ## Settle before capture
 
@@ -39,8 +52,8 @@ Visual baselines state:
 - platform and scale factor;
 - reduced-motion setting.
 
-The gallery asks for a 920×1000 logical window. What is captured is the content
-area the window server gave it, which the platform clamps to the display, so the
+The gallery asks for a 920×1000 logical window. What is captured is the
+window's drawable, whose size the platform clamps to the display, so the
 committed baselines are 1842×1374 device pixels: 921×687 logical at a backing
 scale factor of 2. Those numbers describe the machine the baselines were
 captured on, not a constant. A display of another size or scale produces images
@@ -88,8 +101,12 @@ writes one image per scene per bundled theme under
 window it launched with, because a GPUI application owns the window system for
 its lifetime and paying application startup per image cost over twenty minutes.
 A run takes an exclusive lock: two galleries capturing at once take the
-foreground from each other, and a window nobody is compositing hands back the
-frame it drew last, so both runs read each other's scenes.
+foreground from each other, and a window the platform has pushed to the
+background stops being scheduled for draws, so both runs stall on stale
+frames. Before anything is recorded, one settled frame is rendered and thrown
+away, because the platform delivers mouse events of its own while the window
+takes the foreground, and one arriving late would hover whatever sits under
+the physical cursor into the first image.
 
 `cargo run -p xtask -- scenes check` captures into `target/scene-check` and
 compares. Naming scenes captures or checks only those, which is what a change to
@@ -100,21 +117,23 @@ one component needs.
 `scenes check` needs three things, and a machine that is missing any of them
 cannot report a visual regression truthfully:
 
-1. **A graphical session that composites windows.** The capture asks the window
-   server for the process's own window by id. There is no offscreen path.
-2. **The ability to be frontmost.** A window nobody is compositing keeps handing
-   back the frame it drew last, so the run reads the previous scene until it
-   gives up. The gallery claims the foreground for the run and reclaims it
-   whenever a poll sees an unchanged frame.
-3. **The display the baselines came from.** See the fixture contract above: size
-   and backing scale factor are part of the baseline.
+1. **A macOS graphical session with Metal.** Pixels are read back from the
+   GPU rather than from the window server, but the gallery still opens a real
+   window to host the renderer and drive redraws, so a session that can open
+   one is required. The compositor's output is not consulted.
+2. **The ability to be frontmost.** A window the platform has pushed to the
+   background stops being scheduled for draws, so the run reads the previous
+   scene until it gives up; frontmost is also what lets focus rings and
+   carets render. The gallery claims the foreground for the run and reclaims
+   it whenever a poll sees an unchanged frame.
+3. **The display the baselines came from.** See the fixture contract above:
+   size and backing scale factor are part of the baseline.
 
-A GitHub-hosted runner has not been shown to provide the first two, and does not
-provide the third. So CI runs the gate only on a self-hosted macOS runner named
-by the `VISUAL_RUNNER` repository variable, and says in the run summary when it
-ran nowhere. Where there is no such runner, the gate is a step a reviewer
-performs and records in the pull request; the template asks for the output
-rather than for a claim.
+The gate therefore runs on a Mac someone can hand a display session to — a
+development machine or a self-hosted runner — rather than on an arbitrary
+hosted VM. Where no such machine is attached to CI, the gate is a step a
+reviewer performs and records in the pull request; the template asks for the
+output rather than for a claim.
 
 Wherever it runs, a failing run's `target/scene-check` is uploaded as an
 artifact, because a difference nobody can look at is not a review.
@@ -122,6 +141,37 @@ artifact, because a difference nobody can look at is not a review.
 The same catalog is rendered headlessly by `crates/gpui-kit/tests/scenes.rs`,
 which audits every published tree, so a component cannot be reviewed visually
 in one arrangement and tested in another.
+
+## The headless gate
+
+`tools/headless-visual` renders the same catalog on Linux and Windows with no
+window system at all: GPUI's wgpu renderer draws each scene into an offscreen
+texture and the pixels are read straight back. A software adapter — llvmpipe
+on Linux, WARP on Windows — is enough, so the gate runs on a headless VM or a
+CI box with no GPU. Text is shaped by cosmic-text from the bundled Geist
+fonts only, and time is simulated, which makes the output identical from one
+machine to the next; the comparison is exact rather than tolerant of one
+channel step, because there is no foreign GPU whose antialiasing needs
+absorbing.
+
+```bash
+cargo run -p xtask -- headless check     # compare against the baseline
+cargo run -p xtask -- headless capture   # accept what check reported
+```
+
+Its baseline lives in `snapshots/headless/scenes`, beside but distinct from
+the macOS one. CoreText and Metal land antialiased edges differently from
+cosmic-text and a software rasterizer, so the two baselines are two truthful
+pictures of the same catalog, not one picture captured twice. The macOS
+baseline stays authoritative for what users of native macOS builds see; the
+headless baseline is what every other platform can verify.
+
+The harness is its own Cargo workspace because it temporarily `[patch]`es
+GPUI to the branch of
+[zed-industries/zed#62341](https://github.com/zed-industries/zed/pull/62341),
+which adds the offscreen wgpu renderer. The root workspace and every published
+crate stay on the unmodified upstream revision; when the pull request merges,
+the patch section is deleted and the harness follows upstream directly.
 
 ## Audit
 

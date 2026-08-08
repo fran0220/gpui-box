@@ -165,6 +165,34 @@ and `xtask gate [full]`. `scenes check` is the visual regression gate; see
 
 ### Changed
 
+- The visual regression gate stopped photographing windows and started
+  reading frames back from the GPU. `scenes capture` used to ask the macOS
+  window server for what it had composited, which meant every image carried
+  the window's rounded corners, the compositor's colour handling, and
+  whatever settled latency the machine felt like that day; re-capturing an
+  unchanged catalog could disagree with itself on half the images. Captures
+  now re-render the scene GPUI drew into an offscreen texture and read the
+  pixels straight back (`gpui-kit-testkit::capture::render_frame`, built on
+  GPUI's `render_to_image` under its `test-support` feature). One warm-up
+  frame is rendered and discarded so stray platform mouse events cannot
+  hover a row in the first image. Two runs of the same catalog now agree to
+  the byte, a scoped check matches the full-catalog baseline in any order,
+  and a full check answers in under two minutes instead of six.
+  `capture_window`, the window-server grab, remains for photographing real
+  composited product windows; the gate no longer depends on it.
+
+- Linux and Windows gained their own visual gate. `tools/headless-visual`
+  renders the scene catalog with no window system at all — GPUI's wgpu
+  renderer draws into offscreen textures on a software adapter (llvmpipe,
+  WARP), text is shaped by cosmic-text from the bundled Geist fonts only, and
+  time is simulated — so a headless VM holds a baseline in
+  `snapshots/headless/scenes` and compares it exactly, byte for byte.
+  `cargo run -p xtask -- headless check` runs it. The harness is its own
+  workspace because it temporarily patches GPUI to the branch of
+  zed-industries/zed#62341, which adds the offscreen wgpu renderer upstream;
+  the root workspace and the published crates stay on unmodified upstream,
+  and the patch is deleted when the pull request merges.
+
 - The design system stopped drawing hairlines to say what a colour could say.
   Borders were doing the work of grouping because the surface ramp was too flat
   to do it — canvas, panel and raised sat within about three percent lightness

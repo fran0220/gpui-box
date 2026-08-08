@@ -59,12 +59,15 @@ cargo run -p xtask -- gate        # fmt, check, test, clippy, tokens
 cargo run -p xtask -- gate full   # the above, plus rustdoc and scene images
 ```
 
-Captures are deterministic: the gallery renders with reduced motion and parks
-the pointer, so the same scene produces the same picture on every run. That is
-what makes `scenes check` a gate rather than a suggestion. Images are compared
-as pixels with one step of tolerance per channel, because the renderer does
-land an antialiased edge either way and a gate that reported that would stop
-being read. Anything a component changed moves far further than one step.
+Captures read the frame GPUI drew straight back from the GPU rather than
+asking the window server what it composited, and the gallery renders with
+reduced motion, parks the pointer, and discards one warm-up frame so stray
+platform events cannot leak into the first image. The same scene therefore
+produces the same bytes on every run and in any order — a scoped check
+matches the full-catalog baseline — which is what makes `scenes check` a gate
+rather than a suggestion. The comparison still allows one step per channel,
+because another machine's GPU or OS may rasterize an antialiased edge one
+step differently. Anything a component changed moves far further than that.
 
 While iterating on one component, capture only what it touches:
 
@@ -72,6 +75,14 @@ While iterating on one component, capture only what it touches:
 cargo run -p xtask -- scenes capture list tree   # rewrite these scenes
 cargo run -p xtask -- scenes check list tree     # compare without rewriting
 ```
+
+On Linux and Windows the visual gate is `cargo run -p xtask -- headless check`
+(`headless capture` accepts), which renders the same catalog into offscreen
+textures through a software adapter — no window system or GPU — against its
+own baseline in `snapshots/headless/scenes`. The harness lives in
+`tools/headless-visual` as its own workspace because it temporarily patches
+GPUI to the branch of zed-industries/zed#62341; the root workspace must stay
+on unmodified upstream. See `docs/screenshot-testing.md`.
 
 UI changes additionally require visual inspection of the captured images. A
 changed image is a claim about what the component now looks like, so look at

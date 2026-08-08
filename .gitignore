@@ -1,4 +1,5 @@
 /target/
+/tools/headless-visual/target/
 .DS_Store
 /snapshots/**/*.actual.png
 /snapshots/**/*.diff.png

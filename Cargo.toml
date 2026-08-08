@@ -10,6 +10,9 @@ members = [
   "examples/gallery",
   "xtask",
 ]
+# Its own workspace on purpose: it carries a temporary [patch] on GPUI that
+# must never reach this one. See tools/headless-visual/Cargo.toml.
+exclude = ["tools/headless-visual"]
 
 [workspace.package]
 edition = "2024"

@@ -1,0 +1,44 @@
+# The headless visual gate: the scene catalog rendered and compared without a
+# window system, which is what lets Linux and Windows machines hold a visual
+# baseline at all. macOS keeps its native gate in `xtask scenes`.
+#
+# This package is deliberately its own workspace. The [patch] at the bottom
+# temporarily reroutes GPUI to a contribution branch, and an isolated
+# workspace is what keeps that patch from ever reaching the root workspace or
+# the published crates.
+
+[package]
+name = "headless-visual"
+publish = false
+edition = "2024"
+version = "0.1.0"
+license = "MIT"
+
+[dependencies]
+anyhow = "1"
+# The same major version GPUI's `render_to_image` returns, so the image value
+# crosses the crate boundary as one type.
+image = "0.25"
+gpui = { git = "https://github.com/zed-industries/zed", rev = "a6a23c7b80a5cefa0487b7856335be89ace7e483", features = ["test-support"] }
+gpui-kit = { path = "../../crates/gpui-kit", features = ["fixtures"] }
+gpui-kit-semantics = { path = "../../crates/gpui-kit-semantics" }
+gpui-kit-theme = { path = "../../crates/gpui-kit-theme" }
+
+[target.'cfg(any(target_os = "linux", target_os = "windows"))'.dependencies]
+gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "a6a23c7b80a5cefa0487b7856335be89ace7e483", features = ["test-support"] }
+gpui_wgpu = { git = "https://github.com/zed-industries/zed", rev = "a6a23c7b80a5cefa0487b7856335be89ace7e483", features = ["test-support"] }
+
+[workspace]
+
+# Everything below rides https://github.com/zed-industries/zed/pull/62341,
+# which teaches gpui_wgpu to render to an offscreen texture instead of a
+# window surface. Until that lands, the revision lives on the contribution
+# fork. The moment the PR merges and the root workspace's GPUI revision
+# advances past it, delete this section; the dependencies above then resolve
+# against upstream unmodified.
+[patch."https://github.com/zed-industries/zed"]
+# The version pin disambiguates from a lint test fixture in the Zed repository
+# that also names a package `gpui`.
+gpui = { git = "https://github.com/fran0220/zed", rev = "0bfd4852d83d52aeb8b2d7c4a4ef583a1576f40c", version = "=0.2.2" }
+gpui_platform = { git = "https://github.com/fran0220/zed", rev = "0bfd4852d83d52aeb8b2d7c4a4ef583a1576f40c" }
+gpui_wgpu = { git = "https://github.com/fran0220/zed", rev = "0bfd4852d83d52aeb8b2d7c4a4ef583a1576f40c" }

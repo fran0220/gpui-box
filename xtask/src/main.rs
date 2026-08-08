@@ -24,12 +24,15 @@ fn main() -> Result<()> {
         (Some("scenes"), Some("list")) => scenes_list(),
         (Some("scenes"), Some("capture")) => scenes_capture(&rest),
         (Some("scenes"), Some("check")) => scenes_check(&rest),
+        (Some("headless"), Some("capture")) => headless("capture", &rest),
+        (Some("headless"), Some("check")) => headless("check", &rest),
         (Some("gate"), None) => gate(false),
         (Some("gate"), Some("full")) => gate(true),
         _ => bail!(
             "usage: cargo xtask <tokens generate|tokens check|strings check|\
              strings generate|scenes list|scenes capture [name...]|\
-             scenes check [name...]|gate [full]>"
+             scenes check [name...]|headless capture [name...]|\
+             headless check [name...]|gate [full]>"
         ),
     }
 }
@@ -56,12 +59,14 @@ fn scenes_capture(only: &[String]) -> Result<()> {
 /// the committed one.
 ///
 /// This is the visual regression gate. It only means anything because captures
-/// are deterministic: the gallery renders with reduced motion, so no animation
-/// phase leaks into a file.
+/// are deterministic: the gallery reads frames straight back from the GPU and
+/// renders with reduced motion, so neither compositing nor an animation phase
+/// leaks into a file. On one machine two runs agree to the byte.
 ///
-/// Images are compared as pixels rather than as bytes. The renderer sometimes
-/// lands a channel one step either way, and a gate that cried about a
-/// difference nobody can see would be a gate nobody reads.
+/// Images are still compared as pixels rather than as bytes, because another
+/// machine's GPU or OS may land an antialiased edge one channel step away,
+/// and a gate that cried about a difference nobody can see would be a gate
+/// nobody reads.
 fn scenes_check(only: &[String]) -> Result<()> {
     let committed = snapshots();
     let scratch = root().join("target").join("scene-check");
@@ -140,6 +145,29 @@ fn gate(full: bool) -> Result<()> {
         scenes_check(&[])?;
     }
     println!("gate passed");
+    Ok(())
+}
+
+/// Runs the Linux and Windows visual gate, which lives in its own workspace
+/// so the temporary GPUI [patch] it carries stays out of this one.
+fn headless(command: &str, only: &[String]) -> Result<()> {
+    let manifest = root()
+        .join("tools")
+        .join("headless-visual")
+        .join("Cargo.toml");
+    println!("== headless {command} {}", only.join(" "));
+    let status = Command::new(env!("CARGO"))
+        .args(["run", "--quiet", "--manifest-path"])
+        .arg(&manifest)
+        .arg("--")
+        .arg(command)
+        .args(only)
+        .current_dir(root())
+        .status()
+        .context("run the headless visual gate")?;
+    if !status.success() {
+        bail!("headless {command} failed");
+    }
     Ok(())
 }
 
