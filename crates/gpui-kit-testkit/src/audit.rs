@@ -46,6 +46,24 @@ impl std::fmt::Display for Finding {
     }
 }
 
+/// A complete semantic audit failure, formatted for a test runner.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuditError {
+    pub findings: Vec<Finding>,
+}
+
+impl std::fmt::Display for AuditError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(formatter, "semantic audit failed:")?;
+        for finding in &self.findings {
+            writeln!(formatter, "  {finding}")?;
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for AuditError {}
+
 /// Roles a user can operate, which therefore need a name.
 fn is_actionable(role: Role) -> bool {
     matches!(
@@ -131,6 +149,16 @@ pub fn audit(snapshot: &Snapshot) -> Vec<Finding> {
     }
 
     findings
+}
+
+/// Audits a snapshot and returns all findings in one actionable error.
+pub fn audit_or_error(snapshot: &Snapshot) -> Result<(), AuditError> {
+    let findings = audit(snapshot);
+    if findings.is_empty() {
+        Ok(())
+    } else {
+        Err(AuditError { findings })
+    }
 }
 
 fn name_of(node: &Node) -> Option<&str> {
@@ -304,5 +332,17 @@ mod tests {
         let mut group = node("panel", Role::Group);
         group.bounds.height = 0.0;
         assert_eq!(problems(&snapshot(vec![group])), vec![Problem::ZeroSized]);
+    }
+
+    #[test]
+    fn the_result_api_reports_every_finding_with_its_node() {
+        let mut button = node("items.0", Role::Button);
+        button.bounds.width = 0.0;
+        let error = audit_or_error(&snapshot(vec![button])).expect_err("three findings");
+        assert_eq!(error.findings.len(), 3);
+        assert_eq!(
+            error.to_string(),
+            "semantic audit failed:\n  `items.0` derives its id from list position\n  `items.0` is actionable but has no accessible name\n  `items.0` is visible but occupies no space\n"
+        );
     }
 }
