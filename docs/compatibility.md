@@ -4,7 +4,7 @@
 
 | gpui-kit | GPUI source | Revision |
 |---|---|---|
-| 0.1.x | `https://github.com/fran0220/zed` | `f9e7bd617940af337f34f0c5d90e4a83846b6ebe` |
+| 0.1.x | `https://github.com/fran0220/zed` | `a754da44757a0aa5179224fe37a024c7517c7a92` |
 
 The workspace and the standalone headless harness depend on one immutable
 revision of the integration fork. That revision merges three independently
@@ -18,7 +18,10 @@ published, so the pin remains a Git revision.
 The current integration descendant also carries the product-neutral control
 state projection and deterministic accessibility-adapter activation used by
 gpui-kit, plus whole-window pointer-exit delivery needed to retire transient
-help from the Windows native accessibility tree. The detailed, evidence-scoped
+help from the Windows native accessibility tree. It exposes hitbox pointer
+capture through fluent interactive elements so a bounded drag continues to
+receive move and release events after leaving its original bounds, including
+when a live preview redraws the window mid-gesture. The detailed, evidence-scoped
 platform matrix lives in [`accessibility.md`](accessibility.md).
 
 ## Platform behavior

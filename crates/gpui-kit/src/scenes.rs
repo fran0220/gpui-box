@@ -527,56 +527,168 @@ fn card(_window: &mut Window, cx: &mut App) -> AnyElement {
         .into_any_element()
 }
 
-/// A run that failed and was sent back, which is the case the canvas exists
-/// for: every node state appears once, and the retry loop is drawn as a loop
-/// rather than as another step in the forward order.
+#[derive(Debug)]
+struct SceneGraph {
+    viewport: GraphViewport,
+    ingest: gpui::Point<f32>,
+    validate: gpui::Point<f32>,
+    persist: gpui::Point<f32>,
+    observe: gpui::Point<f32>,
+    publish: gpui::Point<f32>,
+    edges: Vec<GraphEdge>,
+}
+
+impl Global for SceneGraph {}
+
+/// A live processing graph with the visual states and editor gestures shown
+/// together: traffic lanes, a running shockwave, explicit ports, labels,
+/// feedback routing, pan, zoom, node movement, and connection creation.
 fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<SceneGraph>() {
+        cx.set_global(SceneGraph {
+            viewport: GraphViewport::default(),
+            ingest: gpui::point(24.0, 200.0),
+            validate: gpui::point(244.0, 56.0),
+            persist: gpui::point(500.0, 56.0),
+            observe: gpui::point(464.0, 330.0),
+            publish: gpui::point(684.0, 200.0),
+            edges: vec![
+                GraphEdge::new("scene.graph.ingest", "scene.graph.validate")
+                    .id("scene.graph.edge.rows")
+                    .ports("rows", "records")
+                    .label("12.4k rows")
+                    .active(true),
+                GraphEdge::new("scene.graph.validate", "scene.graph.persist")
+                    .id("scene.graph.edge.valid")
+                    .ports("valid", "records")
+                    .active(true),
+                GraphEdge::new("scene.graph.validate", "scene.graph.observe")
+                    .id("scene.graph.edge.telemetry")
+                    .ports("telemetry", "events")
+                    .label("telemetry")
+                    .lane(-1),
+                GraphEdge::new("scene.graph.persist", "scene.graph.publish")
+                    .id("scene.graph.edge.commit")
+                    .ports("commit", "artifact")
+                    .label("commit 8f72")
+                    .active(true),
+                GraphEdge::new("scene.graph.observe", "scene.graph.validate")
+                    .id("scene.graph.edge.retry")
+                    .ports("retry", "retry")
+                    .label("retry policy")
+                    .lane(1)
+                    .feedback(),
+            ],
+        });
+    }
+    let scene = cx.global::<SceneGraph>();
+    let viewport = scene.viewport;
+    let ingest = scene.ingest;
+    let validate = scene.validate;
+    let persist = scene.persist;
+    let observe = scene.observe;
+    let publish = scene.publish;
+    let edges = scene.edges.clone();
     let theme = cx.theme().clone();
     stack(&theme)
         .child(
-            div().w(px(860.0)).h(px(300.0)).child(
+            div().w(px(860.0)).h(px(500.0)).child(
                 NodeGraph::new("scene.graph")
+                    .viewport(viewport)
+                    .zoom_range(0.55, 1.8)
                     .node(
-                        GraphNode::new("scene.graph.plan", "Plan")
+                        GraphNode::new("scene.graph.ingest", "Stream ingest")
+                            .width(176.0)
                             .state(NodeState::Succeeded)
-                            .metric("tokens", "4.1k")
-                            .metric("took", "2.4s"),
-                        24.0,
-                        24.0,
+                            .action("orders.v2 · partition 18")
+                            .metric("rate", "3.2k/s")
+                            .port(GraphPort::input("source", "Source").side(PortSide::Top))
+                            .port(GraphPort::output("rows", "Rows"))
+                            .port(GraphPort::output("errors", "Errors")),
+                        ingest.x,
+                        ingest.y,
                     )
                     .node(
-                        GraphNode::new("scene.graph.edit", "Edit files")
-                            .state(NodeState::Failed)
-                            .action("write crates/gpui-kit/src/lib.rs")
-                            .metric("tokens", "12.7k")
-                            .diff(Diff::new(48, 12)),
-                        300.0,
-                        24.0,
-                    )
-                    .node(
-                        GraphNode::new("scene.graph.test", "Run tests")
+                        GraphNode::new("scene.graph.validate", "Validate & enrich")
+                            .width(176.0)
                             .state(NodeState::Running)
-                            .action("cargo test --workspace")
-                            .metric("took", "18s"),
-                        576.0,
-                        24.0,
+                            .action("schema + fraud signals")
+                            .metric("p95", "18 ms")
+                            .port(GraphPort::input("records", "Records"))
+                            .port(GraphPort::input("retry", "Retry").side(PortSide::Bottom))
+                            .port(GraphPort::output("valid", "Valid"))
+                            .port(GraphPort::output("telemetry", "Events").side(PortSide::Bottom))
+                            .selected(true),
+                        validate.x,
+                        validate.y,
                     )
                     .node(
-                        GraphNode::new("scene.graph.publish", "Publish").state(NodeState::Pending),
-                        576.0,
-                        170.0,
+                        GraphNode::new("scene.graph.persist", "Persist batch")
+                            .width(176.0)
+                            .state(NodeState::Succeeded)
+                            .action("warehouse / orders")
+                            .metric("written", "12.3k")
+                            .port(GraphPort::input("records", "Records"))
+                            .port(GraphPort::output("commit", "Commit")),
+                        persist.x,
+                        persist.y,
                     )
                     .node(
-                        GraphNode::new("scene.graph.deploy", "Deploy")
-                            .state(NodeState::Refused)
-                            .action("host declined: no credentials"),
-                        300.0,
-                        170.0,
+                        GraphNode::new("scene.graph.observe", "Observe quality")
+                            .width(176.0)
+                            .state(NodeState::Failed)
+                            .action("drift threshold exceeded")
+                            .metric("rejected", "94")
+                            .port(GraphPort::input("events", "Events").side(PortSide::Top))
+                            .port(GraphPort::output("retry", "Retry").side(PortSide::Top)),
+                        observe.x,
+                        observe.y,
                     )
-                    .edge(GraphEdge::new("scene.graph.plan", "scene.graph.edit"))
-                    .edge(GraphEdge::new("scene.graph.edit", "scene.graph.test"))
-                    .edge(GraphEdge::new("scene.graph.publish", "scene.graph.deploy"))
-                    .edge(GraphEdge::new("scene.graph.test", "scene.graph.edit").feedback()),
+                    .node(
+                        GraphNode::new("scene.graph.publish", "Publish artifact")
+                            .width(176.0)
+                            .state(NodeState::Pending)
+                            .action("waiting for commit")
+                            .port(GraphPort::input("artifact", "Artifact").side(PortSide::Top))
+                            .port(GraphPort::output("release", "Release").side(PortSide::Bottom)),
+                        publish.x,
+                        publish.y,
+                    )
+                    .edges(edges)
+                    .on_event(|event, _, cx| {
+                        cx.update_global::<SceneGraph, ()>(|scene, _| match event {
+                            NodeGraphEvent::ViewportChanged(viewport) => {
+                                scene.viewport = *viewport;
+                            }
+                            NodeGraphEvent::NodeMoved { id, position } => match id.as_ref() {
+                                "scene.graph.ingest" => scene.ingest = *position,
+                                "scene.graph.validate" => scene.validate = *position,
+                                "scene.graph.persist" => scene.persist = *position,
+                                "scene.graph.observe" => scene.observe = *position,
+                                "scene.graph.publish" => scene.publish = *position,
+                                _ => {}
+                            },
+                            NodeGraphEvent::ConnectionRequested { from, to } => {
+                                let id = format!(
+                                    "scene.graph.edge.user.{}.{}.{}.{}",
+                                    from.node, from.port, to.node, to.port
+                                );
+                                if !scene
+                                    .edges
+                                    .iter()
+                                    .any(|edge| edge.from() == &from.node && edge.to() == &to.node)
+                                {
+                                    scene.edges.push(
+                                        GraphEdge::new(from.node.clone(), to.node.clone())
+                                            .id(id)
+                                            .ports(from.port.clone(), to.port.clone())
+                                            .label("new connection"),
+                                    );
+                                }
+                            }
+                        });
+                        cx.refresh_windows();
+                    }),
             ),
         )
         .into_any_element()

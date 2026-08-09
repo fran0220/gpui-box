@@ -99,7 +99,8 @@ pub mod prelude {
     pub use crate::agent::thinking::{Reasoning, ThinkingBlock};
     pub use crate::agent::tool_call::{Elapsed, ToolBody, ToolCallCard, ToolCallState, ToolOutput};
     pub use crate::canvas::{
-        Diff, EdgeKind, GraphEdge, GraphNode, GraphState, NodeGraph, NodeMetric, NodeState, Placed,
+        Diff, EdgeKind, GraphEdge, GraphEndpoint, GraphNode, GraphPort, GraphState, GraphViewport,
+        NodeGraph, NodeGraphEvent, NodeMetric, NodeState, Placed, PortDirection, PortSide,
     };
     pub use crate::content::{
         Attachment, BrowserPanel, BufferedRange, CodeBlock, CodeLine, CodeSpan, CodeView,

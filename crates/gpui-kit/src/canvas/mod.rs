@@ -39,6 +39,6 @@ mod edge;
 mod graph;
 mod node;
 
-pub use edge::{EdgeKind, GraphEdge};
-pub use graph::{GraphState, NodeGraph, Placed};
-pub use node::{Diff, GraphNode, NODE_WIDTH, NodeMetric, NodeState};
+pub use edge::{EdgeKind, GraphEdge, GraphEndpoint, PortSide};
+pub use graph::{GraphState, GraphViewport, NodeGraph, NodeGraphEvent, Placed};
+pub use node::{Diff, GraphNode, GraphPort, NODE_WIDTH, NodeMetric, NodeState, PortDirection};

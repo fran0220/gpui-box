@@ -13,6 +13,39 @@ Components:
 3. hold only visual transient state such as hover, focus, open, selection, and
    animation.
 
+## Upstream infrastructure
+
+Do not hide a missing GPUI primitive behind a component-specific workaround.
+When a requirement is product-neutral, will be reused by more than one
+component, or must coordinate rendering, layout, clipping, hit testing, input,
+or platform behavior, first verify whether the pinned `fran0220/zed` revision
+already provides it. If it does not, implement the smallest complete primitive
+in that fork and consume the resulting immutable revision here.
+
+Keep product and component policy in this repository. Node routing, port
+meaning, semantic ids, and caller-owned events belong to `gpui-kit`; generic
+subtree transforms, pointer capture, renderer behavior, and platform event
+delivery belong upstream. Do not add a partial upstream API that works for one
+primitive or platform while leaving its layout, clipping, accessibility bounds,
+or hit testing inconsistent.
+
+An upstream infrastructure change must:
+
+1. be product-neutral and documented at the primitive boundary;
+2. carry focused GPUI tests, including the affected platform-independent input
+   or rendering invariants;
+3. be committed and pushed to `fran0220/zed` before this repository pins it;
+4. update the root and `tools/headless-visual` workspaces to the same immutable
+   revision;
+5. update `PROVENANCE.md`, `THIRD_PARTY_NOTICES`, and compatibility documentation;
+6. pass `cargo run -p xtask -- dependencies check` and the relevant Linux,
+   macOS, and Windows validation.
+
+Local geometry remains appropriate when it occurs once and does not create a
+second implementation of a renderer or input primitive. Record any deliberately
+deferred upstream gap in coverage documentation rather than presenting a local
+approximation as complete support.
+
 ## Token authority
 
 `crates/gpui-kit-tokens/tokens/*.json` is the source of truth, and every theme carries the same key

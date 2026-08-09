@@ -67,7 +67,7 @@ pub fn generate(root: &Path) -> Result<()> {
 pub fn check(root: &Path) -> Result<()> {
     let path = index_path(root);
     let current = fs::read_to_string(&path).unwrap_or_default();
-    if current == build(root)? {
+    if same_index(&current, &build(root)?) {
         println!("{} is current", path.display());
         return Ok(());
     }
@@ -78,6 +78,13 @@ pub fn check(root: &Path) -> Result<()> {
          will reject.",
         path.display()
     );
+}
+
+fn same_index(current: &str, expected: &str) -> bool {
+    // Git commonly materializes tracked text with CRLF when core.autocrlf is
+    // enabled. The generated string is LF, but those files have identical
+    // logical contents and must pass the same cross-platform gate.
+    current.replace("\r\n", "\n") == expected
 }
 
 fn index_path(root: &Path) -> PathBuf {
@@ -334,20 +341,18 @@ fn read_source(
 
         if let Some(name) = inherent(line) {
             let functions = read_impl(&lines, at);
-            let entry = items.entry(name.clone()).or_default();
-            if entry.name.is_empty() {
-                entry.name = name;
-                entry.module = module.to_string();
-                entry.source = relative.to_string();
-            }
-            for signature in functions {
-                let how = receiver(&signature);
-                let signature = without_receiver(&signature);
-                match how {
-                    Receiver::None => entry.constructors.push(signature),
-                    Receiver::Owned => entry.options.push(signature),
-                    Receiver::Mutable => entry.commands.push(signature),
-                    Receiver::Shared => entry.queries.push(signature),
+            // An inherent impl does not make a private declaration public.
+            // Only attach methods to a declaration already indexed above.
+            if let Some(entry) = items.get_mut(&name) {
+                for signature in functions {
+                    let how = receiver(&signature);
+                    let signature = without_receiver(&signature);
+                    match how {
+                        Receiver::None => entry.constructors.push(signature),
+                        Receiver::Owned => entry.options.push(signature),
+                        Receiver::Mutable => entry.commands.push(signature),
+                        Receiver::Shared => entry.queries.push(signature),
+                    }
                 }
             }
             docs.clear();
@@ -753,7 +758,9 @@ fn render(
         out.push_str(&format!("      \"summary\": {},\n", quote(&item.summary)));
         out.push_str(&list("variants", &item.variants));
         out.push_str(&list("construct", &item.constructors));
-        out.push_str(&last("options", &item.options));
+        out.push_str(&list("options", &item.options));
+        out.push_str(&list("commands", &item.commands));
+        out.push_str(&last("queries", &item.queries));
         out.push_str(if at + 1 == types.len() {
             "    }\n"
         } else {
@@ -893,6 +900,28 @@ impl Select {
         assert_eq!(select.queries.len(), 1);
     }
 
+    #[test]
+    fn a_private_type_with_an_impl_is_not_advertised() {
+        let source = strip(
+            r#"
+struct Internal;
+impl Internal {
+    pub fn new() -> Self { todo!() }
+}
+pub struct Public;
+impl Public {
+    pub fn value(&self) -> bool { true }
+}
+"#,
+        );
+        let mut items = BTreeMap::new();
+        let mut events = BTreeMap::new();
+        read_source(&source, "controls", "private.rs", &mut items, &mut events);
+
+        assert!(!items.contains_key("Internal"));
+        assert_eq!(items["Public"].queries, vec!["value() -> bool"]);
+    }
+
     /// An event enum is what the component tells the host, so it belongs to
     /// the component rather than floating as a type nobody connects.
     #[test]
@@ -932,14 +961,19 @@ pub enum SelectEvent {
         assert!(!source.contains("pub struct B"));
     }
 
-    /// The index is compared byte for byte by `check`, so a wrapped signature
-    /// has to collapse the same way every time.
+    /// A wrapped signature has to collapse the same way every time.
     #[test]
     fn a_wrapped_signature_collapses_to_one_line() {
         assert_eq!(
             normalize("new(  ident: impl Into<Ident>,\n    label: SharedString,\n) -> Self"),
             "new(ident: impl Into<Ident>, label: SharedString) -> Self"
         );
+    }
+
+    #[test]
+    fn a_windows_checkout_matches_the_generated_lf_index() {
+        assert!(same_index("one\r\ntwo\r\n", "one\ntwo\n"));
+        assert!(!same_index("one\r\nchanged\r\n", "one\ntwo\n"));
     }
 
     #[test]

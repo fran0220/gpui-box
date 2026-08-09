@@ -1215,6 +1215,8 @@
         "state(state: NodeState) -> Self",
         "metric(label: impl Into<SharedString>, value: impl Into<SharedString>) -> Self",
         "metrics(metrics: impl IntoIterator<Item = NodeMetric>) -> Self",
+        "port(port: GraphPort) -> Self",
+        "ports(ports: impl IntoIterator<Item = GraphPort>) -> Self",
         "diff(diff: Diff) -> Self",
         "width(width: f32) -> Self",
         "on_click(handler: impl Fn(&mut Window, &mut App) + 'static) -> Self"
@@ -1733,11 +1735,19 @@
         "state(state: GraphState) -> Self",
         "empty(empty: EmptyState) -> Self",
         "grid(grid: bool) -> Self",
-        "offset(x: f32, y: f32) -> Self"
+        "offset(x: f32, y: f32) -> Self",
+        "viewport(viewport: GraphViewport) -> Self",
+        "zoom(zoom: f32) -> Self",
+        "zoom_range(min: f32, max: f32) -> Self",
+        "on_event(handler: impl Fn(&NodeGraphEvent, &mut Window, &mut App) + 'static) -> Self"
       ],
       "commands": [],
       "queries": [],
-      "reports": [],
+      "reports": [
+        "ViewportChanged",
+        "NodeMoved",
+        "ConnectionRequested"
+      ],
       "scenes": [
         "node-graph"
       ]
@@ -2237,6 +2247,7 @@
         "input",
         "textarea",
         "pagination",
+        "node-graph",
         "search-field",
         "find-replace"
       ]
@@ -2759,6 +2770,7 @@
       "scenes": [
         "input",
         "textarea",
+        "node-graph",
         "search-field",
         "find-replace"
       ]
@@ -2812,6 +2824,7 @@
         "input",
         "textarea",
         "form",
+        "node-graph",
         "schema-form",
         "search-field",
         "find-replace"
@@ -3232,7 +3245,9 @@
         "description(description: impl Into<SharedString>) -> Self",
         "disabled(disabled: bool) -> Self",
         "body(body: impl IntoElement) -> Self"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "ActiveDrag",
@@ -3240,7 +3255,9 @@
       "summary": "The drag as anything outside the module can see it.",
       "variants": [],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Activity",
@@ -3255,7 +3272,9 @@
       "options": [
         "period_ms(theme: &Theme) -> u64",
         "curve(theme: &Theme) -> CubicBezier"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Align",
@@ -3267,7 +3286,9 @@
         "End"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "AlwaysScope",
@@ -3284,7 +3305,13 @@
         "path(path: impl Into<SharedString>) -> Self",
         "host(host: impl Into<SharedString>) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "name() -> &'static str",
+        "subject() -> Option<&SharedString>",
+        "label(cx: &App) -> SharedString"
+      ]
     },
     {
       "name": "ApprovalDecision",
@@ -3295,7 +3322,11 @@
         "Always"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "label(cx: &App) -> SharedString"
+      ]
     },
     {
       "name": "ApprovalEvent",
@@ -3306,7 +3337,9 @@
         "Declined"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "ApprovalStatus",
@@ -3320,7 +3353,11 @@
         "Superseded"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "name() -> &'static str"
+      ]
     },
     {
       "name": "AspectFit",
@@ -3331,7 +3368,9 @@
         "Height"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "AsyncStatus",
@@ -3347,7 +3386,9 @@
         "Error"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "AsyncValue",
@@ -3358,7 +3399,14 @@
         "loading() -> Self",
         "ready(value: T) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [
+        "refresh()",
+        "fail_refresh(error: E)"
+      ],
+      "queries": [
+        "is_stale() -> bool"
+      ]
     },
     {
       "name": "Attachment",
@@ -3370,7 +3418,9 @@
       ],
       "options": [
         "detail(detail: impl Into<SharedString>) -> Self"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Basis",
@@ -3384,7 +3434,9 @@
       "options": [
         "name() -> &'static str",
         "is_estimate() -> bool"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Block",
@@ -3401,7 +3453,11 @@
         "Html"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "lines() -> usize"
+      ]
     },
     {
       "name": "BlockedDay",
@@ -3409,7 +3465,9 @@
       "summary": "One day inside a range the adapter refuses, in the host's own words.",
       "variants": [],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "BlockedReport",
@@ -3422,15 +3480,9 @@
         "Blocked"
       ],
       "construct": [],
-      "options": []
-    },
-    {
-      "name": "Body",
-      "path": "gpui_kit::data::Body",
-      "summary": "",
-      "variants": [],
-      "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "BufferedRange",
@@ -3440,7 +3492,9 @@
       "construct": [
         "new(start: f32, end: f32) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "ButtonJoin",
@@ -3453,7 +3507,9 @@
         "Trailing"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "ButtonVariant",
@@ -3467,7 +3523,9 @@
         "Link"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "CalendarEvent",
@@ -3479,7 +3537,9 @@
         "Hovered"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Catalog",
@@ -3492,7 +3552,9 @@
         "Unavailable"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Cell",
@@ -3505,7 +3567,9 @@
       "options": [
         "text(text: impl Into<SharedString>) -> Self",
         "published(published: bool) -> Self"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "CellAlign",
@@ -3517,7 +3581,9 @@
         "End"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Clock",
@@ -3525,7 +3591,12 @@
       "summary": "The clock the host keeps: how far its hours run, and what it calls the two halves of a twelve-hour day.",
       "variants": [],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "is_twelve_hour() -> bool",
+        "meridiem_label(index: usize) -> Option<SharedString>"
+      ]
     },
     {
       "name": "CodeBlock",
@@ -3533,7 +3604,9 @@
       "summary": "A fenced block, as handed to a host that colours code.",
       "variants": [],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "CodeLine",
@@ -3546,7 +3619,9 @@
       "options": [
         "spans(spans: impl IntoIterator<Item = CodeSpan>) -> Self",
         "mark(mark: LineMark) -> Self"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "CodeSpan",
@@ -3554,7 +3629,9 @@
       "summary": "One coloured run of a code block, in byte offsets into its text.",
       "variants": [],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Column",
@@ -3570,7 +3647,9 @@
         "flex(share: f32) -> Self",
         "align(align: Align) -> Self",
         "sortable(sortable: bool) -> Self"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "ColumnWidth",
@@ -3581,7 +3660,9 @@
         "Flex"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "ComboboxEvent",
@@ -3595,7 +3676,9 @@
         "Closed"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Command",
@@ -3609,6 +3692,13 @@
         "section(section: impl Into<SharedString>) -> Self",
         "shortcut(keystroke: impl Into<SharedString>) -> Self",
         "unavailable(reason: impl Into<SharedString>) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "label() -> &SharedString",
+        "reason() -> Option<&SharedString>",
+        "is_available() -> bool"
       ]
     },
     {
@@ -3621,7 +3711,9 @@
         "Dismissed"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "ContextMenuEvent",
@@ -3634,7 +3726,9 @@
         "Closed"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "CopyEvent",
@@ -3645,7 +3739,9 @@
         "Failed"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "CopyState",
@@ -3657,7 +3753,12 @@
         "Failed"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "is_copied() -> bool",
+        "is_failed() -> bool"
+      ]
     },
     {
       "name": "CostLine",
@@ -3669,6 +3770,11 @@
       ],
       "options": [
         "stale(verified: LastVerified) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "reading() -> &Reading"
       ]
     },
     {
@@ -3679,7 +3785,9 @@
       "construct": [
         "new(id: impl Into<SharedString>, label: impl Into<SharedString>) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "CubicBezier",
@@ -3689,7 +3797,9 @@
       "construct": [],
       "options": [
         "eval(input: f32) -> f32"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "DateInputEvent",
@@ -3703,7 +3813,9 @@
         "Submit"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Day",
@@ -3711,7 +3823,9 @@
       "summary": "One day, meaningful only to the adapter that produced it.",
       "variants": [],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "DayMark",
@@ -3723,7 +3837,9 @@
       ],
       "options": [
         "tone(tone: Tone) -> Self"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "DayRange",
@@ -3734,7 +3850,9 @@
         "starting(start: Day) -> Self",
         "new(start: Day, end: Day) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "DeliveryState",
@@ -3748,7 +3866,12 @@
         "Failed"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "name() -> &'static str",
+        "failed() -> bool"
+      ]
     },
     {
       "name": "DescriptionItem",
@@ -3760,6 +3883,11 @@
       ],
       "options": [
         "copyable(copyable: bool) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "value() -> &DescriptionValue"
       ]
     },
     {
@@ -3777,7 +3905,11 @@
         "redacted(shape: impl Into<SharedString>) -> Self",
         "redacted_from(secret: &str, cx: &App) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "as_str() -> &'static str"
+      ]
     },
     {
       "name": "DialogEvent",
@@ -3791,7 +3923,9 @@
         "Closed"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Diff",
@@ -3803,7 +3937,9 @@
       ],
       "options": [
         "is_empty() -> bool"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "DockEvent",
@@ -3816,7 +3952,9 @@
         "RegionResized"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "DockPanel",
@@ -3831,6 +3969,12 @@
         "badge(badge: impl Into<SharedString>) -> Self",
         "unavailable(reason: impl Into<SharedString>) -> Self",
         "content(content: impl IntoElement) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "title() -> &SharedString",
+        "is_unavailable() -> bool"
       ]
     },
     {
@@ -3846,7 +3990,9 @@
       "construct": [],
       "options": [
         "name() -> &'static str"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Document",
@@ -3856,7 +4002,12 @@
       "construct": [
         "parse(source: &str) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "lines() -> usize",
+        "truncate(max: usize) -> (Self, usize)"
+      ]
     },
     {
       "name": "DragItem",
@@ -3869,7 +4020,9 @@
       "options": [
         "kind(kind: impl Into<SharedString>) -> Self",
         "icon(icon: Icon) -> Self"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "DrawerEvent",
@@ -3881,7 +4034,9 @@
         "Closed"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "DropAxis",
@@ -3892,7 +4047,9 @@
         "Horizontal"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "DropIntent",
@@ -3900,7 +4057,9 @@
       "summary": "One drop, as it is reported to the host.",
       "variants": [],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "DropPosition",
@@ -3912,15 +4071,12 @@
         "Into"
       ],
       "construct": [],
-      "options": []
-    },
-    {
-      "name": "DropZone",
-      "path": "gpui_kit::interaction::DropZone",
-      "summary": "",
-      "variants": [],
-      "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "anchor() -> &SharedString",
+        "verb() -> &'static str"
+      ]
     },
     {
       "name": "DropzoneState",
@@ -3934,7 +4090,9 @@
       "construct": [],
       "options": [
         "name() -> &'static str"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Easing",
@@ -3955,7 +4113,9 @@
       "construct": [],
       "options": [
         "curve(theme: &Theme) -> CubicBezier"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Edge",
@@ -3971,12 +4131,14 @@
       "options": [
         "is_horizontal() -> bool",
         "is_leading() -> bool"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "EdgeKind",
       "path": "gpui_kit::canvas::EdgeKind",
-      "summary": "What a connection means.",
+      "summary": "The routing treatment of an edge.",
       "variants": [
         "Flow",
         "Feedback"
@@ -3984,7 +4146,9 @@
       "construct": [],
       "options": [
         "color(theme: &Theme) -> Hsla"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "EditIntent",
@@ -3992,7 +4156,9 @@
       "summary": "One finished edit, as it is reported to the host.",
       "variants": [],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "EditOutcome",
@@ -4005,7 +4171,9 @@
       "construct": [],
       "options": [
         "as_str() -> &'static str"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "EditingCell",
@@ -4015,15 +4183,9 @@
       "construct": [
         "new(row: impl Into<SharedString>, column: impl Into<SharedString>, value: impl Into<SharedString>) -> Self"
       ],
-      "options": []
-    },
-    {
-      "name": "Editor",
-      "path": "gpui_kit::controls::Editor",
-      "summary": "",
-      "variants": [],
-      "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Elapsed",
@@ -4034,7 +4196,11 @@
         "Unknown"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "as_str() -> &'static str"
+      ]
     },
     {
       "name": "EmptyKind",
@@ -4047,7 +4213,9 @@
         "Failed"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Entrance",
@@ -4060,15 +4228,9 @@
         "Dialog"
       ],
       "construct": [],
-      "options": []
-    },
-    {
-      "name": "Entry",
-      "path": "gpui_kit::overlay::Entry",
-      "summary": "",
-      "variants": [],
-      "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "EntryTime",
@@ -4079,7 +4241,11 @@
         "Unknown"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "as_str() -> &'static str"
+      ]
     },
     {
       "name": "Expanded",
@@ -4089,7 +4255,9 @@
       "construct": [
         "new(id: impl Into<SharedString>, index: usize) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "FieldState",
@@ -4101,7 +4269,9 @@
         "focused(focused: bool) -> Self",
         "invalid(invalid: bool) -> Self",
         "disabled(disabled: bool) -> Self"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "FieldValue",
@@ -4117,7 +4287,9 @@
         "Unrenderable"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "FilterCondition",
@@ -4129,6 +4301,11 @@
       ],
       "options": [
         "tone(tone: Tone) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "label() -> SharedString"
       ]
     },
     {
@@ -4142,7 +4319,9 @@
         "ReplaceAll"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "FitMode",
@@ -4157,7 +4336,9 @@
       "construct": [],
       "options": [
         "name() -> &'static str"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "FixtureDateAdapter",
@@ -4172,6 +4353,11 @@
         "blocking(year: i32, month: u32, day: u32, reason: &'static str) -> Self",
         "twelve_hour(twelve_hour: bool) -> Self",
         "month_bounds(first: MonthKey, last: MonthKey) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "day(year: i32, month: u32, day: u32) -> Day",
+        "month(year: i32, month: u32) -> MonthKey"
       ]
     },
     {
@@ -4187,7 +4373,9 @@
       "construct": [],
       "options": [
         "name() -> &'static str"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Flip",
@@ -4195,15 +4383,16 @@
       "summary": "A handle to one element's slide, keyed by semantic id.",
       "variants": [],
       "construct": [],
-      "options": []
-    },
-    {
-      "name": "FlipState",
-      "path": "gpui_kit::motion::FlipState",
-      "summary": "",
-      "variants": [],
-      "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "offset() -> Point<Pixels>",
+        "size() -> Option<Size<Pixels>>",
+        "target_size() -> Option<Size<Pixels>>",
+        "is_contended() -> bool",
+        "is_animating() -> bool"
+      ]
     },
     {
       "name": "Flipped",
@@ -4211,7 +4400,9 @@
       "summary": "An element painted at an offset from where layout put it, and optionally at a size on its way to the size layout would give it.",
       "variants": [],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "FocusTrap",
@@ -4221,26 +4412,75 @@
       "construct": [
         "new() -> Self"
       ],
-      "options": []
-    },
-    {
-      "name": "Geometry",
-      "path": "gpui_kit::content::Geometry",
-      "summary": "",
-      "variants": [],
-      "construct": [],
-      "options": []
+      "options": [],
+      "commands": [
+        "engage(window: &Window, cx: &App)",
+        "release(window: &mut Window, cx: &mut App)",
+        "begin_frame()",
+        "register(handle: FocusHandle)"
+      ],
+      "queries": [
+        "is_engaged() -> bool",
+        "stops() -> &[FocusHandle]",
+        "focus_first(window: &mut Window, cx: &mut App)",
+        "focus_next(window: &mut Window, cx: &mut App)",
+        "focus_prev(window: &mut Window, cx: &mut App)",
+        "contains_focus(window: &Window, cx: &App) -> bool"
+      ]
     },
     {
       "name": "GraphEdge",
       "path": "gpui_kit::canvas::GraphEdge",
-      "summary": "One connection between two nodes, named by the identities they carry.",
+      "summary": "A controlled connection between two graph nodes.",
       "variants": [],
       "construct": [
-        "new(from: impl Into<gpui::SharedString>, to: impl Into<gpui::SharedString>) -> Self"
+        "new(from: impl Into<SharedString>, to: impl Into<SharedString>) -> Self"
       ],
       "options": [
+        "id(id: impl Into<SharedString>) -> Self",
+        "ports(from: impl Into<SharedString>, to: impl Into<SharedString>) -> Self",
+        "label(label: impl Into<SharedString>) -> Self",
+        "active(active: bool) -> Self",
+        "lane(lane: i16) -> Self",
         "feedback() -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "from() -> &SharedString",
+        "to() -> &SharedString",
+        "kind() -> EdgeKind"
+      ]
+    },
+    {
+      "name": "GraphEndpoint",
+      "path": "gpui_kit::canvas::GraphEndpoint",
+      "summary": "A caller-owned node and port identity used by connection proposals.",
+      "variants": [],
+      "construct": [
+        "new(node: impl Into<SharedString>, port: impl Into<SharedString>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "GraphPort",
+      "path": "gpui_kit::canvas::GraphPort",
+      "summary": "A typed connection point on a [`GraphNode`].",
+      "variants": [],
+      "construct": [
+        "input(id: impl Into<SharedString>, label: impl Into<SharedString>) -> Self",
+        "output(id: impl Into<SharedString>, label: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "side(side: PortSide) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "label() -> &SharedString",
+        "direction() -> PortDirection",
+        "port_side() -> PortSide"
       ]
     },
     {
@@ -4254,7 +4494,21 @@
         "Failed"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "GraphViewport",
+      "path": "gpui_kit::canvas::GraphViewport",
+      "summary": "Caller-owned pan and zoom values for a [`NodeGraph`].",
+      "variants": [],
+      "construct": [
+        "new(offset: Point<f32>, zoom: f32) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "GridColumn",
@@ -4275,6 +4529,10 @@
         "reorderable(reorderable: bool) -> Self",
         "pinned(pinned: bool) -> Self",
         "editable(editable: bool) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "key() -> &SharedString"
       ]
     },
     {
@@ -4286,7 +4544,9 @@
         "Rows"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "GridRow",
@@ -4300,6 +4560,10 @@
         "cell(key: impl Into<SharedString>, cell: impl Into<Cell>) -> Self",
         "text(text: impl Into<SharedString>) -> Self",
         "disabled(disabled: bool) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString"
       ]
     },
     {
@@ -4315,7 +4579,12 @@
         "Unavailable"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "name() -> &'static str",
+        "exact() -> Option<usize>"
+      ]
     },
     {
       "name": "HoverCardEvent",
@@ -4326,7 +4595,9 @@
         "Closed"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "IconPosition",
@@ -4337,7 +4608,9 @@
         "Trailing"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "IconTone",
@@ -4358,7 +4631,9 @@
       "construct": [],
       "options": [
         "color(theme: &Theme) -> Hsla"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Ident",
@@ -4368,7 +4643,15 @@
       "construct": [
         "new(id: impl Into<SharedString>) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "child(suffix: impl AsRef<str>) -> Self",
+        "element_id() -> ElementId",
+        "indexed_element_id(index: usize) -> ElementId",
+        "semantic_id() -> SharedString",
+        "as_str() -> &str"
+      ]
     },
     {
       "name": "ImageFrame",
@@ -4385,6 +4668,11 @@
         "unavailable(reason: impl Into<SharedString>) -> Self",
         "failed(reason: impl Into<SharedString>) -> Self",
         "loading() -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "label() -> &SharedString"
       ]
     },
     {
@@ -4393,7 +4681,9 @@
       "summary": "An image the document referred to and this crate did not fetch.",
       "variants": [],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "ImageSize",
@@ -4403,7 +4693,9 @@
       "construct": [
         "new(width: u32, height: u32) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "ImageState",
@@ -4416,7 +4708,9 @@
         "Ready"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "ImageViewerEvent",
@@ -4428,7 +4722,9 @@
         "ImageRequested"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Inline",
@@ -4447,7 +4743,9 @@
         "HardBreak"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "JsonValue",
@@ -4470,7 +4768,11 @@
         "redacted(shape: impl Into<SharedString>) -> Self",
         "redacted_from(value: &JsonValue, cx: &App) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "kind() -> ValueKind"
+      ]
     },
     {
       "name": "KeybindingRecorderEvent",
@@ -4482,7 +4784,9 @@
         "Cancelled"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Keyframe",
@@ -4494,7 +4798,9 @@
       ],
       "options": [
         "eased(easing: impl Into<Easing>) -> Self"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Keyframes",
@@ -4504,15 +4810,12 @@
       "construct": [
         "new(theme: &Theme, spec: MotionSpec, stops: impl IntoIterator<Item = Keyframe<T>>) -> Option<Self>"
       ],
-      "options": []
-    },
-    {
-      "name": "Landing",
-      "path": "gpui_kit::datetime::Landing",
-      "summary": "",
-      "variants": [],
-      "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "sample(progress: f32) -> T",
+        "offsets() -> Vec<f32>"
+      ]
     },
     {
       "name": "LastVerified",
@@ -4522,7 +4825,9 @@
       "construct": [
         "at(when: impl Into<SharedString>) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Layout",
@@ -4532,7 +4837,19 @@
       "construct": [
         "new(lines: Vec<WrappedLine>, line_height: Pixels) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "line_height() -> Pixels",
+        "total_rows() -> usize",
+        "height() -> Pixels",
+        "painted_lines() -> impl Iterator<Item = (&WrappedLine, Pixels)>",
+        "position_for_offset(offset: usize) -> Point<Pixels>",
+        "row_for_offset(offset: usize) -> usize",
+        "offset_for_position(position: Point<Pixels>) -> usize",
+        "offset_at_row(row: usize, x: Pixels) -> usize",
+        "row_range(row: usize) -> Range<usize>"
+      ]
     },
     {
       "name": "LayoutDirection",
@@ -4549,7 +4866,9 @@
         "start() -> PhysicalSide",
         "end() -> PhysicalSide",
         "arrow_step(key: &str) -> Option<i32>"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Limit",
@@ -4563,7 +4882,12 @@
         "measured(amount: f64, text: impl Into<SharedString>) -> Self",
         "estimated(amount: f64, text: impl Into<SharedString>) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "quantity() -> Option<&Quantity>",
+        "is_known() -> bool"
+      ]
     },
     {
       "name": "LineMark",
@@ -4579,7 +4903,9 @@
       "construct": [],
       "options": [
         "name() -> &'static str"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "ListEntry",
@@ -4587,7 +4913,9 @@
       "summary": "One entry of a bulleted or numbered list.",
       "variants": [],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "ListItem",
@@ -4600,7 +4928,9 @@
       "options": [
         "text(text: impl Into<SharedString>) -> Self",
         "disabled(disabled: bool) -> Self"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Loadable",
@@ -4617,6 +4947,11 @@
       "construct": [],
       "options": [
         "map<U>(map: impl FnOnce(T) -> U) -> Loadable<U, E>"
+      ],
+      "commands": [],
+      "queries": [
+        "value() -> Option<&T>",
+        "is_loading() -> bool"
       ]
     },
     {
@@ -4630,7 +4965,9 @@
       "construct": [],
       "options": [
         "resolve(direction: LayoutDirection) -> PhysicalSide"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "MakeWay",
@@ -4638,7 +4975,9 @@
       "summary": "An element painted beside where layout put it.",
       "variants": [],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "MarkdownEvent",
@@ -4651,7 +4990,9 @@
         "MoreRequested"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "MenuEvent",
@@ -4664,7 +5005,9 @@
         "Closed"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "MenuItem",
@@ -4682,6 +5025,12 @@
         "shortcut(keystroke: impl Into<SharedString>) -> Self",
         "icon(glyph: Icon) -> Self",
         "disabled(disabled: bool) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "label() -> &SharedString",
+        "is_disabled() -> bool"
       ]
     },
     {
@@ -4700,15 +5049,9 @@
         "Other"
       ],
       "construct": [],
-      "options": []
-    },
-    {
-      "name": "MenuState",
-      "path": "gpui_kit::overlay::MenuState",
-      "summary": "",
-      "variants": [],
-      "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "MenubarEvent",
@@ -4720,7 +5063,9 @@
         "Closed"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "MenubarMenu",
@@ -4732,6 +5077,12 @@
       ],
       "options": [
         "disabled(disabled: bool) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "label() -> &SharedString",
+        "is_disabled() -> bool"
       ]
     },
     {
@@ -4751,6 +5102,10 @@
         "streaming(streaming: bool) -> Self",
         "attachment(attachment: Attachment) -> Self",
         "reaction(reaction: Reaction) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString"
       ]
     },
     {
@@ -4762,7 +5117,11 @@
         "Markdown"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "source() -> &SharedString"
+      ]
     },
     {
       "name": "MonthCell",
@@ -4777,7 +5136,9 @@
       "options": [
         "day() -> Option<Day>",
         "is_adjacent() -> bool"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "MonthGrid",
@@ -4787,7 +5148,12 @@
       "construct": [
         "new(weeks: impl IntoIterator<Item = Vec<MonthCell>>) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "is_empty() -> bool",
+        "position_of(day: Day) -> Option<(usize, usize)>"
+      ]
     },
     {
       "name": "MonthKey",
@@ -4795,7 +5161,9 @@
       "summary": "One month, meaningful only to the adapter that produced it.",
       "variants": [],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "MotionSpec",
@@ -4814,7 +5182,23 @@
         "after(previous: MotionSpec) -> Self",
         "animation() -> Animation",
         "repeating() -> Animation"
-      ]
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "NodeGraphEvent",
+      "path": "gpui_kit::canvas::NodeGraphEvent",
+      "summary": "A proposed controlled graph change.",
+      "variants": [
+        "ViewportChanged",
+        "NodeMoved",
+        "ConnectionRequested"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "NodeMetric",
@@ -4824,7 +5208,9 @@
       "construct": [
         "new(label: impl Into<SharedString>, value: impl Into<SharedString>) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "NodeState",
@@ -4840,7 +5226,9 @@
       "construct": [],
       "options": [
         "color(theme: &gpui_kit_theme::Theme) -> Hsla"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Notification",
@@ -4856,6 +5244,13 @@
         "at(at: impl Into<SharedString>) -> Self",
         "read(read: bool) -> Self",
         "action(label: impl Into<SharedString>, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> SharedString",
+        "is_read() -> bool",
+        "message() -> &SharedString",
+        "toast() -> Toast"
       ]
     },
     {
@@ -4869,7 +5264,9 @@
         "ActionTaken"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "NumberBounds",
@@ -4883,7 +5280,9 @@
         "min(min: f64) -> Self",
         "max(max: f64) -> Self",
         "step(step: f64) -> Self"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "NumberInputEvent",
@@ -4895,7 +5294,9 @@
         "Submit"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Offering",
@@ -4911,6 +5312,11 @@
       "options": [
         "summary(summary: impl Into<SharedString>) -> Self",
         "qualifier(qualifier: impl Into<SharedString>) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "kind() -> OfferingKind"
       ]
     },
     {
@@ -4925,7 +5331,9 @@
       "construct": [],
       "options": [
         "name() -> &'static str"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "OverallProgress",
@@ -4937,7 +5345,9 @@
         "Settled"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "PageTotal",
@@ -4951,15 +5361,9 @@
       "options": [
         "is_known() -> bool",
         "count() -> Option<usize>"
-      ]
-    },
-    {
-      "name": "Painter",
-      "path": "gpui_kit::content::Painter",
-      "summary": "",
-      "variants": [],
-      "construct": [],
-      "options": []
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "PermissionAction",
@@ -4969,7 +5373,11 @@
       "construct": [
         "new(key: impl Into<SharedString>, label: impl Into<SharedString>) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "key() -> &SharedString"
+      ]
     },
     {
       "name": "PermissionChange",
@@ -4977,7 +5385,9 @@
       "summary": "What operating a cell asks for. Nothing is applied.",
       "variants": [],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "PermissionEntry",
@@ -4988,7 +5398,12 @@
         "new(state: PermissionState) -> Self",
         "inherited(state: PermissionState, from: impl Into<SharedString>) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "state() -> PermissionState",
+        "source() -> &PermissionSource"
+      ]
     },
     {
       "name": "PermissionSource",
@@ -5001,7 +5416,12 @@
       "construct": [
         "inherited(from: impl Into<SharedString>) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "name() -> &'static str",
+        "label(cx: &App) -> SharedString"
+      ]
     },
     {
       "name": "PermissionState",
@@ -5018,7 +5438,9 @@
         "name() -> &'static str",
         "label(cx: &App) -> SharedString",
         "next() -> Option<Self>"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "PermissionSubject",
@@ -5030,6 +5452,10 @@
       ],
       "options": [
         "cell(action: impl Into<SharedString>, entry: PermissionEntry) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString"
       ]
     },
     {
@@ -5043,7 +5469,9 @@
         "Gone"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "PhysicalSide",
@@ -5057,7 +5485,9 @@
       "options": [
         "opposite() -> Self",
         "is_left() -> bool"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Placed",
@@ -5069,7 +5499,9 @@
       ],
       "options": [
         "height(height: f32) -> Self"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Placement",
@@ -5083,7 +5515,9 @@
         "Edge"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "PopoverEvent",
@@ -5095,7 +5529,39 @@
         "Closed"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "PortDirection",
+      "path": "gpui_kit::canvas::PortDirection",
+      "summary": "Whether a port receives or produces data.",
+      "variants": [
+        "Input",
+        "Output"
+      ],
+      "construct": [],
+      "options": [
+        "name() -> &'static str"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "PortSide",
+      "path": "gpui_kit::canvas::PortSide",
+      "summary": "The side of a node on which a port is placed.",
+      "variants": [
+        "Top",
+        "Right",
+        "Bottom",
+        "Left"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "PrepaintState",
@@ -5103,7 +5569,9 @@
       "summary": "",
       "variants": [],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Presence",
@@ -5114,15 +5582,21 @@
         "hidden(enter: MotionSpec, exit: MotionSpec) -> Self",
         "visible(enter: MotionSpec, exit: MotionSpec) -> Self"
       ],
-      "options": []
-    },
-    {
-      "name": "ProgressValue",
-      "path": "gpui_kit::display::ProgressValue",
-      "summary": "",
-      "variants": [],
-      "construct": [],
-      "options": []
+      "options": [],
+      "commands": [
+        "show()",
+        "hide()",
+        "toggle()",
+        "settle()",
+        "advance(delta: Duration)",
+        "animate(window: &mut Window, cx: &mut App) -> f32"
+      ],
+      "queries": [
+        "phase() -> Phase",
+        "is_rendered() -> bool",
+        "is_animating() -> bool",
+        "progress() -> f32"
+      ]
     },
     {
       "name": "Quantity",
@@ -5133,7 +5607,14 @@
         "measured(amount: f64, text: impl Into<SharedString>) -> Self",
         "estimated(amount: f64, text: impl Into<SharedString>) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "basis() -> Basis",
+        "amount() -> f64",
+        "text() -> &SharedString",
+        "display(cx: &App) -> SharedString"
+      ]
     },
     {
       "name": "RangePickerEvent",
@@ -5144,7 +5625,9 @@
         "EndPicked"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "RangeState",
@@ -5161,7 +5644,9 @@
       ],
       "options": [
         "name() -> &'static str"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Reaction",
@@ -5171,7 +5656,9 @@
       "construct": [
         "new(key: impl Into<SharedString>, label: impl Into<SharedString>, count: usize) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Reading",
@@ -5187,7 +5674,12 @@
         "unavailable() -> Self",
         "unavailable_because(reason: impl Into<SharedString>) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "quantity() -> Option<&Quantity>",
+        "name() -> &'static str"
+      ]
     },
     {
       "name": "Reasoning",
@@ -5202,15 +5694,12 @@
         "present(text: impl Into<SharedString>) -> Self",
         "withheld(reason: impl Into<SharedString>) -> Self"
       ],
-      "options": []
-    },
-    {
-      "name": "Region",
-      "path": "gpui_kit::layout::Region",
-      "summary": "",
-      "variants": [],
-      "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "as_str() -> &'static str",
+        "is_disclosable() -> bool"
+      ]
     },
     {
       "name": "ResultCount",
@@ -5223,7 +5712,11 @@
         "Unavailable"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "as_str() -> &'static str"
+      ]
     },
     {
       "name": "Row",
@@ -5237,15 +5730,9 @@
         "cell(key: impl Into<SharedString>, cell: impl Into<Cell>) -> Self",
         "text(text: impl Into<SharedString>) -> Self",
         "disabled(disabled: bool) -> Self"
-      ]
-    },
-    {
-      "name": "Rows",
-      "path": "gpui_kit::data::Rows",
-      "summary": "",
-      "variants": [],
-      "construct": [],
-      "options": []
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "RunLength",
@@ -5258,7 +5745,9 @@
       "construct": [],
       "options": [
         "as_str() -> &'static str"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "SaveState",
@@ -5271,7 +5760,12 @@
         "Failed"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "name() -> &'static str",
+        "is_clean() -> bool"
+      ]
     },
     {
       "name": "Schema",
@@ -5284,6 +5778,10 @@
       "options": [
         "field(field: SchemaField) -> Self",
         "fields(fields: impl IntoIterator<Item = SchemaField>) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "is_empty() -> bool"
       ]
     },
     {
@@ -5296,7 +5794,9 @@
       ],
       "options": [
         "description(description: impl Into<SharedString>) -> Self"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "SchemaField",
@@ -5310,6 +5810,12 @@
         "label(label: impl Into<SharedString>) -> Self",
         "description(description: impl Into<SharedString>) -> Self",
         "required(required: bool) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "name() -> &SharedString",
+        "kind() -> &SchemaKind",
+        "is_required() -> bool"
       ]
     },
     {
@@ -5321,7 +5827,9 @@
         "Submitted"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "SchemaKind",
@@ -5339,7 +5847,9 @@
         "Unrenderable"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "ScrollAxis",
@@ -5354,7 +5864,9 @@
       "options": [
         "has_vertical() -> bool",
         "has_horizontal() -> bool"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "ScrollLink",
@@ -5369,7 +5881,9 @@
         "decorative(reduce_motion: bool) -> Self",
         "progress(offset: Pixels) -> f32",
         "sample<T: Interpolate>(offset: Pixels, from: T, to: T) -> T"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "SearchFieldEvent",
@@ -5384,7 +5898,9 @@
         "WholeWordToggled"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Segment",
@@ -5402,6 +5918,12 @@
       "options": [
         "icon(glyph: Icon) -> Self",
         "disabled(disabled: bool) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "label() -> &SharedString",
+        "is_disabled() -> bool"
       ]
     },
     {
@@ -5414,7 +5936,9 @@
         "Closed"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "SelectOption",
@@ -5427,7 +5951,9 @@
       "options": [
         "description(description: impl Into<SharedString>) -> Self",
         "disabled(disabled: bool) -> Self"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Selectability",
@@ -5440,7 +5966,12 @@
       "construct": [
         "blocked(reason: impl Into<SharedString>) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "is_selectable() -> bool",
+        "reason() -> Option<&SharedString>"
+      ]
     },
     {
       "name": "SelectionChange",
@@ -5455,7 +5986,11 @@
         "Clear"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "as_str() -> &'static str"
+      ]
     },
     {
       "name": "SelectionMode",
@@ -5467,7 +6002,9 @@
         "Multiple"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Sequence",
@@ -5479,6 +6016,16 @@
       ],
       "options": [
         "then(spec: MotionSpec) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "len() -> usize",
+        "is_empty() -> bool",
+        "start(index: usize) -> Duration",
+        "step(index: usize) -> Option<MotionSpec>",
+        "steps() -> impl Iterator<Item = MotionSpec> + '_",
+        "total() -> Duration",
+        "progress(index: usize, raw: f32) -> f32"
       ]
     },
     {
@@ -5494,6 +6041,10 @@
         "state(state: ServerState) -> Self",
         "catalog(catalog: Catalog) -> Self",
         "offers(offerings: impl IntoIterator<Item = Offering>) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString"
       ]
     },
     {
@@ -5508,7 +6059,11 @@
         "Disabled"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "name() -> &'static str"
+      ]
     },
     {
       "name": "SidebarItem",
@@ -5523,6 +6078,11 @@
         "badge(badge: impl Into<SharedString>) -> Self",
         "disabled(disabled: bool) -> Self",
         "children(children: impl IntoIterator<Item = SidebarItem>) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "label() -> &SharedString"
       ]
     },
     {
@@ -5537,15 +6097,9 @@
         "title(title: impl Into<SharedString>) -> Self",
         "item(item: SidebarItem) -> Self",
         "items(items: impl IntoIterator<Item = SidebarItem>) -> Self"
-      ]
-    },
-    {
-      "name": "SlideState",
-      "path": "gpui_kit::interaction::SlideState",
-      "summary": "",
-      "variants": [],
-      "construct": [],
-      "options": []
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "SortDirection",
@@ -5559,7 +6113,9 @@
       "options": [
         "reversed() -> Self",
         "as_str() -> &'static str"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "SplitAxis",
@@ -5570,7 +6126,9 @@
         "Vertical"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "SplitChange",
@@ -5581,7 +6139,9 @@
         "Collapsed"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "SplitKind",
@@ -5595,7 +6155,9 @@
       "construct": [],
       "options": [
         "name() -> &'static str"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "SplitLayout",
@@ -5613,7 +6175,19 @@
         "vertical(id: impl Into<SharedString>, ratio: f32, start: SplitLayout, end: SplitLayout) -> Self",
         "from_records(records: &[SplitRecord]) -> Result<Self, SplitRecordError>"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "is_pane() -> bool",
+        "panes() -> Vec<&SplitPaneSpec>",
+        "find(id: &str) -> Option<&SplitLayout>",
+        "min_extent(axis: SplitAxis) -> f32",
+        "with_ratio(split: &str, ratio: f32) -> Self",
+        "with_collapsed(pane: &str, collapsed: bool) -> Self",
+        "applied(change: &SplitChange) -> Self",
+        "to_records() -> Vec<SplitRecord>"
+      ]
     },
     {
       "name": "SplitPaneSpec",
@@ -5629,6 +6203,13 @@
         "min_height(min: f32) -> Self",
         "rail(rail: f32) -> Self",
         "collapsed(collapsed: bool) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "min_size(axis: SplitAxis) -> f32",
+        "rail_size() -> f32",
+        "is_collapsed() -> bool"
       ]
     },
     {
@@ -5637,7 +6218,9 @@
       "summary": "One node of a [`SplitLayout`], as plain fields a host can write anywhere.",
       "variants": [],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "SplitRecordError",
@@ -5653,7 +6236,9 @@
         "Unreachable"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "SplitSide",
@@ -5666,7 +6251,9 @@
       "construct": [],
       "options": [
         "name() -> &'static str"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Spring",
@@ -5687,7 +6274,9 @@
         "settle_time() -> Duration",
         "settle_time_at(velocity: f32) -> Duration",
         "animation() -> Animation"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "StagedDrag",
@@ -5699,7 +6288,9 @@
       ],
       "options": [
         "landing(surface: impl Into<SharedString>, position: DropPosition, slot: Option<usize>, accepted: bool) -> Self"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Stagger",
@@ -5714,6 +6305,13 @@
       "options": [
         "max_items(max_items: usize) -> Self",
         "reversed() -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "is_reversed() -> bool",
+        "delay(index: usize, count: usize) -> Duration",
+        "total(count: usize, spec: MotionSpec) -> Duration",
+        "spec(index: usize, count: usize, spec: MotionSpec) -> MotionSpec"
       ]
     },
     {
@@ -5728,7 +6326,9 @@
       "construct": [],
       "options": [
         "name() -> &'static str"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "StatusItem",
@@ -5750,6 +6350,12 @@
         "stale(stale: bool) -> Self",
         "tracking<E>(value: &AsyncValue<SharedString, E>) -> Self",
         "on_click(handler: impl Fn(&mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "label() -> &SharedString",
+        "is_stale() -> bool"
       ]
     },
     {
@@ -5763,6 +6369,10 @@
       "options": [
         "state(state: StepState) -> Self",
         "body(body: impl IntoElement) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString"
       ]
     },
     {
@@ -5777,7 +6387,13 @@
         "Skipped"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "as_str() -> &'static str",
+        "reason() -> Option<&SharedString>",
+        "tone() -> Tone"
+      ]
     },
     {
       "name": "StepStatus",
@@ -5791,7 +6407,12 @@
         "Failed"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "as_str() -> &'static str",
+        "reason() -> Option<&SharedString>"
+      ]
     },
     {
       "name": "StringKey",
@@ -5801,7 +6422,9 @@
       "construct": [
         "from_name(name: &str) -> Option<Self>"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Strings",
@@ -5811,15 +6434,18 @@
       "construct": [
         "new() -> Self"
       ],
-      "options": []
-    },
-    {
-      "name": "SurfaceDrag",
-      "path": "gpui_kit::interaction::SurfaceDrag",
-      "summary": "",
-      "variants": [],
-      "construct": [],
-      "options": []
+      "options": [],
+      "commands": [
+        "set(key: StringKey, text: impl Into<SharedString>) -> &mut Self",
+        "clear(key: StringKey) -> &mut Self",
+        "clear_all() -> &mut Self",
+        "extend(entries: impl IntoIterator<Item = (StringKey, SharedString)>) -> &mut Self"
+      ],
+      "queries": [
+        "is_overridden(key: StringKey) -> bool",
+        "text(key: StringKey) -> SharedString",
+        "format(key: StringKey, args: &[&str]) -> SharedString"
+      ]
     },
     {
       "name": "TabItem",
@@ -5838,7 +6464,9 @@
         "saving() -> Self",
         "save_failed(reason: impl Into<SharedString>) -> Self",
         "closable(closable: bool) -> Self"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "TagInputEvent",
@@ -5851,7 +6479,9 @@
         "Refused"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "TextAreaElement",
@@ -5861,7 +6491,9 @@
       "construct": [
         "new(area: Entity<TextArea>) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "TextAreaEvent",
@@ -5875,7 +6507,9 @@
         "Blur"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "TextElement",
@@ -5885,7 +6519,9 @@
       "construct": [
         "new(input: Entity<TextInput>) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "TextInputEvent",
@@ -5900,7 +6536,9 @@
         "Blur"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "TimeInputEvent",
@@ -5910,7 +6548,9 @@
         "Changed"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "TimeOfDay",
@@ -5923,7 +6563,9 @@
       "options": [
         "with_second(second: u32) -> Self",
         "with_meridiem(index: usize) -> Self"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "TimelineEntry",
@@ -5939,6 +6581,10 @@
         "actor(actor: impl Into<SharedString>) -> Self",
         "tone(tone: Tone) -> Self",
         "detail(detail: impl IntoElement) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString"
       ]
     },
     {
@@ -5952,7 +6598,9 @@
       "options": [
         "entry(entry: TimelineEntry) -> Self",
         "entries(entries: impl IntoIterator<Item = TimelineEntry>) -> Self"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Toast",
@@ -5969,6 +6617,10 @@
         "dismissable(dismissable: bool) -> Self",
         "timeout(timeout: Duration) -> Self",
         "persistent() -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "ident() -> &Ident"
       ]
     },
     {
@@ -5982,7 +6634,9 @@
         "BottomRight"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "ToggleItem",
@@ -5996,6 +6650,12 @@
       "options": [
         "icon(glyph: Icon) -> Self",
         "disabled(disabled: bool) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "label() -> &SharedString",
+        "is_disabled() -> bool"
       ]
     },
     {
@@ -6007,7 +6667,9 @@
         "Any"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Tone",
@@ -6024,7 +6686,9 @@
       "construct": [],
       "options": [
         "name() -> &'static str"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "ToolBody",
@@ -6036,6 +6700,14 @@
       ],
       "options": [
         "max_lines(lines: usize) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "text() -> &SharedString",
+        "line_count() -> usize",
+        "shown_line_count() -> usize",
+        "is_truncated() -> bool",
+        "shape(cx: &App) -> SharedString"
       ]
     },
     {
@@ -6055,7 +6727,12 @@
         "failed(error: impl Into<SharedString>) -> Self",
         "refused(reason: impl Into<SharedString>) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "as_str() -> &'static str",
+        "reason() -> Option<&SharedString>"
+      ]
     },
     {
       "name": "ToolOutput",
@@ -6066,7 +6743,9 @@
         "Silent"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "ToolbarItem",
@@ -6080,6 +6759,11 @@
         "icon(glyph: Icon) -> Self",
         "shortcut(keystroke: impl Into<SharedString>) -> Self",
         "disabled(disabled: bool) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "label() -> &SharedString"
       ]
     },
     {
@@ -6093,7 +6777,9 @@
       "construct": [],
       "options": [
         "name() -> &'static str"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Transition",
@@ -6105,6 +6791,18 @@
       ],
       "options": [
         "spec(spec: MotionSpec) -> Self"
+      ],
+      "commands": [
+        "set(target: T) where T: PartialEq,",
+        "release(target: T, velocity: f32)",
+        "snap(target: T)",
+        "advance(delta: Duration)",
+        "animate(window: &mut Window, cx: &mut App) -> T"
+      ],
+      "queries": [
+        "target() -> T",
+        "value() -> T",
+        "is_animating() -> bool"
       ]
     },
     {
@@ -6119,7 +6817,9 @@
       "options": [
         "is_known() -> bool",
         "seconds() -> Option<f32>"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "TransportEvent",
@@ -6136,7 +6836,9 @@
         "Stepped"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "TransportState",
@@ -6150,7 +6852,9 @@
       "construct": [],
       "options": [
         "name() -> &'static str"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "TreeNode",
@@ -6165,7 +6869,9 @@
         "children(children: impl IntoIterator<Item = TreeNode>) -> Self",
         "icon(icon: Icon) -> Self",
         "disabled(disabled: bool) -> Self"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "UnreadCount",
@@ -6180,7 +6886,9 @@
         "value() -> usize",
         "is_zero() -> bool",
         "name() -> &'static str"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "UnrenderableField",
@@ -6188,7 +6896,9 @@
       "summary": "A field that has to be filled in somewhere other than this form.",
       "variants": [],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Upload",
@@ -6206,7 +6916,9 @@
         "failed(reason: impl Into<SharedString>) -> Self",
         "cancelled() -> Self",
         "refused(reason: impl Into<SharedString>) -> Self"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "UploadState",
@@ -6221,7 +6933,13 @@
         "Refused"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "name() -> &'static str",
+        "is_settled() -> bool",
+        "is_retryable() -> bool"
+      ]
     },
     {
       "name": "ValueKind",
@@ -6237,7 +6955,9 @@
         "Redacted"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Velocity",
@@ -6250,7 +6970,9 @@
       "options": [
         "speed() -> f32",
         "is_still() -> bool"
-      ]
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "VelocityTracker",
@@ -6261,7 +6983,14 @@
         "new() -> Self",
         "with_window(window: Duration) -> Self"
       ],
-      "options": []
+      "options": [],
+      "commands": [
+        "sample(position: Point<Pixels>, at: Instant)",
+        "clear()"
+      ],
+      "queries": [
+        "velocity_at(now: Instant) -> Velocity"
+      ]
     },
     {
       "name": "ViewportState",
@@ -6275,15 +7004,9 @@
         "Failed"
       ],
       "construct": [],
-      "options": []
-    },
-    {
-      "name": "Withheld",
-      "path": "gpui_kit::controls::Withheld",
-      "summary": "",
-      "variants": [],
-      "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "WizardIntent",
@@ -6296,7 +7019,11 @@
         "Finish"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": [
+        "as_str() -> &'static str"
+      ]
     },
     {
       "name": "WizardLayout",
@@ -6307,7 +7034,9 @@
         "Vertical"
       ],
       "construct": [],
-      "options": []
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "WizardStep",
@@ -6326,6 +7055,10 @@
         "blocked(reason: impl Into<SharedString>) -> Self",
         "failed(reason: impl Into<SharedString>) -> Self",
         "reachable(reachable: bool) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString"
       ]
     }
   ],
@@ -7047,9 +7780,12 @@
       "capture": "cargo run -p xtask -- scenes capture node-graph",
       "uses": [
         "GraphNode",
-        "NodeGraph"
+        "NodeGraph",
+        "Select",
+        "TextArea",
+        "TextInput"
       ],
-      "example": "fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(\n            div().w(px(860.0)).h(px(300.0)).child(\n                NodeGraph::new(\"scene.graph\")\n                    .node(\n                        GraphNode::new(\"scene.graph.plan\", \"Plan\")\n                            .state(NodeState::Succeeded)\n                            .metric(\"tokens\", \"4.1k\")\n                            .metric(\"took\", \"2.4s\"),\n                        24.0,\n                        24.0,\n                    )\n                    .node(\n                        GraphNode::new(\"scene.graph.edit\", \"Edit files\")\n                            .state(NodeState::Failed)\n                            .action(\"write crates/gpui-kit/src/lib.rs\")\n                            .metric(\"tokens\", \"12.7k\")\n                            .diff(Diff::new(48, 12)),\n                        300.0,\n                        24.0,\n                    )\n                    .node(\n                        GraphNode::new(\"scene.graph.test\", \"Run tests\")\n                            .state(NodeState::Running)\n                            .action(\"cargo test --workspace\")\n                            .metric(\"took\", \"18s\"),\n                        576.0,\n                        24.0,\n                    )\n                    .node(\n                        GraphNode::new(\"scene.graph.publish\", \"Publish\").state(NodeState::Pending),\n                        576.0,\n                        170.0,\n                    )\n                    .node(\n                        GraphNode::new(\"scene.graph.deploy\", \"Deploy\")\n                            .state(NodeState::Refused)\n                            .action(\"host declined: no credentials\"),\n                        300.0,\n                        170.0,\n                    )\n                    .edge(GraphEdge::new(\"scene.graph.plan\", \"scene.graph.edit\"))\n                    .edge(GraphEdge::new(\"scene.graph.edit\", \"scene.graph.test\"))\n                    .edge(GraphEdge::new(\"scene.graph.publish\", \"scene.graph.deploy\"))\n                    .edge(GraphEdge::new(\"scene.graph.test\", \"scene.graph.edit\").feedback()),\n            ),\n        )\n        .into_any_element()\n}"
+      "example": "fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneGraph>() {\n        cx.set_global(SceneGraph {\n            viewport: GraphViewport::default(),\n            ingest: gpui::point(24.0, 200.0),\n            validate: gpui::point(244.0, 56.0),\n            persist: gpui::point(500.0, 56.0),\n            observe: gpui::point(464.0, 330.0),\n            publish: gpui::point(684.0, 200.0),\n            edges: vec![\n                GraphEdge::new(\"scene.graph.ingest\", \"scene.graph.validate\")\n                    .id(\"scene.graph.edge.rows\")\n                    .ports(\"rows\", \"records\")\n                    .label(\"12.4k rows\")\n                    .active(true),\n                GraphEdge::new(\"scene.graph.validate\", \"scene.graph.persist\")\n                    .id(\"scene.graph.edge.valid\")\n                    .ports(\"valid\", \"records\")\n                    .active(true),\n                GraphEdge::new(\"scene.graph.validate\", \"scene.graph.observe\")\n                    .id(\"scene.graph.edge.telemetry\")\n                    .ports(\"telemetry\", \"events\")\n                    .label(\"telemetry\")\n                    .lane(-1),\n                GraphEdge::new(\"scene.graph.persist\", \"scene.graph.publish\")\n                    .id(\"scene.graph.edge.commit\")\n                    .ports(\"commit\", \"artifact\")\n                    .label(\"commit 8f72\")\n                    .active(true),\n                GraphEdge::new(\"scene.graph.observe\", \"scene.graph.validate\")\n                    .id(\"scene.graph.edge.retry\")\n                    .ports(\"retry\", \"retry\")\n                    .label(\"retry policy\")\n                    .lane(1)\n                    .feedback(),\n            ],\n        });\n    }\n    let scene = cx.global::<SceneGraph>();\n    let viewport = scene.viewport;\n    let ingest = scene.ingest;\n    let validate = scene.validate;\n    let persist = scene.persist;\n    let observe = scene.observe;\n    let publish = scene.publish;\n    let edges = scene.edges.clone();\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(\n            div().w(px(860.0)).h(px(500.0)).child(\n                NodeGraph::new(\"scene.graph\")\n                    .viewport(viewport)\n                    .zoom_range(0.55, 1.8)\n                    .node(\n                        GraphNode::new(\"scene.graph.ingest\", \"Stream ingest\")\n                            .width(176.0)\n                            .state(NodeState::Succeeded)\n                            .action(\"orders.v2 · partition 18\")\n                            .metric(\"rate\", \"3.2k/s\")\n                            .port(GraphPort::input(\"source\", \"Source\").side(PortSide::Top))\n                            .port(GraphPort::output(\"rows\", \"Rows\"))\n                            .port(GraphPort::output(\"errors\", \"Errors\")),\n                        ingest.x,\n                        ingest.y,\n                    )\n                    .node(\n                        GraphNode::new(\"scene.graph.validate\", \"Validate & enrich\")\n                            .width(176.0)\n                            .state(NodeState::Running)\n                            .action(\"schema + fraud signals\")\n                            .metric(\"p95\", \"18 ms\")\n                            .port(GraphPort::input(\"records\", \"Records\"))\n                            .port(GraphPort::input(\"retry\", \"Retry\").side(PortSide::Bottom))\n                            .port(GraphPort::output(\"valid\", \"Valid\"))\n                            .port(GraphPort::output(\"telemetry\", \"Events\").side(PortSide::Bottom))\n                            .selected(true),\n                        validate.x,\n                        validate.y,\n                    )\n                    .node(\n                        GraphNode::new(\"scene.graph.persist\", \"Persist batch\")\n                            .width(176.0)\n                            .state(NodeState::Succeeded)\n                            .action(\"warehouse / orders\")\n                            .metric(\"written\", \"12.3k\")\n                            .port(GraphPort::input(\"records\", \"Records\"))\n                            .port(GraphPort::output(\"commit\", \"Commit\")),\n                        persist.x,\n                        persist.y,\n                    )\n                    .node(\n                        GraphNode::new(\"scene.graph.observe\", \"Observe quality\")\n                            .width(176.0)\n                            .state(NodeState::Failed)\n                            .action(\"drift threshold exceeded\")\n                            .metric(\"rejected\", \"94\")\n                            .port(GraphPort::input(\"events\", \"Events\").side(PortSide::Top))\n                            .port(GraphPort::output(\"retry\", \"Retry\").side(PortSide::Top)),\n                        observe.x,\n                        observe.y,\n                    )\n                    .node(\n                        GraphNode::new(\"scene.graph.publish\", \"Publish artifact\")\n                            .width(176.0)\n                            .state(NodeState::Pending)\n                            .action(\"waiting for commit\")\n                            .port(GraphPort::input(\"artifact\", \"Artifact\").side(PortSide::Top))\n                            .port(GraphPort::output(\"release\", \"Release\").side(PortSide::Bottom)),\n                        publish.x,\n                        publish.y,\n                    )\n                    .edges(edges)\n                    .on_event(|event, _, cx| {\n                        cx.update_global::<SceneGraph, ()>(|scene, _| match event {\n                            NodeGraphEvent::ViewportChanged(viewport) => {\n                                scene.viewport = *viewport;\n                            }\n                            NodeGraphEvent::NodeMoved { id, position } => match id.as_ref() {\n                                \"scene.graph.ingest\" => scene.ingest = *position,\n                                \"scene.graph.validate\" => scene.validate = *position,\n                                \"scene.graph.persist\" => scene.persist = *position,\n                                \"scene.graph.observe\" => scene.observe = *position,\n                                \"scene.graph.publish\" => scene.publish = *position,\n                                _ => {}\n                            },\n                            NodeGraphEvent::ConnectionRequested { from, to } => {\n                                let id = format!(\n                                    \"scene.graph.edge.user.{}.{}.{}.{}\",\n                                    from.node, from.port, to.node, to.port\n                                );\n                                if !scene\n                                    .edges\n                                    .iter()\n                                    .any(|edge| edge.from() == &from.node && edge.to() == &to.node)\n                                {\n                                    scene.edges.push(\n                                        GraphEdge::new(from.node.clone(), to.node.clone())\n                                            .id(id)\n                                            .ports(from.port.clone(), to.port.clone())\n                                            .label(\"new connection\"),\n                                    );\n                                }\n                            }\n                        });\n                        cx.refresh_windows();\n                    }),\n            ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "browser-panel",

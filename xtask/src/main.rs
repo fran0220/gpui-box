@@ -982,6 +982,9 @@ fn gate(full: bool) -> Result<()> {
             &["doc", "--no-deps", "--workspace"],
             Some(("RUSTDOCFLAGS", "-D warnings")),
         )?;
+        #[cfg(any(target_os = "linux", target_os = "windows"))]
+        headless("check", &[])?;
+        #[cfg(not(any(target_os = "linux", target_os = "windows")))]
         scenes_check(&[])?;
     }
     println!("gate passed");

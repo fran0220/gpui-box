@@ -23,8 +23,9 @@ license is stored at `licenses/COMET-MIT.txt`.
 - Upstream source: <https://github.com/zed-industries/zed>
 - Integration source: <https://github.com/fran0220/zed>
 - Upstream baseline: `a6a23c7b80a5cefa0487b7856335be89ace7e483`
-- Pinned integration revision: `f9e7bd617940af337f34f0c5d90e4a83846b6ebe`
+- Pinned integration revision: `a754da44757a0aa5179224fe37a024c7517c7a92`
 - Windows pointer-exit topic head: `f9e7bd617940af337f34f0c5d90e4a83846b6ebe`
+- Fluent pointer-capture topic head: `a754da44757a0aa5179224fe37a024c7517c7a92`
 - Windows UIA focus topic head: `5139c7a398679251d6703ebbe10066260cbfbc13`
 - Runtime topic head: `ed8643941bd01704e1e2c8d4c606c2dc737d4d9c`
 - Offscreen WGPU topic head: `0bfd4852d83d52aeb8b2d7c4a4ef583a1576f40c`
@@ -40,8 +41,11 @@ topic translates a real Windows whole-window leave into GPUI input and retires
 active tooltip state without confusing client/non-client transitions. The WGPU
 topic is kept as a separate history because it is also the basis of upstream
 proposal zed-industries/zed#62341. The integration commit combines those topics
-and adds a consumer verification workflow; generally reusable changes remain
-candidates for small upstream pull requests.
+and adds a consumer verification workflow. The pointer-capture topic exposes
+the existing hitbox capture primitive through fluent interactive elements, so
+identified drag surfaces continue receiving move and release events outside
+their bounds and across redraws during the gesture.
+Generally reusable changes remain candidates for small upstream pull requests.
 
 The Apache-2.0 text is stored at `licenses/ZED-APACHE-2.0.txt`.
 
