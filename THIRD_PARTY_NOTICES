@@ -21,13 +21,14 @@ GPUI / Zed
 Source: https://github.com/zed-industries/zed
 Integration source: https://github.com/fran0220/zed
 Upstream baseline: a6a23c7b80a5cefa0487b7856335be89ace7e483
-Pinned integration revision: b9e434908126d3215c22443b0102093113f8b292
+Pinned integration revision: f9e7bd617940af337f34f0c5d90e4a83846b6ebe
 License: Apache-2.0
 Copyright 2022–2024 Zed Industries, Inc.
 
 Scope: linked GPUI, gpui_platform, gpui_wgpu, EdgeFade, BackdropBlur,
 native-surface integration, accessibility control-state projection and test
-activation, and offscreen rendering patch chains.
+activation, Windows pointer-exit translation, and offscreen rendering patch
+chains.
 License text: licenses/ZED-APACHE-2.0.txt
 
 Geist and Geist Mono

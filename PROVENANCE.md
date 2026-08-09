@@ -23,7 +23,8 @@ license is stored at `licenses/COMET-MIT.txt`.
 - Upstream source: <https://github.com/zed-industries/zed>
 - Integration source: <https://github.com/fran0220/zed>
 - Upstream baseline: `a6a23c7b80a5cefa0487b7856335be89ace7e483`
-- Pinned integration revision: `b9e434908126d3215c22443b0102093113f8b292`
+- Pinned integration revision: `f9e7bd617940af337f34f0c5d90e4a83846b6ebe`
+- Windows pointer-exit topic head: `f9e7bd617940af337f34f0c5d90e4a83846b6ebe`
 - Windows UIA focus topic head: `5139c7a398679251d6703ebbe10066260cbfbc13`
 - Runtime topic head: `ed8643941bd01704e1e2c8d4c606c2dc737d4d9c`
 - Offscreen WGPU topic head: `0bfd4852d83d52aeb8b2d7c4a4ef583a1576f40c`
@@ -34,11 +35,13 @@ license is stored at `licenses/COMET-MIT.txt`.
 `gpui-kit` links one immutable integration revision. The runtime topic carries
 EdgeFade, BackdropBlur, layered scenes, native focus/surface work, and the
 native WebView example. The accessibility topic adds AccessKit control states
-and deterministic adapter activation for platform-tree tests. The WGPU topic
-is kept as a separate history because it is also the basis of upstream proposal
-zed-industries/zed#62341. The integration commit combines those topics and adds
-a consumer verification workflow; generally reusable changes remain candidates
-for small upstream pull requests.
+and deterministic adapter activation for platform-tree tests. The pointer-exit
+topic translates a real Windows whole-window leave into GPUI input and retires
+active tooltip state without confusing client/non-client transitions. The WGPU
+topic is kept as a separate history because it is also the basis of upstream
+proposal zed-industries/zed#62341. The integration commit combines those topics
+and adds a consumer verification workflow; generally reusable changes remain
+candidates for small upstream pull requests.
 
 The Apache-2.0 text is stored at `licenses/ZED-APACHE-2.0.txt`.
 
