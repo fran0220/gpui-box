@@ -694,9 +694,9 @@ fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
         .into_any_element()
 }
 
-/// The shell, in the two states a host without an engine will actually see
-/// beside the one it wants: no engine at all, and a page it was not allowed
-/// to open.
+/// The complete shell contract: every state remains visibly distinct, and
+/// the narrow panels prove long addresses and page content stay clipped to
+/// the caller-owned viewport.
 fn browser_panel(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)
@@ -704,20 +704,67 @@ fn browser_panel(_window: &mut Window, cx: &mut App) -> AnyElement {
             row(&theme)
                 .items_start()
                 .child(
-                    div().w(px(360.0)).h(px(220.0)).child(
-                        BrowserPanel::new("scene.browser.unavailable")
-                            .url("https://docs.example.com/guide")
+                    div().w(px(232.0)).h(px(190.0)).child(
+                        BrowserPanel::new("scene.browser.loading")
+                            .url("https://docs.example.com/a/long/path/that-must-stay-inside-the-address-well")
+                            .state(ViewportState::Loading)
                             .on_reload(|_, _| {}),
                     ),
                 )
                 .child(
-                    div().w(px(360.0)).h(px(220.0)).child(
-                        BrowserPanel::new("scene.browser.refused")
+                    div().w(px(232.0)).h(px(190.0)).child(
+                        BrowserPanel::new("scene.browser.empty")
+                            .url("https://docs.example.com/empty")
+                            .state(ViewportState::Empty)
+                            .on_back(|_, _| {})
+                            .on_reload(|_, _| {}),
+                    ),
+                )
+                .child(
+                    div().w(px(232.0)).h(px(190.0)).child(
+                        BrowserPanel::new("scene.browser.unavailable")
                             .url("https://internal.example.com/admin")
-                            .state(ViewportState::Refused(
+                            .state(ViewportState::Unavailable(
                                 "The workspace policy does not allow this host.".into(),
                             ))
+                            .on_reload(|_, _| {}),
+                    ),
+                ),
+        )
+        .child(
+            row(&theme)
+                .items_start()
+                .child(
+                    div().w(px(352.0)).h(px(210.0)).child(
+                        BrowserPanel::new("scene.browser.error")
+                            .url("https://status.example.com/incidents/current")
+                            .state(ViewportState::Error(
+                                "The host could not resolve this address.".into(),
+                            ))
                             .on_back(|_, _| {})
+                            .on_reload(|_, _| {}),
+                    ),
+                )
+                .child(
+                    div().w(px(352.0)).h(px(210.0)).child(
+                        BrowserPanel::new("scene.browser.ready")
+                            .url("https://docs.example.com/ready")
+                            .state(ViewportState::Ready)
+                            .viewport(
+                                div()
+                                    .size_full()
+                                    .p_token(&theme, Space::Md)
+                                    .text_color(theme.colors.text)
+                                    .child("Host-owned page surface")
+                                    .child(
+                                        div()
+                                            .mt_token(&theme, Space::Sm)
+                                            .text_color(theme.colors.text_muted)
+                                            .child("Long page content remains clipped by the BrowserPanel viewport even when it cannot wrap naturally."),
+                                    ),
+                            )
+                            .on_back(|_, _| {})
+                            .on_forward(|_, _| {})
                             .on_reload(|_, _| {}),
                     ),
                 ),
@@ -2076,7 +2123,7 @@ fn form(window: &mut Window, cx: &mut App) -> AnyElement {
         .w(px(420.0))
         .h(px(720.0))
         .child(
-            FormField::new("scene.form.name.field", "Workspace name")
+            FormField::new("scene.form.name.form-field", "Workspace name")
                 .control("scene.form.name")
                 .required(true)
                 // The description says what the field is for and the error
@@ -2086,7 +2133,7 @@ fn form(window: &mut Window, cx: &mut App) -> AnyElement {
                 .child(name),
         )
         .child(
-            FormField::new("scene.form.retention.field", "Retention")
+            FormField::new("scene.form.retention.form-field", "Retention")
                 .control("scene.form.retention")
                 .required(true)
                 .description("How long a finished run is kept.")
@@ -2094,7 +2141,7 @@ fn form(window: &mut Window, cx: &mut App) -> AnyElement {
                 .child(retention),
         )
         .child(
-            FormField::new("scene.form.visibility.field", "Visibility")
+            FormField::new("scene.form.visibility.form-field", "Visibility")
                 .control("scene.form.visibility")
                 .description("Who can open the runs in this workspace.")
                 .child(
@@ -2110,7 +2157,7 @@ fn form(window: &mut Window, cx: &mut App) -> AnyElement {
                 ),
         )
         .child(
-            FormField::new("scene.form.labels.field", "Labels")
+            FormField::new("scene.form.labels.form-field", "Labels")
                 .control("scene.form.labels")
                 // The keystroke lives in the hint, so the description does not
                 // spend a second line repeating it.
@@ -2119,7 +2166,7 @@ fn form(window: &mut Window, cx: &mut App) -> AnyElement {
                 .child(labels),
         )
         .child(
-            FormField::new("scene.form.region.field", "Region")
+            FormField::new("scene.form.region.form-field", "Region")
                 .control("scene.form.region")
                 .description("Where runs in this workspace are executed.")
                 .child(region),

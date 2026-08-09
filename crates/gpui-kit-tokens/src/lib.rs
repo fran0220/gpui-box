@@ -17,6 +17,8 @@ pub use color::{Color, Palette, contrast_ratio, over};
 
 const STUDIO_DARK_JSON: &str = include_str!("../tokens/studio-dark.json");
 const STUDIO_LIGHT_JSON: &str = include_str!("../tokens/studio-light.json");
+#[cfg(test)]
+const TOKEN_SCHEMA_JSON: &str = include_str!("../tokens/schema.json");
 
 #[derive(Debug, Error)]
 pub enum TokenError {
@@ -34,8 +36,10 @@ pub enum Appearance {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TokenDocument {
+    #[serde(rename = "$schema")]
+    pub schema: String,
     pub meta: Metadata,
     pub color: ColorTokens,
     pub space: SpacingTokens,
@@ -59,6 +63,9 @@ impl TokenDocument {
     }
 
     pub fn validate(&self) -> Result<(), TokenError> {
+        if self.schema.trim().is_empty() {
+            return invalid("$schema", "must not be empty");
+        }
         if self.meta.id.trim().is_empty() {
             return invalid("meta.id", "must not be empty");
         }
@@ -115,8 +122,24 @@ impl TokenDocument {
             self.space.xl,
             self.space.xxl,
         ];
+        if spacing.iter().any(|step| *step < 0.0) {
+            return invalid("space", "steps must not be negative");
+        }
         if spacing.windows(2).any(|window| window[0] >= window[1]) {
             return invalid("space", "steps must be strictly increasing");
+        }
+
+        for (path, radius) in [
+            ("radius.small", self.radius.small),
+            ("radius.control", self.radius.control),
+            ("radius.card", self.radius.card),
+            ("radius.dialog", self.radius.dialog),
+            ("radius.bubble", self.radius.bubble),
+            ("radius.pill", self.radius.pill),
+        ] {
+            if radius < 0.0 {
+                return invalid(path, "must not be negative");
+            }
         }
 
         for (path, step) in self.typography.scale.entries() {
@@ -141,6 +164,9 @@ impl TokenDocument {
             if step.height <= 0.0 || step.font_size <= 0.0 || step.icon_size <= 0.0 {
                 return invalid(path, "height, fontSize and iconSize must be positive");
             }
+            if step.padding_x < 0.0 || step.gap < 0.0 {
+                return invalid(path, "paddingX and gap must not be negative");
+            }
             if step.height < step.font_size {
                 return invalid(path, "height must not be smaller than fontSize");
             }
@@ -155,8 +181,18 @@ impl TokenDocument {
         }
 
         for (path, value) in [
+            ("effect.edgeFadeBand", self.effect.edge_fade_band),
+            ("effect.glowBlur", self.effect.glow_blur),
+        ] {
+            if value < 0.0 {
+                return invalid(path, "must not be negative");
+            }
+        }
+
+        for (path, value) in [
             ("effect.selectedRingAlpha", self.effect.selected_ring_alpha),
             ("effect.focusRingAlpha", self.effect.focus_ring_alpha),
+            ("effect.glowAlpha", self.effect.glow_alpha),
             ("opacity.disabled", self.opacity.disabled),
             ("opacity.muted", self.opacity.muted),
             ("opacity.scrim", self.opacity.scrim),
@@ -706,6 +742,7 @@ impl MotionEasing {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct Metadata {
     pub id: String,
     pub name: String,
@@ -713,6 +750,7 @@ pub struct Metadata {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ElevationTokens {
     pub flat: ElevationStep,
     pub raised: ElevationStep,
@@ -732,6 +770,7 @@ impl ElevationTokens {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ElevationStep {
     pub y: f32,
     pub blur: f32,
@@ -740,7 +779,7 @@ pub struct ElevationStep {
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ZIndexTokens {
     pub content: i32,
     pub sticky: i32,
@@ -766,6 +805,7 @@ impl ZIndexTokens {
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct DensityTokens {
     pub compact: DensityScale,
     pub comfortable: DensityScale,
@@ -781,6 +821,7 @@ impl DensityTokens {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct DensityScale {
     pub space: f32,
     pub control: f32,
@@ -788,6 +829,7 @@ pub struct DensityScale {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct SpringTokens {
     pub stiffness: f32,
     pub damping: f32,
@@ -795,6 +837,7 @@ pub struct SpringTokens {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct SpringPresetTokens {
     pub snappy: SpringTokens,
     pub smooth: SpringTokens,
@@ -803,8 +846,8 @@ pub struct SpringPresetTokens {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ColorTokens {
-    #[serde(default)]
     pub palette: color::Palette,
     pub surface: SurfaceColors,
     pub text: TextColors,
@@ -848,6 +891,7 @@ impl ColorTokens {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct SurfaceColors {
     pub canvas: String,
     /// The well an editable value sits in, recessed below the surface that
@@ -860,7 +904,7 @@ pub struct SurfaceColors {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TextColors {
     pub primary: String,
     pub muted: String,
@@ -869,7 +913,7 @@ pub struct TextColors {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct InteractiveColors {
     pub hover: String,
     pub active: String,
@@ -880,7 +924,7 @@ pub struct InteractiveColors {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SemanticColors {
     pub accent: String,
     pub accent_strong: String,
@@ -891,11 +935,13 @@ pub struct SemanticColors {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct LoaderColors {
     pub gradient: [String; 3],
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct SpacingTokens {
     pub xs: f32,
     pub sm: f32,
@@ -906,6 +952,7 @@ pub struct SpacingTokens {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct RadiusTokens {
     pub small: f32,
     pub control: f32,
@@ -916,6 +963,7 @@ pub struct RadiusTokens {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ControlTokens {
     pub xs: ControlStep,
     pub sm: ControlStep,
@@ -935,7 +983,7 @@ impl ControlTokens {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ControlStep {
     pub height: f32,
     pub padding_x: f32,
@@ -945,12 +993,14 @@ pub struct ControlStep {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct BorderTokens {
     pub hairline: f32,
     pub thick: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct OpacityTokens {
     pub disabled: f32,
     pub muted: f32,
@@ -958,6 +1008,7 @@ pub struct OpacityTokens {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct TypographyTokens {
     pub sans: FontTokens,
     pub mono: FontTokens,
@@ -965,7 +1016,7 @@ pub struct TypographyTokens {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct FontTokens {
     pub family: String,
     pub fallback_macos: String,
@@ -986,6 +1037,7 @@ impl FontTokens {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct TypeScaleTokens {
     pub caption: TypeStep,
     pub label: TypeStep,
@@ -1007,7 +1059,7 @@ impl TypeScaleTokens {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TypeStep {
     pub size: f32,
     pub line_height: f32,
@@ -1015,7 +1067,7 @@ pub struct TypeStep {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MotionTokens {
     pub duration_ms: DurationTokens,
     pub easing: EasingTokens,
@@ -1033,7 +1085,7 @@ pub struct MotionTokens {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DurationTokens {
     pub instant: u64,
     pub quick: u64,
@@ -1055,7 +1107,7 @@ pub struct DurationTokens {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct EasingTokens {
     pub linear: [f32; 4],
     pub standard: [f32; 4],
@@ -1069,7 +1121,7 @@ pub struct EasingTokens {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct EffectTokens {
     pub edge_fade_band: f32,
     pub selected_ring_alpha: f32,
@@ -1122,6 +1174,19 @@ mod tests {
         let ids: Vec<&str> = bundled().iter().map(|doc| doc.meta.id.as_str()).collect();
         assert_eq!(ids, vec!["studio-dark", "studio-light"]);
         assert_eq!(studio_light().meta.appearance, Appearance::Light);
+    }
+
+    #[test]
+    fn portable_schema_accepts_every_bundled_theme() {
+        let schema: serde_json::Value =
+            serde_json::from_str(TOKEN_SCHEMA_JSON).expect("valid JSON schema");
+        let validator = jsonschema::validator_for(&schema).expect("valid token schema");
+        for json in bundled_json() {
+            let document: serde_json::Value = serde_json::from_str(json).expect("theme JSON");
+            if let Err(error) = validator.validate(&document) {
+                panic!("{} does not match schema: {error}", document["meta"]["id"]);
+            }
+        }
     }
 
     #[test]
@@ -1204,6 +1269,21 @@ mod tests {
         value["color"]["surface"]["canvas"] = serde_json::json!("black");
         let error = TokenDocument::parse(&value.to_string()).expect_err("invalid color");
         assert!(error.to_string().contains("color.surface.canvas"));
+    }
+
+    #[test]
+    fn unknown_and_legacy_fields_are_rejected() {
+        let mut value: serde_json::Value =
+            serde_json::from_str(studio_dark_json()).expect("bundled JSON");
+        value["version"] = serde_json::json!(1);
+        let error = TokenDocument::parse(&value.to_string()).expect_err("unknown root field");
+        assert!(error.to_string().contains("unknown field `version`"));
+
+        let mut value: serde_json::Value =
+            serde_json::from_str(studio_dark_json()).expect("bundled JSON");
+        value["color"]["surface"]["legacyCanvas"] = serde_json::json!("#000000");
+        let error = TokenDocument::parse(&value.to_string()).expect_err("unknown nested field");
+        assert!(error.to_string().contains("unknown field `legacyCanvas`"));
     }
 
     #[test]

@@ -4,7 +4,7 @@
 //! elements; prepaint records the bounds GPUI actually produced. Nodes absent
 //! from the next frame disappear instead of lingering as stale claims.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use gpui::{
@@ -232,9 +232,10 @@ pub struct SemanticRegistry {
 #[derive(Default)]
 struct Inner {
     generation: u64,
-    next_sequence: u64,
-    order: BTreeMap<String, u64>,
-    nodes: BTreeMap<String, (u64, Node)>,
+    // Keep registration order and duplicate ids. Collapsing this into a map
+    // would make the duplicate-id audit incapable of observing the error it
+    // exists to report.
+    nodes: Vec<(u64, Node)>,
 }
 
 impl std::fmt::Debug for SemanticRegistry {
@@ -260,11 +261,8 @@ impl SemanticRegistry {
     pub fn begin_frame(&self) {
         let mut inner = self.lock();
         let generation = inner.generation;
-        inner.nodes.retain(|_, (frame, _)| *frame == generation);
-        let live: Vec<String> = inner.nodes.keys().cloned().collect();
-        inner.order.retain(|id, _| live.contains(id));
+        inner.nodes.retain(|(frame, _)| *frame == generation);
         inner.generation = generation + 1;
-        inner.next_sequence = 0;
     }
 
     pub fn generation(&self) -> u64 {
@@ -275,21 +273,15 @@ impl SemanticRegistry {
     pub fn snapshot(&self) -> Snapshot {
         let inner = self.lock();
         let published = inner.generation;
-        let mut nodes: Vec<(u64, Node)> = inner
+        let nodes = inner
             .nodes
-            .values()
+            .iter()
             .filter(|(frame, _)| *frame == published)
-            .map(|(_, node)| {
-                (
-                    inner.order.get(&node.id).copied().unwrap_or(u64::MAX),
-                    node.clone(),
-                )
-            })
+            .map(|(_, node)| node.clone())
             .collect();
-        nodes.sort_by_key(|(sequence, _)| *sequence);
         Snapshot {
             generation: published,
-            nodes: nodes.into_iter().map(|(_, node)| node).collect(),
+            nodes,
         }
     }
 
@@ -310,10 +302,7 @@ impl SemanticRegistry {
     fn record(&self, node: Node) {
         let mut inner = self.lock();
         let generation = inner.generation;
-        let sequence = inner.next_sequence;
-        inner.next_sequence += 1;
-        inner.order.insert(node.id.clone(), sequence);
-        inner.nodes.insert(node.id.clone(), (generation, node));
+        inner.nodes.push((generation, node));
     }
 
     fn lock(&self) -> MutexGuard<'_, Inner> {
@@ -843,6 +832,15 @@ mod tests {
     }
 
     #[test]
+    fn duplicate_registrations_remain_visible_to_automation() {
+        let registry = SemanticRegistry::new();
+        registry.begin_frame();
+        registry.record(node("row", None));
+        registry.record(node("row", None));
+        assert_eq!(registry.snapshot().ids(), vec!["row", "row"]);
+    }
+
+    #[test]
     fn descendants_follow_the_declared_parent_chain() {
         let snapshot = Snapshot {
             generation: 1,
@@ -1039,6 +1037,57 @@ mod tests {
         }
     }
 
+    struct DiagnosticFixture;
+
+    impl Render for DiagnosticFixture {
+        fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            SemanticRegistry::global(cx).begin_frame();
+            div().w(px(120.0)).h(px(24.0)).semantic_in(
+                cx,
+                NodeSpec::new("diagnostic", Role::Status).text("Diagnostic"),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn diagnostics_work_before_and_after_accessibility_activation(cx: &mut TestAppContext) {
+        cx.update(install);
+        let window = AnyWindowHandle::from(cx.add_window(|_, _| DiagnosticFixture));
+
+        cx.update_window(window, |_, window, cx| {
+            assert!(!window.is_a11y_active());
+            window.draw(cx).clear(cx);
+            assert!(
+                SemanticRegistry::global(cx)
+                    .snapshot()
+                    .contains("diagnostic")
+            );
+            assert!(window.debug_a11y_tree_json().is_none());
+        })
+        .expect("inactive test window");
+
+        cx.activate_accessibility(window);
+        cx.update_window(window, |_, window, cx| {
+            window.draw(cx).clear(cx);
+            assert!(window.is_a11y_active());
+            assert!(
+                SemanticRegistry::global(cx)
+                    .snapshot()
+                    .contains("diagnostic")
+            );
+            let tree = window
+                .debug_a11y_tree_json()
+                .expect("committed active accessibility tree");
+            let tree: serde_json::Value = serde_json::from_str(&tree).expect("valid tree JSON");
+            assert!(tree["nodes"].as_object().is_some_and(|nodes| {
+                nodes.values().any(|node| {
+                    node["aria"]["role"] == "Status" && node["aria"]["label"] == "Diagnostic"
+                })
+            }));
+        })
+        .expect("active test window");
+    }
+
     #[gpui::test]
     fn semantics_reach_the_deterministic_platform_tree(cx: &mut TestAppContext) {
         let clicks = Rc::new(Cell::new(0));
@@ -1067,9 +1116,7 @@ mod tests {
             .as_object()
             .and_then(|nodes| {
                 nodes.iter().find(|(_, node)| {
-                    node["element_id"]
-                        .as_str()
-                        .is_some_and(|id| id.contains("volume"))
+                    node["aria"]["role"] == "Slider" && node["aria"]["label"] == "Volume"
                 })
             })
             .unwrap_or_else(|| panic!("semantic node missing from AccessKit tree: {json}"));

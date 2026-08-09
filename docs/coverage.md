@@ -41,8 +41,8 @@ content: that needs an engine, and a component library that pulled one into
 every binary would be charging every host for a feature almost none of them
 use. The host supplies the engine and the surface. What the panel does own is
 the part hosts otherwise each get wrong — a build with no engine says so
-instead of drawing a blank page, and refused, failed and unavailable stay three
-answers.
+instead of drawing a blank page, and Loading, Empty, Unavailable, Error, and
+Ready remain five distinct answers.
 
 `NodeGraph` places nothing. The caller positions every node, because where a
 step belongs is a claim about the run rather than a fact about the component,

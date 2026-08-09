@@ -1,10 +1,10 @@
 //! Progress, tags, and empty surfaces report what is true, including when
 //! what is true is that nothing is known.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use gpui::{IntoElement, ParentElement, Styled, TestAppContext, div};
+use gpui::{IntoElement, ParentElement, Styled, TestAppContext, div, px};
 use gpui_kit::prelude::*;
 use gpui_kit_testkit::harness::Harness;
 
@@ -159,4 +159,163 @@ fn an_avatar_and_a_divider_appear_only_when_named(cx: &mut TestAppContext) {
         2,
         "decorative marks must not add noise to the tree"
     );
+}
+
+#[gpui::test]
+fn browser_states_publish_one_truthful_current_contract(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        div()
+            .flex()
+            .flex_col()
+            .child(
+                div()
+                    .w(px(260.0))
+                    .h(px(150.0))
+                    .child(BrowserPanel::new("browser.loading").state(ViewportState::Loading)),
+            )
+            .child(
+                div()
+                    .w(px(260.0))
+                    .h(px(150.0))
+                    .child(BrowserPanel::new("browser.empty").state(ViewportState::Empty)),
+            )
+            .child(div().w(px(260.0)).h(px(150.0)).child(
+                BrowserPanel::new("browser.unavailable").state(ViewportState::Unavailable(
+                    "The host refused this address.".into(),
+                )),
+            ))
+            .child(
+                div().w(px(260.0)).h(px(150.0)).child(
+                    BrowserPanel::new("browser.error")
+                        .state(ViewportState::Error("Navigation failed.".into())),
+                ),
+            )
+            .child(
+                div().w(px(260.0)).h(px(150.0)).child(
+                    BrowserPanel::new("browser.ready")
+                        .state(ViewportState::Ready)
+                        .viewport(div().size_full().child("page")),
+                ),
+            )
+            .into_any_element()
+    });
+
+    for (id, expected) in [
+        ("browser.loading", "loading"),
+        ("browser.empty", "empty"),
+        ("browser.unavailable", "unavailable"),
+        ("browser.error", "error"),
+        ("browser.ready", "ready"),
+    ] {
+        assert_eq!(
+            harness.node(id).expect("browser state").value.as_deref(),
+            Some(expected)
+        );
+        assert_eq!(
+            harness
+                .node(&format!("{id}.viewport"))
+                .expect("stable viewport")
+                .value
+                .as_deref(),
+            Some(expected)
+        );
+    }
+    assert!(harness.node("browser.loading").expect("loading").busy);
+    assert!(
+        !harness
+            .node("browser.unavailable")
+            .expect("unavailable")
+            .busy
+    );
+}
+
+#[gpui::test]
+fn ready_without_a_host_viewport_reports_an_error(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        div()
+            .w(px(280.0))
+            .h(px(180.0))
+            .child(BrowserPanel::new("browser").state(ViewportState::Ready))
+            .into_any_element()
+    });
+
+    assert_eq!(
+        harness.node("browser").expect("browser").value.as_deref(),
+        Some("error")
+    );
+    assert_eq!(
+        harness
+            .node("browser.viewport.status")
+            .expect("host contract error")
+            .value
+            .as_deref(),
+        Some("failed")
+    );
+}
+
+#[gpui::test]
+fn browser_actions_follow_tab_order_and_keyboard_activation(cx: &mut TestAppContext) {
+    let back = Rc::new(Cell::new(0));
+    let forward = Rc::new(Cell::new(0));
+    let reload = Rc::new(Cell::new(0));
+    let back_sink = Rc::clone(&back);
+    let forward_sink = Rc::clone(&forward);
+    let reload_sink = Rc::clone(&reload);
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let back = Rc::clone(&back_sink);
+        let forward = Rc::clone(&forward_sink);
+        let reload = Rc::clone(&reload_sink);
+        div()
+            .w(px(320.0))
+            .h(px(180.0))
+            .child(
+                BrowserPanel::new("browser")
+                    .on_back(move |_, _| back.set(back.get() + 1))
+                    .on_forward(move |_, _| forward.set(forward.get() + 1))
+                    .on_reload(move |_, _| reload.set(reload.get() + 1)),
+            )
+            .into_any_element()
+    });
+
+    // GPUI's host-level Tab action advances the window tab order; the panel's
+    // enabled controls participate in document order and activate by key.
+    for (id, name, key) in [
+        ("browser.back", "Back", "enter"),
+        ("browser.forward", "Forward", "space"),
+        ("browser.reload", "Reload", "enter"),
+    ] {
+        assert!(harness.node(id).is_some(), "stable semantic id {id}");
+        harness.update(|window, cx| window.focus_next(cx));
+        let tree = harness.accessibility_tree();
+        let focused = tree["gpui_focus"].as_str().expect("focused node");
+        assert_eq!(tree["nodes"][focused]["aria"]["label"], name);
+        harness.keystrokes(key);
+    }
+
+    assert_eq!((back.get(), forward.get(), reload.get()), (1, 1, 1));
+}
+
+#[gpui::test]
+fn browser_long_content_stays_inside_a_narrow_contract(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        div()
+            .w(px(184.0))
+            .h(px(160.0))
+            .child(
+                BrowserPanel::new("browser")
+                    .url("https://example.com/a/very/long/path/that/must/not/widen/the/panel")
+                    .state(ViewportState::Ready)
+                    .viewport(div().size_full().child(
+                        "A long host-owned page line remains clipped to this narrow viewport.",
+                    )),
+            )
+            .into_any_element()
+    });
+
+    let panel = harness.bounds("browser").expect("panel bounds");
+    let address = harness.bounds("browser.address").expect("address bounds");
+    let viewport = harness.bounds("browser.viewport").expect("viewport bounds");
+    assert!(f32::from(panel.size.width) <= 184.0);
+    assert!(address.right() <= panel.right());
+    assert!(viewport.right() <= panel.right());
 }

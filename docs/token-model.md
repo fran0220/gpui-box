@@ -4,7 +4,10 @@
 
 The documents under `crates/gpui-kit-tokens/tokens/` are the authority, and
 they sit inside the crate that embeds them so that crate can be packaged on its
-own. `gpui-kit-tokens` embeds and validates every bundled theme; `gpui-kit-theme` is the only GPUI adapter.
+own. `schema.json` is the single current portable schema; documents and nested
+objects reject unknown or legacy fields rather than carrying compatibility
+readers. `gpui-kit-tokens` embeds and validates every bundled theme;
+`gpui-kit-theme` is the only GPUI adapter.
 `studio-dark` is the default and `studio-light` is its light counterpart.
 
 ```text
@@ -120,9 +123,10 @@ collapsed them would leave a reader unable to tell selection from focus.
 
 `TokenDocument::validate` rejects:
 
+- a missing schema declaration or unknown fields at any level;
 - invalid RGB/RGBA literals and unresolvable palette references;
 - empty metadata;
-- non-increasing spacing and control heights;
+- negative geometry and non-increasing spacing or control heights;
 - invalid type size, line-height, or weight;
 - effect and opacity alpha outside 0–1, or a non-positive focus ring width;
 - negative elevation blur;

@@ -23,7 +23,7 @@ license is stored at `licenses/COMET-MIT.txt`.
 - Upstream source: <https://github.com/zed-industries/zed>
 - Integration source: <https://github.com/fran0220/zed>
 - Upstream baseline: `a6a23c7b80a5cefa0487b7856335be89ace7e483`
-- Pinned integration revision: `a754da44757a0aa5179224fe37a024c7517c7a92`
+- Pinned integration revision: `0d6f50bbac07b76688e5471b932b12412d256a9a`
 - Windows pointer-exit topic head: `f9e7bd617940af337f34f0c5d90e4a83846b6ebe`
 - Fluent pointer-capture topic head: `a754da44757a0aa5179224fe37a024c7517c7a92`
 - Windows UIA focus topic head: `5139c7a398679251d6703ebbe10066260cbfbc13`
@@ -44,7 +44,9 @@ proposal zed-industries/zed#62341. The integration commit combines those topics
 and adds a consumer verification workflow. The pointer-capture topic exposes
 the existing hitbox capture primitive through fluent interactive elements, so
 identified drag surfaces continue receiving move and release events outside
-their bounds and across redraws during the gesture.
+their bounds and across redraws during the gesture. The pinned revision applies
+that complete pointer-capture tree directly to the pointer-exit head without
+forking `wgpu` or `gpu-allocator`; those dependencies resolve from crates.io.
 Generally reusable changes remain candidates for small upstream pull requests.
 
 The Apache-2.0 text is stored at `licenses/ZED-APACHE-2.0.txt`.

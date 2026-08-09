@@ -5,6 +5,7 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "$schema",
     "meta",
     "color",
     "space",
@@ -12,6 +13,9 @@
     "control",
     "border",
     "opacity",
+    "elevation",
+    "zIndex",
+    "density",
     "typography",
     "motion",
     "effect"
@@ -31,8 +35,9 @@
     "color": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["surface", "text", "interactive", "semantic", "loader"],
+      "required": ["palette", "surface", "text", "interactive", "semantic", "loader"],
       "properties": {
+        "palette": { "$ref": "#/$defs/palette" },
         "surface": { "$ref": "#/$defs/surfaceColors" },
         "text": { "$ref": "#/$defs/textColors" },
         "interactive": { "$ref": "#/$defs/interactiveColors" },
@@ -57,16 +62,33 @@
     "control": { "$ref": "#/$defs/control" },
     "border": { "$ref": "#/$defs/border" },
     "opacity": { "$ref": "#/$defs/opacity" },
+    "elevation": { "$ref": "#/$defs/elevation" },
+    "zIndex": { "$ref": "#/$defs/zIndex" },
+    "density": { "$ref": "#/$defs/density" },
     "typography": { "$ref": "#/$defs/typography" },
     "motion": { "$ref": "#/$defs/motion" },
     "effect": { "$ref": "#/$defs/effect" }
   },
   "$defs": {
-    "color": {
+    "colorLiteral": {
       "type": "string",
       "pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$"
     },
+    "color": {
+      "type": "string",
+      "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|\\{[^{}.]+\\.[^{}.]+\\}(/[0-9a-fA-F]{2})?)$"
+    },
+    "palette": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": { "$ref": "#/$defs/colorLiteral" }
+      }
+    },
     "positiveNumber": { "type": "number", "minimum": 0 },
+    "strictlyPositiveNumber": { "type": "number", "exclusiveMinimum": 0 },
     "surfaceColors": {
       "type": "object",
       "additionalProperties": false,
@@ -147,11 +169,11 @@
       "additionalProperties": false,
       "required": ["height", "paddingX", "gap", "fontSize", "iconSize"],
       "properties": {
-        "height": { "$ref": "#/$defs/positiveNumber" },
+        "height": { "$ref": "#/$defs/strictlyPositiveNumber" },
         "paddingX": { "$ref": "#/$defs/positiveNumber" },
         "gap": { "$ref": "#/$defs/positiveNumber" },
-        "fontSize": { "$ref": "#/$defs/positiveNumber" },
-        "iconSize": { "$ref": "#/$defs/positiveNumber" }
+        "fontSize": { "$ref": "#/$defs/strictlyPositiveNumber" },
+        "iconSize": { "$ref": "#/$defs/strictlyPositiveNumber" }
       }
     },
     "control": {
@@ -170,8 +192,8 @@
       "additionalProperties": false,
       "required": ["hairline", "thick"],
       "properties": {
-        "hairline": { "$ref": "#/$defs/positiveNumber" },
-        "thick": { "$ref": "#/$defs/positiveNumber" }
+        "hairline": { "$ref": "#/$defs/strictlyPositiveNumber" },
+        "thick": { "$ref": "#/$defs/strictlyPositiveNumber" }
       }
     },
     "opacity": {
@@ -182,6 +204,71 @@
         "disabled": { "type": "number", "minimum": 0, "maximum": 1 },
         "muted": { "type": "number", "minimum": 0, "maximum": 1 },
         "scrim": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "elevationStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["y", "blur", "spread", "color"],
+      "properties": {
+        "y": { "type": "number" },
+        "blur": { "$ref": "#/$defs/positiveNumber" },
+        "spread": { "type": "number" },
+        "color": { "$ref": "#/$defs/color" }
+      }
+    },
+    "elevation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["flat", "raised", "overlay", "modal"],
+      "properties": {
+        "flat": { "$ref": "#/$defs/elevationStep" },
+        "raised": { "$ref": "#/$defs/elevationStep" },
+        "overlay": { "$ref": "#/$defs/elevationStep" },
+        "modal": { "$ref": "#/$defs/elevationStep" }
+      }
+    },
+    "zIndex": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["content", "sticky", "dock", "popover", "tooltip", "modal", "toast"],
+      "properties": {
+        "content": { "type": "integer" },
+        "sticky": { "type": "integer" },
+        "dock": { "type": "integer" },
+        "popover": { "type": "integer" },
+        "tooltip": { "type": "integer" },
+        "modal": { "type": "integer" },
+        "toast": { "type": "integer" }
+      }
+    },
+    "densityScale": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["space", "control", "font"],
+      "properties": {
+        "space": { "type": "number", "minimum": 0.5, "maximum": 1.5 },
+        "control": { "type": "number", "minimum": 0.5, "maximum": 1.5 },
+        "font": { "type": "number", "minimum": 0.5, "maximum": 1.5 }
+      }
+    },
+    "referenceDensityScale": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["space", "control", "font"],
+      "properties": {
+        "space": { "const": 1 },
+        "control": { "const": 1 },
+        "font": { "const": 1 }
+      }
+    },
+    "density": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["compact", "comfortable"],
+      "properties": {
+        "compact": { "$ref": "#/$defs/densityScale" },
+        "comfortable": { "$ref": "#/$defs/referenceDensityScale" }
       }
     },
     "font": {
@@ -200,8 +287,8 @@
       "additionalProperties": false,
       "required": ["size", "lineHeight", "weight"],
       "properties": {
-        "size": { "$ref": "#/$defs/positiveNumber" },
-        "lineHeight": { "$ref": "#/$defs/positiveNumber" },
+        "size": { "$ref": "#/$defs/strictlyPositiveNumber" },
+        "lineHeight": { "$ref": "#/$defs/strictlyPositiveNumber" },
         "weight": { "type": "number", "minimum": 100, "maximum": 900 }
       }
     },
@@ -236,6 +323,70 @@
         "mass": { "type": "number", "exclusiveMinimum": 0 }
       }
     },
+    "durationMs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instant",
+        "quick",
+        "menu",
+        "dialog",
+        "resize",
+        "entrance",
+        "slow",
+        "staggerStep",
+        "spin",
+        "pulse",
+        "shimmer",
+        "toast"
+      ],
+      "properties": {
+        "instant": { "type": "integer", "minimum": 0 },
+        "quick": { "type": "integer", "minimum": 0 },
+        "menu": { "type": "integer", "minimum": 0 },
+        "dialog": { "type": "integer", "minimum": 0 },
+        "resize": { "type": "integer", "minimum": 0 },
+        "entrance": { "type": "integer", "minimum": 0 },
+        "slow": { "type": "integer", "minimum": 0 },
+        "staggerStep": { "type": "integer", "minimum": 0 },
+        "spin": { "type": "integer", "minimum": 0 },
+        "pulse": { "type": "integer", "minimum": 0 },
+        "shimmer": { "type": "integer", "minimum": 0 },
+        "toast": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "cubicBezier": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": { "type": "number" }
+    },
+    "easing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "linear",
+        "standard",
+        "easeIn",
+        "easeOut",
+        "easeInOut",
+        "emphasized",
+        "overshoot",
+        "exit",
+        "settle"
+      ],
+      "properties": {
+        "linear": { "$ref": "#/$defs/cubicBezier" },
+        "standard": { "$ref": "#/$defs/cubicBezier" },
+        "easeIn": { "$ref": "#/$defs/cubicBezier" },
+        "easeOut": { "$ref": "#/$defs/cubicBezier" },
+        "easeInOut": { "$ref": "#/$defs/cubicBezier" },
+        "emphasized": { "$ref": "#/$defs/cubicBezier" },
+        "overshoot": { "$ref": "#/$defs/cubicBezier" },
+        "exit": { "$ref": "#/$defs/cubicBezier" },
+        "settle": { "$ref": "#/$defs/cubicBezier" }
+      }
+    },
     "motion": {
       "type": "object",
       "additionalProperties": false,
@@ -249,8 +400,8 @@
         "rubberBandTension"
       ],
       "properties": {
-        "durationMs": { "type": "object" },
-        "easing": { "type": "object" },
+        "durationMs": { "$ref": "#/$defs/durationMs" },
+        "easing": { "$ref": "#/$defs/easing" },
         "spring": {
           "type": "object",
           "additionalProperties": false,
@@ -282,7 +433,7 @@
       "properties": {
         "edgeFadeBand": { "$ref": "#/$defs/positiveNumber" },
         "selectedRingAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
-        "focusRingWidth": { "$ref": "#/$defs/positiveNumber" },
+        "focusRingWidth": { "$ref": "#/$defs/strictlyPositiveNumber" },
         "focusRingAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
         "glowAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
         "glowBlur": { "$ref": "#/$defs/positiveNumber" }

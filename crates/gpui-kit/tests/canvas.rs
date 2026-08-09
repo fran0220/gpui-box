@@ -146,6 +146,39 @@ fn blank_canvas_drag_proposes_a_pan_but_does_not_apply_it(cx: &mut TestAppContex
 }
 
 #[gpui::test]
+fn blank_canvas_capture_delivers_an_outside_release(cx: &mut TestAppContext) {
+    let (mut harness, calls) = editor(cx);
+    let bounds = harness.bounds("graph").expect("graph bounds");
+    let start = point(bounds.left() + px(30.0), bounds.bottom() - px(30.0));
+    let outside = point(bounds.right() + px(80.0), bounds.bottom() + px(60.0));
+
+    harness
+        .context()
+        .simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+    harness
+        .context()
+        .simulate_mouse_move(outside, MouseButton::Left, Modifiers::none());
+    harness
+        .context()
+        .simulate_mouse_up(outside, MouseButton::Left, Modifiers::none());
+
+    calls.borrow_mut().clear();
+    harness.context().simulate_event(ScrollWheelEvent {
+        position: bounds.center(),
+        delta: ScrollDelta::Lines(point(0.0, 1.0)),
+        modifiers: Modifiers::none(),
+        touch_phase: TouchPhase::Moved,
+    });
+    assert!(
+        calls
+            .borrow()
+            .iter()
+            .any(|event| matches!(event, NodeGraphEvent::ViewportChanged(_))),
+        "outside mouse-up clears the captured pan before the next gesture"
+    );
+}
+
+#[gpui::test]
 fn wheel_zoom_is_clamped_and_keeps_the_pointer_on_the_same_world_point(cx: &mut TestAppContext) {
     let (mut harness, calls) = editor(cx);
     let bounds = harness.bounds("graph").expect("graph bounds");
@@ -199,6 +232,21 @@ fn node_drag_keeps_reporting_after_the_pointer_leaves_the_canvas(cx: &mut TestAp
     assert!(
         moved,
         "pointer capture keeps the node gesture alive outside"
+    );
+
+    calls.borrow_mut().clear();
+    harness.context().simulate_event(ScrollWheelEvent {
+        position: graph.center(),
+        delta: ScrollDelta::Lines(point(0.0, 1.0)),
+        modifiers: Modifiers::none(),
+        touch_phase: TouchPhase::Moved,
+    });
+    assert!(
+        calls
+            .borrow()
+            .iter()
+            .any(|event| matches!(event, NodeGraphEvent::ViewportChanged(_))),
+        "outside mouse-up releases capture and clears the node gesture"
     );
 }
 
@@ -386,5 +434,45 @@ fn output_drag_requests_only_a_valid_input_connection(cx: &mut TestAppContext) {
             .borrow()
             .iter()
             .any(|event| matches!(event, NodeGraphEvent::ConnectionRequested { .. }))
+    );
+}
+
+#[gpui::test]
+fn output_capture_delivers_an_outside_release(cx: &mut TestAppContext) {
+    let (mut harness, calls) = editor(cx);
+    let from = harness.point_in(&port_id("graph.source", "records"));
+    let graph = harness.bounds("graph").expect("graph bounds");
+    let outside = point(graph.right() + px(100.0), graph.bottom() + px(70.0));
+
+    harness
+        .context()
+        .simulate_mouse_down(from, MouseButton::Left, Modifiers::none());
+    harness
+        .context()
+        .simulate_mouse_move(outside, MouseButton::Left, Modifiers::none());
+    harness
+        .context()
+        .simulate_mouse_up(outside, MouseButton::Left, Modifiers::none());
+    assert!(
+        !calls
+            .borrow()
+            .iter()
+            .any(|event| matches!(event, NodeGraphEvent::ConnectionRequested { .. })),
+        "dropping outside proposes no connection"
+    );
+
+    calls.borrow_mut().clear();
+    harness.context().simulate_event(ScrollWheelEvent {
+        position: graph.center(),
+        delta: ScrollDelta::Lines(point(0.0, 1.0)),
+        modifiers: Modifiers::none(),
+        touch_phase: TouchPhase::Moved,
+    });
+    assert!(
+        calls
+            .borrow()
+            .iter()
+            .any(|event| matches!(event, NodeGraphEvent::ViewportChanged(_))),
+        "outside mouse-up releases capture and clears the port gesture"
     );
 }

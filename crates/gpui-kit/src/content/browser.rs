@@ -8,7 +8,7 @@
 //! hands the panel a [`ViewportState`] saying what is actually there.
 //!
 //! That split is the point rather than a limitation. The states a web view
-//! spends its life in — loading, blocked, failed, no engine at all — are the
+//! spends its life in — loading, empty, unavailable, failed, ready — are the
 //! part a design system should get right and the part every host otherwise
 //! reimplements differently. What is left is a rectangle.
 //!
@@ -38,31 +38,38 @@ use crate::strings::{ActiveStrings, StringKey};
 ///
 /// Five separate answers, kept separate. `Ready` is the only one that shows a
 /// page, and the four that do not each say a different thing about why.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ViewportState {
-    /// A page is there and the host is painting it.
-    #[default]
-    Ready,
     /// A page is on its way.
     Loading,
-    /// This build has no web engine, so nothing can be shown at any address.
-    Unavailable,
-    /// The host declined to open the address, in its own words. A refusal is
-    /// not a failure: nothing went wrong, something was not permitted.
-    Refused(SharedString),
+    /// Navigation completed successfully and returned no page content.
+    Empty,
+    /// The host cannot open this address. The reason remains the host's own;
+    /// a refusal is not rewritten as an empty page or a failed navigation.
+    Unavailable(SharedString),
     /// Navigation failed, in the host's own words.
-    Failed(SharedString),
+    Error(SharedString),
+    /// A page is there and the host is painting it.
+    Ready,
+}
+
+impl Default for ViewportState {
+    fn default() -> Self {
+        // An empty reason selects the localized no-engine explanation. The
+        // panel cannot assume an engine exists until its host says one does.
+        Self::Unavailable(SharedString::default())
+    }
 }
 
 impl ViewportState {
     /// What the panel publishes as its value.
     fn value(&self) -> &'static str {
         match self {
-            Self::Ready => "ready",
             Self::Loading => "loading",
-            Self::Unavailable => "unavailable",
-            Self::Refused(_) => "refused",
-            Self::Failed(_) => "failed",
+            Self::Empty => "empty",
+            Self::Unavailable(_) => "unavailable",
+            Self::Error(_) => "error",
+            Self::Ready => "ready",
         }
     }
 
@@ -115,7 +122,7 @@ impl BrowserPanel {
             // A panel nobody has told about an engine has not got one, so the
             // honest default is the one that says so rather than the one that
             // draws an empty page.
-            state: ViewportState::Unavailable,
+            state: ViewportState::default(),
             url_set: false,
             can_go_back: false,
             can_go_forward: false,
@@ -166,9 +173,21 @@ impl RenderOnce for BrowserPanel {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let strings = cx.strings().clone();
+        let panel_id = self.ident.semantic_id();
+        let viewport_ident = self.ident.child("viewport");
+        let has_page = self.state.shows_page() && self.viewport.is_some();
+        let state_value = if self.state.shows_page() && self.viewport.is_none() {
+            "error"
+        } else {
+            self.state.value()
+        };
+        let busy = self.state == ViewportState::Loading;
 
         let control = |ident: Ident, glyph: Icon, name: SharedString, action: Option<Action>| {
-            let mut button = IconButton::new(ident, glyph, name).ghost().small();
+            let mut button = IconButton::new(ident, glyph, name)
+                .ghost()
+                .small()
+                .semantic_parent(panel_id.clone());
             // A control with nowhere to go is disabled and installs nothing,
             // rather than being enabled and quietly doing nothing.
             match action {
@@ -226,7 +245,17 @@ impl RenderOnce for BrowserPanel {
                         self.url.clone()
                     } else {
                         strings.text(StringKey::BrowserNoAddress)
-                    }),
+                    })
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(self.ident.child("address").semantic_id(), Role::Text)
+                            .parent(panel_id.clone())
+                            .text(if self.url_set {
+                                self.url.clone()
+                            } else {
+                                strings.text(StringKey::BrowserNoAddress)
+                            }),
+                    ),
             );
 
         let body: AnyElement = match &self.state {
@@ -235,10 +264,10 @@ impl RenderOnce for BrowserPanel {
                 // there and did not hand one over. That is a mistake worth
                 // seeing rather than an empty rectangle worth ignoring.
                 EmptyState::new(
-                    self.ident.child("viewport"),
+                    viewport_ident.child("status"),
                     strings.text(StringKey::BrowserNoViewport),
                 )
-                .kind(EmptyKind::Unavailable)
+                .kind(EmptyKind::Failed)
                 .detail(strings.text(StringKey::BrowserNoViewportDetail))
                 .into_any_element()
             }),
@@ -250,24 +279,36 @@ impl RenderOnce for BrowserPanel {
                 .type_scale(&theme, TypeScale::Caption)
                 .text_color(theme.colors.text_muted)
                 .child(strings.text(StringKey::Loading))
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(viewport_ident.child("status").semantic_id(), Role::Status)
+                        .parent(viewport_ident.semantic_id())
+                        .text(strings.text(StringKey::Loading))
+                        .value("loading")
+                        .busy(true),
+                )
                 .into_any_element(),
-            ViewportState::Unavailable => EmptyState::new(
-                self.ident.child("viewport"),
-                strings.text(StringKey::BrowserNoEngine),
+            ViewportState::Empty => EmptyState::new(
+                viewport_ident.child("status"),
+                strings.text(StringKey::BrowserEmpty),
+            )
+            .kind(EmptyKind::Empty)
+            .detail(strings.text(StringKey::BrowserEmptyDetail))
+            .into_any_element(),
+            ViewportState::Unavailable(reason) => EmptyState::new(
+                viewport_ident.child("status"),
+                strings.text(StringKey::BrowserUnavailable),
             )
             .kind(EmptyKind::Unavailable)
-            .detail(strings.text(StringKey::BrowserNoEngineDetail))
+            .detail(if reason.is_empty() {
+                strings.text(StringKey::BrowserNoEngineDetail)
+            } else {
+                reason.clone()
+            })
             .into_any_element(),
-            ViewportState::Refused(reason) => EmptyState::new(
-                self.ident.child("viewport"),
-                strings.text(StringKey::BrowserRefused),
-            )
-            .kind(EmptyKind::Unavailable)
-            .detail(reason.clone())
-            .into_any_element(),
-            ViewportState::Failed(reason) => EmptyState::new(
-                self.ident.child("viewport"),
-                strings.text(StringKey::BrowserFailed),
+            ViewportState::Error(reason) => EmptyState::new(
+                viewport_ident.child("status"),
+                strings.text(StringKey::BrowserError),
             )
             .kind(EmptyKind::Failed)
             .detail(reason.clone())
@@ -288,17 +329,24 @@ impl RenderOnce for BrowserPanel {
                     .min_h_0()
                     .w_full()
                     .surface(&theme, Surface::Canvas)
-                    .when(!self.state.shows_page(), |element| {
+                    .when(!has_page, |element| {
                         element.flex().items_center().justify_center()
                     })
-                    .child(body),
+                    .child(body)
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(viewport_ident.semantic_id(), Role::Region)
+                            .parent(panel_id.clone())
+                            .value(state_value)
+                            .busy(busy),
+                    ),
             )
             .semantic_in(
                 cx,
-                NodeSpec::new(self.ident.semantic_id(), Role::Group)
-                    .text(self.url.clone())
-                    .value(self.state.value())
-                    .busy(self.state == ViewportState::Loading),
+                NodeSpec::new(panel_id, Role::Group)
+                    .text(strings.text(StringKey::BrowserPanel))
+                    .value(state_value)
+                    .busy(busy),
             )
     }
 }
@@ -313,7 +361,7 @@ mod tests {
     #[test]
     fn a_panel_nobody_has_configured_reports_no_engine() {
         let panel = BrowserPanel::new("browser");
-        assert_eq!(panel.state, ViewportState::Unavailable);
+        assert_eq!(panel.state, ViewportState::default());
         assert!(!panel.url_set);
     }
 
@@ -322,24 +370,25 @@ mod tests {
         assert!(ViewportState::Ready.shows_page());
         for state in [
             ViewportState::Loading,
-            ViewportState::Unavailable,
-            ViewportState::Refused("blocked".into()),
-            ViewportState::Failed("dns".into()),
+            ViewportState::Empty,
+            ViewportState::Unavailable("blocked".into()),
+            ViewportState::Error("dns".into()),
         ] {
             assert!(!state.shows_page(), "{state:?}");
         }
     }
 
-    /// Nothing went wrong is not the same as something went wrong, and the
-    /// panel may not report one as the other.
+    /// Nothing returned is not the same as something being unavailable or
+    /// failing, and the panel may not report one as another.
     #[test]
-    fn a_refusal_and_a_failure_report_differently() {
-        assert_eq!(ViewportState::Refused("no".into()).value(), "refused");
-        assert_eq!(ViewportState::Failed("no".into()).value(), "failed");
-        assert_ne!(
-            ViewportState::Unavailable.value(),
-            ViewportState::Failed("no".into()).value()
-        );
+    fn every_non_ready_state_reports_differently() {
+        let values = [
+            ViewportState::Loading.value(),
+            ViewportState::Empty.value(),
+            ViewportState::Unavailable("no".into()).value(),
+            ViewportState::Error("no".into()).value(),
+        ];
+        assert_eq!(values, ["loading", "empty", "unavailable", "error"]);
     }
 
     /// A history control with nowhere to go must not install an action, so

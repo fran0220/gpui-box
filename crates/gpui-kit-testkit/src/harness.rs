@@ -75,7 +75,10 @@ impl Harness {
 
     /// Redraws and returns the semantic tree published by the latest frame.
     pub fn snapshot(&mut self) -> Snapshot {
-        self.cx.run_until_parked();
+        // A forced successful frame is the authority. Besides settling normal
+        // updates, this deliberately rebuilds cached GPUI views so diagnostic
+        // probes and the committed AccessKit tree describe the same draw.
+        self.frame();
         self.cx
             .update(|_, cx| SemanticRegistry::global(cx).snapshot())
     }
@@ -86,8 +89,8 @@ impl Harness {
 
     /// Draws and returns GPUI's deterministic AccessKit tree.
     pub fn accessibility_tree(&mut self) -> serde_json::Value {
-        self.cx.update(|window, cx| {
-            window.draw(cx).clear(cx);
+        self.frame();
+        self.cx.update(|window, _| {
             serde_json::from_str(
                 &window
                     .debug_a11y_tree_json()

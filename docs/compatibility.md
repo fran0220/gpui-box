@@ -4,7 +4,7 @@
 
 | gpui-kit | GPUI source | Revision |
 |---|---|---|
-| 0.1.x | `https://github.com/fran0220/zed` | `a754da44757a0aa5179224fe37a024c7517c7a92` |
+| 0.1.x | `https://github.com/fran0220/zed` | `0d6f50bbac07b76688e5471b932b12412d256a9a` |
 
 The workspace and the standalone headless harness depend on one immutable
 revision of the integration fork. That revision merges three independently
@@ -23,6 +23,11 @@ capture through fluent interactive elements so a bounded drag continues to
 receive move and release events after leaving its original bounds, including
 when a live preview redraws the window mid-gesture. The detailed, evidence-scoped
 platform matrix lives in [`accessibility.md`](accessibility.md).
+
+The renderer graph uses crates.io `wgpu` 29.0.4 and `gpu-allocator` 0.28.0;
+there are no `fran0220/wgpu` or `fran0220/gpu-allocator` sources. GPUI's direct
+Windows bindings remain on the compatible 0.61 line, while the independent
+wgpu and allocator edges resolve their registry Windows 0.62 dependencies.
 
 ## Platform behavior
 
