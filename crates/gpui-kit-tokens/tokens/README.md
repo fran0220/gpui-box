@@ -1,7 +1,10 @@
 # Tokens
 
-`studio-dark.json` is the bundled semantic theme. `schema.json` documents its
-portable JSON contract.
+`studio-dark.json` and `studio-light.json` are the bundled semantic themes.
+`schema.json` documents their portable JSON contract. `TokenDocument::parse`
+rejects incomplete or unknown fields, invalid values, and every required color
+pair below its contrast floor, so applications receive the same validation
+when registering their own documents at runtime.
 
 Rules:
 

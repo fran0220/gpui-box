@@ -75,12 +75,15 @@ Large planes use surface roles. Accent and semantic colors remain compact.
 
 ### Contrast
 
-`cargo run -p xtask -- tokens check` fails when a theme drops below its
-contrast floor: 4.5:1 for body text and `text.onAccent` over `semantic.accent`,
-3.0:1 for `text.faint` and for status colors, which never carry required
-instructions on their own. `semantic.accentStrong` is an emphasis, border and
-hover color rather than a text-bearing fill, so it is held to the non-text
-minimum.
+`TokenDocument::parse`, `TokenDocument::validate`, and therefore
+`ThemeRegistry::register_json` reject a theme that drops below its contrast
+floor. The error names every failing foreground/background pair, its measured
+ratio, and its required ratio. The floors are 4.5:1 for body text and
+`text.onAccent` over `semantic.accent`, and 3.0:1 for `text.faint` and status
+colors, which never carry required instructions on their own.
+`semantic.accentStrong` is an emphasis, border and hover color rather than a
+text-bearing fill, so it is held to the non-text minimum. `cargo run -p xtask --
+tokens check` applies the same contract to the bundled documents.
 
 ## Elevation, layers, and density
 
@@ -132,6 +135,7 @@ collapsed them would leave a reader unable to tell selection from focus.
 - negative elevation blur;
 - z-index layers that are not strictly increasing;
 - density factors outside 0.5–1.5, or a `comfortable` axis that is not 1.
+- required foreground/background pairs below their contrast floor.
 
 Run:
 

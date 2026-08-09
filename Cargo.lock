@@ -2199,6 +2199,7 @@ version = "0.1.0"
 dependencies = [
  "gpui",
  "gpui-kit-tokens",
+ "serde_json",
 ]
 
 [[package]]
