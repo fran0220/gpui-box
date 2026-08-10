@@ -135,14 +135,21 @@ impl AnchorList {
     }
 
     /// Supplies the caller-owned menu that can hold overflowed anchors.
+    /// The menu reports an overflowed anchor through
+    /// [`crate::overlay::MenuEvent::Invoked`] with the same stable id that
+    /// `on_navigate` reports for inline and keyboard navigation.
     pub fn overflow_menu(mut self, menu: Entity<Menu>) -> Self {
         self.overflow_menu = Some(menu);
         self
     }
 
     fn cut(&self) -> usize {
-        match (self.overflow_after, self.overflow_menu.is_some()) {
-            (Some(cut), true) => cut,
+        match (
+            self.disabled,
+            self.overflow_after,
+            self.overflow_menu.is_some(),
+        ) {
+            (false, Some(cut), true) => cut,
             _ => usize::MAX,
         }
     }
@@ -224,9 +231,15 @@ impl Sizable for AnchorList {
 }
 
 impl RenderOnce for AnchorList {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let direction = cx.layout_direction();
+        if self.disabled
+            && let Some(menu) = self.overflow_menu.as_ref()
+            && menu.read(cx).is_open()
+        {
+            menu.update(cx, |menu, cx| menu.close(window, cx));
+        }
         let mut strip = div()
             .id(self.ident.element_id())
             .row_reading(direction)

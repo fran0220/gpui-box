@@ -147,9 +147,22 @@ impl Cascader {
         self
     }
     pub fn set_options(&mut self, options: Vec<CascaderOption>, cx: &mut Context<Self>) {
+        let open_path = Self::valid_open_path(&options, &self.open_path);
+        let active = self.active.take();
         self.options = options;
-        self.open_path.clear();
-        self.active = None;
+        self.open_path = open_path;
+        self.active = if self.open {
+            let current = self.current_options();
+            active
+                .filter(|id| {
+                    current
+                        .iter()
+                        .any(|option| &option.id == id && !option.disabled)
+                })
+                .or_else(|| Self::first_enabled(current, false))
+        } else {
+            None
+        };
         cx.notify();
     }
     pub fn set_selected(&mut self, selected: Option<SharedString>, cx: &mut Context<Self>) {
@@ -215,14 +228,36 @@ impl Cascader {
         false
     }
 
+    fn valid_open_path(options: &[CascaderOption], path: &[SharedString]) -> Vec<SharedString> {
+        let mut current = options;
+        let mut valid = Vec::new();
+        for id in path {
+            let Some(option) = current
+                .iter()
+                .find(|option| &option.id == id && !option.disabled)
+            else {
+                break;
+            };
+            let Some(children) = &option.children else {
+                break;
+            };
+            valid.push(id.clone());
+            match children {
+                Loadable::Ready(children) => current = children,
+                _ => break,
+            }
+        }
+        valid
+    }
+
     fn current_options(&self) -> &[CascaderOption] {
         let mut options = self.options.as_slice();
         for id in &self.open_path {
             let Some(option) = options.iter().find(|option| &option.id == id) else {
-                break;
+                return &[];
             };
             let Some(Loadable::Ready(children)) = &option.children else {
-                break;
+                return &[];
             };
             options = children;
         }
@@ -383,6 +418,7 @@ impl Cascader {
         let mut spec = NodeSpec::new(ident.semantic_id(), Role::Option)
             .parent(column.semantic_id())
             .text(option.label.clone())
+            .hovered(active)
             .disabled(option.disabled);
         if option.children.is_some() {
             spec = spec.expanded(expanded);
@@ -439,11 +475,12 @@ impl Cascader {
                 let weak = cx.entity().downgrade();
                 let parent_id = parent.id.clone();
                 let action_id = ident.child("retry");
-                EmptyState::new(ident, strings.text(StringKey::CascaderUnavailable))
+                EmptyState::new(ident.clone(), strings.text(StringKey::CascaderUnavailable))
                     .kind(EmptyKind::Unavailable)
                     .detail(reason.as_str())
                     .action(
                         Button::new(action_id)
+                            .semantic_parent(ident.semantic_id())
                             .variant(ButtonVariant::Secondary)
                             .label(strings.text(StringKey::TryAgain))
                             .on_click(move |_, cx| {
@@ -458,11 +495,12 @@ impl Cascader {
                 let weak = cx.entity().downgrade();
                 let parent_id = parent.id.clone();
                 let action_id = ident.child("retry");
-                EmptyState::new(ident, strings.text(StringKey::CascaderError))
+                EmptyState::new(ident.clone(), strings.text(StringKey::CascaderError))
                     .kind(EmptyKind::Failed)
                     .detail(reason.clone())
                     .action(
                         Button::new(action_id)
+                            .semantic_parent(ident.semantic_id())
                             .variant(ButtonVariant::Secondary)
                             .label(strings.text(StringKey::TryAgain))
                             .on_click(move |_, cx| {
@@ -491,7 +529,11 @@ impl Cascader {
             .flex()
             .flex_col()
             .children(options.iter().map(|option| self.row(option, ident, cx)))
-            .semantic_in(cx, NodeSpec::new(ident.semantic_id(), Role::Menu))
+            .semantic_in(
+                cx,
+                NodeSpec::new(ident.semantic_id(), Role::Menu)
+                    .parent(self.ident.child("menu").semantic_id()),
+            )
             .into_any_element()
     }
 
@@ -518,7 +560,8 @@ impl Cascader {
             .id(self.ident.child("menu").element_id())
             .semantic_in(
                 cx,
-                NodeSpec::new(self.ident.child("menu").semantic_id(), Role::Menu),
+                NodeSpec::new(self.ident.child("menu").semantic_id(), Role::Menu)
+                    .parent(self.ident.semantic_id()),
             );
         popover::anchored_below(
             ElementId::from(self.ident.child("menu.anchor").semantic_id()),

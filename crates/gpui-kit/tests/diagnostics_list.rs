@@ -102,6 +102,22 @@ fn selection_and_actions_report_ids_without_applying_or_bubbling(cx: &mut TestAp
         .expect("diagnostic row");
     assert_eq!(row.role, Role::Row);
     assert_eq!(row.text.as_deref(), Some("Fixture diagnostic error-a"));
+    assert_eq!(
+        harness
+            .node("fixture.diagnostics.list.error-a.severity")
+            .expect("severity")
+            .parent
+            .as_deref(),
+        Some("fixture.diagnostics.list.error-a")
+    );
+    assert_eq!(
+        harness
+            .node("fixture.diagnostics.list.error-a.action.apply")
+            .expect("action")
+            .parent
+            .as_deref(),
+        Some("fixture.diagnostics.list.error-a")
+    );
     harness.click("fixture.diagnostics.list.error-a");
     assert_eq!(*recorded.selections.borrow(), vec!["error-a"]);
     assert!(
@@ -177,6 +193,14 @@ fn state(cx: &mut TestAppContext, value: Loadable<Vec<Diagnostic>, SharedString>
 
 #[gpui::test]
 fn loading_empty_unavailable_error_and_no_match_remain_distinct(cx: &mut TestAppContext) {
+    let mut idle = state(cx, Loadable::Idle);
+    let idle = idle.node("fixture.diagnostics.idle").expect("idle");
+    assert_eq!(idle.value.as_deref(), Some("unstarted"));
+    assert_eq!(
+        idle.text.as_deref(),
+        Some("Diagnostics have not been requested")
+    );
+
     let mut loading = state(cx, Loadable::Loading);
     assert!(
         loading
@@ -186,6 +210,14 @@ fn loading_empty_unavailable_error_and_no_match_remain_distinct(cx: &mut TestApp
     );
 
     let mut empty = state(cx, Loadable::Empty);
+    assert_eq!(
+        empty
+            .node("fixture.diagnostics.empty")
+            .expect("empty")
+            .text
+            .as_deref(),
+        Some("No diagnostics")
+    );
     assert_eq!(
         empty
             .node("fixture.diagnostics.empty")

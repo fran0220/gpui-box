@@ -1,6 +1,6 @@
 //! Synthetic fixtures for caller-owned in-page anchor navigation.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use gpui::{AppContext as _, Entity, IntoElement, TestAppContext};
@@ -100,6 +100,58 @@ fn disabled_anchor_and_list_install_no_actions(cx: &mut TestAppContext) {
     assert!(calls.borrow().is_empty());
     assert!(harness.node("fixture.anchors.policy").unwrap().disabled);
     assert!(harness.node("fixture.anchors.summary").unwrap().disabled);
+}
+
+#[gpui::test]
+fn disabling_an_overflowing_list_closes_the_menu_and_keeps_every_anchor_inert(
+    cx: &mut TestAppContext,
+) {
+    let disabled = Rc::new(Cell::new(false));
+    let render_disabled = disabled.clone();
+    let calls = Rc::new(RefCell::new(Vec::new()));
+    let sink = calls.clone();
+    let slot: Rc<RefCell<Option<Entity<Menu>>>> = Rc::new(RefCell::new(None));
+    let build = slot.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        let sink = sink.clone();
+        let menu = build
+            .borrow_mut()
+            .get_or_insert_with(|| {
+                cx.new(|cx| Menu::new("fixture.anchor-menu", window, cx).trigger("More"))
+            })
+            .clone();
+        AnchorList::new("fixture.anchors")
+            .anchors(fixture())
+            .active("inputs")
+            .overflow_after(2)
+            .overflow_menu(menu)
+            .disabled(render_disabled.get())
+            .on_navigate(move |id, _, _| sink.borrow_mut().push(id.to_string()))
+            .into_any_element()
+    });
+
+    harness.click("fixture.anchor-menu.trigger");
+    let menu = slot.borrow().clone().expect("overflow menu");
+    assert!(menu.read_with(cx, |menu, _| menu.is_open()));
+
+    harness.update(move |window, _| {
+        disabled.set(true);
+        window.refresh();
+    });
+    assert!(!menu.read_with(cx, |menu, _| menu.is_open()));
+    assert!(harness.node("fixture.anchors.overflow").is_none());
+    assert!(harness.node("fixture.anchor-menu.trigger").is_none());
+    for id in ["summary", "inputs", "policy", "result"] {
+        assert!(
+            harness
+                .node(&format!("fixture.anchors.{id}"))
+                .expect("disabled inline anchor")
+                .disabled
+        );
+    }
+    harness.click("fixture.anchors.result");
+    harness.keystrokes("right");
+    assert!(calls.borrow().is_empty());
 }
 
 #[gpui::test]

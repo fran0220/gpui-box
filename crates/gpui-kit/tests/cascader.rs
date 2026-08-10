@@ -66,6 +66,30 @@ fn identity_expansion_and_selection_remain_caller_owned(cx: &mut TestAppContext)
     harness.click("synthetic.cascader");
     harness.click("synthetic.cascader.synthetic.branch");
 
+    assert_eq!(
+        harness
+            .node("synthetic.cascader.menu")
+            .expect("menu")
+            .parent
+            .as_deref(),
+        Some("synthetic.cascader")
+    );
+    assert_eq!(
+        harness
+            .node("synthetic.cascader.menu.root")
+            .expect("root column")
+            .parent
+            .as_deref(),
+        Some("synthetic.cascader.menu")
+    );
+    assert_eq!(
+        harness
+            .node("synthetic.cascader.synthetic.branch")
+            .expect("branch")
+            .parent
+            .as_deref(),
+        Some("synthetic.cascader.menu.root")
+    );
     assert!(
         harness
             .node("synthetic.cascader.synthetic.leaf-a")
@@ -152,6 +176,57 @@ fn async_branch_states_are_distinct_and_retry_is_an_intent(cx: &mut TestAppConte
             .value
             .as_deref(),
         Some("failed")
+    );
+}
+
+#[gpui::test]
+fn async_children_preserve_the_open_path_when_the_caller_supplies_them(cx: &mut TestAppContext) {
+    let (mut harness, entity) = cascader(cx);
+    harness.click("synthetic.cascader");
+    harness.click("synthetic.cascader.synthetic.loading");
+
+    let update = entity.clone();
+    harness.update(move |_, cx| {
+        update.update(cx, |cascader, cx| {
+            cascader.set_options(
+                vec![
+                    CascaderOption::new("synthetic.loading", "Synthetic loading").children([
+                        CascaderOption::new("synthetic.loaded", "Synthetic loaded child"),
+                    ]),
+                ],
+                cx,
+            )
+        })
+    });
+
+    assert_eq!(
+        entity.read_with(cx, |view, _| view.open_path().to_vec()),
+        vec!["synthetic.loading"]
+    );
+    assert!(
+        harness
+            .node("synthetic.cascader.synthetic.loaded")
+            .expect("new child")
+            .hovered
+    );
+
+    let update = entity.clone();
+    harness.update(move |_, cx| {
+        update.update(cx, |cascader, cx| {
+            cascader.set_options(
+                vec![CascaderOption::new(
+                    "synthetic.replacement",
+                    "Synthetic replacement",
+                )],
+                cx,
+            )
+        })
+    });
+    assert!(entity.read_with(cx, |view, _| view.open_path().is_empty()));
+    assert!(
+        harness
+            .node("synthetic.cascader.synthetic.loaded")
+            .is_none()
     );
 }
 

@@ -330,7 +330,7 @@ impl RenderOnce for DiagnosticsList {
         let state = match self.diagnostics {
             Loadable::Idle => EmptyState::new(
                 ident.child("idle"),
-                cx.strings().text(StringKey::DiagnosticsEmpty),
+                cx.strings().text(StringKey::DiagnosticsUnstarted),
             )
             .kind(EmptyKind::Unstarted)
             .into_any_element(),
@@ -361,6 +361,7 @@ impl RenderOnce for DiagnosticsList {
                     empty = empty.action(
                         Button::new(ident.child("retry"))
                             .label(cx.strings().text(StringKey::TryAgain))
+                            .semantic_parent(ident.child("error").semantic_id())
                             .control_size(self.size)
                             .on_click(move |window, cx| handler(window, cx)),
                     );
@@ -457,6 +458,7 @@ impl RenderOnce for DiagnosticsList {
                             let mut button =
                                 Button::new(item_ident.child("action").child(action.id.as_ref()))
                                     .label(action.label.clone())
+                                    .semantic_parent(item_ident.semantic_id())
                                     .ghost()
                                     .control_size(size)
                                     .disabled(disabled || diagnostic.disabled || action.disabled);
@@ -486,9 +488,21 @@ impl RenderOnce for DiagnosticsList {
                                     .child(diagnostic.message.clone()),
                             )
                             .child(
-                                Badge::new(diagnostic.severity.label(cx))
-                                    .id(item_ident.child("severity"))
-                                    .tone(diagnostic.severity.tone()),
+                                div()
+                                    .flex_none()
+                                    .child(
+                                        Badge::new(diagnostic.severity.label(cx))
+                                            .tone(diagnostic.severity.tone()),
+                                    )
+                                    .semantic_in(
+                                        cx,
+                                        NodeSpec::new(
+                                            item_ident.child("severity").semantic_id(),
+                                            Role::Status,
+                                        )
+                                        .parent(item_ident.semantic_id())
+                                        .text(diagnostic.severity.label(cx)),
+                                    ),
                             )
                             .children(actions);
                         ListItem::new(diagnostic.id.clone(), content)

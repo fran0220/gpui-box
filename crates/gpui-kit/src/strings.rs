@@ -277,6 +277,7 @@ string_keys! {
     GridEmpty => "grid.empty", "No rows";
 
     // Diagnostics.
+    DiagnosticsUnstarted => "diagnostics.unstarted", "Diagnostics have not been requested";
     DiagnosticsEmpty => "diagnostics.empty", "No diagnostics";
     DiagnosticsNoMatch => "diagnostics.no-match", "No diagnostics match these filters";
     DiagnosticsUnavailable => "diagnostics.unavailable", "Diagnostics unavailable";
