@@ -104,6 +104,23 @@ test("canvas drag follows the browser pointer path", async ({ page }, testInfo) 
     .toBeGreaterThan(before.bounds.x + 20);
 });
 
+test("developer data scenes render from the runtime catalog with stable semantics", async ({ page }, testInfo) => {
+  const scenes = [
+    ["log-stream", ["scene.log", "scene.log.entries", "scene.log.stale"]],
+    ["diff-view", ["scene.diff.unified", "scene.diff.split"]],
+    ["sparkline", ["scene.sparkline.rate", "scene.sparkline.stale"]],
+  ];
+
+  for (const [scene, ids] of scenes) {
+    await openScene(page, testInfo, scene);
+    const catalog = JSON.parse(await page.evaluate(() => window.gpuiKitCatalog));
+    expect(catalog.scenes).toContain(scene);
+    for (const id of ids) {
+      expect(await node(page, id)).toBeDefined();
+    }
+  }
+});
+
 test("AccessKit DOM mirrors role, focus, action, and canvas-scaled bounds", async ({ page }, testInfo) => {
   await openScene(page, testInfo, "button");
   const primary = await node(page, "scene.button.primary");

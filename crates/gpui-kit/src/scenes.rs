@@ -1475,11 +1475,11 @@ fn log_stream(_window: &mut Window, cx: &mut App) -> AnyElement {
             .source("cache"),
         LogEntry::new("retry", "Fixture request completed after one retry")
             .timestamp("09:41:05")
-            .level("INFO", Tone::Success)
+            .level("INFO", Tone::Info)
             .source("worker"),
         LogEntry::new("finish", "Fixture run demo-42 completed")
             .timestamp("09:41:06")
-            .level("INFO", Tone::Success)
+            .level("DONE", Tone::Success)
             .source("scheduler")
             .search_hits([12..19]),
     ];
@@ -1539,18 +1539,18 @@ fn diff_view(_window: &mut Window, cx: &mut App) -> AnyElement {
         ))
         .child(
             div()
-                .row()
+                .column()
                 .items_start()
                 .gap_token(&theme, Space::Md)
                 .child(
-                    div().w(px(408.0)).child(
+                    div().w(px(840.0)).child(
                         DiffView::new("scene.diff.unified", scene_diff())
                             .visible_rows(7)
                             .on_event(|_, _, _| {}),
                     ),
                 )
                 .child(
-                    div().w(px(408.0)).child(
+                    div().w(px(840.0)).child(
                         DiffView::new("scene.diff.split", scene_diff())
                             .presentation(DiffPresentation::Split)
                             .visible_rows(7)

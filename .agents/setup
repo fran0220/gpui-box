@@ -63,6 +63,13 @@ toolchain="$(sed -n 's/^channel = "\([^"]*\)"/\1/p' rust-toolchain.toml)"
 echo "Installing Rust $toolchain with repository-required components."
 rustup toolchain install "$toolchain" --profile minimal --component clippy --component rustfmt
 
+wasm_bindgen_version="0.2.126"
+if ! command -v wasm-bindgen >/dev/null 2>&1 ||
+  [[ "$(wasm-bindgen --version)" != "wasm-bindgen $wasm_bindgen_version" ]]; then
+  echo "Installing wasm-bindgen-cli $wasm_bindgen_version for the browser gallery."
+  cargo install wasm-bindgen-cli --version "$wasm_bindgen_version" --locked
+fi
+
 echo "Fetching locked Cargo dependencies."
 cargo fetch --locked
 
