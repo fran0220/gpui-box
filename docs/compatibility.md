@@ -33,16 +33,19 @@ wgpu and allocator edges resolve their registry Windows 0.62 dependencies.
 
 | Capability | macOS | Windows | Linux |
 |---|---|---|---|
-| Core components | Supported | Compile + headless visual gate | Compile + headless visual gate |
+| Core components | Supported; native visual gate | Supported; headless visual gate | Supported; headless visual gate |
 | Native frame capture | Supported | Not implemented | Not implemented |
 | Offscreen WGPU capture | Not used | WARP | llvmpipe |
 | Edge fade | Supported | Supported | Supported |
 | Backdrop blur | Metal | Translucent fallback | Translucent fallback |
 | Native child surfaces | Supported | Supported | Not implemented |
 
-Headless rendering verifies deterministic component output but is not a native
-desktop journey. Windows and Linux support claims should be upgraded only with
-native input, accessibility, windowing, and visual evidence.
+Core component rendering is supported and visually regression-tested on all
+three platforms. macOS uses native window capture; Windows and Linux render the
+same catalog through their deterministic offscreen WGPU backends. Native frame
+capture and some accessibility or native-child capabilities remain
+platform-specific as recorded in this table and in
+[`accessibility.md`](accessibility.md).
 
 Backdrop blur is deliberately renderer-specific: Metal snapshots and blurs the
 scene below it, while other renderers preserve the translucent fill as a

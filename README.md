@@ -4,6 +4,9 @@
 and visual test kit for native desktop applications built with
 [GPUI](https://github.com/zed-industries/zed).
 
+**Website:** [gpui-kit.origingame.dev](https://gpui-kit.origingame.dev) ·
+**MCP endpoint:** [`https://gpui-kit.origingame.dev/mcp`](https://gpui-kit.origingame.dev/mcp)
+
 It extracts product-neutral lessons from a production Studio interface:
 
 - one typed token authority instead of colors scattered through views;
@@ -52,10 +55,11 @@ crate that same URL and revision. `cargo run -p xtask -- dependencies check`
 enforces the equivalent rule across this repository's two workspaces,
 lockfiles, and compatibility declarations.
 
-Requires Rust 1.97 and edition 2024. macOS is the supported platform; Windows
-and Linux are compile targets, which is not the same as a validated journey —
-see [`docs/compatibility.md`](docs/compatibility.md) for what each platform
-actually does.
+Requires Rust 1.97 and edition 2024. macOS, Windows, and Linux are supported
+platforms. The component catalog is visually regression-tested through native
+window capture on macOS and deterministic offscreen WGPU rendering on Windows
+and Linux; see [`docs/compatibility.md`](docs/compatibility.md) for the
+platform-specific renderer and accessibility details.
 
 That is usually all: `gpui-kit` re-exports the assets, theme, token and
 semantics crates as `gpui_kit::{assets, theme, tokens, semantics}`, so an
