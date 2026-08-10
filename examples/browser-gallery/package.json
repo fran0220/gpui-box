@@ -1,0 +1,10 @@
+{
+  "name": "gpui-kit-browser-gallery-smoke",
+  "private": true,
+  "scripts": {
+    "smoke": "playwright test --config playwright.config.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1"
+  }
+}

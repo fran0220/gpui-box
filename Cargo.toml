@@ -7,6 +7,7 @@ members = [
   "crates/gpui-kit-theme",
   "crates/gpui-kit-tokens",
   "crates/gpui-kit",
+  "examples/browser-gallery",
   "examples/gallery",
   "tools/mcp",
   "xtask",
@@ -40,10 +41,12 @@ raw-window-handle = "=0.6.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 jsonschema = { version = "0.33", default-features = false }
+js-sys = "0.3"
 thiserror = "2"
 tracing = "0.1"
 tempfile = "3"
 toml = "0.8"
+wasm-bindgen = "0.2"
 
 core-graphics = "=0.24.0"
 objc2-app-kit = { version = "=0.3.2", features = ["NSView", "NSWindow"] }

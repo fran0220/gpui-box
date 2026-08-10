@@ -61,6 +61,12 @@ Browser accessibility and a deterministic browser visual gate are also
 unverified. Web support remains unclaimed until rendering, interaction,
 accessibility, and visual regression coverage pass together.
 
+The deferred host uses the single-threaded WebPlatform constructor for its
+basic no-header smoke. Threaded browser execution requires separate COOP/COEP
+and worker validation. The current web backend also does not implement
+`PlatformWindow::a11y_init` or `a11y_tree_update`, so the host's diagnostic
+semantic snapshot must not be presented as browser accessibility support.
+
 ## Upgrade process
 
 1. Rebase each fork topic stack onto the selected upstream Zed revision.

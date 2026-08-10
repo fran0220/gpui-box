@@ -272,6 +272,10 @@ compile for a web target. The core library passes its stable Rust wasm check,
 but a browser host remains blocked at the current GPUI pin; see
 [`docs/compatibility.md`](docs/compatibility.md).
 
+The deferred browser-host candidate lives under `examples/browser-gallery` so
+the shared scene and interaction contracts can be reviewed before its upstream
+runtime prerequisite lands. It is not part of the current Web support claim.
+
 ## Validation
 
 ```bash

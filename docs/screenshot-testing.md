@@ -192,6 +192,21 @@ fixture, theme, and platform in its baseline contract. A software-rendered
 gallery baseline does not replace native interaction and accessibility evidence
 for a product surface.
 
+## Deferred browser visual gate
+
+The deferred browser gate enumerates `gpui_kit::scenes::catalog()` and the
+bundled themes at runtime; it carries no hand-maintained scene or image count.
+Its fixed contract is the browser gallery's logical viewport, DPR 1, reduced
+motion, bundled fonts, each scene's declared direction, a pointer parked
+outside the canvas, and one discarded warm-up frame. Future captures remain
+separate from native and headless baselines.
+
+No browser baseline is accepted by this milestone. After the browser host can
+build normally, acceptance requires two clean full-catalog runs to reproduce,
+real pointer and keyboard interaction smokes to pass, and a browser
+accessibility bridge to be verified. The diagnostic semantic snapshot used to
+target controls is not DOM, ARIA, or accessibility evidence.
+
 ## The headless gate
 
 `tools/headless-visual` renders the same catalog on Linux and Windows with no

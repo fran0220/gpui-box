@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>gpui-kit browser gallery</title>
+    <style>
+      html, body {
+        width: 920px;
+        height: 1000px;
+        margin: 0;
+        overflow: hidden;
+        background: #111318;
+      }
+      canvas { display: block; }
+    </style>
+  </head>
+  <body>
+    <script type="module">
+      const query = new URLSearchParams(location.search);
+      window.gpuiKitConfig = {
+        scene: query.get("scene") || "button",
+        theme: query.get("theme") || "studio-light",
+      };
+      const { default: init } = await import("./gpui_kit_browser_gallery.js");
+      await init();
+    </script>
+  </body>
+</html>

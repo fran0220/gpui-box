@@ -42,13 +42,15 @@ fn main() -> Result<()> {
         (Some("headless"), Some("capture")) => headless("capture", &rest),
         (Some("headless"), Some("check")) => headless("check", &rest),
         (Some("web"), Some("check")) => web_check(),
+        (Some("web"), Some("build")) => web_build(),
+        (Some("web"), Some("smoke")) => web_smoke(),
         (Some("gate"), None) => gate(false),
         (Some("gate"), Some("full")) => gate(true),
         _ => bail!(
             "usage: cargo xtask <dependencies check|accessibility check|tokens generate|tokens check|strings check|\
              strings generate|scenes list|scenes capture [name...]|\
              scenes check [name...]|headless capture [name...]|\
-             headless check [name...]|web check|gate [full]>"
+             headless check [name...]|web check|web build|web smoke|gate [full]>"
         ),
     }
 }
@@ -1016,6 +1018,7 @@ fn headless(command: &str, only: &[String]) -> Result<()> {
 }
 
 const WASM_TARGET: &str = "wasm32-unknown-unknown";
+const WASM_BINDGEN_VERSION: &str = "0.2.126";
 
 fn web_check() -> Result<()> {
     step(
@@ -1029,6 +1032,98 @@ fn web_check() -> Result<()> {
             "fixtures",
             "--target",
             WASM_TARGET,
+        ],
+        None,
+    )
+}
+
+fn web_build() -> Result<()> {
+    step(
+        env!("CARGO"),
+        &[
+            "build",
+            "-p",
+            "gpui-kit-browser-gallery",
+            "--target",
+            WASM_TARGET,
+            "--release",
+        ],
+        None,
+    )?;
+
+    let version = Command::new("wasm-bindgen")
+        .arg("--version")
+        .current_dir(root())
+        .output()
+        .context(
+            "wasm-bindgen-cli is required; install it with `cargo install \
+             wasm-bindgen-cli --version 0.2.126 --locked`",
+        )?;
+    let expected = format!("wasm-bindgen {WASM_BINDGEN_VERSION}");
+    if !version.status.success() || String::from_utf8_lossy(&version.stdout).trim() != expected {
+        bail!(
+            "web build requires `{expected}` to match Cargo.lock; install it with \
+             `cargo install wasm-bindgen-cli --version {WASM_BINDGEN_VERSION} --locked`"
+        );
+    }
+
+    let output = root().join("target/browser-gallery");
+    fs::create_dir_all(&output).with_context(|| format!("create {}", output.display()))?;
+    let wasm = root().join(format!(
+        "target/{WASM_TARGET}/release/gpui_kit_browser_gallery.wasm"
+    ));
+    let status = Command::new("wasm-bindgen")
+        .args(["--target", "web", "--no-typescript", "--out-name"])
+        .arg("gpui_kit_browser_gallery")
+        .arg("--out-dir")
+        .arg(&output)
+        .arg(&wasm)
+        .current_dir(root())
+        .status()
+        .context("generate browser bindings")?;
+    if !status.success() {
+        bail!("wasm-bindgen failed");
+    }
+    fs::copy(
+        root().join("examples/browser-gallery/web/index.html"),
+        output.join("index.html"),
+    )
+    .context("copy the browser gallery host page")?;
+    println!("browser gallery built in {}", output.display());
+    Ok(())
+}
+
+fn web_smoke() -> Result<()> {
+    web_build()?;
+    let package = root().join("examples/browser-gallery");
+    let package = package.to_string_lossy();
+    step("npm", &["--prefix", package.as_ref(), "ci"], None)?;
+    step(
+        "npm",
+        &[
+            "--prefix",
+            package.as_ref(),
+            "exec",
+            "--",
+            "playwright",
+            "install",
+            "chromium",
+        ],
+        None,
+    )?;
+    let config = root().join("examples/browser-gallery/playwright.config.mjs");
+    let config = config.to_string_lossy();
+    step(
+        "npm",
+        &[
+            "--prefix",
+            package.as_ref(),
+            "exec",
+            "--",
+            "playwright",
+            "test",
+            "--config",
+            config.as_ref(),
         ],
         None,
     )
