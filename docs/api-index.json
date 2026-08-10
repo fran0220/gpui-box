@@ -1698,6 +1698,38 @@
       ]
     },
     {
+      "name": "KeymapEditor",
+      "kind": "view",
+      "path": "gpui_kit::controls::KeymapEditor",
+      "source": "crates/gpui-kit/src/controls/keymap_editor.rs",
+      "summary": "Coordinates one recorder over caller-owned keymap rows; it never applies a binding.",
+      "construct": [
+        "new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self"
+      ],
+      "options": [
+        "commands(commands: impl IntoIterator<Item = KeymapCommand>) -> Self",
+        "query(query: impl Into<SharedString>) -> Self"
+      ],
+      "commands": [
+        "set_commands(commands: Vec<KeymapCommand>, cx: &mut Context<Self>)",
+        "set_query(query: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_disabled(disabled: bool, cx: &mut Context<Self>)"
+      ],
+      "queries": [
+        "active_command() -> Option<&SharedString>",
+        "current_commands() -> &[KeymapCommand]"
+      ],
+      "reports": [
+        "AddCaptured",
+        "Remove",
+        "Reset",
+        "RecordingCancelled"
+      ],
+      "scenes": [
+        "keymap-editor"
+      ]
+    },
+    {
       "name": "List",
       "kind": "builder",
       "path": "gpui_kit::data::List",
@@ -5533,6 +5565,68 @@
       ]
     },
     {
+      "name": "KeymapBinding",
+      "path": "gpui_kit::controls::KeymapBinding",
+      "summary": "One effective binding, identified independently of its position.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, keystroke: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "conflict(value: impl Into<SharedString>) -> Self",
+        "provenance(value: impl Into<SharedString>) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "keystroke() -> &SharedString",
+        "conflict_reason() -> Option<&SharedString>",
+        "provenance_label() -> Option<&SharedString>"
+      ]
+    },
+    {
+      "name": "KeymapCommand",
+      "path": "gpui_kit::controls::KeymapCommand",
+      "summary": "Caller-owned command metadata and binding facts.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, label: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "context(value: impl Into<SharedString>) -> Self",
+        "defaults(values: impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
+        "bindings(values: impl IntoIterator<Item = KeymapBinding>) -> Self",
+        "searchable(text: impl Into<SharedString>, keywords: impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
+        "refused(reason: impl Into<SharedString>) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "label_text() -> &SharedString",
+        "context_label() -> Option<&SharedString>",
+        "default_bindings() -> &[SharedString]",
+        "effective_bindings() -> &[KeymapBinding]",
+        "search_text() -> &SharedString",
+        "keywords() -> &[SharedString]",
+        "refusal_reason() -> Option<&SharedString>"
+      ]
+    },
+    {
+      "name": "KeymapEditorEvent",
+      "path": "gpui_kit::controls::KeymapEditorEvent",
+      "summary": "",
+      "variants": [
+        "AddCaptured",
+        "Remove",
+        "Reset",
+        "RecordingCancelled"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "LastVerified",
       "path": "gpui_kit::agent::LastVerified",
       "summary": "When a reading was last verified, for a reading that is no longer current.",
@@ -8899,6 +8993,14 @@
         "SettingsSection"
       ],
       "example": "fn keybinding(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneRecorders>() {\n        let idle = cx.new(|cx| {\n            KeybindingRecorder::new(\"scene.keybinding.idle\", window, cx).label(\"Open workspace\")\n        });\n        let recording = cx.new(|cx| {\n            KeybindingRecorder::new(\"scene.keybinding.recording\", window, cx)\n                .label(\"Command palette\")\n        });\n        let captured = cx.new(|cx| {\n            KeybindingRecorder::new(\"scene.keybinding.captured\", window, cx)\n                .label(\"Toggle terminal\")\n                .binding(\"ctrl-`\")\n        });\n        let conflicting = cx.new(|cx| {\n            KeybindingRecorder::new(\"scene.keybinding.conflicting\", window, cx)\n                .label(\"Split editor\")\n                .binding(\"cmd-shift-p\")\n                // The host's words, not the recorder's: it has no keymap.\n                .conflict(Some(\"Already opens the command palette\"))\n        });\n        // Recording is a state, not a gesture, so the scene puts one recorder\n        // into it by hand rather than waiting for a keystroke that a still\n        // image could not photograph anyway.\n        recording.update(cx, |recorder, cx| recorder.start(window, cx));\n        cx.set_global(SceneRecorders {\n            idle,\n            recording,\n            captured,\n            conflicting,\n        });\n    }\n    let recorders = cx.global::<SceneRecorders>().clone();\n    let theme = cx.theme().clone();\n\n    // A recorder carries its name in the tree rather than drawing one, the way\n    // every other control here does, so the scene puts it where a keymap page\n    // would: in a settings row that states what the binding is for.\n    stack(&theme)\n        .w(px(680.0))\n        .child(\n            SettingsSection::new(\"scene.keybinding.keymap\", \"Keyboard shortcuts\")\n                .description(\"Recording captures the next keystroke instead of acting on it.\")\n                .row(\n                    SettingsRow::new(\"scene.keybinding.row.open\", \"Open workspace\")\n                        .description(\"Nothing is bound yet\")\n                        .control(recorders.idle),\n                )\n                .row(\n                    SettingsRow::new(\"scene.keybinding.row.palette\", \"Command palette\")\n                        .description(\"Listening for a keystroke\")\n                        .control(recorders.recording),\n                )\n                .row(\n                    SettingsRow::new(\"scene.keybinding.row.terminal\", \"Toggle terminal\")\n                        .control(recorders.captured),\n                )\n                .row(\n                    SettingsRow::new(\"scene.keybinding.row.split\", \"Split editor\")\n                        .description(\"The host judged this one, and said so\")\n                        .control(recorders.conflicting),\n                ),\n        )\n        .child(caption(\n            &theme,\n            \"Escape ends recording without capturing, so escape cannot be bound \\\n             unless the caller turns allow_escape on.\",\n        ))\n        .into_any_element()\n}"
+    },
+    {
+      "name": "keymap-editor",
+      "capture": "cargo run -p xtask -- scenes capture keymap-editor",
+      "uses": [
+        "KeymapEditor"
+      ],
+      "example": "fn keymap_editor(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneKeymapEditor>() {\n        let editor = cx.new(|cx| {\n            KeymapEditor::new(\"scene.keymap-editor\", window, cx).commands([\n                KeymapCommand::new(\"workspace.open\", \"Open workspace\")\n                    .context(\"Workspace\")\n                    .defaults([\"cmd-o\"])\n                    .bindings([\n                        KeymapBinding::new(\"user\", \"cmd-shift-o\")\n                            .conflict(\"Already opens recent workspaces\")\n                            .provenance(\"User keymap\"),\n                        KeymapBinding::new(\"workspace\", \"ctrl-o\").provenance(\"Workspace keymap\"),\n                    ])\n                    .searchable(\"Open a folder or project\", [\"folder\", \"project\"]),\n                KeymapCommand::new(\"terminal.toggle\", \"Toggle terminal\")\n                    .context(\"Terminal\")\n                    .defaults([\"ctrl-`\"])\n                    .bindings([KeymapBinding::new(\"default\", \"ctrl-`\")])\n                    .searchable(\"Show the integrated terminal\", [\"panel\", \"console\"]),\n                KeymapCommand::new(\"policy.locked\", \"Managed shortcut\")\n                    .context(\"Workspace\")\n                    .defaults([\"cmd-l\"])\n                    .bindings([KeymapBinding::new(\"managed\", \"cmd-l\").provenance(\"Host policy\")])\n                    .refused(\"This binding is managed by the host.\"),\n            ])\n        });\n        cx.set_global(SceneKeymapEditor(editor));\n    }\n    let editor = cx.global::<SceneKeymapEditor>().0.clone();\n    let theme = cx.theme().clone();\n\n    stack(&theme)\n        .w(px(760.0))\n        .child(editor)\n        .child(caption(\n            &theme,\n            \"Bindings remain caller-owned; add, remove, and reset are intents.\",\n        ))\n        .into_any_element()\n}"
     },
     {
       "name": "markdown",

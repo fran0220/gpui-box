@@ -25,7 +25,7 @@ input, and an entry in `docs/components.md`.
 | Overlay | `Overlay`, `Dialog`, `Drawer`, `Popover`, `Menu`, `ContextMenu`, `Menubar`, `CommandPalette`, `Tooltip`, `HoverCard`, `Toast`, `ToastLayer`, `Kbd` |
 | Layout | `SplitPane`, `SplitTree`, `ScrollArea`, `Toolbar`, `AspectRatio` |
 | Shell | `Dock`, `StatusBar` |
-| Keymap | `KeybindingRecorder` |
+| Keymap | `KeybindingRecorder`, `KeymapEditor` |
 | Interaction | `Dropzone` |
 | Filtering | `FilterBar` |
 | Agent run | `ToolCallCard`, `StepList`, `ThinkingBlock`, `NodeGraph` |
@@ -124,10 +124,12 @@ own; both are exercised through every control and overlay that uses them.
   same reasoning that keeps the calendar out of this crate keeps
   “two minutes ago” out of it, and the seam is the adapter above the
   component.
-- **Judging a keybinding.** `KeybindingRecorder` captures a keystroke and
-  reports it. Whether it clashes with something, and what to do about it, needs
-  the keymap, which the host owns; the recorder renders the conflict the host
-  found rather than inventing one.
+- **Judging or applying a keybinding.** `KeybindingRecorder` captures a
+  keystroke and `KeymapEditor` coordinates it with caller-owned command and
+  binding identities. Whether it clashes with something, what provenance it
+  has, and whether add, remove, or reset should be accepted needs the keymap,
+  which the host owns. Both components render the caller's answer rather than
+  inventing or persisting one.
 - **Persisting a layout.** `SplitLayout` converts to and from plain records so
   a host can write it out, and this crate takes no serialization dependency to
   do it for them.
@@ -229,8 +231,7 @@ is for. `Cascader`, `AnchorList`, and `DiagnosticsList` are also covered above;
 they compose the existing popover/menu, navigation, list, filter, badge, and
 status vocabulary instead of creating parallel application infrastructure.
 
-Then: mentions in a text field, search within settings, a keymap editor showing
-conflicts, and undo history.
+Then: mentions in a text field, search within settings, and undo history.
 
 Agent applications need a family this library is still filling in. A
 conversation is not the unit; a run made of steps is, and `ToolCallCard`,

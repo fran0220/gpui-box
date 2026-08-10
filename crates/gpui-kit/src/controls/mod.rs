@@ -12,6 +12,7 @@ pub mod form_field;
 pub mod inline_edit;
 pub mod input;
 pub mod keybinding_recorder;
+pub mod keymap_editor;
 pub mod number_input;
 pub mod search;
 pub mod segmented;

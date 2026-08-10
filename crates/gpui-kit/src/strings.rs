@@ -253,6 +253,12 @@ string_keys! {
     InlineEditPlaceholder => "inline-edit.placeholder", "Empty";
     KeybindingUnbound => "keybinding.unbound", "Not bound";
     KeybindingPrompt => "keybinding.prompt", "Press a shortcut";
+    KeymapAdd => "keymap.add", "Add binding";
+    KeymapRemove => "keymap.remove", "Remove";
+    KeymapReset => "keymap.reset", "Reset to defaults";
+    KeymapEffective => "keymap.effective", "Current bindings";
+    KeymapDefaults => "keymap.defaults", "Defaults";
+    KeymapResultCount => "keymap.result-count", "{0} commands";
 
     // Number field.
     NumberDecrease => "number.decrease", "Decrease";

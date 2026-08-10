@@ -48,6 +48,7 @@ component grows a literal a reader could read.
 | `FilterBar` | builder | add, remove one condition, clear them all | The conditions are the caller's, and so is the result count. Counting, a known count, a count nobody established, and a count the host refused are four different things |
 | `InlineEdit` | view | edit requested, commit, cancel | Text that becomes a field where it stands. The component never opens itself, never applies a commit, and a refused save keeps what was typed |
 | `KeybindingRecorder` | view | recording started, a captured keystroke, cancelled | Captures the next keystroke instead of acting on it, and reports it in GPUI's own syntax so it goes straight into a keymap. A modifier alone is not a keystroke, escape ends recording rather than being captured, and a conflict is the reason the host found |
+| `KeymapEditor` | view | add a captured binding, remove a binding, reset a command, recording cancelled | Coordinates command identity, label, context, defaults, effective bindings, caller-supplied search metadata, and one shared active recorder. Multiple bindings keep caller-owned identities. Conflict, provenance, and refusal are facts supplied by the caller; the editor judges, applies, persists, and executes nothing |
 | `SearchField` | view | the query, next, previous, cancelled, and the two match rules | A find field over `TextInput` with a hit count beside it. Unsearched, counting, none, a known total, a count that stopped early, and a host that could not search are six different things, and a step with nowhere to go installs no handler |
 | `FindReplace` | view | replace one, and replace all with the number it stated | `SearchField` with a replacement field under it. Replace all carries its count on the control before it is taken, and a count nobody established — too many, still counting, unavailable — leaves it refused with the reason beside it |
 | `UploadList`, `Upload` | builder | a file to retry, one to stop, one to take off the list | Files on their way somewhere, over the `Dropzone` that took them. A refusal is not a failure and is offered no retry; overall progress is claimed only when every file still in flight declared an extent |
@@ -185,6 +186,15 @@ every key. The cost is stated rather than hidden — escape cannot be bound
 unless the caller turns `allow_escape` on and provides its own way out. A
 conflict is never the recorder's judgement: it has no keymap to consult, so it
 renders the reason the host found and nothing else.
+
+`KeymapEditor` is the coordination above that primitive rather than another
+settings-row skin. It filters the command facts the caller supplied, keeps at
+most one recorder active across all visible rows, and reports stable
+command-and-binding identities with add, remove, and reset intents. Capturing
+does not change the effective bindings on screen. If the host refuses an
+intent, it leaves its supplied state unchanged; if it marks a command refused,
+the row keeps its bindings and reason but installs no actions. Conflict and
+provenance remain caller statements, never conclusions drawn by the component.
 
 ### A scrollbar that is absent means there is nothing more
 

@@ -704,3 +704,252 @@ fn a_recorder_with_no_conflict_declares_none(cx: &mut TestAppContext) {
     );
     assert!(case.harness.node("settings.palette.conflict").is_none());
 }
+
+// ----------------------------------------------------------- keymap editor
+
+struct KeymapCase {
+    harness: Harness,
+    editor: Entity<KeymapEditor>,
+    events: Calls<KeymapEditorEvent>,
+}
+
+fn keymap_commands() -> Vec<KeymapCommand> {
+    vec![
+        KeymapCommand::new("workspace.open", "Open workspace")
+            .context("Workspace")
+            .defaults(["cmd-o"])
+            .bindings([
+                KeymapBinding::new("user-primary", "cmd-shift-o")
+                    .conflict("Already opens the recent list")
+                    .provenance("User keymap"),
+                KeymapBinding::new("workspace-secondary", "ctrl-o").provenance("Workspace keymap"),
+            ])
+            .searchable("open a folder or project", ["folder", "project"]),
+        KeymapCommand::new("terminal.toggle", "Toggle terminal")
+            .context("Terminal")
+            .defaults(["ctrl-`"])
+            .bindings([KeymapBinding::new("default", "ctrl-`")])
+            .searchable("show the integrated terminal", ["panel", "console"]),
+        KeymapCommand::new("policy.locked", "Managed shortcut")
+            .defaults(["cmd-l"])
+            .bindings([KeymapBinding::new("managed", "cmd-l")])
+            .refused("Managed by the host"),
+    ]
+}
+
+fn keymap(cx: &mut TestAppContext, query: &'static str, disabled: bool) -> KeymapCase {
+    let (events, sink) = recorder::<KeymapEditorEvent>();
+    let slot: Rc<RefCell<Option<Entity<KeymapEditor>>>> = Rc::new(RefCell::new(None));
+    let held = slot.clone();
+    let harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        let sink = sink.clone();
+        let editor = held
+            .borrow_mut()
+            .get_or_insert_with(|| {
+                let editor = cx.new(|cx| {
+                    KeymapEditor::new("keymap", window, cx)
+                        .commands(keymap_commands())
+                        .query(query)
+                        .disabled(disabled)
+                });
+                cx.subscribe(&editor, move |_, event: &KeymapEditorEvent, _| {
+                    sink.borrow_mut().push(event.clone());
+                })
+                .detach();
+                editor
+            })
+            .clone();
+        div().w(px(720.0)).child(editor).into_any_element()
+    });
+    let editor = slot.borrow().clone().expect("the editor was built");
+    KeymapCase {
+        harness,
+        editor,
+        events,
+    }
+}
+
+#[gpui::test]
+fn a_keymap_editor_publishes_caller_owned_metadata_and_multiple_bindings(cx: &mut TestAppContext) {
+    let mut case = keymap(cx, "", false);
+
+    let row = case.harness.node("keymap.workspace.open").expect("row");
+    assert_eq!(row.role, Role::Row);
+    assert_eq!(row.text.as_deref(), Some("Open workspace"));
+    assert_eq!(row.description.as_deref(), Some("Workspace"));
+    assert_eq!(
+        case.harness
+            .node("keymap.workspace.open.effective")
+            .expect("effective bindings")
+            .value
+            .as_deref(),
+        Some("cmd-shift-o, ctrl-o")
+    );
+    assert_eq!(
+        case.harness
+            .node("keymap.workspace.open.defaults")
+            .expect("defaults")
+            .value
+            .as_deref(),
+        Some("cmd-o")
+    );
+    assert_eq!(
+        case.harness
+            .node("keymap.workspace.open.binding.user-primary.conflict")
+            .expect("caller conflict")
+            .text
+            .as_deref(),
+        Some("Already opens the recent list")
+    );
+    assert_eq!(
+        case.harness
+            .node("keymap.workspace.open.binding.user-primary.provenance")
+            .expect("caller provenance")
+            .text
+            .as_deref(),
+        Some("User keymap")
+    );
+    assert!(
+        case.harness
+            .node("keymap.workspace.open.binding.workspace-secondary")
+            .is_some(),
+        "bindings are addressed by caller identity, not position"
+    );
+}
+
+#[gpui::test]
+fn filtering_uses_the_supplied_query_text_and_keywords(cx: &mut TestAppContext) {
+    let mut case = keymap(cx, "CONSOLE", false);
+
+    assert!(case.harness.node("keymap.workspace.open").is_none());
+    assert!(case.harness.node("keymap.terminal.toggle").is_some());
+    assert_eq!(
+        case.harness
+            .node("keymap.status")
+            .expect("filtered count")
+            .value
+            .as_deref(),
+        Some("1")
+    );
+
+    case.harness.context().update(|_, cx| {
+        case.editor
+            .update(cx, |editor, cx| editor.set_query("folder", cx));
+    });
+    assert!(case.harness.node("keymap.workspace.open").is_some());
+    assert!(case.harness.node("keymap.terminal.toggle").is_none());
+}
+
+#[gpui::test]
+fn one_shared_recorder_switches_targets_and_reports_without_applying(cx: &mut TestAppContext) {
+    let mut case = keymap(cx, "", false);
+
+    case.harness.click("keymap.workspace.open.add");
+    assert!(
+        case.harness
+            .node("keymap.recorder")
+            .expect("the shared recorder")
+            .busy
+    );
+    case.harness.click("keymap.terminal.toggle.add");
+    case.harness.keystrokes("ctrl-j");
+
+    assert_eq!(
+        case.events.borrow().as_slice(),
+        [
+            KeymapEditorEvent::RecordingCancelled {
+                command_id: "workspace.open".into(),
+            },
+            KeymapEditorEvent::AddCaptured {
+                command_id: "terminal.toggle".into(),
+                keystroke: "ctrl-j".into(),
+            },
+        ]
+    );
+    assert!(case.harness.node("keymap.recorder").is_none());
+    assert_eq!(
+        case.harness
+            .node("keymap.terminal.toggle.effective")
+            .expect("caller value remains")
+            .value
+            .as_deref(),
+        Some("ctrl-`"),
+        "capturing reports an intent; it does not mutate the keymap"
+    );
+}
+
+#[gpui::test]
+fn remove_reset_refusal_and_disabled_actions_are_truthful(cx: &mut TestAppContext) {
+    let mut case = keymap(cx, "", false);
+
+    case.harness
+        .click("keymap.workspace.open.binding.user-primary.remove");
+    case.harness.click("keymap.workspace.open.reset");
+    assert_eq!(
+        case.events.borrow().as_slice(),
+        [
+            KeymapEditorEvent::Remove {
+                command_id: "workspace.open".into(),
+                binding_id: "user-primary".into(),
+            },
+            KeymapEditorEvent::Reset {
+                command_id: "workspace.open".into(),
+            },
+        ]
+    );
+    assert!(case.harness.node("keymap.terminal.toggle.reset").is_none());
+    assert_eq!(
+        case.harness
+            .node("keymap.policy.locked.refusal")
+            .expect("refusal")
+            .text
+            .as_deref(),
+        Some("Managed by the host")
+    );
+    assert!(case.harness.node("keymap.policy.locked.add").is_none());
+    assert!(
+        case.harness
+            .node("keymap.policy.locked.binding.managed.remove")
+            .is_none()
+    );
+
+    let mut disabled = keymap(cx, "", true);
+    assert!(disabled.harness.node("keymap.workspace.open.add").is_none());
+    assert!(
+        disabled
+            .harness
+            .node("keymap.workspace.open.binding.user-primary.remove")
+            .is_none()
+    );
+    assert_eq!(
+        disabled
+            .harness
+            .node("keymap.workspace.open.effective")
+            .expect("disabled keeps values")
+            .value
+            .as_deref(),
+        Some("cmd-shift-o, ctrl-o")
+    );
+}
+
+#[gpui::test]
+fn filtering_away_an_active_row_cancels_its_invisible_recorder(cx: &mut TestAppContext) {
+    let mut case = keymap(cx, "", false);
+    case.harness.click("keymap.workspace.open.add");
+
+    case.harness.context().update(|_, cx| {
+        case.editor
+            .update(cx, |editor, cx| editor.set_query("terminal", cx));
+    });
+
+    assert!(case.harness.node("keymap.recorder").is_none());
+    assert_eq!(
+        case.events.borrow().last(),
+        Some(&KeymapEditorEvent::RecordingCancelled {
+            command_id: "workspace.open".into(),
+        })
+    );
+    case.harness.context().update(|_, cx| {
+        assert!(case.editor.read(cx).active_command().is_none());
+    });
+}

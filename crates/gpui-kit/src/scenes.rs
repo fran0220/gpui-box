@@ -270,6 +270,10 @@ pub fn catalog() -> Vec<Scene> {
             build: keybinding,
         },
         Scene {
+            name: "keymap-editor",
+            build: keymap_editor,
+        },
+        Scene {
             name: "markdown",
             build: markdown,
         },
@@ -4406,6 +4410,52 @@ fn keybinding(window: &mut Window, cx: &mut App) -> AnyElement {
             &theme,
             "Escape ends recording without capturing, so escape cannot be bound \
              unless the caller turns allow_escape on.",
+        ))
+        .into_any_element()
+}
+
+#[derive(Clone)]
+struct SceneKeymapEditor(Entity<KeymapEditor>);
+
+impl Global for SceneKeymapEditor {}
+
+fn keymap_editor(window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<SceneKeymapEditor>() {
+        let editor = cx.new(|cx| {
+            KeymapEditor::new("scene.keymap-editor", window, cx).commands([
+                KeymapCommand::new("workspace.open", "Open workspace")
+                    .context("Workspace")
+                    .defaults(["cmd-o"])
+                    .bindings([
+                        KeymapBinding::new("user", "cmd-shift-o")
+                            .conflict("Already opens recent workspaces")
+                            .provenance("User keymap"),
+                        KeymapBinding::new("workspace", "ctrl-o").provenance("Workspace keymap"),
+                    ])
+                    .searchable("Open a folder or project", ["folder", "project"]),
+                KeymapCommand::new("terminal.toggle", "Toggle terminal")
+                    .context("Terminal")
+                    .defaults(["ctrl-`"])
+                    .bindings([KeymapBinding::new("default", "ctrl-`")])
+                    .searchable("Show the integrated terminal", ["panel", "console"]),
+                KeymapCommand::new("policy.locked", "Managed shortcut")
+                    .context("Workspace")
+                    .defaults(["cmd-l"])
+                    .bindings([KeymapBinding::new("managed", "cmd-l").provenance("Host policy")])
+                    .refused("This binding is managed by the host."),
+            ])
+        });
+        cx.set_global(SceneKeymapEditor(editor));
+    }
+    let editor = cx.global::<SceneKeymapEditor>().0.clone();
+    let theme = cx.theme().clone();
+
+    stack(&theme)
+        .w(px(760.0))
+        .child(editor)
+        .child(caption(
+            &theme,
+            "Bindings remain caller-owned; add, remove, and reset are intents.",
         ))
         .into_any_element()
 }

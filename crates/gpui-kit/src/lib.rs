@@ -133,6 +133,9 @@ pub mod prelude {
     pub use crate::controls::inline_edit::InlineEdit;
     pub use crate::controls::input::{TextInput, TextInputEvent};
     pub use crate::controls::keybinding_recorder::{KeybindingRecorder, KeybindingRecorderEvent};
+    pub use crate::controls::keymap_editor::{
+        KeymapBinding, KeymapCommand, KeymapEditor, KeymapEditorEvent,
+    };
     pub use crate::controls::number_input::{NumberInput, NumberInputEvent};
     pub use crate::controls::search::{
         FindReplace, FindReplaceEvent, HitCount, SearchField, SearchFieldEvent,
