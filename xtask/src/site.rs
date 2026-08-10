@@ -41,9 +41,12 @@ pub fn generate(root: &Path, out: Option<&str>) -> Result<PathBuf> {
 
     let components = array(&index, "components");
     let scenes = array(&index, "scenes");
+    let image_version = image_version(root)?;
+    let image_root = format!("/images/{image_version}");
 
     write(&out.join("assets/site.css"), STYLE)?;
     write(&out.join("assets/site.js"), SCRIPT)?;
+    write(&out.join("image-version.txt"), &image_version)?;
     write(
         &out.join("llms.txt"),
         &fs::read_to_string(root.join("docs/llms.txt"))?,
@@ -53,7 +56,10 @@ pub fn generate(root: &Path, out: Option<&str>) -> Result<PathBuf> {
         &fs::read_to_string(root.join("docs/api-index.json"))?,
     )?;
 
-    write(&out.join("index.html"), &home(&components, &scenes))?;
+    write(
+        &out.join("index.html"),
+        &home(&components, &scenes, &image_root),
+    )?;
     write(
         &out.join("components/index.html"),
         &component_list(&components),
@@ -62,16 +68,19 @@ pub fn generate(root: &Path, out: Option<&str>) -> Result<PathBuf> {
         let name = string(component, "name");
         write(
             &out.join(format!("components/{name}.html")),
-            &component_page(component, &scenes),
+            &component_page(component, &scenes, &image_root),
         )?;
     }
 
-    write(&out.join("scenes/index.html"), &scene_list(&scenes))?;
+    write(
+        &out.join("scenes/index.html"),
+        &scene_list(&scenes, &image_root),
+    )?;
     for scene in &scenes {
         let name = string(scene, "name");
         write(
             &out.join(format!("scenes/{name}.html")),
-            &scene_page(scene, &components),
+            &scene_page(scene, &components, &image_root),
         )?;
     }
 
@@ -98,7 +107,7 @@ pub fn generate(root: &Path, out: Option<&str>) -> Result<PathBuf> {
     }
     write(&out.join("docs/index.html"), &doc_list(&pages))?;
 
-    let images = out.join("images");
+    let images = out.join("images").join(&image_version);
     fs::create_dir_all(&images)?;
     let mut copied = 0;
     for entry in fs::read_dir(root.join("snapshots/macos/scenes"))? {
@@ -113,7 +122,7 @@ pub fn generate(root: &Path, out: Option<&str>) -> Result<PathBuf> {
     write(&out.join("assets/search.json"), &search(&components))?;
 
     println!(
-        "site: {} components, {} scenes, {} pages, {copied} images -> {}",
+        "site: {} components, {} scenes, {} pages, {copied} images ({image_version}) -> {}",
         components.len(),
         scenes.len(),
         pages.len(),
@@ -147,6 +156,31 @@ fn write(path: &Path, body: &str) -> Result<()> {
     fs::create_dir_all(path.parent().context("a page has a directory")?)?;
     fs::write(path, body)?;
     Ok(())
+}
+
+/// A cache identity for the complete visual catalog.
+///
+/// Static asset caches can retain an old response at a stable path after a
+/// deployment. Put every capture set under a path derived from its bytes so a
+/// page can never pair a current API with a previous image. This is an FNV-1a
+/// content fingerprint, not a security boundary.
+fn image_version(root: &Path) -> Result<String> {
+    let mut paths = fs::read_dir(root.join("snapshots/macos/scenes"))?
+        .map(|entry| entry.map(|entry| entry.path()))
+        .collect::<std::io::Result<Vec<_>>>()?;
+    paths.retain(|path| path.extension().is_some_and(|extension| extension == "png"));
+    paths.sort();
+
+    let mut hash = 0xcbf29ce484222325_u64;
+    for path in paths {
+        let name = path.file_name().context("an image has a name")?;
+        let bytes = fs::read(&path)?;
+        for byte in name.as_encoded_bytes().iter().chain(bytes.iter()) {
+            hash ^= u64::from(*byte);
+            hash = hash.wrapping_mul(0x100000001b3);
+        }
+    }
+    Ok(format!("{hash:016x}"))
 }
 
 // ---------------------------------------------------------------------------
@@ -198,7 +232,7 @@ fn shell(title: &str, active: &str, body: &str) -> String {
     )
 }
 
-fn home(components: &[Value], scenes: &[Value]) -> String {
+fn home(components: &[Value], scenes: &[Value], image_root: &str) -> String {
     let builders = components
         .iter()
         .filter(|c| string(c, "kind") == "builder")
@@ -228,7 +262,7 @@ fn home(components: &[Value], scenes: &[Value]) -> String {
         .map(|name| {
             format!(
                 r#"<a class="tile" href="/scenes/{name}">
-  <img loading="lazy" src="/images/{name}-studio-dark.png" alt="The {name} scene">
+  <img loading="lazy" src="{image_root}/{name}-studio-dark.png" alt="The {name} scene">
   <span>{name}</span>
 </a>"#
             )
@@ -334,7 +368,7 @@ which is why a refused change is visible as the control not moving.</p>
     shell("Components — gpui-kit", "/components/", &body)
 }
 
-fn component_page(component: &Value, scenes: &[Value]) -> String {
+fn component_page(component: &Value, scenes: &[Value], image_root: &str) -> String {
     let name = string(component, "name");
     let kind = string(component, "kind");
 
@@ -398,7 +432,7 @@ fn component_page(component: &Value, scenes: &[Value]) -> String {
             .map(|scene| {
                 format!(
                     r#"<a class="tile" href="/scenes/{scene}">
-  <img loading="lazy" src="/images/{scene}-studio-dark.png" alt="The {scene} scene">
+  <img loading="lazy" src="{image_root}/{scene}-studio-dark.png" alt="The {scene} scene">
   <span>{scene}</span>
 </a>"#
                 )
@@ -428,14 +462,14 @@ fn component_page(component: &Value, scenes: &[Value]) -> String {
     shell(&format!("{name} — gpui-kit"), "/components/", &body)
 }
 
-fn scene_list(scenes: &[Value]) -> String {
+fn scene_list(scenes: &[Value], image_root: &str) -> String {
     let tiles = scenes
         .iter()
         .map(|scene| {
             let name = string(scene, "name");
             format!(
                 r#"<a class="tile" href="/scenes/{name}">
-  <img loading="lazy" src="/images/{name}-studio-dark.png" alt="The {name} scene">
+  <img loading="lazy" src="{image_root}/{name}-studio-dark.png" alt="The {name} scene">
   <span>{name}</span>
 </a>"#
             )
@@ -457,7 +491,7 @@ below each one is what the gate compiled to produce the image above it.</p>
     shell("Scenes — gpui-kit", "/scenes/", &body)
 }
 
-fn scene_page(scene: &Value, components: &[Value]) -> String {
+fn scene_page(scene: &Value, components: &[Value], image_root: &str) -> String {
     let name = string(scene, "name");
     let uses = array(scene, "uses")
         .iter()
@@ -472,8 +506,8 @@ fn scene_page(scene: &Value, components: &[Value]) -> String {
 <h1>{name}</h1>
 <p class="note">Builds {uses}</p>
 <div class="themes">
-  <figure><img src="/images/{name}-studio-dark.png" alt="{name} in the dark theme"><figcaption>studio-dark</figcaption></figure>
-  <figure><img src="/images/{name}-studio-light.png" alt="{name} in the light theme"><figcaption>studio-light</figcaption></figure>
+  <figure><img src="{image_root}/{name}-studio-dark.png" alt="{name} in the dark theme"><figcaption>studio-dark</figcaption></figure>
+  <figure><img src="{image_root}/{name}-studio-light.png" alt="{name} in the light theme"><figcaption>studio-light</figcaption></figure>
 </div>
 <h2>The code that drew it</h2>
 <p class="note">A still frame holds a repeating animation at its first frame and

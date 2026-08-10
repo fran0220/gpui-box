@@ -219,7 +219,8 @@ async function image(env, name, theme) {
     throw new Error(`unknown theme ${JSON.stringify(theme)}: expected studio-dark or studio-light`);
   }
 
-  const path = `/images/${name}-${theme}.png`;
+  const version = (await asset(env, "/image-version.txt")).trim();
+  const path = `/images/${version}/${name}-${theme}.png`;
   const response = await env.ASSETS.fetch(new Request(`https://assets.local${path}`));
   if (!response.ok) {
     throw new Error(

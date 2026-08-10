@@ -111,7 +111,7 @@ custom_domain = true
 | `/scenes/<name>` | the scene's own source, and both captured themes |
 | `/docs/<page>` | `docs/*.md` |
 | `/llms.txt`, `/api-index.json` | served as themselves, for a program |
-| `/images/*.png` | `snapshots/macos/scenes` |
+| `/images/<fingerprint>/*.png` | `snapshots/macos/scenes`; the content-derived directory prevents a new page from receiving an old cached capture |
 | `/mcp` | `tools/site/worker/index.js` with `tools/mcp/tools.json` |
 
 `tools/site/public/` is generated and not committed. A generated file belongs
