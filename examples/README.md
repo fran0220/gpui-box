@@ -7,7 +7,8 @@
 
 ```bash
 cargo run -p gpui-kit-gallery
-cargo run -p gpui-kit-gallery -- --capture snapshots/macos/gallery.png
+cargo run -p gpui-kit-gallery -- \
+  --density=compact --capture snapshots/macos/gallery.png
 cargo run -p gpui-kit-gallery -- \
   --scene=lower --capture snapshots/macos/gallery-patterns.png
 ```

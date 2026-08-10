@@ -136,7 +136,7 @@ Capture the gallery's own window on macOS:
 
 ```bash
 cargo run -p gpui-kit-gallery -- \
-  --capture snapshots/macos/gallery.png
+  --density=compact --capture snapshots/macos/gallery.png
 ```
 
 This uses the owning process and window id. It does not capture the desktop.

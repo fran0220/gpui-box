@@ -343,9 +343,9 @@ impl Render for Gallery {
                                             .secondary()
                                             .on_click(|_, _| {}),
                                     ]),
-                            )
-                            .child(self.publish.clone()),
+                            ),
                     )
+                    .child(self.publish.clone())
                     .child(recipes::section_title(&theme, "Control sizes"))
                     .child(
                         div()
@@ -1520,7 +1520,7 @@ fn state_transitions(theme: &Theme, forward: bool) -> gpui::AnyElement {
 
 fn lower_gallery(theme: &Theme, cx: &mut App) -> gpui::AnyElement {
     div()
-        .id("gallery-lower-root")
+        .id("gallery.lower")
         .size_full()
         .overflow_y_scroll()
         .bg(theme.colors.canvas)

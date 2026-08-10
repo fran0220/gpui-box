@@ -207,11 +207,20 @@ fn home(components: &[Value], scenes: &[Value]) -> String {
 
     let featured = [
         "node-graph",
+        "ide-shell",
+        "browser-panel",
         "data-grid",
+        "schema-form",
+        "date-time",
         "conversation",
+        "notification-center",
+        "loading",
+        "progress-circle",
+        "thinking",
+        "upload-list",
         "dialog",
         "settings",
-        "ide-shell",
+        "failure-panel",
     ];
     let tiles = featured
         .iter()
