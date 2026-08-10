@@ -26,6 +26,8 @@ pub enum TokenError {
     Json(#[from] serde_json::Error),
     #[error("token `{path}` is invalid: {message}")]
     Invalid { path: String, message: String },
+    #[error("token contrast is invalid:\n{0}")]
+    Contrast(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -233,6 +235,22 @@ impl TokenDocument {
             || self.motion.rubber_band_tension == 0.0
         {
             return invalid("motion.rubberBandTension", "must be above 0 and at most 1");
+        }
+
+        let failures = contrast::failures(self);
+        if !failures.is_empty() {
+            return Err(TokenError::Contrast(
+                failures
+                    .iter()
+                    .map(|failure| {
+                        format!(
+                            "  {} on {} is {:.2}:1; requires {:.1}:1",
+                            failure.foreground, failure.background, failure.ratio, failure.minimum
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ));
         }
         Ok(())
     }
@@ -1269,6 +1287,18 @@ mod tests {
         value["color"]["surface"]["canvas"] = serde_json::json!("black");
         let error = TokenDocument::parse(&value.to_string()).expect_err("invalid color");
         assert!(error.to_string().contains("color.surface.canvas"));
+    }
+
+    #[test]
+    fn external_documents_report_every_contrast_failure() {
+        let mut value: serde_json::Value =
+            serde_json::from_str(studio_dark_json()).expect("bundled JSON");
+        value["color"]["text"]["primary"] = value["color"]["surface"]["canvas"].clone();
+        let error = TokenDocument::parse(&value.to_string()).expect_err("invisible primary text");
+        let message = error.to_string();
+        assert!(message.contains("token contrast is invalid"));
+        assert!(message.contains("text.primary on surface.canvas is 1.00:1; requires 4.5:1"));
+        assert!(message.contains("text.primary on surface.overlay"));
     }
 
     #[test]

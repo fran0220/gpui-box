@@ -142,6 +142,56 @@ The same catalog is rendered headlessly by `crates/gpui-kit/tests/scenes.rs`,
 which audits every published tree, so a component cannot be reviewed visually
 in one arrangement and tested in another.
 
+## Downstream theme and gallery contract
+
+An application owns its token documents and baselines; it does not copy the
+token structs or maintain another schema. For each complete dark/light pair:
+
+1. Parse or register both JSON documents with `TokenDocument::parse` or
+   `ThemeRegistry::register_json`. Parsing rejects missing and unknown fields,
+   invalid token values, and all required contrast failures before the
+   registry changes. Assert that the documents declare one `Appearance::Dark`
+   and one `Appearance::Light`; ids and display names remain application-owned.
+2. Render `gpui_kit::scenes::catalog()` in its returned stable order. For each
+   scene, render the dark and light ids next to each other. Set reduced motion,
+   use the scene's `gpui_kit::scenes::direction`, park the pointer, and discard
+   one warm-up frame before settling and capturing. Use a fixed logical
+   viewport and bundled fonts only. These are the same determinism rules used
+   by the repository gallery and headless harness.
+3. Audit the semantic snapshot with `gpui_kit_testkit::audit_or_error`. Its one
+   error contains every failing node id and invariant; do not replace this with
+   source-text assertions or a hand-maintained list of expected ids.
+4. Name each captured frame from stable fixture identity, for example
+   `format!("{}-{}", scene.name, theme_id)`, and pass it to
+   `VisualBaselines::check`. `VisualBaselines::capture` is the explicit accept
+   operation. A mismatch reports the name, path, changed-pixel count and ratio,
+   and maximum and mean channel deltas before a reviewer opens the PNG.
+
+```rust,no_run
+use gpui_kit_testkit::VisualBaselines;
+
+# fn check(frame: &gpui_kit_testkit::capture::Frame) -> Result<(), Box<dyn std::error::Error>> {
+let baselines = VisualBaselines::new(
+    std::path::Path::new("snapshots")
+        .join(std::env::consts::OS)
+        .join("gpui-kit-gallery"),
+);
+baselines.check("button-application-dark", frame)?;
+// Deliberate acceptance is separate:
+// baselines.capture("button-application-dark", frame)?;
+# Ok(())
+# }
+```
+
+Keep native macOS and Windows baselines separate. `render_frame` reads a native
+window where that platform implements GPUI's readback contract; the repository
+uses the same public scene catalog with its offscreen software renderer for
+Linux and Windows CI. A downstream product may supply another product-owned
+`Frame`, but must preserve the fixed viewport, scale, fonts, motion, pointer,
+fixture, theme, and platform in its baseline contract. A software-rendered
+gallery baseline does not replace native interaction and accessibility evidence
+for a product surface.
+
 ## The headless gate
 
 `tools/headless-visual` renders the same catalog on Linux and Windows with no

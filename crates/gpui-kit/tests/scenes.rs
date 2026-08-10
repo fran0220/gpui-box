@@ -3,7 +3,7 @@
 
 use gpui::TestAppContext;
 use gpui_kit::scenes;
-use gpui_kit_testkit::audit;
+use gpui_kit_testkit::audit_or_error;
 use gpui_kit_testkit::harness::Harness;
 
 #[gpui::test]
@@ -19,17 +19,9 @@ fn every_scene_publishes_an_auditable_tree(cx: &mut TestAppContext) {
             scene.name
         );
 
-        let findings = audit(&snapshot);
-        assert!(
-            findings.is_empty(),
-            "scene `{}` failed the audit:\n{}",
-            scene.name,
-            findings
-                .iter()
-                .map(|finding| format!("  {finding}"))
-                .collect::<Vec<_>>()
-                .join("\n")
-        );
+        if let Err(error) = audit_or_error(&snapshot) {
+            panic!("scene `{}` failed the audit:\n{error}", scene.name);
+        }
     }
 }
 

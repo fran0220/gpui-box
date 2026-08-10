@@ -807,6 +807,22 @@ mod tests {
     }
 
     #[test]
+    fn invalid_contrast_is_reported_before_the_registry_changes() {
+        let mut registry = ThemeRegistry::new();
+        let before = registry.ids();
+        let mut value: serde_json::Value =
+            serde_json::from_str(gpui_kit_tokens::studio_dark_json()).expect("bundled JSON");
+        value["meta"]["id"] = serde_json::json!("low-contrast");
+        value["color"]["text"]["primary"] = value["color"]["surface"]["canvas"].clone();
+
+        let error = registry
+            .register_json(&value.to_string())
+            .expect_err("invisible text must not register");
+        assert!(error.to_string().contains("text.primary on surface.canvas"));
+        assert_eq!(registry.ids(), before);
+    }
+
+    #[test]
     fn density_survives_a_theme_switch() {
         let mut registry = ThemeRegistry::new();
         registry.set_density(Density::Compact);
