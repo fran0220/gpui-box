@@ -199,10 +199,10 @@ impl Cascader {
             if &option.id == id {
                 return Some(option);
             }
-            if let Some(Loadable::Ready(children)) = &option.children {
-                if let Some(found) = Self::find(children, id) {
-                    return Some(found);
-                }
+            if let Some(Loadable::Ready(children)) = &option.children
+                && let Some(found) = Self::find(children, id)
+            {
+                return Some(found);
             }
         }
         None
@@ -387,8 +387,11 @@ impl Cascader {
         match key {
             MenuKey::Down => self.step(1, cx),
             MenuKey::Up => self.step(-1, cx),
-            MenuKey::Enter if self.active.is_some() => {
-                self.activate(self.active.clone().unwrap(), cx)
+            MenuKey::Enter => {
+                let Some(active) = self.active.clone() else {
+                    return;
+                };
+                self.activate(active, cx)
             }
             MenuKey::Escape => self.close(cx),
             _ if raw == "home" => {
@@ -399,8 +402,11 @@ impl Cascader {
                 self.active = Self::first_enabled(self.current_options(), true);
                 cx.notify();
             }
-            _ if toward_children && self.active.is_some() => {
-                self.activate(self.active.clone().unwrap(), cx)
+            _ if toward_children => {
+                let Some(active) = self.active.clone() else {
+                    return;
+                };
+                self.activate(active, cx)
             }
             _ if toward_parent => self.back(cx),
             _ => return,

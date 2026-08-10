@@ -39,12 +39,22 @@ fn click_reports_intent_without_changing_caller_owned_active(cx: &mut TestAppCon
     harness.click("fixture.anchors.summary");
 
     assert_eq!(*calls.borrow(), vec!["summary"]);
-    assert_eq!(harness.node("fixture.anchors").unwrap().role, Role::List);
-    let active = harness.node("fixture.anchors.inputs").unwrap();
+    assert_eq!(
+        harness.node("fixture.anchors").expect("anchor list").role,
+        Role::List
+    );
+    let active = harness
+        .node("fixture.anchors.inputs")
+        .expect("active anchor");
     assert_eq!(active.role, Role::Link);
     assert!(active.selected);
     assert_eq!(active.parent.as_deref(), Some("fixture.anchors"));
-    assert!(!harness.node("fixture.anchors.summary").unwrap().selected);
+    assert!(
+        !harness
+            .node("fixture.anchors.summary")
+            .expect("summary anchor")
+            .selected
+    );
 }
 
 #[gpui::test]
@@ -62,7 +72,7 @@ fn business_ids_stay_stable_when_the_caller_reorders_anchors(cx: &mut TestAppCon
     assert_eq!(
         harness
             .node("fixture.anchors.result")
-            .unwrap()
+            .expect("result anchor")
             .text
             .as_deref(),
         Some("Fixture result")
@@ -78,7 +88,7 @@ fn disabled_anchor_and_list_install_no_actions(cx: &mut TestAppContext) {
     assert!(
         anchor_harness
             .node("fixture.anchors.policy")
-            .unwrap()
+            .expect("disabled policy anchor")
             .disabled
     );
 
@@ -98,8 +108,18 @@ fn disabled_anchor_and_list_install_no_actions(cx: &mut TestAppContext) {
     harness.keystrokes("right");
 
     assert!(calls.borrow().is_empty());
-    assert!(harness.node("fixture.anchors.policy").unwrap().disabled);
-    assert!(harness.node("fixture.anchors.summary").unwrap().disabled);
+    assert!(
+        harness
+            .node("fixture.anchors.policy")
+            .expect("disabled policy anchor")
+            .disabled
+    );
+    assert!(
+        harness
+            .node("fixture.anchors.summary")
+            .expect("disabled summary anchor")
+            .disabled
+    );
 }
 
 #[gpui::test]
@@ -221,21 +241,29 @@ fn overflow_relocates_rows_preserving_ids_state_and_count(cx: &mut TestAppContex
     assert_eq!(
         harness
             .node("fixture.anchors.overflow")
-            .unwrap()
+            .expect("overflow anchor group")
             .value
             .as_deref(),
         Some("2")
     );
     assert_eq!(
-        harness.node("fixture.anchors").unwrap().value.as_deref(),
+        harness
+            .node("fixture.anchors")
+            .expect("anchor list")
+            .value
+            .as_deref(),
         Some("4")
     );
 
     harness.click("fixture.anchor-menu.trigger");
-    let policy = harness.node("fixture.anchor-menu.policy").unwrap();
+    let policy = harness
+        .node("fixture.anchor-menu.policy")
+        .expect("overflowed policy anchor");
     assert_eq!(policy.text.as_deref(), Some("Fixture policy"));
     assert!(policy.disabled);
-    let result = harness.node("fixture.anchor-menu.result").unwrap();
+    let result = harness
+        .node("fixture.anchor-menu.result")
+        .expect("overflowed result anchor");
     assert_eq!(result.text.as_deref(), Some("Fixture result"));
     assert_eq!(result.checked, Some(true));
 }

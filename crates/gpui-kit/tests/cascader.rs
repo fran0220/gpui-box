@@ -254,7 +254,7 @@ fn disabled_rows_and_disabled_trigger_install_no_actions(cx: &mut TestAppContext
     let tree = harness.accessibility_tree();
     let trigger = tree["nodes"]
         .as_object()
-        .unwrap()
+        .expect("accessibility nodes")
         .values()
         .find(|node| node["element_id"] == "Name(\"synthetic.cascader\")")
         .expect("native trigger");
