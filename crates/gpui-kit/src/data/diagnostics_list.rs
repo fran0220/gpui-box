@@ -478,17 +478,17 @@ impl RenderOnce for DiagnosticsList {
                             .items_center()
                             .gap(px(cx.theme().space(Space::Sm)))
                             .child(
-                                Badge::new(diagnostic.severity.label(cx))
-                                    .id(item_ident.child("severity"))
-                                    .tone(diagnostic.severity.tone()),
-                            )
-                            .child(
                                 div()
                                     .flex()
                                     .flex_col()
                                     .flex_1()
                                     .child(diagnostic.location.0.clone())
                                     .child(diagnostic.message.clone()),
+                            )
+                            .child(
+                                Badge::new(diagnostic.severity.label(cx))
+                                    .id(item_ident.child("severity"))
+                                    .tone(diagnostic.severity.tone()),
                             )
                             .children(actions);
                         ListItem::new(diagnostic.id.clone(), content)

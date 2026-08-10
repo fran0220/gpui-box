@@ -121,6 +121,20 @@ test("developer data scenes render from the runtime catalog with stable semantic
   }
 });
 
+for (const [scene, id, value] of [
+  ["cascader", "scene.cascader", "Release notes"],
+  ["anchor-list", "scene.anchor-list.inputs", undefined],
+  ["diagnostics-list", "scene.diagnostics.list.fixture-error", undefined],
+]) {
+  test(`common application scene ${scene} publishes catalog semantics`, async ({ page }, testInfo) => {
+    await openScene(page, testInfo, scene);
+    const target = await node(page, id);
+    expect(target.bounds.width).toBeGreaterThan(0);
+    expect(target.bounds.height).toBeGreaterThan(0);
+    if (value !== undefined) expect(target.value).toBe(value);
+  });
+}
+
 test("AccessKit DOM mirrors role, focus, action, and canvas-scaled bounds", async ({ page }, testInfo) => {
   await openScene(page, testInfo, "button");
   const primary = await node(page, "scene.button.primary");
