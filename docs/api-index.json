@@ -127,6 +127,33 @@
       ]
     },
     {
+      "name": "AudioPlayer",
+      "kind": "builder",
+      "path": "gpui_kit::media::AudioPlayer",
+      "source": "crates/gpui-kit/src/media/audio_player.rs",
+      "summary": "A player for one piece of audio.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "title(title: impl Into<SharedString>) -> Self",
+        "subtitle(subtitle: impl Into<SharedString>) -> Self",
+        "transport(transport: Rc<dyn MediaTransport>) -> Self",
+        "elapsed(elapsed: impl Into<SharedString>) -> Self",
+        "remaining(remaining: impl Into<SharedString>) -> Self",
+        "peaks(peaks: impl IntoIterator<Item = f32>) -> Self",
+        "step_seconds(seconds: f32) -> Self",
+        "speeds(speeds: impl IntoIterator<Item = f32>) -> Self",
+        "on_event(handler: impl Fn(&MediaEvent, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "audio-player"
+      ]
+    },
+    {
       "name": "Avatar",
       "kind": "builder",
       "path": "gpui_kit::display::Avatar",
@@ -1042,6 +1069,9 @@
         "conversation",
         "image-viewer",
         "transport",
+        "audio-player",
+        "video-player",
+        "model-viewer",
         "approval",
         "permission-matrix",
         "cost-meter",
@@ -1899,6 +1929,36 @@
       "reports": [],
       "scenes": [
         "conversation"
+      ]
+    },
+    {
+      "name": "ModelViewer",
+      "kind": "builder",
+      "path": "gpui_kit::media::ModelViewer",
+      "source": "crates/gpui-kit/src/media/model_viewer.rs",
+      "summary": "A bounded viewer for one 3D model.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "title(title: impl Into<SharedString>) -> Self",
+        "state(state: ModelState) -> Self",
+        "scene(scene: Rc<ModelScene>) -> Self",
+        "rejected(error: ModelError) -> Self",
+        "loading() -> Self",
+        "shading(shading: ModelShading) -> Self",
+        "orbit(yaw: f32, pitch: f32) -> Self",
+        "height(height: f32) -> Self",
+        "on_event(handler: impl Fn(&ModelViewerEvent, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [
+        "OrbitChanged",
+        "ShadingChanged"
+      ],
+      "scenes": [
+        "model-viewer"
       ]
     },
     {
@@ -3472,7 +3532,9 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "transport"
+        "transport",
+        "audio-player",
+        "video-player"
       ]
     },
     {
@@ -3562,6 +3624,35 @@
       "reports": [],
       "scenes": [
         "upload-list"
+      ]
+    },
+    {
+      "name": "VideoPlayer",
+      "kind": "builder",
+      "path": "gpui_kit::media::VideoPlayer",
+      "source": "crates/gpui-kit/src/media/video_player.rs",
+      "summary": "A player for one piece of video.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "title(title: impl Into<SharedString>) -> Self",
+        "transport(transport: Rc<dyn MediaTransport>) -> Self",
+        "frame(supplier: impl Fn(&mut Window, &mut App) -> Option<AnyElement> + 'static) -> Self",
+        "poster(supplier: impl Fn(&mut Window, &mut App) -> Option<AnyElement> + 'static) -> Self",
+        "ratio(ratio: f32) -> Self",
+        "ratio_of(width: f32, height: f32) -> Self",
+        "elapsed(elapsed: impl Into<SharedString>) -> Self",
+        "remaining(remaining: impl Into<SharedString>) -> Self",
+        "step_seconds(seconds: f32) -> Self",
+        "speeds(speeds: impl IntoIterator<Item = f32>) -> Self",
+        "on_event(handler: impl Fn(&MediaEvent, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "video-player"
       ]
     },
     {
@@ -4956,6 +5047,35 @@
       ]
     },
     {
+      "name": "FixtureTransport",
+      "path": "gpui_kit::media::FixtureTransport",
+      "summary": "A transport that plays nothing, on purpose.",
+      "variants": [],
+      "construct": [
+        "new() -> Self",
+        "ready(duration: f32) -> Self",
+        "live() -> Self"
+      ],
+      "options": [
+        "state(state: TransportState) -> Self",
+        "position(seconds: f32) -> Self",
+        "volume(volume: f32) -> Self",
+        "muted(muted: bool) -> Self",
+        "speed(speed: f32) -> Self",
+        "buffered(ranges: impl IntoIterator<Item = BufferedRange>) -> Self",
+        "loading() -> Self",
+        "no_backend(reason: impl Into<SharedString>) -> Self",
+        "failed(reason: impl Into<SharedString>) -> Self",
+        "refusing(reason: impl Into<SharedString>) -> Self",
+        "unsupported(commands: impl IntoIterator<Item = &'static str>) -> Self",
+        "shared() -> Rc<dyn MediaTransport>"
+      ],
+      "commands": [],
+      "queries": [
+        "commands() -> Vec<MediaCommand>"
+      ]
+    },
+    {
       "name": "Flick",
       "path": "gpui_kit::motion::Flick",
       "summary": "Which way a flick went.",
@@ -5627,6 +5747,106 @@
       "queries": []
     },
     {
+      "name": "MediaAvailability",
+      "path": "gpui_kit::media::MediaAvailability",
+      "summary": "Whether there is anything to play, and whether anything could play it.",
+      "variants": [
+        "Idle",
+        "Loading",
+        "NoBackend",
+        "Failed",
+        "Ready"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "name() -> &'static str",
+        "is_ready() -> bool",
+        "reason() -> Option<SharedString>"
+      ]
+    },
+    {
+      "name": "MediaCommand",
+      "path": "gpui_kit::media::MediaCommand",
+      "summary": "What a surface asks a transport for. It decides none of it.",
+      "variants": [
+        "Play",
+        "Pause",
+        "Seek",
+        "SetVolume",
+        "ToggleMute",
+        "SetSpeed",
+        "Step"
+      ],
+      "construct": [],
+      "options": [
+        "name() -> &'static str"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "MediaEvent",
+      "path": "gpui_kit::media::MediaEvent",
+      "summary": "What a player surface reports. It applies none of it: the transport already did or already refused, and this says which.",
+      "variants": [
+        "Applied",
+        "Refused",
+        "Unsupported"
+      ],
+      "construct": [
+        "of(command: MediaCommand, outcome: MediaOutcome) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "command() -> MediaCommand"
+      ]
+    },
+    {
+      "name": "MediaOrigin",
+      "path": "gpui_kit::media::MediaOrigin",
+      "summary": "Where a surface's playback facts came from.",
+      "variants": [
+        "Platform",
+        "Fixture"
+      ],
+      "construct": [],
+      "options": [
+        "name() -> &'static str",
+        "is_fixture() -> bool"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "MediaOutcome",
+      "path": "gpui_kit::media::MediaOutcome",
+      "summary": "What the transport did with a command.",
+      "variants": [
+        "Applied",
+        "Refused",
+        "Unsupported"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "name() -> &'static str"
+      ]
+    },
+    {
+      "name": "MediaSnapshot",
+      "path": "gpui_kit::media::MediaSnapshot",
+      "summary": "Everything a player surface draws, as the transport reports it.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "MenuEvent",
       "path": "gpui_kit::overlay::MenuEvent",
       "summary": "What a menu reports. The owner decides what any of it means.",
@@ -5754,6 +5974,179 @@
       "queries": [
         "source() -> &SharedString"
       ]
+    },
+    {
+      "name": "ModelAabb",
+      "path": "gpui_kit::media::ModelAabb",
+      "summary": "An axis-aligned box around everything the reader accepted.",
+      "variants": [],
+      "construct": [],
+      "options": [
+        "centre() -> [f32",
+        "radius() -> f32"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "ModelBounds",
+      "path": "gpui_kit::media::ModelBounds",
+      "summary": "How much of a document this reader will take.",
+      "variants": [],
+      "construct": [],
+      "options": [
+        "max_bytes(bytes: usize) -> Self",
+        "max_nodes(nodes: usize) -> Self",
+        "max_depth(depth: usize) -> Self",
+        "max_primitives(primitives: usize) -> Self",
+        "max_vertices(vertices: usize) -> Self",
+        "max_triangles(triangles: usize) -> Self"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "ModelDefect",
+      "path": "gpui_kit::media::ModelDefect",
+      "summary": "Why a document is not one this reader will draw.",
+      "variants": [
+        "NotJson",
+        "BadContainer",
+        "NotGltf",
+        "UnsupportedVersion",
+        "ExternalResource",
+        "UnsupportedEncoding",
+        "SparseAccessor",
+        "UnsupportedPrimitive",
+        "UnsupportedComponentType",
+        "UnsupportedAccessorType",
+        "MissingPositions",
+        "DanglingIndex",
+        "TruncatedBuffer",
+        "IndexOutOfRange",
+        "EmptyScene"
+      ],
+      "construct": [],
+      "options": [
+        "name() -> &'static str"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "ModelError",
+      "path": "gpui_kit::media::ModelError",
+      "summary": "Why a document was not read.",
+      "variants": [
+        "TooLarge",
+        "Rejected"
+      ],
+      "construct": [],
+      "options": [
+        "name() -> &'static str",
+        "code() -> &'static str"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "ModelLimit",
+      "path": "gpui_kit::media::ModelLimit",
+      "summary": "Which cap a document ran into.",
+      "variants": [
+        "Bytes",
+        "Nodes",
+        "Depth",
+        "Primitives",
+        "Vertices",
+        "Triangles"
+      ],
+      "construct": [],
+      "options": [
+        "name() -> &'static str"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "ModelMesh",
+      "path": "gpui_kit::media::ModelMesh",
+      "summary": "One primitive's triangles, already in the document's world space.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "name() -> &SharedString",
+        "positions() -> &[[f32",
+        "indices() -> &[u32]",
+        "triangle_count() -> usize"
+      ]
+    },
+    {
+      "name": "ModelScene",
+      "path": "gpui_kit::media::ModelScene",
+      "summary": "Everything the reader accepted out of one document.",
+      "variants": [],
+      "construct": [
+        "parse(bytes: &[u8], bounds: ModelBounds) -> Result<Self, ModelError>"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "meshes() -> &[ModelMesh]",
+        "mesh_count() -> usize",
+        "vertex_count() -> usize",
+        "triangle_count() -> usize",
+        "aabb() -> ModelAabb"
+      ]
+    },
+    {
+      "name": "ModelShading",
+      "path": "gpui_kit::media::ModelShading",
+      "summary": "How the model is drawn.",
+      "variants": [
+        "Flat",
+        "Wireframe"
+      ],
+      "construct": [],
+      "options": [
+        "name() -> &'static str"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "ModelState",
+      "path": "gpui_kit::media::ModelState",
+      "summary": "What the viewer has, as the host reports it.",
+      "variants": [
+        "Empty",
+        "Loading",
+        "Ready",
+        "Rejected"
+      ],
+      "construct": [
+        "read(bytes: &[u8], bounds: ModelBounds) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "name() -> &'static str"
+      ]
+    },
+    {
+      "name": "ModelViewerEvent",
+      "path": "gpui_kit::media::ModelViewerEvent",
+      "summary": "What a model viewer reports. It applies none of it.",
+      "variants": [
+        "OrbitChanged",
+        "ShadingChanged"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "MonthCell",
@@ -8546,6 +8939,35 @@
         "TransportBar"
       ],
       "example": "fn transport(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(640.0))\n        .child(\n            TransportBar::new(\"scene.transport.playing\")\n                .label(\"Release walkthrough\")\n                .state(TransportState::Playing)\n                .position(72.0)\n                .duration(240.0)\n                .elapsed(\"01:12\")\n                .remaining(\"-02:48\")\n                .buffered([BufferedRange::new(0.0, 156.0)])\n                .volume(0.7)\n                .speeds([1.0, 1.5, 2.0], 1.0)\n                .step_seconds(10.0)\n                .has_next(true)\n                .on_event(|_, _, _| {}),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.transport.rule.live\")\n                .label(\"A stream nobody measured\"),\n        )\n        .child(\n            TransportBar::new(\"scene.transport.live\")\n                .label(\"Incident bridge\")\n                .state(TransportState::Playing)\n                .position(1543.0)\n                .unknown_duration()\n                .elapsed(\"25:43\")\n                .volume(0.4)\n                .on_event(|_, _, _| {}),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.transport.rule.stalled\")\n                .label(\"Playing and waiting\"),\n        )\n        .child(\n            TransportBar::new(\"scene.transport.stalled\")\n                .label(\"Release walkthrough\")\n                .state(TransportState::Buffering)\n                .position(158.0)\n                .duration(240.0)\n                .elapsed(\"02:38\")\n                .remaining(\"-01:22\")\n                .buffered([BufferedRange::new(0.0, 160.0)])\n                .volume(0.7)\n                .muted(true)\n                .on_event(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "audio-player",
+      "capture": "cargo run -p xtask -- scenes capture audio-player",
+      "uses": [
+        "AudioPlayer",
+        "Divider",
+        "TransportBar"
+      ],
+      "example": "fn audio_player(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(640.0))\n        .child(\n            AudioPlayer::new(\"scene.audio.ready\")\n                .title(\"Release walkthrough\")\n                .subtitle(\"Recorded 12 March\")\n                .transport(\n                    FixtureTransport::ready(240.0)\n                        .position(72.0)\n                        .state(TransportState::Playing)\n                        .volume(0.7)\n                        .buffered([BufferedRange::new(0.0, 156.0)])\n                        .shared(),\n                )\n                .elapsed(\"01:12\")\n                .remaining(\"-02:48\")\n                .peaks(scene_peaks(96))\n                .speeds([1.0, 1.5, 2.0])\n                .step_seconds(10.0)\n                .on_event(|_, _, _| {}),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.audio.rule.backend\")\n                .label(\"Nothing here can decode it\"),\n        )\n        .child(\n            AudioPlayer::new(\"scene.audio.absent\")\n                .title(\"interview.opus\")\n                .transport(\n                    FixtureTransport::new()\n                        .no_backend(\"There is no Opus decoder on this machine.\")\n                        .shared(),\n                )\n                .on_event(|_, _, _| {}),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.audio.rule.none\")\n                .label(\"No player connected at all\"),\n        )\n        .child(\n            AudioPlayer::new(\"scene.audio.none\")\n                .title(\"Standup recording\")\n                .on_event(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "video-player",
+      "capture": "cargo run -p xtask -- scenes capture video-player",
+      "uses": [
+        "Divider",
+        "TransportBar",
+        "VideoPlayer"
+      ],
+      "example": "fn video_player(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(440.0))\n        .child(\n            VideoPlayer::new(\"scene.video.frame\")\n                .title(\"Screen capture\")\n                .transport(\n                    FixtureTransport::ready(96.0)\n                        .position(24.0)\n                        .state(TransportState::Playing)\n                        .volume(0.6)\n                        .shared(),\n                )\n                .frame(|_, cx| Some(scene_picture(\"Supplied frame\", cx)))\n                .elapsed(\"00:24\")\n                .remaining(\"-01:12\")\n                .on_event(|_, _, _| {}),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.video.rule.poster\")\n                .label(\"Ready, and no frames supplied\"),\n        )\n        .child(\n            VideoPlayer::new(\"scene.video.poster\")\n                .title(\"Release walkthrough\")\n                .transport(FixtureTransport::ready(240.0).shared())\n                .poster(|_, cx| Some(scene_picture(\"Poster\", cx)))\n                .elapsed(\"00:00\")\n                .remaining(\"-04:00\")\n                .on_event(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "model-viewer",
+      "capture": "cargo run -p xtask -- scenes capture model-viewer",
+      "uses": [
+        "Divider",
+        "ModelViewer"
+      ],
+      "example": "fn model_viewer(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let read = || ModelState::read(CUBE, ModelBounds::default());\n    stack(&theme)\n        .w(px(720.0))\n        .child(\n            div()\n                .row()\n                .items_start()\n                .gap(px(theme.spacing.lg))\n                .child(\n                    div().flex_1().min_w_0().child(\n                        ModelViewer::new(\"scene.model.flat\")\n                            .title(\"cube.gltf\")\n                            .state(read())\n                            .orbit(0.62, 0.42)\n                            .height(240.0)\n                            .on_event(|_, _, _| {}),\n                    ),\n                )\n                .child(\n                    div().flex_1().min_w_0().child(\n                        ModelViewer::new(\"scene.model.wireframe\")\n                            .title(\"cube.gltf\")\n                            .state(read())\n                            .shading(ModelShading::Wireframe)\n                            .orbit(0.62, 0.42)\n                            .height(240.0)\n                            .on_event(|_, _, _| {}),\n                    ),\n                ),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.model.rule.refused\")\n                .label(\"A document past a bound\"),\n        )\n        .child(\n            ModelViewer::new(\"scene.model.refused\")\n                .title(\"city-block.glb\")\n                .rejected(ModelError::TooLarge {\n                    limit: ModelLimit::Triangles,\n                    found: 412_930,\n                    allowed: 24_576,\n                })\n                .height(160.0)\n                .on_event(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "approval",

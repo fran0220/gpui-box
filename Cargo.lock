@@ -2132,6 +2132,8 @@ dependencies = [
  "gpui-kit-theme",
  "gpui-kit-tokens",
  "pulldown-cmark",
+ "serde",
+ "serde_json",
  "unicode-bidi",
  "unicode-segmentation",
  "web-time",

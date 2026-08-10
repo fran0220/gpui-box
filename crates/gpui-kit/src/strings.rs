@@ -201,6 +201,31 @@ string_keys! {
     TransportPreviousTrack => "transport.previous-track", "Previous track";
     TransportNextTrack => "transport.next-track", "Next track";
 
+    // The media players, over a transport this library does not implement.
+    MediaFixture => "media.fixture", "Fixture";
+    MediaNoTransport => "media.no-transport", "No player";
+    MediaNoTransportDetail => "media.no-transport-detail", "No player is connected to this surface, so there is nothing to start.";
+    MediaNoBackend => "media.no-backend", "No playback backend";
+    MediaFailed => "media.failed", "This could not be played";
+    MediaEmpty => "media.empty", "Nothing loaded";
+    MediaWaveform => "media.waveform", "Waveform";
+    VideoNoFrames => "video.no-frames", "No picture";
+    VideoNoFramesDetail => "video.no-frames-detail", "The transport holds this video and no frames have been supplied for it.";
+
+    // The bounded model viewer.
+    ModelEmpty => "model.empty", "No model";
+    ModelEmptyDetail => "model.empty-detail", "Nothing has been handed to this viewer.";
+    ModelRefused => "model.refused", "This model was refused";
+    ModelTooLarge => "model.too-large", "Too many {0}: it asks for {1}, and the limit is {2}.";
+    ModelRejected => "model.rejected", "It is outside the subset this reader accepts ({0}).";
+    ModelFlat => "model.flat", "Flat";
+    ModelWireframe => "model.wireframe", "Wireframe";
+    ModelReset => "model.reset", "Reset the view";
+    ModelCount => "model.count", "{0} {1}";
+    ModelMeshes => "model.meshes", "Meshes";
+    ModelVertices => "model.vertices", "Vertices";
+    ModelTriangles => "model.triangles", "Triangles";
+
     // Combobox and select.
     SelectPlaceholder => "select.placeholder", "Select";
     ComboboxNoMatch => "combobox.no-match", "Nothing here answers “{0}”";

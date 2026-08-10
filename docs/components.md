@@ -452,6 +452,46 @@ playing is a state of its own — a stalled transport says it is waiting, and
 still offers the control that would stop it, because nothing has stopped.
 `docs/content.md` states the whole posture.
 
+## Media
+
+| Component | Kind | Reports | Notes |
+|---|---|---|---|
+| `AudioPlayer` | builder | what a control asked the transport for, and whether it was applied, refused, or unsupported | A player over `MediaTransport`, which this crate declares and does not implement. Idle, loading, no backend, failed, and ready are five renderings, and a player with no transport is a sixth that draws no scrubber at all. A waveform is drawn only from peaks the host measured |
+| `VideoPlayer` | builder | the same, over the same transport | The audio player plus a frame surface. A frame the host supplied publishes `frame`; a still standing in for one publishes `poster` with the reason no picture is arriving over it; neither is `none`. Frames are not asked for from a transport that has said it cannot open the media, and a player with no transport carries no controls |
+| `ModelViewer` | builder | the orbit a drag asked for, and the shading a control asked for | A bounded glTF 2.0 viewer. The document is read by `ModelScene::parse` inside `ModelBounds`, drawn flat-shaded or as a wireframe with an orbit camera, and published as the counts the reader counted. A refusal names the limit or the defect; a viewer holding nothing publishes no counts |
+| `MediaTransport`, `FixtureTransport` | type | — | The seam between a player and an operating-system backend, and the deterministic stand-in that decodes nothing. Every surface publishes `MediaOrigin`, so a fixture is never mistaken for a player |
+
+### There is no player here, and there is none upstream
+
+GPUI draws images, and on macOS composites a `CVPixelBuffer` through its
+surface element. It has no decoder, no audio device, and no frame pump. So the
+players in this module are written against `MediaTransport` — `origin`,
+`snapshot`, and `apply` — and an operating-system backend lands behind that
+trait additively without changing a component above it. What is complete today
+is the component, its states, and its semantics; what is deferred is the
+backend, and `docs/coverage.md` records it as a gap rather than as a feature.
+
+A control asks the transport and reports what came back: `MediaEvent::Applied`,
+`Refused` with the backend's own sentence, or `Unsupported`. The next frame
+draws the transport's snapshot, which is what makes a refused seek leave the
+head where it was. `FixtureTransport` takes commands and advances no clock, so
+a scene renders the same bytes on every run; it reports `MediaOrigin::Fixture`
+and every surface publishes and draws that.
+
+### A model is read inside a fence
+
+`ModelScene::parse` accepts glTF 2.0 in both containers, buffers that are
+inside the file — the GLB binary chunk and `data:` base64 URIs — triangle
+primitives with a `VEC3` `FLOAT` `POSITION` accessor, unsigned byte, short or
+int indices, and node hierarchy by matrix or by translation, rotation and
+scale. Any other URI is refused, because resolving one is I/O and this crate
+performs none. Materials, textures, animation, skins, morph targets, sparse
+accessors and non-triangle primitives are refused rather than approximated, and
+`ModelBounds` caps bytes, nodes, depth, primitives, vertices and triangles with
+every cap checked while reading rather than after allocating. A refusal names
+what the document asked for and what was allowed, so a caller raises a bound on
+purpose instead of guessing.
+
 ## Interaction
 
 | Component | Kind | Reports | Notes |

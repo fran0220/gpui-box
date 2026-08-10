@@ -23,6 +23,9 @@
 //!   host-supplied [`DateAdapter`](datetime::DateAdapter). This crate owns no
 //!   calendar.
 //! - [`layout`] — split panes, scroll areas, and toolbars.
+//! - [`media`] — an audio player, a video player, and a bounded 3D model
+//!   viewer, over a [`MediaTransport`](media::MediaTransport) this crate does
+//!   not implement and a glTF reader that refuses more than it accepts.
 //! - [`overlay`] — anchored and modal surfaces, menus, notifications.
 //! - [`interaction`] — drag and drop, the one gesture that starts in one
 //!   component and finishes in another.
@@ -65,6 +68,7 @@ pub mod display;
 pub mod foundation;
 pub mod interaction;
 pub mod layout;
+pub mod media;
 pub mod motion;
 pub mod navigation;
 pub mod overlay;
@@ -193,6 +197,12 @@ pub mod prelude {
         ScrollAxis, ScrollFade, SplitAxis, SplitChange, SplitKind, SplitLayout, SplitPane,
         SplitPaneSpec, SplitRecord, SplitRecordError, SplitSide, SplitTree, StatusBar, StatusGroup,
         StatusItem, Toolbar, ToolbarItem, scroll_offset,
+    };
+    pub use crate::media::{
+        AudioPlayer, FixtureTransport, MediaAvailability, MediaCommand, MediaEvent, MediaOrigin,
+        MediaOutcome, MediaSnapshot, MediaTransport, ModelBounds, ModelDefect, ModelError,
+        ModelLimit, ModelMesh, ModelScene, ModelShading, ModelState, ModelViewer, ModelViewerEvent,
+        VideoPlayer,
     };
     pub use crate::motion::{
         Flip, Flipping, Keyframe, Keyframes, Presence, ScrollLink, Transition, Velocity, flip,

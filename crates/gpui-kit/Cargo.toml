@@ -21,6 +21,10 @@ gpui-kit-semantics.workspace = true
 gpui-kit-theme.workspace = true
 gpui-kit-tokens.workspace = true
 pulldown-cmark.workspace = true
+# Parsing only, for the bounded glTF reader in `media::gltf`. Nothing here
+# serializes, and nothing here resolves a URI.
+serde = { workspace = true }
+serde_json.workspace = true
 web-time.workspace = true
 
 [dev-dependencies]

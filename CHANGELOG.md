@@ -13,6 +13,35 @@ is what Cargo requires a manifest to carry, not a version anybody can take.
 
 ### Added
 
+**Media.** `media::AudioPlayer`, `media::VideoPlayer` and `media::ModelViewer`
+are the three surfaces a desktop application cannot assemble out of a button
+and a slider. The two players run over `media::MediaTransport` — `origin`,
+`snapshot`, `apply` — which this crate declares and does not implement, because
+there is no decoder, no output device and no frame pump in GPUI at the pinned
+revision. A control asks the transport and reports `Applied`, `Refused` with the
+backend's own sentence, or `Unsupported`; the next frame draws the transport's
+snapshot, so a refused seek leaves the head where it was. Idle, loading, no
+backend, failed and ready are five renderings and a surface with no transport is
+a sixth that carries no controls at all, because a bar with a head at zero says
+playback exists and has not started. `VideoPlayer` publishes `frame` for a
+picture the host supplied and `poster` for a still standing in for one, with the
+reason no picture is arriving drawn over it, and asks for no frames at all from
+a transport that has said it cannot open the media. `AudioPlayer` draws a
+waveform only from peaks somebody measured. `media::FixtureTransport` decodes
+nothing and advances no clock, and every surface publishes `MediaOrigin`, so a
+fixture is never mistaken for a player.
+
+`ModelViewer` reads glTF 2.0 through `media::ModelScene::parse`, which accepts a
+stated subset — both containers, buffers inside the file, triangle primitives
+with a `VEC3` `FLOAT` `POSITION` accessor, and node hierarchy — and refuses
+everything else, including any URI it would have to fetch. `media::ModelBounds`
+caps bytes, nodes, depth, primitives, vertices and triangles, and every cap is
+checked while reading rather than after allocating, so a document declaring ten
+million vertices is refused at the accessor that says so. The model is drawn
+flat-shaded from face normals or as a wireframe, with an orbit camera the caller
+owns; a refusal names the limit or the defect, and a viewer holding nothing
+publishes no counts rather than three zeroes.
+
 **Glass and edge fades.** `overlay::Frost` paints a frosted surface: the pixels
 behind it are blurred and the surface colour is laid over them at the new
 `effect.glassAlpha`, with `effect.glassBlur` deciding how far the blur reaches.
