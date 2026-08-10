@@ -104,11 +104,11 @@ pub mod prelude {
     };
     pub use crate::content::{
         Attachment, BrowserPanel, BufferedRange, CodeBlock, CodeLine, CodeSpan, CodeView,
-        DeliveryState, DiffFile, DiffHunk, DiffLine, DiffLineMark, DiffPresentation, DiffSide,
-        DiffView, DiffViewEvent, FitMode, ImageFrame, ImageRequest, ImageSize, ImageState,
-        ImageViewer, ImageViewerEvent, LineMark, LogEntry, LogStream, LogStreamState, Markdown,
-        MarkdownEvent, Message, MessageBody, MessageList, Reaction, TrackStep, TransportBar,
-        TransportDuration, TransportEvent, TransportState, ViewportState,
+        DeliveryState, DiffFile, DiffHunk, DiffLine, DiffPresentation, DiffView, DiffViewEvent,
+        FitMode, ImageFrame, ImageRequest, ImageSize, ImageState, ImageViewer, ImageViewerEvent,
+        LineMark, LogEntry, LogStream, LogStreamState, Markdown, MarkdownEvent, Message,
+        MessageBody, MessageList, Reaction, TrackStep, TransportBar, TransportDuration,
+        TransportEvent, TransportState, ViewportState,
     };
     pub use crate::controls::button::{
         Button, ButtonGroup, ButtonJoin, ButtonVariant, IconButton, IconPosition,

@@ -438,6 +438,7 @@ string_keys! {
     DiffEmpty => "diff.empty", "No differences";
     SparklineEmpty => "sparkline.empty", "No readings";
     SparklineUnavailable => "sparkline.unavailable", "Reading unavailable";
+    SparklineError => "sparkline.error", "Could not load reading";
     SparklineCurrent => "sparkline.current", "Current: {0}";
     SparklineMinimum => "sparkline.minimum", "Minimum: {0}";
     SparklineMaximum => "sparkline.maximum", "Maximum: {0}";

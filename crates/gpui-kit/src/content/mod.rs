@@ -28,9 +28,7 @@ pub mod transport;
 
 pub use browser::{BrowserPanel, ViewportState};
 pub use code_view::{CodeLine, CodeView, LineMark};
-pub use diff_view::{
-    DiffFile, DiffHunk, DiffLine, DiffLineMark, DiffPresentation, DiffSide, DiffView, DiffViewEvent,
-};
+pub use diff_view::{DiffFile, DiffHunk, DiffLine, DiffPresentation, DiffView, DiffViewEvent};
 pub use image_viewer::{FitMode, ImageFrame, ImageSize, ImageState, ImageViewer, ImageViewerEvent};
 pub use log_stream::{LogEntry, LogStream, LogStreamState};
 pub use markdown::{

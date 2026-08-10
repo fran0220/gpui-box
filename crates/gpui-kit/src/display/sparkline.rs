@@ -21,6 +21,7 @@ use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
 
 use crate::display::badge::Tone;
 use crate::display::empty::{EmptyKind, EmptyState};
+use crate::display::loading::PulseLoader;
 use crate::display::status::StatusDot;
 use crate::foundation::{Ident, StyledExt};
 use crate::strings::{ActiveStrings, StringKey};
@@ -81,9 +82,11 @@ impl SparklineReading {
 /// The complete state of one trend reading.
 #[derive(Debug, Clone, PartialEq)]
 pub enum SparklineState {
+    Loading,
     Ready(SparklineReading),
     Empty,
     Unavailable(SharedString),
+    Error(SharedString),
     /// The reading is the last verified value; the text says why it is stale.
     Stale {
         reading: SparklineReading,
@@ -94,9 +97,11 @@ pub enum SparklineState {
 impl SparklineState {
     pub fn name(&self) -> &'static str {
         match self {
+            Self::Loading => "loading",
             Self::Ready(_) => "ready",
             Self::Empty => "empty",
             Self::Unavailable(_) => "unavailable",
+            Self::Error(_) => "error",
             Self::Stale { .. } => "stale",
         }
     }
@@ -128,6 +133,24 @@ impl RenderOnce for Sparkline {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let (body, spec): (AnyElement, NodeSpec) = match &self.state {
+            SparklineState::Loading => (
+                div()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .w_full()
+                    .p(px(24.0))
+                    .child(
+                        PulseLoader::new(self.ident.child("loading"))
+                            .label(cx.strings().text(StringKey::Loading)),
+                    )
+                    .into_any_element(),
+                NodeSpec::new(self.ident.semantic_id(), Role::Region)
+                    .text(self.label.clone())
+                    .value("loading")
+                    .busy(true)
+                    .read_only(true),
+            ),
             SparklineState::Ready(reading) => (
                 reading_body(&self.ident, &self.label, reading, None, cx),
                 reading_spec(&self.ident, &self.label, reading, cx),
@@ -159,6 +182,21 @@ impl RenderOnce for Sparkline {
                 NodeSpec::new(self.ident.semantic_id(), Role::Region)
                     .text(self.label.clone())
                     .value("unavailable")
+                    .read_only(true),
+            ),
+            SparklineState::Error(reason) => (
+                EmptyState::new(
+                    self.ident.child("error"),
+                    cx.strings().text(StringKey::SparklineError),
+                )
+                .kind(EmptyKind::Failed)
+                .detail(reason.clone())
+                .into_any_element(),
+                NodeSpec::new(self.ident.semantic_id(), Role::Region)
+                    .text(self.label.clone())
+                    .value("error")
+                    .description(reason.clone())
+                    .invalid(true)
                     .read_only(true),
             ),
         };

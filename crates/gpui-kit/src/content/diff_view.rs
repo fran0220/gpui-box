@@ -62,7 +62,7 @@ impl DiffPresentation {
 
 /// The caller's claim about one diff line.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum DiffLineMark {
+enum DiffLineMark {
     #[default]
     Context,
     Added,
@@ -70,14 +70,6 @@ pub enum DiffLineMark {
 }
 
 impl DiffLineMark {
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Context => "context",
-            Self::Added => "added",
-            Self::Removed => "removed",
-        }
-    }
-
     fn tone(self) -> Tone {
         match self {
             Self::Context => Tone::Neutral,
@@ -105,32 +97,21 @@ impl DiffLineMark {
 
 /// One side of a caller-supplied diff line.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DiffSide {
-    pub number: Option<usize>,
-    pub text: SharedString,
-    pub spans: Vec<CodeSpan>,
-    pub mark: DiffLineMark,
+struct DiffSide {
+    number: Option<usize>,
+    text: SharedString,
+    spans: Vec<CodeSpan>,
+    mark: DiffLineMark,
 }
 
 impl DiffSide {
-    pub fn new(text: impl Into<SharedString>, mark: DiffLineMark) -> Self {
+    fn new(text: impl Into<SharedString>, mark: DiffLineMark) -> Self {
         Self {
             number: None,
             text: text.into(),
             spans: Vec::new(),
             mark,
         }
-    }
-
-    pub fn number(mut self, number: usize) -> Self {
-        self.number = Some(number);
-        self
-    }
-
-    /// Pre-classified UTF-8 byte ranges into this side's text.
-    pub fn spans(mut self, spans: impl IntoIterator<Item = CodeSpan>) -> Self {
-        self.spans = spans.into_iter().collect();
-        self
     }
 }
 
@@ -143,8 +124,8 @@ impl DiffSide {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiffLine {
     pub id: SharedString,
-    pub old: Option<DiffSide>,
-    pub new: Option<DiffSide>,
+    old: Option<DiffSide>,
+    new: Option<DiffSide>,
 }
 
 impl DiffLine {
@@ -156,6 +137,24 @@ impl DiffLine {
             id: id.into(),
             old: Some(side.clone()),
             new: Some(side),
+        }
+    }
+
+    /// A pure addition supplied by the caller.
+    pub fn added(id: impl Into<SharedString>, text: impl Into<SharedString>) -> Self {
+        Self {
+            id: id.into(),
+            old: None,
+            new: Some(DiffSide::new(text, DiffLineMark::Added)),
+        }
+    }
+
+    /// A pure removal supplied by the caller.
+    pub fn removed(id: impl Into<SharedString>, text: impl Into<SharedString>) -> Self {
+        Self {
+            id: id.into(),
+            old: Some(DiffSide::new(text, DiffLineMark::Removed)),
+            new: None,
         }
     }
 
@@ -202,51 +201,41 @@ impl DiffLine {
     }
 
     pub fn old_spans(mut self, spans: impl IntoIterator<Item = CodeSpan>) -> Self {
-        if let Some(old) = &mut self.old {
-            old.spans = spans.into_iter().collect();
+        let spans: Vec<CodeSpan> = spans.into_iter().collect();
+        if self.is_context() {
+            if let Some(old) = &mut self.old {
+                old.spans = spans.clone();
+            }
+            if let Some(new) = &mut self.new {
+                new.spans = spans;
+            }
+        } else if let Some(old) = &mut self.old {
+            old.spans = spans;
         }
         self
     }
 
     pub fn new_spans(mut self, spans: impl IntoIterator<Item = CodeSpan>) -> Self {
-        if let Some(new) = &mut self.new {
-            new.spans = spans.into_iter().collect();
+        let spans: Vec<CodeSpan> = spans.into_iter().collect();
+        if self.is_context() {
+            if let Some(old) = &mut self.old {
+                old.spans = spans.clone();
+            }
+            if let Some(new) = &mut self.new {
+                new.spans = spans;
+            }
+        } else if let Some(new) = &mut self.new {
+            new.spans = spans;
         }
         self
     }
 
-    /// Turns a context line into a pure addition or removal. Pairing is never
-    /// inferred; use [`DiffLine::paired`] for an aligned replacement.
-    pub fn mark(mut self, mark: DiffLineMark) -> Self {
-        match mark {
-            DiffLineMark::Context => {
-                if self.old.is_none() {
-                    self.old = self.new.clone();
-                }
-                if self.new.is_none() {
-                    self.new = self.old.clone();
-                }
-                if let Some(old) = &mut self.old {
-                    old.mark = DiffLineMark::Context;
-                }
-                if let Some(new) = &mut self.new {
-                    new.mark = DiffLineMark::Context;
-                }
-            }
-            DiffLineMark::Added => {
-                self.old = None;
-                if let Some(new) = &mut self.new {
-                    new.mark = DiffLineMark::Added;
-                }
-            }
-            DiffLineMark::Removed => {
-                self.new = None;
-                if let Some(old) = &mut self.old {
-                    old.mark = DiffLineMark::Removed;
-                }
-            }
-        }
-        self
+    fn is_context(&self) -> bool {
+        matches!(
+            (&self.old, &self.new),
+            (Some(old), Some(new))
+                if old.mark == DiffLineMark::Context && new.mark == DiffLineMark::Context
+        )
     }
 }
 
@@ -744,12 +733,6 @@ mod tests {
     }
 
     #[test]
-    fn every_line_mark_has_a_distinct_name() {
-        assert_ne!(DiffLineMark::Context.name(), DiffLineMark::Added.name());
-        assert_ne!(DiffLineMark::Added.name(), DiffLineMark::Removed.name());
-    }
-
-    #[test]
     fn caller_aligned_replacement_is_one_split_row_and_two_unified_rows() {
         let files = || {
             vec![DiffFile::new(
@@ -784,5 +767,66 @@ mod tests {
         assert_eq!(unified.len(), 4);
         assert_eq!(unified[2].id, "file.source.hunk.change.line.cache.old");
         assert_eq!(unified[3].id, "file.source.hunk.change.line.cache.new");
+    }
+
+    #[test]
+    fn every_public_line_shape_has_the_same_presence_in_both_presentations() {
+        let lines = [
+            DiffLine::new("context", "same"),
+            DiffLine::added("added", "new"),
+            DiffLine::removed("removed", "old"),
+            DiffLine::paired("paired", "before", "after"),
+        ];
+        let files = || {
+            vec![DiffFile::new(
+                "source",
+                "src/lib.rs",
+                [DiffHunk::new("change", "@@ fixture @@", lines.clone())],
+            )]
+        };
+
+        let split = flatten(files(), DiffPresentation::Split);
+        let unified = flatten(files(), DiffPresentation::Unified);
+
+        assert_eq!(split.len(), 6);
+        assert_eq!(unified.len(), 7);
+        for id in ["context", "added", "removed", "paired"] {
+            assert!(split.iter().any(|row| row.event == line_event(id)));
+            assert!(unified.iter().any(|row| row.event == line_event(id)));
+        }
+    }
+
+    #[test]
+    fn side_specific_spans_keep_a_context_line_one_logical_row() {
+        let files = || {
+            vec![DiffFile::new(
+                "source",
+                "src/lib.rs",
+                [DiffHunk::new(
+                    "change",
+                    "@@ fixture @@",
+                    [DiffLine::new("context", "same").old_spans([CodeSpan {
+                        range: 0..4,
+                        tone: Tone::Accent,
+                    }])],
+                )],
+            )]
+        };
+
+        let split = flatten(files(), DiffPresentation::Split);
+        let unified = flatten(files(), DiffPresentation::Unified);
+
+        assert_eq!(split.len(), 3);
+        assert_eq!(unified.len(), 3);
+        assert_eq!(split[2].event, line_event("context"));
+        assert_eq!(unified[2].event, line_event("context"));
+    }
+
+    fn line_event(id: &str) -> DiffViewEvent {
+        DiffViewEvent::LineActivated {
+            file_id: "source".into(),
+            hunk_id: "change".into(),
+            line_id: id.to_string().into(),
+        }
     }
 }

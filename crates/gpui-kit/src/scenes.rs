@@ -1467,7 +1467,7 @@ fn log_stream(_window: &mut Window, cx: &mut App) -> AnyElement {
             .timestamp("09:41:03")
             .level("INFO", Tone::Info)
             .source("worker")
-            .search_hits([23..26])
+            .search_hits(std::iter::once(23..26))
             .current_hit(0),
         LogEntry::new("cache", "Fixture cache was not warm")
             .timestamp("09:41:04")
@@ -1481,7 +1481,7 @@ fn log_stream(_window: &mut Window, cx: &mut App) -> AnyElement {
             .timestamp("09:41:06")
             .level("DONE", Tone::Success)
             .source("scheduler")
-            .search_hits([12..19]),
+            .search_hits(std::iter::once(12..19)),
     ];
     stack(&theme)
         .w(px(780.0))
@@ -1520,9 +1520,7 @@ fn scene_diff() -> Vec<DiffFile> {
                 DiffLine::paired("cache", "    old_cache.read()", "    verified_cache.read()")
                     .old_number(41)
                     .new_number(41),
-                DiffLine::new("audit", "    audit.record()")
-                    .new_number(42)
-                    .mark(DiffLineMark::Added),
+                DiffLine::added("audit", "    audit.record()").new_number(42),
                 DiffLine::new("close", "}").old_number(42).new_number(43),
             ],
         )],

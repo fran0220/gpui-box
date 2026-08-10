@@ -797,8 +797,16 @@ fn fixture_diff(lines: usize) -> Vec<DiffFile> {
         );
         match index % 3 {
             0 => line.old_number(index + 10).new_number(index + 10),
-            1 => line.new_number(index + 10).mark(DiffLineMark::Added),
-            _ => line.old_number(index + 10).mark(DiffLineMark::Removed),
+            1 => DiffLine::added(
+                format!("line-{index:04}"),
+                format!("fixture line {index:04}"),
+            )
+            .new_number(index + 10),
+            _ => DiffLine::removed(
+                format!("line-{index:04}"),
+                format!("fixture line {index:04}"),
+            )
+            .old_number(index + 10),
         }
     });
     vec![DiffFile::new(
@@ -910,16 +918,22 @@ fn sparkline_publishes_the_callers_exact_reading_and_range(cx: &mut TestAppConte
 }
 
 #[gpui::test]
-fn sparkline_empty_unavailable_and_stale_are_distinct(cx: &mut TestAppContext) {
+fn sparkline_states_are_distinct_and_stale_keeps_the_verified_reading(cx: &mut TestAppContext) {
     let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
         div()
             .column()
             .children([
+                Sparkline::new("loading", "Loading metric", SparklineState::Loading),
                 Sparkline::new("empty", "Empty metric", SparklineState::Empty),
                 Sparkline::new(
                     "unavailable",
                     "Unavailable metric",
                     SparklineState::Unavailable("The fixture has no sampler.".into()),
+                ),
+                Sparkline::new(
+                    "error",
+                    "Failed metric",
+                    SparklineState::Error("The fixture response was unreadable.".into()),
                 ),
                 Sparkline::new(
                     "stale",
@@ -938,6 +952,11 @@ fn sparkline_empty_unavailable_and_stale_are_distinct(cx: &mut TestAppContext) {
             .into_any_element()
     });
 
+    assert!(harness.node("loading").expect("published").busy);
+    assert_eq!(
+        harness.node("loading").expect("published").value.as_deref(),
+        Some("loading")
+    );
     assert_eq!(
         harness.node("empty").expect("published").value.as_deref(),
         Some("empty")
@@ -949,6 +968,13 @@ fn sparkline_empty_unavailable_and_stale_are_distinct(cx: &mut TestAppContext) {
             .value
             .as_deref(),
         Some("unavailable")
+    );
+    let error = harness.node("error").expect("published");
+    assert!(error.invalid);
+    assert_eq!(error.value.as_deref(), Some("error"));
+    assert_eq!(
+        error.description.as_deref(),
+        Some("The fixture response was unreadable.")
     );
     assert_eq!(
         harness.node("stale").expect("published").value.as_deref(),
