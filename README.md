@@ -257,6 +257,19 @@ Cloudflare Worker over static assets and needs no server, because the scene set
 is fixed and its captures are deterministic — see
 [`docs/deploying.md`](docs/deploying.md).
 
+## Roadmap
+
+### Next: Web support
+
+The next milestone is to support browser-hosted GPUI applications without
+forking the component API into a separate web-only library. That work includes
+the upstream GPUI rendering, input and accessibility primitives the browser
+needs, reuse of the same tokens and themes, semantic automation, and a
+deterministic browser visual gate. Native desktop support remains in place;
+web support will be claimed when rendering, interaction, accessibility and
+visual regression coverage pass together rather than when components merely
+compile for a web target.
+
 ## Validation
 
 ```bash
