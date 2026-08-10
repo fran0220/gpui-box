@@ -32,6 +32,7 @@ pub mod grid;
 pub mod list;
 pub mod table;
 pub mod tree;
+pub mod tree_grid;
 pub mod viewport;
 
 pub use diagnostics_list::{
@@ -45,4 +46,5 @@ pub use grid::{
 pub use list::{List, ListItem};
 pub use table::{Align, Cell, Column, ColumnWidth, Row, SortDirection, Table};
 pub use tree::{Tree, TreeNode};
+pub use tree_grid::{TreeGrid, TreeGridRow};
 pub use viewport::{reveal_row, scroll_to_row};

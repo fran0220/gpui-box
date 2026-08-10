@@ -144,7 +144,8 @@ pub mod prelude {
         Align, BulkBar, Cell, Column, ColumnWidth, DataGrid, Diagnostic, DiagnosticAction,
         DiagnosticFilter, DiagnosticLocation, DiagnosticSeverity, DiagnosticsList, EditIntent,
         EditOutcome, EditingCell, Expanded, GridColumn, GridLines, GridRow, List, ListItem, Row,
-        SelectionChange, SelectionMode, SortDirection, Table, Tree, TreeNode,
+        SelectionChange, SelectionMode, SortDirection, Table, Tree, TreeGrid, TreeGridRow,
+        TreeNode,
     };
     pub use crate::datetime::{
         BlockedDay, BlockedReport, Calendar, CalendarEvent, Clock, DateAdapter, DateInput,

@@ -40,7 +40,9 @@ pub enum Role {
     Switch,
     Slider,
     Table,
+    TreeGrid,
     Cell,
+    GridCell,
     Tree,
     TreeItem,
     Progress,
@@ -654,7 +656,7 @@ where
 fn supports_selection(role: Role) -> bool {
     matches!(
         role,
-        Role::Row | Role::Tab | Role::Cell | Role::TreeItem | Role::Option
+        Role::Row | Role::Tab | Role::Cell | Role::GridCell | Role::TreeItem | Role::Option
     )
 }
 
@@ -683,7 +685,9 @@ fn platform_role(role: Role) -> Option<gpui::Role> {
         Role::Switch => gpui::Role::Switch,
         Role::Slider => gpui::Role::Slider,
         Role::Table => gpui::Role::Table,
+        Role::TreeGrid => gpui::Role::TreeGrid,
         Role::Cell => gpui::Role::Cell,
+        Role::GridCell => gpui::Role::GridCell,
         Role::Tree => gpui::Role::Tree,
         Role::TreeItem => gpui::Role::TreeItem,
         Role::Progress => gpui::Role::ProgressIndicator,

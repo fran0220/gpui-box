@@ -59,6 +59,7 @@ use gpui_kit_theme::{
 use crate::controls::input::{Cancel, Submit, TextInput};
 use crate::data::table::{Align, Cell, ColumnWidth, SortDirection};
 use crate::display::empty::{EmptyKind, EmptyState};
+use crate::foundation::direction::ActiveDirection;
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
 use crate::interaction::dnd::{
     self, DragItem, DropAxis, DropIntent, DropPosition, RowTarget, SurfaceDrag,
@@ -194,6 +195,15 @@ pub struct GridRow {
     text: Option<SharedString>,
     disabled: bool,
     cells: Vec<(SharedString, Cell)>,
+    hierarchy: Option<HierarchyRow>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct HierarchyRow {
+    pub level: u32,
+    pub has_children: bool,
+    pub expanded: bool,
+    pub parent: Option<SharedString>,
 }
 
 impl std::fmt::Debug for GridRow {
@@ -214,6 +224,7 @@ impl GridRow {
             text: None,
             disabled: false,
             cells: Vec::new(),
+            hierarchy: None,
         }
     }
 
@@ -236,6 +247,11 @@ impl GridRow {
 
     pub fn id(&self) -> &SharedString {
         &self.id
+    }
+
+    pub(crate) fn hierarchy(mut self, hierarchy: HierarchyRow) -> Self {
+        self.hierarchy = Some(hierarchy);
+        self
     }
 
     fn take(&mut self, key: &SharedString) -> Option<Cell> {
@@ -416,6 +432,7 @@ pub struct DataGrid {
     on_expand: Option<ExpandHandler>,
     on_edit_request: Option<EditRequestHandler>,
     on_edit: Option<EditHandler>,
+    hierarchy: bool,
 }
 
 impl std::fmt::Debug for DataGrid {
@@ -474,6 +491,7 @@ impl DataGrid {
             on_expand: None,
             on_edit_request: None,
             on_edit: None,
+            hierarchy: false,
         }
     }
 
@@ -671,6 +689,11 @@ impl DataGrid {
     fn expanded_indices(&self) -> Vec<usize> {
         self.expanded.iter().map(|row| row.index).collect()
     }
+
+    pub(crate) fn hierarchy_mode(mut self) -> Self {
+        self.hierarchy = true;
+        self
+    }
 }
 
 impl Disableable for DataGrid {
@@ -821,7 +844,15 @@ impl RenderOnce for DataGrid {
 
         frame.semantic_in(
             cx,
-            NodeSpec::new(ident.semantic_id(), Role::Table).value(self.count.to_string()),
+            NodeSpec::new(
+                ident.semantic_id(),
+                if self.hierarchy {
+                    Role::TreeGrid
+                } else {
+                    Role::Table
+                },
+            )
+            .value(self.count.to_string()),
         )
     }
 }
@@ -1364,12 +1395,50 @@ impl DataGrid {
         let detail_rows = self.detail_rows;
         let selected = self.selected.clone();
 
+        let hierarchy = self.hierarchy;
+        let on_expand = self.on_expand.clone();
         frame.on_key_down(move |event, window, cx| {
             // The anchor is read now rather than when the frame was built: a
             // click sets it without the caller having to redraw, and the move
             // that follows should start from the row that was clicked.
             let anchor = state.anchor.borrow().clone();
             let from = current_index(&drawn, anchor.as_ref(), &selected);
+            if hierarchy {
+                if let Some(index) = from {
+                    let row = render_row(index, window, cx);
+                    if let Some(meta) = row.hierarchy {
+                        let logical = cx
+                            .layout_direction()
+                            .arrow_step(event.keystroke.key.as_str());
+                        match logical {
+                            Some(-1) if meta.has_children && meta.expanded => {
+                                if let Some(expand) = &on_expand {
+                                    expand(row.id, false, window, cx);
+                                    cx.stop_propagation();
+                                }
+                                return;
+                            }
+                            Some(-1) => {
+                                if let Some(parent) = meta.parent {
+                                    *state.anchor.borrow_mut() = Some(parent.clone());
+                                    handler(&SelectionChange::Replace(parent), window, cx);
+                                    cx.stop_propagation();
+                                }
+                                return;
+                            }
+                            Some(1) if meta.has_children && !meta.expanded => {
+                                if let Some(expand) = &on_expand {
+                                    expand(row.id, true, window, cx);
+                                    cx.stop_propagation();
+                                }
+                                return;
+                            }
+                            Some(1) => return,
+                            _ => {}
+                        }
+                    }
+                }
+            }
             let Some(target) = target_index(event.keystroke.key.as_str(), from, count) else {
                 return;
             };
@@ -1431,6 +1500,7 @@ impl DataGrid {
             editing: self.editing.clone(),
             editor,
             state: Rc::clone(state),
+            hierarchy: self.hierarchy,
         });
 
         let list = uniform_list(
@@ -1552,6 +1622,7 @@ struct RowContext {
     editing: Option<EditingCell>,
     editor: Option<Entity<TextInput>>,
     state: Rc<Memory>,
+    hierarchy: bool,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1607,7 +1678,9 @@ fn row_element(
         element = element.child(row_mark(theme, selected));
     }
 
-    if let Some(expand) = context.on_expand.clone().filter(|_| !context.disabled) {
+    if !context.hierarchy
+        && let Some(expand) = context.on_expand.clone().filter(|_| !context.disabled)
+    {
         element = element.child(disclosure(&ident, theme, &row, open, expand, cx));
     }
 
@@ -1623,7 +1696,15 @@ fn row_element(
             .find(|next| next.editable)
             .map(|next| (row.id.clone(), next.key.clone()));
         element = element.child(cell_element(
-            &ident, theme, column, &mut row, next, context, window, cx,
+            &ident,
+            theme,
+            column,
+            &mut row,
+            next,
+            position == 0,
+            context,
+            window,
+            cx,
         ));
         if position + 1 == pinned {
             element = element.child(pinned_edge(theme));
@@ -1667,6 +1748,12 @@ fn row_element(
         .disabled(row.disabled || context.disabled);
     if context.on_expand.is_some() {
         spec = spec.expanded(open);
+    }
+    if let Some(meta) = &row.hierarchy {
+        spec = spec.level(meta.level);
+        if meta.has_children {
+            spec = spec.expanded(meta.expanded);
+        }
     }
     if let Some(text) = row.text.clone() {
         spec = spec.text(text);
@@ -1811,6 +1898,7 @@ fn cell_element(
     column: &GridColumn,
     row: &mut GridRow,
     next: Option<(SharedString, SharedString)>,
+    logical_start: bool,
     context: &RowContext,
     _window: &mut Window,
     cx: &mut App,
@@ -1828,7 +1916,28 @@ fn cell_element(
 
     let published = cell.as_ref().is_some_and(|cell| cell.published) || editable;
     let text = cell.as_ref().and_then(|cell| cell.text.clone());
-    let content = cell.map(|cell| cell.content);
+    let mut content = cell.map(|cell| cell.content);
+    if logical_start && context.hierarchy {
+        let hierarchy = row.hierarchy.clone();
+        let mut leading = div().row().items_center().min_w_0();
+        if let Some(meta) = hierarchy {
+            leading = leading.pl(px((meta.level.saturating_sub(1) as f32) * theme.spacing.md));
+            if meta.has_children {
+                if let Some(expand) = context
+                    .on_expand
+                    .clone()
+                    .filter(|_| !context.disabled && !row.disabled)
+                {
+                    leading =
+                        leading.child(disclosure(ident, theme, row, meta.expanded, expand, cx));
+                }
+            } else {
+                leading = leading.child(div().w(px(GUTTER)).flex_none());
+            }
+        }
+        leading = leading.children(content.take());
+        content = Some(leading.into_any_element());
+    }
 
     if !published {
         return column_frame(div(), column, theme)
@@ -1838,7 +1947,15 @@ fn cell_element(
     }
 
     let cell_ident = ident.child(column.key.as_ref());
-    let mut spec = NodeSpec::new(cell_ident.semantic_id(), Role::Cell).parent(ident.semantic_id());
+    let mut spec = NodeSpec::new(
+        cell_ident.semantic_id(),
+        if context.hierarchy {
+            Role::GridCell
+        } else {
+            Role::Cell
+        },
+    )
+    .parent(ident.semantic_id());
     if let Some(text) = text {
         spec = spec.text(text);
     }
