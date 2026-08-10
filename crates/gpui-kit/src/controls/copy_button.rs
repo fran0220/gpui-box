@@ -34,7 +34,7 @@
 //! refusal stays until the next attempt replaces it.
 
 use std::rc::Rc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use gpui::{
     App, ClipboardItem, Context, EventEmitter, FocusHandle, Focusable, IntoElement, ParentElement,
@@ -43,6 +43,7 @@ use gpui::{
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TypeScale};
+use web_time::Instant;
 
 use crate::controls::button::{Button, ButtonVariant};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt};

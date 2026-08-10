@@ -43,7 +43,7 @@
 //! trigger.
 
 use std::rc::Rc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use gpui::{
     AnyElement, App, Context, EventEmitter, FocusHandle, Focusable, InteractiveElement,
@@ -52,6 +52,7 @@ use gpui::{
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Elevation, Space};
+use web_time::Instant;
 
 use crate::foundation::{FocusRing, Ident, StyledExt};
 use crate::overlay::layer::{Overlay, Placement, surface};

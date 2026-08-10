@@ -41,13 +41,14 @@ fn main() -> Result<()> {
         (Some("scenes"), Some("check")) => scenes_check(&rest),
         (Some("headless"), Some("capture")) => headless("capture", &rest),
         (Some("headless"), Some("check")) => headless("check", &rest),
+        (Some("web"), Some("check")) => web_check(),
         (Some("gate"), None) => gate(false),
         (Some("gate"), Some("full")) => gate(true),
         _ => bail!(
             "usage: cargo xtask <dependencies check|accessibility check|tokens generate|tokens check|strings check|\
              strings generate|scenes list|scenes capture [name...]|\
              scenes check [name...]|headless capture [name...]|\
-             headless check [name...]|gate [full]>"
+             headless check [name...]|web check|gate [full]>"
         ),
     }
 }
@@ -1012,6 +1013,25 @@ fn headless(command: &str, only: &[String]) -> Result<()> {
         bail!("headless {command} failed");
     }
     Ok(())
+}
+
+const WASM_TARGET: &str = "wasm32-unknown-unknown";
+
+fn web_check() -> Result<()> {
+    step(
+        env!("CARGO"),
+        &[
+            "check",
+            "-p",
+            "gpui-kit",
+            "--lib",
+            "--features",
+            "fixtures",
+            "--target",
+            WASM_TARGET,
+        ],
+        None,
+    )
 }
 
 fn step(program: &str, args: &[&str], env: Option<(&str, &str)>) -> Result<()> {

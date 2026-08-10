@@ -268,7 +268,9 @@ needs, reuse of the same tokens and themes, semantic automation, and a
 deterministic browser visual gate. Native desktop support remains in place;
 web support will be claimed when rendering, interaction, accessibility and
 visual regression coverage pass together rather than when components merely
-compile for a web target.
+compile for a web target. The core library passes its stable Rust wasm check,
+but a browser host remains blocked at the current GPUI pin; see
+[`docs/compatibility.md`](docs/compatibility.md).
 
 ## Validation
 

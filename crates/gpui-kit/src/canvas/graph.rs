@@ -7,7 +7,7 @@
 //! does own is the part that is the same every time: the backdrop, the
 //! stacking of edges beneath nodes, and the five states a canvas can be in.
 
-use std::{cell::Cell, collections::HashMap, rc::Rc, time::Instant};
+use std::{cell::Cell, collections::HashMap, rc::Rc};
 
 use gpui::{
     AnyElement, App, Bounds, InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels,
@@ -15,6 +15,7 @@ use gpui::{
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TypeScale};
+use web_time::Instant;
 
 use crate::display::empty::EmptyState;
 use crate::foundation::{Ident, StyledExt};

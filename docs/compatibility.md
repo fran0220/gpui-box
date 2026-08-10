@@ -31,14 +31,14 @@ wgpu and allocator edges resolve their registry Windows 0.62 dependencies.
 
 ## Platform behavior
 
-| Capability | macOS | Windows | Linux |
-|---|---|---|---|
-| Core components | Supported; native visual gate | Supported; headless visual gate | Supported; headless visual gate |
-| Native frame capture | Supported | Not implemented | Not implemented |
-| Offscreen WGPU capture | Not used | WARP | llvmpipe |
-| Edge fade | Supported | Supported | Supported |
-| Backdrop blur | Metal | Translucent fallback | Translucent fallback |
-| Native child surfaces | Supported | Supported | Not implemented |
+| Capability | macOS | Windows | Linux | Browser/WASM |
+|---|---|---|---|---|
+| Core components | Supported; native visual gate | Supported; headless visual gate | Supported; headless visual gate | Core stable wasm check passes; browser host blocked |
+| Native frame capture | Supported | Not implemented | Not implemented | Not applicable |
+| Offscreen WGPU capture | Not used | WARP | llvmpipe | No accepted baseline |
+| Edge fade | Supported | Supported | Supported | Unverified |
+| Backdrop blur | Metal | Translucent fallback | Translucent fallback | Unverified |
+| Native child surfaces | Supported | Supported | Not implemented | Not applicable |
 
 Core component rendering is supported and visually regression-tested on all
 three platforms. macOS uses native window capture; Windows and Linux render the
@@ -51,6 +51,15 @@ Backdrop blur is deliberately renderer-specific: Metal snapshots and blurs the
 scene below it, while other renderers preserve the translucent fill as a
 truthful unblurred fallback. Edge fade is encoded into ordinary painted
 primitives and is exercised by the WGPU integration test.
+
+`cargo run -p xtask -- web check` checks the core `gpui-kit` library with
+fixtures for `wasm32-unknown-unknown` on the repository's stable Rust
+toolchain. It does not link `gpui_platform` or claim that a browser host runs.
+At the current pin, linking WebPlatform reaches a dependency that requires an
+unstable wasm feature, so browser rendering and interaction remain blocked.
+Browser accessibility and a deterministic browser visual gate are also
+unverified. Web support remains unclaimed until rendering, interaction,
+accessibility, and visual regression coverage pass together.
 
 ## Upgrade process
 
