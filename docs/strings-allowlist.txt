@@ -52,6 +52,7 @@ Flip
 Flipped
 Follow
 FormField
+Frost
 GraphNode
 GridRow
 HoverCard
@@ -83,6 +84,7 @@ RangePicker
 Row
 SchemaForm
 ScrollArea
+ScrollFade
 SearchField
 SegmentedControl
 Select

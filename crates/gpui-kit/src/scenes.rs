@@ -173,6 +173,14 @@ pub fn catalog() -> Vec<Scene> {
             build: scroll_shadow,
         },
         Scene {
+            name: "scroll-fade",
+            build: scroll_fade,
+        },
+        Scene {
+            name: "frost",
+            build: frost,
+        },
+        Scene {
             name: "toolbar",
             build: toolbar,
         },
@@ -2549,6 +2557,123 @@ fn scroll_area(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .vertical()
                         .height(120.0)
                         .child(filler(&theme, "Summary", 2)),
+                ),
+        )
+        .into_any_element()
+}
+
+/// A region scrolled off both ends, so the fade that says there is more in
+/// either direction is in a captured image, beside one that hides nothing and
+/// therefore fades at neither edge.
+fn scroll_fade(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    crate::layout::scroll_to("scene.fade.output", gpui::point(px(0.0), px(120.0)), cx);
+    stack(&theme)
+        .w(px(480.0))
+        .child(caption(&theme, "Scrolled: content runs past both ends"))
+        .child(
+            div()
+                .hairline(&theme)
+                .radius(&theme, Radius::Card)
+                .overflow_hidden()
+                .child(
+                    ScrollFade::new("scene.fade.scrolled")
+                        .edges(FadeEdges::vertical())
+                        .fit_height()
+                        .child(
+                            ScrollArea::new("scene.fade.output")
+                                .label("Run output")
+                                .vertical()
+                                .height(200.0)
+                                .child(filler(&theme, "Output", 20)),
+                        ),
+                ),
+        )
+        // Nothing is hidden here, so no edge fades and the caller says so.
+        .child(caption(&theme, "Nothing hidden: no edge fades"))
+        .child(
+            div()
+                .hairline(&theme)
+                .radius(&theme, Radius::Card)
+                .overflow_hidden()
+                .child(
+                    ScrollFade::new("scene.fade.settled").fit_height().child(
+                        ScrollArea::new("scene.fade.summary")
+                            .label("Summary")
+                            .vertical()
+                            .height(120.0)
+                            .child(filler(&theme, "Summary", 2)),
+                    ),
+                ),
+        )
+        .into_any_element()
+}
+
+/// Glass over the page it covers, which is the only way to see that the
+/// backdrop is blurred rather than merely tinted.
+fn frost(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let card = |title: &'static str, body: &'static str| {
+        div()
+            .column()
+            .gap(px(theme.space(Space::Xs)))
+            .p(px(theme.space(Space::Md)))
+            .child(
+                div()
+                    .type_scale(&theme, gpui_kit_theme::TypeScale::Label)
+                    .child(SharedString::from(title)),
+            )
+            .child(caption(&theme, body))
+    };
+    stack(&theme)
+        .w(px(480.0))
+        .child(caption(&theme, "A floating surface on glass"))
+        .child(
+            div()
+                .relative()
+                .h(px(200.0))
+                .hairline(&theme)
+                .radius(&theme, Radius::Card)
+                .overflow_hidden()
+                .child(filler(&theme, "Document", 8))
+                .child(
+                    div()
+                        .absolute()
+                        .top(px(48.0))
+                        .left(px(120.0))
+                        .w(px(240.0))
+                        .child(
+                            Frost::new("scene.frost.popover")
+                                .radius(Radius::Card)
+                                .child(card(
+                                    "Rename",
+                                    "The page behind stays visible, out of focus",
+                                )),
+                        ),
+                ),
+        )
+        .child(caption(&theme, "The same glass over a panel surface"))
+        .child(
+            div()
+                .relative()
+                .h(px(160.0))
+                .hairline(&theme)
+                .radius(&theme, Radius::Card)
+                .overflow_hidden()
+                .child(filler(&theme, "Files", 6))
+                .child(
+                    div()
+                        .absolute()
+                        .top(px(32.0))
+                        .left(px(64.0))
+                        .w(px(280.0))
+                        .child(
+                            Frost::new("scene.frost.rail")
+                                .surface(gpui_kit_theme::Surface::Panel)
+                                .radius(Radius::Dialog)
+                                .blur(32.0)
+                                .child(card("Rail", "Where blur is unsupported the tint remains")),
+                        ),
                 ),
         )
         .into_any_element()

@@ -165,6 +165,7 @@
         "table",
         "data-grid",
         "data-grid-editing",
+        "frost",
         "sidebar",
         "motion-flip",
         "motion-state",
@@ -412,6 +413,7 @@
       "reports": [],
       "scenes": [
         "card",
+        "frost",
         "motion-flip",
         "tool-call",
         "step-list",
@@ -1177,6 +1179,28 @@
       ]
     },
     {
+      "name": "Frost",
+      "kind": "builder",
+      "path": "gpui_kit::overlay::Frost",
+      "source": "crates/gpui-kit/src/overlay/frost.rs",
+      "summary": "A frosted-glass surface: blurred backdrop, tinted fill, caller's content.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "surface(surface: Surface) -> Self",
+        "radius(radius: Radius) -> Self",
+        "blur(blur: f32) -> Self",
+        "child(child: impl IntoElement) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "frost"
+      ]
+    },
+    {
       "name": "GradientSpinner",
       "kind": "builder",
       "path": "gpui_kit::display::GradientSpinner",
@@ -1579,6 +1603,7 @@
       "reports": [],
       "scenes": [
         "card",
+        "frost",
         "motion-flip",
         "hover-card"
       ]
@@ -2145,7 +2170,34 @@
       "reports": [],
       "scenes": [
         "scroll-area",
-        "scroll-shadow"
+        "scroll-shadow",
+        "scroll-fade"
+      ]
+    },
+    {
+      "name": "ScrollFade",
+      "kind": "builder",
+      "path": "gpui_kit::layout::ScrollFade",
+      "source": "crates/gpui-kit/src/layout/scroll_fade.rs",
+      "summary": "A region whose content fades towards the edges it is scrolled past.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "edges(edges: FadeEdges) -> Self",
+        "top(fade: bool) -> Self",
+        "bottom(fade: bool) -> Self",
+        "left(fade: bool) -> Self",
+        "right(fade: bool) -> Self",
+        "band(band: f32) -> Self",
+        "fit_height() -> Self",
+        "child(child: impl IntoElement) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "scroll-fade"
       ]
     },
     {
@@ -4256,6 +4308,22 @@
         "new(id: impl Into<SharedString>, index: usize) -> Self"
       ],
       "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "FadeEdges",
+      "path": "gpui_kit::layout::FadeEdges",
+      "summary": "Which edges of a region its content fades towards.",
+      "variants": [],
+      "construct": [
+        "vertical() -> Self",
+        "horizontal() -> Self"
+      ],
+      "options": [
+        "any() -> bool",
+        "names() -> Vec<&'static str>"
+      ],
       "commands": [],
       "queries": []
     },
@@ -7440,6 +7508,26 @@
         "ScrollArea"
       ],
       "example": "fn scroll_shadow(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    crate::layout::scroll_to(\"scene.scroll.scrolled\", gpui::point(px(0.0), px(120.0)), cx);\n    stack(&theme)\n        .w(px(480.0))\n        .child(\n            div()\n                .hairline(&theme)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(\n                    ScrollArea::new(\"scene.scroll.scrolled\")\n                        .label(\"Run output\")\n                        .vertical()\n                        .height(200.0)\n                        .child(filler(&theme, \"Output\", 20)),\n                ),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "scroll-fade",
+      "capture": "cargo run -p xtask -- scenes capture scroll-fade",
+      "uses": [
+        "ScrollArea",
+        "ScrollFade"
+      ],
+      "example": "fn scroll_fade(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    crate::layout::scroll_to(\"scene.fade.output\", gpui::point(px(0.0), px(120.0)), cx);\n    stack(&theme)\n        .w(px(480.0))\n        .child(caption(&theme, \"Scrolled: content runs past both ends\"))\n        .child(\n            div()\n                .hairline(&theme)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(\n                    ScrollFade::new(\"scene.fade.scrolled\")\n                        .edges(FadeEdges::vertical())\n                        .fit_height()\n                        .child(\n                            ScrollArea::new(\"scene.fade.output\")\n                                .label(\"Run output\")\n                                .vertical()\n                                .height(200.0)\n                                .child(filler(&theme, \"Output\", 20)),\n                        ),\n                ),\n        )\n        // Nothing is hidden here, so no edge fades and the caller says so.\n        .child(caption(&theme, \"Nothing hidden: no edge fades\"))\n        .child(\n            div()\n                .hairline(&theme)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(\n                    ScrollFade::new(\"scene.fade.settled\").fit_height().child(\n                        ScrollArea::new(\"scene.fade.summary\")\n                            .label(\"Summary\")\n                            .vertical()\n                            .height(120.0)\n                            .child(filler(&theme, \"Summary\", 2)),\n                    ),\n                ),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "frost",
+      "capture": "cargo run -p xtask -- scenes capture frost",
+      "uses": [
+        "Badge",
+        "Card",
+        "Frost",
+        "ListRow"
+      ],
+      "example": "fn frost(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let card = |title: &'static str, body: &'static str| {\n        div()\n            .column()\n            .gap(px(theme.space(Space::Xs)))\n            .p(px(theme.space(Space::Md)))\n            .child(\n                div()\n                    .type_scale(&theme, gpui_kit_theme::TypeScale::Label)\n                    .child(SharedString::from(title)),\n            )\n            .child(caption(&theme, body))\n    };\n    stack(&theme)\n        .w(px(480.0))\n        .child(caption(&theme, \"A floating surface on glass\"))\n        .child(\n            div()\n                .relative()\n                .h(px(200.0))\n                .hairline(&theme)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(filler(&theme, \"Document\", 8))\n                .child(\n                    div()\n                        .absolute()\n                        .top(px(48.0))\n                        .left(px(120.0))\n                        .w(px(240.0))\n                        .child(\n                            Frost::new(\"scene.frost.popover\")\n                                .radius(Radius::Card)\n                                .child(card(\n                                    \"Rename\",\n                                    \"The page behind stays visible, out of focus\",\n                                )),\n                        ),\n                ),\n        )\n        .child(caption(&theme, \"The same glass over a panel surface\"))\n        .child(\n            div()\n                .relative()\n                .h(px(160.0))\n                .hairline(&theme)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(filler(&theme, \"Files\", 6))\n                .child(\n                    div()\n                        .absolute()\n                        .top(px(32.0))\n                        .left(px(64.0))\n                        .w(px(280.0))\n                        .child(\n                            Frost::new(\"scene.frost.rail\")\n                                .surface(gpui_kit_theme::Surface::Panel)\n                                .radius(Radius::Dialog)\n                                .blur(32.0)\n                                .child(card(\"Rail\", \"Where blur is unsupported the tint remains\")),\n                        ),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "toolbar",

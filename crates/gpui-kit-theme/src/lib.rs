@@ -245,6 +245,8 @@ pub struct Effects {
     pub focus_ring_alpha: f32,
     pub glow_alpha: f32,
     pub glow_blur: f32,
+    pub glass_alpha: f32,
+    pub glass_blur: f32,
 }
 
 impl Theme {
@@ -416,6 +418,8 @@ impl Theme {
                 focus_ring_alpha: tokens.effect.focus_ring_alpha,
                 glow_alpha: tokens.effect.glow_alpha,
                 glow_blur: tokens.effect.glow_blur,
+                glass_alpha: tokens.effect.glass_alpha,
+                glass_blur: tokens.effect.glass_blur,
             },
         }
     }

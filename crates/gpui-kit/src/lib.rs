@@ -176,10 +176,10 @@ pub mod prelude {
         ActiveDrag, DragItem, DropAxis, DropIntent, DropPosition, StagedDrag,
     };
     pub use crate::layout::{
-        AspectFit, AspectRatio, Dock, DockEvent, DockPanel, DockRegion, ScrollArea, ScrollAxis,
-        SplitAxis, SplitChange, SplitKind, SplitLayout, SplitPane, SplitPaneSpec, SplitRecord,
-        SplitRecordError, SplitSide, SplitTree, StatusBar, StatusGroup, StatusItem, Toolbar,
-        ToolbarItem, scroll_offset,
+        AspectFit, AspectRatio, Dock, DockEvent, DockPanel, DockRegion, FadeEdges, ScrollArea,
+        ScrollAxis, ScrollFade, SplitAxis, SplitChange, SplitKind, SplitLayout, SplitPane,
+        SplitPaneSpec, SplitRecord, SplitRecordError, SplitSide, SplitTree, StatusBar, StatusGroup,
+        StatusItem, Toolbar, ToolbarItem, scroll_offset,
     };
     pub use crate::motion::{
         Flip, Flipping, Keyframe, Keyframes, Presence, ScrollLink, Transition, Velocity, flip,
@@ -191,10 +191,10 @@ pub mod prelude {
     };
     pub use crate::overlay::{
         Command, CommandPalette, CommandPaletteEvent, ContextMenu, ContextMenuEvent, Dialog,
-        DialogEvent, Drawer, DrawerEvent, Edge, FocusTrap, HoverCard, HoverCardEvent, Kbd, Menu,
-        MenuEvent, MenuItem, Menubar, MenubarEvent, MenubarMenu, Notification, NotificationCenter,
-        NotificationCenterEvent, Overlay, Placement, Popover, PopoverEvent, Toast, ToastCorner,
-        ToastLayer, Tooltip, Tooltipped, UnreadCount,
+        DialogEvent, Drawer, DrawerEvent, Edge, FocusTrap, Frost, HoverCard, HoverCardEvent, Kbd,
+        Menu, MenuEvent, MenuItem, Menubar, MenubarEvent, MenubarMenu, Notification,
+        NotificationCenter, NotificationCenterEvent, Overlay, Placement, Popover, PopoverEvent,
+        Toast, ToastCorner, ToastLayer, Tooltip, Tooltipped, UnreadCount,
     };
     pub use crate::state::{AsyncStatus, AsyncValue, Loadable};
     pub use crate::strings::{ActiveStrings, StringKey, Strings, reset_strings, set_strings};

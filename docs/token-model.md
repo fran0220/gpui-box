@@ -113,8 +113,13 @@ GPUI text backend applies a variable font's weight axis.
 Motion tokens store duration and cubic-bezier control points. Component motion
 evaluates CSS-compatible curves through the pure `CubicBezier` implementation.
 
-Overlay surfaces are opaque on every platform; GPUI has no per-element
-backdrop blur, and gpui-kit does not fake one.
+Overlay surfaces are opaque by default. `Frost` is the one surface that is not:
+`effect.glassAlpha` is how opaque its own fill is over what it blurs and
+`effect.glassBlur` is how far that blur reaches. A theme that sets the alpha to
+1 declares itself opaque and no blur is painted at all, and where the renderer
+provides no backdrop blur the tinted fill is drawn on its own — gpui-kit does
+not fake a blur with a gradient, because the colour behind a translucent window
+is not a colour anything can paint.
 
 The two rings live here too. `effect.selectedRingAlpha` draws the inset ring on
 the current answer; `effect.focusRingWidth` and `effect.focusRingAlpha` draw the

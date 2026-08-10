@@ -15,6 +15,7 @@
 mod dialog;
 mod drawer;
 mod focus;
+pub mod frost;
 pub mod hover_card;
 mod kbd;
 mod layer;
@@ -30,6 +31,7 @@ pub mod tooltip;
 pub use dialog::{Dialog, DialogEvent};
 pub use drawer::{Drawer, DrawerEvent};
 pub use focus::FocusTrap;
+pub use frost::Frost;
 pub use hover_card::{HoverCard, HoverCardEvent};
 pub use kbd::{Kbd, caps};
 pub use layer::{Edge, Overlay, Placement, priority, surface};

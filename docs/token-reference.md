@@ -172,6 +172,8 @@ Appearance: `Dark`.
 | `effect.selectedRingAlpha` | 0.09 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.55 |
+| `effect.glassAlpha` | 0.72 |
+| `effect.glassBlur` | 24 |
 
 ### Contrast
 
@@ -379,6 +381,8 @@ Appearance: `Light`.
 | `effect.selectedRingAlpha` | 0.12 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.45 |
+| `effect.glassAlpha` | 0.78 |
+| `effect.glassBlur` | 24 |
 
 ### Contrast
 

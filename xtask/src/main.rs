@@ -1657,6 +1657,8 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
         ),
         ("effect.focusRingWidth", tokens.effect.focus_ring_width),
         ("effect.focusRingAlpha", tokens.effect.focus_ring_alpha),
+        ("effect.glassAlpha", tokens.effect.glass_alpha),
+        ("effect.glassBlur", tokens.effect.glass_blur),
     ] {
         writeln!(output, "| `{name}` | {value} |")?;
     }

@@ -434,3 +434,50 @@ fn a_toolbar_publishes_how_many_actions_it_holds(cx: &mut TestAppContext) {
     assert_eq!(bar.text.as_deref(), Some("Editor actions"));
     assert_eq!(bar.value.as_deref(), Some("4"));
 }
+
+// ---------------------------------------------------------------- scroll fade
+
+/// A faded region wrapping a bounded scroll area, told which edges hide
+/// something.
+fn scroll_fade(cx: &mut TestAppContext, edges: FadeEdges) -> Harness {
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        div()
+            .w(px(400.0))
+            .h(px(240.0))
+            .child(
+                ScrollFade::new("run.output.fade").edges(edges).child(
+                    ScrollArea::new("run.output")
+                        .label("Run output")
+                        .vertical()
+                        .height(200.0)
+                        .child(pane("Output", 40)),
+                ),
+            )
+            .into_any_element()
+    });
+    settle(&mut harness);
+    harness
+}
+
+#[gpui::test]
+fn a_faded_region_publishes_which_edges_hide_something(cx: &mut TestAppContext) {
+    let mut harness = scroll_fade(cx, FadeEdges::vertical());
+    let region = harness.node("run.output.fade").expect("published");
+
+    assert_eq!(region.role, Role::Region);
+    assert_eq!(region.value.as_deref(), Some("top bottom"));
+    assert!(
+        harness.node("run.output").is_some(),
+        "a fade wraps the region it fades and hides nothing from the tree"
+    );
+}
+
+#[gpui::test]
+fn a_region_that_hides_nothing_says_no_edge_fades(cx: &mut TestAppContext) {
+    let mut harness = scroll_fade(cx, FadeEdges::default());
+    let region = harness.node("run.output.fade").expect("published");
+
+    // An absent fade is a statement — there is no more content past either
+    // end — so it is published rather than left to be inferred from pixels.
+    assert_eq!(region.value.as_deref(), Some("none"));
+}

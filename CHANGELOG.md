@@ -13,6 +13,19 @@ is what Cargo requires a manifest to carry, not a version anybody can take.
 
 ### Added
 
+**Glass and edge fades.** `overlay::Frost` paints a frosted surface: the pixels
+behind it are blurred and the surface colour is laid over them at the new
+`effect.glassAlpha`, with `effect.glassBlur` deciding how far the blur reaches.
+The whole subtree paints inside one scene layer, so the blur cannot be reordered
+over the content it sits behind. It fakes nothing where blur does not exist —
+a renderer without a backdrop blur, or a theme that sets `effect.glassAlpha` to
+1, gets the tinted fill on its own and a surface that is merely unblurred.
+`layout::ScrollFade` fades content towards the edges it is scrolled past by
+multiplying each painted primitive's opacity, which is what says "there is more"
+over a surface no gradient can match; the edges are the caller's statement about
+hidden content, and a region that hides nothing fades at neither edge and
+publishes `none` rather than implying overflow that is not there.
+
 **Platform accessibility.** Semantic nodes now project supported roles, names,
 values, control states, focus, numeric ranges, and widget selection into GPUI's
 AccessKit tree while retaining the deterministic test registry. The maintained

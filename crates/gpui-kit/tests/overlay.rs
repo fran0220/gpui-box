@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use gpui::{FocusHandle, TestAppContext, div, prelude::*, px};
-use gpui_kit::overlay::{FocusTrap, Overlay, Placement};
+use gpui_kit::overlay::{FocusTrap, Frost, Overlay, Placement};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_testkit::harness::Harness;
 use gpui_kit_testkit::present;
@@ -194,4 +194,33 @@ fn clicking_the_scrim_reports_a_dismissal(cx: &mut TestAppContext) {
     harness.context().run_until_parked();
 
     assert!(*dismissed.borrow(), "a scrim click must report a dismissal");
+}
+
+#[gpui::test]
+fn glass_keeps_its_content_in_the_tree_and_on_the_screen(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, cx| {
+        div()
+            .w(px(400.0))
+            .h(px(300.0))
+            .child(
+                Frost::new("rename.glass").child(div().w(px(200.0)).h(px(80.0)).semantic_in(
+                    cx,
+                    NodeSpec::new("rename.title", Role::Heading).text("Rename"),
+                )),
+            )
+            .into_any_element()
+    });
+
+    let snapshot = harness.snapshot();
+    let glass = present(&snapshot, "rename.glass").expect("the surface is published");
+    assert_eq!(glass.role, Role::Region);
+    assert!(
+        glass.bounds.width > 0.0 && glass.bounds.height > 0.0,
+        "a surface painted in its own layer still occupies the layout it asked for"
+    );
+    // Whether the renderer blurred anything is invisible to the tree, which is
+    // the point: the content is legible either way.
+    let title = present(&snapshot, "rename.title").expect("the content is published");
+    assert_eq!(title.text.as_deref(), Some("Rename"));
+    assert!(title.visible);
 }

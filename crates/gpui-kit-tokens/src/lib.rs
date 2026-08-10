@@ -185,6 +185,7 @@ impl TokenDocument {
         for (path, value) in [
             ("effect.edgeFadeBand", self.effect.edge_fade_band),
             ("effect.glowBlur", self.effect.glow_blur),
+            ("effect.glassBlur", self.effect.glass_blur),
         ] {
             if value < 0.0 {
                 return invalid(path, "must not be negative");
@@ -195,6 +196,7 @@ impl TokenDocument {
             ("effect.selectedRingAlpha", self.effect.selected_ring_alpha),
             ("effect.focusRingAlpha", self.effect.focus_ring_alpha),
             ("effect.glowAlpha", self.effect.glow_alpha),
+            ("effect.glassAlpha", self.effect.glass_alpha),
             ("opacity.disabled", self.opacity.disabled),
             ("opacity.muted", self.opacity.muted),
             ("opacity.scrim", self.opacity.scrim),
@@ -1151,6 +1153,12 @@ pub struct EffectTokens {
     pub glow_alpha: f32,
     /// How far that bleed reaches, in pixels.
     pub glow_blur: f32,
+    /// How opaque a frosted surface's own fill is over what it blurs. A theme
+    /// that sets this to 1 declares itself opaque, and a frosted surface then
+    /// paints no blur at all rather than blurring pixels nobody can see.
+    pub glass_alpha: f32,
+    /// How far a frosted surface blurs what is behind it, in pixels.
+    pub glass_blur: f32,
 }
 
 #[cfg(test)]

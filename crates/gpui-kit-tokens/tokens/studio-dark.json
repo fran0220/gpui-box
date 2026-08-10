@@ -192,6 +192,8 @@
     "focusRingWidth": 2,
     "focusRingAlpha": 0.55,
     "glowAlpha": 0.38,
-    "glowBlur": 12
+    "glowBlur": 12,
+    "glassAlpha": 0.72,
+    "glassBlur": 24
   }
 }

@@ -428,7 +428,9 @@
         "focusRingWidth",
         "focusRingAlpha",
         "glowAlpha",
-        "glowBlur"
+        "glowBlur",
+        "glassAlpha",
+        "glassBlur"
       ],
       "properties": {
         "edgeFadeBand": { "$ref": "#/$defs/positiveNumber" },
@@ -436,7 +438,9 @@
         "focusRingWidth": { "$ref": "#/$defs/strictlyPositiveNumber" },
         "focusRingAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
         "glowAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
-        "glowBlur": { "$ref": "#/$defs/positiveNumber" }
+        "glowBlur": { "$ref": "#/$defs/positiveNumber" },
+        "glassAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "glassBlur": { "$ref": "#/$defs/positiveNumber" }
       }
     }
   }
