@@ -269,8 +269,9 @@ deterministic browser visual gate. Native desktop support remains in place;
 web support will be claimed when rendering, interaction, accessibility and
 visual regression coverage pass together rather than when components merely
 compile for a web target. The product-neutral browser gallery now builds on
-stable Rust and its representative rendering, interaction, accessibility, and
-visual smokes pass; the full catalog baseline is still pending. See
+stable Rust, its representative interaction and accessibility smokes pass, and
+its canonical catalog reproduces across both bundled themes in the browser
+visual gate. See
 [`docs/compatibility.md`](docs/compatibility.md).
 
 The browser host under `examples/browser-gallery` renders the canonical Rust

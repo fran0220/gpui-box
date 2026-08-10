@@ -33,10 +33,10 @@ wgpu and allocator edges resolve their registry Windows 0.62 dependencies.
 
 | Capability | macOS | Windows | Linux | Browser/WASM |
 |---|---|---|---|---|
-| Core components | Supported; native visual gate | Supported; headless visual gate | Supported; headless visual gate | Browser host candidate; full visual baseline pending |
+| Core components | Supported; native visual gate | Supported; headless visual gate | Supported; headless visual gate | Browser host; full WebGL2 visual gate |
 | Native frame capture | Supported | Not implemented | Not implemented | Not applicable |
 | Offscreen WGPU capture | Not used | WARP | llvmpipe | Browser canvas capture gate |
-| Edge fade | Supported | Supported | Supported | Browser gate pending full catalog |
+| Edge fade | Supported | Supported | Supported | Covered by the full browser visual gate |
 | Backdrop blur | Metal | Translucent fallback | Translucent fallback | Translucent fallback |
 | Native child surfaces | Supported | Supported | Not implemented | Not applicable |
 
@@ -57,9 +57,9 @@ fixtures for `wasm32-unknown-unknown` on the repository's stable Rust
 toolchain. `web build` additionally links the browser gallery against
 WebPlatform. The browser host uses the same Rust scene catalog, themes, tokens,
 directions, and stable semantic ids as native rendering; it has no DOM component
-rewrite. Representative two-theme browser baselines reproduce exactly; the
-full runtime-catalog baseline remains pending, so this matrix does not yet
-claim complete browser parity.
+rewrite. The full runtime catalog reproduces exactly in both bundled themes.
+The matrix does not claim threaded execution or screen-reader announcement
+coverage.
 
 The host uses the stable single-threaded WebPlatform path. Threaded browser
 execution requires separate COOP/COEP and worker validation. The WebPlatform

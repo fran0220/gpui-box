@@ -208,12 +208,13 @@ cargo run -p xtask -- web visual check button input dialog node-graph
 cargo run -p xtask -- web visual check # every catalog scene in every bundled theme
 ```
 
-The repository currently accepts representative two-theme baselines for a
-control, text input, overlay, and canvas interaction. They reproduced exactly
-on a second clean run and were visually inspected. Full-catalog browser
-baselines remain pending. The separate Chromium smoke verifies real pointer and
-keyboard paths plus the AccessKit DOM bridge; the diagnostic semantic snapshot
-is used only for stable identity and bounds correlation.
+The repository accepts a two-theme baseline for every scene published by the
+runtime catalog. A second full run reproduced every image exactly, and the
+complete set was visually inspected through labeled contact sheets with
+full-resolution review of suspected anomalies. The separate Chromium smoke
+verifies real pointer and keyboard paths plus the AccessKit DOM bridge; the
+diagnostic semantic snapshot is used only for stable identity and bounds
+correlation.
 
 ## The headless gate
 
