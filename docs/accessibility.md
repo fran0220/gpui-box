@@ -65,26 +65,28 @@ semantic id and GPUI element id are required to match. Installing the test
 registry is not a condition of platform accessibility.
 
 GPUI forwards that AccessKit tree to NSAccessibility on macOS, UI Automation on
-Windows, and AT-SPI on Linux. The macOS, Windows, and Linux rows below describe
-the maintained fork's adapter path; only the deterministic AccessKit tree has
-been exercised by this repository's deterministic test. The macOS smoke check
+Windows, AT-SPI on Linux, and an invisible semantic DOM mirror in browsers. The
+rows below describe the maintained fork's adapter paths. Deterministic tests
+exercise the AccessKit tree, and the browser smoke exercises the DOM mirror's
+roles, focus, actions, and canvas-scaled bounds. The macOS smoke check
 queries each running gallery by PID with `AXUIElement` after confirming that the
 invoking terminal has Accessibility permission. A platform adapter existing is
 not evidence that a particular screen reader announces every property correctly.
 
-| Capability | macOS AX | Windows UIA | Linux AT-SPI |
-|---|---|---|---|
-| Role and accessible name | Native AX smoke verified | Bridged; native session unverified | Bridged; native session unverified |
-| String value and placeholder | Bridged; deterministic tree verified | Bridged; native session unverified | Bridged; native session unverified |
-| Disabled, invalid, required, busy | Disabled native AX smoke verified; other states deterministic only | Bridged; native session unverified | Bridged; native session unverified |
-| Checked, expanded, widget selection | Checked native AX smoke verified; expanded/selection deterministic only | Bridged; native session unverified | Bridged; native session unverified |
-| Focus | GPUI focus is projected and assistive-technology-requested focus has a native AX smoke check | Native UIA `SetFocus` verified: keyboard focus, global focused element, and one focus-changed event agree; Tab navigation is not claimed | GPUI focus action is routed to its owning handle; native AT-SPI session unverified |
-| Numeric min, max, current value | Bridged; deterministic tree verified | Bridged; native session unverified | Bridged; native session unverified |
-| Editable text | Native AX name/value/enabled/focus/editing smoke verified; grapheme-based TextRun structure verified deterministically | Same AccessKit structure; native session unverified | Same AccessKit structure; native session unverified |
-| Text selection and caret | Selection/caret structure and actions verified deterministically; native AX interaction unverified | Same AccessKit structure; native UIA interaction unverified | Same AccessKit structure; native AT-SPI interaction unverified |
-| Live-region updates | Explicit polite/assertive atomic Toast create/update/removal verified deterministically; native `AXApplicationStatus` identity/action/removal verified, but VoiceOver speech/timing unverified; static Status is non-live | Same AccessKit structure; UIA announcement unverified | Same AccessKit structure; AT-SPI announcement unverified |
-| GPUI overlays | Dialog/Menu/Tooltip/Status roles and lifetime native-smoke verified, including exact `AXDialog`, `AXMenu`/`AXMenuItem`, `AXUserInterfaceTooltip`, and `AXApplicationStatus` subroles where applicable; screen-reader ordering, navigation, and announcement remain unverified | Same AccessKit structure; native UIA revalidation pending | Same AccessKit structure; native AT-SPI session unverified |
-| Native-child handoff | Not implemented | Not implemented | Not implemented |
+| Capability | macOS AX | Windows UIA | Linux AT-SPI | Browser semantic DOM |
+|---|---|---|---|---|
+| Role and accessible name | Native AX smoke verified | Bridged; native session unverified | Bridged; native session unverified | Button/dialog roles and names browser-smoke verified |
+| String value and placeholder | Bridged; deterministic tree verified | Bridged; native session unverified | Bridged; native session unverified | Mirrored; text editing browser-smoke verified |
+| Disabled, invalid, required, busy | Disabled native AX smoke verified; other states deterministic only | Bridged; native session unverified | Bridged; native session unverified | Mirrored; screen-reader announcement unverified |
+| Checked, expanded, widget selection | Checked native AX smoke verified; expanded/selection deterministic only | Bridged; native session unverified | Bridged; native session unverified | Mirrored; screen-reader announcement unverified |
+| Focus | GPUI focus is projected and assistive-technology-requested focus has a native AX smoke check | Native UIA `SetFocus` verified: keyboard focus, global focused element, and one focus-changed event agree; Tab navigation is not claimed | GPUI focus action is routed to its owning handle; native AT-SPI session unverified | DOM focus action and ownership browser-smoke verified |
+| Numeric min, max, current value | Bridged; deterministic tree verified | Bridged; native session unverified | Bridged; native session unverified | Mirrored; AT interaction unverified |
+| Editable text | Native AX name/value/enabled/focus/editing smoke verified; grapheme-based TextRun structure verified deterministically | Same AccessKit structure; native session unverified | Same AccessKit structure; native session unverified | Keyboard editing browser-smoke verified |
+| Text selection and caret | Selection/caret structure and actions verified deterministically; native AX interaction unverified | Same AccessKit structure; native UIA interaction unverified | Same AccessKit structure; native AT-SPI interaction unverified | Mirrored; browser AT mutation unverified |
+| Live-region updates | Explicit polite/assertive atomic Toast create/update/removal verified deterministically; native `AXApplicationStatus` identity/action/removal verified, but VoiceOver speech/timing unverified; static Status is non-live | Same AccessKit structure; UIA announcement unverified | Same AccessKit structure; AT-SPI announcement unverified | ARIA live attributes mirrored; announcement unverified |
+| GPUI overlays | Dialog/Menu/Tooltip/Status roles and lifetime native-smoke verified, including exact `AXDialog`, `AXMenu`/`AXMenuItem`, `AXUserInterfaceTooltip`, and `AXApplicationStatus` subroles where applicable; screen-reader ordering, navigation, and announcement remain unverified | Same AccessKit structure; native UIA revalidation pending | Same AccessKit structure; native AT-SPI session unverified | Dialog role and dismiss action browser-smoke verified |
+| Bounds | Native adapter | Native adapter | Native adapter | Canvas-scaled DOM bounds browser-smoke verified |
+| Native-child handoff | Not implemented | Not implemented | Not implemented | Not applicable |
 
 `hovered` and pointer `pressed` remain diagnostic-only transient state. Semantic
 `parent` records actual diagnostic tree parentage; `labels` and `describes`

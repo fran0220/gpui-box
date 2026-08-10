@@ -192,20 +192,28 @@ fixture, theme, and platform in its baseline contract. A software-rendered
 gallery baseline does not replace native interaction and accessibility evidence
 for a product surface.
 
-## Deferred browser visual gate
+## Browser visual gate
 
-The deferred browser gate enumerates `gpui_kit::scenes::catalog()` and the
+The browser gate enumerates `gpui_kit::scenes::catalog()` and the
 bundled themes at runtime; it carries no hand-maintained scene or image count.
 Its fixed contract is the browser gallery's logical viewport, DPR 1, reduced
 motion, bundled fonts, each scene's declared direction, a pointer parked
 outside the canvas, and one discarded warm-up frame. Future captures remain
-separate from native and headless baselines.
+separate from native and headless baselines. Capture and check either the full
+runtime catalog or a scoped list:
 
-No browser baseline is accepted by this milestone. After the browser host can
-build normally, acceptance requires two clean full-catalog runs to reproduce,
-real pointer and keyboard interaction smokes to pass, and a browser
-accessibility bridge to be verified. The diagnostic semantic snapshot used to
-target controls is not DOM, ARIA, or accessibility evidence.
+```bash
+cargo run -p xtask -- web visual capture button input dialog node-graph
+cargo run -p xtask -- web visual check button input dialog node-graph
+cargo run -p xtask -- web visual check # every catalog scene in every bundled theme
+```
+
+The repository currently accepts representative two-theme baselines for a
+control, text input, overlay, and canvas interaction. They reproduced exactly
+on a second clean run and were visually inspected. Full-catalog browser
+baselines remain pending. The separate Chromium smoke verifies real pointer and
+keyboard paths plus the AccessKit DOM bridge; the diagnostic semantic snapshot
+is used only for stable identity and bounds correlation.
 
 ## The headless gate
 

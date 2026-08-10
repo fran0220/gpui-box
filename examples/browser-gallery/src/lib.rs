@@ -1,18 +1,25 @@
 #![cfg(target_family = "wasm")]
 
+use std::cell::RefCell;
+
 use gpui::{
     App, Bounds, Context, IntoElement, Render, Window, WindowBounds, WindowOptions, div,
     prelude::*, px, size,
 };
 use gpui_kit::prelude::{EmptyKind, EmptyState, set_layout_direction};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic, SemanticRegistry};
-use gpui_kit_theme::{Theme, activate_theme};
+use gpui_kit_theme::{Theme, ThemeRegistry, activate_theme};
 use wasm_bindgen::prelude::*;
 
 const VIEWPORT_WIDTH: f32 = 920.0;
 const VIEWPORT_HEIGHT: f32 = 1_000.0;
 const DEFAULT_SCENE: &str = "button";
 const DEFAULT_THEME: &str = "studio-light";
+const DEFAULT_BACKEND: &str = "auto";
+
+thread_local! {
+    static APPLICATION: RefCell<Option<gpui::ApplicationHandle>> = const { RefCell::new(None) };
+}
 
 struct BrowserGallery {
     scene: Option<&'static str>,
@@ -86,27 +93,65 @@ fn publish_snapshot(registry: &SemanticRegistry) {
     );
 }
 
+fn publish_catalog(cx: &App) {
+    let scenes = gpui_kit::scenes::catalog()
+        .into_iter()
+        .map(|scene| scene.name)
+        .collect::<Vec<_>>();
+    let themes = ThemeRegistry::global(cx)
+        .ids()
+        .into_iter()
+        .map(|id| id.to_string())
+        .collect::<Vec<_>>();
+    let Ok(json) = serde_json::to_string(&serde_json::json!({
+        "scenes": scenes,
+        "themes": themes,
+    })) else {
+        return;
+    };
+    let _ = js_sys::Reflect::set(
+        &js_sys::global(),
+        &JsValue::from_str("gpuiKitCatalog"),
+        &JsValue::from_str(&json),
+    );
+}
+
 fn run() {
     let requested_scene = config("scene", DEFAULT_SCENE);
     let scene = gpui_kit::scenes::find(&requested_scene);
     let requested_theme = config("theme", DEFAULT_THEME);
-    let app = gpui_platform::single_threaded_web().with_assets(gpui_kit::assets::Assets);
+    let requested_backend = config("backend", DEFAULT_BACKEND);
+    let (backend, backend_error) = match requested_backend.as_str() {
+        "auto" => (gpui_platform::WebBackendPreference::Auto, None),
+        "webgpu" => (gpui_platform::WebBackendPreference::WebGpu, None),
+        "webgl" => (gpui_platform::WebBackendPreference::WebGl, None),
+        _ => (
+            gpui_platform::WebBackendPreference::Auto,
+            Some(format!("Unknown renderer backend `{requested_backend}`.")),
+        ),
+    };
+    let app =
+        gpui_platform::application_with_web_backend(backend).with_assets(gpui_kit::assets::Assets);
 
-    app.run(move |cx: &mut App| {
+    let handle = app.run_embedded(move |cx: &mut App| {
         gpui_kit::install(cx);
+        publish_catalog(cx);
         cx.set_reduce_motion(true);
         let theme_available = activate_theme(&requested_theme, cx);
         if !theme_available {
             activate_theme(DEFAULT_THEME, cx);
         }
-        let unavailable = match (scene.as_ref(), theme_available) {
-            (None, false) => Some(format!(
-                "Unknown scene `{requested_scene}` and theme `{requested_theme}`."
-            )),
-            (None, true) => Some(format!("Unknown scene `{requested_scene}`.")),
-            (Some(_), false) => Some(format!("Unknown theme `{requested_theme}`.")),
-            (Some(_), true) => None,
-        };
+        let mut unavailable = Vec::new();
+        if scene.is_none() {
+            unavailable.push(format!("Unknown scene `{requested_scene}`."));
+        }
+        if !theme_available {
+            unavailable.push(format!("Unknown theme `{requested_theme}`."));
+        }
+        if let Some(error) = backend_error {
+            unavailable.push(error);
+        }
+        let unavailable = (!unavailable.is_empty()).then(|| unavailable.join(" "));
         let scene_name = scene.as_ref().map(|scene| scene.name);
         set_layout_direction(
             gpui_kit::scenes::direction(scene_name.unwrap_or(DEFAULT_SCENE)),
@@ -133,6 +178,7 @@ fn run() {
         .expect("open browser gallery window");
         cx.activate(true);
     });
+    APPLICATION.with(|application| application.replace(Some(handle)));
 }
 
 #[wasm_bindgen(start)]

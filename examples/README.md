@@ -27,7 +27,7 @@ evidence. The example demonstrates:
 Host-backed applications should keep their own host smoke tests outside this
 repository and use the same components over real view models.
 
-## Deferred browser gallery
+## Browser gallery
 
 `browser-gallery` is a product-neutral host for the same
 `gpui_kit::scenes::catalog()` used by the native gallery, audits, and visual
@@ -39,18 +39,20 @@ Unavailable state.
 ```bash
 rustup target add wasm32-unknown-unknown
 cargo run -p xtask -- web check  # core library; passes without WebPlatform
-cargo run -p xtask -- web build  # deferred browser host
+cargo run -p xtask -- web build  # stable WebPlatform browser host
 cargo run -p xtask -- web smoke  # npm ci + pinned Playwright browser smoke
+cargo run -p xtask -- web visual check button input dialog node-graph
 ```
 
 There was no existing JavaScript package manager convention in this
-repository, so the deferred host uses a local `package.json` and
+repository, so the browser host uses a local `package.json` and
 `package-lock.json`. `xtask web smoke` runs `npm ci` followed by `npm exec`; it
 never relies on a globally installed or floating Playwright package. A small
 Node HTTP server keeps the smoke command cross-platform.
 
-The basic smoke deliberately uses `gpui_platform::single_threaded_web`, which
-does not require the page to provide COOP/COEP headers. A threaded WebPlatform
-host needs separate deployment-header and worker evidence and is not claimed
-by this smoke. The current GPUI compatibility boundary is recorded once in
+The smoke uses WebPlatform's stable single-threaded default and does not require
+the page to provide COOP/COEP headers. It covers forced WebGL2, forced WebGPU,
+and Auto fallback to WebGL2 when WebGPU is disabled. A threaded WebPlatform host
+needs separate deployment-header and worker evidence and is not claimed by
+this smoke. The current GPUI compatibility boundary is recorded once in
 [`docs/compatibility.md`](../docs/compatibility.md).

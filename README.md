@@ -47,7 +47,7 @@ gpui-kit = { git = "https://github.com/fran0220/gpui-kit", rev = "<commit>" }
 # different revision as a different crate: two copies of GPUI in one binary
 # means two sets of globals, and the theme and semantic registry this library
 # installs would be invisible to your views.
-gpui = { git = "https://github.com/fran0220/zed", rev = "0d6f50bbac07b76688e5471b932b12412d256a9a" }
+gpui = { git = "https://github.com/fran0220/zed", rev = "b6755ec0ec370c8c69b4db7c065d0fa7a2cfb2b1" }
 ```
 
 If the application names `gpui_platform` or `gpui_wgpu` too, give every GPUI
@@ -259,7 +259,7 @@ is fixed and its captures are deterministic — see
 
 ## Roadmap
 
-### Next: Web support
+### Next: complete Web support
 
 The next milestone is to support browser-hosted GPUI applications without
 forking the component API into a separate web-only library. That work includes
@@ -268,13 +268,14 @@ needs, reuse of the same tokens and themes, semantic automation, and a
 deterministic browser visual gate. Native desktop support remains in place;
 web support will be claimed when rendering, interaction, accessibility and
 visual regression coverage pass together rather than when components merely
-compile for a web target. The core library passes its stable Rust wasm check,
-but a browser host remains blocked at the current GPUI pin; see
+compile for a web target. The product-neutral browser gallery now builds on
+stable Rust and its representative rendering, interaction, accessibility, and
+visual smokes pass; the full catalog baseline is still pending. See
 [`docs/compatibility.md`](docs/compatibility.md).
 
-The deferred browser-host candidate lives under `examples/browser-gallery` so
-the shared scene and interaction contracts can be reviewed before its upstream
-runtime prerequisite lands. It is not part of the current Web support claim.
+The browser host under `examples/browser-gallery` renders the canonical Rust
+scene catalog directly. It is not a second DOM component implementation and
+does not by itself make a complete Web support claim.
 
 ## Validation
 
@@ -283,6 +284,8 @@ cargo run -p xtask -- dependencies check # one immutable Zed source everywhere
 cargo run -p xtask -- gate        # dependencies, fmt, check, test, clippy, generated artifacts
 cargo run -p xtask -- gate full   # the above, plus rustdoc and scene images
 cargo run -p xtask -- headless check # deterministic Linux/Windows visual gate
+cargo run -p xtask -- web smoke      # real Chromium interaction/backend/a11y smoke
+cargo run -p xtask -- web visual check button input dialog node-graph
 ```
 
 The scene images are the visual regression gate:
@@ -302,10 +305,11 @@ requires and why a job that ran it anyway would be worse than no job.
 ## GPUI compatibility
 
 The workspace pins the `fran0220/zed` integration fork at
-`0d6f50bbac07b76688e5471b932b12412d256a9a`. It combines the runtime
+`b6755ec0ec370c8c69b4db7c065d0fa7a2cfb2b1`. It combines the runtime
 primitives and native-surface work with the offscreen WGPU renderer and the
 Windows pointer-exit lifecycle correction, plus pointer capture that survives
-gesture redraws, on one immutable revision. WGPU 29.0.4 and gpu-allocator
+gesture redraws, and the browser renderer/input/accessibility integration on
+one immutable revision. WGPU 29.0.4 and gpu-allocator
 0.28.0 resolve from crates.io rather than integration forks; reusable pieces
 can be proposed upstream independently. See
 [`docs/compatibility.md`](docs/compatibility.md).

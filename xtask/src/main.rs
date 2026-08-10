@@ -44,13 +44,15 @@ fn main() -> Result<()> {
         (Some("web"), Some("check")) => web_check(),
         (Some("web"), Some("build")) => web_build(),
         (Some("web"), Some("smoke")) => web_smoke(),
+        (Some("web"), Some("visual")) => web_visual(&rest),
         (Some("gate"), None) => gate(false),
         (Some("gate"), Some("full")) => gate(true),
         _ => bail!(
             "usage: cargo xtask <dependencies check|accessibility check|tokens generate|tokens check|strings check|\
              strings generate|scenes list|scenes capture [name...]|\
              scenes check [name...]|headless capture [name...]|\
-             headless check [name...]|web check|web build|web smoke|gate [full]>"
+             headless check [name...]|web check|web build|web smoke|\
+             web visual <capture|check> [name...]|gate [full]>"
         ),
     }
 }
@@ -1127,6 +1129,55 @@ fn web_smoke() -> Result<()> {
         ],
         None,
     )
+}
+
+fn web_visual(args: &[String]) -> Result<()> {
+    let Some(command @ ("capture" | "check")) = args.first().map(String::as_str) else {
+        bail!("usage: cargo xtask web visual <capture|check> [scene...]");
+    };
+    web_build()?;
+    let package = root().join("examples/browser-gallery");
+    let package = package.to_string_lossy();
+    step("npm", &["--prefix", package.as_ref(), "ci"], None)?;
+    step(
+        "npm",
+        &[
+            "--prefix",
+            package.as_ref(),
+            "exec",
+            "--",
+            "playwright",
+            "install",
+            "chromium",
+        ],
+        None,
+    )?;
+
+    let config = root().join("examples/browser-gallery/visual.config.mjs");
+    let mut playwright = Command::new("npm");
+    playwright
+        .args([
+            "--prefix",
+            package.as_ref(),
+            "exec",
+            "--",
+            "playwright",
+            "test",
+            "--config",
+        ])
+        .arg(config)
+        .current_dir(root());
+    if command == "capture" {
+        playwright.arg("--update-snapshots");
+    }
+    if args.len() > 1 {
+        playwright.env("GPUI_KIT_WEB_SCENES", args[1..].join(","));
+    }
+    let status = playwright.status().context("run browser visual gate")?;
+    if !status.success() {
+        bail!("browser visual {command} failed");
+    }
+    Ok(())
 }
 
 fn step(program: &str, args: &[&str], env: Option<(&str, &str)>) -> Result<()> {

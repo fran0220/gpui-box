@@ -15,10 +15,32 @@ export default defineConfig({
     colorScheme: "light",
     reducedMotion: "reduce",
     screenshot: "off",
-    launchOptions: {
-      args: ["--enable-unsafe-webgpu"],
-    },
   },
+  projects: [
+    {
+      name: "forced-webgl",
+      metadata: { backend: "webgl", renderer: "webgl2" },
+      use: { launchOptions: { args: ["--enable-unsafe-swiftshader"] } },
+    },
+    {
+      name: "auto-webgl-fallback",
+      metadata: { backend: "auto", renderer: "webgl2" },
+      use: {
+        launchOptions: {
+          args: ["--disable-features=WebGPU", "--enable-unsafe-swiftshader"],
+        },
+      },
+    },
+    {
+      name: "forced-webgpu",
+      metadata: { backend: "webgpu", renderer: "webgpu" },
+      use: {
+        launchOptions: {
+          args: ["--enable-unsafe-webgpu", "--enable-unsafe-swiftshader"],
+        },
+      },
+    },
+  ],
   webServer: {
     command: "node examples/browser-gallery/server.mjs",
     cwd: repoRoot,

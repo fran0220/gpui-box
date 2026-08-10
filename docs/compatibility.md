@@ -4,7 +4,7 @@
 
 | gpui-kit | GPUI source | Revision |
 |---|---|---|
-| 0.1.x | `https://github.com/fran0220/zed` | `0d6f50bbac07b76688e5471b932b12412d256a9a` |
+| 0.1.x | `https://github.com/fran0220/zed` | `b6755ec0ec370c8c69b4db7c065d0fa7a2cfb2b1` |
 
 The workspace and the standalone headless harness depend on one immutable
 revision of the integration fork. That revision merges three independently
@@ -33,11 +33,11 @@ wgpu and allocator edges resolve their registry Windows 0.62 dependencies.
 
 | Capability | macOS | Windows | Linux | Browser/WASM |
 |---|---|---|---|---|
-| Core components | Supported; native visual gate | Supported; headless visual gate | Supported; headless visual gate | Core stable wasm check passes; browser host blocked |
+| Core components | Supported; native visual gate | Supported; headless visual gate | Supported; headless visual gate | Browser host candidate; full visual baseline pending |
 | Native frame capture | Supported | Not implemented | Not implemented | Not applicable |
-| Offscreen WGPU capture | Not used | WARP | llvmpipe | No accepted baseline |
-| Edge fade | Supported | Supported | Supported | Unverified |
-| Backdrop blur | Metal | Translucent fallback | Translucent fallback | Unverified |
+| Offscreen WGPU capture | Not used | WARP | llvmpipe | Browser canvas capture gate |
+| Edge fade | Supported | Supported | Supported | Browser gate pending full catalog |
+| Backdrop blur | Metal | Translucent fallback | Translucent fallback | Translucent fallback |
 | Native child surfaces | Supported | Supported | Not implemented | Not applicable |
 
 Core component rendering is supported and visually regression-tested on all
@@ -54,18 +54,19 @@ primitives and is exercised by the WGPU integration test.
 
 `cargo run -p xtask -- web check` checks the core `gpui-kit` library with
 fixtures for `wasm32-unknown-unknown` on the repository's stable Rust
-toolchain. It does not link `gpui_platform` or claim that a browser host runs.
-At the current pin, linking WebPlatform reaches a dependency that requires an
-unstable wasm feature, so browser rendering and interaction remain blocked.
-Browser accessibility and a deterministic browser visual gate are also
-unverified. Web support remains unclaimed until rendering, interaction,
-accessibility, and visual regression coverage pass together.
+toolchain. `web build` additionally links the browser gallery against
+WebPlatform. The browser host uses the same Rust scene catalog, themes, tokens,
+directions, and stable semantic ids as native rendering; it has no DOM component
+rewrite. Representative two-theme browser baselines reproduce exactly; the
+full runtime-catalog baseline remains pending, so this matrix does not yet
+claim complete browser parity.
 
-The deferred host uses the single-threaded WebPlatform constructor for its
-basic no-header smoke. Threaded browser execution requires separate COOP/COEP
-and worker validation. The current web backend also does not implement
-`PlatformWindow::a11y_init` or `a11y_tree_update`, so the host's diagnostic
-semantic snapshot must not be presented as browser accessibility support.
+The host uses the stable single-threaded WebPlatform path. Threaded browser
+execution requires separate COOP/COEP and worker validation. The WebPlatform
+AccessKit adapter mirrors semantic roles, focus, supported actions, values, and
+canvas-scaled bounds into an invisible browser DOM tree; the gallery's JSON
+semantic snapshot remains a locator/debugging surface rather than a substitute
+for that adapter.
 
 ## Upgrade process
 

@@ -21,6 +21,7 @@
       window.gpuiKitConfig = {
         scene: query.get("scene") || "button",
         theme: query.get("theme") || "studio-light",
+        backend: query.get("backend") || "auto",
       };
       const { default: init } = await import("./gpui_kit_browser_gallery.js");
       await init();
