@@ -247,8 +247,8 @@ source into another: the root workspace and harness directly pin the same
 immutable `fran0220/zed` integration revision. That revision includes the
 offscreen renderer from
 [zed-industries/zed#62341](https://github.com/zed-industries/zed/pull/62341)
-alongside the runtime primitives the scenes use, and `xtask dependencies check`
-fails if either workspace or lockfile drifts.
+alongside the runtime primitives and bounded WGPU backdrop blur the scenes use,
+and `xtask dependencies check` fails if either workspace or lockfile drifts.
 
 ## Audit
 

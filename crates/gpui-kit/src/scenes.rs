@@ -3149,6 +3149,27 @@ fn frost(_window: &mut Window, cx: &mut App) -> AnyElement {
             )
             .child(caption(&theme, body))
     };
+    let stripes = || {
+        div()
+            .absolute()
+            .top(px(56.0))
+            .left(px(100.0))
+            .w(px(330.0))
+            .h(px(64.0))
+            .flex()
+            .overflow_hidden()
+            .children((0..22).map(|index| {
+                div()
+                    .flex_none()
+                    .w(px(15.0))
+                    .h(px(64.0))
+                    .bg(if index % 2 == 0 {
+                        theme.colors.accent
+                    } else {
+                        theme.colors.canvas
+                    })
+            }))
+    };
     stack(&theme)
         .w(px(480.0))
         .child(caption(&theme, "A floating surface on glass"))
@@ -3159,6 +3180,7 @@ fn frost(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .hairline(&theme)
                 .radius(&theme, Radius::Card)
                 .overflow_hidden()
+                .child(stripes())
                 .child(filler(&theme, "Document", 8))
                 .child(
                     div()
@@ -3184,19 +3206,20 @@ fn frost(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .hairline(&theme)
                 .radius(&theme, Radius::Card)
                 .overflow_hidden()
+                .child(stripes())
                 .child(filler(&theme, "Files", 6))
                 .child(
                     div()
                         .absolute()
                         .top(px(32.0))
-                        .left(px(64.0))
+                        .left(px(120.0))
                         .w(px(280.0))
                         .child(
                             Frost::new("scene.frost.rail")
                                 .surface(gpui_kit_theme::Surface::Panel)
                                 .radius(Radius::Dialog)
                                 .blur(32.0)
-                                .child(card("Rail", "Where blur is unsupported the tint remains")),
+                                .child(card("Rail", "The striped backdrop stays out of focus")),
                         ),
                 ),
         )

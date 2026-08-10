@@ -21,7 +21,7 @@ GPUI / Zed
 Source: https://github.com/zed-industries/zed
 Integration source: https://github.com/fran0220/zed
 Upstream baseline: a6a23c7b80a5cefa0487b7856335be89ace7e483
-Pinned integration revision: b6755ec0ec370c8c69b4db7c065d0fa7a2cfb2b1
+Pinned integration revision: ce35a66556c39f948ada12b60d2aaef579a8aa68
 License: Apache-2.0
 Copyright 2022–2024 Zed Industries, Inc.
 
@@ -29,8 +29,9 @@ Scope: linked GPUI, gpui_platform, gpui_wgpu, EdgeFade, BackdropBlur,
 native-surface integration, accessibility control-state projection and test
 activation, Windows pointer-exit translation, and offscreen rendering patch
 chains, fluent hitbox pointer capture for bounded drag gestures, and browser
-WebGPU/WebGL2 rendering, input delivery, and AccessKit semantic DOM mirroring. WGPU and
-gpu-allocator are consumed from crates.io rather than integration forks.
+WebGPU/WebGL2 rendering, input delivery, AccessKit semantic DOM mirroring, and
+bounded ordered WGPU backdrop blur. WGPU and gpu-allocator are consumed from
+crates.io rather than integration forks.
 License text: licenses/ZED-APACHE-2.0.txt
 
 Geist and Geist Mono

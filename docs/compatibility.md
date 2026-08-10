@@ -4,7 +4,7 @@
 
 | gpui-kit | GPUI source | Revision |
 |---|---|---|
-| 0.1.x | `https://github.com/fran0220/zed` | `b6755ec0ec370c8c69b4db7c065d0fa7a2cfb2b1` |
+| 0.1.x | `https://github.com/fran0220/zed` | `ce35a66556c39f948ada12b60d2aaef579a8aa68` |
 
 The workspace and the standalone headless harness depend on one immutable
 revision of the integration fork. That revision merges three independently
@@ -37,7 +37,7 @@ wgpu and allocator edges resolve their registry Windows 0.62 dependencies.
 | Native frame capture | Supported | Not implemented | Not implemented | Not applicable |
 | Offscreen WGPU capture | Not used | WARP | llvmpipe | Browser canvas capture gate |
 | Edge fade | Supported | Supported | Supported | Covered by the full browser visual gate |
-| Backdrop blur | Metal | Translucent fallback | Translucent fallback | Translucent fallback |
+| Backdrop blur | Metal | WGPU | WGPU | WebGPU and WebGL2 |
 | Native child surfaces | Supported | Supported | Not implemented | Not applicable |
 
 Core component rendering is supported and visually regression-tested on all
@@ -47,10 +47,13 @@ capture and some accessibility or native-child capabilities remain
 platform-specific as recorded in this table and in
 [`accessibility.md`](accessibility.md).
 
-Backdrop blur is deliberately renderer-specific: Metal snapshots and blurs the
-scene below it, while other renderers preserve the translucent fill as a
-truthful unblurred fallback. Edge fade is encoded into ordinary painted
-primitives and is exercised by the WGPU integration test.
+Backdrop blur is deliberately renderer-specific: Metal and WGPU snapshot and
+blur the scene below each ordered blur fence. WGPU applies the content mask and
+rounded bounds exactly, bounds variance splitting and aggregate per-frame work,
+and preserves the translucent fill over an unblurred backdrop for invalid or
+over-budget regions. Other renderers retain that same truthful unblurred
+fallback. Edge fade is encoded into ordinary painted primitives and is
+exercised by the WGPU integration test.
 
 `cargo run -p xtask -- web check` checks the core `gpui-kit` library with
 fixtures for `wasm32-unknown-unknown` on the repository's stable Rust

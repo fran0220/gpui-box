@@ -19,13 +19,13 @@ anyhow = "1"
 # The same major version GPUI's `render_to_image` returns, so the image value
 # crosses the crate boundary as one type.
 image = "0.25"
-gpui = { git = "https://github.com/fran0220/zed", rev = "b6755ec0ec370c8c69b4db7c065d0fa7a2cfb2b1", features = ["test-support"] }
+gpui = { git = "https://github.com/fran0220/zed", rev = "ce35a66556c39f948ada12b60d2aaef579a8aa68", features = ["test-support"] }
 gpui-kit = { path = "../../crates/gpui-kit", features = ["fixtures"] }
 gpui-kit-semantics = { path = "../../crates/gpui-kit-semantics" }
 gpui-kit-theme = { path = "../../crates/gpui-kit-theme" }
 
 [target.'cfg(any(target_os = "linux", target_os = "windows"))'.dependencies]
-gpui_platform = { git = "https://github.com/fran0220/zed", rev = "b6755ec0ec370c8c69b4db7c065d0fa7a2cfb2b1", features = ["test-support"] }
-gpui_wgpu = { git = "https://github.com/fran0220/zed", rev = "b6755ec0ec370c8c69b4db7c065d0fa7a2cfb2b1", features = ["test-support"] }
+gpui_platform = { git = "https://github.com/fran0220/zed", rev = "ce35a66556c39f948ada12b60d2aaef579a8aa68", features = ["test-support"] }
+gpui_wgpu = { git = "https://github.com/fran0220/zed", rev = "ce35a66556c39f948ada12b60d2aaef579a8aa68", features = ["test-support"] }
 
 [workspace]
