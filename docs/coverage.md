@@ -14,7 +14,7 @@ input, and an entry in `docs/components.md`.
 | Family | Components |
 |---|---|
 | Action | `Button`, `IconButton`, `ButtonGroup`, `SplitButton`, `Toggle`, `ToggleGroup`, `CopyButton` |
-| Text entry | `TextInput`, `TextArea`, `NumberInput`, `TagInput`, `InlineEdit` |
+| Text entry | `TextInput`, `PasswordInput`, `OneTimeCodeInput`, `TextArea`, `NumberInput`, `TagInput`, `InlineEdit` |
 | Choice | `Select`, `Combobox`, `Checkbox`, `Radio`, `Switch`, `Slider`, `SegmentedControl` |
 | Form | `FormField`, `SettingsRow`, `SettingsSection` |
 | Navigation | `Tabs`, `Accordion`, `Collapsible`, `Breadcrumb`, `Sidebar`, `Pagination`, `Wizard` |
@@ -34,6 +34,13 @@ input, and an entry in `docs/components.md`.
 
 `Tooltipped` is an extension trait rather than a component: it attaches a
 `Tooltip` to any element, and is covered wherever that `Tooltip` is.
+
+`PasswordInput` and `OneTimeCodeInput` cover only product-neutral sensitive
+entry. The `auth-sign-in` and `auth-verification` scenes show password,
+one-time verification, passkey, organization sign-on, and recovery actions as
+composition from generic primitives. Account models, provider policy,
+credential storage, validation, networking, RPC, and authentication outcomes
+remain with the caller.
 
 `BrowserPanel` is listed with a qualification because it is one. It is the
 chrome and the states around an embedded web view and it renders no web
@@ -194,11 +201,8 @@ is for. `Cascader`, `AnchorList`, and `DiagnosticsList` are also covered above;
 they compose the existing popover/menu, navigation, list, filter, badge, and
 status vocabulary instead of creating parallel application infrastructure.
 
-Then: mentions in a text field, a segmented one-time-code field, a password
-reveal, search within settings, a keymap editor showing conflicts, undo
-history, and `Sparkline` —
-the one exception worth making to charts being out of scope, because a token
-count over time is a reading, not a chart.
+Then: mentions in a text field, search within settings, a keymap editor showing
+conflicts, and undo history.
 
 Agent applications need a family this library is still filling in. A
 conversation is not the unit; a run made of steps is, and `ToolCallCard`,

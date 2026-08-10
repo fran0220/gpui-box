@@ -367,6 +367,45 @@ pub(crate) fn fit_to_max_length(
         .collect()
 }
 
+/// Truncates an insertion to a grapheme limit without splitting a user-
+/// perceived character. This is separate from the byte-oriented
+/// `max_length` contract so existing callers keep their exact limit meaning.
+pub(crate) fn fit_to_max_graphemes(
+    text: &str,
+    max_graphemes: Option<usize>,
+    replacing: &Range<usize>,
+    new_text: &str,
+) -> String {
+    let Some(max_graphemes) = max_graphemes else {
+        return new_text.to_string();
+    };
+
+    // Grapheme segmentation is not compositional: a combining mark or ZWJ
+    // sequence at either insertion edge can join what was already there. Test
+    // candidate prefixes in the reconstructed value rather than adding three
+    // independently computed counts. Only the two edge graphemes can merge,
+    // so no accepted prefix can contain more than `max + 2` standalone
+    // insertion graphemes.
+    let prefix = &text[..replacing.start];
+    let suffix = &text[replacing.end..];
+    let mut candidate = String::with_capacity(prefix.len() + new_text.len() + suffix.len());
+    let mut accepted = 0;
+    for (index, grapheme) in new_text
+        .grapheme_indices(true)
+        .take(max_graphemes.saturating_add(2))
+    {
+        let end = index + grapheme.len();
+        candidate.clear();
+        candidate.push_str(prefix);
+        candidate.push_str(&new_text[..end]);
+        candidate.push_str(suffix);
+        if candidate.graphemes(true).count() <= max_graphemes {
+            accepted = end;
+        }
+    }
+    new_text[..accepted].to_string()
+}
+
 pub(crate) fn normalize_single_line(text: &str) -> String {
     text.replace("\r\n", " ").replace(['\r', '\n'], " ")
 }
@@ -423,6 +462,29 @@ mod tests {
         assert_eq!(fit_to_max_length("", Some(4), &(0..0), "héllo"), "hél");
         assert_eq!(fit_to_max_length("ab", Some(3), &(0..0), "cd"), "c");
         assert_eq!(fit_to_max_length("ab", None, &(0..0), "cd"), "cd");
+    }
+
+    #[test]
+    fn a_grapheme_limit_counts_extended_characters_not_bytes() {
+        assert_eq!(
+            fit_to_max_graphemes("", Some(2), &(0..0), "e\u{301}👩‍💻x"),
+            "e\u{301}👩‍💻"
+        );
+        assert_eq!(fit_to_max_graphemes("ab", Some(3), &(1..2), "👩‍💻xy"), "👩‍💻x");
+        assert_eq!(fit_to_max_graphemes("ab", None, &(0..0), "cd"), "cd");
+    }
+
+    #[test]
+    fn a_grapheme_limit_segments_the_reconstructed_value_at_both_edges() {
+        assert_eq!(
+            fit_to_max_graphemes("a", Some(1), &(1..1), "\u{301}"),
+            "\u{301}"
+        );
+        assert_eq!(fit_to_max_graphemes("\u{301}", Some(1), &(0..0), "a"), "a");
+        assert_eq!(
+            fit_to_max_graphemes("👩", Some(1), &("👩".len().."👩".len()), "‍💻"),
+            "‍💻"
+        );
     }
 
     #[test]

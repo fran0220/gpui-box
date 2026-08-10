@@ -22,15 +22,19 @@ AnchorList
 AnimatedNumber
 ApprovalPrompt
 AspectRatio
+BackspaceAtStart
+Blur
 Breadcrumb
 BrowserPanel
 BulkBar
 Button
 ButtonGroup
 Calendar
+Cancel
 Card
 Cascader
 Cell
+Change
 Checkbox
 CodeView
 Collapsible
@@ -54,6 +58,7 @@ FilterBar
 FindReplace
 Flip
 Flipped
+Focus
 Follow
 FormField
 Frost
@@ -79,8 +84,10 @@ NodeGraph
 Notification
 NotificationCenter
 NumberInput
+OneTimeCodeInput
 Overlay
 Pagination
+PasswordInput
 PermissionMatrix
 Placed
 Popover
@@ -105,6 +112,7 @@ StatusBar
 StatusItem
 Step
 StepList
+Submit
 Switch
 Table
 Tabs

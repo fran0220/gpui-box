@@ -1,5 +1,6 @@
 //! Interactive controls that emit caller-owned actions.
 
+pub mod auth;
 pub mod button;
 pub mod cascader;
 pub mod combobox;

@@ -24,6 +24,8 @@ component grows a literal a reader could read.
 |---|---|---|---|
 | `Button` | builder | click | No handler is installed while disabled or loading |
 | `TextInput` | view | change, submit, cancel, focus, blur | Grapheme-aware editing, input-method composition, masking, length limit |
+| `PasswordInput` | view | change, submit, cancel, backspace at start, focus, blur | One sensitive `TextInput` editor plus a keyboard-operable reveal action. Reveal changes only the visual mask: semantic and AccessKit values/text runs, Debug, and clipboard copy/cut remain redacted |
+| `OneTimeCodeInput` | view | change, submit | One sensitive `TextInput` editor rendered as 1–12 caller-chosen slots (six by default), not one field per slot. A slot accepts one Unicode grapheme; semantics and AccessKit publish only redaction plus the current/target length shape |
 | `TextArea` | view | change, submit, cancel, focus, blur | Wrapped multi-line editing. Enter inserts a line and the primary modifier plus enter submits. Motion follows visual rows with a preserved goal column, and the frame grows from `rows` to `max_rows` before it scrolls |
 | `Select` | view | selected, opened, closed | Owns only whether the menu is open. `name` supplies the caller-owned accessible label independently of the answer or placeholder |
 | `Cascader`, `CascaderOption` | view | selected, expanded, retry, opened, closed | A hierarchical choice with stable caller-owned option identities. Only the open path is transient; the accepted value and hierarchy remain caller-owned. Child loading, empty, unavailable, error, and ready states stay distinct, and RTL swaps the arrows that enter and leave a branch |
@@ -50,6 +52,21 @@ component grows a literal a reader could read.
 | `FindReplace` | view | replace one, and replace all with the number it stated | `SearchField` with a replacement field under it. Replace all carries its count on the control before it is taken, and a count nobody established — too many, still counting, unavailable — leaves it refused with the reason beside it |
 | `UploadList`, `Upload` | builder | a file to retry, one to stop, one to take off the list | Files on their way somewhere, over the `Dropzone` that took them. A refusal is not a failure and is offered no retry; overall progress is claimed only when every file still in flight declared an extent |
 | `field_shell`, `FieldState` | helper | — | The one border, background, and focus treatment every editable control draws. A composed field — `NumberInput`, `Combobox`, `TagInput` — wraps a bare input in one of these rather than nesting two frames |
+
+### Sensitive text remains one editor
+
+`PasswordInput` and `OneTimeCodeInput` do not duplicate editing. Each owns one
+`TextInput` entity, one focus handle, one selection, one caret, and one input
+method composition. Password reveal is visual transient state. One-time-code
+slots are visual policy over the same editor, with hit testing and input-method
+bounds mapped across the complete segmented surface.
+
+Both controls return the typed value only to their caller and emit caller-owned
+change/submit events whose `Debug` output is redacted. Deterministic semantics,
+GPUI's AccessKit values and text runs, clipboard copy/cut, and component Debug
+carry no credential or code. `auth-sign-in` and `auth-verification` demonstrate
+composition with `Card`, `FormField`, `Callout`, and generic caller-supplied
+actions. They define no account, provider, network, or credential policy.
 
 ## Display
 

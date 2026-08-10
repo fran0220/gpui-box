@@ -1,10 +1,13 @@
-//! Typing, selection, and refusal behaviour of `TextInput`, driven through
-//! simulated key and mouse input rather than by calling editing methods.
+//! Typing, selection, refusal, and input-method behaviour of `TextInput`,
+//! driven through simulated input and GPUI's native input-handler contract.
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use gpui::{App, AppContext as _, Entity, Focusable, IntoElement, TestAppContext, Window};
+use gpui::{
+    App, AppContext as _, Entity, EntityInputHandler, Focusable, IntoElement, TestAppContext,
+    Window,
+};
 use gpui_kit::controls::input::{TextInput, TextInputEvent};
 use gpui_kit::prelude::*;
 use gpui_kit_testkit::harness::Harness;
@@ -92,6 +95,58 @@ fn a_length_limit_truncates_instead_of_rejecting(cx: &mut TestAppContext) {
     harness.keystrokes("a b c d e");
 
     assert_eq!(value(&mut harness, &slot), "abc");
+}
+
+#[gpui::test]
+fn ime_relative_utf16_selection_is_converted_against_the_replacement(cx: &mut TestAppContext) {
+    let (mut harness, slot) = input(cx, |input| input.text("ab"));
+    let entity = slot.borrow().clone().expect("input entity");
+
+    harness.update(|window, cx| {
+        entity.update(cx, |input, cx| {
+            input.replace_and_mark_text_in_range(None, "😀", Some(0..2), window, cx);
+        });
+    });
+    assert_eq!(value(&mut harness, &slot), "ab😀");
+    assert_eq!(
+        harness.update(|_, cx| entity.read(cx).selected_range()),
+        2..6
+    );
+
+    harness.update(|window, cx| {
+        entity.update(cx, |input, cx| {
+            input.replace_and_mark_text_in_range(None, "e\u{301}", Some(0..2), window, cx);
+        });
+    });
+    assert_eq!(value(&mut harness, &slot), "abe\u{301}");
+    assert_eq!(
+        harness.update(|_, cx| entity.read(cx).selected_range()),
+        2..5
+    );
+}
+
+#[gpui::test]
+fn rejected_ime_input_does_not_report_an_unchanged_value(cx: &mut TestAppContext) {
+    let (mut harness, slot) = input(cx, |input| input.text("a").max_length(1));
+    let entity = slot.borrow().clone().expect("input entity");
+    let changes = Rc::new(RefCell::new(0));
+    harness.update(|_, cx| {
+        let changes = changes.clone();
+        cx.subscribe(&entity, move |_, event: &TextInputEvent, _| {
+            if matches!(event, TextInputEvent::Change(_)) {
+                *changes.borrow_mut() += 1;
+            }
+        })
+        .detach();
+    });
+
+    harness.update(|window, cx| {
+        entity.update(cx, |input, cx| {
+            input.replace_and_mark_text_in_range(None, "x", Some(0..1), window, cx);
+        });
+    });
+    assert_eq!(value(&mut harness, &slot), "a");
+    assert_eq!(*changes.borrow(), 0);
 }
 
 #[gpui::test]

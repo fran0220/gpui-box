@@ -110,6 +110,9 @@ pub mod prelude {
         MessageBody, MessageList, Reaction, TrackStep, TransportBar, TransportDuration,
         TransportEvent, TransportState, ViewportState,
     };
+    pub use crate::controls::auth::{
+        OneTimeCodeInput, OneTimeCodeInputEvent, PasswordInput, PasswordInputEvent,
+    };
     pub use crate::controls::button::{
         Button, ButtonGroup, ButtonJoin, ButtonVariant, IconButton, IconPosition,
     };

@@ -30,6 +30,7 @@ pub struct PrepaintState {
     cursor: Option<PaintQuad>,
     selection: Option<PaintQuad>,
     scroll_offset: Pixels,
+    custom_visual: bool,
 }
 
 impl IntoElement for TextElement {
@@ -61,7 +62,11 @@ impl Element for TextElement {
     ) -> (LayoutId, Self::RequestLayoutState) {
         let mut style = Style::default();
         style.size.width = relative(1.0).into();
-        style.size.height = window.line_height().into();
+        style.size.height = if self.input.read(cx).visual_slots().is_some() {
+            relative(1.0).into()
+        } else {
+            window.line_height().into()
+        };
         (window.request_layout(style, [], cx), ())
     }
 
@@ -76,6 +81,7 @@ impl Element for TextElement {
     ) -> Self::PrepaintState {
         let theme = cx.theme().clone();
         let input = self.input.read(cx);
+        let custom_visual = input.visual_slots().is_some();
         let content = input.display_text();
         let selected = input.selected_range();
         let cursor = input.display_offset(input.cursor_offset());
@@ -136,19 +142,27 @@ impl Element for TextElement {
         // instead of being painted outside the control.
         let cursor_x = line.x_for_index(cursor);
         let previous = self.input.read(cx).scroll_offset();
-        let mut scroll_offset = previous.min(line.width - bounds.size.width).max(px(0.0));
-        if cursor_x - scroll_offset > bounds.size.width {
-            scroll_offset = cursor_x - bounds.size.width;
-        }
-        if cursor_x < scroll_offset {
-            scroll_offset = cursor_x;
-        }
-        if line.width <= bounds.size.width {
-            scroll_offset = px(0.0);
+        let mut scroll_offset = if custom_visual {
+            px(0.0)
+        } else {
+            previous.min(line.width - bounds.size.width).max(px(0.0))
+        };
+        if !custom_visual {
+            if cursor_x - scroll_offset > bounds.size.width {
+                scroll_offset = cursor_x - bounds.size.width;
+            }
+            if cursor_x < scroll_offset {
+                scroll_offset = cursor_x;
+            }
+            if line.width <= bounds.size.width {
+                scroll_offset = px(0.0);
+            }
         }
 
         let left = bounds.left() - scroll_offset;
-        let (selection, cursor) = if selected.is_empty() {
+        let (selection, cursor) = if custom_visual {
+            (None, None)
+        } else if selected.is_empty() {
             (
                 None,
                 Some(fill(
@@ -177,6 +191,7 @@ impl Element for TextElement {
             cursor,
             selection,
             scroll_offset,
+            custom_visual,
         }
     }
 
@@ -208,15 +223,17 @@ impl Element for TextElement {
                 window.paint_quad(selection);
             }
             if let Some(line) = prepaint.line.take() {
-                line.paint(
-                    point(bounds.origin.x - scroll_offset, bounds.origin.y),
-                    window.line_height(),
-                    gpui::TextAlign::Left,
-                    None,
-                    window,
-                    cx,
-                )
-                .ok();
+                if !prepaint.custom_visual {
+                    line.paint(
+                        point(bounds.origin.x - scroll_offset, bounds.origin.y),
+                        window.line_height(),
+                        gpui::TextAlign::Left,
+                        None,
+                        window,
+                        cx,
+                    )
+                    .ok();
+                }
                 self.input.update(cx, |input, _| {
                     input.set_last_layout(line, bounds);
                     input.set_scroll_offset(scroll_offset);

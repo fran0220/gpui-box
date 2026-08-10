@@ -164,7 +164,7 @@ pub(crate) fn install(cx: &mut App) {
 }
 
 /// What an input reports to its owner.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum TextInputEvent {
     /// The text changed, by typing, deletion, paste, or a programmatic set.
     Change(SharedString),
@@ -180,6 +180,25 @@ pub enum TextInputEvent {
     BackspaceAtStart,
     Focus,
     Blur,
+}
+
+impl std::fmt::Debug for TextInputEvent {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            // TextInput is also the editor under sensitive controls. Its
+            // payload remains available to the subscriber, but formatting an
+            // event must never turn the payload into an action log.
+            Self::Change(_) => formatter
+                .debug_tuple("Change")
+                .field(&"[REDACTED]")
+                .finish(),
+            Self::Submit => formatter.write_str("Submit"),
+            Self::Cancel => formatter.write_str("Cancel"),
+            Self::BackspaceAtStart => formatter.write_str("BackspaceAtStart"),
+            Self::Focus => formatter.write_str("Focus"),
+            Self::Blur => formatter.write_str("Blur"),
+        }
+    }
 }
 
 impl EventEmitter<TextInputEvent> for TextInput {}
@@ -210,10 +229,22 @@ pub struct TextInput {
     invalid: bool,
     required: bool,
     read_only: bool,
+    /// Sensitivity controls every export boundary and never changes while a
+    /// credential is visually revealed.
     secret: bool,
+    /// Visual masking is deliberately separate from sensitivity. A password
+    /// reveal changes this bit and leaves semantic, accessibility, clipboard,
+    /// and Debug redaction untouched.
+    visually_masked: bool,
     /// Set when a composing control supplies the frame itself.
     bare: bool,
     max_length: Option<usize>,
+    /// Used by segmented sensitive inputs, where one slot means one Unicode
+    /// grapheme rather than one UTF-8 byte.
+    max_graphemes: Option<usize>,
+    /// A custom visual may segment the one editor into this many slots. The
+    /// editor still owns hit testing and IME geometry for the full surface.
+    visual_slots: Option<usize>,
     scroll_offset: Pixels,
     is_selecting: bool,
     last_layout: Option<ShapedLine>,
@@ -250,8 +281,11 @@ impl TextInput {
             required: false,
             read_only: false,
             secret: false,
+            visually_masked: false,
             bare: false,
             max_length: None,
+            max_graphemes: None,
+            visual_slots: None,
             scroll_offset: px(0.0),
             is_selecting: false,
             last_layout: None,
@@ -298,8 +332,8 @@ impl TextInput {
         self
     }
 
-    /// Keeps the value focusable and exposed while refusing keyboard,
-    /// pointer, IME, and accessibility value changes.
+    /// Keeps the value focusable and selectable while refusing editing, IME,
+    /// and accessibility value changes.
     pub fn read_only(mut self, read_only: bool) -> Self {
         self.read_only = read_only;
         self
@@ -308,7 +342,28 @@ impl TextInput {
     /// Renders as dots and keeps the text out of every snapshot and export.
     pub fn secret(mut self, secret: bool) -> Self {
         self.secret = secret;
+        self.visually_masked = secret;
         self
+    }
+
+    /// Changes only what is painted for a sensitive field.
+    ///
+    /// This is crate-private because a caller should choose a public
+    /// sensitive control rather than assemble an export policy from toggles.
+    pub(crate) fn set_visually_masked(&mut self, masked: bool, cx: &mut Context<Self>) {
+        self.visually_masked = self.secret && masked;
+        cx.notify();
+    }
+
+    /// Gives a sensitive editor a segmented visual contract while preserving
+    /// one input handler, focus handle, selection, and composition.
+    pub(crate) fn set_sensitive_slots(&mut self, slots: usize, cx: &mut Context<Self>) {
+        let slots = slots.max(1);
+        self.secret = true;
+        self.visually_masked = true;
+        self.max_graphemes = Some(slots);
+        self.visual_slots = Some(slots);
+        cx.notify();
     }
 
     /// Drops the input's own border and background.
@@ -387,6 +442,16 @@ impl TextInput {
         cx.notify();
     }
 
+    pub(crate) fn set_required(&mut self, required: bool, cx: &mut Context<Self>) {
+        self.required = required;
+        cx.notify();
+    }
+
+    pub(crate) fn set_control_size(&mut self, size: ControlSize, cx: &mut Context<Self>) {
+        self.size = size;
+        cx.notify();
+    }
+
     pub fn set_invalid(&mut self, invalid: bool, cx: &mut Context<Self>) {
         self.invalid = invalid;
         cx.notify();
@@ -398,6 +463,10 @@ impl TextInput {
 
     pub fn is_secret(&self) -> bool {
         self.secret
+    }
+
+    pub(crate) fn visual_slots(&self) -> Option<usize> {
+        self.visual_slots
     }
 
     pub fn selected_range(&self) -> Range<usize> {
@@ -442,7 +511,7 @@ impl TextInput {
     /// The mask is one dot per grapheme so the caret can still be placed
     /// between characters the typist entered.
     pub(crate) fn display_text(&self) -> SharedString {
-        if !self.secret || self.content.is_empty() {
+        if !self.visually_masked || self.content.is_empty() {
             return self.content.clone();
         }
         SharedString::from("•".repeat(self.content.graphemes(true).count()))
@@ -451,7 +520,7 @@ impl TextInput {
     /// Maps a content offset onto the masked text, which has its own byte
     /// widths, so the caret lands between dots rather than inside one.
     pub(crate) fn display_offset(&self, offset: usize) -> usize {
-        if !self.secret {
+        if !self.visually_masked {
             return offset;
         }
         let graphemes = self.content[..offset.min(self.content.len())]
@@ -495,17 +564,38 @@ impl TextInput {
         text_edit::next_word_boundary(&self.content, offset)
     }
 
-    pub(crate) fn index_for_position(&self, position: Point<Pixels>) -> usize {
-        let (Some(bounds), Some(line)) = (self.last_bounds.as_ref(), self.last_layout.as_ref())
-        else {
+    pub(crate) fn index_for_position(&self, position: Point<Pixels>, rtl: bool) -> usize {
+        let Some(bounds) = self.last_bounds.as_ref() else {
             return 0;
         };
+        if let Some(slots) = self.visual_slots {
+            let x = (position.x - bounds.left()).clamp(px(0.0), bounds.size.width);
+            let width = bounds.size.width.max(px(1.0));
+            let slot_width = width / slots as f32;
+            let physical_slot = ((x / slot_width).floor() as usize).min(slots.saturating_sub(1));
+            let logical_slot = if rtl {
+                slots - physical_slot - 1
+            } else {
+                physical_slot
+            };
+            let after_midpoint = if rtl {
+                x - slot_width * (physical_slot as f32) < slot_width / 2.0
+            } else {
+                x - slot_width * physical_slot as f32 >= slot_width / 2.0
+            };
+            let boundary = (logical_slot + usize::from(after_midpoint))
+                .min(self.content.graphemes(true).count());
+            return self.content_offset_for_grapheme(boundary);
+        }
         if position.y < bounds.top() {
             return 0;
         }
         if position.y > bounds.bottom() {
             return self.content.len();
         }
+        let Some(line) = self.last_layout.as_ref() else {
+            return 0;
+        };
         let x = position.x - bounds.left() + self.scroll_offset;
         let display_index = if x <= px(0.0) {
             0
@@ -519,55 +609,117 @@ impl TextInput {
 
     /// The inverse of [`Self::display_offset`], for a hit test on masked text.
     fn content_offset_for_display(&self, display_index: usize) -> usize {
-        if !self.secret {
+        if !self.visually_masked {
             return display_index;
         }
         let dots = display_index / "•".len();
+        self.content_offset_for_grapheme(dots)
+    }
+
+    fn content_offset_for_grapheme(&self, grapheme: usize) -> usize {
         self.content
             .grapheme_indices(true)
-            .nth(dots)
+            .nth(grapheme)
             .map(|(index, _)| index)
             .unwrap_or(self.content.len())
     }
 
+    fn grapheme_offset(&self, offset: usize) -> usize {
+        self.content[..offset.min(self.content.len())]
+            .graphemes(true)
+            .count()
+    }
+
     fn left(&mut self, _: &Left, _: &mut Window, cx: &mut Context<Self>) {
+        let backwards = self.visual_slots.is_none() || !cx.layout_direction().is_rtl();
         if self.selected_range.is_empty() {
-            self.move_to(self.previous_boundary(self.cursor_offset()), cx);
+            let offset = if backwards {
+                self.previous_boundary(self.cursor_offset())
+            } else {
+                self.next_boundary(self.cursor_offset())
+            };
+            self.move_to(offset, cx);
         } else {
-            self.move_to(self.selected_range.start, cx);
+            let offset = if backwards {
+                self.selected_range.start
+            } else {
+                self.selected_range.end
+            };
+            self.move_to(offset, cx);
         }
     }
 
     fn right(&mut self, _: &Right, _: &mut Window, cx: &mut Context<Self>) {
+        let forwards = self.visual_slots.is_none() || !cx.layout_direction().is_rtl();
         if self.selected_range.is_empty() {
-            self.move_to(self.next_boundary(self.cursor_offset()), cx);
+            let offset = if forwards {
+                self.next_boundary(self.cursor_offset())
+            } else {
+                self.previous_boundary(self.cursor_offset())
+            };
+            self.move_to(offset, cx);
         } else {
-            self.move_to(self.selected_range.end, cx);
+            let offset = if forwards {
+                self.selected_range.end
+            } else {
+                self.selected_range.start
+            };
+            self.move_to(offset, cx);
         }
     }
 
     fn word_left(&mut self, _: &WordLeft, _: &mut Window, cx: &mut Context<Self>) {
-        self.move_to(self.previous_word_boundary(self.cursor_offset()), cx);
+        let offset = if self.visual_slots.is_some() && cx.layout_direction().is_rtl() {
+            self.next_word_boundary(self.cursor_offset())
+        } else {
+            self.previous_word_boundary(self.cursor_offset())
+        };
+        self.move_to(offset, cx);
     }
 
     fn word_right(&mut self, _: &WordRight, _: &mut Window, cx: &mut Context<Self>) {
-        self.move_to(self.next_word_boundary(self.cursor_offset()), cx);
+        let offset = if self.visual_slots.is_some() && cx.layout_direction().is_rtl() {
+            self.previous_word_boundary(self.cursor_offset())
+        } else {
+            self.next_word_boundary(self.cursor_offset())
+        };
+        self.move_to(offset, cx);
     }
 
     fn select_left(&mut self, _: &SelectLeft, _: &mut Window, cx: &mut Context<Self>) {
-        self.select_to(self.previous_boundary(self.cursor_offset()), cx);
+        let offset = if self.visual_slots.is_some() && cx.layout_direction().is_rtl() {
+            self.next_boundary(self.cursor_offset())
+        } else {
+            self.previous_boundary(self.cursor_offset())
+        };
+        self.select_to(offset, cx);
     }
 
     fn select_right(&mut self, _: &SelectRight, _: &mut Window, cx: &mut Context<Self>) {
-        self.select_to(self.next_boundary(self.cursor_offset()), cx);
+        let offset = if self.visual_slots.is_some() && cx.layout_direction().is_rtl() {
+            self.previous_boundary(self.cursor_offset())
+        } else {
+            self.next_boundary(self.cursor_offset())
+        };
+        self.select_to(offset, cx);
     }
 
     fn select_word_left(&mut self, _: &SelectWordLeft, _: &mut Window, cx: &mut Context<Self>) {
-        self.select_to(self.previous_word_boundary(self.cursor_offset()), cx);
+        let offset = if self.visual_slots.is_some() && cx.layout_direction().is_rtl() {
+            self.next_word_boundary(self.cursor_offset())
+        } else {
+            self.previous_word_boundary(self.cursor_offset())
+        };
+        self.select_to(offset, cx);
     }
 
     fn select_word_right(&mut self, _: &SelectWordRight, _: &mut Window, cx: &mut Context<Self>) {
-        self.select_to(self.next_word_boundary(self.cursor_offset()), cx);
+        let offset = if self.visual_slots.is_some() && cx.layout_direction().is_rtl() {
+            self.previous_word_boundary(self.cursor_offset())
+        } else {
+            self.next_word_boundary(self.cursor_offset())
+        };
+        self.select_to(offset, cx);
     }
 
     fn select_to_line_start(
@@ -707,7 +859,7 @@ impl TextInput {
         }
         window.focus(&self.focus_handle, cx);
         self.is_selecting = true;
-        let offset = self.index_for_position(event.position);
+        let offset = self.index_for_position(event.position, cx.layout_direction().is_rtl());
         if event.modifiers.shift {
             self.select_to(offset, cx);
         } else if event.click_count > 1 {
@@ -720,7 +872,10 @@ impl TextInput {
 
     fn on_mouse_move(&mut self, event: &MouseMoveEvent, _: &mut Window, cx: &mut Context<Self>) {
         if self.is_selecting {
-            self.select_to(self.index_for_position(event.position), cx);
+            self.select_to(
+                self.index_for_position(event.position, cx.layout_direction().is_rtl()),
+                cx,
+            );
         }
     }
 
@@ -766,6 +921,13 @@ impl TextInput {
             if !self.content.is_empty() {
                 spec = spec.value("[REDACTED]");
             }
+            if let Some(slots) = self.visual_slots {
+                spec = spec.description(SharedString::from(format!(
+                    "{}/{}",
+                    self.content.graphemes(true).count(),
+                    slots
+                )));
+            }
         } else if !self.content.is_empty() {
             spec = spec.value(self.content.clone());
         }
@@ -785,7 +947,7 @@ impl std::fmt::Debug for TextInput {
             .field("disabled", &self.disabled)
             .field("invalid", &self.invalid)
             .field("secret", &self.secret)
-            .field("length", &self.content.len())
+            .field("length", &self.content.graphemes(true).count())
             .finish()
     }
 }
@@ -868,14 +1030,22 @@ impl EntityInputHandler for TextInput {
         let new_text = text_edit::normalize_single_line(new_text);
         let new_text =
             text_edit::fit_to_max_length(&self.content, self.max_length, &range, &new_text);
-        self.content =
-            (self.content[..range.start].to_owned() + &new_text + &self.content[range.end..])
-                .into();
-        self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
+        let new_text =
+            text_edit::fit_to_max_graphemes(&self.content, self.max_graphemes, &range, &new_text);
+        let next_content =
+            self.content[..range.start].to_owned() + &new_text + &self.content[range.end..];
+        let changed = self.content.as_ref() != next_content.as_str();
+        if changed {
+            self.content = next_content.into();
+            self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
+        }
         let caret = range.start + new_text.len();
         self.selected_range = caret..caret;
+        self.selection_reversed = false;
         self.marked_range = None;
-        cx.emit(TextInputEvent::Change(self.content.clone()));
+        if changed {
+            cx.emit(TextInputEvent::Change(self.content.clone()));
+        }
         cx.notify();
     }
 
@@ -897,21 +1067,35 @@ impl EntityInputHandler for TextInput {
             .unwrap_or_else(|| self.selected_range.clone());
 
         let new_text = text_edit::normalize_single_line(new_text);
-        self.content =
-            (self.content[..range.start].to_owned() + &new_text + &self.content[range.end..])
-                .into();
-        self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
+        let new_text =
+            text_edit::fit_to_max_length(&self.content, self.max_length, &range, &new_text);
+        let new_text =
+            text_edit::fit_to_max_graphemes(&self.content, self.max_graphemes, &range, &new_text);
+        let next_content =
+            self.content[..range.start].to_owned() + &new_text + &self.content[range.end..];
+        let changed = self.content.as_ref() != next_content.as_str();
+        if changed {
+            self.content = next_content.into();
+            self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
+        }
         self.marked_range =
             (!new_text.is_empty()).then(|| range.start..range.start + new_text.len());
         self.selected_range = new_selected_range_utf16
             .as_ref()
-            .map(|range_utf16| self.range_from_utf16(range_utf16))
+            // GPUI reports this range relative to the composing replacement,
+            // not the full document. Convert against exactly that replacement
+            // before offsetting it into the document; converting against the
+            // already-mutated document can land inside an astral UTF-8 scalar.
+            .map(|range_utf16| text_edit::range_from_utf16(&new_text, range_utf16))
             .map(|new_range| new_range.start + range.start..new_range.end + range.start)
             .unwrap_or_else(|| {
                 let caret = range.start + new_text.len();
                 caret..caret
             });
-        cx.emit(TextInputEvent::Change(self.content.clone()));
+        self.selection_reversed = false;
+        if changed {
+            cx.emit(TextInputEvent::Change(self.content.clone()));
+        }
         cx.notify();
     }
 
@@ -920,10 +1104,26 @@ impl EntityInputHandler for TextInput {
         range_utf16: Range<usize>,
         bounds: Bounds<Pixels>,
         _window: &mut Window,
-        _cx: &mut Context<Self>,
+        cx: &mut Context<Self>,
     ) -> Option<Bounds<Pixels>> {
-        let line = self.last_layout.as_ref()?;
         let range = self.range_from_utf16(&range_utf16);
+        if let Some(slots) = self.visual_slots {
+            let boundary_x = |offset| {
+                let boundary = self.grapheme_offset(offset) as f32 / slots as f32;
+                if cx.layout_direction().is_rtl() {
+                    bounds.right() - bounds.size.width * boundary
+                } else {
+                    bounds.left() + bounds.size.width * boundary
+                }
+            };
+            let start = boundary_x(range.start);
+            let end = boundary_x(range.end);
+            return Some(Bounds::from_corners(
+                gpui::point(start.min(end), bounds.top()),
+                gpui::point(start.max(end), bounds.bottom()),
+            ));
+        }
+        let line = self.last_layout.as_ref()?;
         Some(Bounds::from_corners(
             gpui::point(
                 bounds.left() + line.x_for_index(self.display_offset(range.start))
@@ -942,9 +1142,9 @@ impl EntityInputHandler for TextInput {
         &mut self,
         point: Point<Pixels>,
         _window: &mut Window,
-        _cx: &mut Context<Self>,
+        cx: &mut Context<Self>,
     ) -> Option<usize> {
-        let offset = self.index_for_position(point);
+        let offset = self.index_for_position(point, cx.layout_direction().is_rtl());
         Some(self.offset_to_utf16(offset))
     }
 }
@@ -994,13 +1194,8 @@ impl Render for TextInput {
             .when(!self.disabled, |element| {
                 element.track_focus(&self.focus_handle)
             })
-            .when(!self.disabled && !self.read_only, |element| {
+            .when(!self.disabled, |element| {
                 element
-                    .on_action(cx.listener(Self::backspace))
-                    .on_action(cx.listener(Self::delete))
-                    .on_action(cx.listener(Self::delete_word_left))
-                    .on_action(cx.listener(Self::delete_word_right))
-                    .on_action(cx.listener(Self::delete_to_line_start))
                     .on_action(cx.listener(Self::left))
                     .on_action(cx.listener(Self::right))
                     .on_action(cx.listener(Self::word_left))
@@ -1015,16 +1210,24 @@ impl Render for TextInput {
                     .on_action(cx.listener(Self::line_start))
                     .on_action(cx.listener(Self::line_end))
                     .on_action(cx.listener(Self::copy))
-                    .on_action(cx.listener(Self::cut))
-                    .on_action(cx.listener(Self::paste))
                     .on_action(cx.listener(Self::submit))
                     .on_action(cx.listener(Self::cancel))
-                    .on_action(cx.listener(Self::show_character_palette))
                     .on_mouse_down(MouseButton::Left, cx.listener(Self::on_mouse_down))
                     .on_mouse_move(cx.listener(Self::on_mouse_move))
                     .on_mouse_up(MouseButton::Left, cx.listener(Self::on_mouse_up))
                     .on_mouse_up_out(MouseButton::Left, cx.listener(Self::on_mouse_up))
                     .cursor(CursorStyle::IBeam)
+            })
+            .when(!self.disabled && !self.read_only, |element| {
+                element
+                    .on_action(cx.listener(Self::backspace))
+                    .on_action(cx.listener(Self::delete))
+                    .on_action(cx.listener(Self::delete_word_left))
+                    .on_action(cx.listener(Self::delete_word_right))
+                    .on_action(cx.listener(Self::delete_to_line_start))
+                    .on_action(cx.listener(Self::cut))
+                    .on_action(cx.listener(Self::paste))
+                    .on_action(cx.listener(Self::show_character_palette))
             })
             .when(!self.secret, |element| {
                 element

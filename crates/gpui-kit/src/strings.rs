@@ -95,6 +95,10 @@ string_keys! {
     Expand => "common.expand", "Expand";
     Collapse => "common.collapse", "Collapse";
 
+    // Sensitive text controls.
+    PasswordReveal => "password.reveal", "Reveal password";
+    PasswordConceal => "password.conceal", "Conceal password";
+
     // Calendar.
     CalendarNoMonth => "calendar.no-month", "No month to show";
     CalendarPreviousMonth => "calendar.previous-month", "Previous month";
