@@ -134,6 +134,7 @@ Toolbar
 ToolbarItem
 TransportBar
 Tree
+TreeGrid
 UploadList
 Wizard
 [REDACTED]

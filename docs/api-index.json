@@ -3484,6 +3484,36 @@
       ]
     },
     {
+      "name": "TreeGrid",
+      "kind": "builder",
+      "path": "gpui_kit::data::TreeGrid",
+      "source": "crates/gpui-kit/src/data/tree_grid.rs",
+      "summary": "A product-neutral, caller-owned virtualized treegrid adapter.",
+      "construct": [
+        "new(ident: impl Into<Ident>, visible_row_count: usize, render_row: impl Fn(usize, &mut Window, &mut App) -> TreeGridRow + 'static) -> Self"
+      ],
+      "options": [
+        "column(column: GridColumn) -> Self",
+        "columns(columns: impl IntoIterator<Item = GridColumn>) -> Self",
+        "selected(id: impl Into<SharedString>) -> Self",
+        "visible_rows(rows: usize) -> Self",
+        "row_height(height: f32) -> Self",
+        "lines(lines: GridLines) -> Self",
+        "loading(loading: bool) -> Self",
+        "failure(detail: impl Into<SharedString>) -> Self",
+        "empty(state: EmptyState) -> Self",
+        "unavailable(title: impl Into<SharedString>) -> Self",
+        "on_select(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self",
+        "on_expand(handler: impl Fn(SharedString, bool, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "tree-grid"
+      ]
+    },
+    {
       "name": "UploadList",
       "kind": "builder",
       "path": "gpui_kit::controls::UploadList",
@@ -7512,6 +7542,24 @@
       "queries": []
     },
     {
+      "name": "TreeGridRow",
+      "path": "gpui_kit::data::TreeGridRow",
+      "summary": "One already-visible hierarchy row, identified by stable business identity.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, level: u32) -> Self"
+      ],
+      "options": [
+        "text(text: impl Into<SharedString>) -> Self",
+        "cell(key: impl Into<SharedString>, cell: impl Into<Cell>) -> Self",
+        "branch(expanded: bool) -> Self",
+        "parent(id: impl Into<SharedString>) -> Self",
+        "disabled(disabled: bool) -> Self"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "TreeNode",
       "path": "gpui_kit::data::TreeNode",
       "summary": "One node, identified by business identity rather than by its place in the hierarchy, so moving a branch does not rename what hangs under it.",
@@ -8082,6 +8130,14 @@
         "Table"
       ],
       "example": "fn data_grid_editing(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(760.0))\n        .child(\n            DataGrid::new(\"scene.data-grid-editing.jobs\", 6, |index, _, _| {\n                grid_row(index)\n            })\n            .columns(grid_columns())\n            .sorted_by(\"duration\", SortDirection::Descending)\n            .selection_mode(SelectionMode::Single)\n            .selected([\"job-0001\"])\n            .editing(Some(EditingCell::new(\"job-0001\", \"owner\", \"fixture-b\")))\n            .visible_rows(6)\n            .on_sort(|_, _, _, _| {})\n            .on_select(|_, _, _| {})\n            .on_resize(|_, _, _, _| {})\n            .on_edit_request(|_, _, _, _| {})\n            .on_edit(|_, _, _| {}),\n        )\n        .child(\n            div()\n                .type_scale(&theme, gpui_kit_theme::TypeScale::Caption)\n                .text_color(theme.colors.text_muted)\n                .child(SharedString::from(\n                    \"Escape reverts, enter commits, tab commits and moves on. The grid never \\\n                     writes the value.\",\n                )),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "tree-grid",
+      "capture": "cargo run -p xtask -- scenes capture tree-grid",
+      "uses": [
+        "TreeGrid"
+      ],
+      "example": "fn tree_grid(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let rows = [\n        (\"workspace\", \"Workspace\", 1, true, true, None),\n        (\"src\", \"src\", 2, true, true, Some(\"workspace\")),\n        (\"components\", \"components\", 3, false, false, Some(\"src\")),\n        (\"lib\", \"lib.rs\", 3, false, false, Some(\"src\")),\n        (\"docs\", \"docs\", 2, true, false, Some(\"workspace\")),\n    ];\n    stack(&theme)\n        .w(px(720.0))\n        .child(\n            TreeGrid::new(\"scene.tree-grid.files\", rows.len(), move |index, _, _| {\n                let (id, name, level, branch, expanded, parent) = rows[index];\n                let mut row = TreeGridRow::new(id, level)\n                    .text(name)\n                    .cell(\"name\", Cell::new(name).text(name).published(true))\n                    .cell(\"kind\", if branch { \"Folder\" } else { \"File\" })\n                    .cell(\"state\", if expanded { \"Expanded\" } else { \"Ready\" });\n                if branch {\n                    row = row.branch(expanded);\n                }\n                if let Some(parent) = parent {\n                    row = row.parent(parent);\n                }\n                row\n            })\n            .columns([\n                GridColumn::new(\"name\", \"Name\").flex(2.0),\n                GridColumn::new(\"kind\", \"Kind\").fixed(120.0),\n                GridColumn::new(\"state\", \"State\").flex(1.0),\n            ])\n            .selected(\"components\")\n            .visible_rows(5)\n            .lines(GridLines::Rows)\n            .on_select(|_, _, _| {})\n            .on_expand(|_, _, _, _| {}),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "tree",

@@ -95,6 +95,12 @@ scroll, so a pinned column holds the left edge rather than freezing under one;
 and no fit-to-content measurement, so a double click on a column edge reports
 the request and lets the host answer.
 
+`TreeGrid` reuses that virtualized machinery for a caller-flattened hierarchy.
+Its `tree-grid` scene and `crates/gpui-kit/tests/tree_grid.rs` cover bounded
+materialization, TreeGrid/Row/GridCell semantics, row hierarchy metadata, and
+logical disclosure/parent keyboard intents. It deliberately adds no second
+flattening, horizontal-scroll, frozen-column, or cross-tree layout system.
+
 ## Helpers, which the four-part rule does not reach
 
 `field_shell` and `FieldState` draw the one border, background, and focus

@@ -166,6 +166,10 @@ pub fn catalog() -> Vec<Scene> {
             build: data_grid_editing,
         },
         Scene {
+            name: "tree-grid",
+            build: tree_grid,
+        },
+        Scene {
             name: "tree",
             build: tree,
         },
@@ -2140,6 +2144,47 @@ fn data_grid_editing(_window: &mut Window, cx: &mut App) -> AnyElement {
                     "Escape reverts, enter commits, tab commits and moves on. The grid never \
                      writes the value.",
                 )),
+        )
+        .into_any_element()
+}
+
+fn tree_grid(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let rows = [
+        ("workspace", "Workspace", 1, true, true, None),
+        ("src", "src", 2, true, true, Some("workspace")),
+        ("components", "components", 3, false, false, Some("src")),
+        ("lib", "lib.rs", 3, false, false, Some("src")),
+        ("docs", "docs", 2, true, false, Some("workspace")),
+    ];
+    stack(&theme)
+        .w(px(720.0))
+        .child(
+            TreeGrid::new("scene.tree-grid.files", rows.len(), move |index, _, _| {
+                let (id, name, level, branch, expanded, parent) = rows[index];
+                let mut row = TreeGridRow::new(id, level)
+                    .text(name)
+                    .cell("name", Cell::new(name).text(name).published(true))
+                    .cell("kind", if branch { "Folder" } else { "File" })
+                    .cell("state", if expanded { "Expanded" } else { "Ready" });
+                if branch {
+                    row = row.branch(expanded);
+                }
+                if let Some(parent) = parent {
+                    row = row.parent(parent);
+                }
+                row
+            })
+            .columns([
+                GridColumn::new("name", "Name").flex(2.0),
+                GridColumn::new("kind", "Kind").fixed(120.0),
+                GridColumn::new("state", "State").flex(1.0),
+            ])
+            .selected("components")
+            .visible_rows(5)
+            .lines(GridLines::Rows)
+            .on_select(|_, _, _| {})
+            .on_expand(|_, _, _, _| {}),
         )
         .into_any_element()
 }
