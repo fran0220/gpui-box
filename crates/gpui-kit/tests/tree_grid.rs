@@ -97,3 +97,32 @@ fn logical_keys_emit_caller_owned_intents_and_disabled_rows_do_not(cx: &mut Test
     disabled.keystrokes("left right down");
     assert!(disabled_calls.borrow().is_empty());
 }
+
+#[gpui::test]
+fn logical_start_column_and_disclosure_follow_reading_direction(cx: &mut TestAppContext) {
+    let (mut harness, _) = tree_grid(cx, false);
+    let ltr_name = harness
+        .bounds("data.tree-grid.node-0000.name")
+        .expect("LTR name cell");
+    let ltr_value = harness
+        .bounds("data.tree-grid.node-0000.value")
+        .expect("LTR value cell");
+    let ltr_disclosure = harness
+        .bounds("data.tree-grid.node-0000.expand")
+        .expect("LTR disclosure");
+    assert!(ltr_name.left() < ltr_value.left());
+    assert!(ltr_disclosure.left() < ltr_name.center().x);
+
+    harness.update(|_, cx| set_layout_direction(LayoutDirection::RightToLeft, cx));
+    let rtl_name = harness
+        .bounds("data.tree-grid.node-0000.name")
+        .expect("RTL name cell");
+    let rtl_value = harness
+        .bounds("data.tree-grid.node-0000.value")
+        .expect("RTL value cell");
+    let rtl_disclosure = harness
+        .bounds("data.tree-grid.node-0000.expand")
+        .expect("RTL disclosure");
+    assert!(rtl_name.left() > rtl_value.left());
+    assert!(rtl_disclosure.left() > rtl_name.center().x);
+}

@@ -59,7 +59,7 @@ use gpui_kit_theme::{
 use crate::controls::input::{Cancel, Submit, TextInput};
 use crate::data::table::{Align, Cell, ColumnWidth, SortDirection};
 use crate::display::empty::{EmptyKind, EmptyState};
-use crate::foundation::direction::ActiveDirection;
+use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
 use crate::interaction::dnd::{
     self, DragItem, DropAxis, DropIntent, DropPosition, RowTarget, SurfaceDrag,
@@ -994,7 +994,10 @@ impl DataGrid {
             .gap_token(theme, Space::Sm)
             .surface(theme, Surface::Raised)
             .type_scale(theme, TypeScale::Caption)
-            .text_color(theme.colors.text_muted);
+            .text_color(theme.colors.text_muted)
+            .when(self.hierarchy, |header| {
+                header.row_reading(cx.layout_direction())
+            });
 
         if let Some(box_element) = self.select_all(theme, cx) {
             header = header.child(box_element);
@@ -1688,6 +1691,9 @@ fn row_element(
                     element.hover(|style| style.bg(theme.colors.hover.opacity(0.3)))
                 })
                 .focus_ring(theme)
+        })
+        .when(context.hierarchy, |element| {
+            element.row_reading(cx.layout_direction())
         });
 
     if context.selection_mode == SelectionMode::Multiple {
@@ -1938,9 +1944,17 @@ fn cell_element(
     let mut content = cell.map(|cell| cell.content);
     if logical_start && context.hierarchy {
         let hierarchy = row.hierarchy.clone();
-        let mut leading = div().row().items_center().min_w_0();
+        let direction = cx.layout_direction();
+        let mut leading = div()
+            .row_reading(direction)
+            .items_center()
+            .min_w_0()
+            .w_full();
         if let Some(meta) = hierarchy {
-            leading = leading.pl(px((meta.level.saturating_sub(1) as f32) * theme.spacing.md));
+            leading = leading.ps(
+                direction,
+                px((meta.level.saturating_sub(1) as f32) * theme.spacing.md),
+            );
             if meta.has_children {
                 if let Some(expand) = context
                     .on_expand
