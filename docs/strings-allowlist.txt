@@ -40,6 +40,7 @@ DataGrid
 DateInput
 DescriptionList
 Dialog
+DiffView
 Dock
 DockPanel
 Drawer
@@ -65,6 +66,7 @@ Layout
 List
 ListItem
 ListRow
+LogStream
 MakeWay
 Markdown
 Menu

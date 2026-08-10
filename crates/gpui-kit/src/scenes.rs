@@ -365,6 +365,18 @@ pub fn catalog() -> Vec<Scene> {
             build: failure_panel,
         },
         Scene {
+            name: "log-stream",
+            build: log_stream,
+        },
+        Scene {
+            name: "diff-view",
+            build: diff_view,
+        },
+        Scene {
+            name: "sparkline",
+            build: sparkline,
+        },
+        Scene {
             name: "code-view",
             build: code_view,
         },
@@ -1441,6 +1453,147 @@ fn failure_panel(_window: &mut Window, cx: &mut App) -> AnyElement {
                     .on_retry(|_, _| {})
             }),
         )
+        .into_any_element()
+}
+
+fn log_stream(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let entries = [
+        LogEntry::new("boot", "Fixture worker entered the queue")
+            .timestamp("09:41:02")
+            .level("INFO", Tone::Info)
+            .source("scheduler"),
+        LogEntry::new("claim", "Fixture worker claimed run demo-42")
+            .timestamp("09:41:03")
+            .level("INFO", Tone::Info)
+            .source("worker")
+            .search_hits([23..26])
+            .current_hit(0),
+        LogEntry::new("cache", "Fixture cache was not warm")
+            .timestamp("09:41:04")
+            .level("WARN", Tone::Warning)
+            .source("cache"),
+        LogEntry::new("retry", "Fixture request completed after one retry")
+            .timestamp("09:41:05")
+            .level("INFO", Tone::Success)
+            .source("worker"),
+        LogEntry::new("finish", "Fixture run demo-42 completed")
+            .timestamp("09:41:06")
+            .level("INFO", Tone::Success)
+            .source("scheduler")
+            .search_hits([12..19]),
+    ];
+    stack(&theme)
+        .w(px(780.0))
+        .child(caption(
+            &theme,
+            "fixed virtual rows; metadata and search ranges are caller inputs",
+        ))
+        .child(
+            LogStream::new("scene.log", entries)
+                .state(LogStreamState::Stale(
+                    "The latest refresh did not complete; verified entries remain.".into(),
+                ))
+                .visible_rows(5)
+                .selected("retry")
+                .on_select(|_, _, _| {})
+                .on_copy(|_, _, _| {}),
+        )
+        .into_any_element()
+}
+
+fn scene_diff() -> Vec<DiffFile> {
+    vec![DiffFile::new(
+        "report",
+        "src/report.rs",
+        [DiffHunk::new(
+            "summary",
+            "@@ -40,3 +40,4 @@ fn report",
+            [
+                DiffLine::new("signature", "fn report() -> Outcome {")
+                    .old_number(40)
+                    .new_number(40)
+                    .spans([CodeSpan {
+                        range: 0..2,
+                        tone: Tone::Accent,
+                    }]),
+                DiffLine::paired("cache", "    old_cache.read()", "    verified_cache.read()")
+                    .old_number(41)
+                    .new_number(41),
+                DiffLine::new("audit", "    audit.record()")
+                    .new_number(42)
+                    .mark(DiffLineMark::Added),
+                DiffLine::new("close", "}").old_number(42).new_number(43),
+            ],
+        )],
+    )]
+}
+
+fn diff_view(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(840.0))
+        .child(caption(
+            &theme,
+            "the same caller-owned rows arranged as unified and split",
+        ))
+        .child(
+            div()
+                .row()
+                .items_start()
+                .gap_token(&theme, Space::Md)
+                .child(
+                    div().w(px(408.0)).child(
+                        DiffView::new("scene.diff.unified", scene_diff())
+                            .visible_rows(7)
+                            .on_event(|_, _, _| {}),
+                    ),
+                )
+                .child(
+                    div().w(px(408.0)).child(
+                        DiffView::new("scene.diff.split", scene_diff())
+                            .presentation(DiffPresentation::Split)
+                            .visible_rows(7)
+                            .on_event(|_, _, _| {}),
+                    ),
+                ),
+        )
+        .into_any_element()
+}
+
+fn sparkline(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let points = [
+        SparklinePoint::new(0.0, 0.20),
+        SparklinePoint::new(0.14, 0.34),
+        SparklinePoint::new(0.28, 0.29),
+        SparklinePoint::new(0.42, 0.56),
+        SparklinePoint::new(0.57, 0.48),
+        SparklinePoint::new(0.71, 0.74),
+        SparklinePoint::new(0.85, 0.66),
+        SparklinePoint::new(1.0, 0.82),
+    ];
+    stack(&theme)
+        .w(px(520.0))
+        .child(caption(
+            &theme,
+            "normalized geometry with caller-formatted current, minimum and maximum",
+        ))
+        .child(Sparkline::new(
+            "scene.sparkline.rate",
+            "Fixture throughput",
+            SparklineState::Ready(SparklineReading::new(
+                points, "82 req/s", "20 req/s", "82 req/s",
+            )),
+        ))
+        .child(Sparkline::new(
+            "scene.sparkline.stale",
+            "Fixture queue depth",
+            SparklineState::Stale {
+                reading: SparklineReading::new(points, "34 jobs", "8 jobs", "41 jobs"),
+                reason: "The latest sample is unavailable; the verified reading remains.".into(),
+            },
+        ))
         .into_any_element()
 }
 

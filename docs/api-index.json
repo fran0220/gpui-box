@@ -887,6 +887,31 @@
       ]
     },
     {
+      "name": "DiffView",
+      "kind": "builder",
+      "path": "gpui_kit::content::DiffView",
+      "source": "crates/gpui-kit/src/content/diff_view.rs",
+      "summary": "A virtualized, read-only diff presentation.",
+      "construct": [
+        "new(ident: impl Into<Ident>, files: impl IntoIterator<Item = DiffFile>) -> Self"
+      ],
+      "options": [
+        "presentation(presentation: DiffPresentation) -> Self",
+        "visible_rows(rows: usize) -> Self",
+        "on_event(handler: impl Fn(DiffViewEvent, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [
+        "FileActivated",
+        "HunkActivated",
+        "LineActivated"
+      ],
+      "scenes": [
+        "diff-view"
+      ]
+    },
+    {
       "name": "Divider",
       "kind": "builder",
       "path": "gpui_kit::display::Divider",
@@ -1606,6 +1631,29 @@
         "frost",
         "motion-flip",
         "hover-card"
+      ]
+    },
+    {
+      "name": "LogStream",
+      "kind": "builder",
+      "path": "gpui_kit::content::LogStream",
+      "source": "crates/gpui-kit/src/content/log_stream.rs",
+      "summary": "A virtualized, read-only log presentation.",
+      "construct": [
+        "new(ident: impl Into<Ident>, entries: impl IntoIterator<Item = LogEntry>) -> Self"
+      ],
+      "options": [
+        "state(state: LogStreamState) -> Self",
+        "visible_rows(rows: usize) -> Self",
+        "selected(id: impl Into<SharedString>) -> Self",
+        "on_select(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self",
+        "on_copy(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "log-stream"
       ]
     },
     {
@@ -2451,6 +2499,23 @@
       "reports": [],
       "scenes": [
         "choice"
+      ]
+    },
+    {
+      "name": "Sparkline",
+      "kind": "builder",
+      "path": "gpui_kit::display::Sparkline",
+      "source": "crates/gpui-kit/src/display/sparkline.rs",
+      "summary": "A compact, accessible trend reading.",
+      "construct": [
+        "new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: SparklineState) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "sparkline"
       ]
     },
     {
@@ -3994,6 +4059,110 @@
       "queries": []
     },
     {
+      "name": "DiffFile",
+      "path": "gpui_kit::content::DiffFile",
+      "summary": "One caller-supplied file and its hunks.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, label: impl Into<SharedString>, hunks: impl IntoIterator<Item = DiffHunk>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "DiffHunk",
+      "path": "gpui_kit::content::DiffHunk",
+      "summary": "One caller-supplied hunk.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, header: impl Into<SharedString>, lines: impl IntoIterator<Item = DiffLine>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "DiffLine",
+      "path": "gpui_kit::content::DiffLine",
+      "summary": "One stable, caller-supplied logical diff row.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, text: impl Into<SharedString>) -> Self",
+        "paired(id: impl Into<SharedString>, old: impl Into<SharedString>, new: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "old_number(number: usize) -> Self",
+        "new_number(number: usize) -> Self",
+        "spans(spans: impl IntoIterator<Item = CodeSpan>) -> Self",
+        "old_spans(spans: impl IntoIterator<Item = CodeSpan>) -> Self",
+        "new_spans(spans: impl IntoIterator<Item = CodeSpan>) -> Self",
+        "mark(mark: DiffLineMark) -> Self"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "DiffLineMark",
+      "path": "gpui_kit::content::DiffLineMark",
+      "summary": "The caller's claim about one diff line.",
+      "variants": [
+        "Context",
+        "Added",
+        "Removed"
+      ],
+      "construct": [],
+      "options": [
+        "name() -> &'static str"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "DiffPresentation",
+      "path": "gpui_kit::content::DiffPresentation",
+      "summary": "How the same caller-supplied lines are arranged.",
+      "variants": [
+        "Unified",
+        "Split"
+      ],
+      "construct": [],
+      "options": [
+        "name() -> &'static str"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "DiffSide",
+      "path": "gpui_kit::content::DiffSide",
+      "summary": "One side of a caller-supplied diff line.",
+      "variants": [],
+      "construct": [
+        "new(text: impl Into<SharedString>, mark: DiffLineMark) -> Self"
+      ],
+      "options": [
+        "number(number: usize) -> Self",
+        "spans(spans: impl IntoIterator<Item = CodeSpan>) -> Self"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "DiffViewEvent",
+      "path": "gpui_kit::content::DiffViewEvent",
+      "summary": "An action on caller-owned diff identity.",
+      "variants": [
+        "FileActivated",
+        "HunkActivated",
+        "LineActivated"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "DockEvent",
       "path": "gpui_kit::layout::DockEvent",
       "summary": "What the dock reports. The caller decides what any of it means.",
@@ -5020,6 +5189,43 @@
       "queries": [
         "value() -> Option<&T>",
         "is_loading() -> bool"
+      ]
+    },
+    {
+      "name": "LogEntry",
+      "path": "gpui_kit::content::LogEntry",
+      "summary": "One caller-owned log entry.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, message: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "timestamp(timestamp: impl Into<SharedString>) -> Self",
+        "level(level: impl Into<SharedString>, tone: Tone) -> Self",
+        "source(source: impl Into<SharedString>) -> Self",
+        "search_hits(hits: impl IntoIterator<Item = Range<usize>>) -> Self",
+        "current_hit(hit: usize) -> Self"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "LogStreamState",
+      "path": "gpui_kit::content::LogStreamState",
+      "summary": "What is known about the stream as a whole.",
+      "variants": [
+        "Loading",
+        "Empty",
+        "Unavailable",
+        "Error",
+        "Stale",
+        "Ready"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "name() -> &'static str"
       ]
     },
     {
@@ -6184,6 +6390,51 @@
       ],
       "commands": [],
       "queries": []
+    },
+    {
+      "name": "SparklinePoint",
+      "path": "gpui_kit::display::SparklinePoint",
+      "summary": "One point already normalized by the caller.",
+      "variants": [],
+      "construct": [
+        "new(x: f32, y: f32) -> Self"
+      ],
+      "options": [
+        "is_bounded() -> bool"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "SparklineReading",
+      "path": "gpui_kit::display::SparklineReading",
+      "summary": "The plotted points and the exact text that makes them accessible.",
+      "variants": [],
+      "construct": [
+        "new(points: impl IntoIterator<Item = SparklinePoint>, current: impl Into<SharedString>, minimum: impl Into<SharedString>, maximum: impl Into<SharedString>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "published_points() -> usize"
+      ]
+    },
+    {
+      "name": "SparklineState",
+      "path": "gpui_kit::display::SparklineState",
+      "summary": "The complete state of one trend reading.",
+      "variants": [
+        "Ready",
+        "Empty",
+        "Unavailable",
+        "Stale"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "name() -> &'static str"
+      ]
     },
     {
       "name": "SplitAxis",
@@ -8130,6 +8381,30 @@
         "Timeline"
       ],
       "example": "fn failure_panel(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    // A failure, not a refusal. Retrying a refusal would only be refused\n    // again, so the retry here is offered against something that can succeed\n    // on a second attempt; refusals are shown by ToolCallCard instead.\n    let failed: Result<(), &str> = Err(\"The runs service did not respond.\");\n    stack(&theme)\n        .w(px(560.0))\n        .child(caption(\n            &theme,\n            \"the host's own words, kept on screen; the retry belongs to the host\",\n        ))\n        .children(\n            FailurePanel::from_result(\"scene.failure.query\", &failed).map(|panel| {\n                panel\n                    .title(\"Runs\")\n                    .detail(\"The connection timed out after 30 seconds.\")\n                    .attempts(3)\n                    .on_retry(|_, _| {})\n            }),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "log-stream",
+      "capture": "cargo run -p xtask -- scenes capture log-stream",
+      "uses": [
+        "LogStream"
+      ],
+      "example": "fn log_stream(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let entries = [\n        LogEntry::new(\"boot\", \"Fixture worker entered the queue\")\n            .timestamp(\"09:41:02\")\n            .level(\"INFO\", Tone::Info)\n            .source(\"scheduler\"),\n        LogEntry::new(\"claim\", \"Fixture worker claimed run demo-42\")\n            .timestamp(\"09:41:03\")\n            .level(\"INFO\", Tone::Info)\n            .source(\"worker\")\n            .search_hits([23..26])\n            .current_hit(0),\n        LogEntry::new(\"cache\", \"Fixture cache was not warm\")\n            .timestamp(\"09:41:04\")\n            .level(\"WARN\", Tone::Warning)\n            .source(\"cache\"),\n        LogEntry::new(\"retry\", \"Fixture request completed after one retry\")\n            .timestamp(\"09:41:05\")\n            .level(\"INFO\", Tone::Success)\n            .source(\"worker\"),\n        LogEntry::new(\"finish\", \"Fixture run demo-42 completed\")\n            .timestamp(\"09:41:06\")\n            .level(\"INFO\", Tone::Success)\n            .source(\"scheduler\")\n            .search_hits([12..19]),\n    ];\n    stack(&theme)\n        .w(px(780.0))\n        .child(caption(\n            &theme,\n            \"fixed virtual rows; metadata and search ranges are caller inputs\",\n        ))\n        .child(\n            LogStream::new(\"scene.log\", entries)\n                .state(LogStreamState::Stale(\n                    \"The latest refresh did not complete; verified entries remain.\".into(),\n                ))\n                .visible_rows(5)\n                .selected(\"retry\")\n                .on_select(|_, _, _| {})\n                .on_copy(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "diff-view",
+      "capture": "cargo run -p xtask -- scenes capture diff-view",
+      "uses": [
+        "DiffView"
+      ],
+      "example": "fn diff_view(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(840.0))\n        .child(caption(\n            &theme,\n            \"the same caller-owned rows arranged as unified and split\",\n        ))\n        .child(\n            div()\n                .row()\n                .items_start()\n                .gap_token(&theme, Space::Md)\n                .child(\n                    div().w(px(408.0)).child(\n                        DiffView::new(\"scene.diff.unified\", scene_diff())\n                            .visible_rows(7)\n                            .on_event(|_, _, _| {}),\n                    ),\n                )\n                .child(\n                    div().w(px(408.0)).child(\n                        DiffView::new(\"scene.diff.split\", scene_diff())\n                            .presentation(DiffPresentation::Split)\n                            .visible_rows(7)\n                            .on_event(|_, _, _| {}),\n                    ),\n                ),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "sparkline",
+      "capture": "cargo run -p xtask -- scenes capture sparkline",
+      "uses": [
+        "Sparkline"
+      ],
+      "example": "fn sparkline(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let points = [\n        SparklinePoint::new(0.0, 0.20),\n        SparklinePoint::new(0.14, 0.34),\n        SparklinePoint::new(0.28, 0.29),\n        SparklinePoint::new(0.42, 0.56),\n        SparklinePoint::new(0.57, 0.48),\n        SparklinePoint::new(0.71, 0.74),\n        SparklinePoint::new(0.85, 0.66),\n        SparklinePoint::new(1.0, 0.82),\n    ];\n    stack(&theme)\n        .w(px(520.0))\n        .child(caption(\n            &theme,\n            \"normalized geometry with caller-formatted current, minimum and maximum\",\n        ))\n        .child(Sparkline::new(\n            \"scene.sparkline.rate\",\n            \"Fixture throughput\",\n            SparklineState::Ready(SparklineReading::new(\n                points, \"82 req/s\", \"20 req/s\", \"82 req/s\",\n            )),\n        ))\n        .child(Sparkline::new(\n            \"scene.sparkline.stale\",\n            \"Fixture queue depth\",\n            SparklineState::Stale {\n                reading: SparklineReading::new(points, \"34 jobs\", \"8 jobs\", \"41 jobs\"),\n                reason: \"The latest sample is unavailable; the verified reading remains.\".into(),\n            },\n        ))\n        .into_any_element()\n}"
     },
     {
       "name": "code-view",

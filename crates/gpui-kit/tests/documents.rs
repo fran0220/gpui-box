@@ -15,6 +15,7 @@ use gpui::{
     TestAppContext, div, prelude::*,
 };
 use gpui_kit::prelude::*;
+use gpui_kit_semantics::Role;
 use gpui_kit_testkit::harness::Harness;
 
 type Calls<T> = Rc<RefCell<Vec<T>>>;
@@ -628,6 +629,339 @@ fn a_code_view_with_nothing_in_it_copies_nothing(cx: &mut TestAppContext) {
 
     assert!(harness.node("hunk.copy").expect("published").disabled);
     assert!(harness.node("hunk.empty").is_some());
+}
+
+// -------------------------------------------------------------- developer data
+
+fn fixture_logs(count: usize) -> Vec<LogEntry> {
+    (0..count)
+        .map(|index| {
+            LogEntry::new(
+                format!("entry-{index:04}"),
+                format!("Fixture log message {index:04}"),
+            )
+            .timestamp(format!("09:41:{:02}", index % 60))
+            .level("INFO", Tone::Info)
+            .source("fixture")
+        })
+        .collect()
+}
+
+#[gpui::test]
+fn a_log_stream_virtualizes_stable_entries_and_reports_intents(cx: &mut TestAppContext) {
+    let (selected, select_sink) = recorder::<String>();
+    let (copied, copy_sink) = recorder::<String>();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let select_sink = select_sink.clone();
+        let copy_sink = copy_sink.clone();
+        LogStream::new("logs", fixture_logs(1000))
+            .visible_rows(6)
+            .selected("entry-0999")
+            .on_select(move |id, _, _| select_sink.borrow_mut().push(id.to_string()))
+            .on_copy(move |id, _, _| copy_sink.borrow_mut().push(id.to_string()))
+            .into_any_element()
+    });
+
+    assert_eq!(
+        harness.node("logs.entries").expect("published").value,
+        Some("1000".into())
+    );
+    assert!(harness.node("logs.entries.entry-0999").is_some());
+    assert!(
+        harness.node("logs.entries.entry-0000").is_none(),
+        "following opens on the newest fixed rows"
+    );
+
+    harness.click("logs.entries.entry-0998");
+    harness.click("logs.copy");
+    assert_eq!(*selected.borrow(), vec!["entry-0998".to_string()]);
+    assert_eq!(*copied.borrow(), vec!["entry-0999".to_string()]);
+    assert!(
+        harness
+            .node("logs.entries.entry-0999")
+            .expect("published")
+            .selected,
+        "selection remains the caller's"
+    );
+}
+
+#[gpui::test]
+fn pausing_a_log_changes_only_transient_follow_state(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        LogStream::new("logs", fixture_logs(8))
+            .visible_rows(4)
+            .into_any_element()
+    });
+
+    let following = harness.node("logs.mode").expect("published");
+    assert_eq!(following.value.as_deref(), Some("following"));
+    assert_eq!(
+        harness.node("logs.follow").expect("published").checked,
+        Some(true)
+    );
+
+    harness.click("logs.follow");
+
+    let paused = harness.node("logs.mode").expect("published");
+    assert_eq!(paused.value.as_deref(), Some("paused"));
+    assert_eq!(
+        harness.node("logs.follow").expect("published").checked,
+        Some(false)
+    );
+    assert_eq!(
+        harness.node("logs.entries").expect("still present").value,
+        Some("8".into())
+    );
+}
+
+#[gpui::test]
+fn log_states_do_not_collapse_and_stale_keeps_verified_entries(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        div()
+            .column()
+            .children([
+                LogStream::new("loading", []).state(LogStreamState::Loading),
+                LogStream::new("empty", []).state(LogStreamState::Empty),
+                LogStream::new("unavailable", []).state(LogStreamState::Unavailable(
+                    "The fixture source is offline.".into(),
+                )),
+                LogStream::new("error", []).state(LogStreamState::Error(
+                    "The fixture response was unreadable.".into(),
+                )),
+                LogStream::new("stale", fixture_logs(2))
+                    .state(LogStreamState::Stale("The fixture refresh failed.".into())),
+            ])
+            .into_any_element()
+    });
+
+    for (id, state) in [
+        ("loading", "loading"),
+        ("empty", "empty"),
+        ("unavailable", "unavailable"),
+        ("error", "error"),
+        ("stale", "stale"),
+    ] {
+        assert_eq!(
+            harness.node(id).expect("published").value.as_deref(),
+            Some(state)
+        );
+    }
+    assert!(harness.node("loading").expect("published").busy);
+    assert!(harness.node("error").expect("published").invalid);
+    assert!(harness.node("stale.entries.entry-0001").is_some());
+    assert_eq!(
+        harness
+            .node("stale.stale")
+            .expect("published")
+            .text
+            .as_deref(),
+        Some("The fixture refresh failed.")
+    );
+}
+
+#[gpui::test]
+fn log_search_hits_are_caller_ranges_and_payloads_are_not_published(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        LogStream::new(
+            "logs",
+            [LogEntry::new("match", "fixture ready")
+                .level("INFO", Tone::Info)
+                .search_hits([0..7, 40..50])],
+        )
+        .into_any_element()
+    });
+
+    assert_eq!(
+        harness
+            .node("logs.entries.match.hits")
+            .expect("published")
+            .value,
+        Some("1".into())
+    );
+    assert_eq!(
+        harness
+            .node("logs.entries.match")
+            .expect("published")
+            .text
+            .as_deref(),
+        Some("INFO"),
+        "the log payload does not enter diagnostic snapshots"
+    );
+}
+
+fn fixture_diff(lines: usize) -> Vec<DiffFile> {
+    let lines = (0..lines).map(|index| {
+        let line = DiffLine::new(
+            format!("line-{index:04}"),
+            format!("fixture line {index:04}"),
+        );
+        match index % 3 {
+            0 => line.old_number(index + 10).new_number(index + 10),
+            1 => line.new_number(index + 10).mark(DiffLineMark::Added),
+            _ => line.old_number(index + 10).mark(DiffLineMark::Removed),
+        }
+    });
+    vec![DiffFile::new(
+        "report",
+        "fixture/report.rs",
+        [DiffHunk::new("body", "@@ fixture @@", lines)],
+    )]
+}
+
+#[gpui::test]
+fn a_diff_reports_file_hunk_and_line_identity_without_applying_anything(cx: &mut TestAppContext) {
+    let (events, sink) = recorder::<DiffViewEvent>();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let sink = sink.clone();
+        DiffView::new("review", fixture_diff(3))
+            .visible_rows(5)
+            .on_event(move |event, _, _| sink.borrow_mut().push(event))
+            .into_any_element()
+    });
+
+    harness.click("review.rows.file.report");
+    harness.click("review.rows.file.report.hunk.body");
+    harness.click("review.rows.file.report.hunk.body.line.line-0001");
+
+    assert_eq!(
+        events.borrow().as_slice(),
+        [
+            DiffViewEvent::FileActivated {
+                file_id: "report".into(),
+            },
+            DiffViewEvent::HunkActivated {
+                file_id: "report".into(),
+                hunk_id: "body".into(),
+            },
+            DiffViewEvent::LineActivated {
+                file_id: "report".into(),
+                hunk_id: "body".into(),
+                line_id: "line-0001".into(),
+            },
+        ]
+    );
+    assert_eq!(
+        harness.node("review").expect("published").value.as_deref(),
+        Some("unified")
+    );
+    assert!(harness.node("review").expect("published").read_only);
+}
+
+#[gpui::test]
+fn split_diff_uses_the_same_stable_rows_and_large_diffs_stay_virtual(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        DiffView::new("review", fixture_diff(1000))
+            .presentation(DiffPresentation::Split)
+            .visible_rows(6)
+            .on_event(|_, _, _| {})
+            .into_any_element()
+    });
+
+    assert_eq!(
+        harness.node("review").expect("published").value.as_deref(),
+        Some("split")
+    );
+    assert_eq!(
+        harness.node("review.rows").expect("published").value,
+        Some("1002".into())
+    );
+    assert!(
+        harness
+            .node("review.rows.file.report.hunk.body.line.line-0000")
+            .is_some()
+    );
+    assert!(
+        harness
+            .node("review.rows.file.report.hunk.body.line.line-0900")
+            .is_none(),
+        "a far line is neither laid out nor published"
+    );
+}
+
+#[gpui::test]
+fn sparkline_publishes_the_callers_exact_reading_and_range(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        Sparkline::new(
+            "throughput",
+            "Fixture throughput",
+            SparklineState::Ready(SparklineReading::new(
+                [
+                    SparklinePoint::new(0.0, 0.2),
+                    SparklinePoint::new(0.5, 0.7),
+                    SparklinePoint::new(1.0, 0.4),
+                ],
+                "40 req/s",
+                "20 req/s",
+                "70 req/s",
+            )),
+        )
+        .into_any_element()
+    });
+
+    let node = harness.node("throughput").expect("published");
+    assert_eq!(node.role, Role::Image);
+    assert_eq!(node.text.as_deref(), Some("Fixture throughput"));
+    assert_eq!(node.value.as_deref(), Some("40 req/s"));
+    assert_eq!(
+        node.description.as_deref(),
+        Some("Minimum 20 req/s; maximum 70 req/s")
+    );
+    assert!(node.read_only);
+}
+
+#[gpui::test]
+fn sparkline_empty_unavailable_and_stale_are_distinct(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        div()
+            .column()
+            .children([
+                Sparkline::new("empty", "Empty metric", SparklineState::Empty),
+                Sparkline::new(
+                    "unavailable",
+                    "Unavailable metric",
+                    SparklineState::Unavailable("The fixture has no sampler.".into()),
+                ),
+                Sparkline::new(
+                    "stale",
+                    "Stale metric",
+                    SparklineState::Stale {
+                        reading: SparklineReading::new(
+                            [SparklinePoint::new(0.0, 0.2), SparklinePoint::new(1.0, 0.8)],
+                            "8 jobs",
+                            "2 jobs",
+                            "9 jobs",
+                        ),
+                        reason: "The fixture refresh failed.".into(),
+                    },
+                ),
+            ])
+            .into_any_element()
+    });
+
+    assert_eq!(
+        harness.node("empty").expect("published").value.as_deref(),
+        Some("empty")
+    );
+    assert_eq!(
+        harness
+            .node("unavailable")
+            .expect("published")
+            .value
+            .as_deref(),
+        Some("unavailable")
+    );
+    assert_eq!(
+        harness.node("stale").expect("published").value.as_deref(),
+        Some("8 jobs")
+    );
+    assert_eq!(
+        harness
+            .node("stale.stale")
+            .expect("published")
+            .value
+            .as_deref(),
+        Some("stale")
+    );
 }
 
 // ----------------------------------------------------------------- upload list

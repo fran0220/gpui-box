@@ -327,7 +327,7 @@ fn line_element(
                 .whitespace_nowrap()
                 .pl(px(GUTTER_GAP / 2.0))
                 .when(struck, |element| element.line_through())
-                .children(runs(theme, line)),
+                .children(code_runs(theme, line.text.as_ref(), &line.spans)),
         );
 
     match line.mark {
@@ -366,11 +366,10 @@ fn line_id(ident: &Ident, number: usize) -> SharedString {
 /// one direction, a run that is allowed to shrink is shrunk to nothing, and
 /// every run then paints from the same left edge with one word on top of the
 /// next.
-fn runs(theme: &Theme, line: &CodeLine) -> Vec<AnyElement> {
-    let text = line.text.as_ref();
+pub(crate) fn code_runs(theme: &Theme, text: &str, spans: &[CodeSpan]) -> Vec<AnyElement> {
     let mut out: Vec<AnyElement> = Vec::new();
     let mut cut = 0usize;
-    for span in &line.spans {
+    for span in spans {
         if span.range.start < cut || span.range.start >= span.range.end {
             continue;
         }
@@ -579,7 +578,7 @@ mod tests {
             tone: Tone::Accent,
         }]);
         // One run, the whole line, because the span named nothing real.
-        assert_eq!(runs(&theme, &line).len(), 1);
+        assert_eq!(code_runs(&theme, line.text.as_ref(), &line.spans).len(), 1);
     }
 
     #[test]

@@ -20,8 +20,8 @@ input, and an entry in `docs/components.md`.
 | Navigation | `Tabs`, `Accordion`, `Collapsible`, `Breadcrumb`, `Sidebar`, `Pagination`, `Wizard` |
 | Data | `List` (virtualized), `Table`, `DataGrid` (virtualized), `BulkBar`, `Tree` |
 | Date and time | `Calendar`, `DateInput`, `RangePicker`, `TimeInput` |
-| Content | `Markdown`, `MessageList`, `ImageViewer`, `TransportBar`, `BrowserPanel` (shell only) |
-| Display | `Badge`, `Tag`, `Avatar`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `StatusDot`, `StatusLine`, `Callout`, `PulseLoader`, `GradientSpinner`, `Skeleton`, `ProgressCircle`, `DescriptionList`, `Timeline` |
+| Content | `Markdown`, `MessageList`, `ImageViewer`, `TransportBar`, `BrowserPanel` (shell only), `LogStream`, `DiffView` |
+| Display | `Badge`, `Tag`, `Avatar`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `StatusDot`, `StatusLine`, `Callout`, `PulseLoader`, `GradientSpinner`, `Skeleton`, `ProgressCircle`, `DescriptionList`, `Timeline`, `Sparkline` |
 | Overlay | `Overlay`, `Dialog`, `Drawer`, `Popover`, `Menu`, `ContextMenu`, `Menubar`, `CommandPalette`, `Tooltip`, `HoverCard`, `Toast`, `ToastLayer`, `Kbd` |
 | Layout | `SplitPane`, `SplitTree`, `ScrollArea`, `Toolbar`, `AspectRatio` |
 | Shell | `Dock`, `StatusBar` |
@@ -146,7 +146,9 @@ own; both are exercised through every control and overlay that uses them.
   player, and this crate has no player — which is why a duration nobody stated
   is a state rather than a zero.
 - **Charts.** A chart is a data-visualisation library with its own scales,
-  axes and accessibility model.
+  axes and accessibility model. `Sparkline` is the deliberate narrow exception:
+  an accessible reading over caller-normalized points, with no scale, axes,
+  locale, interaction or chart model of its own.
 - **Colour picker, file picker, print dialog.** Platform surfaces; a host
   should reach the operating system rather than a reimplementation.
 - **Menu bar and window chrome.** Owned by the platform window, not by a
@@ -192,9 +194,7 @@ is for.
 
 Then: mentions in a text field, a segmented one-time-code field, a password
 reveal, `Cascader`, an in-page anchor list, a diagnostics list, search within
-settings, a keymap editor showing conflicts, undo history, and `Sparkline` —
-the one exception worth making to charts being out of scope, because a token
-count over time is a reading, not a chart.
+settings, a keymap editor showing conflicts, and undo history.
 
 Agent applications need a family this library is still filling in. A
 conversation is not the unit; a run made of steps is, and `ToolCallCard`,
@@ -202,9 +202,9 @@ conversation is not the unit; a run made of steps is, and `ToolCallCard`,
 `ApprovalPrompt` and `PermissionMatrix` where the default is
 refusal and the scope of "always" is stated, `CostMeter` and a context gauge
 that says when a number is an estimate, `ToolCatalog` with per-server
-attribution because two servers may offer the same tool name, `SkillCard`,
-`LogStream`, and `DiffView`. `JsonView`, `SchemaForm`, `ServerList` and
-`NodeGraph` are covered above.
+attribution because two servers may offer the same tool name, and `SkillCard`.
+`LogStream`, `DiffView`, `JsonView`, `SchemaForm`, `ServerList` and `NodeGraph`
+are covered above.
 
 `NodeGraph` covers drawing a run that branched or was retried; it does not
 cover arranging one. A caller with a topology and no coordinates needs a layout
@@ -215,8 +215,8 @@ precisely because it is separable from the drawing.
 
 | Gap | Why it matters |
 |---|---|
-| Text selection | Nothing here can be selected or copied. Reading a rendered answer and keeping it is table stakes, and GPUI does not offer the primitive. |
-| Text range highlighting | No API marks a substring of already-rendered text, which blocks search hits, log filtering, diff, and find-in-page at once. |
+| Text selection | GPUI offers no pointer text-selection primitive. Components such as `CodeView`, `Markdown` and `LogStream` can offer explicit whole-value copy actions or intents, but arbitrary rendered ranges cannot be selected. |
+| Text range highlighting | `HighlightedText`, `LogStream`, `CodeView` and `DiffView` render caller-supplied ranges while constructing their text. GPUI still has no API that marks a substring of an arbitrary already-rendered text element, which blocks a generic find-in-page overlay. |
 | Writing direction | Nothing reads right-to-left. Every inset is left and right rather than start and end, so this is whole-library work that gets more expensive every batch. |
 | Number, date, and quantity formatting | Every word is now host-replaceable, but every *number* beside one is still formatted by Rust. See "Numbers a catalogue cannot fix" below. |
 | Assistive technology gaps | Basic semantics, grapheme-based editable text runs and selection actions, and explicit live-region properties now reach GPUI's AccessKit platform tree. Character geometry/native caret tracking, verified screen-reader announcement timing, native-child handoff, and native Windows/Linux session verification remain absent; see `docs/accessibility.md`. |

@@ -19,14 +19,20 @@
 
 pub mod browser;
 pub mod code_view;
+pub mod diff_view;
 pub mod image_viewer;
+pub mod log_stream;
 pub mod markdown;
 pub mod message_list;
 pub mod transport;
 
 pub use browser::{BrowserPanel, ViewportState};
 pub use code_view::{CodeLine, CodeView, LineMark};
+pub use diff_view::{
+    DiffFile, DiffHunk, DiffLine, DiffLineMark, DiffPresentation, DiffSide, DiffView, DiffViewEvent,
+};
 pub use image_viewer::{FitMode, ImageFrame, ImageSize, ImageState, ImageViewer, ImageViewerEvent};
+pub use log_stream::{LogEntry, LogStream, LogStreamState};
 pub use markdown::{
     Block, CellAlign, CodeBlock, CodeSpan, Document, ImageRequest, Inline, ListEntry, Markdown,
     MarkdownEvent,

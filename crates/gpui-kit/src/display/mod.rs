@@ -12,6 +12,7 @@ pub mod icon;
 pub mod loading;
 pub mod progress;
 pub mod progress_circle;
+pub mod sparkline;
 pub mod status;
 pub mod tag;
 pub mod timeline;

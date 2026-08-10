@@ -67,6 +67,7 @@ component grows a literal a reader could read.
 | `DescriptionList` | builder | Term and value pairs for a detail page. Unknown, not applicable, and redacted are three different facts, and a redacted value carries only its shape |
 | `Timeline` | builder | A chronological feed. Every time and every day heading is a string the caller already formatted, and an entry whose time nobody knows says so |
 | `HighlightedText` | builder | Marks caller-given byte ranges in caller-given text. It searches nothing: the ranges are the caller's, the current one is drawn differently from the others rather than more strongly, and a range naming no real slice costs its mark and not the line |
+| `Sparkline` | builder | A narrow accessible trend reading rather than a chart. The caller supplies points already normalized into the `0..=1` square and exact label/current/minimum/maximum text; invalid points are skipped, no scale or locale is inferred, and empty, unavailable, and stale are separate states |
 | `FailurePanel` | builder | A region the host could not produce, in the host's own words. Not an error boundary and deliberately not named one: GPUI has no fallible render and no catchable render panic, so this takes a failure the host is already holding, through `from_result`. It publishes `failed`, never empty |
 | `Icon` | builder | A glyph from the bundled catalog, sized from the `control.*` glyph step and coloured from a semantic role rather than an `Hsla`. Emits nothing: a glyph that can be clicked is `IconButton`. Decorative by default and published only when named, so a glyph that repeats the label beside it is not announced twice |
 
@@ -346,7 +347,24 @@ from the component path.
 | `MessageList` | builder | a failed message that should be tried again, and whatever a Markdown body reported | A conversation over the virtualized `List`. Five delivery states, a streaming mark keyed to the message rather than to its text, caller-declared grouping, and following that happens only while the reader is already at the bottom |
 | `ImageViewer` | builder | the fit that was asked for, the image that was stepped to, and an image the host has not supplied | One image at a time, with contain, cover, 1:1, and zoom; the wheel zooms at the pointer and a drag pans, clamped so the picture cannot leave the frame. Loading, unavailable, failed, and ready are four renderings, and dimensions are a caller input |
 | `CodeView`, `CodeLine` | builder | a copy of the whole text | Read-only code with a gutter. No grammar and no new dependency: spans are pre-classified by the caller, exactly as a Markdown fenced block. A long line scrolls rather than wrapping, because a column carries meaning in code and a wrap would break the gutter's claim that one line is one row. Line numbers are the file's, not the slice's, and only a marked line publishes a node |
+| `LogStream`, `LogEntry` | builder | the stable entry selected and the selected entry the host should copy | Caller-owned entries over virtualized `List`, with fixed clipped rows and a bounded viewport. Timestamp, level, source and message strings and search-hit ranges all come from the caller. Following/paused is identity-keyed visual state; loading, empty, unavailable, error and stale remain distinct, and stale keeps the last verified entries visible |
+| `DiffView`, `DiffFile`, `DiffHunk`, `DiffLine` | builder | file, hunk and line activation by stable caller identity | Read-only, caller-computed diff rows. The caller supplies aligned old/new sides for replacements; unified and split arrange them with the same fixed-row renderer. Spans are pre-classified as in `CodeView`. It computes no diff or alignment, parses no syntax, applies nothing and reads no filesystem |
 | `TransportBar` | builder | play, pause, a preview while scrubbing and one seek on release, volume, mute, speed, and a track step | Playback controls for media this crate does not play. A duration the host does not know is a state, buffered ranges are drawn apart from the played position, and every readout is a string the host wrote |
+
+### Developer data stays caller-owned
+
+`LogStream` and `DiffView` both flatten caller-owned data into the crate's one
+fixed-height virtualized `List`. Only viewport rows are laid out and published;
+the list node still reports the complete row count. That keeps a large
+already-materialized log or diff viewport-cheap, but it is not lazy loading:
+building a frame still walks the caller's entries or hierarchy. Fixed rows also
+mean long content is clipped instead of wrapped or horizontally scrolled.
+
+`LogStream` keeps only follow/paused and scroll position. Selection remains the
+caller's, and copy is a stable-entry intent because GPUI has no pointer text
+selection. `DiffView` reports file, hunk and line actions and has no apply
+operation. Neither component opens files, starts a process, searches text,
+computes a diff or classifies syntax.
 
 ### A document is drawn, never obeyed
 

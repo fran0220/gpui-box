@@ -422,6 +422,27 @@ string_keys! {
     CodeLineError => "code.line-error", "Error";
     CodeEmpty => "code.empty", "Nothing to show";
 
+    // Developer and data readings. Log metadata and metric values are caller
+    // strings; only controls and state names belong to this catalogue.
+    LogFollow => "log.follow", "Follow output";
+    LogPause => "log.pause", "Pause output";
+    LogFollowing => "log.following", "Following newest";
+    LogPaused => "log.paused", "Follow paused";
+    LogEmpty => "log.empty", "No log entries";
+    LogUnavailable => "log.unavailable", "Log unavailable";
+    LogError => "log.error", "Could not load log";
+    DiffFile => "diff.file", "File";
+    DiffHunk => "diff.hunk", "Hunk";
+    DiffContextLine => "diff.context-line", "Context line";
+    DiffChangedLine => "diff.changed-line", "Changed line";
+    DiffEmpty => "diff.empty", "No differences";
+    SparklineEmpty => "sparkline.empty", "No readings";
+    SparklineUnavailable => "sparkline.unavailable", "Reading unavailable";
+    SparklineCurrent => "sparkline.current", "Current: {0}";
+    SparklineMinimum => "sparkline.minimum", "Minimum: {0}";
+    SparklineMaximum => "sparkline.maximum", "Maximum: {0}";
+    SparklineRange => "sparkline.range", "Minimum {0}; maximum {1}";
+
     // Uploads.
     UploadQueued => "upload.queued", "Queued";
     UploadUploading => "upload.uploading", "Uploading";

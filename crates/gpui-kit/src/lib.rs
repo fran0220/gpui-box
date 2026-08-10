@@ -104,10 +104,11 @@ pub mod prelude {
     };
     pub use crate::content::{
         Attachment, BrowserPanel, BufferedRange, CodeBlock, CodeLine, CodeSpan, CodeView,
-        DeliveryState, FitMode, ImageFrame, ImageRequest, ImageSize, ImageState, ImageViewer,
-        ImageViewerEvent, LineMark, Markdown, MarkdownEvent, Message, MessageBody, MessageList,
-        Reaction, TrackStep, TransportBar, TransportDuration, TransportEvent, TransportState,
-        ViewportState,
+        DeliveryState, DiffFile, DiffHunk, DiffLine, DiffLineMark, DiffPresentation, DiffSide,
+        DiffView, DiffViewEvent, FitMode, ImageFrame, ImageRequest, ImageSize, ImageState,
+        ImageViewer, ImageViewerEvent, LineMark, LogEntry, LogStream, LogStreamState, Markdown,
+        MarkdownEvent, Message, MessageBody, MessageList, Reaction, TrackStep, TransportBar,
+        TransportDuration, TransportEvent, TransportState, ViewportState,
     };
     pub use crate::controls::button::{
         Button, ButtonGroup, ButtonJoin, ButtonVariant, IconButton, IconPosition,
@@ -160,6 +161,9 @@ pub mod prelude {
     pub use crate::display::loading::{GradientSpinner, PulseLoader, Skeleton};
     pub use crate::display::progress::ProgressBar;
     pub use crate::display::progress_circle::ProgressCircle;
+    pub use crate::display::sparkline::{
+        Sparkline, SparklinePoint, SparklineReading, SparklineState,
+    };
     pub use crate::display::status::{Callout, StatusDot, StatusLine};
     pub use crate::display::tag::Tag;
     pub use crate::display::timeline::{EntryTime, Timeline, TimelineEntry, TimelineGroup};
