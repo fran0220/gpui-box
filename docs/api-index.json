@@ -29,6 +29,30 @@
       ]
     },
     {
+      "name": "AnchorList",
+      "kind": "builder",
+      "path": "gpui_kit::navigation::AnchorList",
+      "source": "crates/gpui-kit/src/navigation/anchor_list.rs",
+      "summary": "A horizontal reading-order list of links to sections in the current page.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "anchor(anchor: Anchor) -> Self",
+        "anchors(anchors: impl IntoIterator<Item = Anchor>) -> Self",
+        "active(id: impl Into<SharedString>) -> Self",
+        "on_navigate(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self",
+        "overflow_after(count: usize) -> Self",
+        "overflow_menu(menu: Entity<Menu>) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "anchor-list"
+      ]
+    },
+    {
       "name": "AnimatedNumber",
       "kind": "builder",
       "path": "gpui_kit::display::AnimatedNumber",
@@ -133,7 +157,8 @@
         "hover-card",
         "menubar",
         "copy-button",
-        "document-tabs"
+        "document-tabs",
+        "anchor-list"
       ]
     },
     {
@@ -305,6 +330,7 @@
         "menubar",
         "copy-button",
         "document-tabs",
+        "anchor-list",
         "calendar",
         "date-range",
         "date-time"
@@ -423,6 +449,46 @@
       ]
     },
     {
+      "name": "Cascader",
+      "kind": "view",
+      "path": "gpui_kit::controls::Cascader",
+      "source": "crates/gpui-kit/src/controls/cascader.rs",
+      "summary": "A menu of progressively revealed caller-owned option columns.",
+      "construct": [
+        "new(ident: impl Into<Ident>, _window: &mut Window, cx: &mut Context<Self>) -> Self"
+      ],
+      "options": [
+        "options(options: impl IntoIterator<Item = CascaderOption>) -> Self",
+        "selected(id: impl Into<SharedString>) -> Self",
+        "name(name: impl Into<SharedString>) -> Self",
+        "placeholder(placeholder: impl Into<SharedString>) -> Self"
+      ],
+      "commands": [
+        "set_options(options: Vec<CascaderOption>, cx: &mut Context<Self>)",
+        "set_selected(selected: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_placeholder(placeholder: Option<SharedString>, cx: &mut Context<Self>)",
+        "set_disabled(disabled: bool, cx: &mut Context<Self>)",
+        "open(window: &mut Window, cx: &mut Context<Self>)",
+        "close(cx: &mut Context<Self>)"
+      ],
+      "queries": [
+        "selected_id() -> Option<&SharedString>",
+        "is_open() -> bool",
+        "open_path() -> &[SharedString]"
+      ],
+      "reports": [
+        "Selected",
+        "Expanded",
+        "Retry",
+        "Opened",
+        "Closed"
+      ],
+      "scenes": [
+        "cascader"
+      ]
+    },
+    {
       "name": "Checkbox",
       "kind": "builder",
       "path": "gpui_kit::controls::Checkbox",
@@ -455,7 +521,8 @@
         "hover-card",
         "menubar",
         "copy-button",
-        "document-tabs"
+        "document-tabs",
+        "anchor-list"
       ]
     },
     {
@@ -591,7 +658,8 @@
         "hover-card",
         "menubar",
         "copy-button",
-        "document-tabs"
+        "document-tabs",
+        "anchor-list"
       ]
     },
     {
@@ -660,7 +728,8 @@
         "hover-card",
         "menubar",
         "copy-button",
-        "document-tabs"
+        "document-tabs",
+        "anchor-list"
       ]
     },
     {
@@ -841,7 +910,33 @@
         "copy-button",
         "document-tabs",
         "notification-center",
-        "failure-panel"
+        "failure-panel",
+        "anchor-list"
+      ]
+    },
+    {
+      "name": "DiagnosticsList",
+      "kind": "builder",
+      "path": "gpui_kit::data::DiagnosticsList",
+      "source": "crates/gpui-kit/src/data/diagnostics_list.rs",
+      "summary": "A diagnostic list whose data and state remain owned by its caller.",
+      "construct": [
+        "new(ident: impl Into<Ident>, diagnostics: Loadable<Vec<Diagnostic>, SharedString>) -> Self"
+      ],
+      "options": [
+        "filter(filter: DiagnosticFilter) -> Self",
+        "selected(id: impl Into<SharedString>) -> Self",
+        "visible_rows(rows: usize) -> Self",
+        "on_filter(handler: impl Fn(DiagnosticFilter, &mut Window, &mut App) + 'static) -> Self",
+        "on_select(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self",
+        "on_action(handler: impl Fn(SharedString, SharedString, &mut Window, &mut App) + 'static) -> Self",
+        "on_retry(handler: impl Fn(&mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "diagnostics-list"
       ]
     },
     {
@@ -947,7 +1042,8 @@
         "hover-card",
         "menubar",
         "copy-button",
-        "document-tabs"
+        "document-tabs",
+        "anchor-list"
       ]
     },
     {
@@ -1091,7 +1187,8 @@
         "hover-card",
         "menubar",
         "copy-button",
-        "document-tabs"
+        "document-tabs",
+        "anchor-list"
       ]
     },
     {
@@ -1389,7 +1486,8 @@
         "hover-card",
         "menubar",
         "copy-button",
-        "document-tabs"
+        "document-tabs",
+        "anchor-list"
       ]
     },
     {
@@ -1607,7 +1705,9 @@
         "document-tabs",
         "notification-center",
         "failure-panel",
-        "upload-list"
+        "upload-list",
+        "anchor-list",
+        "diagnostics-list"
       ]
     },
     {
@@ -1733,7 +1833,8 @@
         "hover-card",
         "menubar",
         "copy-button",
-        "document-tabs"
+        "document-tabs",
+        "anchor-list"
       ]
     },
     {
@@ -2023,7 +2124,8 @@
         "hover-card",
         "menubar",
         "copy-button",
-        "document-tabs"
+        "document-tabs",
+        "anchor-list"
       ]
     },
     {
@@ -2059,7 +2161,8 @@
         "hover-card",
         "menubar",
         "copy-button",
-        "document-tabs"
+        "document-tabs",
+        "anchor-list"
       ]
     },
     {
@@ -2805,7 +2908,8 @@
         "hover-card",
         "menubar",
         "copy-button",
-        "document-tabs"
+        "document-tabs",
+        "anchor-list"
       ]
     },
     {
@@ -3037,7 +3141,8 @@
         "copy-button",
         "document-tabs",
         "notification-center",
-        "failure-panel"
+        "failure-panel",
+        "anchor-list"
       ]
     },
     {
@@ -3431,6 +3536,24 @@
       ]
     },
     {
+      "name": "Anchor",
+      "path": "gpui_kit::navigation::Anchor",
+      "summary": "One caller-owned document destination, identified independently of order.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, label: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "disabled(disabled: bool) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "label() -> &SharedString",
+        "is_disabled() -> bool"
+      ]
+    },
+    {
       "name": "ApprovalDecision",
       "path": "gpui_kit::agent::ApprovalDecision",
       "summary": "How far an approval reaches.",
@@ -3655,6 +3778,42 @@
       ],
       "construct": [],
       "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "CascaderEvent",
+      "path": "gpui_kit::controls::CascaderEvent",
+      "summary": "",
+      "variants": [
+        "Selected",
+        "Expanded",
+        "Retry",
+        "Opened",
+        "Closed"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "CascaderOption",
+      "path": "gpui_kit::controls::CascaderOption",
+      "summary": "One caller-owned node in a cascader.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, label: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "disabled(disabled: bool) -> Self",
+        "idle_children() -> Self",
+        "loading_children() -> Self",
+        "empty_children() -> Self",
+        "unavailable_children(reason: impl Into<SharedString>) -> Self",
+        "error_children(reason: impl Into<SharedString>) -> Self",
+        "children(children: impl IntoIterator<Item = CascaderOption>) -> Self"
+      ],
       "commands": [],
       "queries": []
     },
@@ -4027,6 +4186,94 @@
       "queries": [
         "as_str() -> &'static str"
       ]
+    },
+    {
+      "name": "Diagnostic",
+      "path": "gpui_kit::data::Diagnostic",
+      "summary": "One caller-owned diagnostic.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, severity: DiagnosticSeverity, location: DiagnosticLocation, message: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "action(action: DiagnosticAction) -> Self",
+        "actions(actions: impl IntoIterator<Item = DiagnosticAction>) -> Self",
+        "disabled(disabled: bool) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "severity() -> DiagnosticSeverity",
+        "location() -> &DiagnosticLocation",
+        "message() -> &SharedString",
+        "diagnostic_actions() -> &[DiagnosticAction]",
+        "is_disabled() -> bool"
+      ]
+    },
+    {
+      "name": "DiagnosticAction",
+      "path": "gpui_kit::data::DiagnosticAction",
+      "summary": "A caller-owned action that can be reported for a diagnostic.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, label: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "disabled(disabled: bool) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "label() -> &SharedString",
+        "is_disabled() -> bool"
+      ]
+    },
+    {
+      "name": "DiagnosticFilter",
+      "path": "gpui_kit::data::DiagnosticFilter",
+      "summary": "Selected severities, stored as a compact bit set.",
+      "variants": [],
+      "construct": [
+        "from_severities(values: impl IntoIterator<Item = DiagnosticSeverity>) -> Self"
+      ],
+      "options": [
+        "includes(diagnostic: &Diagnostic) -> bool",
+        "severities() -> impl Iterator<Item = DiagnosticSeverity>"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "DiagnosticLocation",
+      "path": "gpui_kit::data::DiagnosticLocation",
+      "summary": "Caller-formatted location text. No path interpretation is performed.",
+      "variants": [],
+      "construct": [
+        "new(label: impl Into<SharedString>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "label() -> &SharedString"
+      ]
+    },
+    {
+      "name": "DiagnosticSeverity",
+      "path": "gpui_kit::data::DiagnosticSeverity",
+      "summary": "Severity assigned by the caller.",
+      "variants": [
+        "Error",
+        "Warning",
+        "Information",
+        "Hint"
+      ],
+      "construct": [],
+      "options": [
+        "name() -> &'static str",
+        "tone() -> Tone"
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "DialogEvent",
@@ -8398,6 +8645,46 @@
         "UploadList"
       ],
       "example": "fn upload_list(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(560.0))\n        .child(caption(\n            &theme,\n            \"a refusal is not a failure, and only a failure is offered a retry\",\n        ))\n        .child(\n            UploadList::new(\"scene.uploads\")\n                .dropzone(\n                    Dropzone::new(\"scene.uploads.zone\", \"Drop files to attach\")\n                        .hint(\"PDF, PNG, or plain text\")\n                        .on_files(|_, _, _| {}),\n                )\n                .uploads([\n                    Upload::new(\"brief\", \"brief.pdf\").size(\"1.2 MB\").done(),\n                    Upload::new(\"capture\", \"capture.png\")\n                        .size(\"4.8 MB\")\n                        .uploading(0.4),\n                    Upload::new(\"notes\", \"notes.txt\").size(\"12 KB\"),\n                    Upload::new(\"archive\", \"archive.zip\")\n                        .size(\"240 MB\")\n                        .failed(\"The connection dropped.\"),\n                    Upload::new(\"installer\", \"installer.exe\")\n                        .size(\"64 MB\")\n                        .refused(\"This zone does not take programs.\"),\n                ])\n                .on_retry(|_, _, _| {})\n                .on_cancel(|_, _, _| {})\n                .on_remove(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "cascader",
+      "capture": "cargo run -p xtask -- scenes capture cascader",
+      "uses": [
+        "Cascader"
+      ],
+      "example": "fn cascader(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneCascader>() {\n        let cascader = cx.new(|cx| {\n            Cascader::new(\"scene.cascader\", window, cx)\n                .name(\"Fixture destination\")\n                .selected(\"release-notes\")\n                .options([\n                    CascaderOption::new(\"guides\", \"Guides\").children([\n                        CascaderOption::new(\"getting-started\", \"Getting started\"),\n                        CascaderOption::new(\"configuration\", \"Configuration\"),\n                    ]),\n                    CascaderOption::new(\"reference\", \"Reference\").loading_children(),\n                    CascaderOption::new(\"archive\", \"Archive\").unavailable_children(\n                        \"The fixture host does not provide archived sections.\",\n                    ),\n                    CascaderOption::new(\"release-notes\", \"Release notes\"),\n                    CascaderOption::new(\"managed\", \"Managed section\").disabled(true),\n                ])\n        });\n        cascader.update(cx, |cascader, cx| cascader.open(window, cx));\n        cx.set_global(SceneCascader { cascader });\n    }\n    let theme = cx.theme().clone();\n    let cascader = cx.global::<SceneCascader>().cascader.clone();\n    stack(&theme)\n        .w(px(680.0))\n        .child(caption(\n            &theme,\n            \"caller-owned hierarchy and value; the open path belongs only to the view\",\n        ))\n        .child(cascader)\n        .into_any_element()\n}"
+    },
+    {
+      "name": "anchor-list",
+      "capture": "cargo run -p xtask -- scenes capture anchor-list",
+      "uses": [
+        "AnchorList",
+        "Avatar",
+        "Button",
+        "Checkbox",
+        "CommandPalette",
+        "ContextMenu",
+        "DescriptionList",
+        "Divider",
+        "EmptyState",
+        "Icon",
+        "List",
+        "Menu",
+        "Popover",
+        "ProgressBar",
+        "Tag",
+        "Timeline"
+      ],
+      "example": "fn anchor_navigation(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneAnchorList>() {\n        let label = cx.strings().text(StringKey::AnchorMoreSections);\n        let overflow = cx.new(|cx| Menu::new(\"scene.anchor-list.menu\", window, cx).trigger(label));\n        cx.set_global(SceneAnchorList { overflow });\n    }\n    let theme = cx.theme().clone();\n    let overflow = cx.global::<SceneAnchorList>().overflow.clone();\n    stack(&theme)\n        .w(px(700.0))\n        .child(caption(\n            &theme,\n            \"section intents only; the declared overflow moves anchors into a menu\",\n        ))\n        .child(\n            AnchorList::new(\"scene.anchor-list\")\n                .anchors([\n                    Anchor::new(\"summary\", \"Summary\"),\n                    Anchor::new(\"inputs\", \"Inputs\"),\n                    Anchor::new(\"constraints\", \"Constraints\"),\n                    Anchor::new(\"verification\", \"Verification\"),\n                    Anchor::new(\"history\", \"History\").disabled(true),\n                ])\n                .active(\"inputs\")\n                .overflow_after(3)\n                .overflow_menu(overflow)\n                .on_navigate(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "diagnostics-list",
+      "capture": "cargo run -p xtask -- scenes capture diagnostics-list",
+      "uses": [
+        "DiagnosticsList",
+        "List"
+      ],
+      "example": "fn diagnostics_surface(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let diagnostics = [\n        Diagnostic::new(\n            \"fixture-error\",\n            DiagnosticSeverity::Error,\n            DiagnosticLocation::new(\"fixture.rs:18\"),\n            \"Fixture diagnostic: incompatible value\",\n        )\n        .action(DiagnosticAction::new(\"inspect\", \"Inspect fixture\")),\n        Diagnostic::new(\n            \"fixture-warning\",\n            DiagnosticSeverity::Warning,\n            DiagnosticLocation::new(\"fixture.rs:31\"),\n            \"Fixture diagnostic: unused declaration\",\n        ),\n        Diagnostic::new(\n            \"fixture-information\",\n            DiagnosticSeverity::Information,\n            DiagnosticLocation::new(\"fixture.rs:47\"),\n            \"Fixture diagnostic: a simpler form is available\",\n        ),\n        Diagnostic::new(\n            \"fixture-hint\",\n            DiagnosticSeverity::Hint,\n            DiagnosticLocation::new(\"fixture.rs:64\"),\n            \"Fixture diagnostic: consider a descriptive name\",\n        ),\n    ];\n    stack(&theme)\n        .w(px(760.0))\n        .child(caption(\n            &theme,\n            \"synthetic diagnostics; filters, selection, and actions are caller-owned intents\",\n        ))\n        .child(\n            DiagnosticsList::new(\"scene.diagnostics\", Loadable::Ready(diagnostics.to_vec()))\n                .selected(\"fixture-warning\")\n                .visible_rows(5)\n                .on_filter(|_, _, _| {})\n                .on_select(|_, _, _| {})\n                .on_action(|_, _, _, _| {}),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "calendar",

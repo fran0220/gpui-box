@@ -131,6 +131,9 @@ string_keys! {
     BreadcrumbHiddenOne => "breadcrumb.hidden-one", "1 hidden level";
     BreadcrumbHiddenMany => "breadcrumb.hidden-many", "{0} hidden levels";
 
+    // In-page anchors.
+    AnchorMoreSections => "anchor.more-sections", "More sections";
+
     // Pagination.
     PaginationFirst => "pagination.first", "First page";
     PaginationPrevious => "pagination.previous", "Previous page";
@@ -200,6 +203,13 @@ string_keys! {
     ComboboxCreateHint => "combobox.create-hint", "Press enter to add it as a new value.";
     ComboboxClosedHint => "combobox.closed-hint", "This field only accepts one of the options offered.";
 
+    // Cascader.
+    CascaderPlaceholder => "cascader.placeholder", "Select";
+    CascaderUnstarted => "cascader.unstarted", "Nothing has been asked for yet";
+    CascaderEmpty => "cascader.empty", "No options";
+    CascaderUnavailable => "cascader.unavailable", "Options unavailable";
+    CascaderError => "cascader.error", "Could not load options";
+
     // Drop zone.
     DropzoneRefusal => "dropzone.refusal", "This zone does not take that.";
 
@@ -265,6 +275,18 @@ string_keys! {
     GridLoadingRows => "grid.loading-rows", "Loading rows";
     GridLoadFailed => "grid.load-failed", "Could not load rows";
     GridEmpty => "grid.empty", "No rows";
+
+    // Diagnostics.
+    DiagnosticsEmpty => "diagnostics.empty", "No diagnostics";
+    DiagnosticsNoMatch => "diagnostics.no-match", "No diagnostics match these filters";
+    DiagnosticsUnavailable => "diagnostics.unavailable", "Diagnostics unavailable";
+    DiagnosticsError => "diagnostics.error", "Could not load diagnostics";
+    DiagnosticsFilterField => "diagnostics.filter-field", "Severity";
+    DiagnosticsFilterOperator => "diagnostics.filter-operator", "is";
+    DiagnosticsSeverityError => "diagnostics.severity-error", "Error";
+    DiagnosticsSeverityWarning => "diagnostics.severity-warning", "Warning";
+    DiagnosticsSeverityInformation => "diagnostics.severity-information", "Information";
+    DiagnosticsSeverityHint => "diagnostics.severity-hint", "Hint";
 
     // Drag and drop.
     DragFileOne => "drag.file-one", "1 file";

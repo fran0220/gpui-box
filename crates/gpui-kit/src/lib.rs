@@ -113,6 +113,7 @@ pub mod prelude {
     pub use crate::controls::button::{
         Button, ButtonGroup, ButtonJoin, ButtonVariant, IconButton, IconPosition,
     };
+    pub use crate::controls::cascader::{Cascader, CascaderEvent, CascaderOption};
     pub use crate::controls::combobox::{Combobox, ComboboxEvent};
     pub use crate::controls::copy_button::{CopyButton, CopyEvent, CopyState};
     pub use crate::controls::dropzone::{Dropzone, DropzoneState};
@@ -137,9 +138,10 @@ pub mod prelude {
     pub use crate::controls::toggle_button::{Toggle, ToggleGroup, ToggleItem, ToggleSelection};
     pub use crate::controls::upload_list::{OverallProgress, Upload, UploadList, UploadState};
     pub use crate::data::{
-        Align, BulkBar, Cell, Column, ColumnWidth, DataGrid, EditIntent, EditOutcome, EditingCell,
-        Expanded, GridColumn, GridLines, GridRow, List, ListItem, Row, SelectionChange,
-        SelectionMode, SortDirection, Table, Tree, TreeNode,
+        Align, BulkBar, Cell, Column, ColumnWidth, DataGrid, Diagnostic, DiagnosticAction,
+        DiagnosticFilter, DiagnosticLocation, DiagnosticSeverity, DiagnosticsList, EditIntent,
+        EditOutcome, EditingCell, Expanded, GridColumn, GridLines, GridRow, List, ListItem, Row,
+        SelectionChange, SelectionMode, SortDirection, Table, Tree, TreeNode,
     };
     pub use crate::datetime::{
         BlockedDay, BlockedReport, Calendar, CalendarEvent, Clock, DateAdapter, DateInput,
@@ -189,9 +191,9 @@ pub mod prelude {
         Flip, Flipping, Keyframe, Keyframes, Presence, ScrollLink, Transition, Velocity, flip,
     };
     pub use crate::navigation::{
-        Accordion, AccordionSection, Breadcrumb, Collapsible, Crumb, PageTotal, Pagination,
-        SaveState, Sidebar, SidebarItem, SidebarSection, StepStatus, TabItem, Tabs, Wizard,
-        WizardIntent, WizardLayout, WizardStep,
+        Accordion, AccordionSection, Anchor, AnchorList, Breadcrumb, Collapsible, Crumb, PageTotal,
+        Pagination, SaveState, Sidebar, SidebarItem, SidebarSection, StepStatus, TabItem, Tabs,
+        Wizard, WizardIntent, WizardLayout, WizardStep,
     };
     pub use crate::overlay::{
         Command, CommandPalette, CommandPaletteEvent, ContextMenu, ContextMenuEvent, Dialog,

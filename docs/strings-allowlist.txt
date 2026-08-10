@@ -18,6 +18,7 @@
 :
 Accordion
 AccordionSection
+AnchorList
 AnimatedNumber
 ApprovalPrompt
 AspectRatio
@@ -28,6 +29,7 @@ Button
 ButtonGroup
 Calendar
 Card
+Cascader
 Cell
 Checkbox
 CodeView
@@ -39,6 +41,7 @@ CopyButton
 DataGrid
 DateInput
 DescriptionList
+DiagnosticsList
 Dialog
 DiffView
 Dock

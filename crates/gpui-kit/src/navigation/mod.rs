@@ -6,6 +6,7 @@
 //! refuses a move keeps showing the place that still holds.
 
 pub mod accordion;
+pub mod anchor_list;
 pub mod breadcrumb;
 pub mod collapsible;
 pub mod pagination;
@@ -14,6 +15,7 @@ pub mod tabs;
 pub mod wizard;
 
 pub use accordion::{Accordion, AccordionSection};
+pub use anchor_list::{Anchor, AnchorList};
 pub use breadcrumb::{Breadcrumb, Crumb};
 pub use collapsible::Collapsible;
 pub use pagination::{PageTotal, Pagination};

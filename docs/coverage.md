@@ -190,11 +190,15 @@ small: `Collapsible` is an `Accordion` with one section, `Menubar` is a row of
 `Button` that publishes a checked state. Two of them state a limit rather than
 inventing an answer, and `docs/components.md` carries both — what `CopyButton`
 can and cannot know about the clipboard, and what a hover card's grace period
-is for.
+is for. `Cascader`, `AnchorList`, and `DiagnosticsList` are also covered above;
+they compose the existing popover/menu, navigation, list, filter, badge, and
+status vocabulary instead of creating parallel application infrastructure.
 
 Then: mentions in a text field, a segmented one-time-code field, a password
-reveal, `Cascader`, an in-page anchor list, a diagnostics list, search within
-settings, a keymap editor showing conflicts, and undo history.
+reveal, search within settings, a keymap editor showing conflicts, undo
+history, and `Sparkline` —
+the one exception worth making to charts being out of scope, because a token
+count over time is a reading, not a chart.
 
 Agent applications need a family this library is still filling in. A
 conversation is not the unit; a run made of steps is, and `ToolCallCard`,

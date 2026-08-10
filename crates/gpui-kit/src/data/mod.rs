@@ -27,12 +27,17 @@
 //! lays every row out — which is the right answer for a settings summary and
 //! the wrong one for a hundred thousand log lines.
 
+pub mod diagnostics_list;
 pub mod grid;
 pub mod list;
 pub mod table;
 pub mod tree;
 pub mod viewport;
 
+pub use diagnostics_list::{
+    Diagnostic, DiagnosticAction, DiagnosticFilter, DiagnosticLocation, DiagnosticSeverity,
+    DiagnosticsList,
+};
 pub use grid::{
     BulkBar, DataGrid, EditIntent, EditOutcome, EditingCell, Expanded, GridColumn, GridLines,
     GridRow, SelectionChange, SelectionMode,

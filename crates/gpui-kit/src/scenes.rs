@@ -384,6 +384,18 @@ pub fn catalog() -> Vec<Scene> {
             name: "upload-list",
             build: upload_list,
         },
+        Scene {
+            name: "cascader",
+            build: cascader,
+        },
+        Scene {
+            name: "anchor-list",
+            build: anchor_navigation,
+        },
+        Scene {
+            name: "diagnostics-list",
+            build: diagnostics_surface,
+        },
     ];
     #[cfg(feature = "fixtures")]
     scenes.extend([
@@ -1665,6 +1677,131 @@ fn upload_list(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .on_retry(|_, _, _| {})
                 .on_cancel(|_, _, _| {})
                 .on_remove(|_, _, _| {}),
+        )
+        .into_any_element()
+}
+
+/// The cascader owns only the open surface and path, so its scene keeps one
+/// view alive across capture frames.
+struct SceneCascader {
+    cascader: Entity<Cascader>,
+}
+
+impl Global for SceneCascader {}
+
+fn cascader(window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<SceneCascader>() {
+        let cascader = cx.new(|cx| {
+            Cascader::new("scene.cascader", window, cx)
+                .name("Fixture destination")
+                .selected("release-notes")
+                .options([
+                    CascaderOption::new("guides", "Guides").children([
+                        CascaderOption::new("getting-started", "Getting started"),
+                        CascaderOption::new("configuration", "Configuration"),
+                    ]),
+                    CascaderOption::new("reference", "Reference").loading_children(),
+                    CascaderOption::new("archive", "Archive").unavailable_children(
+                        "The fixture host does not provide archived sections.",
+                    ),
+                    CascaderOption::new("release-notes", "Release notes"),
+                    CascaderOption::new("managed", "Managed section").disabled(true),
+                ])
+        });
+        cascader.update(cx, |cascader, cx| cascader.open(window, cx));
+        cx.set_global(SceneCascader { cascader });
+    }
+    let theme = cx.theme().clone();
+    let cascader = cx.global::<SceneCascader>().cascader.clone();
+    stack(&theme)
+        .w(px(680.0))
+        .child(caption(
+            &theme,
+            "caller-owned hierarchy and value; the open path belongs only to the view",
+        ))
+        .child(cascader)
+        .into_any_element()
+}
+
+struct SceneAnchorList {
+    overflow: Entity<Menu>,
+}
+
+impl Global for SceneAnchorList {}
+
+fn anchor_navigation(window: &mut Window, cx: &mut App) -> AnyElement {
+    if !cx.has_global::<SceneAnchorList>() {
+        let label = cx.strings().text(StringKey::AnchorMoreSections);
+        let overflow = cx.new(|cx| Menu::new("scene.anchor-list.menu", window, cx).trigger(label));
+        cx.set_global(SceneAnchorList { overflow });
+    }
+    let theme = cx.theme().clone();
+    let overflow = cx.global::<SceneAnchorList>().overflow.clone();
+    stack(&theme)
+        .w(px(700.0))
+        .child(caption(
+            &theme,
+            "section intents only; the declared overflow moves anchors into a menu",
+        ))
+        .child(
+            AnchorList::new("scene.anchor-list")
+                .anchors([
+                    Anchor::new("summary", "Summary"),
+                    Anchor::new("inputs", "Inputs"),
+                    Anchor::new("constraints", "Constraints"),
+                    Anchor::new("verification", "Verification"),
+                    Anchor::new("history", "History").disabled(true),
+                ])
+                .active("inputs")
+                .overflow_after(3)
+                .overflow_menu(overflow)
+                .on_navigate(|_, _, _| {}),
+        )
+        .into_any_element()
+}
+
+fn diagnostics_surface(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let diagnostics = [
+        Diagnostic::new(
+            "fixture-error",
+            DiagnosticSeverity::Error,
+            DiagnosticLocation::new("fixture.rs:18"),
+            "Fixture diagnostic: incompatible value",
+        )
+        .action(DiagnosticAction::new("inspect", "Inspect fixture")),
+        Diagnostic::new(
+            "fixture-warning",
+            DiagnosticSeverity::Warning,
+            DiagnosticLocation::new("fixture.rs:31"),
+            "Fixture diagnostic: unused declaration",
+        ),
+        Diagnostic::new(
+            "fixture-information",
+            DiagnosticSeverity::Information,
+            DiagnosticLocation::new("fixture.rs:47"),
+            "Fixture diagnostic: a simpler form is available",
+        ),
+        Diagnostic::new(
+            "fixture-hint",
+            DiagnosticSeverity::Hint,
+            DiagnosticLocation::new("fixture.rs:64"),
+            "Fixture diagnostic: consider a descriptive name",
+        ),
+    ];
+    stack(&theme)
+        .w(px(760.0))
+        .child(caption(
+            &theme,
+            "synthetic diagnostics; filters, selection, and actions are caller-owned intents",
+        ))
+        .child(
+            DiagnosticsList::new("scene.diagnostics", Loadable::Ready(diagnostics.to_vec()))
+                .selected("fixture-warning")
+                .visible_rows(5)
+                .on_filter(|_, _, _| {})
+                .on_select(|_, _, _| {})
+                .on_action(|_, _, _, _| {}),
         )
         .into_any_element()
 }
