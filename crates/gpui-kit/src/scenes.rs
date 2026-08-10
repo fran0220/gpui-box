@@ -9,6 +9,7 @@ use gpui::{
     px,
 };
 use gpui_kit_assets::Icon;
+use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{Radius, Space, Theme};
 
 use crate::controls::combobox::Combobox;
@@ -83,6 +84,14 @@ pub fn catalog() -> Vec<Scene> {
         Scene {
             name: "form",
             build: form,
+        },
+        Scene {
+            name: "auth-sign-in",
+            build: auth_sign_in,
+        },
+        Scene {
+            name: "auth-verification",
+            build: auth_verification,
         },
         Scene {
             name: "actions",
@@ -2466,6 +2475,172 @@ fn form(window: &mut Window, cx: &mut App) -> AnyElement {
                 .control("scene.form.region")
                 .description("Where runs in this workspace are executed.")
                 .child(region),
+        )
+        .into_any_element()
+}
+
+/// The password in the canonical sign-in composition, kept across frames.
+struct SceneAuthSignIn {
+    password: Entity<PasswordInput>,
+}
+
+impl Global for SceneAuthSignIn {}
+
+fn ensure_auth_sign_in(window: &mut Window, cx: &mut App) {
+    if cx.has_global::<SceneAuthSignIn>() {
+        return;
+    }
+    let password = cx.new(|cx| {
+        PasswordInput::new("scene.auth.sign-in.password", window, cx)
+            .name("Password")
+            .placeholder("Enter password")
+            .required(true)
+    });
+    cx.set_global(SceneAuthSignIn { password });
+}
+
+fn auth_sign_in(window: &mut Window, cx: &mut App) -> AnyElement {
+    ensure_auth_sign_in(window, cx);
+    let password = cx.global::<SceneAuthSignIn>().password.clone();
+    let theme = cx.theme().clone();
+    let card_id = "scene.auth.sign-in.card";
+    let title = div()
+        .type_scale(&theme, gpui_kit_theme::TypeScale::Title)
+        .child("Sign in")
+        .semantic_in(
+            cx,
+            NodeSpec::new("scene.auth.sign-in.title", Role::Text)
+                .parent(card_id)
+                .text("Sign in"),
+        );
+
+    stack(&theme)
+        .w(px(440.0))
+        .child(
+            Card::new().id(card_id).padded(true).child(
+                div()
+                    .column()
+                    .gap_token(&theme, Space::Md)
+                    .child(title)
+                    .child(
+                        Callout::new("Credentials are verified by the caller.", Tone::Neutral)
+                            .id("scene.auth.sign-in.boundary"),
+                    )
+                    .child(
+                        FormField::new("scene.auth.sign-in.password.field", "Password")
+                            .control("scene.auth.sign-in.password")
+                            .required(true)
+                            .child(password),
+                    )
+                    .child(
+                        Button::new("scene.auth.sign-in.submit")
+                            .label("Sign in")
+                            .full_width(true)
+                            .on_click(|_, _| {}),
+                    )
+                    .child(
+                        Button::new("scene.auth.sign-in.passkey")
+                            .label("Continue with passkey")
+                            .icon(Icon::Key)
+                            .secondary()
+                            .full_width(true)
+                            .on_click(|_, _| {}),
+                    )
+                    .child(
+                        Button::new("scene.auth.sign-in.organization")
+                            .label("Continue with organization sign-on")
+                            .icon(Icon::Global)
+                            .secondary()
+                            .full_width(true)
+                            .on_click(|_, _| {}),
+                    )
+                    .child(
+                        Button::new("scene.auth.sign-in.recovery")
+                            .label("Use a recovery option")
+                            .link()
+                            .on_click(|_, _| {}),
+                    ),
+            ),
+        )
+        .into_any_element()
+}
+
+/// The one logical code input in the canonical verification composition.
+struct SceneAuthVerification {
+    code: Entity<OneTimeCodeInput>,
+}
+
+impl Global for SceneAuthVerification {}
+
+fn ensure_auth_verification(window: &mut Window, cx: &mut App) {
+    if cx.has_global::<SceneAuthVerification>() {
+        return;
+    }
+    let code = cx.new(|cx| {
+        OneTimeCodeInput::new("scene.auth.verification.code", window, cx)
+            .name("Verification code")
+            .slots(6)
+            .required(true)
+    });
+    cx.set_global(SceneAuthVerification { code });
+}
+
+fn auth_verification(window: &mut Window, cx: &mut App) -> AnyElement {
+    ensure_auth_verification(window, cx);
+    let code = cx.global::<SceneAuthVerification>().code.clone();
+    let theme = cx.theme().clone();
+    let card_id = "scene.auth.verification.card";
+    let title = div()
+        .type_scale(&theme, gpui_kit_theme::TypeScale::Title)
+        .child("Verify sign-in")
+        .semantic_in(
+            cx,
+            NodeSpec::new("scene.auth.verification.title", Role::Text)
+                .parent(card_id)
+                .text("Verify sign-in"),
+        );
+
+    stack(&theme)
+        .w(px(440.0))
+        .child(
+            Card::new().id(card_id).padded(true).child(
+                div()
+                    .column()
+                    .gap_token(&theme, Space::Md)
+                    .child(title)
+                    .child(
+                        Callout::new(
+                            "Enter the code from your authenticator or recovery method.",
+                            Tone::Neutral,
+                        )
+                        .id("scene.auth.verification.guidance"),
+                    )
+                    .child(
+                        FormField::new("scene.auth.verification.code.field", "Verification code")
+                            .control("scene.auth.verification.code")
+                            .required(true)
+                            .child(code),
+                    )
+                    .child(
+                        Button::new("scene.auth.verification.submit")
+                            .label("Verify")
+                            .full_width(true)
+                            .on_click(|_, _| {}),
+                    )
+                    .child(
+                        Button::new("scene.auth.verification.alternative")
+                            .label("Use another method")
+                            .secondary()
+                            .full_width(true)
+                            .on_click(|_, _| {}),
+                    )
+                    .child(
+                        Button::new("scene.auth.verification.recovery")
+                            .label("Use a recovery option")
+                            .link()
+                            .on_click(|_, _| {}),
+                    ),
+            ),
         )
         .into_any_element()
 }

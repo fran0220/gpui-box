@@ -77,6 +77,42 @@ test("text input accepts real browser keyboard input", async ({ page }, testInfo
     .toBe("edited@example.com");
 });
 
+test("password scene edits and reveals without weakening redaction", async ({ page }, testInfo) => {
+  await openScene(page, testInfo, "auth-sign-in");
+  const password = await node(page, "scene.auth.sign-in.password");
+  await pointer(page, "pointerdown", center(password), 1);
+  await pointer(page, "pointerup", center(password), 0);
+  await page.keyboard.type("browser-password-needle");
+  await expect.poll(async () => (await node(page, "scene.auth.sign-in.password")).value)
+    .toBe("[REDACTED]");
+  expect(JSON.stringify(await snapshot(page))).not.toContain("browser-password-needle");
+  expect(await page.locator("[data-gpui-accessibility]").evaluate(element => element.outerHTML))
+    .not.toContain("browser-password-needle");
+
+  const reveal = page.locator('[data-gpui-accessibility] button[aria-label="Reveal password"]');
+  await expect(reveal).toHaveCount(1);
+  await reveal.evaluate(element => element.click());
+  await settle(page);
+  expect(JSON.stringify(await snapshot(page))).not.toContain("browser-password-needle");
+  expect(await page.locator("[data-gpui-accessibility]").evaluate(element => element.outerHTML))
+    .not.toContain("browser-password-needle");
+});
+
+test("verification scene edits one redacted segmented input", async ({ page }, testInfo) => {
+  await openScene(page, testInfo, "auth-verification");
+  const code = await node(page, "scene.auth.verification.code");
+  await pointer(page, "pointerdown", center(code), 1);
+  await pointer(page, "pointerup", center(code), 0);
+  await page.keyboard.type("ABCDEF");
+  await expect.poll(async () => (await node(page, "scene.auth.verification.code")).description)
+    .toBe("6/6");
+  await expect.poll(async () => (await node(page, "scene.auth.verification.code")).value)
+    .toBe("[REDACTED]");
+  expect(JSON.stringify(await snapshot(page))).not.toContain("ABCDEF");
+  expect(await page.locator("[data-gpui-accessibility]").evaluate(element => element.outerHTML))
+    .not.toContain("ABCDEF");
+});
+
 test("overlay action dismisses the catalog dialog", async ({ page }, testInfo) => {
   await openScene(page, testInfo, "dialog");
   const dialog = page.locator('[data-gpui-accessibility] [role="dialog"]');

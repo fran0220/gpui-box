@@ -309,6 +309,8 @@
       "reports": [],
       "scenes": [
         "button",
+        "auth-sign-in",
+        "auth-verification",
         "actions",
         "content",
         "overlay",
@@ -417,6 +419,8 @@
       "reports": [],
       "scenes": [
         "status",
+        "auth-sign-in",
+        "auth-verification",
         "approval"
       ]
     },
@@ -439,6 +443,8 @@
       "reports": [],
       "scenes": [
         "card",
+        "auth-sign-in",
+        "auth-verification",
         "frost",
         "motion-flip",
         "tool-call",
@@ -1297,6 +1303,8 @@
       "reports": [],
       "scenes": [
         "form",
+        "auth-sign-in",
+        "auth-verification",
         "schema-form"
       ]
     },
@@ -1468,6 +1476,7 @@
       ],
       "reports": [],
       "scenes": [
+        "auth-sign-in",
         "actions",
         "menu",
         "context-menu",
@@ -2007,6 +2016,44 @@
       ]
     },
     {
+      "name": "OneTimeCodeInput",
+      "kind": "view",
+      "path": "gpui_kit::controls::OneTimeCodeInput",
+      "source": "crates/gpui-kit/src/controls/auth.rs",
+      "summary": "One sensitive editor presented as a bounded run of visual slots.",
+      "construct": [
+        "new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self"
+      ],
+      "options": [
+        "name(name: impl Into<SharedString>) -> Self",
+        "text(text: impl Into<SharedString>) -> Self",
+        "slots(slots: usize) -> Self",
+        "invalid(invalid: bool) -> Self",
+        "required(required: bool) -> Self",
+        "read_only(read_only: bool) -> Self"
+      ],
+      "commands": [
+        "set_value(value: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_disabled(disabled: bool, cx: &mut Context<Self>)",
+        "set_read_only(read_only: bool, cx: &mut Context<Self>)",
+        "set_invalid(invalid: bool, cx: &mut Context<Self>)"
+      ],
+      "queries": [
+        "value(cx: &App) -> SharedString",
+        "len(cx: &App) -> usize",
+        "is_empty(cx: &App) -> bool",
+        "is_complete(cx: &App) -> bool",
+        "slot_count() -> usize"
+      ],
+      "reports": [
+        "Change",
+        "Submit"
+      ],
+      "scenes": [
+        "auth-verification"
+      ]
+    },
+    {
       "name": "Overlay",
       "kind": "builder",
       "path": "gpui_kit::overlay::Overlay",
@@ -2057,6 +2104,46 @@
       "reports": [],
       "scenes": [
         "pagination"
+      ]
+    },
+    {
+      "name": "PasswordInput",
+      "kind": "view",
+      "path": "gpui_kit::controls::PasswordInput",
+      "source": "crates/gpui-kit/src/controls/auth.rs",
+      "summary": "One sensitive password editor with a visual reveal action.",
+      "construct": [
+        "new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self"
+      ],
+      "options": [
+        "placeholder(placeholder: impl Into<SharedString>) -> Self",
+        "name(name: impl Into<SharedString>) -> Self",
+        "text(text: impl Into<SharedString>) -> Self",
+        "invalid(invalid: bool) -> Self",
+        "required(required: bool) -> Self",
+        "read_only(read_only: bool) -> Self"
+      ],
+      "commands": [
+        "set_value(value: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "set_disabled(disabled: bool, cx: &mut Context<Self>)",
+        "set_read_only(read_only: bool, cx: &mut Context<Self>)",
+        "set_invalid(invalid: bool, cx: &mut Context<Self>)"
+      ],
+      "queries": [
+        "value(cx: &App) -> SharedString",
+        "is_revealed() -> bool",
+        "selected_range(cx: &App) -> Range<usize>"
+      ],
+      "reports": [
+        "Change",
+        "Submit",
+        "Cancel",
+        "BackspaceAtStart",
+        "Focus",
+        "Blur"
+      ],
+      "scenes": [
+        "auth-sign-in"
       ]
     },
     {
@@ -5827,6 +5914,19 @@
       "queries": []
     },
     {
+      "name": "OneTimeCodeInputEvent",
+      "path": "gpui_kit::controls::OneTimeCodeInputEvent",
+      "summary": "What a one-time code field reports to its owner.",
+      "variants": [
+        "Change",
+        "Submit"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "OverallProgress",
       "path": "gpui_kit::controls::OverallProgress",
       "summary": "How much of the whole batch is done, if anybody knows.",
@@ -5853,6 +5953,23 @@
         "is_known() -> bool",
         "count() -> Option<usize>"
       ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "PasswordInputEvent",
+      "path": "gpui_kit::controls::PasswordInputEvent",
+      "summary": "What a password field reports to its owner.",
+      "variants": [
+        "Change",
+        "Submit",
+        "Cancel",
+        "BackspaceAtStart",
+        "Focus",
+        "Blur"
+      ],
+      "construct": [],
+      "options": [],
       "commands": [],
       "queries": []
     },
@@ -7693,6 +7810,31 @@
         "TextInput"
       ],
       "example": "fn form(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_form(window, cx);\n    let form = cx.global::<SceneForm>();\n    let (name, retention, region, labels) = (\n        form.name.clone(),\n        form.retention.clone(),\n        form.region.clone(),\n        form.labels.clone(),\n    );\n    let theme = cx.theme().clone();\n\n    stack(&theme)\n        .w(px(420.0))\n        .h(px(720.0))\n        .child(\n            FormField::new(\"scene.form.name.form-field\", \"Workspace name\")\n                .control(\"scene.form.name\")\n                .required(true)\n                // The description says what the field is for and the error\n                // says what went wrong; neither answers for the other.\n                .description(\"Shown wherever this workspace appears.\")\n                .error(\"A workspace with this name already exists.\")\n                .child(name),\n        )\n        .child(\n            FormField::new(\"scene.form.retention.form-field\", \"Retention\")\n                .control(\"scene.form.retention\")\n                .required(true)\n                .description(\"How long a finished run is kept.\")\n                .error(\"This workspace allows at most 60 days.\")\n                .child(retention),\n        )\n        .child(\n            FormField::new(\"scene.form.visibility.form-field\", \"Visibility\")\n                .control(\"scene.form.visibility\")\n                .description(\"Who can open the runs in this workspace.\")\n                .child(\n                    SegmentedControl::new(\"scene.form.visibility\")\n                        .label(\"Visibility\")\n                        .segments([\n                            Segment::new(\"private\", \"Private\"),\n                            Segment::new(\"team\", \"Team\"),\n                            Segment::new(\"public\", \"Public\").disabled(true),\n                        ])\n                        .selected(\"team\")\n                        .on_select(|_, _, _| {}),\n                ),\n        )\n        .child(\n            FormField::new(\"scene.form.labels.form-field\", \"Labels\")\n                .control(\"scene.form.labels\")\n                // The keystroke lives in the hint, so the description does not\n                // spend a second line repeating it.\n                .description(\"At most five, and each one only once.\")\n                .hint(\"enter\")\n                .child(labels),\n        )\n        .child(\n            FormField::new(\"scene.form.region.form-field\", \"Region\")\n                .control(\"scene.form.region\")\n                .description(\"Where runs in this workspace are executed.\")\n                .child(region),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "auth-sign-in",
+      "capture": "cargo run -p xtask -- scenes capture auth-sign-in",
+      "uses": [
+        "Button",
+        "Callout",
+        "Card",
+        "FormField",
+        "Icon",
+        "PasswordInput"
+      ],
+      "example": "fn auth_sign_in(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_auth_sign_in(window, cx);\n    let password = cx.global::<SceneAuthSignIn>().password.clone();\n    let theme = cx.theme().clone();\n    let card_id = \"scene.auth.sign-in.card\";\n    let title = div()\n        .type_scale(&theme, gpui_kit_theme::TypeScale::Title)\n        .child(\"Sign in\")\n        .semantic_in(\n            cx,\n            NodeSpec::new(\"scene.auth.sign-in.title\", Role::Text)\n                .parent(card_id)\n                .text(\"Sign in\"),\n        );\n\n    stack(&theme)\n        .w(px(440.0))\n        .child(\n            Card::new().id(card_id).padded(true).child(\n                div()\n                    .column()\n                    .gap_token(&theme, Space::Md)\n                    .child(title)\n                    .child(\n                        Callout::new(\"Credentials are verified by the caller.\", Tone::Neutral)\n                            .id(\"scene.auth.sign-in.boundary\"),\n                    )\n                    .child(\n                        FormField::new(\"scene.auth.sign-in.password.field\", \"Password\")\n                            .control(\"scene.auth.sign-in.password\")\n                            .required(true)\n                            .child(password),\n                    )\n                    .child(\n                        Button::new(\"scene.auth.sign-in.submit\")\n                            .label(\"Sign in\")\n                            .full_width(true)\n                            .on_click(|_, _| {}),\n                    )\n                    .child(\n                        Button::new(\"scene.auth.sign-in.passkey\")\n                            .label(\"Continue with passkey\")\n                            .icon(Icon::Key)\n                            .secondary()\n                            .full_width(true)\n                            .on_click(|_, _| {}),\n                    )\n                    .child(\n                        Button::new(\"scene.auth.sign-in.organization\")\n                            .label(\"Continue with organization sign-on\")\n                            .icon(Icon::Global)\n                            .secondary()\n                            .full_width(true)\n                            .on_click(|_, _| {}),\n                    )\n                    .child(\n                        Button::new(\"scene.auth.sign-in.recovery\")\n                            .label(\"Use a recovery option\")\n                            .link()\n                            .on_click(|_, _| {}),\n                    ),\n            ),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "auth-verification",
+      "capture": "cargo run -p xtask -- scenes capture auth-verification",
+      "uses": [
+        "Button",
+        "Callout",
+        "Card",
+        "FormField",
+        "OneTimeCodeInput"
+      ],
+      "example": "fn auth_verification(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_auth_verification(window, cx);\n    let code = cx.global::<SceneAuthVerification>().code.clone();\n    let theme = cx.theme().clone();\n    let card_id = \"scene.auth.verification.card\";\n    let title = div()\n        .type_scale(&theme, gpui_kit_theme::TypeScale::Title)\n        .child(\"Verify sign-in\")\n        .semantic_in(\n            cx,\n            NodeSpec::new(\"scene.auth.verification.title\", Role::Text)\n                .parent(card_id)\n                .text(\"Verify sign-in\"),\n        );\n\n    stack(&theme)\n        .w(px(440.0))\n        .child(\n            Card::new().id(card_id).padded(true).child(\n                div()\n                    .column()\n                    .gap_token(&theme, Space::Md)\n                    .child(title)\n                    .child(\n                        Callout::new(\n                            \"Enter the code from your authenticator or recovery method.\",\n                            Tone::Neutral,\n                        )\n                        .id(\"scene.auth.verification.guidance\"),\n                    )\n                    .child(\n                        FormField::new(\"scene.auth.verification.code.field\", \"Verification code\")\n                            .control(\"scene.auth.verification.code\")\n                            .required(true)\n                            .child(code),\n                    )\n                    .child(\n                        Button::new(\"scene.auth.verification.submit\")\n                            .label(\"Verify\")\n                            .full_width(true)\n                            .on_click(|_, _| {}),\n                    )\n                    .child(\n                        Button::new(\"scene.auth.verification.alternative\")\n                            .label(\"Use another method\")\n                            .secondary()\n                            .full_width(true)\n                            .on_click(|_, _| {}),\n                    )\n                    .child(\n                        Button::new(\"scene.auth.verification.recovery\")\n                            .label(\"Use a recovery option\")\n                            .link()\n                            .on_click(|_, _| {}),\n                    ),\n            ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "actions",
