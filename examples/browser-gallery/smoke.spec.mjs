@@ -157,6 +157,22 @@ test("developer data scenes render from the runtime catalog with stable semantic
   }
 });
 
+test("treegrid mirrors accessible ancestry and accepts row selection", async ({ page }, testInfo) => {
+  await openScene(page, testInfo, "tree-grid");
+  const treegrid = page.locator('[data-gpui-accessibility] [role="treegrid"]');
+  const row = treegrid.locator('[role="row"][aria-label="components"]');
+  const cells = row.locator('[role="gridcell"]');
+  await expect(treegrid).toHaveCount(1);
+  await expect(row).toHaveCount(1);
+  await expect(cells).toHaveCount(3);
+
+  const docs = await node(page, "scene.tree-grid.files.docs");
+  await pointer(page, "pointerdown", center(docs), 1);
+  await pointer(page, "pointerup", center(docs), 0);
+  await expect.poll(async () => (await node(page, "scene.tree-grid.files.docs")).selected)
+    .toBe(false);
+});
+
 for (const [scene, id, value] of [
   ["cascader", "scene.cascader", "Release notes"],
   ["anchor-list", "scene.anchor-list.inputs", undefined],

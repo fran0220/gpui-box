@@ -50,7 +50,9 @@ fn tree_grid(cx: &mut TestAppContext, disabled: bool) -> (Harness, Rc<RefCell<Ve
 #[gpui::test]
 fn publishes_bounded_treegrid_hierarchy(cx: &mut TestAppContext) {
     let (mut harness, _) = tree_grid(cx, false);
-    let root = harness.node("data.tree-grid").unwrap();
+    let root = harness
+        .node("data.tree-grid")
+        .expect("treegrid root should publish");
     assert_eq!(root.role, Role::TreeGrid);
     assert_eq!(root.value.as_deref(), Some("1000"));
     let rows = harness
@@ -60,10 +62,22 @@ fn publishes_bounded_treegrid_hierarchy(cx: &mut TestAppContext) {
         .filter(|n| n.role == Role::Row)
         .count();
     assert!((1..24).contains(&rows));
-    let row = harness.node("data.tree-grid.node-0001").unwrap();
+    let row = harness
+        .node("data.tree-grid.node-0001")
+        .expect("visible row should publish");
     assert_eq!(row.level, Some(2));
     assert_eq!(
-        harness.node("data.tree-grid.node-0001.name").unwrap().role,
+        harness
+            .node("data.tree-grid.node-0001.name")
+            .expect("visible name cell should publish")
+            .role,
+        Role::GridCell
+    );
+    assert_eq!(
+        harness
+            .node("data.tree-grid.node-0001.value")
+            .expect("visible value cell should publish")
+            .role,
         Role::GridCell
     );
     assert!(harness.node("data.tree-grid.node-0900").is_none());
@@ -75,6 +89,8 @@ fn logical_keys_emit_caller_owned_intents_and_disabled_rows_do_not(cx: &mut Test
     harness.click("data.tree-grid.node-0001");
     harness.keystrokes("left");
     assert!(calls.borrow().iter().any(|call| call == "select:node-0000"));
+    harness.keystrokes("right");
+    assert!(calls.borrow().iter().any(|call| call == "select:node-0001"));
 
     let (mut disabled, disabled_calls) = tree_grid(cx, true);
     disabled.click("data.tree-grid.node-0001");

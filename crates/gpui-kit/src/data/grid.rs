@@ -1403,39 +1403,55 @@ impl DataGrid {
             // that follows should start from the row that was clicked.
             let anchor = state.anchor.borrow().clone();
             let from = current_index(&drawn, anchor.as_ref(), &selected);
-            if hierarchy {
-                if let Some(index) = from {
-                    let row = render_row(index, window, cx);
-                    if let Some(meta) = row.hierarchy {
-                        let logical = cx
-                            .layout_direction()
-                            .arrow_step(event.keystroke.key.as_str());
-                        match logical {
-                            Some(-1) if meta.has_children && meta.expanded => {
-                                if let Some(expand) = &on_expand {
-                                    expand(row.id, false, window, cx);
-                                    cx.stop_propagation();
-                                }
-                                return;
+            if hierarchy && let Some(index) = from {
+                let row = render_row(index, window, cx);
+                if let Some(meta) = row.hierarchy {
+                    if row.disabled {
+                        return;
+                    }
+                    let logical = cx
+                        .layout_direction()
+                        .arrow_step(event.keystroke.key.as_str());
+                    match logical {
+                        Some(-1) if meta.has_children && meta.expanded => {
+                            if let Some(expand) = &on_expand {
+                                expand(row.id, false, window, cx);
+                                cx.stop_propagation();
                             }
-                            Some(-1) => {
-                                if let Some(parent) = meta.parent {
-                                    *state.anchor.borrow_mut() = Some(parent.clone());
-                                    handler(&SelectionChange::Replace(parent), window, cx);
-                                    cx.stop_propagation();
-                                }
-                                return;
-                            }
-                            Some(1) if meta.has_children && !meta.expanded => {
-                                if let Some(expand) = &on_expand {
-                                    expand(row.id, true, window, cx);
-                                    cx.stop_propagation();
-                                }
-                                return;
-                            }
-                            Some(1) => return,
-                            _ => {}
+                            return;
                         }
+                        Some(-1) => {
+                            if let Some(parent) = meta.parent {
+                                *state.anchor.borrow_mut() = Some(parent.clone());
+                                handler(&SelectionChange::Replace(parent), window, cx);
+                                cx.stop_propagation();
+                            }
+                            return;
+                        }
+                        Some(1) if meta.has_children && !meta.expanded => {
+                            if let Some(expand) = &on_expand {
+                                expand(row.id, true, window, cx);
+                                cx.stop_propagation();
+                            }
+                            return;
+                        }
+                        Some(1) if meta.has_children && meta.expanded => {
+                            if let Some((_, child)) = reachable(
+                                &render_row,
+                                index.saturating_add(1),
+                                1,
+                                count,
+                                window,
+                                cx,
+                            ) {
+                                *state.anchor.borrow_mut() = Some(child.clone());
+                                handler(&SelectionChange::Replace(child), window, cx);
+                                cx.stop_propagation();
+                            }
+                            return;
+                        }
+                        Some(1) => return,
+                        _ => {}
                     }
                 }
             }
@@ -1914,7 +1930,10 @@ fn cell_element(
         return editor_cell(theme, column, row, edit, field, next, context);
     }
 
-    let published = cell.as_ref().is_some_and(|cell| cell.published) || editable;
+    // A treegrid's rendered columns are structural gridcells, not optional
+    // diagnostic detail. DataGrid retains its opt-in publication policy.
+    let published =
+        context.hierarchy || cell.as_ref().is_some_and(|cell| cell.published) || editable;
     let text = cell.as_ref().and_then(|cell| cell.text.clone());
     let mut content = cell.map(|cell| cell.content);
     if logical_start && context.hierarchy {

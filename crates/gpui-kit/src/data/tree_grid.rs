@@ -18,6 +18,8 @@ use crate::display::empty::{EmptyKind, EmptyState};
 use crate::foundation::{Disableable, Ident};
 
 type RenderRow = Rc<dyn Fn(usize, &mut Window, &mut App) -> TreeGridRow>;
+type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
+type ExpandHandler = Rc<dyn Fn(SharedString, bool, &mut Window, &mut App)>;
 
 /// One already-visible hierarchy row, identified by stable business identity.
 #[derive(Debug)]
@@ -92,8 +94,8 @@ pub struct TreeGrid {
     failure: Option<SharedString>,
     vacancy: Option<EmptyState>,
     disabled: bool,
-    on_select: Option<Rc<dyn Fn(SharedString, &mut Window, &mut App)>>,
-    on_expand: Option<Rc<dyn Fn(SharedString, bool, &mut Window, &mut App)>>,
+    on_select: Option<SelectHandler>,
+    on_expand: Option<ExpandHandler>,
 }
 
 impl std::fmt::Debug for TreeGrid {
