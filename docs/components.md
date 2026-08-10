@@ -713,6 +713,7 @@ turns a number into text.
 | `JsonView` | builder | a path and the disclosure state it should take, and the row that was picked | A structured value over a caller-supplied `JsonValue`. Virtualized, so only the rows the viewport holds are laid out or published. `null`, an empty container, and a key the document does not hold are three presentations, and a withheld subtree reads as withheld |
 | `SchemaForm` | view | a field that changed, and a submit | A form built from a caller-supplied `Schema` over the existing controls. A field it cannot draw states so where the control would have been and is still reported by `values` |
 | `ServerList` | builder | a server that was picked, a failed one that should be tried again, and a server whose offerings should be shown | What is connected and what each connection offers. Five states, none of them a shade of another, and an empty answer that is not an unasked question |
+| `OfferingCatalog` | builder | activation carrying `{server_id, offering_id}` | Searchable Tool, Skill, and Resource results aggregated across caller-owned servers. Search text and kind filters are caller supplied; duplicate names remain attributed, stale data remains visible, and the component performs no install, invocation, trust, permission, or network policy |
 
 ### This crate parses nothing
 

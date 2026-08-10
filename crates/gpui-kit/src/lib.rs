@@ -88,6 +88,9 @@ pub mod prelude {
     pub use crate::agent::cost::{
         Basis, ContextGauge, CostLine, CostMeter, LastVerified, Limit, Quantity, Reading,
     };
+    pub use crate::agent::offering_catalog::{
+        OfferingCatalog, OfferingIdentity, OfferingSource, OfferingSourceState, SearchableOffering,
+    };
     pub use crate::agent::permission::{
         PermissionAction, PermissionChange, PermissionEntry, PermissionMatrix, PermissionSource,
         PermissionState, PermissionSubject,

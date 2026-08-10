@@ -2016,6 +2016,30 @@
       ]
     },
     {
+      "name": "OfferingCatalog",
+      "kind": "builder",
+      "path": "gpui_kit::agent::OfferingCatalog",
+      "source": "crates/gpui-kit/src/agent/offering_catalog.rs",
+      "summary": "A searchable, kind-filterable catalog of offerings from multiple servers.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "source(source: OfferingSource) -> Self",
+        "sources(sources: impl IntoIterator<Item = OfferingSource>) -> Self",
+        "query(query: impl Into<SharedString>) -> Self",
+        "kinds(kinds: impl IntoIterator<Item = OfferingKind>) -> Self",
+        "selected(identity: OfferingIdentity) -> Self",
+        "on_activate(handler: impl Fn(OfferingIdentity, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "offering-catalog"
+      ]
+    },
+    {
       "name": "OneTimeCodeInput",
       "kind": "view",
       "path": "gpui_kit::controls::OneTimeCodeInput",
@@ -5924,8 +5948,23 @@
       "commands": [],
       "queries": [
         "id() -> &SharedString",
-        "kind() -> OfferingKind"
+        "kind() -> OfferingKind",
+        "name() -> &SharedString",
+        "summary_text() -> Option<&SharedString>",
+        "qualifier_text() -> Option<&SharedString>"
       ]
+    },
+    {
+      "name": "OfferingIdentity",
+      "path": "gpui_kit::agent::OfferingIdentity",
+      "summary": "Stable identity for one server-owned offering.",
+      "variants": [],
+      "construct": [
+        "new(server_id: impl Into<SharedString>, offering_id: impl Into<SharedString>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "OfferingKind",
@@ -5942,6 +5981,40 @@
       ],
       "commands": [],
       "queries": []
+    },
+    {
+      "name": "OfferingSource",
+      "path": "gpui_kit::agent::OfferingSource",
+      "summary": "One attributed source and its independently truthful state.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, name: impl Into<SharedString>, state: OfferingSourceState) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "state() -> &OfferingSourceState"
+      ]
+    },
+    {
+      "name": "OfferingSourceState",
+      "path": "gpui_kit::agent::OfferingSourceState",
+      "summary": "What is truthfully known about one source's offerings.",
+      "variants": [
+        "Loading",
+        "Empty",
+        "Unavailable",
+        "Error",
+        "Ready",
+        "Stale"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "name() -> &'static str"
+      ]
     },
     {
       "name": "OneTimeCodeInputEvent",
@@ -6539,6 +6612,20 @@
       "options": [],
       "commands": [],
       "queries": []
+    },
+    {
+      "name": "SearchableOffering",
+      "path": "gpui_kit::agent::SearchableOffering",
+      "summary": "An offering and the caller-authored text used to search it.",
+      "variants": [],
+      "construct": [
+        "new(offering: Offering, searchable_text: impl Into<SharedString>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "offering() -> &Offering"
+      ]
     },
     {
       "name": "Segment",
@@ -8598,6 +8685,14 @@
         "ToggleGroup"
       ],
       "example": "fn server_list(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(560.0))\n        .child(\n            // Only the one with a catalogue is opened. Expanding the two empty\n            // ones as well pushed disconnected, failed, and disabled out of\n            // the captured screen, and a state no image shows is a state no\n            // image guards.\n            ServerList::new(\"scene.servers\")\n                .expanded_ids(&[\"workspace\"])\n                .selected(\"workspace\")\n                .servers([\n                    ServerEntry::new(\"workspace\", \"Workspace tools\")\n                        .detail(\"Running beside this window\")\n                        .state(ServerState::Connected)\n                        .offers([\n                            Offering::tool(\"read\", \"Read a file\")\n                                .summary(\"Returns the contents of one file\")\n                                .qualifier(\"path, max_bytes\"),\n                            Offering::tool(\"write\", \"Write a file\")\n                                .summary(\"Replaces the contents of one file\"),\n                            Offering::skill(\"review\", \"Review a change\")\n                                .summary(\"Reads a diff and reports what it finds\"),\n                            Offering::resource(\"changelog\", \"Changelog\")\n                                .qualifier(\"workspace:/CHANGELOG.md\"),\n                        ]),\n                    ServerEntry::new(\"index\", \"Search index\")\n                        .detail(\"Answered, and the answer was empty\")\n                        .state(ServerState::Connected)\n                        .offers([]),\n                    ServerEntry::new(\"archive\", \"Archive\")\n                        .detail(\"Nobody has asked it anything yet\")\n                        .state(ServerState::Connected),\n                    ServerEntry::new(\"build\", \"Build runner\")\n                        .state(ServerState::Connecting)\n                        .catalog(Catalog::Asking),\n                    ServerEntry::new(\"notes\", \"Notes\").state(ServerState::Disconnected),\n                    ServerEntry::new(\"deploy\", \"Deployment\").state(ServerState::Failed {\n                        reason: \"The connection was refused after three attempts.\".into(),\n                    }),\n                    ServerEntry::new(\"telemetry\", \"Telemetry\").state(ServerState::Disabled {\n                        reason: Some(\"You turned this one off.\".into()),\n                    }),\n                ])\n                .on_select(|_, _, _| {})\n                .on_retry(|_, _, _| {})\n                .on_toggle(|_, _, _, _| {}),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "offering-catalog",
+      "capture": "cargo run -p xtask -- scenes capture offering-catalog",
+      "uses": [
+        "OfferingCatalog"
+      ],
+      "example": "fn offering_catalog(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let workspace = OfferingSource::new(\n        \"workspace\",\n        \"Workspace tools\",\n        OfferingSourceState::Ready(vec![\n            SearchableOffering::new(\n                Offering::tool(\"read\", \"Read a file\")\n                    .summary(\"Returns the contents of one file\")\n                    .qualifier(\"path, max_bytes\"),\n                \"read file contents path workspace\",\n            ),\n            SearchableOffering::new(\n                Offering::skill(\"review\", \"Review a change\")\n                    .summary(\"Reads a diff and reports what it finds\"),\n                \"review change diff findings\",\n            ),\n        ]),\n    );\n    let archive = OfferingSource::new(\n        \"archive\",\n        \"Archive tools\",\n        OfferingSourceState::Stale {\n            offerings: vec![\n                SearchableOffering::new(\n                    Offering::tool(\"read\", \"Read a file\").summary(\"Reads one archived file\"),\n                    \"read archived file contents\",\n                ),\n                SearchableOffering::new(\n                    Offering::resource(\"changelog\", \"Changelog\").qualifier(\"archive:/CHANGELOG.md\"),\n                    \"changelog changes release history\",\n                ),\n            ],\n            reason: \"Archive refresh failed; showing the last verified results.\".into(),\n        },\n    );\n    stack(&theme)\n        .w(px(560.0))\n        .child(\n            OfferingCatalog::new(\"scene.offering-catalog\")\n                .sources([workspace, archive])\n                .selected(OfferingIdentity::new(\"workspace\", \"read\"))\n                .on_activate(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "reading-direction",

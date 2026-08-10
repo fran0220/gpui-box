@@ -207,6 +207,18 @@ impl Offering {
     pub fn kind(&self) -> OfferingKind {
         self.kind
     }
+
+    pub fn name(&self) -> &SharedString {
+        &self.name
+    }
+
+    pub fn summary_text(&self) -> Option<&SharedString> {
+        self.summary.as_ref()
+    }
+
+    pub fn qualifier_text(&self) -> Option<&SharedString> {
+        self.qualifier.as_ref()
+    }
 }
 
 /// What is known about what a server offers.

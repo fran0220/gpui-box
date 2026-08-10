@@ -330,6 +330,10 @@ pub fn catalog() -> Vec<Scene> {
             build: server_list,
         },
         Scene {
+            name: "offering-catalog",
+            build: offering_catalog,
+        },
+        Scene {
             name: "reading-direction",
             build: reading_direction,
         },
@@ -5375,6 +5379,53 @@ fn server_list(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .on_select(|_, _, _| {})
                 .on_retry(|_, _, _| {})
                 .on_toggle(|_, _, _, _| {}),
+        )
+        .into_any_element()
+}
+
+fn offering_catalog(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let workspace = OfferingSource::new(
+        "workspace",
+        "Workspace tools",
+        OfferingSourceState::Ready(vec![
+            SearchableOffering::new(
+                Offering::tool("read", "Read a file")
+                    .summary("Returns the contents of one file")
+                    .qualifier("path, max_bytes"),
+                "read file contents path workspace",
+            ),
+            SearchableOffering::new(
+                Offering::skill("review", "Review a change")
+                    .summary("Reads a diff and reports what it finds"),
+                "review change diff findings",
+            ),
+        ]),
+    );
+    let archive = OfferingSource::new(
+        "archive",
+        "Archive tools",
+        OfferingSourceState::Stale {
+            offerings: vec![
+                SearchableOffering::new(
+                    Offering::tool("read", "Read a file").summary("Reads one archived file"),
+                    "read archived file contents",
+                ),
+                SearchableOffering::new(
+                    Offering::resource("changelog", "Changelog").qualifier("archive:/CHANGELOG.md"),
+                    "changelog changes release history",
+                ),
+            ],
+            reason: "Archive refresh failed; showing the last verified results.".into(),
+        },
+    );
+    stack(&theme)
+        .w(px(560.0))
+        .child(
+            OfferingCatalog::new("scene.offering-catalog")
+                .sources([workspace, archive])
+                .selected(OfferingIdentity::new("workspace", "read"))
+                .on_activate(|_, _, _| {}),
         )
         .into_any_element()
 }

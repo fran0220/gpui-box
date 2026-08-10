@@ -499,6 +499,15 @@ string_keys! {
     BrowserNoViewport => "browser.no-viewport", "No page surface";
     BrowserNoViewportDetail => "browser.no-viewport-detail",
         "The host reported a ready page but supplied no viewport.";
+
+    // Offerings aggregated across caller-owned server sources.
+    OfferingCatalogEmpty => "offering-catalog.empty", "No offerings";
+    OfferingCatalogNoMatch => "offering-catalog.no-match", "No matching offerings";
+    OfferingSourceLoading => "offering-source.loading", "{0}: Loading offerings";
+    OfferingSourceEmpty => "offering-source.empty", "{0}: No offerings";
+    OfferingSourceUnavailable => "offering-source.unavailable", "{0}: Offerings unavailable";
+    OfferingSourceError => "offering-source.error", "{0}: Could not load offerings";
+    OfferingSourceStale => "offering-source.stale", "{0}: Showing last verified offerings";
 }
 
 /// The catalogue a host installs, and the one components read.

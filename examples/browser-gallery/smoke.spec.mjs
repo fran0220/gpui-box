@@ -177,6 +177,7 @@ for (const [scene, id, value] of [
   ["cascader", "scene.cascader", "Release notes"],
   ["anchor-list", "scene.anchor-list.inputs", undefined],
   ["diagnostics-list", "scene.diagnostics.list.fixture-error", undefined],
+  ["offering-catalog", "scene.offering-catalog.results.archive.read", "tool"],
 ]) {
   test(`common application scene ${scene} publishes catalog semantics`, async ({ page }, testInfo) => {
     await openScene(page, testInfo, scene);

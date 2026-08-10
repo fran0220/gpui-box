@@ -13,6 +13,7 @@
 # Blank lines and lines starting with `#` are ignored; a literal that begins
 # with `#` cannot be listed, which no literal here does.
  
+%2E
 *
 /
 :
@@ -84,6 +85,7 @@ NodeGraph
 Notification
 NotificationCenter
 NumberInput
+OfferingCatalog
 OneTimeCodeInput
 Overlay
 Pagination

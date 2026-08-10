@@ -30,7 +30,7 @@ input, and an entry in `docs/components.md`.
 | Filtering | `FilterBar` |
 | Agent run | `ToolCallCard`, `StepList`, `ThinkingBlock`, `NodeGraph` |
 | Structured data | `JsonView`, `SchemaForm` |
-| Connections | `ServerList` |
+| Connections | `ServerList`, `OfferingCatalog` |
 
 `Tooltipped` is an extension trait rather than a component: it attaches a
 `Tooltip` to any element, and is covered wherever that `Tooltip` is.
@@ -215,10 +215,11 @@ conversation is not the unit; a run made of steps is, and `ToolCallCard`,
 `StepList` and `ThinkingBlock` are covered above. Still wanted:
 `ApprovalPrompt` and `PermissionMatrix` where the default is
 refusal and the scope of "always" is stated, `CostMeter` and a context gauge
-that says when a number is an estimate, `ToolCatalog` with per-server
-attribution because two servers may offer the same tool name, and `SkillCard`.
-`LogStream`, `DiffView`, `JsonView`, `SchemaForm`, `ServerList` and `NodeGraph`
-are covered above.
+that says when a number is an estimate. `OfferingCatalog` covers Tool, Skill,
+and Resource results together rather than creating separate `ToolCatalog` and
+`SkillCard` APIs; per-server attribution is part of every result because two
+servers may offer the same name. `LogStream`, `DiffView`, `JsonView`,
+`SchemaForm`, `ServerList`, `OfferingCatalog` and `NodeGraph` are covered above.
 
 `NodeGraph` covers drawing a run that branched or was retried; it does not
 cover arranging one. A caller with a topology and no coordinates needs a layout

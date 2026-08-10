@@ -3,6 +3,7 @@
 //! A run made of steps, the permission it asks for, and what it costs.
 pub mod approval;
 pub mod cost;
+pub mod offering_catalog;
 pub mod permission;
 pub mod server_list;
 pub mod step_list;
@@ -11,6 +12,9 @@ pub mod tool_call;
 
 pub use approval::{AlwaysScope, ApprovalDecision, ApprovalEvent, ApprovalPrompt, ApprovalStatus};
 pub use cost::{Basis, ContextGauge, CostLine, CostMeter, LastVerified, Limit, Quantity, Reading};
+pub use offering_catalog::{
+    OfferingCatalog, OfferingIdentity, OfferingSource, OfferingSourceState, SearchableOffering,
+};
 pub use permission::{
     PermissionAction, PermissionChange, PermissionEntry, PermissionMatrix, PermissionSource,
     PermissionState, PermissionSubject,
