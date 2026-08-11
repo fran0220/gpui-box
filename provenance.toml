@@ -18,11 +18,11 @@ config = "scripts/sync-zed/config.json"
 state = "scripts/sync-zed/state.json"
 filter_schema_version = 1
 history_algorithm = "first-parent-v1"
-history_bootstrapped = false
-bootstrap_vendor_tip = ""
-vendor_tip = ""
-last_synced_sha = ""
-integration_commit = ""
+history_bootstrapped = true
+bootstrap_vendor_tip = "c036e5bcb472b7c557c231a66d69e646285d1942"
+vendor_tip = "c036e5bcb472b7c557c231a66d69e646285d1942"
+last_synced_sha = "a6a23c7b80a5cefa0487b7856335be89ace7e483"
+integration_commit = "82fdda6a265e556afc65b9ff1eb200f7bda8d3fc"
 
 [licenses]
 framework = "Apache-2.0"
