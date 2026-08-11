@@ -16,7 +16,7 @@
 //!
 //! The hierarchy is flattened once per render, which walks all caller-owned
 //! files, hunks and lines. The resulting fixed-height rows are handed to the
-//! virtualized [`List`](crate::data::List), so only viewport rows are laid out
+//! virtualized [`List`], so only viewport rows are laid out
 //! or published. The explicit price is the same one paid by virtualized
 //! `CodeView`: long lines are clipped and do not horizontally scroll. This is
 //! suitable for a large already-materialized diff, not for lazy diff loading.

@@ -7,7 +7,7 @@
 //!
 //! # One entry, one fixed slot
 //!
-//! [`LogStream`] composes the crate's [`List`](crate::data::List), so only the
+//! [`LogStream`] composes the crate's [`List`], so only the
 //! rows inside its bounded viewport are laid out. Every entry is one clipped,
 //! non-wrapping slot. That makes a large stream viewport-cheap, at the explicit
 //! cost that a long message does not grow its row. The list node publishes the

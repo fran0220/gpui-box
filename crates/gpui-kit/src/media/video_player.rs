@@ -19,7 +19,7 @@
 //! bar at all.
 //!
 //! **It states its aspect ratio rather than distorting the picture.** The
-//! frame is an [`AspectRatio`](crate::layout::AspectRatio), so a 16∶9 stream
+//! frame is an [`AspectRatio`], so a 16∶9 stream
 //! in a 4∶3 slot is letterboxed by the layout instead of stretched by it.
 
 use std::rc::Rc;
