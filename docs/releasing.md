@@ -68,21 +68,28 @@ list, is authoritative.
 
 ## Publish
 
-Only the protected release workflow may execute publication:
+Only the protected release workflow, dispatched from `main`, may execute
+publication:
 
 ```bash
 GPUI_BOX_PUBLISH=1 cargo run -p xtask -- package publish --execute
 ```
 
-It refuses other arguments, a missing opt-in, a dirty worktree, a HEAD not
-pointed to by an annotated `v<authority version>` tag, or missing `package
-check` archives. Before each upload it independently regenerates that package
-and requires its SHA-256 to equal the downloaded preflight archive. It checks
-crates.io download bytes and the unyanked sparse-index entry before and after
-each publish, and resumes only when the bytes equal that same archive and the
-exact version is visible for dependency resolution. Cargo's `--no-verify` is
-used only because the workflow already ran the complete offline `package
-check`.
+It refuses other arguments, a missing opt-in, an unprotected workflow ref, a
+dirty release worktree, a release HEAD not pointed to by an annotated
+`v<authority version>` tag, or missing `package check` archives. The publisher
+tooling comes from the exact protected `main` commit that defines the workflow;
+it operates on a separate release-tag checkout, so a publisher fix never
+changes or moves immutable release source. Before each upload it independently
+regenerates that package from the release checkout and requires its SHA-256 to
+equal the downloaded preflight archive. Reproduction and `cargo publish` receive
+the same generated cohort source overrides so Cargo's internal repackaging
+cannot resolve a different dependency graph. The exact-version crates.io API
+is the authority for whether a version exists; when it does, the publisher also
+checks the download bytes and unyanked sparse-index entry. It resumes only when
+those bytes equal the same preflight archive and the exact version is visible
+for dependency resolution. Cargo's `--no-verify` is used only because the
+workflow already ran the complete offline `package check`.
 
 Publish each package in the exact `package plan` order. After each publish,
 wait until the new crate/version is visible in the crates.io
@@ -94,6 +101,17 @@ success after verifying its checksum/metadata; never attempt to overwrite it.
 Pause on any other error. Determine whether crates.io accepted the upload
 before retrying. Publication is immutable and a partially published cohort is
 better documented and resumed than guessed at.
+
+If publisher tooling fails before an upload, fix it on protected `main` and
+rerun the workflow from `main` against the same immutable tag. Never copy the
+fix into the tagged source or move the tag. The rerun repeats every release
+gate, downloads newly generated preflight archives, reproduces them from the
+tag checkout, and skips an already-published package only after its registry
+metadata, archive checksum, and unyanked index entry all match.
+The initial `v0.1.0` recovery is additionally pinned in both workflow preflight
+and publisher code to commit
+`888369c73c258567664785a761faebdc64d39d4e`; tag self-consistency alone is not
+accepted as proof of that reviewed source.
 
 ## Post-publication acceptance
 

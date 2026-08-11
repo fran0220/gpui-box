@@ -32,6 +32,9 @@ jobs:
     outputs:
       release_commit: ${{ steps.tag.outputs.release_commit }}
     steps:
+      - name: Require the protected publisher branch
+        if: ${{ inputs.execute }}
+        run: test "$GITHUB_REF" = refs/heads/main
       - uses: actions/checkout@v5
         with: { ref: "v${{ inputs.version }}", fetch-depth: 0 }
       - name: Verify immutable tag and authority version
@@ -47,6 +50,9 @@ jobs:
           PY
           test "$(git cat-file -t "refs/tags/v${RELEASE_VERSION}")" = tag
           test "$(git rev-list -n 1 "refs/tags/v${RELEASE_VERSION}")" = "$(git rev-parse HEAD)"
+          if test "$RELEASE_VERSION" = 0.1.0; then
+            test "$(git rev-parse HEAD)" = 888369c73c258567664785a761faebdc64d39d4e
+          fi
           python3 - <<'PY'
           import os
           import tomllib
@@ -187,20 +193,28 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v5
-        with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0 }
+        with: { ref: "${{ github.sha }}", fetch-depth: 0, path: publisher }
+      - uses: actions/checkout@v5
+        with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0, path: release }
+      - name: Verify publisher and immutable release checkouts
+        run: |
+          test "$(git -C publisher rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C release rev-parse HEAD)" = "${{ needs.preflight.outputs.release_commit }}"
+          test -z "$(git -C release status --porcelain)"
       - uses: dtolnay/rust-toolchain@master
         with: { toolchain: 1.97.0 }
       - uses: actions/download-artifact@v5
         with:
           name: gpui-box-${{ inputs.version }}-${{ needs.preflight.outputs.release_commit }}-crates
-          path: target/package-check/archives
+          path: release/target/package-check/archives
       - name: Require protected crates.io token
         run: test -n "$CARGO_REGISTRY_TOKEN"
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
-      - run: cargo run -p xtask -- package publish --execute
+      - run: cargo run --manifest-path publisher/xtask/Cargo.toml -- package publish --execute
         env:
           GPUI_BOX_PUBLISH: "1"
+          GPUI_BOX_RELEASE_ROOT: ${{ github.workspace }}/release
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
 
   publish-with-oidc:
@@ -213,16 +227,24 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v5
-        with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0 }
+        with: { ref: "${{ github.sha }}", fetch-depth: 0, path: publisher }
+      - uses: actions/checkout@v5
+        with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0, path: release }
+      - name: Verify publisher and immutable release checkouts
+        run: |
+          test "$(git -C publisher rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C release rev-parse HEAD)" = "${{ needs.preflight.outputs.release_commit }}"
+          test -z "$(git -C release status --porcelain)"
       - uses: dtolnay/rust-toolchain@master
         with: { toolchain: 1.97.0 }
       - uses: actions/download-artifact@v5
         with:
           name: gpui-box-${{ inputs.version }}-${{ needs.preflight.outputs.release_commit }}-crates
-          path: target/package-check/archives
+          path: release/target/package-check/archives
       - id: crates-io-auth
         uses: rust-lang/crates-io-auth-action@v1
-      - run: cargo run -p xtask -- package publish --execute
+      - run: cargo run --manifest-path publisher/xtask/Cargo.toml -- package publish --execute
         env:
           GPUI_BOX_PUBLISH: "1"
+          GPUI_BOX_RELEASE_ROOT: ${{ github.workspace }}/release
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-io-auth.outputs.token }}

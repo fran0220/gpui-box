@@ -36,7 +36,12 @@ fn main() -> Result<()> {
         (Some("dependencies"), Some("check")) => dependencies::check(&root(), &rest),
         (Some("package"), Some("plan")) => package::plan(&root()),
         (Some("package"), Some("check")) => package::check(&root()),
-        (Some("package"), Some("publish")) => package::publish(&root(), &rest),
+        (Some("package"), Some("publish")) => {
+            let release_root = env::var_os("GPUI_BOX_RELEASE_ROOT")
+                .map(PathBuf::from)
+                .unwrap_or_else(root);
+            package::publish(&release_root, &rest)
+        }
         (Some("site"), Some("generate")) => {
             site::generate(&root(), rest.first().map(String::as_str)).map(|_| ())
         }

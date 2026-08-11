@@ -13,6 +13,9 @@ use std::{
 
 const LOCAL_REGISTRY_VERSION: &str = "cargo-local-registry 0.2.12";
 const PUBLISH_OPT_IN: &str = "GPUI_BOX_PUBLISH";
+const CRATES_IO_USER_AGENT: &str = "gpui-box-release/0.1 (https://github.com/fran0220/gpui-box)";
+const INITIAL_RELEASE_VERSION: &str = "0.1.0";
+const INITIAL_RELEASE_COMMIT: &str = "888369c73c258567664785a761faebdc64d39d4e";
 
 struct PublicationPlan {
     packages: BTreeMap<String, Package>,
@@ -138,6 +141,12 @@ fn package_patches(root: &Path, packages: &BTreeMap<String, Package>) -> Result<
         .collect()
 }
 
+fn apply_package_patches(command: &mut Command, patches: &[String]) {
+    for patch in patches {
+        command.args(["--config", patch]);
+    }
+}
+
 pub fn check(root: &Path) -> Result<()> {
     let PublicationPlan {
         packages, order, ..
@@ -160,9 +169,7 @@ pub fn check(root: &Path) -> Result<()> {
         ])
         .arg(root.join(&p.manifest))
         .env("CARGO_TARGET_DIR", &out);
-        for patch in &patches {
-            cmd.args(["--config", patch]);
-        }
+        apply_package_patches(&mut cmd, &patches);
         let status = cmd.status()?;
         ensure!(status.success(), "cargo package failed for {name}");
         let archive_name = format!("{}-{}.crate", name, p.version);
@@ -360,6 +367,12 @@ pub fn publish(root: &Path, args: &[String]) -> Result<()> {
         tag_commit.status.success() && head.status.success() && tag_commit.stdout == head.stdout,
         "annotated release tag v{version} must point at HEAD"
     );
+    if version == INITIAL_RELEASE_VERSION {
+        ensure!(
+            String::from_utf8_lossy(&head.stdout).trim() == INITIAL_RELEASE_COMMIT,
+            "initial release v{version} must remain pinned to {INITIAL_RELEASE_COMMIT}"
+        );
+    }
 
     let patches = package_patches(root, &packages)?;
     let reproduction = root.join("target/publish-reproduction");
@@ -384,9 +397,7 @@ pub fn publish(root: &Path, args: &[String]) -> Result<()> {
             .arg(root.join(&p.manifest))
             .current_dir(root)
             .env("CARGO_TARGET_DIR", &reproduction);
-        for patch in &patches {
-            package.args(["--config", patch]);
-        }
+        apply_package_patches(&mut package, &patches);
         let status = package.status()?;
         ensure!(
             status.success(),
@@ -399,44 +410,52 @@ pub fn publish(root: &Path, args: &[String]) -> Result<()> {
             reproduced.is_file() && sha256_file(&reproduced)? == expected,
             "publisher did not reproduce the checked archive for {name}; refusing to upload"
         );
-        match remote_archive_checksum(&name, &p.version)? {
-            Some(found) => {
-                ensure!(
-                    found == expected,
-                    "crates.io {name} {} exists with a different archive checksum",
-                    p.version
-                );
-                ensure!(
-                    remote_index_contains(&name, &p.version)?,
-                    "crates.io {name} {} is downloadable but absent or yanked in the sparse index; refusing to continue",
-                    p.version
-                );
-            }
-            None => {
-                let status = Command::new("cargo")
-                    .args(["publish", "--locked", "--no-verify", "--manifest-path"])
-                    .arg(root.join(&p.manifest))
-                    .current_dir(root)
-                    .status()?;
-                ensure!(
-                    status.success(),
-                    "cargo publish failed for {name}; check crates.io before retrying"
-                );
-                let mut verified = false;
-                for delay in [2, 4, 8, 16, 30, 60] {
-                    thread::sleep(Duration::from_secs(delay));
-                    if remote_archive_checksum(&name, &p.version)?.as_deref() == Some(&expected)
-                        && remote_index_contains(&name, &p.version)?
-                    {
-                        verified = true;
-                        break;
-                    }
+        if remote_version_exists(&name, &p.version)? {
+            match remote_archive_checksum(&name, &p.version)? {
+                Some(found) => {
+                    ensure!(
+                        found == expected,
+                        "crates.io {name} {} exists with a different archive checksum",
+                        p.version
+                    );
+                    ensure!(
+                        remote_index_contains(&name, &p.version)?,
+                        "crates.io {name} {} is downloadable but absent or yanked in the sparse index; refusing to continue",
+                        p.version
+                    );
                 }
-                ensure!(
-                    verified,
-                    "published {name} but its exact archive and unyanked sparse-index entry did not both become visible within the bounded wait; inspect crates.io before resuming"
-                );
+                None => bail!(
+                    "crates.io reports {name} {} exists, but its archive is unavailable; refusing to continue",
+                    p.version
+                ),
             }
+        } else {
+            let mut publish = Command::new("cargo");
+            publish
+                .args(["publish", "--locked", "--no-verify", "--manifest-path"])
+                .arg(root.join(&p.manifest))
+                .current_dir(root);
+            apply_package_patches(&mut publish, &patches);
+            let status = publish.status()?;
+            ensure!(
+                status.success(),
+                "cargo publish failed for {name}; check crates.io before retrying"
+            );
+            let mut verified = false;
+            for delay in [2, 4, 8, 16, 30, 60] {
+                thread::sleep(Duration::from_secs(delay));
+                if remote_version_exists(&name, &p.version)?
+                    && remote_archive_checksum(&name, &p.version)?.as_deref() == Some(&expected)
+                    && remote_index_contains(&name, &p.version)?
+                {
+                    verified = true;
+                    break;
+                }
+            }
+            ensure!(
+                verified,
+                "published {name} but its exact metadata, archive, and unyanked sparse-index entry did not all become visible within the bounded wait; inspect crates.io before resuming"
+            );
         }
     }
     Ok(())
@@ -471,6 +490,43 @@ fn crate_download_url(name: &str, version: &str) -> Result<String> {
     ))
 }
 
+fn crate_version_url(name: &str, version: &str) -> Result<String> {
+    validate_remote_coordinate(name, version)?;
+    Ok(format!("https://crates.io/api/v1/crates/{name}/{version}"))
+}
+
+fn version_exists_from_status(code: &str, name: &str, version: &str) -> Result<bool> {
+    match code {
+        "200" => Ok(true),
+        "404" => Ok(false),
+        _ => bail!(
+            "crates.io version lookup returned HTTP {code} for {name} {version}; refusing to publish"
+        ),
+    }
+}
+
+fn remote_version_exists(name: &str, version: &str) -> Result<bool> {
+    let output = Command::new("curl")
+        .args([
+            "--silent",
+            "--show-error",
+            "--location",
+            "--output",
+            "/dev/null",
+            "--user-agent",
+            CRATES_IO_USER_AGENT,
+            "--write-out",
+            "%{http_code}",
+            &crate_version_url(name, version)?,
+        ])
+        .output()?;
+    ensure!(
+        output.status.success(),
+        "crates.io version lookup failed for {name} {version}"
+    );
+    version_exists_from_status(&String::from_utf8(output.stdout)?, name, version)
+}
+
 fn remote_archive_checksum(name: &str, version: &str) -> Result<Option<String>> {
     let temp = std::env::temp_dir().join(format!(
         "gpui-box-download-{}-{name}.crate",
@@ -480,6 +536,8 @@ fn remote_archive_checksum(name: &str, version: &str) -> Result<Option<String>> 
         .args(["--silent", "--show-error", "--location", "--output"])
         .arg(&temp)
         .args([
+            "--user-agent",
+            CRATES_IO_USER_AGENT,
             "--write-out",
             "%{http_code}",
             &crate_download_url(name, version)?,
@@ -492,7 +550,7 @@ fn remote_archive_checksum(name: &str, version: &str) -> Result<Option<String>> 
     let code = String::from_utf8(output.stdout)?;
     let result = match code.as_str() {
         "200" => Some(sha256_file(&temp)?),
-        "404" => None,
+        "403" | "404" => None,
         _ => bail!("crates.io download returned HTTP {code} for {name}; refusing to publish"),
     };
     let _ = fs::remove_file(temp);
@@ -507,6 +565,8 @@ fn remote_index_contains(name: &str, version: &str) -> Result<bool> {
             "--silent",
             "--show-error",
             "--location",
+            "--user-agent",
+            CRATES_IO_USER_AGENT,
             "--write-out",
             "\n%{http_code}",
             &url,
@@ -1029,6 +1089,18 @@ mod tests {
         );
         assert!(crate_download_url("../gpui", "0.1.0").is_err());
         assert!(crate_download_url("gpui", "0.1.0?x").is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn version_api_is_the_authority_for_release_presence() -> Result<()> {
+        assert_eq!(
+            crate_version_url("gpui-box", "0.1.0")?,
+            "https://crates.io/api/v1/crates/gpui-box/0.1.0"
+        );
+        assert!(version_exists_from_status("200", "gpui-box", "0.1.0")?);
+        assert!(!version_exists_from_status("404", "gpui-box", "0.1.0")?);
+        assert!(version_exists_from_status("403", "gpui-box", "0.1.0").is_err());
         Ok(())
     }
 
