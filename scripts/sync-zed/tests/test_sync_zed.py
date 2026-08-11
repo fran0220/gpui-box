@@ -12,6 +12,12 @@ spec.loader.exec_module(sync_zed)
 
 
 class UnitTests(unittest.TestCase):
+    def unbootstrapped_state(self):
+        state = json.loads((MODULE.parent / "state.json").read_text())
+        for key in sync_zed.RECEIPT_KEYS:
+            state[key] = None
+        return state
+
     def git(self, repo, *args):
         return subprocess.check_output(
             ["git", "-C", str(repo), *args], text=True
@@ -167,31 +173,40 @@ class UnitTests(unittest.TestCase):
                 )
 
     def test_dry_run_bootstrap_does_not_call_git(self):
-        old_load, old_run = sync_zed.load, sync_zed.run
+        old_load, old_run, old_provenance_errors = (
+            sync_zed.load,
+            sync_zed.run,
+            sync_zed.provenance_errors,
+        )
         config = json.loads((MODULE.parent / "config.json").read_text())
-        state = json.loads((MODULE.parent / "state.json").read_text())
+        state = self.unbootstrapped_state()
         sync_zed.load = lambda path: config if path == sync_zed.CONFIG else state
         sync_zed.run = lambda *args, **kwargs: self.fail("dry run invoked git")
+        sync_zed.provenance_errors = lambda *_: []
         try:
             sync_zed.bootstrap(type("Args", (), {"dry_run": True})())
         finally:
-            sync_zed.load, sync_zed.run = old_load, old_run
+            sync_zed.load, sync_zed.run, sync_zed.provenance_errors = (
+                old_load,
+                old_run,
+                old_provenance_errors,
+            )
 
     def test_development_validation_accepts_an_unbootstrapped_receipt(self):
         config = json.loads((MODULE.parent / "config.json").read_text())
-        state = json.loads((MODULE.parent / "state.json").read_text())
+        state = self.unbootstrapped_state()
         self.assertEqual(sync_zed.validate_state(config, state), [])
 
     def test_release_validation_requires_every_receipt_coordinate(self):
         config = json.loads((MODULE.parent / "config.json").read_text())
-        state = json.loads((MODULE.parent / "state.json").read_text())
+        state = self.unbootstrapped_state()
         errors = sync_zed.validate_state(config, state, release=True)
         for key in sync_zed.RECEIPT_KEYS:
             self.assertIn(f"release receipt requires {key}", errors)
 
     def test_partial_receipt_is_never_accepted_as_development_state(self):
         config = json.loads((MODULE.parent / "config.json").read_text())
-        state = json.loads((MODULE.parent / "state.json").read_text())
+        state = self.unbootstrapped_state()
         state["vendor_tip"] = "0" * 40
         self.assertIn(
             "receipt coordinates must be either all null or all full SHAs",
