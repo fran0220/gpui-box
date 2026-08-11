@@ -6,7 +6,11 @@ const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 export default defineConfig({
   testDir: ".",
   testMatch: "smoke.spec.mjs",
-  timeout: 30_000,
+  // A cold CI worker can spend most of the default timeout starting
+  // SwiftShader and compiling the first forced-WebGL scene. The same scene
+  // completes in seconds once the renderer cache is warm, so allow cold-start
+  // headroom without hiding failures behind retries.
+  timeout: 60_000,
   workers: 1,
   use: {
     baseURL: "http://127.0.0.1:4173",
