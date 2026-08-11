@@ -122,9 +122,10 @@ mod handle {
     /// A non-owning reference to a child `HWND` hosted inside a GPUI window.
     ///
     /// Windows does not provide retain/release semantics for window handles.
-    /// Cloning this value retains the GPUI hosting reference, but the component
-    /// that created the `HWND` remains responsible for destroying it after it is
-    /// no longer hosted and all handles have been dropped.
+    /// Cloning duplicates this reference without transferring lifetime
+    /// ownership. The component that created the `HWND` remains responsible for
+    /// destroying it after it is no longer hosted and all handles have been
+    /// dropped.
     #[derive(Clone)]
     pub struct PlatformViewHandle {
         hwnd: HWND,

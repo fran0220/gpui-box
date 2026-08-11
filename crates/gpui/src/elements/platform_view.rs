@@ -22,11 +22,10 @@ pub struct PlatformView {
 ///
 /// # Stacking
 ///
-/// The hosted view is a sibling of GPUI's rendering surface, ordered above it.
-/// Within the element's bounds it therefore covers GPUI content unconditionally:
-/// GPUI clipping, overlays, tooltips, modals and anything else drawn on the same
-/// surface do **not** composite over it. Keep interface elements that must stay
-/// visible outside the hosted view's bounds.
+/// The hosted view is ordered above GPUI's root scene. Content drawn on that
+/// same base surface does not composite over the native view. When the window's
+/// scene overlay is enabled, deferred and window-level overlay content is drawn
+/// on a separate surface above hosted views.
 ///
 /// # Platforms
 ///

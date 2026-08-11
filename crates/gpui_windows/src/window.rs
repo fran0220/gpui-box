@@ -1839,14 +1839,14 @@ fn set_non_rude_hwnd(hwnd: HWND, non_rude: bool) {
 
 #[cfg(test)]
 mod tests {
-    use super::{ClickState, attach_platform_view, detach_platform_view};
+    use super::{ClickState, ScreenToClient, attach_platform_view, detach_platform_view};
     use gpui::{
         Bounds, DevicePixels, MouseButton, PlatformViewHandle, PlatformViewPlacement, point, px,
         size,
     };
     use std::time::Duration;
     use windows::Win32::{
-        Foundation::{HWND, POINT, RECT, ScreenToClient},
+        Foundation::{HWND, POINT, RECT},
         UI::WindowsAndMessaging::{
             CreateWindowExW, DestroyWindow, GA_PARENT, GWL_STYLE, GetAncestor, GetWindowLongPtrW,
             GetWindowRect, IsWindow, WINDOW_EX_STYLE, WINDOW_STYLE, WS_CHILD, WS_CLIPSIBLINGS,
@@ -1882,9 +1882,8 @@ mod tests {
         let child = create_test_window(Some(original_parent), WS_CHILD | WS_VISIBLE);
         let original_style = unsafe { GetWindowLongPtrW(child, GWL_STYLE) };
         {
-            let handle = unsafe { PlatformViewHandle::from_hwnd(child) };
             let placement = PlatformViewPlacement {
-                handle: handle.clone(),
+                handle: unsafe { PlatformViewHandle::from_hwnd(child) },
                 bounds: Bounds {
                     origin: point(px(10.), px(20.)),
                     size: size(px(100.), px(50.)),
