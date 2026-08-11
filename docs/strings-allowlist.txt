@@ -143,6 +143,7 @@ ToolbarItem
 TransportBar
 Tree
 TreeGrid
+UndoHistory
 UploadList
 VEC3
 VideoPlayer

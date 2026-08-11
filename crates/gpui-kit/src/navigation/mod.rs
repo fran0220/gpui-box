@@ -12,6 +12,7 @@ pub mod collapsible;
 pub mod pagination;
 pub mod sidebar;
 pub mod tabs;
+pub mod undo_history;
 pub mod wizard;
 
 pub use accordion::{Accordion, AccordionSection};
@@ -21,4 +22,5 @@ pub use collapsible::Collapsible;
 pub use pagination::{PageTotal, Pagination};
 pub use sidebar::{Sidebar, SidebarItem, SidebarSection};
 pub use tabs::{SaveState, TabItem, Tabs};
+pub use undo_history::{HistoryEntry, UndoHistory};
 pub use wizard::{StepStatus, Wizard, WizardIntent, WizardLayout, WizardStep};

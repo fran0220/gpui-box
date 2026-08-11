@@ -17,7 +17,7 @@ input, and an entry in `docs/components.md`.
 | Text entry | `TextInput`, `PasswordInput`, `OneTimeCodeInput`, `TextArea`, `NumberInput`, `TagInput`, `InlineEdit` |
 | Choice | `Select`, `Combobox`, `Checkbox`, `Radio`, `Switch`, `Slider`, `SegmentedControl` |
 | Form | `FormField`, `SettingsRow`, `SettingsSection` |
-| Navigation | `Tabs`, `Accordion`, `Collapsible`, `Breadcrumb`, `Sidebar`, `Pagination`, `Wizard` |
+| Navigation | `Tabs`, `Accordion`, `Collapsible`, `Breadcrumb`, `Sidebar`, `Pagination`, `Wizard`, `UndoHistory` |
 | Data | `List` (virtualized), `Table`, `DataGrid` (virtualized), `BulkBar`, `Tree` |
 | Date and time | `Calendar`, `DateInput`, `RangePicker`, `TimeInput` |
 | Content | `Markdown`, `MessageList`, `ImageViewer`, `TransportBar`, `BrowserPanel` (shell only), `LogStream`, `DiffView` |
@@ -346,7 +346,9 @@ is for. `Cascader`, `AnchorList`, and `DiagnosticsList` are also covered above;
 they compose the existing popover/menu, navigation, list, filter, badge, and
 status vocabulary instead of creating parallel application infrastructure.
 
-Then: mentions in a text field, search within settings, and undo history.
+Then: mentions in a text field and search within settings. `UndoHistory` now
+covers the caller-owned revision list and reports restore intents without
+keeping or mutating an undo stack.
 
 Agent applications need a family this library is still filling in. A
 conversation is not the unit; a run made of steps is, and `ToolCallCard`,

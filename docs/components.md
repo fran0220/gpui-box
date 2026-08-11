@@ -101,6 +101,7 @@ actions. They define no account, provider, network, or credential policy.
 | `Breadcrumb` | builder | the crumb that was picked, and the ids an ellipsis hides | The last crumb is the current place: it publishes `Text` rather than `Link` and installs no handler. `max_visible` collapses the middle of a long trail and publishes the hidden count |
 | `Sidebar` | builder | the place that was picked | Sections, badges, and one level of nesting. Collapsing narrows the drawing, never the substance: a glyph-only rail reaches each label through a `Tooltip` and every item still publishes its full name and its depth |
 | `Wizard` | builder | a step to jump to, back, next, or finish | A step strip with the caller's body under it, horizontal or vertical. A step is complete, current, upcoming, blocked, or failed, and the last two say why |
+| `UndoHistory`, `HistoryEntry` | builder | the history entry that should be restored | A caller-owned revision list, not an undo stack. Entry order, current identity, descriptions, already-formatted time/source labels, and restore refusals are rendered exactly as supplied. Arrow, Home, and End keys skip refused entries; reporting a jump changes nothing |
 | `Pagination` | builder | the page that was asked for | First, previous, next, last, and a numbered range with an ellipsis that says how many pages it stands for. A step with nowhere to go installs no handler. With `PageTotal::Unknown` there is no last-page control, no numbers, and no total in the copy |
 
 ### The wizard moves nothing
@@ -111,6 +112,15 @@ completed steps are revisitable by default, and a step nobody may jump to
 installs no handler. `Blocked` and `Failed` carry the host's reason and publish
 it as a child node, because a step that has gone grey for a reason nobody
 states is a dead end.
+
+### Undo history owns no undo stack
+
+`UndoHistory` neither records changes nor restores them. The caller supplies
+durable entry identities, their order, the current entry, and any refusal to
+restore one; `on_jump` reports only the requested identity. Times are already
+formatted by the caller because locale and time-zone policy do not belong in
+a navigation component. An unavailable revision stays visible with its reason
+and installs no action.
 
 ### An unknown page count is not a page count
 

@@ -13,6 +13,12 @@ is what Cargo requires a manifest to carry, not a version anybody can take.
 
 ### Added
 
+**Undo history.** `navigation::UndoHistory` renders caller-owned revision
+entries and reports only the durable identity a typist asked to restore. The
+caller owns order, current identity, already-formatted time and source labels,
+and restoration refusals; an unavailable entry stays visible with its reason,
+and the component keeps no undo stack and mutates no document state.
+
 **Media.** `media::AudioPlayer`, `media::VideoPlayer` and `media::ModelViewer`
 are the three surfaces a desktop application cannot assemble out of a button
 and a slider. The two players run over `media::MediaTransport` — `origin`,

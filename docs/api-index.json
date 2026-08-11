@@ -3632,6 +3632,28 @@
       ]
     },
     {
+      "name": "UndoHistory",
+      "kind": "builder",
+      "path": "gpui_kit::navigation::UndoHistory",
+      "source": "crates/gpui-kit/src/navigation/undo_history.rs",
+      "summary": "A history list that reports jump intents and changes no document state.",
+      "construct": [
+        "new(ident: impl Into<Ident>, label: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "entry(entry: HistoryEntry) -> Self",
+        "entries(entries: impl IntoIterator<Item = HistoryEntry>) -> Self",
+        "current(id: impl Into<SharedString>) -> Self",
+        "on_jump(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "undo-history"
+      ]
+    },
+    {
       "name": "UploadList",
       "kind": "builder",
       "path": "gpui_kit::controls::UploadList",
@@ -5311,6 +5333,26 @@
       "commands": [],
       "queries": [
         "id() -> &SharedString"
+      ]
+    },
+    {
+      "name": "HistoryEntry",
+      "path": "gpui_kit::navigation::HistoryEntry",
+      "summary": "One caller-owned point in an undo history.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, label: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "description(description: impl Into<SharedString>) -> Self",
+        "time(time: impl Into<SharedString>) -> Self",
+        "source(source: impl Into<SharedString>) -> Self",
+        "unavailable(reason: impl Into<SharedString>) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "label() -> &SharedString"
       ]
     },
     {
@@ -8906,6 +8948,14 @@
         "Wizard"
       ],
       "example": "fn wizard(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(720.0))\n        .child(caption(\n            &theme,\n            \"horizontal, with a blocked step and a failed one\",\n        ))\n        .child(\n            Wizard::new(\"scene.wizard.release\")\n                .steps([\n                    WizardStep::new(\"prepare\", \"Prepare\")\n                        .description(\"Check the workspace is clean\")\n                        .complete(),\n                    WizardStep::new(\"build\", \"Build\")\n                        .description(\"Compile every target\")\n                        .failed(\"The build failed on the test target.\"),\n                    WizardStep::new(\"sign\", \"Sign\").current(),\n                    WizardStep::new(\"publish\", \"Publish\")\n                        .blocked(\"Approval is required for this workspace.\"),\n                ])\n                .body(\n                    div()\n                        .p(px(theme.spacing.md))\n                        .radius(&theme, Radius::Card)\n                        .hairline(&theme)\n                        .child(crate::foundation::text(\n                            &theme,\n                            TypeScale::Body,\n                            SharedString::new_static(\n                                \"The body of the current step belongs to the caller.\",\n                            ),\n                        )),\n                )\n                .back_to(\"build\")\n                .on_navigate(|_, _, _| {}),\n        )\n        .child(caption(&theme, \"vertical, finishing\"))\n        .child(\n            Wizard::new(\"scene.wizard.setup\")\n                .vertical()\n                .steps([\n                    WizardStep::new(\"account\", \"Account\").complete(),\n                    WizardStep::new(\"workspace\", \"Workspace\").complete(),\n                    WizardStep::new(\"review\", \"Review\").current(),\n                ])\n                .back_to(\"workspace\")\n                .finish(true)\n                .on_navigate(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "undo-history",
+      "capture": "cargo run -p xtask -- headless capture undo-history",
+      "uses": [
+        "UndoHistory"
+      ],
+      "example": "fn undo_history(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(520.0))\n        .child(caption(\n            &theme,\n            \"the caller owns every revision and whether it can be restored\",\n        ))\n        .child(\n            UndoHistory::new(\"scene.undo-history\", \"Document undo history\")\n                .entries([\n                    HistoryEntry::new(\"opened\", \"Opened the fixture\")\n                        .description(\"The initial verified document\")\n                        .source(\"Fixture host\")\n                        .time(\"10:14\"),\n                    HistoryEntry::new(\"renamed\", \"Renamed the title\")\n                        .source(\"Alex\")\n                        .time(\"10:16\"),\n                    HistoryEntry::new(\"imported\", \"Imported archived blocks\")\n                        .description(\"The archive is no longer available\")\n                        .source(\"Archive\")\n                        .time(\"10:18\")\n                        .unavailable(\"This revision cannot be restored without the archive.\"),\n                    HistoryEntry::new(\"current\", \"Reordered the summary\")\n                        .description(\"Current document\")\n                        .source(\"Alex\")\n                        .time(\"10:21\"),\n                    HistoryEntry::new(\"draft\", \"Drafted a new conclusion\")\n                        .source(\"Fixture host\")\n                        .time(\"10:23\"),\n                ])\n                .current(\"current\")\n                .on_jump(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "settings",

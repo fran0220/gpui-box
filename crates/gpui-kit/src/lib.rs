@@ -211,9 +211,9 @@ pub mod prelude {
         Flip, Flipping, Keyframe, Keyframes, Presence, ScrollLink, Transition, Velocity, flip,
     };
     pub use crate::navigation::{
-        Accordion, AccordionSection, Anchor, AnchorList, Breadcrumb, Collapsible, Crumb, PageTotal,
-        Pagination, SaveState, Sidebar, SidebarItem, SidebarSection, StepStatus, TabItem, Tabs,
-        Wizard, WizardIntent, WizardLayout, WizardStep,
+        Accordion, AccordionSection, Anchor, AnchorList, Breadcrumb, Collapsible, Crumb,
+        HistoryEntry, PageTotal, Pagination, SaveState, Sidebar, SidebarItem, SidebarSection,
+        StepStatus, TabItem, Tabs, UndoHistory, Wizard, WizardIntent, WizardLayout, WizardStep,
     };
     pub use crate::overlay::{
         Command, CommandPalette, CommandPaletteEvent, ContextMenu, ContextMenuEvent, Dialog,

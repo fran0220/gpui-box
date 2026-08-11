@@ -389,3 +389,154 @@ fn a_drawer_that_cannot_be_dismissed_installs_no_escape_handler(cx: &mut TestApp
     );
     assert!(harness.node("runs.filters").is_some());
 }
+
+// ------------------------------------------------------------ undo history
+
+fn revisions() -> Vec<HistoryEntry> {
+    vec![
+        HistoryEntry::new("opened", "Opened document")
+            .source("Fixture host")
+            .time("10:14"),
+        HistoryEntry::new("managed", "Applied managed template")
+            .unavailable("The template is no longer available."),
+        HistoryEntry::new("current", "Renamed document").description("Current document"),
+        HistoryEntry::new("draft", "Drafted conclusion")
+            .source("Alex")
+            .time("10:23"),
+        HistoryEntry::new("saved", "Saved document"),
+    ]
+}
+
+fn undo_history(cx: &mut TestAppContext, disabled: bool) -> (Harness, Calls<String>) {
+    let (calls, sink) = recorder::<String>();
+    let harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let sink = sink.clone();
+        UndoHistory::new("document.history", "Document undo history")
+            .entries(revisions())
+            .current("current")
+            .disabled(disabled)
+            .on_jump(move |id, _, _| sink.borrow_mut().push(id.to_string()))
+            .into_any_element()
+    });
+    (harness, calls)
+}
+
+#[gpui::test]
+fn undo_history_entries_publish_business_identity_and_caller_metadata(cx: &mut TestAppContext) {
+    let (mut harness, _calls) = undo_history(cx, false);
+
+    let list = harness.node("document.history").expect("published");
+    assert_eq!(list.role, Role::List);
+    assert_eq!(list.text.as_deref(), Some("Document undo history"));
+    assert_eq!(list.value.as_deref(), Some("5"));
+
+    let entry = harness.node("document.history.opened").expect("published");
+    assert_eq!(entry.role, Role::Row);
+    assert_eq!(entry.text.as_deref(), Some("Opened document"));
+    assert_eq!(entry.parent.as_deref(), Some("document.history"));
+    assert_eq!(
+        harness
+            .node("document.history.opened.source")
+            .expect("published")
+            .text
+            .as_deref(),
+        Some("Fixture host")
+    );
+    assert_eq!(
+        harness
+            .node("document.history.opened.time")
+            .expect("published")
+            .text
+            .as_deref(),
+        Some("10:14")
+    );
+}
+
+#[gpui::test]
+fn undo_history_jump_reports_an_entry_and_moves_no_history(cx: &mut TestAppContext) {
+    let (mut harness, calls) = undo_history(cx, false);
+
+    harness.click("document.history.opened");
+
+    assert_eq!(*calls.borrow(), vec!["opened".to_string()]);
+    assert!(
+        harness
+            .node("document.history.current")
+            .expect("published")
+            .selected,
+        "the caller still owns the current revision"
+    );
+    assert!(
+        !harness
+            .node("document.history.opened")
+            .expect("published")
+            .selected
+    );
+}
+
+#[gpui::test]
+fn undo_history_current_entry_reports_no_redundant_jump(cx: &mut TestAppContext) {
+    let (mut harness, calls) = undo_history(cx, false);
+
+    harness.click("document.history.current");
+    harness.keystrokes("enter");
+
+    assert!(calls.borrow().is_empty());
+}
+
+#[gpui::test]
+fn undo_history_unavailable_revision_keeps_its_reason_and_installs_no_action(
+    cx: &mut TestAppContext,
+) {
+    let (mut harness, calls) = undo_history(cx, false);
+
+    harness.click("document.history.managed");
+
+    assert!(calls.borrow().is_empty());
+    assert!(
+        harness
+            .node("document.history.managed")
+            .expect("published")
+            .disabled
+    );
+    assert_eq!(
+        harness
+            .node("document.history.managed.reason")
+            .expect("published")
+            .text
+            .as_deref(),
+        Some("The template is no longer available.")
+    );
+}
+
+#[gpui::test]
+fn undo_history_keyboard_skips_refusals_and_the_current_revision(cx: &mut TestAppContext) {
+    let (mut harness, calls) = undo_history(cx, false);
+
+    harness.click("document.history.saved");
+    calls.borrow_mut().clear();
+    harness.keystrokes("up");
+    assert_eq!(*calls.borrow(), vec!["opened".to_string()]);
+
+    calls.borrow_mut().clear();
+    harness.keystrokes("down");
+    assert_eq!(*calls.borrow(), vec!["draft".to_string()]);
+
+    calls.borrow_mut().clear();
+    harness.keystrokes("home");
+    harness.keystrokes("end");
+    assert_eq!(
+        *calls.borrow(),
+        vec!["opened".to_string(), "saved".to_string()]
+    );
+}
+
+#[gpui::test]
+fn undo_history_disabled_state_installs_no_jump_handlers(cx: &mut TestAppContext) {
+    let (mut harness, calls) = undo_history(cx, true);
+
+    harness.click("document.history.opened");
+    harness.keystrokes("end enter");
+
+    assert!(calls.borrow().is_empty());
+}

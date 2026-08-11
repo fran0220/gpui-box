@@ -238,6 +238,10 @@ pub fn catalog() -> Vec<Scene> {
             build: wizard,
         },
         Scene {
+            name: "undo-history",
+            build: undo_history,
+        },
+        Scene {
             name: "settings",
             build: settings,
         },
@@ -4066,6 +4070,43 @@ fn wizard(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .back_to("workspace")
                 .finish(true)
                 .on_navigate(|_, _, _| {}),
+        )
+        .into_any_element()
+}
+
+fn undo_history(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(520.0))
+        .child(caption(
+            &theme,
+            "the caller owns every revision and whether it can be restored",
+        ))
+        .child(
+            UndoHistory::new("scene.undo-history", "Document undo history")
+                .entries([
+                    HistoryEntry::new("opened", "Opened the fixture")
+                        .description("The initial verified document")
+                        .source("Fixture host")
+                        .time("10:14"),
+                    HistoryEntry::new("renamed", "Renamed the title")
+                        .source("Alex")
+                        .time("10:16"),
+                    HistoryEntry::new("imported", "Imported archived blocks")
+                        .description("The archive is no longer available")
+                        .source("Archive")
+                        .time("10:18")
+                        .unavailable("This revision cannot be restored without the archive."),
+                    HistoryEntry::new("current", "Reordered the summary")
+                        .description("Current document")
+                        .source("Alex")
+                        .time("10:21"),
+                    HistoryEntry::new("draft", "Drafted a new conclusion")
+                        .source("Fixture host")
+                        .time("10:23"),
+                ])
+                .current("current")
+                .on_jump(|_, _, _| {}),
         )
         .into_any_element()
 }
