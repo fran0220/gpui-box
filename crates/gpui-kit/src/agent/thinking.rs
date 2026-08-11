@@ -28,10 +28,10 @@ use gpui::{
 };
 use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TextTone, TypeScale};
 
 use crate::display::icon::{Icon as IconView, IconTone};
-use crate::foundation::{FocusRing, Ident, Pressable, Sizable, StyledExt};
+use crate::foundation::{FocusRing, Ident, Pressable, Sizable, StyledExt, text};
 use crate::strings::{ActiveStrings, StringKey};
 
 type ToggleHandler = Rc<dyn Fn(bool, &mut Window, &mut App)>;
@@ -198,8 +198,6 @@ impl RenderOnce for ThinkingBlock {
             .gap_token(&theme, Space::Sm)
             .px_token(&theme, Space::Sm)
             .py(px(theme.space(Space::Xs)))
-            .type_scale(&theme, TypeScale::Caption)
-            .text_color(theme.colors.text_muted)
             .child({
                 let mark = IconView::new(Glyph::Chat).small().tone(tone);
                 // Deliberation breathes rather than turns: a turn claims work
@@ -211,18 +209,22 @@ impl RenderOnce for ThinkingBlock {
                     mark
                 }
             })
-            .child(div().flex_1().min_w_0().child(label.clone()))
+            .child(
+                text(&theme, TypeScale::Label, label.clone())
+                    .flex_1()
+                    .min_w_0()
+                    .text_tone(&theme, gpui_kit_theme::TextTone::Muted),
+            )
             // Which of the three states holds is on screen without opening
             // anything, because two of them can never be opened.
             .child(
-                div()
+                text(&theme, TypeScale::Caption, mark)
                     .flex_none()
                     .text_color(match self.reasoning {
                         Reasoning::Withheld(_) => theme.colors.warning,
                         _ if self.thinking => theme.colors.accent,
                         _ => theme.colors.text_faint,
-                    })
-                    .child(mark),
+                    }),
             )
             .when(actionable, |element| {
                 element
@@ -270,12 +272,14 @@ impl RenderOnce for ThinkingBlock {
                     .w_full()
                     .px_token(&theme, Space::Sm)
                     .pb(px(theme.space(Space::Xs)))
-                    .type_scale(&theme, TypeScale::Caption)
-                    .text_color(theme.colors.text_muted)
-                    .children(
-                        text.lines()
-                            .map(|line| div().child(SharedString::from(line.to_string()))),
-                    )
+                    .children(text.lines().map(|line| {
+                        crate::foundation::text(
+                            &theme,
+                            TypeScale::Body,
+                            SharedString::from(line.to_string()),
+                        )
+                        .text_tone(&theme, TextTone::Muted)
+                    }))
                     .semantic_in(
                         cx,
                         NodeSpec::new(ident.child("body").semantic_id(), Role::Text)
@@ -285,13 +289,11 @@ impl RenderOnce for ThinkingBlock {
             ),
             Reasoning::Present(_) => None,
             Reasoning::Withheld(reason) => Some(
-                div()
+                text(&theme, TypeScale::Body, reason.clone())
                     .w_full()
                     .px_token(&theme, Space::Sm)
                     .pb(px(theme.space(Space::Xs)))
-                    .type_scale(&theme, TypeScale::Caption)
                     .text_color(theme.colors.warning)
-                    .child(reason.clone())
                     .semantic_in(
                         cx,
                         NodeSpec::new(ident.child("withheld").semantic_id(), Role::Status)

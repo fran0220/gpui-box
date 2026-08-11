@@ -41,7 +41,7 @@ use crate::controls::button::{Button, ButtonVariant};
 use crate::display::badge::Tone;
 use crate::display::description_list::{DescriptionItem, DescriptionList};
 use crate::display::status::StatusLine;
-use crate::foundation::{Ident, StyledExt};
+use crate::foundation::{Ident, StyledExt, text};
 use crate::strings::{ActiveStrings, StringKey};
 
 /// What a standing approval covers.
@@ -471,16 +471,12 @@ impl Render for ApprovalPrompt {
                 element.on_key_down(cx.listener(Self::on_key))
             })
             .child(
-                div()
-                    .type_scale(&theme, TypeScale::Body)
-                    .text_color(theme.colors.text)
-                    .child(self.action.clone())
-                    .semantic_in(
-                        cx,
-                        NodeSpec::new(self.ident.child("action").semantic_id(), Role::Text)
-                            .text(self.action.clone())
-                            .parent(self.ident.semantic_id()),
-                    ),
+                text(&theme, TypeScale::Body, self.action.clone()).semantic_in(
+                    cx,
+                    NodeSpec::new(self.ident.child("action").semantic_id(), Role::Text)
+                        .text(self.action.clone())
+                        .parent(self.ident.semantic_id()),
+                ),
             )
             .children(details)
             .when_some(outcome, |element, (text, tone)| {

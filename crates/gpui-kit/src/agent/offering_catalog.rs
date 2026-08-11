@@ -13,13 +13,15 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TypeScale};
+use gpui_kit_theme::{
+    ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TextTone, TypeScale,
+};
 
 use crate::agent::server_list::{Offering, OfferingKind};
 use crate::display::badge::{Badge, Tone};
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::status::StatusDot;
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
 use crate::strings::{ActiveStrings, StringKey};
 
 type ActivateHandler = Rc<dyn Fn(OfferingIdentity, &mut Window, &mut App)>;
@@ -319,10 +321,13 @@ impl OfferingCatalog {
                 div()
                     .column()
                     .min_w_0()
-                    .type_scale(theme, TypeScale::Caption)
-                    .text_color(tone.color(theme))
-                    .child(label.clone())
-                    .children(reason.clone()),
+                    .child(
+                        text(theme, TypeScale::Caption, label.clone())
+                            .text_color(tone.color(theme)),
+                    )
+                    .children(reason.clone().map(|reason| {
+                        text(theme, TypeScale::Body, reason).text_color(tone.color(theme))
+                    })),
             )
             .semantic_in(
                 cx,
@@ -440,20 +445,17 @@ impl OfferingCatalog {
                     .column()
                     .flex_1()
                     .min_w_0()
-                    .child(
-                        div()
-                            .type_scale(theme, TypeScale::Label)
-                            .text_color(theme.colors.text)
-                            .child(result.offering.name().clone()),
-                    )
+                    .child(text(
+                        theme,
+                        TypeScale::Label,
+                        result.offering.name().clone(),
+                    ))
                     .when_some(
                         result.offering.summary_text().cloned(),
                         |element, summary| {
                             element.child(
-                                div()
-                                    .type_scale(theme, TypeScale::Caption)
-                                    .text_color(theme.colors.text_muted)
-                                    .child(summary),
+                                text(theme, TypeScale::Body, summary)
+                                    .text_tone(theme, TextTone::Muted),
                             )
                         },
                     )
@@ -461,11 +463,9 @@ impl OfferingCatalog {
                         result.offering.qualifier_text().cloned(),
                         |element, qualifier| {
                             element.child(
-                                div()
-                                    .type_scale(theme, TypeScale::Caption)
-                                    .text_color(theme.colors.text_faint)
-                                    .font_family(theme.typography.mono.clone())
-                                    .child(qualifier),
+                                text(theme, TypeScale::Code, qualifier)
+                                    .text_tone(theme, TextTone::Faint)
+                                    .font_family(theme.typography.mono.clone()),
                             )
                         },
                     ),
@@ -477,10 +477,8 @@ impl OfferingCatalog {
                     .gap_token(theme, Space::Xs)
                     .child(Badge::new(kind.name()).tone(Tone::Neutral))
                     .child(
-                        div()
-                            .type_scale(theme, TypeScale::Caption)
-                            .text_color(theme.colors.text_muted)
-                            .child(source.name.clone())
+                        text(theme, TypeScale::Caption, source.name.clone())
+                            .text_tone(theme, TextTone::Muted)
                             .semantic_in(
                                 cx,
                                 NodeSpec::new(ident.child("server").semantic_id(), Role::Status)

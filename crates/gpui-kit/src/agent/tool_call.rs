@@ -30,13 +30,13 @@ use std::rc::Rc;
 use gpui::{App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div, px};
 use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TextTone, Theme, TypeScale};
 
 use crate::controls::button::Button;
 use crate::display::badge::{Badge, Tone};
 use crate::display::icon::{Icon as IconView, IconTone};
 use crate::display::status::Callout;
-use crate::foundation::{Ident, Sizable, StyledExt};
+use crate::foundation::{Ident, Sizable, StyledExt, text};
 use crate::strings::{ActiveStrings, StringKey};
 
 type RetryHandler = Rc<dyn Fn(&mut Window, &mut App)>;
@@ -398,13 +398,10 @@ impl RenderOnce for ToolCallCard {
                 }
             })
             .child(
-                div()
+                text(&theme, TypeScale::Code, self.tool.clone())
                     .flex_1()
                     .min_w_0()
-                    .font_family(theme.typography.mono.clone())
-                    .type_scale(&theme, TypeScale::Label)
-                    .text_color(theme.colors.text)
-                    .child(self.tool.clone()),
+                    .font_family(theme.typography.mono.clone()),
             )
             .child(
                 Badge::new(cx.strings().text(self.state.key()))
@@ -413,14 +410,15 @@ impl RenderOnce for ToolCallCard {
             )
             .children(self.state.ran().then(|| {
                 let words = self.elapsed.shown(cx);
-                div()
+                text(&theme, TypeScale::Caption, words.clone())
                     .flex_none()
-                    .type_scale(&theme, TypeScale::Caption)
-                    .text_color(match self.elapsed {
-                        Elapsed::Took(_) => theme.colors.text_muted,
-                        Elapsed::Unknown => theme.colors.text_faint,
-                    })
-                    .child(words.clone())
+                    .text_tone(
+                        &theme,
+                        match self.elapsed {
+                            Elapsed::Took(_) => TextTone::Muted,
+                            Elapsed::Unknown => TextTone::Faint,
+                        },
+                    )
                     .semantic_in(
                         cx,
                         NodeSpec::new(ident.child("elapsed").semantic_id(), Role::Text)
@@ -460,10 +458,8 @@ impl RenderOnce for ToolCallCard {
                 ),
                 ToolOutput::Silent => {
                     let words = cx.strings().text(StringKey::AgentNoOutput);
-                    div()
-                        .type_scale(&theme, TypeScale::Caption)
-                        .text_color(theme.colors.text_muted)
-                        .child(words.clone())
+                    text(&theme, TypeScale::Caption, words.clone())
+                        .text_tone(&theme, TextTone::Muted)
                         .semantic_in(
                             cx,
                             NodeSpec::new(ident.child("result").semantic_id(), Role::Text)
@@ -536,13 +532,17 @@ fn block(
                 .row()
                 .justify_between()
                 .gap_token(theme, Space::Sm)
-                .type_scale(theme, TypeScale::Caption)
-                .text_color(theme.colors.text_faint)
-                .child(label.clone())
+                .child(
+                    text(theme, TypeScale::Caption, label.clone())
+                        .text_tone(theme, TextTone::Faint),
+                )
                 // The measurement is stated whether or not anything was cut,
                 // so "there is more" is read off the same line every time
                 // rather than appearing only when it is bad news.
-                .child(div().child(shape.clone())),
+                .child(
+                    text(theme, TypeScale::Caption, shape.clone())
+                        .text_tone(theme, TextTone::Faint),
+                ),
         )
         .child(
             div()
@@ -552,11 +552,11 @@ fn block(
                 .radius(theme, Radius::Small)
                 .surface(theme, Surface::Raised)
                 .font_family(theme.typography.mono.clone())
-                .type_scale(theme, TypeScale::Caption)
-                .text_color(theme.colors.text_muted)
                 // One element per line, the way a fenced block is drawn: a
                 // single element would run the whole body together.
-                .children(body.shown_lines().into_iter().map(|line| div().child(line))),
+                .children(body.shown_lines().into_iter().map(|line| {
+                    text(theme, TypeScale::Code, line).text_tone(theme, TextTone::Muted)
+                })),
         )
         .semantic_in(
             cx,

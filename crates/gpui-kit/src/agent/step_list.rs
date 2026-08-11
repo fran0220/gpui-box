@@ -23,12 +23,12 @@ use gpui::{
     prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Space, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Space, TextTone, Theme, TypeScale};
 
 use crate::display::badge::Tone;
 use crate::display::progress::ProgressBar;
 use crate::display::status::StatusDot;
-use crate::foundation::{Ident, StyledExt};
+use crate::foundation::{Ident, StyledExt, text};
 use crate::strings::{ActiveStrings, StringKey};
 
 /// How wide the column holding the rail and its dots is.
@@ -296,10 +296,8 @@ fn step_element(
 
     let reason = step.state.reason().cloned().map(|reason| {
         let state = step.state.as_str();
-        div()
-            .type_scale(theme, TypeScale::Caption)
+        text(theme, TypeScale::Body, reason.clone())
             .text_color(step.state.tone().color(theme))
-            .child(reason.clone())
             .semantic_in(
                 cx,
                 NodeSpec::new(ident.child("reason").semantic_id(), Role::Status)
@@ -328,19 +326,18 @@ fn step_element(
                         .row()
                         .gap_token(theme, Space::Sm)
                         .child(
-                            div()
+                            text(theme, TypeScale::Label, step.title.clone())
                                 .flex_1()
-                                .min_w_0()
-                                .type_scale(theme, TypeScale::Label)
-                                .text_color(theme.colors.text)
-                                .child(step.title.clone()),
+                                .min_w_0(),
                         )
                         .child(
-                            div()
-                                .flex_none()
-                                .type_scale(theme, TypeScale::Caption)
-                                .text_color(theme.colors.text_faint)
-                                .child(cx.strings().text(step.state.key())),
+                            text(
+                                theme,
+                                TypeScale::Caption,
+                                cx.strings().text(step.state.key()),
+                            )
+                            .flex_none()
+                            .text_tone(theme, TextTone::Faint),
                         ),
                 )
                 .children(reason)

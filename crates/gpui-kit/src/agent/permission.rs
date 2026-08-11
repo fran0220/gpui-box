@@ -34,9 +34,9 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TextTone, Theme, TypeScale};
 
-use crate::foundation::{FocusRing, Ident, StyledExt};
+use crate::foundation::{FocusRing, Ident, StyledExt, text};
 use crate::strings::{ActiveStrings, StringKey};
 
 type ChangeHandler = Rc<dyn Fn(PermissionChange, &mut Window, &mut App)>;
@@ -301,19 +301,22 @@ impl RenderOnce for PermissionMatrix {
             .gap_token(&theme, Space::Sm)
             .px_token(&theme, Space::Sm)
             .py_token(&theme, Space::Xs)
-            .type_scale(&theme, TypeScale::Caption)
-            .text_color(theme.colors.text_faint)
             .child(
-                div()
-                    .w(px(160.0))
-                    .flex_none()
-                    .child(cx.strings().text(StringKey::PermissionSubjectHeading)),
+                div().w(px(160.0)).flex_none().child(
+                    text(
+                        &theme,
+                        TypeScale::Caption,
+                        cx.strings().text(StringKey::PermissionSubjectHeading),
+                    )
+                    .text_tone(&theme, TextTone::Faint),
+                ),
             )
-            .children(
-                self.actions
-                    .iter()
-                    .map(|action| div().flex_1().min_w_0().child(action.label.clone())),
-            );
+            .children(self.actions.iter().map(|action| {
+                div().flex_1().min_w_0().child(
+                    text(&theme, TypeScale::Caption, action.label.clone())
+                        .text_tone(&theme, TextTone::Faint),
+                )
+            }));
 
         let rows: Vec<_> = self
             .subjects
@@ -331,9 +334,7 @@ impl RenderOnce for PermissionMatrix {
                         div()
                             .w(px(160.0))
                             .flex_none()
-                            .type_scale(&theme, TypeScale::Label)
-                            .text_color(theme.colors.text)
-                            .child(subject.label.clone())
+                            .child(text(&theme, TypeScale::Label, subject.label.clone()))
                             .semantic_in(
                                 cx,
                                 NodeSpec::new(row_ident.semantic_id(), Role::Row)
@@ -397,15 +398,13 @@ fn cell(
                 .rounded_full()
                 .bg(state.color(theme)),
         )
-        .child(state.label(cx));
+        .child(text(theme, TypeScale::Label, state.label(cx)));
 
     // Provenance is shown on every cell that has a state, so "set here" is a
     // statement rather than the absence of one.
     let source = (state != PermissionState::NotApplicable).then(|| {
-        div()
-            .type_scale(theme, TypeScale::Caption)
-            .text_color(theme.colors.text_faint)
-            .child(entry.source().label(cx))
+        text(theme, TypeScale::Caption, entry.source().label(cx))
+            .text_tone(theme, TextTone::Faint)
             .semantic_in(
                 cx,
                 NodeSpec::new(ident.child("source").semantic_id(), Role::Text)
@@ -418,8 +417,6 @@ fn cell(
     let body = div()
         .column()
         .gap_token(theme, Space::Xs)
-        .type_scale(theme, TypeScale::Label)
-        .text_color(theme.colors.text)
         .child(mark)
         .children(source);
 
@@ -444,7 +441,7 @@ fn cell(
         .min_w_0()
         .px_token(theme, Space::Sm)
         .py_token(theme, Space::Xs)
-        .border_1()
+        .hairline(theme)
         .radius(theme, Radius::Control);
 
     match handler {
@@ -455,7 +452,6 @@ fn cell(
                 .id(ident.element_id())
                 .tab_index(0)
                 .cursor_pointer()
-                .border_color(theme.colors.hairline)
                 .hover(|style| style.bg(theme.colors.hover))
                 .focus_ring(theme)
                 .on_click(move |_event, window, cx| {

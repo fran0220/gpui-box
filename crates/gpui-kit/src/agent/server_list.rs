@@ -34,7 +34,7 @@ use gpui::{
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{
-    ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, Theme, TypeScale,
+    ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TextTone, Theme, TypeScale,
 };
 
 use crate::controls::button::Button;
@@ -42,7 +42,7 @@ use crate::display::badge::{Badge, Tone};
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::loading::PulseLoader;
 use crate::display::status::{Callout, StatusDot};
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
 use crate::strings::{ActiveStrings, StringKey};
 
 use std::f32::consts::FRAC_PI_2;
@@ -517,18 +517,11 @@ impl ServerList {
                     .flex_1()
                     .min_w_0()
                     .column()
-                    .child(
-                        div()
-                            .type_scale(theme, TypeScale::Label)
-                            .text_color(theme.colors.text)
-                            .child(server.name.clone()),
-                    )
+                    .child(text(theme, TypeScale::Label, server.name.clone()))
                     .when_some(server.detail.clone(), |element, detail| {
                         element.child(
-                            div()
-                                .type_scale(theme, TypeScale::Caption)
-                                .text_color(theme.colors.text_muted)
-                                .child(detail),
+                            text(theme, TypeScale::Caption, detail)
+                                .text_tone(theme, TextTone::Muted),
                         )
                     }),
             )
@@ -677,12 +670,10 @@ impl ServerList {
                             .column()
                             .w_full()
                             .child(
-                                div()
+                                text(theme, TypeScale::Subtitle, heading.clone())
                                     .px_token(theme, Space::Sm)
                                     .py_token(theme, Space::Xs)
-                                    .type_scale(theme, TypeScale::Caption)
-                                    .text_color(theme.colors.text_faint)
-                                    .child(heading.clone())
+                                    .text_tone(theme, TextTone::Faint)
                                     .semantic_in(
                                         cx,
                                         NodeSpec::new(heading_ident.semantic_id(), Role::Heading)
@@ -745,27 +736,17 @@ impl ServerList {
                     .flex_1()
                     .min_w_0()
                     .column()
-                    .child(
-                        div()
-                            .type_scale(theme, TypeScale::Label)
-                            .text_color(theme.colors.text)
-                            .child(offering.name.clone()),
-                    )
+                    .child(text(theme, TypeScale::Label, offering.name.clone()))
                     .when_some(offering.summary.clone(), |element, summary| {
                         element.child(
-                            div()
-                                .type_scale(theme, TypeScale::Caption)
-                                .text_color(theme.colors.text_muted)
-                                .child(summary),
+                            text(theme, TypeScale::Body, summary).text_tone(theme, TextTone::Muted),
                         )
                     })
                     .when_some(offering.qualifier.clone(), |element, qualifier| {
                         element.child(
-                            div()
-                                .type_scale(theme, TypeScale::Caption)
-                                .text_color(theme.colors.text_faint)
-                                .font_family(theme.typography.mono.clone())
-                                .child(qualifier),
+                            text(theme, TypeScale::Code, qualifier)
+                                .text_tone(theme, TextTone::Faint)
+                                .font_family(theme.typography.mono.clone()),
                         )
                     }),
             )

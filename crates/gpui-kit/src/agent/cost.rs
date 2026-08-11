@@ -41,10 +41,10 @@ use gpui::{
     prelude::FluentBuilder, px, relative,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TextTone, TypeScale};
 
 use crate::display::badge::{Badge, Tone};
-use crate::foundation::{Ident, StyledExt};
+use crate::foundation::{Ident, StyledExt, text};
 use crate::strings::{ActiveStrings, StringKey};
 
 /// How a number was arrived at.
@@ -331,24 +331,23 @@ impl RenderOnce for CostMeter {
                             .w_full()
                             .justify_between()
                             .gap_token(&theme, Space::Sm)
-                            .type_scale(&theme, TypeScale::Label)
                             .child(
-                                div()
-                                    .text_color(theme.colors.text_muted)
-                                    .child(line.label.clone()),
+                                text(&theme, TypeScale::Label, line.label.clone())
+                                    .text_tone(&theme, TextTone::Muted),
                             )
                             .child(
                                 div()
                                     .row()
                                     .gap_token(&theme, Space::Sm)
                                     .child(
-                                        div()
-                                            .text_color(if unavailable {
-                                                theme.colors.text_faint
+                                        text(&theme, TypeScale::Label, display.clone()).text_tone(
+                                            &theme,
+                                            if unavailable {
+                                                TextTone::Faint
                                             } else {
-                                                theme.colors.text
-                                            })
-                                            .child(display.clone()),
+                                                TextTone::Primary
+                                            },
+                                        ),
                                     )
                                     .when(line.reading.is_estimate(), |element| {
                                         element.child(estimate_mark(&ident, cx))
@@ -379,10 +378,7 @@ impl RenderOnce for CostMeter {
             .frame(&theme, Surface::Panel, Elevation::Raised)
             .when_some(self.label.clone(), |element, label| {
                 element.child(
-                    div()
-                        .type_scale(&theme, TypeScale::Caption)
-                        .text_color(theme.colors.text_faint)
-                        .child(label),
+                    text(&theme, TypeScale::Caption, label).text_tone(&theme, TextTone::Faint),
                 )
             })
             .children(rows)
@@ -452,6 +448,7 @@ impl RenderOnce for ContextGauge {
         let theme = cx.theme().clone();
         let fraction = self.fraction();
         let used_display = self.used.display(cx);
+        let unavailable = self.used.quantity().is_none();
         let estimated = self.used.is_estimate()
             || self
                 .limit
@@ -482,15 +479,13 @@ impl RenderOnce for ContextGauge {
         };
 
         let limit_note = (!self.limit.is_known()).then(|| {
-            let text = cx.strings().text(StringKey::ContextUnknownLimit);
-            div()
-                .type_scale(&theme, TypeScale::Caption)
-                .text_color(theme.colors.text_faint)
-                .child(text.clone())
+            let words = cx.strings().text(StringKey::ContextUnknownLimit);
+            text(&theme, TypeScale::Caption, words.clone())
+                .text_tone(&theme, TextTone::Faint)
                 .semantic_in(
                     cx,
                     NodeSpec::new(self.ident.child("limit").semantic_id(), Role::Text)
-                        .text(text)
+                        .text(words)
                         .value(SharedString::new_static("unknown-limit"))
                         .parent(self.ident.semantic_id()),
                 )
@@ -506,17 +501,21 @@ impl RenderOnce for ContextGauge {
                     .w_full()
                     .justify_between()
                     .gap_token(&theme, Space::Sm)
-                    .type_scale(&theme, TypeScale::Label)
-                    .child(
-                        div()
-                            .text_color(theme.colors.text_muted)
-                            .children(self.label.clone()),
-                    )
+                    .children(self.label.clone().map(|label| {
+                        text(&theme, TypeScale::Label, label).text_tone(&theme, TextTone::Muted)
+                    }))
                     .child(
                         div()
                             .row()
                             .gap_token(&theme, Space::Sm)
-                            .child(div().text_color(theme.colors.text).child(reading))
+                            .child(text(&theme, TypeScale::Label, reading).text_tone(
+                                &theme,
+                                if unavailable {
+                                    TextTone::Faint
+                                } else {
+                                    TextTone::Primary
+                                },
+                            ))
                             .when(estimated, |element| {
                                 element.child(estimate_mark(&self.ident, cx))
                             }),
@@ -569,10 +568,8 @@ fn stale_line(
     sentence: SharedString,
     cx: &App,
 ) -> impl IntoElement {
-    div()
-        .type_scale(theme, TypeScale::Caption)
+    text(theme, TypeScale::Caption, sentence.clone())
         .text_color(theme.colors.warning)
-        .child(sentence.clone())
         .semantic_in(
             cx,
             NodeSpec::new(ident.child("stale").semantic_id(), Role::Status)
