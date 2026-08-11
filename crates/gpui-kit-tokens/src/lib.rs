@@ -436,6 +436,8 @@ impl TokenDocument {
             TypeScale::Caption => &self.typography.scale.caption,
             TypeScale::Label => &self.typography.scale.label,
             TypeScale::Body => &self.typography.scale.body,
+            TypeScale::Strong => &self.typography.scale.strong,
+            TypeScale::Subtitle => &self.typography.scale.subtitle,
             TypeScale::Title => &self.typography.scale.title,
             TypeScale::Code => &self.typography.scale.code,
         }
@@ -696,6 +698,11 @@ pub enum TypeScale {
     Caption,
     Label,
     Body,
+    /// Body at emphasis weight. Same size and line height, so a run can be
+    /// emphasised without changing the line box it sits in.
+    Strong,
+    /// A heading inside a component, between body and the component's own name.
+    Subtitle,
     Title,
     Code,
 }
@@ -1062,16 +1069,20 @@ pub struct TypeScaleTokens {
     pub caption: TypeStep,
     pub label: TypeStep,
     pub body: TypeStep,
+    pub strong: TypeStep,
+    pub subtitle: TypeStep,
     pub title: TypeStep,
     pub code: TypeStep,
 }
 
 impl TypeScaleTokens {
-    fn entries(&self) -> [(&'static str, &TypeStep); 5] {
+    fn entries(&self) -> [(&'static str, &TypeStep); 7] {
         [
             ("typography.scale.caption", &self.caption),
             ("typography.scale.label", &self.label),
             ("typography.scale.body", &self.body),
+            ("typography.scale.strong", &self.strong),
+            ("typography.scale.subtitle", &self.subtitle),
             ("typography.scale.title", &self.title),
             ("typography.scale.code", &self.code),
         ]

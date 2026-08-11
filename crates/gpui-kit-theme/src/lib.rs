@@ -81,6 +81,8 @@ pub struct Typography {
     pub caption: TypeStyle,
     pub label: TypeStyle,
     pub body: TypeStyle,
+    pub strong: TypeStyle,
+    pub subtitle: TypeStyle,
     pub title: TypeStyle,
     pub code: TypeStyle,
 }
@@ -319,6 +321,8 @@ impl Theme {
                 caption: style(TypeScale::Caption),
                 label: style(TypeScale::Label),
                 body: style(TypeScale::Body),
+                strong: style(TypeScale::Strong),
+                subtitle: style(TypeScale::Subtitle),
                 title: style(TypeScale::Title),
                 code: style(TypeScale::Code),
             },
@@ -481,6 +485,8 @@ impl Theme {
             TypeScale::Caption => self.typography.caption,
             TypeScale::Label => self.typography.label,
             TypeScale::Body => self.typography.body,
+            TypeScale::Strong => self.typography.strong,
+            TypeScale::Subtitle => self.typography.subtitle,
             TypeScale::Title => self.typography.title,
             TypeScale::Code => self.typography.code,
         }

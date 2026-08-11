@@ -214,6 +214,13 @@ and `xtask gate [full]`. `scenes check` is the visual regression gate; see
 
 ### Changed
 
+- `TypeScale` gained `Strong` and `Subtitle`. The scale ran caption 10.5, label
+  12, body 13, and then jumped to title 16 at weight 600, so anything between a
+  field label and a component's own name had nowhere to land and reached for
+  `Title`. `Strong` is body's size and line height at weight 600, so a run can
+  be emphasised without changing the line box it sits in; `Subtitle` is 14/20 at
+  600 for a heading inside a component. Both themes carry both steps. No
+  component uses them yet, so no baseline moved.
 - The visual gate is `xtask headless check` on every platform, and the macOS
   baseline moved from `snapshots/macos/scenes` to
   `snapshots/headless/macos/scenes`. It used to open a real 920×1000 window and

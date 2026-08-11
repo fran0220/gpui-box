@@ -145,6 +145,8 @@
       "caption": { "size": 10.5, "lineHeight": 14, "weight": 400 },
       "label": { "size": 12, "lineHeight": 16, "weight": 500 },
       "body": { "size": 13, "lineHeight": 19, "weight": 400 },
+      "strong": { "size": 13, "lineHeight": 19, "weight": 600 },
+      "subtitle": { "size": 14, "lineHeight": 20, "weight": 600 },
       "title": { "size": 16, "lineHeight": 22, "weight": 600 },
       "code": { "size": 12, "lineHeight": 18, "weight": 400 }
     }

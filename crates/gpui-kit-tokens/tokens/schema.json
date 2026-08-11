@@ -302,11 +302,21 @@
         "scale": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["caption", "label", "body", "title", "code"],
+          "required": [
+            "caption",
+            "label",
+            "body",
+            "strong",
+            "subtitle",
+            "title",
+            "code"
+          ],
           "properties": {
             "caption": { "$ref": "#/$defs/typeStep" },
             "label": { "$ref": "#/$defs/typeStep" },
             "body": { "$ref": "#/$defs/typeStep" },
+            "strong": { "$ref": "#/$defs/typeStep" },
+            "subtitle": { "$ref": "#/$defs/typeStep" },
             "title": { "$ref": "#/$defs/typeStep" },
             "code": { "$ref": "#/$defs/typeStep" }
           }
