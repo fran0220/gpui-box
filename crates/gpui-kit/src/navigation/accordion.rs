@@ -15,11 +15,13 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TypeScale};
+use gpui_kit_theme::{
+    ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TextTone, TypeScale,
+};
 
 use crate::display::icon::flips;
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
-use crate::foundation::{FocusRing, Ident, Pressable, Sizable, StyledExt};
+use crate::foundation::{FocusRing, Ident, Pressable, Sizable, StyledExt, text as foundation_text};
 use crate::layout::measure;
 use crate::motion;
 
@@ -192,8 +194,6 @@ impl RenderOnce for Accordion {
                 .gap(px(theme.space(Space::Sm)))
                 .px(px(metrics.padding_x))
                 .py(px(theme.space(Space::Sm)))
-                .text_size(px(metrics.font_size))
-                .text_color(color)
                 .child(
                     icon(Icon::AltArrowRight)
                         .size(px(metrics.icon_size))
@@ -211,12 +211,16 @@ impl RenderOnce for Accordion {
                         .column()
                         .flex_1()
                         .gap(px(2.0))
-                        .child(section.title.clone())
+                        .child(
+                            foundation_text(&theme, TypeScale::Label, section.title.clone())
+                                .text_size(px(metrics.font_size))
+                                .text_start(direction)
+                                .text_color(color),
+                        )
                         .children(section.description.clone().map(|description| {
-                            div()
-                                .type_scale(&theme, TypeScale::Caption)
-                                .text_color(theme.colors.text_muted)
-                                .child(description)
+                            foundation_text(&theme, TypeScale::Caption, description)
+                                .text_start(direction)
+                                .text_tone(&theme, TextTone::Muted)
                         })),
                 )
                 .when(section.disabled, |element| {
@@ -287,8 +291,6 @@ impl RenderOnce for Accordion {
                         + theme.space(Space::Sm)))
                     .pr(px(metrics.padding_x))
                     .pb(px(theme.space(Space::Sm)))
-                    .text_size(px(metrics.font_size))
-                    .text_color(theme.colors.text_muted)
                     .child(body);
                 let record = {
                     let measured = Rc::clone(&measured);

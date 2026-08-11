@@ -11,11 +11,11 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Space};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TypeScale};
 
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::stepping::bounded_step;
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable};
+use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, text};
 use crate::overlay::{Menu, MenuItem};
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -177,9 +177,11 @@ impl AnchorList {
             .flex()
             .items_center()
             .rounded(px(theme.radii.control))
-            .text_size(px(metrics.font_size))
-            .text_color(color)
-            .child(anchor.label.clone())
+            .child(
+                text(&theme, TypeScale::Label, anchor.label.clone())
+                    .text_size(px(metrics.font_size))
+                    .text_color(color),
+            )
             .when(active, |element| element.bg(theme.colors.selected))
             .when(disabled, |element| element.opacity(theme.opacity.disabled))
             .when(actionable, |element| {

@@ -17,10 +17,12 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TextTone, Theme, TypeScale};
 
 use crate::display::badge::Badge;
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
+use crate::foundation::{
+    Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text as foundation_text,
+};
 use crate::motion::{Flipping, flip};
 use crate::overlay::Tooltipped;
 
@@ -255,8 +257,6 @@ impl Sidebar {
             .pl(px(theme.space(Space::Sm) + indent))
             .pr(px(theme.space(Space::Sm)))
             .radius(theme, Radius::Control)
-            .text_size(px(metrics.font_size))
-            .text_color(color)
             .when(self.collapsed, |element| element.justify_center())
             .when(active, |element| element.bg(theme.colors.selected))
             .when(disabled, |element| element.opacity(theme.opacity.disabled))
@@ -277,7 +277,13 @@ impl Sidebar {
             )
             .when(!self.collapsed, |element| {
                 element
-                    .child(div().flex_1().overflow_hidden().child(item.label.clone()))
+                    .child(
+                        div().flex_1().overflow_hidden().child(
+                            foundation_text(theme, TypeScale::Label, item.label.clone())
+                                .text_size(px(metrics.font_size))
+                                .text_color(color),
+                        ),
+                    )
                     .children(item.badge.clone().map(|badge| Badge::new(badge).neutral()))
             })
             .when(actionable, |element| {
@@ -366,11 +372,9 @@ impl RenderOnce for Sidebar {
                 .clone()
                 .filter(|_| !self.collapsed)
                 .map(|title| {
-                    div()
+                    foundation_text(&theme, TypeScale::Caption, title.clone())
                         .px(px(theme.space(Space::Sm)))
-                        .type_scale(&theme, TypeScale::Caption)
-                        .text_color(theme.colors.text_faint)
-                        .child(title.clone())
+                        .text_tone(&theme, TextTone::Faint)
                         .semantic_in(
                             cx,
                             NodeSpec::new(section_ident.semantic_id(), Role::Heading)

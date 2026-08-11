@@ -17,12 +17,14 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TextTone, Theme, TypeScale};
 
 use crate::controls::button::Button;
 use crate::display::badge::Tone;
 use crate::foundation::stepping::bounded_step;
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
+use crate::foundation::{
+    Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text as foundation_text,
+};
 use crate::motion;
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -371,10 +373,8 @@ impl Wizard {
 
         let reason = step.status.reason().map(|reason| {
             let failed = matches!(step.status, StepStatus::Failed(_));
-            div()
-                .type_scale(theme, TypeScale::Caption)
+            foundation_text(theme, TypeScale::Caption, reason.clone())
                 .text_color(color)
-                .child(reason.clone())
                 .semantic_in(
                     cx,
                     NodeSpec::new(ident.child("reason").semantic_id(), Role::Status)
@@ -384,25 +384,23 @@ impl Wizard {
                 )
         });
 
-        let text = div()
+        let text_element = div()
             .column()
             .min_w_0()
             .gap(px(2.0))
             .child(
-                div()
-                    .type_scale(theme, TypeScale::Label)
-                    .text_color(if current {
-                        theme.colors.text
+                foundation_text(theme, TypeScale::Label, step.title.clone()).text_tone(
+                    theme,
+                    if current {
+                        TextTone::Primary
                     } else {
-                        theme.colors.text_muted
-                    })
-                    .child(step.title.clone()),
+                        TextTone::Muted
+                    },
+                ),
             )
             .children(step.description.clone().map(|description| {
-                div()
-                    .type_scale(theme, TypeScale::Caption)
-                    .text_color(theme.colors.text_faint)
-                    .child(description)
+                foundation_text(theme, TypeScale::Caption, description)
+                    .text_tone(theme, TextTone::Faint)
             }))
             .children(reason);
 
@@ -426,7 +424,7 @@ impl Wizard {
                     .focus_ring(theme)
             })
             .child(marker)
-            .child(text);
+            .child(text_element);
 
         if let (true, Some(handler)) = (actionable, self.handler()) {
             let id = step.id.clone();

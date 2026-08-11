@@ -30,12 +30,12 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlMetrics, ControlSize, Space, Theme};
+use gpui_kit_theme::{ActiveTheme, ControlMetrics, ControlSize, Space, Theme, TypeScale};
 
 use crate::display::badge::Badge;
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::stepping::bounded_step;
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
 use crate::interaction::dnd::{
     self, DragItem, DropAxis, DropIntent, DropPosition, MakingWay, RowTarget, SurfaceDrag,
 };
@@ -506,6 +506,7 @@ impl Tabs {
         let carried = drag.is_some_and(|drag| drag.carries(&tab.id));
         let landing = drag.and_then(|drag| drag.indicator_for(&tab.id));
         let ident = self.ident.child(tab.id.as_ref());
+        let hover_group = ident.child("hover").semantic_id();
         let color = if disabled {
             theme.colors.text_faint
         } else if selected {
@@ -516,6 +517,7 @@ impl Tabs {
 
         let mut element = div()
             .id(ident.element_id())
+            .group(hover_group.clone())
             .flex_none()
             .column()
             .child(
@@ -524,13 +526,20 @@ impl Tabs {
                     .h(px(metrics.height))
                     .px(px(metrics.padding_x))
                     .gap(px(metrics.gap))
-                    .text_size(px(metrics.font_size))
-                    .text_color(color)
                     .children(
                         tab.icon
                             .map(|glyph| icon(glyph).size(px(metrics.icon_size)).text_color(color)),
                     )
-                    .child(tab.label.clone())
+                    .child(
+                        text(theme, TypeScale::Label, tab.label.clone())
+                            .text_size(px(metrics.font_size))
+                            .text_color(color)
+                            .when(actionable, |element| {
+                                element.group_hover(hover_group, |style| {
+                                    style.text_color(theme.colors.text)
+                                })
+                            }),
+                    )
                     .children(tab.badge.clone().map(|badge| Badge::new(badge).neutral()))
                     .children(self.save_mark(tab, &ident, theme, cx))
                     .children(self.close_control(tab, &ident, theme, metrics, cx)),
@@ -563,7 +572,6 @@ impl Tabs {
                     .cursor_pointer()
                     .tab_index(0)
                     .pressable(cx)
-                    .hover(|style| style.text_color(theme.colors.text))
                     .focus_ring(theme)
             });
 

@@ -16,11 +16,13 @@ use gpui::{
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TextTone, TypeScale};
 
 use crate::controls::button::{Button, ButtonVariant, IconButton};
 use crate::controls::select::Select;
-use crate::foundation::{Disableable, Ident, Selectable, Sizable, StyledExt};
+use crate::foundation::{
+    Disableable, Ident, Selectable, Sizable, StyledExt, text as foundation_text,
+};
 use crate::strings::{ActiveStrings, StringKey};
 
 type SelectHandler = Rc<dyn Fn(usize, &mut Window, &mut App)>;
@@ -258,7 +260,8 @@ impl RenderOnce for Pagination {
                 range = match slot {
                     PageSlot::Page(number) => {
                         let current = number == self.page;
-                        let mut button = Button::new(ident.child(format!("page-{number}")))
+                        let page_id = format!("page-{number}");
+                        let mut button = Button::new(ident.child(page_id))
                             .label(number.to_string())
                             .variant(if current {
                                 ButtonVariant::Secondary
@@ -274,13 +277,20 @@ impl RenderOnce for Pagination {
                         range.child(button)
                     }
                     PageSlot::Gap(from, to) => {
-                        let gap = ident.child(format!("gap-{from}-{to}"));
+                        let gap_id = format!("gap-{from}-{to}");
+                        let gap = ident.child(gap_id);
                         let hidden = to - from - 1;
                         range.child(
                             div()
                                 .px(px(theme.space(Space::Xs)))
-                                .text_color(theme.colors.text_faint)
-                                .child(SharedString::new_static("…"))
+                                .child(
+                                    foundation_text(
+                                        &theme,
+                                        TypeScale::Label,
+                                        SharedString::new_static("…"),
+                                    )
+                                    .text_tone(&theme, gpui_kit_theme::TextTone::Faint),
+                                )
                                 .semantic_in(
                                     cx,
                                     NodeSpec::new(gap.semantic_id(), Role::Text)
@@ -309,10 +319,8 @@ impl RenderOnce for Pagination {
                 strings.format(StringKey::PaginationPage, &[&self.page.to_string()])
             }
         };
-        let status = div()
-            .type_scale(&theme, TypeScale::Caption)
-            .text_color(theme.colors.text_muted)
-            .child(status_text.clone())
+        let status = foundation_text(&theme, TypeScale::Caption, status_text.clone())
+            .text_tone(&theme, TextTone::Muted)
             .semantic_in(
                 cx,
                 NodeSpec::new(ident.child("status").semantic_id(), Role::Text)

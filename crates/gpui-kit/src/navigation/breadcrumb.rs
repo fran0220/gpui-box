@@ -15,7 +15,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Space, TypeScale};
 
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
-use crate::foundation::{FocusRing, Ident, Pressable, StyledExt};
+use crate::foundation::{FocusRing, Ident, Pressable, StyledExt, text as foundation_text};
 use crate::strings::{ActiveStrings, StringKey};
 
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
@@ -138,8 +138,7 @@ impl RenderOnce for Breadcrumb {
         let mut trail = div()
             .row_reading(cx.layout_direction())
             .flex_wrap()
-            .gap(px(theme.space(Space::Xs)))
-            .type_scale(&theme, TypeScale::Label);
+            .gap(px(theme.space(Space::Xs)));
         let mut placed = 0;
 
         for crumb in head.iter().chain(tail.iter()) {
@@ -165,23 +164,30 @@ impl Breadcrumb {
     fn crumb_element(&self, crumb: &Crumb, current: bool, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let ident = self.ident.child(crumb.id.as_ref());
+        let hover_group = ident.child("hover").semantic_id();
         let actionable = !current && self.on_select.is_some();
 
         let mut element = div()
             .id(ident.element_id())
+            .group(hover_group.clone())
             .flex_none()
-            .text_color(if current {
-                theme.colors.text
-            } else {
-                theme.colors.text_muted
-            })
-            .child(crumb.label.clone())
+            .child(
+                foundation_text(&theme, TypeScale::Label, crumb.label.clone())
+                    .text_color(if current {
+                        theme.colors.text
+                    } else {
+                        theme.colors.text_muted
+                    })
+                    .when(actionable, |element| {
+                        element
+                            .group_hover(hover_group, |style| style.text_color(theme.colors.text))
+                    }),
+            )
             .when(actionable, |element| {
                 element
                     .cursor_pointer()
                     .tab_index(0)
                     .pressable(cx)
-                    .hover(|style| style.text_color(theme.colors.text))
                     .focus_ring(&theme)
             });
 
@@ -225,18 +231,25 @@ impl Breadcrumb {
                 .format(StringKey::BreadcrumbHiddenMany, &[&count.to_string()])
         };
         let actionable = self.on_reveal.is_some();
+        let hover_group = ident.child("hover").semantic_id();
 
         let mut element = div()
             .id(ident.element_id())
+            .group(hover_group.clone())
             .flex_none()
-            .text_color(theme.colors.text_muted)
-            .child(SharedString::from("…"))
+            .child(
+                foundation_text(&theme, TypeScale::Label, SharedString::from("…"))
+                    .text_tone(&theme, gpui_kit_theme::TextTone::Muted)
+                    .when(actionable, |element| {
+                        element
+                            .group_hover(hover_group, |style| style.text_color(theme.colors.text))
+                    }),
+            )
             .when(actionable, |element| {
                 element
                     .cursor_pointer()
                     .tab_index(0)
                     .pressable(cx)
-                    .hover(|style| style.text_color(theme.colors.text))
                     .focus_ring(&theme)
             });
 
@@ -267,8 +280,8 @@ impl Breadcrumb {
 }
 
 fn separator(theme: &gpui_kit_theme::Theme) -> impl IntoElement {
-    div()
-        .flex_none()
-        .text_color(theme.colors.text_faint)
-        .child(SharedString::from("/"))
+    div().flex_none().child(
+        foundation_text(theme, TypeScale::Label, SharedString::from("/"))
+            .text_tone(theme, gpui_kit_theme::TextTone::Faint),
+    )
 }
