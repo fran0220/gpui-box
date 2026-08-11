@@ -2403,6 +2403,7 @@ dependencies = [
  "wasm-bindgen",
  "web-time",
  "windows 0.61.3",
+ "windows-capture",
  "zed-font-kit",
  "zed-scap",
 ]
@@ -6991,9 +6992,9 @@ dependencies = [
 
 [[package]]
 name = "windows-capture"
-version = "1.5.0"
+version = "1.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a4df73e95feddb9ec1a7e9c2ca6323b8c97d5eeeff78d28f1eccdf19c882b24"
+checksum = "757c9e7b920233fec91cb314ad92b96853ba2907e3482a193d290d33838e3fc5"
 dependencies = [
  "parking_lot",
  "rayon",

@@ -22,6 +22,9 @@ Git-linked Cargo dependency. The bootstrap includes native surfaces, offscreen
 WGPU, browser WebGPU/WebGL2 rendering and input, AccessKit projection, bounded
 backdrop blur, pointer exit/capture, and first-prepaint tracked scrolling.
 `wgpu` and `gpu-allocator` resolve from crates.io, not integration forks.
+The workspace retains the pinned bootstrap's complete `windows` feature
+authority. Its crates.io `zed-scap` substitute constrains `windows-capture` to
+the compatible 1.4.4 API instead of restoring Zed's Cargo Git patch.
 
 The committed receipt records bootstrap/vendor tip
 `c036e5bcb472b7c557c231a66d69e646285d1942`, official cursor

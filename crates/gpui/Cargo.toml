@@ -37,6 +37,7 @@ x11 = [
 ]
 screen-capture = [
     "scap",
+    "dep:windows-capture",
 ]
 windows-manifest = ["dep:embed-resource"]
 input-latency-histogram = ["dep:hdrhistogram"]
@@ -144,6 +145,9 @@ scap = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { workspace = true, features = ["Win32_Foundation", "Win32_System_Power"] }
+# zed-scap 0.0.8-zed accepts newer 1.x releases whose API it cannot compile
+# against. Keep its Windows backend on the latest compatible registry release.
+windows-capture = { workspace = true, optional = true }
 
 
 [dev-dependencies]
