@@ -13,13 +13,15 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Space};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TypeScale};
 
 use crate::controls::field::{FieldState, field_shell};
 use crate::controls::input::{TextInput, TextInputEvent};
 use crate::controls::select::SelectOption;
 use crate::display::empty::{EmptyKind, EmptyState};
-use crate::foundation::{Disableable, Ident, Pressable, Sizable, StyledExt};
+use crate::foundation::{
+    Disableable, Ident, Pressable, Sizable, StyledExt, text as foundation_text,
+};
 use crate::motion;
 use crate::overlay::popover::{self, MenuKey};
 use crate::strings::{ActiveStrings, StringKey};
@@ -454,9 +456,11 @@ impl Combobox {
         let selected = self.selected.as_ref() == Some(&option.id);
         let active = highlighted == Some(index);
         let ident = self.ident.child(option.id.as_ref());
+        let hover_group = ident.child("hover").semantic_id();
 
         let row = popover::menu_row(&theme, selected, active)
             .id(ident.element_id())
+            .group(hover_group.clone())
             .when(!option.disabled, |element| {
                 element.cursor_pointer().pressable(cx)
             })
@@ -467,13 +471,17 @@ impl Combobox {
                 div()
                     .column()
                     .gap(px(2.0))
-                    .child(option.label.clone())
+                    .child(popover::menu_label(
+                        &theme,
+                        option.label.clone(),
+                        selected,
+                        active,
+                        hover_group,
+                    ))
                     .when_some(option.description.clone(), |element, description| {
                         element.child(
-                            div()
-                                .text_size(px(theme.typography.caption.size))
-                                .text_color(theme.colors.text_muted)
-                                .child(description),
+                            foundation_text(&theme, TypeScale::Caption, description)
+                                .text_tone(&theme, gpui_kit_theme::TextTone::Muted),
                         )
                     }),
             )

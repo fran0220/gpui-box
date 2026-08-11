@@ -7,9 +7,11 @@ use gpui::{
     Styled, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Space};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TypeScale};
 
-use crate::foundation::{Disableable, FocusRing, Ident, Sizable};
+use crate::foundation::{
+    Disableable, FocusRing, Ident, Sizable, StyledExt, text as foundation_text,
+};
 use crate::layout::measure;
 use crate::motion::{self, keyed};
 
@@ -280,11 +282,16 @@ impl RenderOnce for Slider {
                         .flex()
                         .flex_row()
                         .justify_between()
-                        .text_size(px(metrics.font_size))
-                        .text_color(theme.colors.text_muted)
-                        .child(label)
+                        .child(
+                            foundation_text(&theme, TypeScale::Label, label)
+                                .text_size(px(metrics.font_size))
+                                .text_tone(&theme, gpui_kit_theme::TextTone::Muted),
+                        )
                         .when_some(self.display.clone(), |element, display| {
-                            element.child(div().text_color(theme.colors.text).child(display))
+                            element.child(
+                                foundation_text(&theme, TypeScale::Label, display)
+                                    .text_size(px(metrics.font_size)),
+                            )
                         }),
                 )
             })

@@ -15,10 +15,10 @@ use gpui::{
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Space, Theme};
+use gpui_kit_theme::{ActiveTheme, Elevation, Space, TextTone, Theme, TypeScale};
 
 use crate::controls::button::Button;
-use crate::foundation::{Ident, StyledExt};
+use crate::foundation::{Ident, StyledExt, text};
 use crate::overlay::focus::FocusTrap;
 use crate::overlay::layer::{Overlay, Placement, surface};
 
@@ -180,7 +180,6 @@ pub fn card(theme: &Theme) -> gpui::Div {
         .p(px(theme.spacing.xs))
         .overflow_hidden()
         .bg(theme.colors.overlay)
-        .text_size(px(theme.typography.body.size))
         .text_color(theme.colors.text)
 }
 
@@ -297,12 +296,6 @@ pub fn menu_row(theme: &Theme, selected: bool, highlighted: bool) -> gpui::Div {
         .px(px(theme.spacing.sm))
         .py(px(6.0))
         .rounded(px(theme.radii.control))
-        .text_size(px(theme.typography.body.size))
-        .text_color(if selected || highlighted {
-            theme.colors.text
-        } else {
-            theme.colors.text_muted
-        })
         .when(selected, |element| {
             element
                 .bg(theme.colors.selected)
@@ -312,7 +305,27 @@ pub fn menu_row(theme: &Theme, selected: bool, highlighted: bool) -> gpui::Div {
             element.bg(theme.colors.hover)
         })
         .when(!selected && !highlighted, |element| {
-            element.hover(|style| style.bg(theme.colors.hover).text_color(theme.colors.text))
+            element.hover(|style| style.bg(theme.colors.hover))
+        })
+}
+
+/// A menu row's visible label, including the foreground transition for a
+/// pointer anywhere over the row rather than only over the glyphs themselves.
+pub fn menu_label(
+    theme: &Theme,
+    label: impl Into<SharedString>,
+    selected: bool,
+    highlighted: bool,
+    hover_group: SharedString,
+) -> gpui::Div {
+    text(theme, TypeScale::Label, label)
+        .text_color(if selected || highlighted {
+            theme.colors.text
+        } else {
+            theme.colors.text_muted
+        })
+        .when(!selected && !highlighted, |element| {
+            element.group_hover(hover_group, |style| style.text_color(theme.colors.text))
         })
 }
 
@@ -322,10 +335,14 @@ pub fn heading(theme: &Theme, label: &str) -> gpui::Div {
         .px(px(theme.spacing.sm))
         .pb(px(theme.spacing.xs))
         .pt(px(6.0))
-        .text_size(px(10.0))
-        .font_weight(gpui::FontWeight::MEDIUM)
-        .text_color(theme.colors.text_muted.opacity(0.6))
-        .child(SharedString::from(tracked_upper(label)))
+        .child(
+            text(
+                theme,
+                TypeScale::Caption,
+                SharedString::from(tracked_upper(label)),
+            )
+            .text_color(theme.colors.text_muted.opacity(0.6)),
+        )
 }
 
 /// The hairline between two groups of menu rows.
@@ -347,10 +364,7 @@ pub fn key_cap(theme: &Theme, label: impl Into<SharedString>) -> gpui::Div {
         .items_center()
         .justify_center()
         .bg(theme.colors.hover.opacity(0.38))
-        .font_family(theme.typography.mono.clone())
-        .text_size(px(theme.typography.caption.size))
-        .text_color(theme.colors.text_muted)
-        .child(label.into())
+        .child(text(theme, TypeScale::Code, label.into()).text_tone(theme, TextTone::Muted))
 }
 
 /// The surface a modal draws itself on.
@@ -368,21 +382,14 @@ pub fn dialog_card(theme: &Theme) -> gpui::Div {
 
 /// The one question a modal is asking.
 pub fn dialog_title(theme: &Theme, title: impl Into<SharedString>) -> gpui::Div {
-    div()
-        .text_size(px(15.0))
-        .font_weight(gpui::FontWeight::SEMIBOLD)
-        .text_color(theme.colors.text)
-        .child(title.into())
+    text(theme, TypeScale::Title, title.into())
 }
 
 /// The detail under a modal's question.
 pub fn dialog_body(theme: &Theme, body: impl Into<SharedString>) -> gpui::Div {
-    div()
+    text(theme, TypeScale::Body, body.into())
         .mt(px(theme.spacing.sm))
-        .text_size(px(theme.typography.body.size))
-        .line_height(px(theme.typography.body.line_height))
-        .text_color(theme.colors.text_muted)
-        .child(body.into())
+        .text_tone(theme, TextTone::Muted)
 }
 
 /// Lays a trigger out with the slot an anchored overlay hangs from.

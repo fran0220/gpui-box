@@ -12,14 +12,14 @@ use gpui::{
     prelude::FluentBuilder as _, px,
 };
 use gpui_kit_assets::Icon;
-use gpui_kit_theme::{ActiveTheme, ControlSize};
+use gpui_kit_theme::{ActiveTheme, ControlSize, TypeScale};
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::controls::button::Button;
 use crate::controls::field::{FieldState, field_shell};
 use crate::controls::input::{TextInput, TextInputEvent};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
-use crate::foundation::{Disableable, Ident, Sizable};
+use crate::foundation::{Disableable, Ident, Sizable, text as foundation_text};
 use crate::strings::{ActiveStrings, StringKey};
 
 const DEFAULT_CODE_SLOTS: usize = 6;
@@ -574,7 +574,11 @@ impl Render for OneTimeCodeInput {
                 })
                 .when(selected, |slot| slot.bg(theme.colors.selected))
                 .when(active, |slot| slot.bg(theme.colors.hover))
-                .child(if index < length { "•" } else { "" })
+                .child(foundation_text(
+                    &theme,
+                    TypeScale::Label,
+                    if index < length { "•" } else { "" },
+                ))
         });
 
         field_shell(

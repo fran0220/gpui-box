@@ -17,7 +17,9 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TypeScale};
 use crate::controls::field::{FieldState, field_shell};
 use crate::controls::input::{TextInput, TextInputEvent};
 use crate::display::tag::Tag;
-use crate::foundation::{Disableable, Ident, Selectable, Sizable, StyledExt};
+use crate::foundation::{
+    Disableable, Ident, Selectable, Sizable, StyledExt, text as foundation_text,
+};
 use crate::strings::{ActiveStrings, StringKey};
 
 /// What a tag field reports. The owner decides what any of it means.
@@ -294,12 +296,12 @@ impl Render for TagInput {
         let tags = self
             .tags
             .iter()
-            .map(|value| {
-                let ident = self.ident.child(value.as_ref());
-                let removing = value.clone();
+            .map(|tag_value| {
+                let ident = self.ident.child(tag_value.as_ref());
+                let removing = tag_value.clone();
                 let control = control.clone();
-                Tag::new(ident, value.clone())
-                    .selected(self.targeted.as_ref() == Some(value))
+                Tag::new(ident, tag_value.clone())
+                    .selected(self.targeted.as_ref() == Some(tag_value))
                     .disabled(self.disabled)
                     .on_remove(move |_window, cx| {
                         control
@@ -344,10 +346,8 @@ impl Render for TagInput {
                 .child(div().flex_1().min_w(px(80.0)).child(self.field.clone())),
             )
             .children(self.refusal.clone().map(|refusal| {
-                div()
-                    .type_scale(&theme, TypeScale::Caption)
+                foundation_text(&theme, TypeScale::Caption, refusal.clone())
                     .text_color(theme.colors.danger)
-                    .child(refusal.clone())
                     .semantic_in(
                         cx,
                         NodeSpec::new(self.ident.child("refusal").semantic_id(), Role::Status)
@@ -358,16 +358,18 @@ impl Render for TagInput {
             }))
             .when(full && self.refusal.is_none(), |element| {
                 element.child(
-                    div()
-                        .type_scale(&theme, TypeScale::Caption)
-                        .text_color(theme.colors.text_muted)
-                        .child(cx.strings().format(
+                    foundation_text(
+                        &theme,
+                        TypeScale::Caption,
+                        cx.strings().format(
                             StringKey::TagInputUsed,
                             &[
                                 &count.to_string(),
                                 &self.max.unwrap_or_default().to_string(),
                             ],
-                        )),
+                        ),
+                    )
+                    .text_tone(&theme, gpui_kit_theme::TextTone::Muted),
                 )
             })
             .semantic_in(cx, spec)

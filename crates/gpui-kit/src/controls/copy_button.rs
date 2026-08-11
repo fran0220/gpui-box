@@ -46,7 +46,7 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TypeScale};
 use web_time::Instant;
 
 use crate::controls::button::{Button, ButtonVariant};
-use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
+use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text as foundation_text};
 use crate::strings::{ActiveStrings, StringKey};
 
 /// How long a confirmation stays before the button goes back to offering.
@@ -344,14 +344,12 @@ impl Render for CopyButton {
         };
         let status_ident = self.ident.child("status");
         let status = status.map(|(text, failed)| {
-            div()
-                .type_scale(&theme, TypeScale::Caption)
+            foundation_text(&theme, TypeScale::Caption, text.clone())
                 .text_color(if failed {
                     theme.colors.danger
                 } else {
                     theme.colors.text_muted
                 })
-                .child(text.clone())
                 .semantic_in(
                     cx,
                     NodeSpec::new(status_ident.semantic_id(), Role::Status)

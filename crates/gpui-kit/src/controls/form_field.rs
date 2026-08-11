@@ -11,7 +11,7 @@ use gpui::{
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Space, TypeScale};
 
-use crate::foundation::{Ident, StyledExt};
+use crate::foundation::{Ident, StyledExt, text as foundation_text};
 use crate::overlay::Kbd;
 
 /// A labelled control, with the secondary text a typist needs around it.
@@ -127,17 +127,13 @@ impl RenderOnce for FormField {
             label_spec = label_spec.labels(control);
         }
 
-        let label = div()
+        let label_element = foundation_text(&theme, TypeScale::Label, self.label.clone())
             .row()
             .gap_token(&theme, Space::Xs)
-            .type_scale(&theme, TypeScale::Label)
-            .text_color(theme.colors.text)
-            .child(self.label.clone())
             .when(self.required, |element| {
                 element.child(
-                    div()
-                        .text_color(theme.colors.danger)
-                        .child(SharedString::from("*")),
+                    foundation_text(&theme, TypeScale::Label, SharedString::from("*"))
+                        .text_color(theme.colors.danger),
                 )
             })
             .when_some(self.hint.clone(), |element, keystroke| {
@@ -150,10 +146,8 @@ impl RenderOnce for FormField {
             .semantic_in(cx, label_spec);
 
         let description = description.map(|text| {
-            div()
-                .type_scale(&theme, TypeScale::Caption)
-                .text_color(theme.colors.text_muted)
-                .child(text.clone())
+            foundation_text(&theme, TypeScale::Caption, text.clone())
+                .text_tone(&theme, gpui_kit_theme::TextTone::Muted)
                 .semantic_in(
                     cx,
                     NodeSpec::new(self.ident.child("description").semantic_id(), Role::Text)
@@ -163,10 +157,8 @@ impl RenderOnce for FormField {
         });
 
         let error = self.error.clone().map(|text| {
-            div()
-                .type_scale(&theme, TypeScale::Caption)
+            foundation_text(&theme, TypeScale::Caption, text.clone())
                 .text_color(theme.colors.danger)
-                .child(text.clone())
                 .semantic_in(
                     cx,
                     NodeSpec::new(self.ident.child("error").semantic_id(), Role::Status)
@@ -180,7 +172,7 @@ impl RenderOnce for FormField {
             .column()
             .w_full()
             .gap(px(theme.space(Space::Xs)))
-            .child(label)
+            .child(label_element)
             .children(self.children)
             .children(description)
             .children(error)

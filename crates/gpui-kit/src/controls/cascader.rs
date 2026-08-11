@@ -7,14 +7,14 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TypeScale};
 
 use crate::controls::button::{Button, ButtonVariant};
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::loading::PulseLoader;
 use crate::foundation::{
     ActiveDirection, DirectionalExt, Disableable, Ident, LayoutDirection, Pressable, Sizable,
-    StyledExt,
+    StyledExt, text as foundation_text,
 };
 use crate::overlay::{
     Placement,
@@ -418,6 +418,7 @@ impl Cascader {
         let theme = cx.theme().clone();
         let direction = cx.layout_direction();
         let ident = self.ident.child(option.id.as_ref());
+        let hover_group = ident.child("hover").semantic_id();
         let active = self.active.as_ref() == Some(&option.id);
         let expanded = self.open_path.contains(&option.id);
         let id = option.id.clone();
@@ -431,10 +432,17 @@ impl Cascader {
         }
         popover::menu_row(&theme, false, active)
             .id(ident.element_id())
+            .group(hover_group.clone())
             .row_reading(direction)
             .when(!option.disabled, |row| row.cursor_pointer().pressable(cx))
             .when(option.disabled, |row| row.opacity(theme.opacity.disabled))
-            .child(option.label.clone())
+            .child(popover::menu_label(
+                &theme,
+                option.label.clone(),
+                false,
+                active,
+                hover_group,
+            ))
             .when(option.children.is_some(), |row| {
                 row.child(div().flex_1()).child(
                     icon(if direction.is_rtl() {
@@ -631,12 +639,6 @@ impl Render for Cascader {
             .radius(&theme, Radius::Control)
             .well(&theme)
             .when(focused, |element| element.shadow(theme.focus_ring()))
-            .text_size(px(metrics.font_size))
-            .text_color(if self.disabled || selected.is_none() {
-                theme.colors.text_faint
-            } else {
-                theme.colors.text
-            })
             .when(self.disabled, |el| el.opacity(theme.opacity.disabled))
             .when(!self.disabled, |el| {
                 el.cursor_pointer().on_mouse_down(
@@ -650,7 +652,15 @@ impl Render for Cascader {
                     }),
                 )
             })
-            .child(label)
+            .child(
+                foundation_text(&theme, TypeScale::Label, label)
+                    .text_size(px(metrics.font_size))
+                    .text_color(if self.disabled || selected.is_none() {
+                        theme.colors.text_faint
+                    } else {
+                        theme.colors.text
+                    }),
+            )
             .child(
                 icon(Icon::AltArrowDown)
                     .size(px(metrics.icon_size * 0.9))

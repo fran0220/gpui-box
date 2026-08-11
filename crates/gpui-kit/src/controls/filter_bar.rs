@@ -17,7 +17,7 @@ use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
 use crate::controls::button::Button;
 use crate::display::badge::Tone;
 use crate::display::tag::Tag;
-use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
+use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text as foundation_text};
 use crate::strings::{ActiveStrings, StringKey};
 
 type RemoveHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
@@ -290,15 +290,13 @@ impl RenderOnce for FilterBar {
             .clone()
             .unwrap_or_else(|| cx.strings().text(StringKey::FilterBarResultsNoun));
         let count = self.count.sentence(&noun, cx).map(|sentence| {
-            div()
+            foundation_text(&theme, TypeScale::Caption, sentence.clone())
                 .flex_none()
-                .type_scale(&theme, TypeScale::Caption)
                 .text_color(match self.count {
                     ResultCount::Unavailable(_) => theme.colors.warning,
                     ResultCount::Counting => theme.colors.text_faint,
                     _ => theme.colors.text_muted,
                 })
-                .child(sentence.clone())
                 .semantic_in(
                     cx,
                     NodeSpec::new(count_ident.semantic_id(), Role::Status)
@@ -315,6 +313,7 @@ impl RenderOnce for FilterBar {
             .row()
             .w_full()
             .flex_wrap()
+            .items_center()
             .gap_token(&theme, Space::Sm)
             .px_token(&theme, Space::Sm)
             .py_token(&theme, Space::Xs)

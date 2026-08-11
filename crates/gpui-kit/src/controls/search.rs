@@ -21,7 +21,9 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Radius, Space, Surface
 
 use crate::controls::button::{Button, IconButton};
 use crate::controls::input::{TextInput, TextInputEvent};
-use crate::foundation::{Disableable, Ident, Selectable, Sizable, StyledExt};
+use crate::foundation::{
+    Disableable, Ident, Selectable, Sizable, StyledExt, text as foundation_text,
+};
 use crate::strings::{ActiveStrings, StringKey};
 
 /// How many hits the host says the query has.
@@ -347,15 +349,13 @@ impl Render for SearchField {
                 ),
             )
             .child(
-                div()
+                foundation_text(&theme, TypeScale::Caption, sentence.clone())
                     .flex_none()
-                    .type_scale(&theme, TypeScale::Caption)
                     .text_color(match self.count {
                         HitCount::Unavailable(_) => theme.colors.warning,
                         HitCount::Counting | HitCount::Unsearched => theme.colors.text_faint,
                         _ => theme.colors.text_muted,
                     })
-                    .child(sentence.clone())
                     .semantic_in(
                         cx,
                         NodeSpec::new(count_ident.semantic_id(), Role::Status)
@@ -575,16 +575,18 @@ impl Render for FindReplace {
 
         let uncountable = counted.is_none().then(|| {
             let ident = self.ident.child("replace-all.reason");
-            div()
-                .type_scale(&theme, TypeScale::Caption)
-                .text_color(theme.colors.text_faint)
-                .child(cx.strings().text(StringKey::ReplaceAllUncountable))
-                .semantic_in(
-                    cx,
-                    NodeSpec::new(ident.semantic_id(), Role::Text)
-                        .parent(self.ident.semantic_id())
-                        .text(cx.strings().text(StringKey::ReplaceAllUncountable)),
-                )
+            foundation_text(
+                &theme,
+                TypeScale::Caption,
+                cx.strings().text(StringKey::ReplaceAllUncountable),
+            )
+            .text_tone(&theme, gpui_kit_theme::TextTone::Faint)
+            .semantic_in(
+                cx,
+                NodeSpec::new(ident.semantic_id(), Role::Text)
+                    .parent(self.ident.semantic_id())
+                    .text(cx.strings().text(StringKey::ReplaceAllUncountable)),
+            )
         });
 
         div()

@@ -8,10 +8,10 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space};
+use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
 
 use crate::display::badge::Tone;
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Selectable, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Selectable, StyledExt, text};
 use crate::strings::{ActiveStrings, StringKey};
 
 type RemoveHandler = Rc<dyn Fn(&mut Window, &mut App)>;
@@ -137,12 +137,10 @@ impl RenderOnce for Tag {
             .when(self.selected, |element| {
                 element.shadow(theme.selected_ring())
             })
-            .text_size(px(theme.typography.caption.size))
-            .text_color(color)
             .when(self.disabled, |element| {
                 element.opacity(theme.opacity.disabled)
             })
-            .child(self.label.clone())
+            .child(text(&theme, TypeScale::Label, self.label.clone()).text_color(color))
             .children(remove)
             .semantic_in(
                 cx,

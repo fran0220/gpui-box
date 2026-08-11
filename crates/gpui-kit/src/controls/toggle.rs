@@ -11,9 +11,12 @@ use gpui::{
     SharedString, Styled, Window, div, point, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Theme};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Theme, TypeScale};
 
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Selectable, Sizable, StyledExt};
+use crate::foundation::{
+    Disableable, FocusRing, Ident, Pressable, Selectable, Sizable, StyledExt,
+    text as foundation_text,
+};
 use crate::motion::{self, Interpolate};
 
 type ToggleHandler = Rc<dyn Fn(bool, &mut Window, &mut App)>;
@@ -521,8 +524,6 @@ fn choice_row(
         .flex_row()
         .items_start()
         .gap(px(theme.space(gpui_kit_theme::Space::Sm)))
-        .text_size(px(font_size))
-        .text_color(text_color)
         .when(disabled, |element| element.opacity(theme.opacity.disabled))
         .when(actionable, |element| {
             element
@@ -533,17 +534,24 @@ fn choice_row(
         })
         .child(div().mt(px(1.0)).child(mark))
         .when_some(label, |element, label| {
-            element.child(div().flex().flex_col().gap(px(2.0)).child(label).when_some(
-                description,
-                |element, description| {
-                    element.child(
-                        div()
-                            .text_size(px(font_size * 0.9))
-                            .text_color(theme.colors.text_muted)
-                            .child(description),
+            element.child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(px(2.0))
+                    .child(
+                        foundation_text(theme, TypeScale::Label, label)
+                            .text_size(px(font_size))
+                            .text_color(text_color),
                     )
-                },
-            ))
+                    .when_some(description, |element, description| {
+                        element.child(
+                            foundation_text(theme, TypeScale::Caption, description)
+                                .text_size(px(font_size * 0.9))
+                                .text_tone(theme, gpui_kit_theme::TextTone::Muted),
+                        )
+                    }),
+            )
         });
 
     if let (true, Some(handler)) = (actionable, handler) {

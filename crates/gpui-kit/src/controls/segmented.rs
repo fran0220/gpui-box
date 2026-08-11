@@ -13,11 +13,13 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Surface};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Surface, TypeScale};
 
 use crate::foundation::direction::ActiveDirection;
 use crate::foundation::stepping::bounded_step;
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
+use crate::foundation::{
+    Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text as foundation_text,
+};
 use crate::motion::{Flipping, flip};
 
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
@@ -188,7 +190,15 @@ impl RenderOnce for SegmentedControl {
                 let selected = self.selected.as_ref() == Some(&segment.id);
                 let refused = self.disabled || segment.disabled;
                 let ident = self.ident.child(segment.id.as_ref());
+                let hover_group = ident.child("hover").semantic_id();
                 let id = segment.id.clone();
+                let label_color = if refused {
+                    theme.colors.text_faint
+                } else if selected {
+                    theme.colors.text
+                } else {
+                    theme.colors.text_muted
+                };
 
                 let fill = selected.then(|| {
                     div()
@@ -202,6 +212,7 @@ impl RenderOnce for SegmentedControl {
 
                 div()
                     .id(ident.element_id())
+                    .group(hover_group.clone())
                     .row()
                     .justify_center()
                     .flex_none()
@@ -210,29 +221,15 @@ impl RenderOnce for SegmentedControl {
                     .gap(px(metrics.gap))
                     .px(px(metrics.padding_x))
                     .radius(&theme, Radius::Control)
-                    .text_size(px(metrics.font_size))
-                    .text_color(if refused {
-                        theme.colors.text_faint
-                    } else if selected {
-                        theme.colors.text
-                    } else {
-                        theme.colors.text_muted
-                    })
                     .children(fill)
                     .when(segment.disabled, |element| {
                         element.opacity(theme.opacity.disabled)
                     })
                     .when(actionable && !segment.disabled, |element| {
-                        element
-                            .cursor_pointer()
-                            .pressable(cx)
-                            .when(!selected, |element| {
-                                element.hover(|style| style.text_color(theme.colors.text))
-                            })
-                            .on_click({
-                                let handler = self.on_select.clone().expect("checked above");
-                                move |_, window, cx| handler(id.clone(), window, cx)
-                            })
+                        element.cursor_pointer().pressable(cx).on_click({
+                            let handler = self.on_select.clone().expect("checked above");
+                            move |_, window, cx| handler(id.clone(), window, cx)
+                        })
                     })
                     .children(segment.icon.map(|glyph| {
                         icon(glyph)
@@ -243,7 +240,16 @@ impl RenderOnce for SegmentedControl {
                                 theme.colors.text_muted
                             })
                     }))
-                    .child(segment.label.clone())
+                    .child(
+                        foundation_text(&theme, TypeScale::Label, segment.label.clone())
+                            .text_size(px(metrics.font_size))
+                            .text_color(label_color)
+                            .when(!refused && !selected, |element| {
+                                element.group_hover(hover_group, |style| {
+                                    style.text_color(theme.colors.text)
+                                })
+                            }),
+                    )
                     .semantic_in(
                         cx,
                         NodeSpec::new(ident.semantic_id(), Role::Radio)

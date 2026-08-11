@@ -38,7 +38,9 @@ use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TypeScale};
 
-use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
+use crate::foundation::{
+    Disableable, FocusRing, Ident, Sizable, StyledExt, text as foundation_text,
+};
 use crate::overlay::Kbd;
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -286,7 +288,15 @@ impl Render for KeybindingRecorder {
                         .size(px(metrics.icon_size))
                         .text_color(theme.colors.accent),
                 )
-                .child(cx.strings().text(StringKey::KeybindingPrompt))
+                .child(
+                    foundation_text(
+                        &theme,
+                        TypeScale::Label,
+                        cx.strings().text(StringKey::KeybindingPrompt),
+                    )
+                    .text_size(px(metrics.font_size))
+                    .text_color(theme.colors.accent),
+                )
                 .into_any_element()
         } else {
             match self.binding.clone() {
@@ -295,9 +305,9 @@ impl Render for KeybindingRecorder {
                     .gap_token(&theme, Space::Xs)
                     .child(Kbd::new(binding).id(self.ident.child("keys")))
                     .into_any_element(),
-                None => div()
-                    .text_color(theme.colors.text_faint)
-                    .child(self.resolved_placeholder(cx))
+                None => foundation_text(&theme, TypeScale::Label, self.resolved_placeholder(cx))
+                    .text_size(px(metrics.font_size))
+                    .text_tone(&theme, gpui_kit_theme::TextTone::Faint)
                     .into_any_element(),
             }
         };
@@ -376,14 +386,15 @@ impl Render for KeybindingRecorder {
             div()
                 .row()
                 .gap_token(&theme, Space::Xs)
-                .type_scale(&theme, TypeScale::Caption)
-                .text_color(theme.colors.danger)
                 .child(
                     icon(Icon::Danger)
                         .size(px(11.0))
                         .text_color(theme.colors.danger),
                 )
-                .child(reason.clone())
+                .child(
+                    foundation_text(&theme, TypeScale::Caption, reason.clone())
+                        .text_color(theme.colors.danger),
+                )
                 .semantic_in(
                     cx,
                     NodeSpec::new(ident.semantic_id(), Role::Status)

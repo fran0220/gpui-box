@@ -12,9 +12,11 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TypeScale};
 
-use crate::foundation::{Disableable, Ident, Pressable, Sizable, StyledExt};
+use crate::foundation::{
+    Disableable, Ident, Pressable, Sizable, StyledExt, text as foundation_text,
+};
 use crate::motion;
 use crate::overlay::popover::{self, MenuKey};
 use crate::strings::{ActiveStrings, StringKey};
@@ -342,6 +344,7 @@ impl Select {
         let selected = self.selected.as_ref() == Some(&option.id);
         let active = self.active == Some(index);
         let ident = self.ident.child(option.id.as_ref());
+        let hover_group = ident.child("hover").semantic_id();
 
         let mut spec = NodeSpec::new(ident.semantic_id(), Role::Option)
             .parent(self.ident.child("menu").semantic_id())
@@ -354,6 +357,7 @@ impl Select {
 
         let row = popover::menu_row(&theme, selected, active)
             .id(ident.element_id())
+            .group(hover_group.clone())
             .when(!option.disabled, |element| {
                 element.cursor_pointer().pressable(cx)
             })
@@ -365,13 +369,17 @@ impl Select {
                     .flex()
                     .flex_col()
                     .gap(px(2.0))
-                    .child(option.label.clone())
+                    .child(popover::menu_label(
+                        &theme,
+                        option.label.clone(),
+                        selected,
+                        active,
+                        hover_group,
+                    ))
                     .when_some(option.description.clone(), |element, description| {
                         element.child(
-                            div()
-                                .text_size(px(theme.typography.caption.size))
-                                .text_color(theme.colors.text_muted)
-                                .child(description),
+                            foundation_text(&theme, TypeScale::Caption, description)
+                                .text_tone(&theme, gpui_kit_theme::TextTone::Muted),
                         )
                     }),
             )
@@ -465,12 +473,6 @@ impl Render for Select {
                 element.border_color(theme.colors.danger)
             })
             .when(focused, |element| element.shadow(theme.focus_ring()))
-            .text_size(px(metrics.font_size))
-            .text_color(if self.disabled || !has_choice {
-                theme.colors.text_faint
-            } else {
-                theme.colors.text
-            })
             .when(self.disabled, |element| {
                 element.opacity(theme.opacity.disabled)
             })
@@ -480,7 +482,15 @@ impl Render for Select {
                     cx.listener(|select, _, window, cx| select.toggle(window, cx)),
                 )
             })
-            .child(div().child(label))
+            .child(
+                foundation_text(&theme, TypeScale::Label, label)
+                    .text_size(px(metrics.font_size))
+                    .text_color(if self.disabled || !has_choice {
+                        theme.colors.text_faint
+                    } else {
+                        theme.colors.text
+                    }),
+            )
             .child(
                 // One glyph in both states: the menu itself shows whether the
                 // control is open, and a flipped arrow would say it twice.

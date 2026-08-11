@@ -9,7 +9,7 @@ use gpui_kit_theme::{ActiveTheme, Space, TypeScale};
 
 use crate::controls::button::Button;
 use crate::controls::keybinding_recorder::{KeybindingRecorder, KeybindingRecorderEvent};
-use crate::foundation::{Disableable, Ident, StyledExt};
+use crate::foundation::{Disableable, Ident, StyledExt, text as foundation_text};
 use crate::overlay::Kbd;
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -314,19 +314,19 @@ impl Render for KeymapEditor {
             .column()
             .gap_token(&theme, Space::Md)
             .child(
-                div()
-                    .type_scale(&theme, TypeScale::Caption)
-                    .text_color(theme.colors.text_muted)
-                    .child(
-                        cx.strings()
-                            .format(StringKey::KeymapResultCount, &[&count.to_string()]),
-                    )
-                    .semantic_in(
-                        cx,
-                        NodeSpec::new(self.ident.child("status").semantic_id(), Role::Status)
-                            .parent(root_id.clone())
-                            .value(count.to_string()),
-                    ),
+                foundation_text(
+                    &theme,
+                    TypeScale::Caption,
+                    cx.strings()
+                        .format(StringKey::KeymapResultCount, &[&count.to_string()]),
+                )
+                .text_tone(&theme, gpui_kit_theme::TextTone::Muted)
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(self.ident.child("status").semantic_id(), Role::Status)
+                        .parent(root_id.clone())
+                        .value(count.to_string()),
+                ),
             )
             .children(visible.into_iter().map(|command| {
                 let row = self.ident.child(command.id.as_ref());
@@ -383,7 +383,8 @@ impl Render for KeymapEditor {
                     }
                 }
                 let bindings = command.effective_bindings.iter().map(|binding| {
-                    let binding_id = row.child(format!("binding.{}", binding.id));
+                    let binding_suffix = format!("binding.{}", binding.id);
+                    let binding_id = row.child(binding_suffix);
                     let mut spec = NodeSpec::new(binding_id.semantic_id(), Role::Group)
                         .parent(row.semantic_id())
                         .value(binding.keystroke.clone());
@@ -408,9 +409,8 @@ impl Render for KeymapEditor {
                                 .min_w_0()
                                 .gap_token(&theme, Space::Sm)
                                 .children(binding.conflict.clone().map(|reason| {
-                                    div()
+                                    foundation_text(&theme, TypeScale::Body, reason.clone())
                                         .text_color(theme.colors.danger)
-                                        .child(reason.clone())
                                         .semantic_in(
                                             cx,
                                             NodeSpec::new(
@@ -423,9 +423,8 @@ impl Render for KeymapEditor {
                                         )
                                 }))
                                 .children(binding.provenance.clone().map(|provenance| {
-                                    div()
-                                        .text_color(theme.colors.text_muted)
-                                        .child(provenance.clone())
+                                    foundation_text(&theme, TypeScale::Body, provenance.clone())
+                                        .text_tone(&theme, gpui_kit_theme::TextTone::Muted)
                                         .semantic_in(
                                             cx,
                                             NodeSpec::new(
@@ -495,8 +494,15 @@ impl Render for KeymapEditor {
                             .child(
                                 div()
                                     .column()
-                                    .child(command.label.clone())
-                                    .children(command.context.clone()),
+                                    .child(foundation_text(
+                                        &theme,
+                                        TypeScale::Subtitle,
+                                        command.label.clone(),
+                                    ))
+                                    .children(command.context.clone().map(|context| {
+                                        foundation_text(&theme, TypeScale::Body, context)
+                                            .text_tone(&theme, gpui_kit_theme::TextTone::Muted)
+                                    })),
                             )
                             .child(actions),
                     )
@@ -505,12 +511,14 @@ impl Render for KeymapEditor {
                             .id(row.child("effective").element_id())
                             .column()
                             .gap_token(&theme, Space::Xs)
-                            .type_scale(&theme, TypeScale::Caption)
-                            .child(cx.strings().text(StringKey::KeymapEffective))
-                            .children(
-                                (command.effective_bindings.is_empty())
-                                    .then(|| div().child(effective_value.clone())),
-                            )
+                            .child(foundation_text(
+                                &theme,
+                                TypeScale::Label,
+                                cx.strings().text(StringKey::KeymapEffective),
+                            ))
+                            .children((command.effective_bindings.is_empty()).then(|| {
+                                foundation_text(&theme, TypeScale::Body, effective_value.clone())
+                            }))
                             .children(bindings)
                             .semantic_in(
                                 cx,
@@ -523,8 +531,13 @@ impl Render for KeymapEditor {
                         div()
                             .id(row.child("defaults").element_id())
                             .row()
+                            .items_center()
                             .gap_token(&theme, Space::Xs)
-                            .child(cx.strings().text(StringKey::KeymapDefaults))
+                            .child(foundation_text(
+                                &theme,
+                                TypeScale::Body,
+                                cx.strings().text(StringKey::KeymapDefaults),
+                            ))
                             .children(defaults)
                             .semantic_in(
                                 cx,
@@ -534,7 +547,7 @@ impl Render for KeymapEditor {
                             ),
                     )
                     .children(command.refusal.clone().map(|reason| {
-                        div().child(reason.clone()).semantic_in(
+                        foundation_text(&theme, TypeScale::Body, reason.clone()).semantic_in(
                             cx,
                             NodeSpec::new(row.child("refusal").semantic_id(), Role::Status)
                                 .parent(row.semantic_id())

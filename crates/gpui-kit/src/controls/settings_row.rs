@@ -16,7 +16,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, Theme, TypeScale};
 
 use crate::display::badge::Badge;
-use crate::foundation::{Ident, StyledExt};
+use crate::foundation::{Ident, StyledExt, text as foundation_text};
 use crate::strings::{ActiveStrings, StringKey};
 
 /// Why a row is showing its value instead of its control.
@@ -156,12 +156,9 @@ impl SettingsRow {
             .min_w_0()
             .gap(px(2.0))
             .child(
-                div()
+                foundation_text(theme, TypeScale::Label, self.label.clone())
                     .row()
                     .gap_token(theme, Space::Sm)
-                    .type_scale(theme, TypeScale::Label)
-                    .text_color(theme.colors.text)
-                    .child(self.label.clone())
                     .children(
                         self.badge
                             .clone()
@@ -169,10 +166,8 @@ impl SettingsRow {
                     ),
             )
             .children(self.description.clone().map(|description| {
-                div()
-                    .type_scale(theme, TypeScale::Caption)
-                    .text_color(theme.colors.text_muted)
-                    .child(description)
+                foundation_text(theme, TypeScale::Caption, description)
+                    .text_tone(theme, gpui_kit_theme::TextTone::Muted)
             }));
 
         // A withheld row shows what is set and who set it. The control never
@@ -184,23 +179,22 @@ impl SettingsRow {
                 .flex_none()
                 .gap(px(2.0))
                 .children(self.value.clone().map(|value| {
-                    div()
-                        .type_scale(theme, TypeScale::Label)
-                        .text_color(theme.colors.text_muted)
-                        .child(value)
+                    foundation_text(theme, TypeScale::Label, value)
+                        .text_tone(theme, gpui_kit_theme::TextTone::Muted)
                 }))
                 .child(
                     div()
                         .row()
                         .gap(px(theme.space(Space::Xs)))
-                        .type_scale(theme, TypeScale::Caption)
-                        .text_color(theme.colors.text_faint)
                         .child(
                             icon(withheld.glyph())
                                 .size(px(theme.control.xs.icon_size))
                                 .text_color(theme.colors.text_faint),
                         )
-                        .child(withheld.sentence(cx))
+                        .child(
+                            foundation_text(theme, TypeScale::Caption, withheld.sentence(cx))
+                                .text_tone(theme, gpui_kit_theme::TextTone::Faint),
+                        )
                         .semantic_in(
                             cx,
                             NodeSpec::new(ident.child("managed").semantic_id(), Role::Status)
@@ -214,10 +208,8 @@ impl SettingsRow {
             (None, None) => div()
                 .flex_none()
                 .children(self.value.clone().map(|value| {
-                    div()
-                        .type_scale(theme, TypeScale::Label)
-                        .text_color(theme.colors.text_muted)
-                        .child(value)
+                    foundation_text(theme, TypeScale::Label, value)
+                        .text_tone(theme, gpui_kit_theme::TextTone::Muted)
                 }))
                 .into_any_element(),
         };
@@ -331,17 +323,14 @@ impl RenderOnce for SettingsSection {
                     .flex_1()
                     .min_w_0()
                     .gap(px(2.0))
-                    .child(
-                        div()
-                            .type_scale(&theme, TypeScale::Label)
-                            .text_color(theme.colors.text)
-                            .child(self.title.clone()),
-                    )
+                    .child(foundation_text(
+                        &theme,
+                        TypeScale::Label,
+                        self.title.clone(),
+                    ))
                     .children(self.description.clone().map(|description| {
-                        div()
-                            .type_scale(&theme, TypeScale::Caption)
-                            .text_color(theme.colors.text_muted)
-                            .child(description)
+                        foundation_text(&theme, TypeScale::Caption, description)
+                            .text_tone(&theme, gpui_kit_theme::TextTone::Muted)
                     })),
             )
             .children(
@@ -356,14 +345,15 @@ impl RenderOnce for SettingsSection {
                 .row()
                 .w_full()
                 .gap_token(&theme, Space::Xs)
-                .type_scale(&theme, TypeScale::Caption)
-                .text_color(theme.colors.text_faint)
                 .child(
                     icon(Icon::Info)
                         .size(px(theme.control.xs.icon_size))
                         .text_color(theme.colors.text_faint),
                 )
-                .child(reason.clone())
+                .child(
+                    foundation_text(&theme, TypeScale::Caption, reason.clone())
+                        .text_tone(&theme, gpui_kit_theme::TextTone::Faint),
+                )
                 .semantic_in(
                     cx,
                     NodeSpec::new(ident.child("dimmed").semantic_id(), Role::Status)

@@ -41,7 +41,7 @@ use crate::display::badge::Tone;
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::progress::ProgressBar;
 use crate::display::status::StatusDot;
-use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
+use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text as foundation_text};
 use crate::strings::{ActiveStrings, StringKey};
 
 type FileHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
@@ -428,30 +428,28 @@ impl UploadList {
                             .w_full()
                             .gap_token(&theme, Space::Sm)
                             .child(
-                                div()
+                                foundation_text(&theme, TypeScale::Label, upload.name.clone())
                                     .flex_1()
-                                    .min_w_0()
-                                    .type_scale(&theme, TypeScale::Label)
-                                    .child(upload.name.clone()),
+                                    .min_w_0(),
                             )
                             .children(upload.size.clone().map(|size| {
-                                div()
+                                foundation_text(&theme, TypeScale::Caption, size)
                                     .flex_none()
-                                    .type_scale(&theme, TypeScale::Caption)
-                                    .text_color(theme.colors.text_faint)
-                                    .child(size)
+                                    .text_tone(&theme, gpui_kit_theme::TextTone::Faint)
                             })),
                     )
-                    .child(
-                        div()
-                            .type_scale(&theme, TypeScale::Caption)
-                            .text_color(match upload.state {
-                                UploadState::Failed { .. } => theme.colors.danger,
-                                UploadState::Refused { .. } => theme.colors.warning,
-                                _ => theme.colors.text_muted,
-                            })
-                            .child(wording.clone()),
-                    )
+                    .child(match upload.state {
+                        UploadState::Failed { .. } => {
+                            foundation_text(&theme, TypeScale::Caption, wording.clone())
+                                .text_color(theme.colors.danger)
+                        }
+                        UploadState::Refused { .. } => {
+                            foundation_text(&theme, TypeScale::Caption, wording.clone())
+                                .text_color(theme.colors.warning)
+                        }
+                        _ => foundation_text(&theme, TypeScale::Caption, wording.clone())
+                            .text_tone(&theme, gpui_kit_theme::TextTone::Muted),
+                    })
                     .children(bar),
             )
             .children(retry)

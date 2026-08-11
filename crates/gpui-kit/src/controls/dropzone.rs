@@ -20,7 +20,7 @@ use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
 
-use crate::foundation::{Disableable, Ident, StyledExt};
+use crate::foundation::{Disableable, Ident, StyledExt, text as foundation_text};
 use crate::interaction::dnd::{self, DragItem, FILE_KIND};
 use crate::layout::measure;
 use crate::strings::{ActiveStrings, StringKey};
@@ -212,26 +212,19 @@ impl RenderOnce for Dropzone {
             .when(self.disabled, |element| {
                 element.opacity(theme.opacity.disabled)
             })
-            .text_color(text)
             .children(self.icon.map(|glyph| {
                 icon(glyph)
                     .size(px(theme.control.md.icon_size))
                     .text_color(text)
             }))
-            .child(
-                div()
-                    .type_scale(&theme, TypeScale::Label)
-                    .child(message.clone()),
-            )
+            .child(foundation_text(&theme, TypeScale::Label, message.clone()).text_color(text))
             .children(
                 self.hint
                     .clone()
                     .filter(|_| state == DropzoneState::Idle)
                     .map(|hint| {
-                        div()
-                            .type_scale(&theme, TypeScale::Caption)
-                            .text_color(theme.colors.text_faint)
-                            .child(hint)
+                        foundation_text(&theme, TypeScale::Caption, hint)
+                            .text_tone(&theme, gpui_kit_theme::TextTone::Faint)
                     }),
             );
 

@@ -1,16 +1,19 @@
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, Div, FocusHandle, FontWeight, Hsla, InteractiveElement, IntoElement,
-    ParentElement, RenderOnce, SharedString, StatefulInteractiveElement, Styled, Window, div,
+    AnyElement, App, Div, FocusHandle, Hsla, InteractiveElement, IntoElement, ParentElement,
+    RenderOnce, SharedString, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlMetrics, ControlSize, Radius, Theme};
+use gpui_kit_theme::{ActiveTheme, ControlMetrics, ControlSize, Radius, Theme, TypeScale};
 
 use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Selectable, Sizable, StyledExt};
+use crate::foundation::{
+    Disableable, FocusRing, Ident, Pressable, Selectable, Sizable, StyledExt,
+    text as foundation_text,
+};
 
 /// How much weight an action carries. Primary is the one decision a local
 /// area is asking for; Danger is reserved for irreversible intent.
@@ -267,6 +270,7 @@ impl RenderOnce for Button {
         let inert = self.disabled || self.loading;
         let direction = cx.layout_direction();
         let actionable = self.actionable();
+        let hover_group = self.ident.child("hover").semantic_id();
 
         let mut content: Vec<AnyElement> = Vec::new();
         let glyph = self.glyph.map(|glyph| {
@@ -276,6 +280,16 @@ impl RenderOnce for Button {
                 .size(px(metrics.icon_size))
                 .flex_none()
                 .text_color(foreground(&theme, self.variant))
+                .when(!inert && self.variant == ButtonVariant::Ghost, |element| {
+                    element.group_hover(hover_group.clone(), |style| {
+                        style.text_color(theme.colors.text)
+                    })
+                })
+                .when(!inert && self.variant == ButtonVariant::Link, |element| {
+                    element.group_hover(hover_group.clone(), |style| {
+                        style.text_color(theme.colors.accent_strong)
+                    })
+                })
                 .into_any_element()
         });
         if let Some(glyph) = glyph {
@@ -285,7 +299,21 @@ impl RenderOnce for Button {
             }
         }
         if let Some(label) = self.label.clone() {
-            let label = div().flex_none().child(label).into_any_element();
+            let label = foundation_text(&theme, TypeScale::Label, label)
+                .text_size(px(metrics.font_size))
+                .text_color(foreground(&theme, self.variant))
+                .when(!inert && self.variant == ButtonVariant::Ghost, |element| {
+                    element.group_hover(hover_group.clone(), |style| {
+                        style.text_color(theme.colors.text)
+                    })
+                })
+                .when(!inert && self.variant == ButtonVariant::Link, |element| {
+                    element.group_hover(hover_group.clone(), |style| {
+                        style.text_color(theme.colors.accent_strong)
+                    })
+                })
+                .flex_none()
+                .into_any_element();
             match self.icon_position {
                 IconPosition::Leading => content.push(label),
                 IconPosition::Trailing => content.insert(0, label),
@@ -293,6 +321,7 @@ impl RenderOnce for Button {
         }
 
         let mut button = frame(&theme, self.variant, metrics, inert, direction)
+            .group(hover_group)
             .when(self.icon_only, |element| {
                 element.w(px(metrics.height)).px(px(0.0))
             })
@@ -416,37 +445,25 @@ fn frame(
         .radius(theme, Radius::Control)
         .border(px(theme.borders.hairline))
         .border_color(gpui::transparent_black())
-        .text_size(px(metrics.font_size))
-        .font_weight(FontWeight::MEDIUM)
         .when(inert, |element| element.opacity(theme.opacity.disabled));
 
     match variant {
         ButtonVariant::Primary => base
             .bg(theme.colors.text)
-            .text_color(theme.colors.text_on_accent)
             .when(!inert, |element| element.hover(|style| style.opacity(0.9))),
         ButtonVariant::Secondary => base
             .bg(theme.colors.raised)
             .border_color(theme.colors.hairline)
-            .text_color(theme.colors.text)
             .when(!inert, |element| {
                 element.hover(|style| style.bg(theme.colors.hover))
             }),
-        ButtonVariant::Ghost => base
-            .text_color(theme.colors.text_muted)
-            .when(!inert, |element| {
-                element.hover(|style| style.bg(theme.colors.hover).text_color(theme.colors.text))
-            }),
+        ButtonVariant::Ghost => base.when(!inert, |element| {
+            element.hover(|style| style.bg(theme.colors.hover))
+        }),
         ButtonVariant::Danger => base
             .bg(theme.colors.danger.opacity(0.8))
-            .text_color(gpui::white())
             .when(!inert, |element| element.hover(|style| style.opacity(0.9))),
-        ButtonVariant::Link => base
-            .px(px(0.0))
-            .text_color(theme.colors.accent)
-            .when(!inert, |element| {
-                element.hover(|style| style.text_color(theme.colors.accent_strong))
-            }),
+        ButtonVariant::Link => base.px(px(0.0)),
     }
 }
 

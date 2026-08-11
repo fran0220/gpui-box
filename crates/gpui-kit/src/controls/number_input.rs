@@ -18,7 +18,7 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, TypeScale};
 use crate::controls::button::IconButton;
 use crate::controls::field::{FieldState, field_shell};
 use crate::controls::input::{TextInput, TextInputEvent};
-use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
+use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text as foundation_text};
 use crate::strings::{ActiveStrings, StringKey};
 
 /// How much larger a page step is than a single step.
@@ -485,11 +485,9 @@ impl Render for NumberInput {
                 .child(div().flex_1().child(self.field.clone()))
                 .when_some(self.unit.clone(), |element, unit| {
                     element.child(
-                        div()
+                        foundation_text(&theme, TypeScale::Label, unit)
                             .flex_none()
-                            .type_scale(&theme, TypeScale::Caption)
-                            .text_color(theme.colors.text_muted)
-                            .child(unit),
+                            .text_tone(&theme, gpui_kit_theme::TextTone::Muted),
                     )
                 })
                 .child(div().flex_none().row().child(decrement).child(increment)),

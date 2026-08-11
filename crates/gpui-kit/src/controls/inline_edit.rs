@@ -27,7 +27,9 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TypeScale};
 
 use crate::controls::input::{self, TextInput};
 use crate::controls::textarea::{self, TextArea};
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
+use crate::foundation::{
+    Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text as foundation_text,
+};
 use crate::strings::{ActiveStrings, StringKey};
 
 type EditHandler = Rc<dyn Fn(&mut Window, &mut App)>;
@@ -265,10 +267,8 @@ impl RenderOnce for InlineEdit {
         }
 
         let failure = self.failure.clone().map(|reason| {
-            div()
-                .type_scale(&theme, TypeScale::Caption)
+            foundation_text(&theme, TypeScale::Body, reason.clone())
                 .text_color(theme.colors.danger)
-                .child(reason.clone())
                 .semantic_in(
                     cx,
                     NodeSpec::new(self.ident.child("failure").semantic_id(), Role::Status)
@@ -287,17 +287,23 @@ impl RenderOnce for InlineEdit {
                 .min_h(px(metrics.height))
                 .px(px(theme.space(Space::Xs)))
                 .radius(&theme, Radius::Control)
-                .text_size(px(metrics.font_size))
-                .text_color(if self.disabled || empty {
-                    theme.colors.text_faint
-                } else {
-                    theme.colors.text
-                })
-                .child(if empty {
-                    self.resolved_placeholder(cx)
-                } else {
-                    self.value.clone()
-                })
+                .child(
+                    foundation_text(
+                        &theme,
+                        TypeScale::Label,
+                        if empty {
+                            self.resolved_placeholder(cx)
+                        } else {
+                            self.value.clone()
+                        },
+                    )
+                    .text_size(px(metrics.font_size))
+                    .text_color(if self.disabled || empty {
+                        theme.colors.text_faint
+                    } else {
+                        theme.colors.text
+                    }),
+                )
                 .when(actionable, |element| {
                     element
                         .cursor_pointer()
