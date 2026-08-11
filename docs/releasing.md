@@ -146,6 +146,20 @@ approval, and auditable owners. These are crates.io/GitHub settings outside
 this repository; their presence must be checked, not assumed from this
 document.
 
+Immediately after the initial cohort is accepted, rerun `release.yml` from
+protected `main` with `execute=false` and
+`bootstrap_trusted_publishing=true`. That mode still requires every release
+gate. It verifies that all authority packages and their exact versions exist,
+that `fran0220` is an individual owner, and that each crate has either zero or
+exactly one matching GitHub publisher. It refuses conflicting or duplicate
+configurations because the crates.io create endpoint is not idempotent. It then
+uses the official action to exchange the `release.yml` OIDC identity for a
+short-lived token, enables trusted-publishing-only mode on every crate, and
+revokes the bootstrap token through crates.io's current-token endpoint. Only
+after that workflow succeeds, delete the now-invalid secret from the GitHub
+environment and any external secret stores. Later publication runs use
+`auth=oidc`; token authentication exists only for first-publication recovery.
+
 There is no crates.io baseline for the first version, so the release workflow
 explicitly skips semantic-version comparison only for `0.1.0`. Every later
 release runs pinned `cargo-semver-checks` against the latest applicable

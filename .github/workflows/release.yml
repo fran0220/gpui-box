@@ -18,6 +18,11 @@ on:
         default: token
         type: choice
         options: [token, oidc]
+      bootstrap_trusted_publishing:
+        description: Configure OIDC, enforce trusted-publishing-only, and revoke the bootstrap token
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -32,9 +37,14 @@ jobs:
     outputs:
       release_commit: ${{ steps.tag.outputs.release_commit }}
     steps:
-      - name: Require the protected publisher branch
-        if: ${{ inputs.execute }}
-        run: test "$GITHUB_REF" = refs/heads/main
+      - name: Require a valid protected-branch operation
+        if: ${{ inputs.execute || inputs.bootstrap_trusted_publishing }}
+        env:
+          EXECUTE: ${{ inputs.execute }}
+          BOOTSTRAP_TRUSTPUB: ${{ inputs.bootstrap_trusted_publishing }}
+        run: |
+          test "$GITHUB_REF" = refs/heads/main
+          test "$EXECUTE" != "$BOOTSTRAP_TRUSTPUB"
       - uses: actions/checkout@v5
         with: { ref: "v${{ inputs.version }}", fetch-depth: 0 }
       - name: Verify immutable tag and authority version
@@ -248,3 +258,38 @@ jobs:
           GPUI_BOX_PUBLISH: "1"
           GPUI_BOX_RELEASE_ROOT: ${{ github.workspace }}/release
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-io-auth.outputs.token }}
+
+  bootstrap-trusted-publishing:
+    if: ${{ inputs.bootstrap_trusted_publishing }}
+    needs: [preflight, native, headless, macos-full, web, semver]
+    runs-on: ubuntu-24.04
+    environment: crates-io
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+        with: { ref: "${{ github.sha }}", fetch-depth: 0 }
+      - name: Test trusted-publishing reconciliation
+        run: python3 -m unittest discover -s scripts/release/tests -v
+      - name: Require protected crates.io bootstrap token
+        run: test -n "$CARGO_REGISTRY_TOKEN"
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+      - name: Configure and verify every trusted publisher
+        run: python3 scripts/release/trusted_publishing.py configure
+        env:
+          GPUI_BOX_TRUSTPUB_BOOTSTRAP: "1"
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+      - id: crates-io-auth
+        name: Verify the release workflow OIDC identity
+        uses: rust-lang/crates-io-auth-action@v1
+      - name: Require an exchanged short-lived token
+        run: test -n "$CARGO_REGISTRY_TOKEN"
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-io-auth.outputs.token }}
+      - name: Enforce trusted publishing and revoke the bootstrap token
+        run: python3 scripts/release/trusted_publishing.py harden-and-revoke
+        env:
+          GPUI_BOX_TRUSTPUB_BOOTSTRAP: "1"
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}

@@ -16,6 +16,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: scripts/sync-zed/sync-zed verify --release
       - run: python3 -m unittest discover -s scripts/sync-zed/tests -v
+      - run: python3 -m unittest discover -s scripts/release/tests -v
       - run: cargo run -p xtask -- dependencies check
       - run: cargo run -p xtask -- gate
       - run: cargo doc --no-deps --workspace
