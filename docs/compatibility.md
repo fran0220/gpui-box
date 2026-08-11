@@ -11,9 +11,10 @@ and `gpui-box-kit` as `gpui_kit`. Zed crates must not be mixed into that graph.
 | `0.1.x` | filtered bootstrap `fran0220/zed@0b9c8dc932b65cba2dc87464148984e93f60ae18`; official baseline `a6a23c7b80a5cefa0487b7856335be89ace7e483` | 1.97, edition 2024 | unreleased release candidate |
 
 The SHAs identify imported source provenance, not Cargo Git dependencies.
-`scripts/sync-zed/state.json` currently has null vendor tip, cursor, and
-integration commit: filtered-sync history has not been bootstrapped. Do not
-describe the baseline as a completed sync cursor until that receipt changes.
+`scripts/sync-zed/state.json` records the deterministic filtered bootstrap tip,
+the official baseline cursor, and its exact integration merge. Release
+verification reconstructs those commits from the two upstream repositories and
+proves the receipt against the release commit's first-parent history.
 
 ## Platform evidence and limits
 
@@ -48,9 +49,9 @@ DOM, but the JSON semantic snapshot is only a testing/debug surface.
 ## Upstream update contract
 
 Zed is upstream input and a compatibility-validation object, not a dependency.
-To update it: verify `scripts/sync-zed/config.json`; bootstrap history first if
-the receipt remains null; sync an official full SHA; resolve conflicts
-manually; update the receipt and provenance; run `dependencies check`, package
-check, all claimed platform gates, and inspect changed images. Generally useful
-changes may still be proposed to Zed independently. GPUI Box remains an
-independent derivative and is not endorsed by Zed Industries.
+To update it: verify `scripts/sync-zed/config.json`; sync an official full SHA;
+resolve conflicts manually; update the receipt and provenance; run
+`dependencies check`, package check, all claimed platform gates, and inspect
+changed images. Generally useful changes may still be proposed to Zed
+independently. GPUI Box remains an independent derivative and is not endorsed
+by Zed Industries.

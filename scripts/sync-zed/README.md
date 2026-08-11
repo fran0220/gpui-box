@@ -75,19 +75,20 @@ replacing that message, then update the vendor ref, `state.json`, and the
 never invokes AI or automatically chooses a resolution. Dry runs do not change
 the worktree, refs, index, or object database.
 
-## Ownership boundary and initial bootstrap
+## Ownership boundary and bootstrap receipt
 
 Only mapped source subtrees are synchronized. Root manifests/package policy,
 GPUI Box package identities and dependency adaptation, local fonts, kit code,
-docs, snapshots, release policy, and visual baselines remain GPUI Box-owned.
-After this migration (including this directory and the imported sources) is
-committed and the worktree is clean, run:
+docs, snapshots, release policy, and visual baselines remain GPUI Box-owned. The
+initial bootstrap is committed: `state.json` names the deterministic vendor tip,
+official baseline cursor, and exact integration merge, and `verify --release`
+reconstructs and checks all three. To inspect the current receipt, run:
 
 ```sh
 scripts/sync-zed/sync-zed verify
-scripts/sync-zed/sync-zed bootstrap
+scripts/sync-zed/sync-zed verify --release
+scripts/sync-zed/sync-zed status
 ```
 
-Review the two local commits and vendor ref. Do not bootstrap in the current
-uncommitted migration: the truthful checked-in receipt therefore has null
-`vendor_tip`, `last_synced_sha`, and `integration_commit` fields.
+Do not run `bootstrap` again. Future updates use `sync` from a clean, committed
+worktree and preserve the existing append-only vendor ancestry.

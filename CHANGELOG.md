@@ -20,7 +20,8 @@ rather than linked as a Cargo Git dependency. The public identities are
 `gpui-box-kit`/`gpui-box-kit-*`, and `gpui-box-mcp`, with one GPUI type
 universe. A local-registry package gate validates registry-only framework and
 framework-plus-kit consumers, while `scripts/sync-zed` records the reproducible
-filtered update boundary; its committed history receipt remains unbootstrapped.
+filtered update boundary. Its committed bootstrap receipt is reproducible from
+the pinned fork and official source objects and is enforced by the release gate.
 
 **Undo history.** `navigation::UndoHistory` renders caller-owned revision
 entries and reports only the durable identity a typist asked to restore. The

@@ -23,11 +23,13 @@ WGPU, browser WebGPU/WebGL2 rendering and input, AccessKit projection, bounded
 backdrop blur, pointer exit/capture, and first-prepaint tracked scrolling.
 `wgpu` and `gpu-allocator` resolve from crates.io, not integration forks.
 
-The committed receipt truth is important: `vendor_tip`, `last_synced_sha`, and
-`integration_commit` are null. The filtered-sync history has not yet been
-bootstrapped, so the official baseline is not claimed as an advanced cursor.
-Once bootstrapped, future source movement follows `scripts/sync-zed/README.md`.
-License text: `licenses/ZED-APACHE-2.0.txt`.
+The committed receipt records bootstrap/vendor tip
+`c036e5bcb472b7c557c231a66d69e646285d1942`, official cursor
+`a6a23c7b80a5cefa0487b7856335be89ace7e483`, and integration merge
+`82fdda6a265e556afc65b9ff1eb200f7bda8d3fc`. Release verification reconstructs
+the filtered commits from remote source objects and proves that merge on the
+current first-parent history. Future source movement follows
+`scripts/sync-zed/README.md`. License text: `licenses/ZED-APACHE-2.0.txt`.
 
 Kit text-input code under `crates/gpui-kit/src/controls/input/` follows GPUI's
 `EntityInputHandler`, UTF-8/UTF-16 conversion, shaping, caret, and selection
