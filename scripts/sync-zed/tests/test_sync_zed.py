@@ -143,7 +143,7 @@ class UnitTests(unittest.TestCase):
 
     def test_filtered_noop(self):
         with tempfile.TemporaryDirectory() as directory:
-            subprocess.run(["git", "init", "-q", directory], check=True)
+            self.init_repo(directory)
             path = Path(directory) / "src"; path.mkdir(); (path / "a").write_text("same")
             subprocess.run(["git", "-C", directory, "add", "."], check=True)
             subprocess.run(["git", "-C", directory, "-c", "user.name=A", "-c", "user.email=a@b", "commit", "-m", "one"], check=True, stdout=subprocess.DEVNULL)
