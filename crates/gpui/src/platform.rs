@@ -1,6 +1,7 @@
 mod app_menu;
 mod keyboard;
 mod keystroke;
+mod platform_view;
 
 #[cfg(all(target_os = "linux", feature = "wayland"))]
 #[expect(missing_docs)]
@@ -89,6 +90,11 @@ use uuid::Uuid;
 pub use app_menu::*;
 pub use keyboard::*;
 pub use keystroke::*;
+pub(crate) use platform_view::PlatformViewRegistry;
+pub use platform_view::{
+    PlatformViewHandle, PlatformViewId, PlatformViewPlacement, PlatformViewUpdate,
+    flip_bounds_origin_y, snap_platform_view_bounds,
+};
 
 #[cfg(any(test, feature = "test-support"))]
 pub(crate) use test::*;
@@ -878,6 +884,13 @@ pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
     fn create_native_surface(&self) -> Result<Rc<dyn PlatformNativeSurface>> {
         anyhow::bail!("native surface portals are not supported on this platform")
     }
+    /// Attaches, repositions and detaches natively hosted views to match the
+    /// frame GPUI just drew.
+    ///
+    /// Called from the window's draw, which runs on the platform's UI thread, so
+    /// implementations may touch native view hierarchies directly. Platforms
+    /// without native view hosting ignore the update.
+    fn update_platform_views(&self, _update: &PlatformViewUpdate) {}
     fn completed_frame(&self) {}
     fn sprite_atlas(&self) -> Arc<dyn PlatformAtlas>;
     fn is_subpixel_rendering_supported(&self) -> bool;
