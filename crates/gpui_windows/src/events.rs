@@ -357,10 +357,18 @@ impl WindowsWindowInner {
     }
 
     fn handle_close_msg(&self) -> Option<isize> {
-        let mut callback = self.state.callbacks.should_close.take()?;
-        let should_close = callback();
-        self.state.callbacks.should_close.set(Some(callback));
-        if should_close { None } else { Some(0) }
+        let should_close = if let Some(mut callback) = self.state.callbacks.should_close.take() {
+            let should_close = callback();
+            self.state.callbacks.should_close.set(Some(callback));
+            should_close
+        } else {
+            true
+        };
+        if should_close && detach_all_platform_views(self) {
+            None
+        } else {
+            Some(0)
+        }
     }
 
     fn handle_destroy_msg(&self, handle: HWND) -> Option<isize> {

@@ -3201,7 +3201,7 @@ impl Window {
         // Native surfaces are composited after the root scene and before all
         // deferred/window-level overlays. Platform backends with layered scene
         // support use this boundary to render the remainder on a transparent
-        // surface above native children such as WebViews.
+        // surface above native children.
         self.next_frame.overlay_scene_start = self.next_frame.scene.len();
 
         self.paint_deferred_draws(cx);

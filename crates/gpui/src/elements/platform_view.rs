@@ -12,8 +12,8 @@ pub struct PlatformView {
     style: StyleRefinement,
 }
 
-/// Hosts a native platform view — on macOS an `NSView` such as a `WKWebView` —
-/// inside the window, at the bounds this element is laid out at.
+/// Hosts a native platform view — an `NSView` on macOS or a child `HWND` on
+/// Windows — inside the window, at the bounds this element is laid out at.
 ///
 /// The element itself paints nothing. Size it the way you would size any other
 /// element; GPUI owns the native view's frame from then on and repositions it
@@ -30,8 +30,8 @@ pub struct PlatformView {
 ///
 /// # Platforms
 ///
-/// Only macOS hosts native views today. Elsewhere the element still lays out and
-/// reserves space, and no view appears.
+/// macOS and Windows host native views. Elsewhere the element still lays out,
+/// reserves space, and does not host a view.
 pub fn platform_view(handle: PlatformViewHandle) -> PlatformView {
     PlatformView {
         handle,

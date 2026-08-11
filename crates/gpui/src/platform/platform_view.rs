@@ -1,7 +1,7 @@
 //! Hosting of native platform views inside GPUI windows.
 //!
 //! A [`PlatformViewHandle`] refers to a view owned by the operating system's
-//! toolkit — on macOS an `NSView`, such as a `WKWebView`. The
+//! toolkit — an `NSView` on macOS or a child `HWND` on Windows. The
 //! [`crate::platform_view`] element gives such a view a place in GPUI's layout;
 //! GPUI owns its frame from then on and the platform layer repositions it after
 //! each drawn frame.
@@ -113,17 +113,79 @@ mod handle {
     impl Eq for PlatformViewHandle {}
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "windows")]
+mod handle {
+    use super::PlatformViewId;
+    use std::fmt;
+    use windows::Win32::Foundation::HWND;
+
+    /// A non-owning reference to a child `HWND` hosted inside a GPUI window.
+    ///
+    /// Windows does not provide retain/release semantics for window handles.
+    /// Cloning this value retains the GPUI hosting reference, but the component
+    /// that created the `HWND` remains responsible for destroying it after it is
+    /// no longer hosted and all handles have been dropped.
+    #[derive(Clone)]
+    pub struct PlatformViewHandle {
+        hwnd: HWND,
+    }
+
+    impl PlatformViewHandle {
+        /// Wraps a child `HWND` so it can be hosted by a GPUI window.
+        ///
+        /// # Safety
+        ///
+        /// `hwnd` must be a non-null, live child window owned by the calling
+        /// process. It must remain valid, and must not be destroyed, for as long
+        /// as this handle or any clone is painted or retained by GPUI. The
+        /// caller remains responsible for destroying it on its owning thread.
+        pub unsafe fn from_hwnd(hwnd: HWND) -> Self {
+            assert!(
+                !hwnd.is_invalid(),
+                "PlatformViewHandle::from_hwnd requires a non-null HWND"
+            );
+            Self { hwnd }
+        }
+
+        /// Returns the hosted child `HWND` without transferring ownership.
+        pub fn as_hwnd(&self) -> HWND {
+            self.hwnd
+        }
+
+        /// Returns this view's stable identity.
+        pub fn id(&self) -> PlatformViewId {
+            PlatformViewId(self.hwnd.0 as usize)
+        }
+    }
+
+    impl fmt::Debug for PlatformViewHandle {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("PlatformViewHandle")
+                .field("id", &self.id())
+                .finish()
+        }
+    }
+
+    impl PartialEq for PlatformViewHandle {
+        fn eq(&self, other: &Self) -> bool {
+            self.id() == other.id()
+        }
+    }
+
+    impl Eq for PlatformViewHandle {}
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 mod handle {
     use super::PlatformViewId;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     /// An inert stand-in for a natively hosted view.
     ///
-    /// Only macOS hosts native views today. This stub exists so cross-platform
-    /// code that mentions [`PlatformViewHandle`] still compiles; painting the
-    /// [`crate::platform_view`] element with one reserves layout space and does
-    /// nothing else.
+    /// This stub exists so cross-platform code that mentions
+    /// [`PlatformViewHandle`] still compiles; it does not refer to or host a
+    /// native view. Painting the [`crate::platform_view`] element with one only
+    /// reserves layout space.
     #[derive(Clone, PartialEq, Eq, Debug)]
     pub struct PlatformViewHandle {
         id: PlatformViewId,
@@ -257,6 +319,7 @@ fn last_placement_indices(ids: &[PlatformViewId]) -> Vec<usize> {
             None => indices.push(index),
         }
     }
+    indices.sort_unstable();
     indices
 }
 
@@ -383,7 +446,7 @@ mod tests {
     fn platform_view_deduplication_keeps_the_last_paint_of_a_view() {
         let ids = [id(1), id(2), id(1), id(3)];
 
-        assert_eq!(last_placement_indices(&ids), vec![2, 1, 3]);
+        assert_eq!(last_placement_indices(&ids), vec![1, 2, 3]);
     }
 
     #[test]
@@ -423,6 +486,45 @@ mod tests {
         assert_eq!(update.detached, vec![id(1), id(2)]);
         assert!(registry.hosted.is_empty());
         assert!(registry.sync(&[], 2.0).is_none());
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    #[test]
+    fn platform_view_registry_retains_frame_placement_and_handle_identity() {
+        let mut registry = PlatformViewRegistry::default();
+        let handle = PlatformViewHandle::inert();
+        let placement = PlatformViewPlacement {
+            handle: handle.clone(),
+            bounds: Bounds {
+                origin: point(px(10.3), px(20.4)),
+                size: size(px(100.2), px(50.1)),
+            },
+        };
+
+        let update = registry
+            .sync(&[placement], 2.0)
+            .expect("painted views need an update");
+
+        assert_eq!(update.placements.len(), 1);
+        assert_eq!(update.placements[0].handle, handle);
+        assert_eq!(
+            update.placements[0].bounds.origin,
+            point(px(10.5), px(20.5))
+        );
+        assert_eq!(update.placements[0].bounds.size, size(px(100.), px(50.)));
+        assert!(update.detached.is_empty());
+
+        let detached = registry
+            .sync(&[], 2.0)
+            .expect("hosted views need a detach update");
+        assert_eq!(detached.detached, vec![handle.id()]);
+        let handle_id = handle.id();
+        #[expect(
+            clippy::redundant_clone,
+            reason = "this assertion covers clone identity"
+        )]
+        let cloned_handle = handle.clone();
+        assert_eq!(handle_id, cloned_handle.id());
     }
 
     #[test]

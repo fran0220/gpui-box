@@ -34,6 +34,12 @@ use gpui::*;
 
 pub(crate) struct WindowsWindow(pub Rc<WindowsWindowInner>);
 
+struct HostedPlatformView {
+    handle: PlatformViewHandle,
+    previous_parent: Option<HWND>,
+    previous_style: isize,
+}
+
 impl std::ops::Deref for WindowsWindow {
     type Target = WindowsWindowInner;
 
@@ -63,6 +69,7 @@ pub struct WindowsWindowState {
     pub direct_manipulation: DirectManipulationHandler,
 
     pub renderer: RefCell<DirectXRenderer>,
+    hosted_platform_views: RefCell<Vec<HostedPlatformView>>,
     /// Set when the next `draw_window` call must be treated as a forced
     /// render. Used after a GPU device-lost recovery, where the next frame
     /// must both re-enable drawing (via `mark_drawable`) and bypass the GPUI
@@ -173,6 +180,7 @@ impl WindowsWindowState {
             last_reported_capslock: Cell::new(last_reported_capslock),
             hovered: Cell::new(hovered),
             renderer: RefCell::new(renderer),
+            hosted_platform_views: RefCell::new(Vec::new()),
             force_render_pending: Cell::new(false),
             click_state,
             current_cursor: Cell::new(current_cursor),
@@ -592,8 +600,196 @@ impl rwh::HasDisplayHandle for WindowsWindow {
     }
 }
 
+fn attach_platform_view(
+    parent: HWND,
+    placement: &PlatformViewPlacement,
+    scale_factor: f32,
+) -> Result<HostedPlatformView> {
+    let hwnd = placement.handle.as_hwnd();
+    anyhow::ensure!(
+        unsafe { IsWindow(Some(hwnd)) }.as_bool(),
+        "platform view HWND is no longer valid"
+    );
+
+    let previous_style = unsafe { get_window_long(hwnd, GWL_STYLE) };
+    anyhow::ensure!(
+        previous_style & WS_CHILD.0 as isize != 0,
+        "platform view HWND must have the WS_CHILD style"
+    );
+    let previous_parent = unsafe { GetAncestor(hwnd, GA_PARENT) };
+    let previous_parent = (!previous_parent.is_invalid()).then_some(previous_parent);
+    let hosted = HostedPlatformView {
+        handle: placement.handle.clone(),
+        previous_parent,
+        previous_style,
+    };
+
+    let attach_result = (|| {
+        unsafe {
+            let _was_visible = ShowWindow(hwnd, SW_HIDE);
+            let hosted_style =
+                (previous_style | WS_CLIPSIBLINGS.0 as isize) & !(WS_VISIBLE.0 as isize);
+            set_window_long(hwnd, GWL_STYLE, hosted_style);
+            anyhow::ensure!(
+                get_window_long(hwnd, GWL_STYLE) == hosted_style,
+                "failed to apply platform view child-window style"
+            );
+            if GetAncestor(hwnd, GA_PARENT) != parent {
+                SetParent(hwnd, Some(parent)).context("failed to parent platform view HWND")?;
+            }
+        }
+        place_platform_view(&hosted, placement.bounds, scale_factor)
+    })();
+
+    if let Err(error) = attach_result {
+        rollback_platform_view(parent, &hosted).log_err();
+        return Err(error);
+    }
+
+    Ok(hosted)
+}
+
+fn place_platform_view(
+    hosted: &HostedPlatformView,
+    bounds: Bounds<Pixels>,
+    scale_factor: f32,
+) -> Result<()> {
+    let bounds = bounds.to_device_pixels(scale_factor);
+    unsafe {
+        SetWindowPos(
+            hosted.handle.as_hwnd(),
+            Some(HWND_TOP),
+            bounds.origin.x.0,
+            bounds.origin.y.0,
+            bounds.size.width.0.max(0),
+            bounds.size.height.0.max(0),
+            SWP_NOACTIVATE | SWP_NOCOPYBITS | SWP_SHOWWINDOW,
+        )
+        .context("failed to place platform view HWND")?;
+    }
+    Ok(())
+}
+
+fn detach_platform_view(parent: HWND, hosted: &HostedPlatformView) -> Result<()> {
+    let hwnd = hosted.handle.as_hwnd();
+    if !unsafe { IsWindow(Some(hwnd)) }.as_bool() {
+        return Ok(());
+    }
+
+    unsafe {
+        let _was_visible = ShowWindow(hwnd, SW_HIDE);
+        if GetAncestor(hwnd, GA_PARENT) == parent {
+            let previous_parent = hosted.previous_parent.filter(|previous_parent| {
+                *previous_parent != parent && IsWindow(Some(*previous_parent)).as_bool()
+            });
+            if let Err(error) = SetParent(hwnd, previous_parent) {
+                log::error!("failed to restore platform view parent: {error:#}");
+                SetParent(hwnd, None).context("failed to detach platform view HWND")?;
+            }
+        }
+        let detached_style = hosted.previous_style & !(WS_VISIBLE.0 as isize);
+        set_window_long(hwnd, GWL_STYLE, detached_style);
+        anyhow::ensure!(
+            get_window_long(hwnd, GWL_STYLE) == detached_style,
+            "failed to restore platform view child-window style"
+        );
+        let _was_visible = ShowWindow(hwnd, SW_HIDE);
+    }
+    Ok(())
+}
+
+fn rollback_platform_view(parent: HWND, hosted: &HostedPlatformView) -> Result<()> {
+    let hwnd = hosted.handle.as_hwnd();
+    if !unsafe { IsWindow(Some(hwnd)) }.as_bool() {
+        return Ok(());
+    }
+
+    unsafe {
+        if GetAncestor(hwnd, GA_PARENT) == parent {
+            SetParent(hwnd, hosted.previous_parent)
+                .context("failed to restore platform view parent after attach failure")?;
+        }
+        set_window_long(hwnd, GWL_STYLE, hosted.previous_style);
+        anyhow::ensure!(
+            get_window_long(hwnd, GWL_STYLE) == hosted.previous_style,
+            "failed to restore platform view style after attach failure"
+        );
+        let _was_visible = ShowWindow(
+            hwnd,
+            if hosted.previous_style & WS_VISIBLE.0 as isize != 0 {
+                SW_SHOWNA
+            } else {
+                SW_HIDE
+            },
+        );
+    }
+    Ok(())
+}
+
+fn platform_view_can_be_forgotten(parent: HWND, hosted: &HostedPlatformView) -> bool {
+    let hwnd = hosted.handle.as_hwnd();
+    !unsafe { IsWindow(Some(hwnd)) }.as_bool() || unsafe { GetAncestor(hwnd, GA_PARENT) } != parent
+}
+
+fn update_platform_views(window: &WindowsWindowInner, update: &PlatformViewUpdate) {
+    let parent = window.hwnd;
+    let mut hosted = window.state.hosted_platform_views.borrow_mut();
+
+    for detached in &update.detached {
+        let Some(index) = hosted
+            .iter()
+            .position(|hosted| hosted.handle.id() == *detached)
+        else {
+            continue;
+        };
+        let detach_result = detach_platform_view(parent, &hosted[index]);
+        if detach_result.is_ok() || platform_view_can_be_forgotten(parent, &hosted[index]) {
+            hosted.remove(index);
+        }
+        detach_result.log_err();
+    }
+
+    for placement in &update.placements {
+        let view = if let Some(index) = hosted
+            .iter()
+            .position(|hosted| hosted.handle.id() == placement.handle.id())
+        {
+            let view = hosted.remove(index);
+            place_platform_view(&view, placement.bounds, window.state.scale_factor.get()).log_err();
+            hosted.push(view);
+            continue;
+        } else {
+            attach_platform_view(parent, placement, window.state.scale_factor.get())
+        };
+
+        if let Some(view) = view.log_err() {
+            hosted.push(view);
+        }
+    }
+}
+
+pub(crate) fn detach_all_platform_views(window: &WindowsWindowInner) -> bool {
+    let mut hosted = window.state.hosted_platform_views.borrow_mut();
+    let mut index = 0;
+    while index < hosted.len() {
+        let detach_result = detach_platform_view(window.hwnd, &hosted[index]);
+        if detach_result.is_ok() || platform_view_can_be_forgotten(window.hwnd, &hosted[index]) {
+            hosted.remove(index);
+        } else {
+            index += 1;
+        }
+        detach_result.log_err();
+    }
+    hosted.is_empty()
+}
+
 impl Drop for WindowsWindow {
     fn drop(&mut self) {
+        if !detach_all_platform_views(&self.0) {
+            log::error!("refusing to destroy a window with attached borrowed platform views");
+            return;
+        }
+
         // clone this `Rc` to prevent early release of the pointer
         let this = self.0.clone();
         self.0
@@ -1010,6 +1206,10 @@ impl PlatformWindow for WindowsWindow {
 
     fn create_native_surface(&self) -> anyhow::Result<Rc<dyn PlatformNativeSurface>> {
         self.state.renderer.borrow_mut().create_native_surface()
+    }
+
+    fn update_platform_views(&self, update: &PlatformViewUpdate) {
+        update_platform_views(&self.0, update);
     }
 
     fn sprite_atlas(&self) -> Arc<dyn PlatformAtlas> {
@@ -1639,9 +1839,92 @@ fn set_non_rude_hwnd(hwnd: HWND, non_rude: bool) {
 
 #[cfg(test)]
 mod tests {
-    use super::ClickState;
-    use gpui::{DevicePixels, MouseButton, point};
+    use super::{ClickState, attach_platform_view, detach_platform_view};
+    use gpui::{
+        Bounds, DevicePixels, MouseButton, PlatformViewHandle, PlatformViewPlacement, point, px,
+        size,
+    };
     use std::time::Duration;
+    use windows::Win32::{
+        Foundation::{HWND, POINT, RECT, ScreenToClient},
+        UI::WindowsAndMessaging::{
+            CreateWindowExW, DestroyWindow, GA_PARENT, GWL_STYLE, GetAncestor, GetWindowLongPtrW,
+            GetWindowRect, IsWindow, WINDOW_EX_STYLE, WINDOW_STYLE, WS_CHILD, WS_CLIPSIBLINGS,
+            WS_VISIBLE,
+        },
+    };
+    use windows::core::w;
+
+    fn create_test_window(parent: Option<HWND>, style: WINDOW_STYLE) -> HWND {
+        unsafe {
+            CreateWindowExW(
+                WINDOW_EX_STYLE::default(),
+                w!("STATIC"),
+                None,
+                style,
+                0,
+                0,
+                10,
+                10,
+                parent,
+                None,
+                None,
+                None,
+            )
+            .expect("failed to create test HWND")
+        }
+    }
+
+    #[test]
+    fn platform_view_reparents_places_and_restores_child_hwnd() {
+        let original_parent = create_test_window(None, WINDOW_STYLE::default());
+        let host = create_test_window(None, WINDOW_STYLE::default());
+        let child = create_test_window(Some(original_parent), WS_CHILD | WS_VISIBLE);
+        let original_style = unsafe { GetWindowLongPtrW(child, GWL_STYLE) };
+        {
+            let handle = unsafe { PlatformViewHandle::from_hwnd(child) };
+            let placement = PlatformViewPlacement {
+                handle: handle.clone(),
+                bounds: Bounds {
+                    origin: point(px(10.), px(20.)),
+                    size: size(px(100.), px(50.)),
+                },
+            };
+
+            let hosted =
+                attach_platform_view(host, &placement, 2.).expect("failed to host child HWND");
+
+            assert_eq!(unsafe { GetAncestor(child, GA_PARENT) }, host);
+            let hosted_style = unsafe { GetWindowLongPtrW(child, GWL_STYLE) };
+            assert_ne!(hosted_style & WS_VISIBLE.0 as isize, 0);
+            assert_ne!(hosted_style & WS_CLIPSIBLINGS.0 as isize, 0);
+            let mut rect = RECT::default();
+            unsafe { GetWindowRect(child, &mut rect) }.expect("failed to read child bounds");
+            let mut origin = POINT {
+                x: rect.left,
+                y: rect.top,
+            };
+            unsafe { ScreenToClient(host, &mut origin) }
+                .ok()
+                .expect("failed to map child origin");
+            assert_eq!((origin.x, origin.y), (20, 40));
+            assert_eq!((rect.right - rect.left, rect.bottom - rect.top), (200, 100));
+
+            detach_platform_view(host, &hosted).expect("failed to detach child HWND");
+
+            assert_eq!(unsafe { GetAncestor(child, GA_PARENT) }, original_parent);
+            assert_eq!(
+                unsafe { GetWindowLongPtrW(child, GWL_STYLE) },
+                original_style & !(WS_VISIBLE.0 as isize)
+            );
+        }
+        assert!(unsafe { IsWindow(Some(child)) }.as_bool());
+
+        unsafe {
+            DestroyWindow(host).expect("failed to destroy host HWND");
+            DestroyWindow(original_parent).expect("failed to destroy original parent HWND");
+        }
+    }
 
     #[test]
     fn test_double_click_interval() {

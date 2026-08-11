@@ -1918,9 +1918,8 @@ impl PlatformWindow for MacWindow {
                 setLayerContentsRedrawPolicy: NSViewLayerContentsRedrawDuringViewResize
             ];
 
-            // wry has already inserted WKWebView by the time this API is called.
-            // Adding the overlay last places it above the WebView in AppKit's
-            // back-to-front subview order.
+            // Adding the overlay last places it above hosted native views in
+            // AppKit's back-to-front subview order.
             native_view.addSubview_(overlay_view.autorelease());
             this.overlay_view = NonNull::new(overlay_view);
             this.overlay_renderer = Some(overlay_renderer);
