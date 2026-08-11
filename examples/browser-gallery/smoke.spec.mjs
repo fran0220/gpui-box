@@ -82,9 +82,11 @@ test("password scene edits and reveals without weakening redaction", async ({ pa
   const password = await node(page, "scene.auth.sign-in.password");
   await pointer(page, "pointerdown", center(password), 1);
   await pointer(page, "pointerup", center(password), 0);
-  await page.keyboard.type("browser-password-needle");
+  const nativePassword = page.locator('[data-gpui-accessibility] input[aria-label="Password"]');
+  await nativePassword.fill("browser-password-needle");
   await expect.poll(async () => (await node(page, "scene.auth.sign-in.password")).value)
     .toBe("[REDACTED]");
+  await expect(nativePassword).toHaveValue("[REDACTED]");
   expect(JSON.stringify(await snapshot(page))).not.toContain("browser-password-needle");
   expect(await page.locator("[data-gpui-accessibility]").evaluate(element => element.outerHTML))
     .not.toContain("browser-password-needle");
