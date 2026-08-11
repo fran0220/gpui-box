@@ -63,11 +63,11 @@ use gpui::{
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{
-    ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, Theme, TypeScale,
+    ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TextTone, Theme, TypeScale,
 };
 
 use crate::data::viewport::scroll_handle;
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
 
 type SortHandler = Rc<dyn Fn(SharedString, SortDirection, &mut Window, &mut App)>;
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
@@ -162,9 +162,23 @@ impl Column {
 
 /// One cell's content, and whether it is an assertion target.
 pub struct Cell {
-    pub(crate) content: AnyElement,
+    pub(crate) content: CellContent,
     pub(crate) text: Option<SharedString>,
     pub(crate) published: bool,
+}
+
+pub(crate) enum CellContent {
+    Element(AnyElement),
+    Plain(SharedString),
+}
+
+impl CellContent {
+    pub(crate) fn into_element(self, theme: &Theme) -> AnyElement {
+        match self {
+            Self::Element(element) => element,
+            Self::Plain(value) => text(theme, TypeScale::Body, value).into_any_element(),
+        }
+    }
 }
 
 impl std::fmt::Debug for Cell {
@@ -180,7 +194,7 @@ impl std::fmt::Debug for Cell {
 impl Cell {
     pub fn new(content: impl IntoElement) -> Self {
         Self {
-            content: content.into_any_element(),
+            content: CellContent::Element(content.into_any_element()),
             text: None,
             published: false,
         }
@@ -202,7 +216,7 @@ impl Cell {
 impl From<SharedString> for Cell {
     fn from(value: SharedString) -> Self {
         Self {
-            content: value.clone().into_any_element(),
+            content: CellContent::Plain(value.clone()),
             text: Some(value),
             published: false,
         }
@@ -431,12 +445,11 @@ impl Table {
             .h(px(height))
             .px(px(theme.space(Space::Sm)))
             .gap(px(theme.space(Space::Sm)))
-            .surface(theme, Surface::Raised)
-            .type_scale(theme, TypeScale::Caption)
-            .text_color(theme.colors.text_muted);
+            .surface(theme, Surface::Raised);
 
         for column in &self.columns {
             let ident = self.ident.child("header").child(column.key.as_ref());
+            let hover_group = ident.child("hover").semantic_id();
             let direction = self
                 .sort
                 .as_ref()
@@ -447,23 +460,33 @@ impl Table {
             let content = div()
                 .row()
                 .gap(px(theme.space(Space::Xs)))
-                .child(column.header.clone())
+                .child(
+                    text(theme, TypeScale::Label, column.header.clone())
+                        .text_tone(theme, TextTone::Muted)
+                        .when(actionable, |element| {
+                            element.group_hover(hover_group.clone(), |style| {
+                                style.text_color(theme.colors.text)
+                            })
+                        }),
+                )
                 .children(direction.map(|direction| {
-                    div()
-                        .text_color(theme.colors.text)
-                        .child(SharedString::from(match direction {
+                    text(
+                        theme,
+                        TypeScale::Label,
+                        SharedString::from(match direction {
                             SortDirection::Ascending => "↑",
                             SortDirection::Descending => "↓",
-                        }))
+                        }),
+                    )
                 }));
 
             let mut cell = cell_frame(div().id(ident.element_id()), column, theme)
+                .group(hover_group)
                 .when(actionable, |element| {
                     element
                         .cursor_pointer()
                         .tab_index(0)
                         .pressable(cx)
-                        .hover(|style| style.text_color(theme.colors.text))
                         .focus_ring(theme)
                 })
                 .child(content);
@@ -548,7 +571,7 @@ impl Body {
             let text = cell.as_ref().and_then(|cell| cell.text.clone());
             let frame = cell_frame(div(), column, theme)
                 .overflow_hidden()
-                .children(cell.map(|cell| cell.content));
+                .children(cell.map(|cell| cell.content.into_element(theme)));
 
             let frame = if published {
                 let cell_ident = ident.child(column.key.as_ref());
@@ -661,7 +684,6 @@ impl RenderOnce for Table {
             .radius(&theme, Radius::Card)
             .frame(&theme, Surface::Panel, Elevation::Raised)
             .overflow_hidden()
-            .text_size(px(metrics.font_size))
             .child(header)
             .child(body)
             .semantic_in(

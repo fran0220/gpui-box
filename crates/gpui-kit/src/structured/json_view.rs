@@ -61,10 +61,10 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TextTone, Theme, TypeScale};
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
 use crate::strings::{ActiveStrings, StringKey};
 
 type ToggleHandler = Rc<dyn Fn(SharedString, bool, &mut Window, &mut App)>;
@@ -735,7 +735,6 @@ fn row_element(
             + line.level.saturating_sub(1) as f32
                 * theme.space(Space::Md)))
         .gap(px(theme.space(Space::Xs)))
-        .type_scale(theme, TypeScale::Code)
         .when(selected, |element| element.bg(theme.colors.selected))
         .when(view.disabled, |element| {
             element.opacity(theme.opacity.disabled)
@@ -757,17 +756,15 @@ fn row_element(
             element.child(div().flex_none().size(px(icon_size)))
         })
         .child(
-            div()
+            text(theme, TypeScale::Code, line.label.clone())
                 .flex_none()
-                .text_color(theme.colors.text_muted)
-                .child(line.label.clone()),
+                .text_tone(theme, TextTone::Muted),
         )
         .child(
-            div()
+            text(theme, TypeScale::Code, line.shown.clone())
                 .flex_1()
                 .overflow_hidden()
-                .text_color(value_color)
-                .child(line.shown.clone()),
+                .text_color(value_color),
         );
 
     // The mark says the value was kept back; the shape says how much was kept
@@ -778,10 +775,15 @@ fn row_element(
                 .flex_none()
                 .row()
                 .gap(px(theme.space(Space::Xs)))
-                .type_scale(theme, TypeScale::Caption)
-                .text_color(theme.colors.text_muted)
-                .child(cx.strings().text(StringKey::JsonWithheld))
-                .child(div().text_color(theme.colors.text_faint).child(shape)),
+                .child(
+                    text(
+                        theme,
+                        TypeScale::Caption,
+                        cx.strings().text(StringKey::JsonWithheld),
+                    )
+                    .text_tone(theme, TextTone::Muted),
+                )
+                .child(text(theme, TypeScale::Code, shape).text_tone(theme, TextTone::Faint)),
         );
     }
 

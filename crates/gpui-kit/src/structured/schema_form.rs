@@ -39,7 +39,7 @@ use gpui::{
     px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TextTone, TypeScale};
 
 use crate::controls::combobox::{Combobox, ComboboxEvent};
 use crate::controls::form_field::FormField;
@@ -50,7 +50,7 @@ use crate::controls::tag_input::{TagInput, TagInputEvent};
 use crate::controls::toggle::Switch;
 use crate::display::badge::Tone;
 use crate::display::status::Callout;
-use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
+use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text};
 use crate::strings::{ActiveStrings, StringKey};
 
 /// One option a closed or open choice offers.
@@ -857,18 +857,11 @@ impl SchemaForm {
                 .ml(indent)
                 .column()
                 .gap_token(&theme, Space::Xs)
-                .child(
-                    div()
-                        .type_scale(&theme, TypeScale::Label)
-                        .text_color(theme.colors.text)
-                        .child(field.label.clone()),
-                )
+                .child(text(&theme, TypeScale::Subtitle, field.label.clone()))
                 .when_some(field.description.clone(), |element, description| {
                     element.child(
-                        div()
-                            .type_scale(&theme, TypeScale::Caption)
-                            .text_color(theme.colors.text_muted)
-                            .child(description),
+                        text(&theme, TypeScale::Body, description)
+                            .text_tone(&theme, TextTone::Muted),
                     )
                 })
                 .semantic_in(

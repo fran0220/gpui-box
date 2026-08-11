@@ -40,12 +40,12 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Theme};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Theme, TypeScale};
 
 use crate::data::viewport::scroll_handle;
 use crate::display::icon::flips;
 use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
 use crate::interaction::dnd::{
     self, DragItem, DropAxis, DropIntent, DropPosition, MakingWay, RowTarget, SurfaceDrag,
 };
@@ -446,11 +446,7 @@ impl RenderOnce for Tree {
         let mut visible = Vec::new();
         flatten(&self.nodes, &self.expanded, 1, None, &mut visible);
 
-        let mut stack = div()
-            .id(self.ident.element_id())
-            .column()
-            .w_full()
-            .text_size(px(metrics.font_size));
+        let mut stack = div().id(self.ident.element_id()).column().w_full();
 
         // A tree that draws only its viewport can still be walked end to end,
         // because the keyboard moves over the flattened rows rather than over
@@ -712,7 +708,13 @@ impl Rows {
                 node.icon
                     .map(|glyph| icon(glyph).size(px(icon_size)).text_color(color)),
             )
-            .child(div().flex_1().overflow_hidden().child(node.label.clone()))
+            .child(
+                text(theme, TypeScale::Body, node.label.clone())
+                    .flex_1()
+                    .overflow_hidden()
+                    .text_start(direction)
+                    .text_color(color),
+            )
             .children(landing.map(|(position, accepted)| {
                 dnd::indicator(&position, accepted, DropAxis::Vertical, cx)
             }));

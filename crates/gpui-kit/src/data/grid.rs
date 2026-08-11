@@ -53,14 +53,14 @@ use gpui::{
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{
-    ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, Theme, TypeScale,
+    ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TextTone, Theme, TypeScale,
 };
 
 use crate::controls::input::{Cancel, Submit, TextInput};
 use crate::data::table::{Align, Cell, ColumnWidth, SortDirection};
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
 use crate::interaction::dnd::{
     self, DragItem, DropAxis, DropIntent, DropPosition, RowTarget, SurfaceDrag,
 };
@@ -834,7 +834,6 @@ impl RenderOnce for DataGrid {
             .radius(&theme, Radius::Card)
             .frame(&theme, Surface::Panel, Elevation::Raised)
             .overflow_hidden()
-            .text_size(px(metrics.font_size))
             .children(self.banner(&theme, cx))
             .child(header)
             .child(body);
@@ -876,14 +875,12 @@ impl DataGrid {
                     .colors
                     .danger
                     .opacity(theme.effects.selected_ring_alpha))
-                .type_scale(theme, TypeScale::Caption)
-                .text_color(theme.colors.text)
                 .child(
                     icon(Icon::Danger)
                         .size(px(theme.control.sm.icon_size))
                         .text_color(theme.colors.danger),
                 )
-                .child(failure.clone())
+                .child(text(theme, TypeScale::Body, failure.clone()))
                 .semantic_in(
                     cx,
                     NodeSpec::new(ident.semantic_id(), Role::Status)
@@ -993,8 +990,6 @@ impl DataGrid {
             .px_token(theme, Space::Sm)
             .gap_token(theme, Space::Sm)
             .surface(theme, Surface::Raised)
-            .type_scale(theme, TypeScale::Caption)
-            .text_color(theme.colors.text_muted)
             .when(self.hierarchy, |header| {
                 header.row_reading(cx.layout_direction())
             });
@@ -1113,6 +1108,7 @@ impl DataGrid {
         cx: &mut App,
     ) -> AnyElement {
         let ident = self.ident.child("header").child(column.key.as_ref());
+        let hover_group = ident.child("hover").semantic_id();
         let direction = self
             .sort
             .as_ref()
@@ -1136,17 +1132,28 @@ impl DataGrid {
             .row()
             .overflow_hidden()
             .gap_token(theme, Space::Xs)
-            .child(column.header.clone())
+            .child(
+                text(theme, TypeScale::Label, column.header.clone())
+                    .text_tone(theme, TextTone::Muted)
+                    .when(sortable, |element| {
+                        element.group_hover(hover_group.clone(), |style| {
+                            style.text_color(theme.colors.text)
+                        })
+                    }),
+            )
             .children(direction.map(|direction| {
-                div()
-                    .text_color(theme.colors.text)
-                    .child(SharedString::from(match direction {
+                text(
+                    theme,
+                    TypeScale::Label,
+                    SharedString::from(match direction {
                         SortDirection::Ascending => "↑",
                         SortDirection::Descending => "↓",
-                    }))
+                    }),
+                )
             }));
 
         let mut cell = column_frame(div().id(ident.element_id()), column, theme)
+            .group(hover_group)
             .relative()
             .when(carried, |element| element.opacity(theme.opacity.muted))
             .when(sortable, |element| {
@@ -1154,7 +1161,6 @@ impl DataGrid {
                     .cursor_pointer()
                     .tab_index(0)
                     .pressable(cx)
-                    .hover(|style| style.text_color(theme.colors.text))
                     .focus_ring(theme)
             })
             .child(
@@ -1941,7 +1947,7 @@ fn cell_element(
     let published =
         context.hierarchy || cell.as_ref().is_some_and(|cell| cell.published) || editable;
     let text = cell.as_ref().and_then(|cell| cell.text.clone());
-    let mut content = cell.map(|cell| cell.content);
+    let mut content = cell.map(|cell| cell.content.into_element(theme));
     if logical_start && context.hierarchy {
         let hierarchy = row.hierarchy.clone();
         let direction = cx.layout_direction();
@@ -2337,9 +2343,7 @@ impl RenderOnce for BulkBar {
             .radius(&theme, Radius::Control)
             .frame(&theme, Surface::Raised, Elevation::Raised)
             .opacity(progress)
-            .type_scale(&theme, TypeScale::Label)
-            .text_color(theme.colors.text)
-            .child(div().flex_none().child(label.clone()));
+            .child(text(&theme, TypeScale::Label, label.clone()).flex_none());
 
         if let Some((handler, total)) = wider {
             let ident = self.ident.child("select-all");
@@ -2349,11 +2353,15 @@ impl RenderOnce for BulkBar {
                     .flex_none()
                     .cursor_pointer()
                     .tab_index(0)
-                    .text_color(theme.colors.accent)
                     .focus_ring(&theme)
                     .child(
-                        cx.strings()
-                            .format(StringKey::GridSelectAllTotal, &[&total.to_string()]),
+                        text(
+                            &theme,
+                            TypeScale::Label,
+                            cx.strings()
+                                .format(StringKey::GridSelectAllTotal, &[&total.to_string()]),
+                        )
+                        .text_color(theme.colors.accent),
                     )
                     .on_click(move |_, window, cx| handler(window, cx))
                     .semantic_in(

@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 use gpui::{App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div, px};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Space};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TextTone, TypeScale};
 
 use crate::controls::button::Button;
 use crate::controls::filter_bar::{FilterBar, FilterCondition, ResultCount};
@@ -16,7 +16,7 @@ use crate::data::list::{List, ListItem};
 use crate::display::badge::{Badge, Tone};
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::loading::PulseLoader;
-use crate::foundation::{Disableable, Ident, Sizable};
+use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text};
 use crate::state::Loadable;
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -484,8 +484,19 @@ impl RenderOnce for DiagnosticsList {
                                     .flex()
                                     .flex_col()
                                     .flex_1()
-                                    .child(diagnostic.location.0.clone())
-                                    .child(diagnostic.message.clone()),
+                                    .child(
+                                        text(
+                                            cx.theme(),
+                                            TypeScale::Caption,
+                                            diagnostic.location.0.clone(),
+                                        )
+                                        .text_tone(cx.theme(), TextTone::Muted),
+                                    )
+                                    .child(text(
+                                        cx.theme(),
+                                        TypeScale::Body,
+                                        diagnostic.message.clone(),
+                                    )),
                             )
                             .child(
                                 div()
