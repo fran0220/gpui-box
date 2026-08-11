@@ -11,7 +11,7 @@
 //! bottom-left-origin coordinate systems live here so they can be unit tested
 //! without a window.
 
-use crate::{Bounds, Pixels, Point, point, px, util::round_to_device_pixel};
+use crate::{Bounds, DevicePixels, Pixels, Point, point, px, size, util::round_to_device_pixel};
 use std::fmt;
 
 /// The stable identity of a hosted platform view.
@@ -137,9 +137,12 @@ mod handle {
         /// # Safety
         ///
         /// `hwnd` must be a non-null, live child window owned by the calling
-        /// process. It must remain valid, and must not be destroyed, for as long
-        /// as this handle or any clone is painted or retained by GPUI. The
-        /// caller remains responsible for destroying it on its owning thread.
+        /// process, and must have been created on the thread that owns the GPUI
+        /// window hosting it — hosting reparents it, and reparenting across
+        /// threads would attach their input queues to each other. It must remain
+        /// valid, and must not be destroyed, for as long as this handle or any
+        /// clone is painted or retained by GPUI. The caller remains responsible
+        /// for destroying it on its owning thread.
         pub unsafe fn from_hwnd(hwnd: HWND) -> Self {
             assert!(
                 !hwnd.is_invalid(),
@@ -366,6 +369,181 @@ pub fn flip_bounds_origin_y(bounds: Bounds<Pixels>, container_height: Pixels) ->
     )
 }
 
+/// Converts window-space bounds into the physical-pixel rectangle a platform
+/// layer positions a native view at.
+///
+/// Win32 and the other window systems that address windows in physical pixels
+/// need this conversion; the size is clamped at zero so a degenerate layout
+/// cannot ask a native view for a negative extent.
+pub fn platform_view_physical_bounds(
+    bounds: Bounds<Pixels>,
+    scale_factor: f32,
+) -> Bounds<DevicePixels> {
+    let scale_factor = if scale_factor.is_finite() && scale_factor > 0.0 {
+        scale_factor
+    } else {
+        1.0
+    };
+
+    let left = (bounds.left().0 * scale_factor).round() as i32;
+    let top = (bounds.top().0 * scale_factor).round() as i32;
+    let right = ((bounds.right().0 * scale_factor).round() as i32).max(left);
+    let bottom = ((bounds.bottom().0 * scale_factor).round() as i32).max(top);
+
+    Bounds {
+        origin: point(DevicePixels(left), DevicePixels(top)),
+        size: size(DevicePixels(right - left), DevicePixels(bottom - top)),
+    }
+}
+
+/// The bookkeeping a platform layer needs while it hosts native views, kept
+/// apart from the native calls so attach, reposition, restack and detach
+/// sequencing can be tested without a window.
+///
+/// `A` carries whatever the platform layer captured at attach time and must put
+/// back verbatim at detach: on Windows the child window's parent, window styles
+/// and window region.
+pub struct PlatformViewHosting<A> {
+    /// Hosted views in the stacking order last applied, bottom-most first.
+    hosted: Vec<HostedView<A>>,
+}
+
+struct HostedView<A> {
+    id: PlatformViewId,
+    attributes: A,
+    geometry: Option<HostedGeometry>,
+}
+
+/// The frame last applied to a hosted view, remembered so unchanged frames cost
+/// no native calls.
+///
+/// The scale factor is part of the identity because a per-monitor DPI change
+/// leaves the logical bounds alone while moving the view's physical rectangle.
+#[derive(Clone, Copy, PartialEq)]
+struct HostedGeometry {
+    bounds: Bounds<DevicePixels>,
+    scale_factor: f32,
+}
+
+impl<A> Default for PlatformViewHosting<A> {
+    fn default() -> Self {
+        Self { hosted: Vec::new() }
+    }
+}
+
+impl<A> PlatformViewHosting<A> {
+    /// Returns true while no view is hosted.
+    pub fn is_empty(&self) -> bool {
+        self.hosted.is_empty()
+    }
+
+    /// Returns whether the given view is hosted.
+    pub fn contains(&self, id: PlatformViewId) -> bool {
+        self.hosted.iter().any(|hosted| hosted.id == id)
+    }
+
+    /// Records a view as hosted, stacked above every view hosted so far.
+    ///
+    /// Attaching a view that is already hosted replaces what has to be restored
+    /// for it and forgets its applied frame, so the next placement is applied
+    /// unconditionally.
+    pub fn attach(&mut self, id: PlatformViewId, attributes: A) {
+        self.hosted.retain(|hosted| hosted.id != id);
+        self.hosted.push(HostedView {
+            id,
+            attributes,
+            geometry: None,
+        });
+    }
+
+    /// Forgets a hosted view, returning what the platform layer must restore.
+    pub fn detach(&mut self, id: PlatformViewId) -> Option<A> {
+        let index = self.hosted.iter().position(|hosted| hosted.id == id)?;
+        Some(self.hosted.remove(index).attributes)
+    }
+
+    /// Forgets every hosted view, bottom-most first.
+    pub fn detach_all(&mut self) -> Vec<(PlatformViewId, A)> {
+        std::mem::take(&mut self.hosted)
+            .into_iter()
+            .map(|hosted| (hosted.id, hosted.attributes))
+            .collect()
+    }
+
+    /// Adopts `order` — bottom-most first — as the stacking order, returning
+    /// true when it differs from the order last applied and the platform layer
+    /// therefore has to restack.
+    ///
+    /// Ids that are not hosted are ignored, and hosted views the frame did not
+    /// mention keep their relative order beneath the ordered ones.
+    pub fn restack(&mut self, order: &[PlatformViewId]) -> bool {
+        let mut ordered: Vec<usize> = Vec::with_capacity(self.hosted.len());
+        for id in order {
+            match self.hosted.iter().position(|hosted| hosted.id == *id) {
+                Some(index) if !ordered.contains(&index) => ordered.push(index),
+                _ => {}
+            }
+        }
+        let mut target = (0..self.hosted.len())
+            .filter(|index| !ordered.contains(index))
+            .collect::<Vec<_>>();
+        target.extend(ordered);
+
+        if target.iter().copied().eq(0..self.hosted.len()) {
+            return false;
+        }
+
+        let mut source = self
+            .hosted
+            .drain(..)
+            .map(Some)
+            .collect::<Vec<Option<HostedView<A>>>>();
+        self.hosted = target
+            .into_iter()
+            .map(|index| {
+                source[index]
+                    .take()
+                    .expect("every index appears exactly once")
+            })
+            .collect();
+        true
+    }
+
+    /// Records the frame a hosted view was laid out at, returning the physical
+    /// rectangle to move it to, or `None` when it already sits there.
+    pub fn place(
+        &mut self,
+        id: PlatformViewId,
+        bounds: Bounds<Pixels>,
+        scale_factor: f32,
+    ) -> Option<Bounds<DevicePixels>> {
+        let hosted = self.hosted.iter_mut().find(|hosted| hosted.id == id)?;
+        let geometry = HostedGeometry {
+            bounds: platform_view_physical_bounds(bounds, scale_factor),
+            scale_factor,
+        };
+        if hosted.geometry == Some(geometry) {
+            return None;
+        }
+        hosted.geometry = Some(geometry);
+        Some(geometry.bounds)
+    }
+
+    /// Returns what the platform layer must restore for a hosted view.
+    pub fn attributes(&self, id: PlatformViewId) -> Option<&A> {
+        self.hosted
+            .iter()
+            .find(|hosted| hosted.id == id)
+            .map(|hosted| &hosted.attributes)
+    }
+
+    /// Returns the hosted views in the stacking order last applied, bottom-most
+    /// first.
+    pub fn ids(&self) -> Vec<PlatformViewId> {
+        self.hosted.iter().map(|hosted| hosted.id).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -526,6 +704,162 @@ mod tests {
         )]
         let cloned_handle = handle.clone();
         assert_eq!(handle_id, cloned_handle.id());
+    }
+
+    #[test]
+    fn platform_view_physical_bounds_scale_the_snapped_rectangle() {
+        let bounds = Bounds {
+            origin: point(px(10.5), px(20.5)),
+            size: size(px(100.0), px(50.0)),
+        };
+
+        let physical = platform_view_physical_bounds(bounds, 2.0);
+
+        assert_eq!(physical.origin, point(DevicePixels(21), DevicePixels(41)));
+        assert_eq!(physical.size, size(DevicePixels(200), DevicePixels(100)));
+    }
+
+    #[test]
+    fn platform_view_physical_bounds_follow_a_dpi_change() {
+        let bounds = Bounds {
+            origin: point(px(10.0), px(20.0)),
+            size: size(px(100.0), px(50.0)),
+        };
+
+        assert_ne!(
+            platform_view_physical_bounds(bounds, 1.0),
+            platform_view_physical_bounds(bounds, 1.5)
+        );
+        assert_eq!(
+            platform_view_physical_bounds(bounds, 1.5).origin,
+            point(DevicePixels(15), DevicePixels(30))
+        );
+    }
+
+    #[test]
+    fn platform_view_physical_bounds_never_go_negative() {
+        let inverted = Bounds {
+            origin: point(px(40.0), px(30.0)),
+            size: size(px(-30.0), px(-25.0)),
+        };
+
+        let physical = platform_view_physical_bounds(inverted, 2.0);
+
+        assert_eq!(physical.origin, point(DevicePixels(80), DevicePixels(60)));
+        assert_eq!(physical.size, size(DevicePixels(0), DevicePixels(0)));
+    }
+
+    #[test]
+    fn platform_view_physical_bounds_fall_back_to_an_unscaled_rectangle() {
+        let bounds = Bounds {
+            origin: point(px(10.0), px(20.0)),
+            size: size(px(30.0), px(40.0)),
+        };
+
+        assert_eq!(
+            platform_view_physical_bounds(bounds, 0.0),
+            platform_view_physical_bounds(bounds, 1.0)
+        );
+        assert_eq!(
+            platform_view_physical_bounds(bounds, f32::NAN),
+            platform_view_physical_bounds(bounds, 1.0)
+        );
+    }
+
+    #[test]
+    fn platform_view_hosting_records_what_detaching_must_restore() {
+        let mut hosting = PlatformViewHosting::<&'static str>::default();
+
+        assert!(hosting.is_empty());
+        hosting.attach(id(1), "before-1");
+        hosting.attach(id(2), "before-2");
+
+        assert!(hosting.contains(id(1)));
+        assert_eq!(hosting.attributes(id(2)), Some(&"before-2"));
+        assert_eq!(hosting.detach(id(1)), Some("before-1"));
+        assert!(!hosting.contains(id(1)));
+        assert_eq!(hosting.detach(id(1)), None);
+        assert_eq!(hosting.detach_all(), vec![(id(2), "before-2")]);
+        assert!(hosting.is_empty());
+    }
+
+    #[test]
+    fn platform_view_hosting_reattaching_replaces_the_restore_state() {
+        let mut hosting = PlatformViewHosting::<&'static str>::default();
+        hosting.attach(id(1), "stale");
+        hosting.place(id(1), Bounds::default(), 1.0);
+
+        hosting.attach(id(1), "fresh");
+
+        assert_eq!(hosting.ids(), vec![id(1)]);
+        assert_eq!(hosting.attributes(id(1)), Some(&"fresh"));
+        assert!(
+            hosting.place(id(1), Bounds::default(), 1.0).is_some(),
+            "a freshly attached view has no applied frame to skip"
+        );
+    }
+
+    #[test]
+    fn platform_view_hosting_moves_only_when_the_frame_changed() {
+        let mut hosting = PlatformViewHosting::<()>::default();
+        hosting.attach(id(1), ());
+        let bounds = Bounds {
+            origin: point(px(10.0), px(20.0)),
+            size: size(px(100.0), px(50.0)),
+        };
+
+        assert_eq!(
+            hosting.place(id(1), bounds, 2.0),
+            Some(platform_view_physical_bounds(bounds, 2.0))
+        );
+        assert_eq!(hosting.place(id(1), bounds, 2.0), None);
+        assert_eq!(
+            hosting.place(id(1), bounds, 1.5),
+            Some(platform_view_physical_bounds(bounds, 1.5)),
+            "a scale factor change must move the view even at unchanged logical bounds"
+        );
+        assert_eq!(hosting.place(id(2), bounds, 1.5), None);
+    }
+
+    #[test]
+    fn platform_view_hosting_restacks_into_paint_order() {
+        let mut hosting = PlatformViewHosting::<()>::default();
+        hosting.attach(id(1), ());
+        hosting.attach(id(2), ());
+        hosting.attach(id(3), ());
+
+        assert!(!hosting.restack(&[id(1), id(2), id(3)]));
+        assert!(hosting.restack(&[id(3), id(1), id(2)]));
+        assert_eq!(hosting.ids(), vec![id(3), id(1), id(2)]);
+        assert!(!hosting.restack(&[id(3), id(1), id(2)]));
+    }
+
+    #[test]
+    fn platform_view_hosting_restack_keeps_unmentioned_views_underneath() {
+        let mut hosting = PlatformViewHosting::<()>::default();
+        hosting.attach(id(1), ());
+        hosting.attach(id(2), ());
+        hosting.attach(id(3), ());
+
+        assert!(hosting.restack(&[id(9), id(1)]));
+
+        assert_eq!(hosting.ids(), vec![id(2), id(3), id(1)]);
+    }
+
+    #[test]
+    fn platform_view_hosting_restack_preserves_applied_frames() {
+        let mut hosting = PlatformViewHosting::<()>::default();
+        hosting.attach(id(1), ());
+        hosting.attach(id(2), ());
+        let bounds = Bounds {
+            origin: point(px(1.0), px(2.0)),
+            size: size(px(3.0), px(4.0)),
+        };
+        hosting.place(id(1), bounds, 1.0);
+
+        assert!(hosting.restack(&[id(2), id(1)]));
+
+        assert_eq!(hosting.place(id(1), bounds, 1.0), None);
     }
 
     #[test]

@@ -129,15 +129,11 @@ struct DirectComposition {
     // Keep these COM objects alive for the lifetime of the visual tree. They
     // are not otherwise read after the tree is attached to the target.
     #[allow(dead_code)]
-    base_target: IDCompositionTarget,
+    comp_target: IDCompositionTarget,
     #[allow(dead_code)]
-    overlay_target: IDCompositionTarget,
-    #[allow(dead_code)]
-    base_root_visual: IDCompositionVisual,
+    root_visual: IDCompositionVisual,
     base_visual: IDCompositionVisual,
     portal_container: IDCompositionVisual,
-    #[allow(dead_code)]
-    overlay_root_visual: IDCompositionVisual,
     overlay_visual: IDCompositionVisual,
 }
 
@@ -1065,34 +1061,26 @@ impl DirectXRenderPipelines {
 impl DirectComposition {
     pub fn new(dxgi_device: &IDXGIDevice, hwnd: HWND) -> Result<Self> {
         let comp_device = get_comp_device(dxgi_device)?;
-        let base_target = unsafe { comp_device.CreateTargetForHwnd(hwnd, false) }?;
-        let overlay_target = unsafe { comp_device.CreateTargetForHwnd(hwnd, true) }?;
-        let base_root_visual = unsafe { comp_device.CreateVisual() }?;
+        let comp_target = unsafe { comp_device.CreateTargetForHwnd(hwnd, true) }?;
+        let root_visual = unsafe { comp_device.CreateVisual() }?;
         let base_visual = unsafe { comp_device.CreateVisual() }?;
         let portal_container = unsafe { comp_device.CreateVisual() }?;
-        let overlay_root_visual = unsafe { comp_device.CreateVisual() }?;
         let overlay_visual = unsafe { comp_device.CreateVisual() }?;
 
         unsafe {
-            // Child HWNDs occupy the system layer between DirectComposition's
-            // non-topmost and topmost targets. Keeping GPUI's base and overlay
-            // scenes in separate targets lets native views sit between them.
-            base_root_visual.AddVisual(&base_visual, false, None)?;
-            base_root_visual.AddVisual(&portal_container, true, &base_visual)?;
-            overlay_root_visual.AddVisual(&overlay_visual, false, None)?;
-            base_target.SetRoot(&base_root_visual)?;
-            overlay_target.SetRoot(&overlay_root_visual)?;
+            root_visual.AddVisual(&base_visual, false, None)?;
+            root_visual.AddVisual(&portal_container, true, &base_visual)?;
+            root_visual.AddVisual(&overlay_visual, true, &portal_container)?;
+            comp_target.SetRoot(&root_visual)?;
             comp_device.Commit()?;
         }
 
         Ok(Self {
             comp_device,
-            base_target,
-            overlay_target,
-            base_root_visual,
+            comp_target,
+            root_visual,
             base_visual,
             portal_container,
-            overlay_root_visual,
             overlay_visual,
         })
     }
