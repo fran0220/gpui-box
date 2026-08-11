@@ -76,7 +76,7 @@ theming are this repository's own work, under the same Apache-2.0 terms.
 - Transport source: Comet revision P01
 - License: SIL Open Font License 1.1
 - Copyright: Copyright 2023 Vercel Inc.
-- Files: `crates/gpui-kit-assets/assets/fonts/*`
+- Files: `crates/gpui-kit-assets/assets/fonts/Geist*.ttf`
 
 The variable fonts and static Medium, SemiBold, and Bold faces are embedded so
 font weight remains correct on GPUI backends that do not apply variable-font
@@ -95,6 +95,29 @@ The OFL text is stored at `licenses/GEIST-OFL-1.1.txt`.
 
 Several product-neutral hand-drawn glyphs are Comet MIT material rather than
 Solar Icons; these are identified in the adjacent `assets/SOURCE.md`.
+
+## P05: Noto Sans Symbols, Noto Sans Symbols 2
+
+- Source: <https://github.com/notofonts/notofonts.github.io>
+- Revision: `c16b117609abbe4e60b3f2bd4433bdb3d0accb2e`
+- Versions: Noto Sans Symbols 2.003, Noto Sans Symbols 2 2.008
+- License: SIL Open Font License 1.1, no Reserved Font Name
+- Copyright: Copyright 2022 The Noto Project Authors
+- Files: `crates/gpui-kit-assets/assets/fonts/KeySymbols.ttf`
+
+A seven-glyph subset merged from both families, renamed to the family
+`GPUI Kit Key Symbols`, supplying the keyboard symbols `⌘ ⌃ ⌥ ⏎ ⌦ ⌫ ␣` that no
+Geist face draws. Before it existed those glyphs came from whatever font the
+host machine had installed, so the library could not draw its own keyboard
+shortcuts unaided and no visual baseline could record them.
+
+The rename is not required by the license, which declares no Reserved Font
+Name; it exists so the subset cannot shadow a full Noto family on a host that
+has one. The `hhea` and `OS/2` vertical metrics are copied from `Geist.ttf` so
+that a fallback glyph cannot change the line box of the run it appears in.
+`crates/gpui-kit-assets/assets/SOURCE.md` records the exact subset recipe.
+
+The OFL text is stored at `licenses/NOTO-OFL-1.1.txt`.
 
 ## What was deliberately not copied
 

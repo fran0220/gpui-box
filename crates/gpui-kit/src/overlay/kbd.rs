@@ -112,8 +112,13 @@ pub fn caps(keystroke: &str, macos: bool, strings: &Strings) -> Vec<SharedString
     }
 }
 
-/// The bundled faces carry none of the modifier symbols; the platform's own
-/// fallback draws them, which is why they are only ever reached under macOS.
+/// The symbol forms are only ever reached under macOS, where they are what a
+/// keyboard shortcut is expected to look like.
+///
+/// The Geist faces draw `⇧` and `⇥` but none of the others, so the asset crate
+/// bundles a small fallback face for the remainder. Leaving that to whatever
+/// font the host machine happened to install made this component's output
+/// depend on the machine rather than on the caller's data.
 fn modifier_label(modifier: &str, macos: bool, strings: &Strings) -> String {
     match (modifier, macos) {
         ("cmd" | "super" | "win", true) => "⌘".into(),

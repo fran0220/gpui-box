@@ -44,6 +44,21 @@ Scope: embedded variable fonts and static Medium/SemiBold/Bold faces under
 crates/gpui-kit-assets/assets/fonts.
 License text: licenses/GEIST-OFL-1.1.txt
 
+Noto Sans Symbols and Noto Sans Symbols 2
+--------------------------------------------------------------------------------
+Source: https://github.com/notofonts/notofonts.github.io
+Revision: c16b117609abbe4e60b3f2bd4433bdb3d0accb2e
+Versions: Noto Sans Symbols 2.003, Noto Sans Symbols 2 2.008
+License: SIL Open Font License 1.1, no Reserved Font Name
+Copyright 2022 The Noto Project Authors (https://github.com/notofonts/symbols)
+
+Scope: crates/gpui-kit-assets/assets/fonts/KeySymbols.ttf, a seven-glyph subset
+merged from both families and renamed to "GPUI Kit Key Symbols" so that it
+cannot shadow a full Noto family installed on the host. It supplies the
+keyboard symbols no Geist face draws. See
+crates/gpui-kit-assets/assets/SOURCE.md for the exact subset recipe.
+License text: licenses/NOTO-OFL-1.1.txt
+
 Solar Icons
 --------------------------------------------------------------------------------
 Source: Solar Icons, Linear weight, by 480 Design

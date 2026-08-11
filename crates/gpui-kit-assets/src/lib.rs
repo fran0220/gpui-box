@@ -143,14 +143,21 @@ static FONT_GEIST_MONO: &[u8] = include_bytes!("../assets/fonts/GeistMono.ttf");
 static FONT_GEIST_MEDIUM: &[u8] = include_bytes!("../assets/fonts/Geist-Medium.ttf");
 static FONT_GEIST_SEMIBOLD: &[u8] = include_bytes!("../assets/fonts/Geist-SemiBold.ttf");
 static FONT_GEIST_BOLD: &[u8] = include_bytes!("../assets/fonts/Geist-Bold.ttf");
+/// The seven keyboard symbols `Kbd` can emit that no Geist face draws.
+///
+/// Without it those glyphs render only where the platform happens to own a
+/// font that covers them, which made the library's own output depend on what
+/// the host machine had installed. See `assets/SOURCE.md`.
+static FONT_KEY_SYMBOLS: &[u8] = include_bytes!("../assets/fonts/KeySymbols.ttf");
 
-pub fn font_bytes() -> [&'static [u8]; 5] {
+pub fn font_bytes() -> [&'static [u8]; 6] {
     [
         FONT_GEIST,
         FONT_GEIST_MONO,
         FONT_GEIST_MEDIUM,
         FONT_GEIST_SEMIBOLD,
         FONT_GEIST_BOLD,
+        FONT_KEY_SYMBOLS,
     ]
 }
 
