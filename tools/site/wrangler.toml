@@ -16,9 +16,14 @@ compatibility_date = "2025-08-01"
 workers_dev = false
 preview_urls = false
 
-# Cloudflare owns DNS and certificate issuance for this hostname. Keeping the
-# site and MCP on one custom domain means the public contract remains `/` for
-# people and `/mcp` for agents without a second deployment to drift.
+# Cloudflare owns DNS and certificate issuance for both hostnames. One Worker
+# keeps `/` for people and `/mcp` for agents on the same catalog while the old
+# GPUI Kit hostname remains a compatibility alias rather than a deployment that
+# can drift.
+[[routes]]
+pattern = "gpui-box.origingame.dev"
+custom_domain = true
+
 [[routes]]
 pattern = "gpui-kit.origingame.dev"
 custom_domain = true

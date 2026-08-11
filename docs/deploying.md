@@ -1,9 +1,9 @@
 # Deploying the GPUI Box catalog
 
-The existing production catalog endpoint is
-<https://gpui-kit.origingame.dev>. The hostname is real current infrastructure;
-it has not been renamed and this document makes no DNS-migration claim. Pages
-and client labels should identify the product as **GPUI Box**.
+The production catalog endpoint is <https://gpui-box.origingame.dev>. The
+former <https://gpui-kit.origingame.dev> hostname remains a compatibility alias
+served by the same Worker, so existing clients continue to receive the exact
+same catalog and MCP implementation.
 
 ```bash
 tools/site/deploy.sh
@@ -18,7 +18,7 @@ for working-copy rendering.
 ```json
 {
   "mcpServers": {
-    "gpui-box": { "url": "https://gpui-kit.origingame.dev/mcp" }
+    "gpui-box": { "url": "https://gpui-box.origingame.dev/mcp" }
   }
 }
 ```
@@ -31,17 +31,21 @@ least-privilege `CLOUDFLARE_API_TOKEN` with Workers Scripts Edit and the current
 zone's Workers Routes Edit permission. Keep those values in protected project
 settings and never print them.
 
-The current Worker route remains:
+Both hostnames are bound to the same Worker:
 
 ```toml
+[[routes]]
+pattern = "gpui-box.origingame.dev"
+custom_domain = true
+
 [[routes]]
 pattern = "gpui-kit.origingame.dev"
 custom_domain = true
 ```
 
-Do not change this key merely to match branding; a hostname migration requires
-an intentional infrastructure/DNS change. `workers_dev = false`, so this custom
-domain is the production route.
+The GPUI Box hostname is canonical. The GPUI Kit hostname is compatibility
+infrastructure, not a second site or a forked catalog. `workers_dev = false`,
+so these custom domains are the production routes.
 
 ## Published inputs
 

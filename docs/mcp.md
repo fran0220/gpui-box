@@ -40,6 +40,6 @@ checkout**, Rust toolchain, dependencies, platform renderer, and build time. A
 crate installation alone cannot render. The server reads and renders but does
 not edit files; it does not replace `cargo run -p xtask -- gate`.
 
-The hosted endpoint at <https://gpui-kit.origingame.dev/mcp> is different: it
+The hosted endpoint at <https://gpui-box.origingame.dev/mcp> is different: it
 serves the currently deployed static catalog and committed images. See
 [`deploying.md`](deploying.md).

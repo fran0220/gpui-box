@@ -53,8 +53,8 @@ Do not hand-edit `docs/api-index.json`, `docs/token-reference.md`,
 commands own them.
 
 The checkout-backed `gpui-box-mcp` reads `GPUI_BOX_ROOT` or discovers upward
-from cwd. `render_scene` requires the complete checkout. The current hosted
-static catalog remains <https://gpui-kit.origingame.dev>.
+from cwd. `render_scene` requires the complete checkout. The hosted static
+catalog is <https://gpui-box.origingame.dev>.
 
 References: `docs/components.md`, `docs/component-contracts.md`,
 `docs/coverage.md`, `docs/truthful-ui.md`, `docs/token-model.md`,

@@ -11,8 +11,8 @@ async states, caller-owned data and actions, stable semantic automation, and
 deterministic scene fixtures. It contains no OriginGame/Forge domain logic,
 credentials, transports, accounts, or product models.
 
-**Current catalog endpoint:** <https://gpui-kit.origingame.dev> ·
-**Hosted MCP:** <https://gpui-kit.origingame.dev/mcp>
+**Catalog endpoint:** <https://gpui-box.origingame.dev> ·
+**Hosted MCP:** <https://gpui-box.origingame.dev/mcp>
 
 ## Packages
 
@@ -119,8 +119,7 @@ The framework cohort is Apache-2.0. GPUI Box Kit and MCP are MIT. Bundled Geist
 and Noto fonts are OFL 1.1; Solar Icons are CC BY 4.0; other derived assets
 retain their stated terms. See [`THIRD_PARTY_NOTICES`](THIRD_PARTY_NOTICES).
 
-The existing catalog infrastructure remains at
-<https://gpui-kit.origingame.dev>; that URL is not a statement that the
-repository or DNS has already migrated. Deployment details are in
-[`docs/deploying.md`](docs/deploying.md), and release operations are in
-[`docs/releasing.md`](docs/releasing.md).
+The former <https://gpui-kit.origingame.dev> endpoint remains a compatibility
+alias backed by the same Worker; it is not a second deployment. Deployment
+details are in [`docs/deploying.md`](docs/deploying.md), and release operations
+are in [`docs/releasing.md`](docs/releasing.md).
