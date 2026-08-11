@@ -428,6 +428,31 @@ fn prepare_gradient_color(tag: u32, color_space: u32,
     return result;
 }
 
+// lowbias32 from Hash Function Prospector, revision
+// 396dbe235c94dfc2e9b559fc965bcfda8b6a122c (Unlicense).
+fn lowbias32(input: u32) -> u32 {
+    var x = input;
+    x = x ^ (x >> 16u);
+    x *= 0x7feb352du;
+    x = x ^ (x >> 15u);
+    x *= 0x846ca68bu;
+    x = x ^ (x >> 16u);
+    return x;
+}
+
+fn gradient_dither(position: vec2<f32>) -> f32 {
+    let pixel = vec2<u32>(position);
+    let seed =
+        (pixel.x * 0x9e3779b9u) ^
+        (pixel.y * 0x85ebca6bu);
+    let h0 = lowbias32(seed ^ 0xa511e9b3u);
+    let h1 = lowbias32(seed ^ 0x63d83595u);
+
+    // The shifted values and power-of-two scale are exact in binary32.
+    return (f32(h0 >> 8u) - f32(h1 >> 8u)) *
+        (1.0 / 16777216.0);
+}
+
 fn gradient_color(background: Background, position: vec2<f32>, bounds: Bounds,
     solid_color: vec4<f32>, color0: vec4<f32>, color1: vec4<f32>) -> vec4<f32> {
     var background_color = vec4<f32>(0.0);
@@ -468,15 +493,26 @@ fn gradient_color(background: Background, position: vec2<f32>, bounds: Bounds,
             t = (t - stop0_percentage) / (stop1_percentage - stop0_percentage);
             t = clamp(t, 0.0, 1.0);
 
+            var encoded_color = vec4<f32>(0.0);
             switch (background.color_space) {
                 default: {
-                    background_color = srgba_to_linear(mix(color0, color1, t));
+                    encoded_color = mix(color0, color1, t);
                 }
                 case 1u: {
                     let oklab_color = mix(color0, color1, t);
-                    background_color = oklab_to_linear_srgb(oklab_color);
+                    encoded_color = linear_to_srgba(oklab_to_linear_srgb(oklab_color));
                 }
             }
+
+            // Apply the renderer-wide screen-pixel dither in encoded sRGB so
+            // two channel steps have the same visible amplitude as Metal and
+            // Direct3D, then return to WGPU's linear compositing contract.
+            let tri = gradient_dither(position);
+            encoded_color = vec4<f32>(
+                encoded_color.rgb + vec3<f32>(tri * (2.0 / 255.0)),
+                encoded_color.a + tri * (3.0 / 255.0),
+            );
+            background_color = srgba_to_linear(encoded_color);
         }
         case 2u: {
             // pattern slash

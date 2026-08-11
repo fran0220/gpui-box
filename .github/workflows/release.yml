@@ -100,6 +100,9 @@ jobs:
         with: { toolchain: 1.97.0 }
       - uses: Swatinem/rust-cache@v2
       - run: cargo check --workspace --all-targets --all-features --locked
+      - name: Compile Direct3D release shaders
+        if: runner.os == 'Windows'
+        run: cargo check -p gpui-box-windows --release --locked
 
   headless:
     needs: preflight

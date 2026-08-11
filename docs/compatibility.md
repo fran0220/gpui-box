@@ -31,6 +31,13 @@ the final column. Accessibility capability details remain in
 [`accessibility.md`](accessibility.md), and visual mechanics in
 [`screenshot-testing.md`](screenshot-testing.md).
 
+Linear-gradient dithering follows one rendering contract on Metal, Direct3D,
+and WGPU: a screen-pixel-anchored unsigned integer hash produces the two
+triangular samples, so GPU families and shader compilers cannot choose different
+transcendental approximations for the noise. Color conversion and edge
+rasterization remain renderer-specific, which is why each renderer retains its
+own baseline rather than claiming identical bytes across platforms.
+
 Browser checks are:
 
 ```bash

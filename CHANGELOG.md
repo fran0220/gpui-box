@@ -413,6 +413,11 @@ threading limits.
 
 ### Fixed
 
+- Linear-gradient dithering used a transcendental float hash whose result was
+  not required to agree between GPU families, so identical Metal scenes could
+  differ by up to five channel steps across Macs. Metal, Direct3D, and WGPU now
+  derive the same triangular noise from an integer screen-pixel hash; renderer-
+  specific color conversion still keeps their baseline sets separate.
 - `overlay::Kbd` drew `⌘ ⌃ ⌥ ⏎ ⌦ ⌫ ␣` only where the host machine happened to
   own a font covering them. No Geist face does, and the component relied on the
   platform's own fallback, so the library could not draw its own keyboard

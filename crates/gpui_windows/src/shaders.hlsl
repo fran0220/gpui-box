@@ -340,6 +340,29 @@ float2x2 rotate2d(float angle) {
     return float2x2(c, -s, s, c);
 }
 
+// lowbias32 from Hash Function Prospector, revision
+// 396dbe235c94dfc2e9b559fc965bcfda8b6a122c (Unlicense).
+uint lowbias32(uint x) {
+    x ^= x >> 16u;
+    x *= 0x7feb352du;
+    x ^= x >> 15u;
+    x *= 0x846ca68bu;
+    x ^= x >> 16u;
+    return x;
+}
+
+float gradient_dither(uint2 pixel) {
+    uint seed =
+        (pixel.x * 0x9e3779b9u) ^
+        (pixel.y * 0x85ebca6bu);
+    uint h0 = lowbias32(seed ^ 0xa511e9b3u);
+    uint h1 = lowbias32(seed ^ 0x63d83595u);
+
+    // The shifted values and power-of-two scale are exact in binary32.
+    return ((float)(h0 >> 8u) - (float)(h1 >> 8u)) *
+           (1.0f / 16777216.0f);
+}
+
 float4 gradient_color(Background background,
                       float2 position,
                       Bounds bounds,
@@ -397,10 +420,9 @@ float4 gradient_color(Background background,
             // ±2/255 for RGB (enough for dark-on-dark compositing),
             // ±3/255 for alpha (needs more because alpha × dark color = tiny steps).
             {
-                float2 seed = position * 0.6180339887; // golden ratio spread
-                float r1 = frac(sin(dot(seed, float2(12.9898, 78.233))) * 43758.5453);
-                float r2 = frac(sin(dot(seed, float2(39.3460, 11.135))) * 24634.6345);
-                float tri = r1 + r2 - 1.0; // triangular PDF, range [-1, +1]
+                // Integer screen-pixel hashing is stable across Direct3D
+                // adapters; transcendental float hashes are not required to agree.
+                float tri = gradient_dither((uint2)position);
                 color.rgb += tri * 2.0 / 255.0;
                 color.a   += tri * 3.0 / 255.0;
             }

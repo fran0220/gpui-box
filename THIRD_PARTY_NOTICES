@@ -29,6 +29,17 @@ Scope: theme geometry, motion, loader math, popover/dialog and settings
 scaffolding, frost, edge fade, font registration, and generic assets.
 License text: licenses/COMET-MIT.txt
 
+Hash Function Prospector — lowbias32
+--------------------------------------------------------------------------------
+Source: https://github.com/skeeto/hash-prospector
+Revision: 396dbe235c94dfc2e9b559fc965bcfda8b6a122c
+Author/discoverer: Christopher Wellons (skeeto)
+License: public-domain dedication under the Unlicense
+Scope: lowbias32 finalizer translated to Metal, HLSL, and WGSL for deterministic
+screen-pixel gradient dithering. GPUI Box supplies the pixel fold, salts, and
+triangular sample mapping.
+License text: licenses/HASH-PROSPECTOR-UNLICENSE.txt
+
 Geist and Geist Mono
 --------------------------------------------------------------------------------
 Source: https://vercel.com/font

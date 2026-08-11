@@ -1044,6 +1044,43 @@ mod tests {
     }
 
     #[test]
+    fn gradient_dither_is_stable_at_screen_pixels() {
+        fn lowbias32(mut value: u32) -> u32 {
+            value ^= value >> 16;
+            value = value.wrapping_mul(0x7feb_352d);
+            value ^= value >> 15;
+            value = value.wrapping_mul(0x846c_a68b);
+            value ^= value >> 16;
+            value
+        }
+
+        let cases: [((u32, u32), u32, u32, u32, i64); 4] = [
+            ((0, 0), 0x0000_0000, 0x86a2_4fa0, 0x7cc4_acaf, 646_563),
+            ((1, 0), 0x9e37_79b9, 0x6441_0d95, 0x0bec_fece, 5_788_687),
+            ((0, 1), 0x85eb_ca6b, 0xed53_cbbe, 0x48c1_24af, 10_785_447),
+            (
+                (919, 999),
+                0x6207_1092,
+                0x229b_548c,
+                0xb4f8_4bec,
+                -9_592_055,
+            ),
+        ];
+
+        for ((x, y), expected_seed, expected_h0, expected_h1, expected_difference) in cases {
+            let seed = x.wrapping_mul(0x9e37_79b9) ^ y.wrapping_mul(0x85eb_ca6b);
+            let h0 = lowbias32(seed ^ 0xa511_e9b3);
+            let h1 = lowbias32(seed ^ 0x63d8_3595);
+            let difference = i64::from(h0 >> 8) - i64::from(h1 >> 8);
+
+            assert_eq!(seed, expected_seed);
+            assert_eq!(h0, expected_h0);
+            assert_eq!(h1, expected_h1);
+            assert_eq!(difference, expected_difference);
+        }
+    }
+
+    #[test]
     fn test_rgba_alpha() {
         let color = Rgba {
             r: 0.2,

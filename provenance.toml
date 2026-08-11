@@ -32,5 +32,15 @@ kit = "MIT"
 mcp = "MIT"
 fonts = ["OFL-1.1"]
 solar_icons = "CC-BY-4.0"
+gradient_hash = "Unlicense"
 notices = "THIRD_PARTY_NOTICES"
 human_provenance = "PROVENANCE.md"
+
+[[derived_source]]
+name = "Hash Function Prospector lowbias32"
+url = "https://github.com/skeeto/hash-prospector"
+revision = "396dbe235c94dfc2e9b559fc965bcfda8b6a122c"
+source_location = "README.md:lowbias32"
+relationship = "translated-and-adapted"
+license = "Unlicense"
+license_text = "licenses/HASH-PROSPECTOR-UNLICENSE.txt"

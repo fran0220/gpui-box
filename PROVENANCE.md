@@ -98,5 +98,20 @@ that embeds them carries `assets/fonts/SOURCES.md` and the applicable license
 text beside the font files, so its `.crate` archive is independently
 redistributable.
 
+## P07: Hash Function Prospector `lowbias32`
+
+- Source: <https://github.com/skeeto/hash-prospector>
+- Revision: `396dbe235c94dfc2e9b559fc965bcfda8b6a122c`
+- Author/discoverer: Christopher Wellons (`skeeto`)
+- Source location: `README.md`, `lowbias32`
+- License: public-domain dedication under the Unlicense
+- Scope: the `lowbias32` finalizer translated to Metal, HLSL, and WGSL for
+  deterministic gradient dithering
+
+GPUI Box adds the two-dimensional screen-pixel fold, domain-separation salts,
+and triangular sample mapping. The exact upstream license is preserved in
+`licenses/HASH-PROSPECTOR-UNLICENSE.txt` and beside each public renderer crate
+that contains the translation.
+
 No product state, credentials, telemetry, user content, provider logos, or Zed
 editor/workspace/product source is included by the framework filter.
