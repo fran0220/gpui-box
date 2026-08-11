@@ -337,11 +337,20 @@ mod tests {
         foundation::{NSArray, NSData},
     };
     use std::ffi::c_void;
+    use std::sync::{Mutex, MutexGuard};
 
     use gpui::{ClipboardEntry, ClipboardItem, ClipboardString, ImageFormat};
     use objc::rc::autoreleasepool;
 
     use super::*;
+
+    static PASTEBOARD_TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    fn lock_pasteboard_tests() -> MutexGuard<'static, ()> {
+        PASTEBOARD_TEST_LOCK
+            .lock()
+            .expect("another pasteboard test panicked while holding the lock")
+    }
 
     unsafe fn simulate_external_file_copy(pasteboard: &Pasteboard, paths: &[&str]) {
         unsafe {
@@ -372,6 +381,7 @@ mod tests {
 
     #[test]
     fn test_string() {
+        let _lock = lock_pasteboard_tests();
         let pasteboard = Pasteboard::unique();
         assert_eq!(pasteboard.read(), None);
 
@@ -406,6 +416,7 @@ mod tests {
 
     #[test]
     fn test_custom_types_survive_creation_autorelease_pool() {
+        let _lock = lock_pasteboard_tests();
         let pasteboard = autoreleasepool(|| unsafe { Pasteboard::new(nil) });
 
         unsafe {
@@ -418,6 +429,7 @@ mod tests {
 
     #[test]
     fn test_read_external_path() {
+        let _lock = lock_pasteboard_tests();
         let pasteboard = Pasteboard::unique();
 
         unsafe {
@@ -448,6 +460,7 @@ mod tests {
 
     #[test]
     fn test_read_external_paths_with_spaces() {
+        let _lock = lock_pasteboard_tests();
         let pasteboard = Pasteboard::unique();
         let paths = ["/some file with spaces.txt"];
 
@@ -467,6 +480,7 @@ mod tests {
 
     #[test]
     fn test_read_multiple_external_paths() {
+        let _lock = lock_pasteboard_tests();
         let pasteboard = Pasteboard::unique();
         let paths = ["/file.txt", "/image.png"];
 
@@ -499,6 +513,7 @@ mod tests {
 
     #[test]
     fn test_read_image() {
+        let _lock = lock_pasteboard_tests();
         let pasteboard = Pasteboard::unique();
 
         // Smallest valid PNG: 1x1 transparent pixel
