@@ -30,11 +30,11 @@ use gpui::{
     Window, canvas, div, point, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TextTone, TypeScale};
 
 use crate::content::transport::{TransportBar, TransportDuration, TransportEvent};
 use crate::display::badge::Badge;
-use crate::foundation::{Disableable, Ident, StyledExt};
+use crate::foundation::{Disableable, Ident, StyledExt, text};
 use crate::media::notice;
 use crate::media::transport::{MediaAvailability, MediaCommand, MediaEvent, MediaTransport};
 use crate::strings::{ActiveStrings, StringKey};
@@ -191,17 +191,13 @@ impl RenderOnce for AudioPlayer {
         let titles = div()
             .column()
             .gap_token(&theme, Space::Xs)
-            .children(self.title.clone().map(|title| {
-                div()
-                    .type_scale(&theme, TypeScale::Label)
-                    .text_color(theme.colors.text)
-                    .child(title)
-            }))
+            .children(
+                self.title
+                    .clone()
+                    .map(|title| text(&theme, TypeScale::Subtitle, title)),
+            )
             .children(self.subtitle.clone().map(|subtitle| {
-                div()
-                    .type_scale(&theme, TypeScale::Caption)
-                    .text_color(theme.colors.text_muted)
-                    .child(subtitle)
+                text(&theme, TypeScale::Caption, subtitle).text_tone(&theme, TextTone::Muted)
             }));
         // Where the facts came from is published for every transport and drawn
         // only for the one a reader could mistake for a player.

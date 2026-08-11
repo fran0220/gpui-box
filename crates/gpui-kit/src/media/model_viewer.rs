@@ -31,11 +31,13 @@ use gpui::{
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TypeScale};
+use gpui_kit_theme::{
+    ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TextTone, TypeScale,
+};
 
 use crate::controls::button::IconButton;
 use crate::controls::segmented::{Segment, SegmentedControl};
-use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt, text};
 use crate::layout::measure;
 use crate::media::gltf::{ModelBounds, ModelError, ModelScene};
 use crate::media::notice;
@@ -445,10 +447,9 @@ impl RenderOnce for ModelViewer {
                     .w_full()
                     .flex_wrap()
                     .gap_token(&theme, Space::Md)
-                    .type_scale(&theme, TypeScale::Caption)
-                    .text_color(theme.colors.text_muted)
                     .child(count(
                         cx,
+                        &theme,
                         &strings,
                         &ident,
                         "meshes",
@@ -457,6 +458,7 @@ impl RenderOnce for ModelViewer {
                     ))
                     .child(count(
                         cx,
+                        &theme,
                         &strings,
                         &ident,
                         "vertices",
@@ -465,6 +467,7 @@ impl RenderOnce for ModelViewer {
                     ))
                     .child(count(
                         cx,
+                        &theme,
                         &strings,
                         &ident,
                         "triangles",
@@ -500,12 +503,11 @@ impl RenderOnce for ModelViewer {
                     .items_center()
                     .justify_between()
                     .gap_token(&theme, Space::Sm)
-                    .children(self.title.clone().map(|title| {
-                        div()
-                            .type_scale(&theme, TypeScale::Label)
-                            .text_color(theme.colors.text)
-                            .child(title)
-                    }))
+                    .children(
+                        self.title
+                            .clone()
+                            .map(|title| text(&theme, TypeScale::Subtitle, title)),
+                    )
                     .child(
                         div()
                             .row()
@@ -547,21 +549,26 @@ impl RenderOnce for ModelViewer {
 /// One counted fact, published so a test reads the count rather than the row.
 fn count(
     cx: &mut App,
+    theme: &gpui_kit_theme::Theme,
     strings: &crate::strings::Strings,
     ident: &Ident,
     name: &'static str,
     label: SharedString,
     value: usize,
 ) -> impl IntoElement {
-    div()
-        .child(strings.format(StringKey::ModelCount, &[&label, &value.to_string()]))
-        .semantic_in(
-            cx,
-            NodeSpec::new(ident.child(name).semantic_id(), Role::Text)
-                .parent(ident.semantic_id())
-                .text(label)
-                .value(value.to_string()),
-        )
+    text(
+        theme,
+        TypeScale::Caption,
+        strings.format(StringKey::ModelCount, &[&label, &value.to_string()]),
+    )
+    .text_tone(theme, TextTone::Muted)
+    .semantic_in(
+        cx,
+        NodeSpec::new(ident.child(name).semantic_id(), Role::Text)
+            .parent(ident.semantic_id())
+            .text(label)
+            .value(value.to_string()),
+    )
 }
 
 /// The host-facing sentence for a refusal, with the reader's own code in it.

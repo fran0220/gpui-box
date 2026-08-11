@@ -33,7 +33,7 @@ use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
 
 use crate::content::transport::{TransportBar, TransportDuration};
 use crate::display::badge::Badge;
-use crate::foundation::{Disableable, Ident, StyledExt};
+use crate::foundation::{Disableable, Ident, StyledExt, text};
 use crate::layout::{AspectFit, AspectRatio};
 use crate::media::audio_player::{command_for, unready};
 use crate::media::transport::{MediaAvailability, MediaEvent, MediaSnapshot, MediaTransport};
@@ -307,12 +307,11 @@ impl RenderOnce for VideoPlayer {
             .items_center()
             .justify_between()
             .gap_token(&theme, Space::Sm)
-            .children(self.title.clone().map(|title| {
-                div()
-                    .type_scale(&theme, TypeScale::Label)
-                    .text_color(theme.colors.text)
-                    .child(title)
-            }))
+            .children(
+                self.title
+                    .clone()
+                    .map(|title| text(&theme, TypeScale::Subtitle, title)),
+            )
             .children(
                 origin
                     .filter(|origin| origin.is_fixture())

@@ -47,7 +47,7 @@ pub use video_player::VideoPlayer;
 use gpui::{AnyElement, Hsla, IntoElement, ParentElement, SharedString, Styled, div, px};
 use gpui_kit_theme::{Space, Theme, TypeScale};
 
-use crate::foundation::StyledExt;
+use crate::foundation::{StyledExt, text};
 
 /// Where a notice sits on the surface it covers.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -91,18 +91,11 @@ fn notice_at(
         .gap_token(theme, Space::Xs)
         .p_token(theme, Space::Lg)
         .text_align(gpui::TextAlign::Center)
+        .child(text(theme, TypeScale::Subtitle, title))
         .child(
-            div()
-                .type_scale(theme, TypeScale::Label)
-                .text_color(theme.colors.text)
-                .child(title),
-        )
-        .child(
-            div()
+            text(theme, TypeScale::Body, detail)
                 .max_w(px(360.0))
-                .type_scale(theme, TypeScale::Caption)
-                .text_color(tint)
-                .child(detail),
+                .text_color(tint),
         )
         .into_any_element()
 }
