@@ -87,9 +87,9 @@ async function dispatch(method, params, env) {
       return {
         protocolVersion: PROTOCOL,
         capabilities: { tools: {} },
-        serverInfo: { name: "gpui-kit", version: VERSION },
+        serverInfo: { name: "gpui-box", version: VERSION },
         instructions:
-          "The gpui-kit component catalog, served from the published " +
+          "The GPUI Box component catalog, served from the published " +
           "revision. Signatures come from an index generated out of the " +
           "source, and render_scene returns the image the gate captured for " +
           "that scene. It cannot show a component you are changing locally — " +

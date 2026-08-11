@@ -164,7 +164,7 @@ pub fn font_bytes() -> [&'static [u8]; 6] {
 pub fn register_fonts(cx: &App) {
     let fonts = font_bytes().into_iter().map(Cow::Borrowed).collect();
     if let Err(error) = cx.text_system().add_fonts(fonts) {
-        tracing::warn!(%error, "gpui-kit could not register embedded fonts");
+        tracing::warn!(%error, "GPUI Box could not register embedded fonts");
     }
 }
 

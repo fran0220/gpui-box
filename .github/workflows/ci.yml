@@ -1,97 +1,100 @@
 name: CI
-
-on:
-  push:
-  pull_request:
-
+on: [push, pull_request]
 permissions:
   contents: read
 
 jobs:
-  rust:
-    name: Non-visual gate (macOS)
-    runs-on: macos-15
+  authority:
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+      - name: Install Linux GPUI libraries
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libegl1-mesa-dev libfontconfig1-dev libudev-dev libvulkan-dev libwayland-dev libx11-dev libx11-xcb-dev libxcb-randr0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-x11-dev mesa-vulkan-drivers
       - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: 1.97.0
-          components: rustfmt, clippy
+        with: { toolchain: 1.97.0, components: "rustfmt, clippy" }
       - uses: Swatinem/rust-cache@v2
+      - run: scripts/sync-zed/sync-zed verify --release
+      - run: python3 -m unittest discover -s scripts/sync-zed/tests -v
+      - run: cargo run -p xtask -- dependencies check
       - run: cargo run -p xtask -- gate
       - run: cargo doc --no-deps --workspace
-        env:
-          RUSTDOCFLAGS: -D warnings
-      # Says out loud that the visual gate did not run here, rather than
-      # leaving a skipped job for a reviewer to notice. A gate nobody was told
-      # about is the same problem as a gate that passes without looking.
-      - name: Report whether the visual regression ran
-        if: ${{ vars.VISUAL_RUNNER == '' }}
-        run: |
-          echo "::notice title=Visual regression did not run::No VISUAL_RUNNER is configured, so \`xtask scenes check\` ran nowhere in CI. A UI change needs the result of a local run pasted into the pull request."
-          {
-            echo "### Visual regression: not run"
-            echo
-            echo "\`cargo run -p xtask -- scenes check\` needs a composited, frontmost"
-            echo "window and a display matching the one the baselines were captured on."
-            echo "No \`VISUAL_RUNNER\` repository variable is set, so no job ran it."
-            echo "See docs/screenshot-testing.md for the manual step a reviewer records."
-          } >> "$GITHUB_STEP_SUMMARY"
+        env: { RUSTDOCFLAGS: "-D warnings" }
 
-  headless:
-    name: Headless visual gate (Windows)
-    runs-on: windows-2025
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, ubuntu-24.04, windows-2025]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Linux GPUI libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libegl1-mesa-dev libfontconfig1-dev libudev-dev libvulkan-dev libwayland-dev libx11-dev libx11-xcb-dev libxcb-randr0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-x11-dev mesa-vulkan-drivers
+      - uses: dtolnay/rust-toolchain@master
+        with: { toolchain: 1.97.0 }
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --workspace --all-targets --all-features --locked
+
+  web:
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: 1.97.0
+        with: { toolchain: 1.97.0, targets: wasm32-unknown-unknown }
       - uses: Swatinem/rust-cache@v2
-      - run: cargo run -p xtask -- dependencies check
+      - uses: taiki-e/install-action@v2
+        with: { tool: "wasm-bindgen-cli@0.2.126" }
+      - run: cargo run -p xtask -- web check
+      - run: cargo run -p xtask -- web build
+      - run: cargo run -p xtask -- web smoke
+      - run: cargo run -p xtask -- web visual check button input dialog node-graph
+
+  headless:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, ubuntu-24.04, windows-2025]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Linux GPUI libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libegl1-mesa-dev libfontconfig1-dev libudev-dev libvulkan-dev libwayland-dev libx11-dev libx11-xcb-dev libxcb-randr0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-x11-dev mesa-vulkan-drivers
+      - uses: dtolnay/rust-toolchain@master
+        with: { toolchain: 1.97.0 }
+      - uses: Swatinem/rust-cache@v2
       - run: cargo run -p xtask -- headless check
-      - name: Upload headless render differences
-        if: failure()
+      - if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: headless-scene-check-windows
+          name: headless-diff-${{ runner.os }}
           path: target/headless-scene-check
           if-no-files-found: ignore
 
-  # The visual regression gate, which only runs where it can actually look.
-  #
-  # `xtask scenes check` drives a real gallery window and asks the macOS window
-  # server for its pixels, so it needs three things a GitHub-hosted runner is
-  # not known to provide: a GUI session that composites windows, an application
-  # that can make itself frontmost (a window nobody composites hands back the
-  # frame it drew last, which is how a capture silently reads the previous
-  # scene), and a display whose size and backing scale factor match the machine
-  # the committed baselines came from. The baselines are 1842x1374 device
-  # pixels; the comparison treats any difference in size as maximally different,
-  # so a runner with a 1x virtual display fails all 116 images without a
-  # component having changed.
-  #
-  # None of that has been established on a hosted runner, so this job runs only
-  # where an operator has said it can: set the repository variable
-  # VISUAL_RUNNER to the labels of a self-hosted macOS runner with a logged-in
-  # graphical session. Pointing it at a hosted label is how this gate goes back
-  # to reporting things that did not happen.
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Linux GPUI libraries
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libegl1-mesa-dev libfontconfig1-dev libudev-dev libvulkan-dev libwayland-dev libx11-dev libx11-xcb-dev libxcb-randr0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-x11-dev mesa-vulkan-drivers
+      - uses: dtolnay/rust-toolchain@master
+        with: { toolchain: 1.97.0 }
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo install cargo-local-registry --version 0.2.12 --locked
+      - run: cargo run -p xtask -- package check
+
+  # Real-window capture is intentionally self-hosted: unlike the headless gate,
+  # it needs a logged-in composited macOS session, a frontmost window, and the
+  # exact display scale used by the legacy real-window baselines.
   visual:
     if: ${{ vars.VISUAL_RUNNER != '' }}
     runs-on: ${{ vars.VISUAL_RUNNER }}
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: 1.97.0
-      - uses: Swatinem/rust-cache@v2
-      # Captures render with reduced motion and a parked pointer, so a scene
-      # produces the same bytes on every run of the same machine. A difference
-      # here is a real visual change, not noise.
+        with: { toolchain: 1.97.0 }
       - run: cargo run -p xtask -- scenes check
-      # The scratch directory holds what the run actually captured, which is
-      # the only way a reviewer can see what changed.
       - if: failure()
         uses: actions/upload-artifact@v4
-        with:
-          name: scene-check
-          path: target/scene-check
+        with: { name: scene-check, path: target/scene-check }

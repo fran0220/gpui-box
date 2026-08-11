@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/fran0220/gpui-kit/tokens/schema.json",
-  "title": "gpui-kit theme tokens",
+  "$id": "https://github.com/fran0220/gpui-box/blob/main/crates/gpui-kit-tokens/tokens/schema.json",
+  "title": "GPUI Box Kit theme tokens",
   "type": "object",
   "additionalProperties": false,
   "required": [

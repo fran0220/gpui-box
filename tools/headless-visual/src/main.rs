@@ -1,20 +1,19 @@
 //! Renders the scene catalog without a window system and compares the pixels.
 //!
-//! This is the visual gate on supported macOS and Windows hosts. GPUI draws each scene into an
-//! offscreen texture at an exact device-pixel size and the pixels are read
-//! straight back, so no window, display, menu bar, dock, or compositor takes
-//! part. Text is shaped by cosmic-text from the fonts this repository bundles,
-//! and time is simulated, which together make the same scene produce the same
-//! bytes on any machine running the same renderer.
+//! This is the visual gate on supported macOS, Linux, and Windows hosts. GPUI
+//! draws each scene into an offscreen texture at an exact device-pixel size and
+//! the pixels are read straight back, so no window, display, menu bar, dock, or
+//! compositor takes part. Text is shaped by cosmic-text from the fonts this
+//! repository bundles, and time is simulated, which together make the same
+//! scene produce the same bytes on any machine running the same renderer.
 //!
 //! Asking the renderer for the size is the point. A real window negotiates its
 //! size with the display it opens on, so the same catalog captured on two Macs
 //! produced two incompatible baseline sets; that is what this harness exists to
 //! prevent.
 //!
-//! Active baselines live in `snapshots/headless/{macos,windows}/scenes`, one set
-//! per renderer. The Linux/llvmpipe path and its prior images are retained for
-//! a future roadmap wave but are deliberately non-gating today.
+//! Active baselines live in
+//! `snapshots/headless/{macos,linux,windows}/scenes`, one set per renderer.
 
 use anyhow::Result;
 

@@ -1,18 +1,21 @@
 [package]
-name = "gpui-kit-semantics"
-description = "Per-frame semantic trees for testing native GPUI interfaces"
+name = "gpui-box-kit-semantics"
+description = "GPUI Box Kit per-frame semantic trees for testing native GPUI interfaces"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[lib]
+name = "gpui_kit_semantics"
+
 [dependencies]
 gpui.workspace = true
 serde.workspace = true
 
 [dev-dependencies]
-gpui = { workspace = true, features = ["test-support"] }
+gpui = { package = "gpui-box", path = "../gpui", features = ["test-support"] }
 serde_json.workspace = true
 
 [lints]

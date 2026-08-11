@@ -1,6 +1,6 @@
 ---
 name: building-gpui-product-ui
-description: "Builds or reviews native GPUI product interfaces using gpui-kit tokens, components, truthful async state, semantic automation, and window-level visual validation. Use when implementing GPUI views, extracting GPUI components, adding native UI states, or reviewing GPUI design-system compliance."
+description: "Builds or reviews native GPUI product interfaces using GPUI Box Kit tokens, components, truthful async state, semantic automation, and window-level visual validation. Use when implementing GPUI views, extracting GPUI components, adding native UI states, or reviewing GPUI Box design-system compliance."
 ---
 
 # Building GPUI product UI
@@ -40,7 +40,8 @@ Use `Loadable` or `AsyncValue` rather than booleans that collapse states.
 
 ## 3. Select semantic tokens
 
-Use `gpui-kit-theme::Theme`. Do not add literal palette colors in views.
+Use `gpui_kit_theme::Theme` from Cargo package `gpui-box-kit-theme`. Do not add
+literal palette colors in views.
 Promote a value to the token document only when it is repeated and semantic;
 one-off geometry may remain local.
 
@@ -49,7 +50,7 @@ surface roles.
 
 ## 4. Reuse components
 
-Search `gpui-kit` before creating a primitive. Keep one Button, Card, Popover,
+Search `gpui-box-kit` before creating a primitive. Keep one Button, Card, Popover,
 Dialog, Settings rhythm, loader family, and status language per product.
 
 Application-specific combinations remain in the application until at least two

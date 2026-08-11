@@ -1,5 +1,5 @@
 {
-  "name": "gpui-kit-browser-gallery-smoke",
+  "name": "gpui-box-browser-gallery-smoke",
   "private": true,
   "scripts": {
     "smoke": "playwright test --config playwright.config.mjs",

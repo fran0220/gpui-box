@@ -1,0 +1,44 @@
+schema = 1
+project = "GPUI Box"
+repository = "https://github.com/fran0220/gpui-box"
+cohort = "0.1.x"
+release_status = "unreleased"
+rust_version = "1.97"
+edition = "2024"
+type_universe_package = "gpui-box"
+type_universe_crate = "gpui"
+
+[[platform]]
+name = "macos"
+contract = "framework-kit-native-metal"
+commands = ["cargo run -p xtask -- gate full", "cargo run -p xtask -- headless check"]
+ci_gated = true
+ci_commands = ["cargo run -p xtask -- gate", "cargo doc --no-deps --workspace"]
+limitations = ["visual CI requires separately configured evidence", "does not prove other platforms"]
+
+[[platform]]
+name = "windows"
+contract = "framework-kit-headless-warp"
+commands = ["cargo run -p xtask -- headless check"]
+ci_gated = true
+limitations = ["native frame capture not implemented"]
+
+[[platform]]
+name = "linux"
+contract = "wayland-x11-code-and-llvmpipe-baseline"
+commands = ["cargo run -p xtask -- headless check"]
+ci_gated = true
+limitations = ["AT-SPI coverage remains capability-scoped", "native behavior still requires host-specific review"]
+
+[[platform]]
+name = "wasm32-unknown-unknown"
+contract = "single-threaded-browser-gallery"
+commands = ["cargo run -p xtask -- web check", "cargo run -p xtask -- web build", "cargo run -p xtask -- web smoke", "cargo run -p xtask -- web visual check button input dialog node-graph"]
+ci_gated = true
+limitations = ["threaded COOP/COEP not claimed", "screen-reader announcements not covered"]
+
+[release_validation]
+dependency_graph = "cargo run -p xtask -- dependencies check"
+publication_plan = "cargo run -p xtask -- package plan"
+registry_only = "cargo run -p xtask -- package check"
+requires_recorded_platform_evidence = true

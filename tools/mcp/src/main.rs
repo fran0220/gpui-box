@@ -36,6 +36,25 @@ use serde_json::{Value, json};
 const PROTOCOL: &str = "2025-06-18";
 
 fn main() -> Result<()> {
+    let mut args = std::env::args().skip(1);
+    match args.next().as_deref() {
+        Some("-h" | "--help") => {
+            ensure_no_more_args(args)?;
+            println!(
+                "gpui-box-mcp {}\n\nRead MCP JSON-RPC messages from stdin and write responses to stdout.\n\nEnvironment:\n  GPUI_BOX_ROOT  Absolute path to a GPUI Box checkout (otherwise discover from cwd)",
+                env!("CARGO_PKG_VERSION")
+            );
+            return Ok(());
+        }
+        Some("-V" | "--version") => {
+            ensure_no_more_args(args)?;
+            println!("gpui-box-mcp {}", env!("CARGO_PKG_VERSION"));
+            return Ok(());
+        }
+        Some(other) => bail!("unknown argument {other:?}; use --help"),
+        None => {}
+    }
+
     let root = root()?;
     let stdin = io::stdin();
     let mut stdout = io::stdout();
@@ -48,7 +67,7 @@ fn main() -> Result<()> {
         let request: Value = match serde_json::from_str(&line) {
             Ok(request) => request,
             Err(error) => {
-                eprintln!("gpui-kit-mcp: unreadable request: {error}");
+                eprintln!("gpui-box-mcp: unreadable request: {error}");
                 continue;
             }
         };
@@ -77,13 +96,20 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+fn ensure_no_more_args(mut args: impl Iterator<Item = String>) -> Result<()> {
+    if let Some(extra) = args.next() {
+        bail!("unexpected argument {extra:?}")
+    }
+    Ok(())
+}
+
 fn dispatch(root: &Path, method: &str, params: &Value) -> Result<Value> {
     match method {
         "initialize" => Ok(json!({
             "protocolVersion": PROTOCOL,
             "capabilities": { "tools": {} },
-            "serverInfo": { "name": "gpui-kit", "version": env!("CARGO_PKG_VERSION") },
-            "instructions": "The gpui-kit component catalog, served from a working \
+            "serverInfo": { "name": env!("CARGO_PKG_NAME"), "version": env!("CARGO_PKG_VERSION") },
+            "instructions": "The GPUI Box Kit component catalog, served from a working \
                              copy of the repository. Signatures come from an index \
                              generated out of the source, and render_scene draws the \
                              scene now, from the code as it currently stands — so it \
@@ -326,7 +352,7 @@ fn render(root: &Path, name: &str, theme: &str) -> Result<Value> {
     std::fs::create_dir_all(out.parent().expect("the path has a parent"))?;
 
     let output = Command::new(env!("CARGO"))
-        .args(["run", "--quiet", "-p", "gpui-kit-gallery", "--", "--scene"])
+        .args(["run", "--quiet", "-p", "gpui-box-gallery", "--", "--scene"])
         .arg(name)
         .arg("--theme")
         .arg(theme)
@@ -377,18 +403,39 @@ fn base64(bytes: &[u8]) -> String {
     out
 }
 
-/// The repository this server serves, found from the binary rather than from
-/// the working directory, because a client starts a server wherever it likes.
+/// The repository this server serves. An installed binary has no durable
+/// relationship to the registry source directory it was compiled from, so an
+/// explicit root wins and the current directory is the only safe fallback.
 fn root() -> Result<PathBuf> {
-    if let Ok(set) = std::env::var("GPUI_KIT_ROOT") {
-        return Ok(PathBuf::from(set));
+    if let Ok(set) = std::env::var("GPUI_BOX_ROOT") {
+        return checked_root(PathBuf::from(set));
     }
-    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    manifest
-        .ancestors()
-        .nth(2)
-        .map(Path::to_path_buf)
-        .context("could not find the repository root")
+    let current = std::env::current_dir().context("read the current directory")?;
+    find_root(&current).with_context(|| {
+        format!(
+            "could not find a GPUI Box checkout above {}; set GPUI_BOX_ROOT to the checkout root",
+            current.display()
+        )
+    })
+}
+
+fn checked_root(root: PathBuf) -> Result<PathBuf> {
+    find_root(&root)
+        .filter(|found| found == &root)
+        .with_context(|| {
+            format!(
+                "GPUI_BOX_ROOT={} is not a GPUI Box checkout root",
+                root.display()
+            )
+        })
+}
+
+fn find_root(start: &Path) -> Option<PathBuf> {
+    start.ancestors().find_map(|candidate| {
+        (candidate.join("package-authority.toml").is_file()
+            && candidate.join("docs/api-index.json").is_file())
+        .then(|| candidate.to_path_buf())
+    })
 }
 
 #[cfg(test)]
@@ -421,10 +468,24 @@ mod tests {
     /// A notification carries no id, and a reply to one is a protocol error.
     #[test]
     fn initialize_announces_tools() {
-        let root = root().expect("the repository root");
-        let result = dispatch(&root, "initialize", &json!({})).expect("initialize");
+        let result = dispatch(Path::new("."), "initialize", &json!({})).expect("initialize");
         assert_eq!(result["protocolVersion"], PROTOCOL);
         assert!(result["capabilities"]["tools"].is_object());
+    }
+
+    #[test]
+    fn checkout_root_is_discovered_from_a_child() {
+        let expected =
+            std::env::temp_dir().join(format!("gpui-box-mcp-root-{}", std::process::id()));
+        let child = expected.join("tools/mcp/src");
+        std::fs::create_dir_all(expected.join("docs")).expect("create root fixture");
+        std::fs::create_dir_all(&child).expect("create child fixture");
+        std::fs::write(expected.join("package-authority.toml"), "schema = 1\n")
+            .expect("write authority fixture");
+        std::fs::write(expected.join("docs/api-index.json"), "{}\n").expect("write index fixture");
+
+        assert_eq!(find_root(&child).as_deref(), Some(expected.as_path()));
+        std::fs::remove_dir_all(expected).expect("remove root fixture");
     }
 
     #[test]

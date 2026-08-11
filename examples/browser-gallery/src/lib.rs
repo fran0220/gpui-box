@@ -52,7 +52,7 @@ impl Render for BrowserGallery {
             .semantic_in(
                 cx,
                 NodeSpec::new("browser.gallery.root", Role::Window)
-                    .text("gpui-kit browser gallery"),
+                    .text("GPUI Box browser gallery"),
             )
             .child(content)
     }
@@ -60,7 +60,7 @@ impl Render for BrowserGallery {
 
 fn config(key: &str, default: &'static str) -> String {
     let global = js_sys::global();
-    js_sys::Reflect::get(&global, &JsValue::from_str("gpuiKitConfig"))
+    js_sys::Reflect::get(&global, &JsValue::from_str("gpuiBoxConfig"))
         .ok()
         .and_then(|config| js_sys::Reflect::get(&config, &JsValue::from_str(key)).ok())
         .and_then(|value| value.as_string())

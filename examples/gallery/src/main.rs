@@ -241,11 +241,11 @@ impl Render for Gallery {
             .text_color(theme.colors.text)
             .semantic_in(
                 cx,
-                NodeSpec::new("gallery.root", Role::Window).text("gpui-kit gallery"),
+                NodeSpec::new("gallery.root", Role::Window).text("GPUI Box gallery"),
             )
             .child(
                 recipes::page(&theme)
-                    .child(recipes::page_header(&theme, "gpui-kit", Some(24)))
+                    .child(recipes::page_header(&theme, "GPUI Box", Some(24)))
                     .child(recipes::subtitle(
                         &theme,
                         "A truthful desktop UI design system, semantic tree, and test kit.",
@@ -481,7 +481,7 @@ impl Render for Gallery {
                                     .crumbs([
                                         Crumb::new("workspace", "Workspace"),
                                         Crumb::new("projects", "Projects"),
-                                        Crumb::new("gpui-kit", "gpui-kit"),
+                                        Crumb::new("gpui-box", "gpui-box"),
                                         Crumb::new("runs", "Runs"),
                                         Crumb::new("indexing", "Indexing"),
                                     ])
@@ -1062,7 +1062,7 @@ fn menu_sample(theme: &Theme, width: f32) -> gpui::Div {
         .child(
             popover::menu_row(theme, true, false)
                 .child(icon(Icon::Folder).size(px(15.0)))
-                .child(SharedString::from("gpui-kit"))
+                .child(SharedString::from("gpui-box"))
                 .child(div().flex_1())
                 .child(popover::key_cap(theme, "↵")),
         )
@@ -1153,8 +1153,8 @@ fn fixture_tree() -> Vec<TreeNode> {
                 TreeNode::new("crates", "crates")
                     .icon(Icon::Folder)
                     .children([
-                        TreeNode::new("kit", "gpui-kit").icon(Icon::Document),
-                        TreeNode::new("tokens", "gpui-kit-tokens").icon(Icon::Document),
+                        TreeNode::new("kit", "gpui-box-kit").icon(Icon::Document),
+                        TreeNode::new("tokens", "gpui-box-kit-tokens").icon(Icon::Document),
                     ]),
                 TreeNode::new("docs", "docs")
                     .icon(Icon::Folder)
@@ -1528,7 +1528,7 @@ fn lower_gallery(theme: &Theme, cx: &mut App) -> gpui::AnyElement {
         .text_color(theme.colors.text)
         .semantic_in(
             cx,
-            NodeSpec::new("gallery.lower", Role::Window).text("gpui-kit gallery lower scene"),
+            NodeSpec::new("gallery.lower", Role::Window).text("GPUI Box gallery lower scene"),
         )
         .child(
             recipes::page(theme)

@@ -1,37 +1,27 @@
-# Contributing
+# Contributing to GPUI Box
 
 1. Read `AGENTS.md`, `PROVENANCE.md`, and the relevant design document.
-2. Add or change semantic tokens before duplicating repeated visual values.
-3. Keep components independent of application state and host services.
-4. Cover pure reducers and state transitions with unit tests.
-5. Register gallery controls in the semantic tree.
-6. Update the gallery when a component gains a visual state.
-7. While iterating on one component, `cargo run -p xtask -- gate only <scene>`
-   answers in about a minute. Run `cargo run -p xtask -- gate`, and `gate full`,
-   before committing: `gate only` says nothing about the rest of the workspace.
-8. After a UI change, run `cargo run -p xtask -- headless check`, look at every
-   image it reports, and accept them with `headless capture` only once you have.
-   The supported native gates run on macOS and Windows; Linux is deferred and
-   its retained baselines are non-gating. See `docs/screenshot-testing.md`, and
-   record the result in the pull request.
-9. Add a `CHANGELOG.md` entry for anything a reader of the library would
-   notice. Say what it now does and what it refuses to do, not which files
-   moved.
+2. Preserve the boundary: framework primitives are product-neutral; kit
+   components read caller data, emit caller actions, and hold transient visual
+   state only.
+3. Add semantic tokens before duplicating repeated visual values. Give every
+   action/assertion target a stable business-derived semantic id.
+4. Cover reducers and transitions with tests and add gallery states when a
+   component gains visible behavior.
+5. Iterate with `cargo run -p xtask -- gate only <scene>`, then run
+   `cargo run -p xtask -- gate` and `gate full` before committing.
+6. For UI changes run `headless check`, inspect every reported image, and use
+   `headless capture` only after review. macOS, Linux, and Windows each carry an
+   active renderer-specific CI baseline.
+7. Add a reader-facing changelog entry. Rust API, token-key, and semantic-id
+   compatibility changes must be explicit.
 
-A rename is a breaking change when it breaks a consumer, and two of the three
-things that break one are invisible to the compiler: a token key, which a
-host's own theme document is validated against at runtime, and a semantic id,
-which a host's tests assert on. Both are covered by "Versioning and
-compatibility" in `README.md`, and both belong under a breaking heading in the
-changelog.
+Use public package names in commands (`gpui-box-gallery`, `gpui-box-mcp`,
+`gpui-box-kit`). Internal Cargo aliases and physical directories that still say
+`gpui-kit` are implementation details and need not be renamed.
 
-Public API changes should document:
-
-- the user-visible capability;
-- default, hover, pressed, selected, disabled, and focus behavior;
-- keyboard and reduced-motion behavior;
-- semantic role and required stable id;
-- migration impact.
-
-New derived source or assets are not accepted without an exact source URL,
-revision, license, and scope entry in `PROVENANCE.md`.
+Framework source updates use the filtered workflow in
+`scripts/sync-zed/README.md`; never restore Zed as a Cargo Git dependency. New
+derived source/assets require exact URL, revision, license, and scope in
+`PROVENANCE.md` and `THIRD_PARTY_NOTICES`. GPUI Box is independent and must not
+be presented as an official Zed project.

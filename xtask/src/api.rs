@@ -703,7 +703,7 @@ fn render(
     let mut out = String::new();
     out.push_str("{\n");
     out.push_str(&format!("  \"note\": {},\n", quote(NOTE)));
-    out.push_str("  \"library\": \"gpui-kit\",\n");
+    out.push_str("  \"library\": \"gpui-box-kit\",\n");
 
     let components: Vec<&Item> = items
         .values()

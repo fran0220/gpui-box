@@ -1,0 +1,296 @@
+schema = 1
+
+[[package]]
+manifest = "crates/collections/Cargo.toml"
+name = "gpui-box-collections"
+lib = "collections"
+cohort = "framework"
+version = "0.1.0"
+license = "Apache-2.0"
+publish = true
+layer = 0
+
+[[package]]
+manifest = "crates/gpui_util/Cargo.toml"
+name = "gpui-box-util"
+lib = "gpui_util"
+cohort = "framework"
+version = "0.1.0"
+license = "Apache-2.0"
+publish = true
+layer = 0
+
+[[package]]
+manifest = "crates/gpui/Cargo.toml"
+name = "gpui-box"
+lib = "gpui"
+cohort = "framework"
+version = "0.1.0"
+license = "Apache-2.0"
+publish = true
+layer = 0
+
+[[package]]
+manifest = "crates/gpui_macros/Cargo.toml"
+name = "gpui-box-macros"
+lib = "gpui_macros"
+cohort = "framework"
+version = "0.1.0"
+license = "Apache-2.0"
+publish = true
+layer = 0
+
+[[package]]
+manifest = "crates/gpui_shared_string/Cargo.toml"
+name = "gpui-box-shared-string"
+lib = "gpui_shared_string"
+cohort = "framework"
+version = "0.1.0"
+license = "Apache-2.0"
+publish = true
+layer = 0
+
+[[package]]
+manifest = "crates/http_client/Cargo.toml"
+name = "gpui-box-http-client"
+lib = "http_client"
+cohort = "framework"
+version = "0.1.0"
+license = "Apache-2.0"
+publish = true
+layer = 0
+
+[[package]]
+manifest = "crates/refineable/Cargo.toml"
+name = "gpui-box-refineable"
+lib = "refineable"
+cohort = "framework"
+version = "0.1.0"
+license = "Apache-2.0"
+publish = true
+layer = 0
+
+[[package]]
+manifest = "crates/refineable/derive_refineable/Cargo.toml"
+name = "gpui-box-refineable-derive"
+lib = "derive_refineable"
+cohort = "framework"
+version = "0.1.0"
+license = "Apache-2.0"
+publish = true
+layer = 0
+
+[[package]]
+manifest = "crates/scheduler/Cargo.toml"
+name = "gpui-box-scheduler"
+lib = "scheduler"
+cohort = "framework"
+version = "0.1.0"
+license = "Apache-2.0"
+publish = true
+layer = 0
+
+[[package]]
+manifest = "crates/sum_tree/Cargo.toml"
+name = "gpui-box-sum-tree"
+lib = "sum_tree"
+cohort = "framework"
+version = "0.1.0"
+license = "Apache-2.0"
+publish = true
+layer = 0
+
+[[package]]
+manifest = "crates/util_macros/Cargo.toml"
+name = "gpui-box-util-macros"
+lib = "util_macros"
+cohort = "framework"
+version = "0.1.0"
+license = "Apache-2.0"
+publish = true
+layer = 0
+
+[[package]]
+manifest = "crates/gpui_platform/Cargo.toml"
+name = "gpui-box-platform"
+lib = "gpui_platform"
+cohort = "framework"
+version = "0.1.0"
+license = "Apache-2.0"
+publish = true
+layer = 0
+
+[[package]]
+manifest = "crates/gpui_wgpu/Cargo.toml"
+name = "gpui-box-wgpu"
+lib = "gpui_wgpu"
+cohort = "framework"
+version = "0.1.0"
+license = "Apache-2.0"
+publish = true
+layer = 0
+
+[[package]]
+manifest = "crates/gpui_linux/Cargo.toml"
+name = "gpui-box-linux"
+lib = "gpui_linux"
+cohort = "framework"
+version = "0.1.0"
+license = "Apache-2.0"
+publish = true
+layer = 0
+
+[[package]]
+manifest = "crates/gpui_web/Cargo.toml"
+name = "gpui-box-web"
+lib = "gpui_web"
+cohort = "framework"
+version = "0.1.0"
+license = "Apache-2.0"
+publish = true
+layer = 0
+
+[[package]]
+manifest = "crates/gpui_macos/Cargo.toml"
+name = "gpui-box-macos"
+lib = "gpui_macos"
+cohort = "framework"
+version = "0.1.0"
+license = "Apache-2.0"
+publish = true
+layer = 0
+
+[[package]]
+manifest = "crates/media/Cargo.toml"
+name = "gpui-box-media"
+lib = "media"
+cohort = "framework"
+version = "0.1.0"
+license = "Apache-2.0"
+publish = true
+layer = 0
+
+[[package]]
+manifest = "crates/gpui_windows/Cargo.toml"
+name = "gpui-box-windows"
+lib = "gpui_windows"
+cohort = "framework"
+version = "0.1.0"
+license = "Apache-2.0"
+publish = true
+layer = 0
+
+[[package]]
+manifest = "tooling/perf/Cargo.toml"
+name = "perf"
+lib = "perf"
+cohort = "tool"
+version = "0.1.0"
+license = "Apache-2.0"
+publish = false
+layer = 2
+
+[[package]]
+manifest = "crates/gpui-kit-assets/Cargo.toml"
+name = "gpui-box-kit-assets"
+lib = "gpui_kit_assets"
+cohort = "kit"
+version = "0.1.0"
+license = "MIT"
+publish = true
+layer = 1
+
+[[package]]
+manifest = "crates/gpui-kit-semantics/Cargo.toml"
+name = "gpui-box-kit-semantics"
+lib = "gpui_kit_semantics"
+cohort = "kit"
+version = "0.1.0"
+license = "MIT"
+publish = true
+layer = 1
+
+[[package]]
+manifest = "crates/gpui-kit-testkit/Cargo.toml"
+name = "gpui-box-kit-testkit"
+lib = "gpui_kit_testkit"
+cohort = "kit"
+version = "0.1.0"
+license = "MIT"
+publish = true
+layer = 1
+
+[[package]]
+manifest = "crates/gpui-kit-theme/Cargo.toml"
+name = "gpui-box-kit-theme"
+lib = "gpui_kit_theme"
+cohort = "kit"
+version = "0.1.0"
+license = "MIT"
+publish = true
+layer = 1
+
+[[package]]
+manifest = "crates/gpui-kit-tokens/Cargo.toml"
+name = "gpui-box-kit-tokens"
+lib = "gpui_kit_tokens"
+cohort = "kit"
+version = "0.1.0"
+license = "MIT"
+publish = true
+layer = 1
+
+[[package]]
+manifest = "crates/gpui-kit/Cargo.toml"
+name = "gpui-box-kit"
+lib = "gpui_kit"
+cohort = "kit"
+version = "0.1.0"
+license = "MIT"
+publish = true
+layer = 1
+
+[[package]]
+manifest = "examples/browser-gallery/Cargo.toml"
+name = "gpui-box-browser-gallery"
+cohort = "tool"
+version = "0.1.0"
+license = "MIT"
+publish = false
+layer = 2
+
+[[package]]
+manifest = "examples/gallery/Cargo.toml"
+name = "gpui-box-gallery"
+cohort = "tool"
+version = "0.1.0"
+license = "MIT"
+publish = false
+layer = 2
+
+[[package]]
+manifest = "tools/mcp/Cargo.toml"
+name = "gpui-box-mcp"
+cohort = "tool"
+version = "0.1.0"
+license = "MIT"
+publish = true
+layer = 2
+
+[[package]]
+manifest = "xtask/Cargo.toml"
+name = "xtask"
+cohort = "tool"
+version = "0.1.0"
+license = "MIT"
+publish = false
+layer = 2
+
+[[package]]
+manifest = "tools/headless-visual/Cargo.toml"
+name = "gpui-box-headless-visual"
+cohort = "tool"
+version = "0.1.0"
+license = "MIT"
+publish = false
+layer = 2

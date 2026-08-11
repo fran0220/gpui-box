@@ -1,91 +1,56 @@
-# GPUI compatibility
+# GPUI Box compatibility
 
-## Current pin
+## 0.1.x matrix
 
-| gpui-kit | GPUI source | Revision |
-|---|---|---|
-| 0.1.x | `https://github.com/fran0220/zed` | `0b9c8dc932b65cba2dc87464148984e93f60ae18` |
+GPUI Box owns its framework and package compatibility. There is one package and
+type universe: applications use Cargo package `gpui-box` as Rust crate `gpui`,
+and `gpui-box-kit` as `gpui_kit`. Zed crates must not be mixed into that graph.
 
-The workspace and the standalone headless harness depend on one immutable
-revision of the integration fork. That revision merges three independently
-reviewable topic stacks on upstream baseline
-`a6a23c7b80a5cefa0487b7856335be89ace7e483`: runtime primitives/native
-surfaces, the offscreen WGPU renderer, and deterministic software-adapter
-selection confined to headless rendering. crates.io is not usable yet: the
-published `gpui` crate stopped at 0.2.2 and `gpui_platform` has never been
-published, so the pin remains a Git revision.
+| GPUI Box cohort | Framework origin | Rust | Status |
+|---|---|---|---|
+| `0.1.x` | filtered bootstrap `fran0220/zed@0b9c8dc932b65cba2dc87464148984e93f60ae18`; official baseline `a6a23c7b80a5cefa0487b7856335be89ace7e483` | 1.97, edition 2024 | unreleased release candidate |
 
-The current integration descendant also carries the product-neutral control
-state projection and deterministic accessibility-adapter activation used by
-gpui-kit, plus whole-window pointer-exit delivery needed to retire transient
-help from the Windows native accessibility tree. It exposes hitbox pointer
-capture through fluent interactive elements so a bounded drag continues to
-receive move and release events after leaving its original bounds, including
-when a live preview redraws the window mid-gesture. Pending tracked-scroll
-requests are applied after current child and viewport geometry is known, so a
-variable-height active child is completely visible on its first prepaint. The
-detailed, evidence-scoped platform matrix lives in
-[`accessibility.md`](accessibility.md).
+The SHAs identify imported source provenance, not Cargo Git dependencies.
+`scripts/sync-zed/state.json` currently has null vendor tip, cursor, and
+integration commit: filtered-sync history has not been bootstrapped. Do not
+describe the baseline as a completed sync cursor until that receipt changes.
 
-The renderer graph uses crates.io `wgpu` 29.0.4 and `gpu-allocator` 0.28.0;
-there are no `fran0220/wgpu` or `fran0220/gpu-allocator` sources. GPUI's direct
-Windows bindings remain on the compatible 0.61 line, while the independent
-wgpu and allocator edges resolve their registry Windows 0.62 dependencies.
+## Platform evidence and limits
 
-## Platform behavior
+| Platform | Current repository contract | Validation command/evidence | Limits |
+|---|---|---|---|
+| macOS | Framework, kit, Metal, and deterministic headless catalog | CI runs the all-feature native check and `cargo run -p xtask -- headless check`; real-window review remains separate | A local result is not evidence for another OS; real-window accessibility needs a logged-in host |
+| Windows | Framework/kit and deterministic WGPU/WARP headless catalog | CI runs the all-feature native check and `cargo run -p xtask -- headless check`; Windows baselines exist | Native frame capture is not implemented; detailed UIA limits are in `accessibility.md` |
+| Linux | Wayland/X11 framework code and deterministic llvmpipe headless catalog | CI runs the all-feature native check and `cargo run -p xtask -- headless check`; Linux baselines exist | AT-SPI and native behavior claims remain capability-scoped |
+| Browser/WASM | Stable, single-threaded browser gallery using the same Rust scenes | CI runs `web check` and the real Chromium `web smoke`; the visual command remains available for scoped review | No threaded COOP/COEP claim and no screen-reader announcement coverage |
 
-| Capability | macOS | Windows | Linux | Browser/WASM |
-|---|---|---|---|---|
-| Core components | Supported; native visual gate | Supported; headless visual gate | Deferred; non-gating | Browser host; full WebGL2 visual gate |
-| Native frame capture | Supported | Not implemented | Deferred | Not applicable |
-| Offscreen WGPU capture | Not used | WARP | Historical llvmpipe harness only | Browser canvas capture gate |
-| Edge fade | Supported | Supported | Deferred | Covered by the full browser visual gate |
-| Backdrop blur | Metal | WGPU | Deferred | WebGPU and WebGL2 |
-| Native child surfaces | Supported | Supported | Deferred | Not applicable |
+All four rows are mandatory CI surfaces. A release may claim only results
+recorded for its commit; the commands do not erase the explicit limitations in
+the final column. Accessibility capability details remain in
+[`accessibility.md`](accessibility.md), and visual mechanics in
+[`screenshot-testing.md`](screenshot-testing.md).
 
-Core component rendering is supported and visually regression-tested on macOS
-and Windows. macOS uses native window capture; Windows renders the same catalog
-through its deterministic offscreen WGPU backend. Browser/WASM has its own
-catalog and smoke gates. Linux renderer code and prior llvmpipe snapshots remain
-available for a future roadmap wave, but they make no current compatibility or
-release claim. Native frame capture and some accessibility or native-child
-capabilities remain platform-specific as recorded in this table and in
-[`accessibility.md`](accessibility.md).
+Browser checks are:
 
-Backdrop blur is deliberately renderer-specific: Metal and WGPU snapshot and
-blur the scene below each ordered blur fence. WGPU applies the content mask and
-rounded bounds exactly, bounds variance splitting and aggregate per-frame work,
-and preserves the translucent fill over an unblurred backdrop for invalid or
-over-budget regions. Other renderers retain that same truthful unblurred
-fallback. Edge fade is encoded into ordinary painted primitives and is
-exercised by the WGPU integration test.
+```bash
+rustup target add wasm32-unknown-unknown
+cargo run -p xtask -- web check
+cargo run -p xtask -- web build
+cargo run -p xtask -- web smoke
+cargo run -p xtask -- web visual check button input dialog node-graph
+```
 
-`cargo run -p xtask -- web check` checks the core `gpui-kit` library with
-fixtures for `wasm32-unknown-unknown` on the repository's stable Rust
-toolchain. `web build` additionally links the browser gallery against
-WebPlatform. The browser host uses the same Rust scene catalog, themes, tokens,
-directions, and stable semantic ids as native rendering; it has no DOM component
-rewrite. The full runtime catalog reproduces exactly in both bundled themes.
-The matrix does not claim threaded execution or screen-reader announcement
-coverage.
+The browser host is not a DOM rewrite. It covers forced WebGL2, forced WebGPU,
+and automatic fallback in the pinned Playwright smoke. Its AccessKit adapter
+mirrors roles, focus, actions, values, and canvas-scaled bounds into semantic
+DOM, but the JSON semantic snapshot is only a testing/debug surface.
 
-The host uses the stable single-threaded WebPlatform path. Threaded browser
-execution requires separate COOP/COEP and worker validation. The WebPlatform
-AccessKit adapter mirrors semantic roles, focus, supported actions, values, and
-canvas-scaled bounds into an invisible browser DOM tree; the gallery's JSON
-semantic snapshot remains a locator/debugging surface rather than a substitute
-for that adapter.
+## Upstream update contract
 
-## Upgrade process
-
-1. Rebase each fork topic stack onto the selected upstream Zed revision.
-2. Merge the verified topic heads into a new integration commit without
-   rewriting the topic branches.
-3. Update the root and headless manifests to that exact integration SHA.
-4. Run `cargo run -p xtask -- dependencies check`, both workspace gates, and
-   the fork's `gpui-kit consumer` workflow.
-5. Capture the gallery on each supported native platform and inspect text layout:
-   upstream wrapping fixes land continuously and move line breaks.
-6. Update this matrix, `PROVENANCE.md`, and `THIRD_PARTY_NOTICES`.
-
-Do not use a floating branch dependency.
+Zed is upstream input and a compatibility-validation object, not a dependency.
+To update it: verify `scripts/sync-zed/config.json`; bootstrap history first if
+the receipt remains null; sync an official full SHA; resolve conflicts
+manually; update the receipt and provenance; run `dependencies check`, package
+check, all claimed platform gates, and inspect changed images. Generally useful
+changes may still be proposed to Zed independently. GPUI Box remains an
+independent derivative and is not endorsed by Zed Industries.

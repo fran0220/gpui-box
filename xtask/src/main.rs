@@ -12,6 +12,7 @@ use anyhow::{Context, Result, bail};
 
 mod api;
 mod dependencies;
+mod package;
 mod site;
 mod strings;
 mod typography;
@@ -33,6 +34,9 @@ fn main() -> Result<()> {
         (Some("api"), Some("check")) => api::check(&root()),
         (Some("api"), Some("generate")) => api::generate(&root()),
         (Some("dependencies"), Some("check")) => dependencies::check(&root(), &rest),
+        (Some("package"), Some("plan")) => package::plan(&root()),
+        (Some("package"), Some("check")) => package::check(&root()),
+        (Some("package"), Some("publish")) => package::publish(&root(), &rest),
         (Some("site"), Some("generate")) => {
             site::generate(&root(), rest.first().map(String::as_str)).map(|_| ())
         }
@@ -50,7 +54,7 @@ fn main() -> Result<()> {
         (Some("gate"), Some("full")) => gate(true),
         (Some("gate"), Some("only")) => gate_only(&rest),
         _ => bail!(
-            "usage: cargo xtask <dependencies check|accessibility check|tokens generate|tokens check|strings check|\
+            "usage: cargo xtask <dependencies check|package plan|package check|package publish --execute|accessibility check|tokens generate|tokens check|strings check|\
              strings generate|typography check|scenes list|scenes render [name...]|\
              headless capture [name...]|\
              headless check [name...]|web check|web build|web smoke|\
@@ -61,8 +65,8 @@ fn main() -> Result<()> {
 
 #[cfg(target_os = "macos")]
 fn accessibility_check() -> Result<()> {
-    step("cargo", &["build", "-p", "gpui-kit-gallery"], None)?;
-    let executable = root().join("target/debug/gpui-kit-gallery");
+    step("cargo", &["build", "-p", "gpui-box-gallery"], None)?;
+    let executable = root().join("target/debug/gpui-box-gallery");
     let mut gallery = Command::new(&executable)
         .args(["--scene", "button", "--theme", "studio-light"])
         .current_dir(root())
@@ -119,7 +123,7 @@ fn accessibility_check() -> Result<()> {
 
 #[cfg(target_os = "macos")]
 fn editable_accessibility_check() -> Result<()> {
-    let executable = root().join("target/debug/gpui-kit-gallery");
+    let executable = root().join("target/debug/gpui-box-gallery");
     let mut gallery = Command::new(&executable)
         .args(["--scene", "input", "--theme", "studio-light"])
         .current_dir(root())
@@ -159,7 +163,7 @@ fn editable_accessibility_check() -> Result<()> {
 
 #[cfg(target_os = "macos")]
 fn dialog_accessibility_check() -> Result<()> {
-    let executable = root().join("target/debug/gpui-kit-gallery");
+    let executable = root().join("target/debug/gpui-box-gallery");
     let mut gallery = Command::new(&executable)
         .args(["--scene", "dialog", "--theme", "studio-light"])
         .current_dir(root())
@@ -194,7 +198,7 @@ fn dialog_accessibility_check() -> Result<()> {
 
 #[cfg(target_os = "macos")]
 fn menu_accessibility_check() -> Result<()> {
-    let executable = root().join("target/debug/gpui-kit-gallery");
+    let executable = root().join("target/debug/gpui-box-gallery");
     let mut gallery = Command::new(&executable)
         .args(["--scene", "menu", "--theme", "studio-light"])
         .current_dir(root())
@@ -216,7 +220,7 @@ fn menu_accessibility_check() -> Result<()> {
 
 #[cfg(target_os = "macos")]
 fn tooltip_accessibility_check() -> Result<()> {
-    let executable = root().join("target/debug/gpui-kit-gallery");
+    let executable = root().join("target/debug/gpui-box-gallery");
     let mut gallery = Command::new(&executable)
         .args(["--scene", "tooltip", "--theme", "studio-light"])
         .current_dir(root())
@@ -238,7 +242,7 @@ fn tooltip_accessibility_check() -> Result<()> {
 
 #[cfg(target_os = "macos")]
 fn toast_accessibility_check() -> Result<()> {
-    let executable = root().join("target/debug/gpui-kit-gallery");
+    let executable = root().join("target/debug/gpui-box-gallery");
     let mut gallery = Command::new(&executable)
         .args(["--scene", "toast", "--theme", "studio-light"])
         .current_dir(root())
@@ -917,12 +921,36 @@ fn gate(full: bool) -> Result<()> {
     dependencies::check(&root(), &[])?;
     step("cargo", &["check", "--workspace", "--all-targets"], None)?;
     step("cargo", &["test", "--workspace"], None)?;
+    // The framework subtree is a filtered upstream import and keeps its
+    // upstream lint posture. Run Clippy across it, then make warnings fatal for
+    // the GPUI Box-owned kit, catalogs, and release tooling.
+    step("cargo", &["clippy", "--workspace", "--all-targets"], None)?;
     step(
         "cargo",
         &[
             "clippy",
-            "--workspace",
+            "-p",
+            "gpui-box-kit",
+            "-p",
+            "gpui-box-kit-assets",
+            "-p",
+            "gpui-box-kit-semantics",
+            "-p",
+            "gpui-box-kit-testkit",
+            "-p",
+            "gpui-box-kit-theme",
+            "-p",
+            "gpui-box-kit-tokens",
+            "-p",
+            "gpui-box-browser-gallery",
+            "-p",
+            "gpui-box-gallery",
+            "-p",
+            "gpui-box-mcp",
+            "-p",
+            "xtask",
             "--all-targets",
+            "--no-deps",
             "--",
             "-D",
             "warnings",
@@ -972,7 +1000,7 @@ fn gate_only(scenes: &[String]) -> Result<()> {
         &[
             "clippy",
             "-p",
-            "gpui-kit",
+            "gpui-box-kit",
             "--all-targets",
             "--",
             "-D",
@@ -983,7 +1011,7 @@ fn gate_only(scenes: &[String]) -> Result<()> {
     // A scene name is also how its tests are named, which is what makes one
     // argument enough to select both.
     for scene in scenes {
-        step("cargo", &["test", "-p", "gpui-kit", scene], None)?;
+        step("cargo", &["test", "-p", "gpui-box-kit", scene], None)?;
     }
     tokens(true)?;
     strings::check(&root())?;
@@ -1030,7 +1058,7 @@ fn web_check() -> Result<()> {
         &[
             "check",
             "-p",
-            "gpui-kit",
+            "gpui-box-kit",
             "--lib",
             "--features",
             "fixtures",
@@ -1047,7 +1075,7 @@ fn web_build() -> Result<()> {
         &[
             "build",
             "-p",
-            "gpui-kit-browser-gallery",
+            "gpui-box-browser-gallery",
             "--target",
             WASM_TARGET,
             "--release",
@@ -1207,7 +1235,7 @@ fn capture_into(directory: &Path, only: &[String]) -> Result<usize> {
     fs::create_dir_all(directory).with_context(|| format!("create {}", directory.display()))?;
     let mut command = Command::new(env!("CARGO"));
     command
-        .args(["run", "--quiet", "-p", "gpui-kit-gallery", "--"])
+        .args(["run", "--quiet", "-p", "gpui-box-gallery", "--"])
         .arg("--capture-all")
         .arg(directory)
         .current_dir(root());

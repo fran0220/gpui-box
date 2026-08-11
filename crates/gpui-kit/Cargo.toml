@@ -1,11 +1,14 @@
 [package]
-name = "gpui-kit"
-description = "Design-system components and interaction primitives for GPUI desktop applications"
+name = "gpui-box-kit"
+description = "GPUI Box Kit design-system components and interaction primitives"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
+
+[lib]
+name = "gpui_kit"
 
 [features]
 # The reference calendar the datetime scenes and tests run on. Off by default,
@@ -28,11 +31,11 @@ serde_json.workspace = true
 web-time.workspace = true
 
 [dev-dependencies]
-gpui = { workspace = true, features = ["test-support"] }
+gpui = { package = "gpui-box", path = "../gpui", features = ["test-support"] }
 # The tests drive the datetime scenes, which only exist with the reference
 # calendar compiled in.
-gpui-kit = { path = ".", features = ["fixtures"] }
-gpui-kit-testkit = { workspace = true, features = ["test-support"] }
+gpui-kit = { package = "gpui-box-kit", path = ".", features = ["fixtures"] }
+gpui-kit-testkit = { package = "gpui-box-kit-testkit", path = "../gpui-kit-testkit", features = ["test-support"] }
 
 [lints]
 workspace = true

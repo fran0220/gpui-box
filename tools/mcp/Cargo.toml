@@ -1,12 +1,13 @@
 [package]
-name = "gpui-kit-mcp"
-description = "Model Context Protocol server exposing the gpui-kit catalog to an agent"
-publish = false
+name = "gpui-box-mcp"
+description = "Model Context Protocol server exposing the GPUI Box Kit catalog to an agent"
+publish = true
 edition.workspace = true
 version.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
+readme = "../../docs/mcp.md"
 
 [dependencies]
 anyhow.workspace = true

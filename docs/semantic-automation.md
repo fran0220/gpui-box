@@ -1,6 +1,6 @@
 # Semantic automation
 
-GPUI renders native windows without a browser DOM. `gpui-kit-semantics`
+GPUI renders native windows without a browser DOM. `gpui-box-kit-semantics`
 provides a small, transport-independent semantic tree.
 
 ## Registration

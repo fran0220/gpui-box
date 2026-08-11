@@ -4,14 +4,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Entries say what the library now does and what it refuses to do, because a
 refusal is the part a caller has to plan around.
 
-Nothing here has been released. There is no tag and no registry entry, and
-what a consumer pins is a commit; see "Versioning and compatibility" in
-`README.md` for what that means for a dependency. The `0.1.0` in `Cargo.toml`
-is what Cargo requires a manifest to carry, not a version anybody can take.
+Nothing here has been released: there is no GPUI Box tag or confirmed registry
+entry yet. The `0.1.0` manifests describe the intended first crates.io cohort;
+see `docs/releasing.md` for the protected publication and verification runbook.
 
 ## Unreleased
 
 ### Added
+
+**GPUI Box umbrella distribution.** Filtered GPUI framework/support source is
+now imported from `fran0220/zed@0b9c8dc932b65cba2dc87464148984e93f60ae18`
+against official baseline `a6a23c7b80a5cefa0487b7856335be89ace7e483`,
+rather than linked as a Cargo Git dependency. The public identities are
+`gpui-box` (Rust `gpui`), the `gpui-box-*` framework cohort,
+`gpui-box-kit`/`gpui-box-kit-*`, and `gpui-box-mcp`, with one GPUI type
+universe. A local-registry package gate validates registry-only framework and
+framework-plus-kit consumers, while `scripts/sync-zed` records the reproducible
+filtered update boundary; its committed history receipt remains unbootstrapped.
 
 **Undo history.** `navigation::UndoHistory` renders caller-owned revision
 entries and reports only the durable identity a typist asked to restore. The
@@ -23,7 +32,7 @@ and the component keeps no undo stack and mutates no document state.
 are the three surfaces a desktop application cannot assemble out of a button
 and a slider. The two players run over `media::MediaTransport` — `origin`,
 `snapshot`, `apply` — which this crate declares and does not implement, because
-there is no decoder, no output device and no frame pump in GPUI at the pinned
+there is no decoder, no output device and no frame pump in GPUI at the imported
 revision. A control asks the transport and reports `Applied`, `Refused` with the
 backend's own sentence, or `Unsupported`; the next frame draws the transport's
 snapshot, so a refused seek leaves the head where it was. Idle, loading, no
@@ -214,16 +223,18 @@ two failures a reader most needs told apart. Refused and failed stay separate
 for the same reason, and a history control with nowhere to go is disabled and
 installs no handler.
 
-**Tooling.** `xtask tokens generate|check`, `xtask scenes list|capture|check`
-and `xtask gate [full]`. `scenes check` is the visual regression gate; see
-`docs/screenshot-testing.md` for where it can and cannot run.
+**Tooling.** `xtask tokens generate|check`, `xtask scenes list|render`,
+`xtask headless capture|check`, and `xtask gate [full]`. The headless check is
+the renderer-specific visual regression gate; see `docs/screenshot-testing.md`
+for where it can and cannot run.
 
 ### Changed
 
-**Supported platforms.** Linux compatibility is deferred until a future
-roadmap explicitly restores it. macOS, Windows, and Browser/WASM remain the
-supported targets; Linux CI and release gating are removed, while prior
-llvmpipe snapshots and renderer code remain as non-gating historical evidence.
+**Supported platforms.** macOS, Linux, Windows, and single-threaded
+Browser/WASM are active CI surfaces. The three native platforms compile every
+feature and gate renderer-specific headless baselines; Browser/WASM gates the
+shared gallery and real Chromium smoke within its documented accessibility and
+threading limits.
 
 - Studio Dark now keeps faint text above 4.8:1 even on the raised surface,
   strengthens hairlines that previously disappeared into dark panels, and
@@ -263,7 +274,7 @@ llvmpipe snapshots and renderer code remain as non-gating historical evidence.
   the ninetieth scene of a full run, and that moves one antialiased pixel of
   `frost`.
 - `xtask gate only <scene>...` runs the part of the gate one component can
-  invalidate: `gpui-kit` clippy, the tests whose names mention those scenes, the
+  invalidate: `gpui-box-kit` clippy, the tests whose names mention those scenes, the
   generated-artifact checks, and those scenes' baselines. The full gate compiles
   and tests every workspace member and renders the whole catalog, which is
   minutes of waiting for an edit to one file. It is a shortcut while iterating
@@ -272,15 +283,12 @@ llvmpipe snapshots and renderer code remain as non-gating historical evidence.
   `xtask scenes render`, which writes to `target/scenes` and holds no baseline.
   A real window is still how motion and the text caret get reviewed; it is no
   longer how a baseline is recorded.
-- GPUI dependency ownership moved to the maintained `fran0220/zed` integration
-  fork. The root workspace and standalone headless harness now pin the same
-  immutable revision instead of combining an upstream pin with a temporary
-  Cargo patch. `xtask dependencies check` treats the root pin as authority and
-  rejects manifest, lockfile, compatibility-document, or cross-repository
-  consumer drift. The fork keeps runtime/native-surface and offscreen-WGPU work
-  on separate topic histories, merges them only on an integration branch, and
-  can validate a gpui-kit ref against the exact fork SHA before either side is
-  promoted.
+- GPUI framework source is now a filtered import from the exact recorded Zed
+  bootstrap revision rather than a Cargo Git dependency. The root workspace and
+  standalone headless harness consume the same local GPUI Box package family
+  through path-plus-version declarations with no `[patch]` override. `xtask
+  dependencies check` treats `package-authority.toml` as authority and rejects
+  manifest, graph, lockfile, compatibility, provenance, or sync-boundary drift.
 
 - The visual regression gate stopped photographing windows and started
   reading frames back from the GPU. `scenes capture` used to ask the macOS
@@ -289,7 +297,7 @@ llvmpipe snapshots and renderer code remain as non-gating historical evidence.
   whatever settled latency the machine felt like that day; re-capturing an
   unchanged catalog could disagree with itself on half the images. Captures
   now re-render the scene GPUI drew into an offscreen texture and read the
-  pixels straight back (`gpui-kit-testkit::capture::render_frame`, built on
+  pixels straight back (`gpui_kit_testkit::capture::render_frame`, built on
   GPUI's `render_to_image` under its `test-support` feature). One warm-up
   frame is rendered and discarded so stray platform mouse events cannot
   hover a row in the first image. Two runs of the same catalog now agree to
@@ -307,8 +315,8 @@ llvmpipe snapshots and renderer code remain as non-gating historical evidence.
   baselines in `snapshots/headless/{linux,windows}/scenes`.
   `cargo run -p xtask -- headless check` runs it. The harness is its own
   workspace with renderer-specific dependencies and a separate lockfile, but
-  directly pins the same integration revision as the root. The offscreen WGPU
-  topic remains independently traceable to zed-industries/zed#62341.
+  resolves the same local GPUI Box authority as the root without a Git source
+  or patch. The offscreen WGPU origin remains recorded in the provenance files.
 
 - The design system stopped drawing hairlines to say what a colour could say.
   Borders were doing the work of grouping because the surface ramp was too flat
@@ -350,13 +358,13 @@ llvmpipe snapshots and renderer code remain as non-gating historical evidence.
   settled one says "Reasoning", so reduced motion loses the movement and keeps
   the state.
 
-- The catalog is readable by a program. `docs/api-index.json` carries all 105
+- The catalog is readable by a program. `docs/api-index.json` carries all 122
   components, the exact signature of every public method sorted by what the
   caller has to hold, the events each one reports, and the scenes that render
   it — generated from the source by `xtask api generate` and checked by `gate`,
-  so a signature it states is one a compiler agreed to. Each of the 82 scenes
+  so a signature it states is one a compiler agreed to. Each of the 99 scenes
   carries its own source as an example, which is worth more than a written one
-  because the gate compiles it and `scenes check` renders it. `docs/llms.txt`
+  because the gate compiles it and `headless check` renders it. `docs/llms.txt`
   is the entry point, and `tools/mcp` serves the same catalog as Model Context
   Protocol tools, one of which renders a scene and returns the image so a
   caller can look at a component rather than read a description of it.
@@ -364,7 +372,7 @@ llvmpipe snapshots and renderer code remain as non-gating historical evidence.
   the same index, the same scene sources and the same captured images the gate
   checks, styled from the token document the components read, and one
   Cloudflare Worker serves it alongside an MCP endpoint at `/mcp`. It needs no
-  host: `render_scene` can only ever draw catalog scenes, the catalog is 82
+  host: `render_scene` can only ever draw catalog scenes, the catalog is 99
   scenes in two themes, and captures here are deterministic, so the bytes a
   hosted renderer would produce are the bytes already committed. The hosted
   server therefore serves the published revision and says so, while the local
@@ -374,8 +382,8 @@ llvmpipe snapshots and renderer code remain as non-gating historical evidence.
   repository-root `tokens/` meant the one crate in this workspace that does not
   depend on GPUI — and could therefore be published — could not even be
   packaged. It packages now. `docs/releasing.md` records what a release is
-  here, which is a tag on a verified commit rather than a registry version,
-  and why publishing that crate today would still be premature.
+  here: one protected, verified, registry-only-tested cohort from an immutable
+  tag, rather than an isolated package upload.
 
 - The component-level `effects::frosted` and `effects::edge_faded` wrappers
   remain removed. The integration fork now carries the underlying
@@ -408,7 +416,7 @@ llvmpipe snapshots and renderer code remain as non-gating historical evidence.
   own a font covering them. No Geist face does, and the component relied on the
   platform's own fallback, so the library could not draw its own keyboard
   shortcuts unaided and no baseline could record them — the first offscreen
-  macOS run rendered them as missing-glyph boxes. `gpui-kit-assets` now bundles
+  macOS run rendered them as missing-glyph boxes. `gpui-box-kit-assets` now bundles
   `KeySymbols.ttf`, a seven-glyph subset of Noto Sans Symbols and Noto Sans
   Symbols 2 renamed so it cannot shadow a full Noto family on the host.
 - `cargo doc` rejected three redundant explicit link targets in `content::DiffView`,

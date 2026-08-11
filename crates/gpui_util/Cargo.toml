@@ -1,0 +1,23 @@
+[package]
+name = "gpui-box-util"
+version = "0.1.0"
+publish = true
+edition.workspace = true
+rust-version.workspace = true
+homepage.workspace = true
+
+license = "Apache-2.0"
+repository = "https://github.com/fran0220/gpui-box"
+description = "Utility types for GPUI Box"
+[lib]
+name = "gpui_util"
+
+[dependencies]
+log.workspace = true
+anyhow.workspace = true
+
+[target.'cfg(target_os = "windows")'.dependencies]
+which.workspace = true
+
+[lints]
+workspace = true

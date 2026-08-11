@@ -1,0 +1,22 @@
+[package]
+name = "gpui-box-shared-string"
+version = "0.1.0"
+publish = true
+edition.workspace = true
+rust-version.workspace = true
+homepage.workspace = true
+
+license = "Apache-2.0"
+repository = "https://github.com/fran0220/gpui-box"
+description = "Shared string types for GPUI Box"
+[lib]
+name = "gpui_shared_string"
+path = "gpui_shared_string.rs"
+
+[dependencies]
+schemars.workspace = true
+serde.workspace = true
+smol_str = "0.3.6"
+
+[lints]
+workspace = true

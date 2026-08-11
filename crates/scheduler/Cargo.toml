@@ -1,0 +1,31 @@
+[package]
+name = "gpui-box-scheduler"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+homepage.workspace = true
+publish = true
+license = "Apache-2.0"
+
+repository = "https://github.com/fran0220/gpui-box"
+description = "Task scheduler for GPUI Box"
+[lints]
+workspace = true
+
+[lib]
+name = "scheduler"
+path = "src/scheduler.rs"
+doctest = false
+
+[features]
+test-support = []
+
+[dependencies]
+async-task.workspace = true
+backtrace.workspace = true
+chrono.workspace = true
+flume.workspace = true
+futures.workspace = true
+parking_lot.workspace = true
+rand.workspace = true
+web-time.workspace = true

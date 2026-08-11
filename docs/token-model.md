@@ -6,8 +6,8 @@ The documents under `crates/gpui-kit-tokens/tokens/` are the authority, and
 they sit inside the crate that embeds them so that crate can be packaged on its
 own. `schema.json` is the single current portable schema; documents and nested
 objects reject unknown or legacy fields rather than carrying compatibility
-readers. `gpui-kit-tokens` embeds and validates every bundled theme;
-`gpui-kit-theme` is the only GPUI adapter.
+readers. Cargo package `gpui-box-kit-tokens` embeds and validates every bundled
+theme; `gpui-box-kit-theme` is the only GPUI adapter.
 `studio-dark` is the default and `studio-light` is its light counterpart.
 
 ```text
@@ -117,7 +117,7 @@ Overlay surfaces are opaque by default. `Frost` is the one surface that is not:
 `effect.glassAlpha` is how opaque its own fill is over what it blurs and
 `effect.glassBlur` is how far that blur reaches. A theme that sets the alpha to
 1 declares itself opaque and no blur is painted at all, and where the renderer
-provides no backdrop blur the tinted fill is drawn on its own — gpui-kit does
+provides no backdrop blur the tinted fill is drawn on its own — GPUI Box Kit does
 not fake a blur with a gradient, because the colour behind a translucent window
 is not a colour anything can paint.
 

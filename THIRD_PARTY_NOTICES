@@ -1,9 +1,23 @@
-THIRD-PARTY NOTICES — gpui-kit
+THIRD-PARTY NOTICES — GPUI Box
 ================================================================================
 
-gpui-kit contains or derives portions of the projects and assets below.
-The repository itself is MIT licensed; third-party material remains under the
-license named in each entry.
+GPUI Box combines Apache-2.0 framework code with MIT kit/MCP code. Imported
+source and assets retain the licenses and attribution below. GPUI Box is an
+independent derivative and is not an official Zed Industries project.
+
+GPUI / Zed
+--------------------------------------------------------------------------------
+Official source: https://github.com/zed-industries/zed
+Bootstrap source: https://github.com/fran0220/zed
+Official baseline: a6a23c7b80a5cefa0487b7856335be89ace7e483
+Filtered bootstrap revision: 0b9c8dc932b65cba2dc87464148984e93f60ae18
+License: Apache-2.0
+Copyright 2022–2024 Zed Industries, Inc.
+
+Scope: filtered imported GPUI framework/support source, including platform,
+renderer, accessibility, input, and browser support. It is not a linked Git
+dependency. Filter and current null sync receipt are in scripts/sync-zed/.
+License text: licenses/ZED-APACHE-2.0.txt
 
 Comet
 --------------------------------------------------------------------------------
@@ -11,53 +25,27 @@ Source: https://github.com/zeronsh/comet
 Revision: fb22e269ac57331ee7aa4a9673530acf3299a886
 License: MIT
 Copyright (c) 2026 Wing
-
 Scope: theme geometry, motion, loader math, popover/dialog and settings
-scaffolding, frost, edge fade, font registration, and generic icon assets.
+scaffolding, frost, edge fade, font registration, and generic assets.
 License text: licenses/COMET-MIT.txt
-
-GPUI / Zed
---------------------------------------------------------------------------------
-Source: https://github.com/zed-industries/zed
-Integration source: https://github.com/fran0220/zed
-Upstream baseline: a6a23c7b80a5cefa0487b7856335be89ace7e483
-Pinned integration revision: 0b9c8dc932b65cba2dc87464148984e93f60ae18
-License: Apache-2.0
-Copyright 2022–2024 Zed Industries, Inc.
-
-Scope: linked GPUI, gpui_platform, gpui_wgpu, EdgeFade, BackdropBlur,
-native-surface integration, accessibility control-state projection and test
-activation, Windows pointer-exit translation, and offscreen rendering patch
-chains, fluent hitbox pointer capture for bounded drag gestures, and browser
-WebGPU/WebGL2 rendering, input delivery, AccessKit semantic DOM mirroring, and
-bounded ordered WGPU backdrop blur, plus first-prepaint tracked scrolling for
-variable-height children. WGPU and gpu-allocator are consumed from crates.io
-rather than integration forks.
-License text: licenses/ZED-APACHE-2.0.txt
 
 Geist and Geist Mono
 --------------------------------------------------------------------------------
 Source: https://vercel.com/font
 License: SIL Open Font License 1.1
 Copyright 2023 Vercel Inc.
-
-Scope: embedded variable fonts and static Medium/SemiBold/Bold faces under
-crates/gpui-kit-assets/assets/fonts.
+Scope: embedded fonts under crates/gpui-kit-assets/assets/fonts.
 License text: licenses/GEIST-OFL-1.1.txt
 
 Noto Sans Symbols and Noto Sans Symbols 2
 --------------------------------------------------------------------------------
 Source: https://github.com/notofonts/notofonts.github.io
 Revision: c16b117609abbe4e60b3f2bd4433bdb3d0accb2e
-Versions: Noto Sans Symbols 2.003, Noto Sans Symbols 2 2.008
+Versions: 2.003 and 2.008
 License: SIL Open Font License 1.1, no Reserved Font Name
-Copyright 2022 The Noto Project Authors (https://github.com/notofonts/symbols)
-
-Scope: crates/gpui-kit-assets/assets/fonts/KeySymbols.ttf, a seven-glyph subset
-merged from both families and renamed to "GPUI Kit Key Symbols" so that it
-cannot shadow a full Noto family installed on the host. It supplies the
-keyboard symbols no Geist face draws. See
-crates/gpui-kit-assets/assets/SOURCE.md for the exact subset recipe.
+Copyright 2022 The Noto Project Authors
+Scope: KeySymbols.ttf seven-glyph subset, renamed “GPUI Kit Key Symbols”.
+Recipe: crates/gpui-kit-assets/assets/SOURCE.md
 License text: licenses/NOTO-OFL-1.1.txt
 
 Solar Icons
@@ -67,7 +55,15 @@ https://www.figma.com/community/file/1166831539721848736
 License: Creative Commons Attribution 4.0 International
 https://creativecommons.org/licenses/by/4.0/
 Attribution: “Solar Icons by 480 Design.”
+Scope: product-neutral SVGs under crates/gpui-kit-assets/assets/icons. Generic
+Comet glyphs identified in assets/SOURCE.md are covered by Comet's MIT license.
+License text: crates/gpui-kit-assets/licenses/CC-BY-4.0.txt
 
-Scope: product-neutral SVGs under crates/gpui-kit-assets/assets/icons.
-Comet-authored generic glyphs in that directory are covered by the Comet MIT
-entry instead. See crates/gpui-kit-assets/assets/SOURCE.md.
+IBM Plex Sans and Lilex
+--------------------------------------------------------------------------------
+Sources: https://github.com/IBM/plex and https://github.com/mishamyrt/Lilex
+License: SIL Open Font License 1.1
+
+Scope: framework test and fallback fonts under crates/gpui/assets/fonts,
+crates/gpui_web/assets/fonts, and crates/gpui_wgpu/assets/fonts. Each directory
+carries SOURCES.md and the applicable license text beside the font files.

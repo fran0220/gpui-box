@@ -1,5 +1,5 @@
 [package]
-name = "gpui-kit-gallery"
+name = "gpui-box-gallery"
 publish = false
 edition.workspace = true
 version.workspace = true

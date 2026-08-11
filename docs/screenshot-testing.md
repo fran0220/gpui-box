@@ -2,7 +2,8 @@
 
 ## Two captures, two questions
 
-`gpui-kit-testkit::capture` answers two different questions with two functions.
+The `gpui_kit_testkit::capture` module from Cargo package
+`gpui-box-kit-testkit` answers two different questions with two functions.
 
 `render_frame` (behind the `test-support` feature) re-renders the scene GPUI
 drew last into an offscreen texture and reads the pixels straight back. The
@@ -123,9 +124,8 @@ it names and reads the pixels straight back. No window, display, menu bar,
 dock, or compositor takes part, so any machine with the same renderer produces
 the same bytes. Baselines live in `snapshots/headless/{macos,linux,windows}/scenes`,
 one set per renderer, because Metal, llvmpipe, and WARP land antialiased edges
-differently. The macOS and Windows sets are active gates. Linux compatibility
-is deferred; its llvmpipe set is retained as historical, non-gating evidence
-and is not refreshed until the roadmap restores Linux support.
+differently. All three sets are active platform-specific gates and must be
+captured on the renderer they represent.
 
 Text is shaped by cosmic-text from the bundled fonts only. Loading the
 machine's own fonts would shape text differently from one machine to the next,
@@ -224,33 +224,28 @@ correlation.
 
 ## The headless gate
 
-`tools/headless-visual` renders the same catalog on Windows with no window
-system at all: GPUI's wgpu renderer draws each scene into an offscreen texture
-and the pixels are read straight back. WARP is enough, so the gate runs on a
-headless VM or CI box with no GPU. Text is shaped by cosmic-text from the
-bundled Geist fonts only, and time is simulated. Repeated WARP runs are
-byte-stable and compare against the Windows baseline.
+`tools/headless-visual` renders the same catalog with no window system at all:
+GPUI's renderer draws each scene into an offscreen texture and the pixels are
+read straight back. Metal is used on macOS; llvmpipe and WARP provide software
+adapters on Linux and Windows, so those gates run on headless CI machines with
+no discrete GPU. Text is shaped from bundled fonts only, and time is simulated.
+Repeated runs are stable within each renderer and compare against that
+platform's baseline.
 
 ```bash
 cargo run -p xtask -- headless check     # compare against the baseline
 cargo run -p xtask -- headless capture   # accept what check reported
 ```
 
-The active WARP baseline lives in `snapshots/headless/windows/scenes`, beside
-but distinct from the macOS one. CoreText and WARP land antialiased edges
-differently, so each supported renderer verifies its own baseline exactly. The
-retained `snapshots/headless/linux/scenes` images record the prior llvmpipe
-renderer; they are not acceptance evidence or a release requirement while
-Linux compatibility is deferred.
+The active baselines live in `snapshots/headless/{macos,linux,windows}/scenes`.
+Metal, llvmpipe, and WARP land antialiased edges differently, so each supported
+renderer verifies its own baseline.
 
 The harness is its own Cargo workspace because its renderer dependencies and
-lockfile are platform-specific. It no longer patches one GPUI source into
-another: the root workspace and harness directly pin the same
-immutable `fran0220/zed` integration revision. That revision includes the
-offscreen renderer from
-[zed-industries/zed#62341](https://github.com/zed-industries/zed/pull/62341)
-alongside the runtime primitives and bounded WGPU backdrop blur the scenes use,
-and `xtask dependencies check` fails if either workspace or lockfile drifts.
+lockfile are platform-specific. It resolves the same local GPUI Box package
+family as the root workspace with path-plus-version declarations and no Git
+source or `[patch]` override. `xtask dependencies check` fails if either graph,
+authority declaration, or lockfile drifts.
 
 ## Audit
 

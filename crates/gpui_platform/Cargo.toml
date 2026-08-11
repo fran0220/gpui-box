@@ -1,0 +1,51 @@
+[package]
+name = "gpui-box-platform"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+homepage.workspace = true
+publish = true
+license = "Apache-2.0"
+
+repository = "https://github.com/fran0220/gpui-box"
+description = "Cross-platform integration for GPUI Box"
+[lints]
+workspace = true
+
+[lib]
+name = "gpui_platform"
+path = "src/gpui_platform.rs"
+
+[features]
+default = []
+font-kit = ["gpui_macos/font-kit"]
+web-multithreaded = ["gpui_web/multithreaded"]
+test-support = [
+    "gpui/test-support",
+    "gpui_macos/test-support",
+    "dep:gpui_wgpu",
+    "gpui_wgpu/test-support",
+]
+screen-capture = ["gpui/screen-capture", "gpui_macos/screen-capture", "gpui_windows/screen-capture", "gpui_linux/screen-capture"]
+runtime_shaders = ["gpui_macos/runtime_shaders"]
+wayland = ["gpui_linux/wayland"]
+x11 = ["gpui_linux/x11"]
+
+[dependencies]
+gpui.workspace = true
+gpui_wgpu = { workspace = true, optional = true }
+log.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+gpui_macos.workspace = true
+
+[target.'cfg(target_os = "windows")'.dependencies]
+gpui_windows.workspace = true
+gpui = { workspace = true, features = ["windows-manifest"] }
+
+[target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
+gpui_linux.workspace = true
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+gpui_web.workspace = true
+console_error_panic_hook.workspace = true

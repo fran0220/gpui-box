@@ -1,0 +1,32 @@
+[package]
+name = "gpui-box-media"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+homepage.workspace = true
+publish = true
+license = "Apache-2.0"
+description = "macOS media API bindings for GPUI Box"
+
+repository = "https://github.com/fran0220/gpui-box"
+[lints]
+workspace = true
+
+[lib]
+name = "media"
+path = "src/media.rs"
+doctest = false
+
+[dependencies]
+anyhow.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation.workspace = true
+ctor.workspace = true
+foreign-types.workspace = true
+metal.workspace = true
+core-video.workspace = true
+objc.workspace = true
+
+[build-dependencies]
+bindgen = "0.71"

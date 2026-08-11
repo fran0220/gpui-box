@@ -1,60 +1,45 @@
-# The catalog as tools
+# GPUI Box catalog tools
 
-`tools/mcp` is a Model Context Protocol server over stdio. It exposes what this
-repository already generates — the API index and the scene renderer — as tools
-an agent can call, so finding a component and looking at one are single calls
-rather than a guess about which file to open.
-
-It reads the repository and renders from it. It does not write to it. An agent
-that wants to change a component edits the source and runs `gate`; a tool here
-that patched files would be a way around the check that means something.
-
-## Connecting it
+Install the published stdio server with:
 
 ```bash
-cargo build --release -p gpui-kit-mcp
+cargo install gpui-box-mcp --version 0.1.0
+gpui-box-mcp --help
 ```
 
-Then point a client at the binary. The shape differs by client, but every one
-needs a command, and most accept something close to this:
+This command is the intended registry interface; it does not assert that 0.1.0
+has already been published. For workspace development use
+`cargo build --release -p gpui-box-mcp`.
+
+The server deliberately contains no embedded static catalog. It reads the
+calling project's GPUI Box checkout: set `GPUI_BOX_ROOT` to the checkout root,
+or start the server with cwd inside the checkout and it discovers the root by
+walking upward. It does not infer a checkout from the installed binary.
 
 ```json
 {
   "mcpServers": {
-    "gpui-kit": {
-      "command": "/absolute/path/to/gpui-kit/target/release/gpui-kit-mcp",
-      "env": { "GPUI_KIT_ROOT": "/absolute/path/to/gpui-kit" }
+    "gpui-box": {
+      "command": "gpui-box-mcp",
+      "env": { "GPUI_BOX_ROOT": "/absolute/path/to/gpui-box" }
     }
   }
 }
 ```
 
-`GPUI_KIT_ROOT` is optional. Without it the server finds the repository from
-its own location, which is correct for a binary built in this workspace and
-wrong for one copied elsewhere.
-
-## The tools
-
-| Tool | Answers |
+| Tool | Result |
 |---|---|
-| `search_components` | What is there? Matches name, summary and module. |
-| `component` | What exactly is it called? Constructors, chainable options, commands that need a `Context`, queries, and the events it reports. |
-| `scene` | What does using it look like? The source of a canonical scene, which the gate compiles and renders. |
-| `render_scene` | What does it look like? Runs the real renderer and returns the PNG. |
-| `rules` | What will fail the build? `docs/llms.txt`. |
+| `search_components` | Matches catalog names, summaries, and modules |
+| `component` | Exact constructors, options, commands, queries, and reports |
+| `scene` | Canonical compiling scene source |
+| `render_scene` | PNG rendered from the checkout's real gallery |
+| `rules` | The checkout's `docs/llms.txt` |
 
-`render_scene` is the one worth having. Every other tool moves text around;
-that one draws the component and hands back the image, so the answer to "does
-this look right" is the picture rather than a description of it. It shells out
-to the gallery, so a cold build takes tens of seconds and a warm one a few.
+`render_scene` shells out to the gallery and therefore requires a **complete
+checkout**, Rust toolchain, dependencies, platform renderer, and build time. A
+crate installation alone cannot render. The server reads and renders but does
+not edit files; it does not replace `cargo run -p xtask -- gate`.
 
-## What it is not
-
-It is not a way to build an interface without the repository. The signatures
-it returns are Rust, the scenes it renders are this catalog, and the images it
-produces come from the real-window review renderer. The visual gate renders
-the same catalog offscreen with `headless check`.
-
-Nor does it replace `gate`. The server can tell an agent what a component is
-called and show it what one looks like; only `cargo run -p xtask -- gate` can
-tell it whether what it wrote is allowed to land.
+The hosted endpoint at <https://gpui-kit.origingame.dev/mcp> is different: it
+serves the currently deployed static catalog and committed images. See
+[`deploying.md`](deploying.md).

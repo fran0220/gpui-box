@@ -1,0 +1,37 @@
+[package]
+name = "gpui-box-sum-tree"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+homepage.workspace = true
+publish = true
+license = "Apache-2.0"
+description = "A sum tree data structure, a concurrency-friendly B-tree"
+
+repository = "https://github.com/fran0220/gpui-box"
+[lints]
+workspace = true
+
+[lib]
+name = "sum_tree"
+path = "src/sum_tree.rs"
+doctest = false
+
+[dependencies]
+heapless.workspace = true
+rayon.workspace = true
+log.workspace = true
+tracing.workspace = true
+proptest = { workspace = true, optional = true }
+
+[dev-dependencies]
+ctor.workspace = true
+rand.workspace = true
+proptest.workspace = true
+
+
+[package.metadata.cargo-machete]
+ignored = ["tracing"]
+
+[features]
+test-support = ["proptest"]

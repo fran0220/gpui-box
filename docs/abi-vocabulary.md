@@ -1,6 +1,6 @@
 # ABI vocabulary feasibility
 
-`gpui-kit` can be the public visual vocabulary of a host-rendered plugin ABI.
+GPUI Box Kit can be the public visual vocabulary of a host-rendered plugin ABI.
 It cannot become that vocabulary by serializing its current public API. The
 components are renderer contracts: they take GPUI elements, entities, focus
 handles, and callbacks, while the wire needs stable data and typed intent.
@@ -14,7 +14,7 @@ Sophon is one possible consuming host. Surface registration and placement,
 JSON-RPC, the command palette, and the WebView widget remain Sophon concerns.
 Dock panels, status items, settings sections, dialogs, wizards, timeline cards,
 and other slot contents may use this vocabulary without putting a slot system
-or product model into `gpui-kit`.
+or product model into GPUI Box Kit.
 
 ## Verdict
 
@@ -155,7 +155,7 @@ log.
 `FieldValue`, `SchemaFormEvent`, and `SchemaForm` in
 `crates/gpui-kit/src/structured/schema_form.rs`. Its module explicitly says
 that the host converts its schema dialect into this product-neutral shape
-because `gpui-kit` takes no serialization dependency. Unsupported input stays
+because GPUI Box Kit takes no serialization dependency. Unsupported input stays
 visible as `SchemaKind::Unrenderable` and `FieldValue::Unrenderable`.
 
 The other structured surface is `JsonValue`, `ValueKind`, and `JsonView` in
@@ -329,7 +329,7 @@ permission, cost, and timeline identities; truthful states and reasons;
 bounded caller text; ordering and run-length knowledge; declarative detail;
 and explicit retry, approval, permission, expansion, and selection actions.
 The host may compose these records into a timeline card without exposing an
-agent product model to `gpui-kit`.
+agent product model to GPUI Box Kit.
 
 **Current Rust types.** Product-neutral agent primitives now include:
 
@@ -444,7 +444,7 @@ its generation and node map. `NodeSpec` contains `SharedString` and optional
 `FocusHandle`; the `Semantic` trait records actual bounds during GPUI prepaint.
 Those remain renderer-side.
 
-`gpui-kit-testkit` now provides `present`, `visible`, `actionable`, and `text`
+`gpui-box-kit-testkit` now provides `present`, `visible`, `actionable`, and `text`
 in `crates/gpui-kit-testkit/src/lib.rs`; `Finding`, `Problem`, and `audit` in
 `gpui-kit-testkit/src/audit.rs`; and the headless `Harness` in
 `gpui-kit-testkit/src/harness.rs`. `Harness` is available as
@@ -467,12 +467,12 @@ namespace rules are enforced.
 The DTO crate should depend on serde and a JSON Schema generator, but not on
 GPUI, theme, slots, JSON-RPC, host services, or product models. Check in a
 deterministic schema for every published vocabulary minor. Put the vocabulary
-version in the surface envelope or schema id, independently of the `gpui-kit`
+version in the surface envelope or schema id, independently of the GPUI Box Kit
 crate version and the host's plugin protocol version.
 
 ```text
 ┌─────────────┐    ┌──────────────────┐    ┌──────────────┐    ┌──────────┐
-│ Plugin JSON │───▶│ versioned DTO +  │───▶│ host adapter │───▶│ gpui-kit │
+│ Plugin JSON │───▶│ versioned DTO +  │───▶│ host adapter │───▶│ GPUI Box Kit │
 └──────┬──────┘    │ schema validation│    └──────┬───────┘    └────┬─────┘
        │           └──────────────────┘           │                 │
        │                                          │ typed callback  │
@@ -502,7 +502,7 @@ This is an illustrative future JSON record, not a current Rust type:
 
 ```json
 {
-  "vocabulary": "gpui-kit.ui/1.0",
+  "vocabulary": "gpui-box.ui/1.0",
   "kind": "status-item",
   "node": "sync.open",
   "presentation": {
@@ -523,7 +523,7 @@ The host qualifies `sync.open` as, for example,
 
 ```json
 {
-  "vocabulary": "gpui-kit.ui/1.0",
+  "vocabulary": "gpui-box.ui/1.0",
   "kind": "activate",
   "node": "sync.open",
   "action": "open-sync",
@@ -542,7 +542,7 @@ data. One possible fragment is:
 
 ```json
 {
-  "vocabulary": "gpui-kit.ui/1.0",
+  "vocabulary": "gpui-box.ui/1.0",
   "kind": "data-grid",
   "node": "jobs",
   "loaded": 1,
@@ -587,7 +587,7 @@ A sort callback becomes intent, not a local sort:
 
 ```json
 {
-  "vocabulary": "gpui-kit.ui/1.0",
+  "vocabulary": "gpui-box.ui/1.0",
   "kind": "grid-sort-requested",
   "node": "jobs",
   "action": "sort-jobs",
@@ -751,4 +751,4 @@ real component limitations, but they need not block a first vocabulary if its
 published capabilities say so.
 
 Slot registration, placement, command palette integration, JSON-RPC, and the
-WebView widget are host work, not missing `gpui-kit` components.
+WebView widget are host work, not missing GPUI Box Kit components.

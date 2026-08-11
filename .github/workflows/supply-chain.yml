@@ -1,0 +1,27 @@
+name: Supply chain
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "17 6 * * 1"
+permissions:
+  contents: read
+jobs:
+  policy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@master
+        with: { toolchain: 1.97.0 }
+      - uses: taiki-e/install-action@v2
+        with: { tool: "cargo-audit@0.22.2,cargo-deny@0.20.2,cargo-cyclonedx@0.5.9" }
+      - run: cargo audit --file Cargo.lock
+      - run: cargo audit --file tools/headless-visual/Cargo.lock
+      - run: cargo deny --all-features check licenses sources
+      - name: Generate reproducible CycloneDX 1.5 SBOMs
+        run: SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)" cargo cyclonedx --all --all-features --format json --spec-version 1.5
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cyclonedx-sbom
+          path: "**/*.cdx.json"
+          if-no-files-found: error

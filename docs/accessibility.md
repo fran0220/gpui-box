@@ -138,7 +138,7 @@ descendant without inventing selection state.
 The deterministic smoke test activates GPUI's test accessibility adapter,
 renders a real element tree, and asserts role, name, value, range, control
 states, selection, focus, and an inherited click action in
-`gpui-kit-semantics`. On macOS, run:
+`gpui-box-kit-semantics`. On macOS, run:
 
 ```bash
 cargo run -p xtask -- accessibility check

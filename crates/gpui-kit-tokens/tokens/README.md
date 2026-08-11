@@ -19,7 +19,7 @@ Rules:
 After editing:
 
 ```bash
-cargo test -p gpui-kit-tokens
+cargo test -p gpui-box-kit-tokens
 cargo run -p xtask -- tokens generate
 cargo run -p xtask -- tokens check
 ```

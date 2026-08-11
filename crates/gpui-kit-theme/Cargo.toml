@@ -1,11 +1,14 @@
 [package]
-name = "gpui-kit-theme"
-description = "GPUI adapter for gpui-kit semantic design tokens"
+name = "gpui-box-kit-theme"
+description = "GPUI adapter for GPUI Box Kit semantic design tokens"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
+
+[lib]
+name = "gpui_kit_theme"
 
 [dependencies]
 gpui.workspace = true

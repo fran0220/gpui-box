@@ -1,7 +1,13 @@
 # Migration guide
 
-This guide moves an existing GPUI application onto `gpui-kit` without a
-big-bang shell rewrite.
+This guide moves an existing GPUI application onto the `gpui-box` framework
+and `gpui-box-kit` component library without a big-bang shell rewrite.
+
+```toml
+[dependencies]
+gpui = { package = "gpui-box", version = "0.1" }
+gpui_kit = { package = "gpui-box-kit", version = "0.1" }
+```
 
 ## 1. Inventory
 

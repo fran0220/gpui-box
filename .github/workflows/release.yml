@@ -1,0 +1,225 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Authority version without the v prefix
+        required: true
+        type: string
+      execute:
+        description: Publish after preflight
+        required: true
+        default: false
+        type: boolean
+      auth:
+        description: crates.io authentication; token is required for each crate's first publication
+        required: true
+        default: token
+        type: choice
+        options: [token, oidc]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    outputs:
+      release_commit: ${{ steps.tag.outputs.release_commit }}
+    steps:
+      - uses: actions/checkout@v5
+        with: { ref: "v${{ inputs.version }}", fetch-depth: 0 }
+      - name: Verify immutable tag and authority version
+        id: tag
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          python3 - <<'PY'
+          import os, re
+          version = os.environ['RELEASE_VERSION']
+          if not re.fullmatch(r'[0-9A-Za-z][0-9A-Za-z.+-]*', version):
+              raise SystemExit(f'invalid release version: {version!r}')
+          PY
+          test "$(git cat-file -t "refs/tags/v${RELEASE_VERSION}")" = tag
+          test "$(git rev-list -n 1 "refs/tags/v${RELEASE_VERSION}")" = "$(git rev-parse HEAD)"
+          python3 - <<'PY'
+          import os
+          import tomllib
+          with open('package-authority.toml', 'rb') as source:
+              packages = tomllib.load(source)['package']
+          versions = {package['version'] for package in packages if package['publish']}
+          expected = {os.environ['RELEASE_VERSION']}
+          if versions != expected:
+              raise SystemExit(f'authority versions {versions!r} do not equal {expected!r}')
+          PY
+          echo "release_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Install Linux GPUI libraries
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libegl1-mesa-dev libfontconfig1-dev libudev-dev libvulkan-dev libwayland-dev libx11-dev libx11-xcb-dev libxcb-randr0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-x11-dev mesa-vulkan-drivers
+      - uses: dtolnay/rust-toolchain@master
+        with: { toolchain: 1.97.0, components: "rustfmt, clippy" }
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo install cargo-local-registry --version 0.2.12 --locked
+      - run: cargo install cargo-cyclonedx --version 0.5.9 --locked
+      - run: scripts/sync-zed/sync-zed verify --release
+      - run: python3 -m unittest discover -s scripts/sync-zed/tests -v
+      - run: cargo run -p xtask -- dependencies check
+      - run: cargo run -p xtask -- gate
+      - run: cargo run -p xtask -- package check
+      - name: Generate reproducible CycloneDX 1.5 SBOMs
+        run: SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)" cargo cyclonedx --all --all-features --format json --spec-version 1.5
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gpui-box-${{ inputs.version }}-${{ steps.tag.outputs.release_commit }}-crates
+          path: target/package-check/archives/*.crate
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gpui-box-${{ inputs.version }}-${{ steps.tag.outputs.release_commit }}-sbom
+          path: "**/*.cdx.json"
+          if-no-files-found: error
+
+  native:
+    needs: preflight
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, ubuntu-24.04, windows-2025]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+        with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0 }
+      - name: Install Linux GPUI libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libegl1-mesa-dev libfontconfig1-dev libudev-dev libvulkan-dev libwayland-dev libx11-dev libx11-xcb-dev libxcb-randr0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-x11-dev mesa-vulkan-drivers
+      - uses: dtolnay/rust-toolchain@master
+        with: { toolchain: 1.97.0 }
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --workspace --all-targets --all-features --locked
+
+  headless:
+    needs: preflight
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, ubuntu-24.04, windows-2025]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+        with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0 }
+      - name: Install Linux GPUI libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libegl1-mesa-dev libfontconfig1-dev libudev-dev libvulkan-dev libwayland-dev libx11-dev libx11-xcb-dev libxcb-randr0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-x11-dev mesa-vulkan-drivers
+      - uses: dtolnay/rust-toolchain@master
+        with: { toolchain: 1.97.0 }
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo run -p xtask -- headless check
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: headless-release-diff-${{ runner.os }}
+          path: target/headless-scene-check
+          if-no-files-found: ignore
+
+  macos-full:
+    needs: preflight
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+        with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0 }
+      - uses: dtolnay/rust-toolchain@master
+        with: { toolchain: 1.97.0, components: "rustfmt, clippy" }
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo run -p xtask -- gate full
+
+  web:
+    needs: preflight
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0 }
+      - uses: dtolnay/rust-toolchain@master
+        with: { toolchain: 1.97.0, targets: wasm32-unknown-unknown }
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with: { tool: "wasm-bindgen-cli@0.2.126" }
+      - run: cargo run -p xtask -- web check
+      - run: cargo run -p xtask -- web build
+      - run: cargo run -p xtask -- web smoke
+      - run: cargo run -p xtask -- web visual check button input dialog node-graph
+
+  semver:
+    needs: preflight
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, ubuntu-24.04, windows-2025]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+        with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0 }
+      - name: Install Linux GPUI libraries
+        if: ${{ inputs.version != '0.1.0' && runner.os == 'Linux' }}
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libegl1-mesa-dev libfontconfig1-dev libudev-dev libvulkan-dev libwayland-dev libx11-dev libx11-xcb-dev libxcb-randr0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-x11-dev mesa-vulkan-drivers
+      - uses: dtolnay/rust-toolchain@master
+        with: { toolchain: 1.97.0 }
+      - name: Install cargo-semver-checks
+        if: ${{ inputs.version != '0.1.0' }}
+        uses: taiki-e/install-action@v2
+        with: { tool: "cargo-semver-checks@0.50.0" }
+      - name: Compare every published library API with crates.io
+        if: ${{ inputs.version != '0.1.0' }}
+        run: cargo semver-checks check-release --manifest-path Cargo.toml --workspace --all-features
+
+  publish-with-token:
+    if: ${{ inputs.execute && inputs.auth == 'token' }}
+    needs: [preflight, native, headless, macos-full, web, semver]
+    runs-on: ubuntu-24.04
+    environment: crates-io
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0 }
+      - uses: dtolnay/rust-toolchain@master
+        with: { toolchain: 1.97.0 }
+      - uses: actions/download-artifact@v5
+        with:
+          name: gpui-box-${{ inputs.version }}-${{ needs.preflight.outputs.release_commit }}-crates
+          path: target/package-check/archives
+      - name: Require protected crates.io token
+        run: test -n "$CARGO_REGISTRY_TOKEN"
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+      - run: cargo run -p xtask -- package publish --execute
+        env:
+          GPUI_BOX_PUBLISH: "1"
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+
+  publish-with-oidc:
+    if: ${{ inputs.execute && inputs.auth == 'oidc' }}
+    needs: [preflight, native, headless, macos-full, web, semver]
+    runs-on: ubuntu-24.04
+    environment: crates-io
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+        with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0 }
+      - uses: dtolnay/rust-toolchain@master
+        with: { toolchain: 1.97.0 }
+      - uses: actions/download-artifact@v5
+        with:
+          name: gpui-box-${{ inputs.version }}-${{ needs.preflight.outputs.release_commit }}-crates
+          path: target/package-check/archives
+      - id: crates-io-auth
+        uses: rust-lang/crates-io-auth-action@v1
+      - run: cargo run -p xtask -- package publish --execute
+        env:
+          GPUI_BOX_PUBLISH: "1"
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-io-auth.outputs.token }}

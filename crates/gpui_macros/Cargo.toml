@@ -1,0 +1,31 @@
+[package]
+name = "gpui-box-macros"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+homepage.workspace = true
+publish = true
+license = "Apache-2.0"
+description = "Procedural macros for GPUI Box"
+
+repository = "https://github.com/fran0220/gpui-box"
+[lints]
+workspace = true
+
+[features]
+inspector = []
+
+[lib]
+name = "gpui_macros"
+path = "src/gpui_macros.rs"
+proc-macro = true
+doctest = true
+
+[dependencies]
+heck.workspace = true
+proc-macro2.workspace = true
+quote.workspace = true
+syn.workspace = true
+
+[dev-dependencies]
+gpui = { package = "gpui-box", path = "../gpui", features = ["inspector", "test-support"] }

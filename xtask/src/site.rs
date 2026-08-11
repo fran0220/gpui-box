@@ -213,9 +213,9 @@ fn shell(title: &str, active: &str, body: &str) -> String {
 </head>
 <body>
 <header>
-  <a class="brand" href="/">gpui-kit</a>
+  <a class="brand" href="/">GPUI Box</a>
   <nav>{nav}</nav>
-  <a class="repo" href="https://github.com/fran0220/gpui-kit">GitHub</a>
+  <a class="repo" href="https://github.com/fran0220/gpui-box">GitHub</a>
 </header>
 <main>
 {body}
@@ -329,7 +329,7 @@ cargo run -p xtask -- headless capture badge   # accept what changed</code></pre
         scenes_count = scenes.len(),
         images = scenes.len() * 2,
     );
-    shell("gpui-kit — native desktop components for GPUI", "/", &body)
+    shell("GPUI Box — native desktop components for GPUI", "/", &body)
 }
 
 fn component_list(components: &[Value]) -> String {
@@ -365,7 +365,7 @@ which is why a refused change is visible as the control not moving.</p>
 "#,
         count = components.len()
     );
-    shell("Components — gpui-kit", "/components/", &body)
+    shell("Components — GPUI Box", "/components/", &body)
 }
 
 fn component_page(component: &Value, scenes: &[Value], image_root: &str) -> String {
@@ -453,13 +453,13 @@ fn component_page(component: &Value, scenes: &[Value], image_root: &str) -> Stri
 <p class="note">{held}</p>
 <pre class="path"><code>use {path};</code></pre>
 {sections}
-<p class="source">Source: <a href="https://github.com/fran0220/gpui-kit/blob/main/{source}">{source}</a></p>
+<p class="source">Source: <a href="https://github.com/fran0220/gpui-box/blob/main/{source}">{source}</a></p>
 "#,
         summary = escape(&string(component, "summary")),
         path = escape(&string(component, "path")),
         source = escape(&string(component, "source")),
     );
-    shell(&format!("{name} — gpui-kit"), "/components/", &body)
+    shell(&format!("{name} — GPUI Box"), "/components/", &body)
 }
 
 fn scene_list(scenes: &[Value], image_root: &str) -> String {
@@ -488,7 +488,7 @@ below each one is what the gate compiled to produce the image above it.</p>
 "#,
         count = scenes.len()
     );
-    shell("Scenes — gpui-kit", "/scenes/", &body)
+    shell("Scenes — GPUI Box", "/scenes/", &body)
 }
 
 fn scene_page(scene: &Value, components: &[Value], image_root: &str) -> String {
@@ -517,7 +517,7 @@ Run the gallery to review motion.</p>
 "#,
         example = highlight(&string(scene, "example")),
     );
-    shell(&format!("{name} — gpui-kit scenes"), "/scenes/", &body)
+    shell(&format!("{name} — GPUI Box scenes"), "/scenes/", &body)
 }
 
 fn doc_list(pages: &[String]) -> String {
@@ -529,7 +529,7 @@ fn doc_list(pages: &[String]) -> String {
     let body = format!(
         "<h1>Docs</h1><p class=\"lead\">The contracts, in full.</p><ul class=\"docs\">{items}</ul>"
     );
-    shell("Docs — gpui-kit", "/docs/", &body)
+    shell("Docs — GPUI Box", "/docs/", &body)
 }
 
 fn doc_page(page: &str, markdown: &str, pages: &[String]) -> String {
@@ -556,7 +556,7 @@ fn doc_page(page: &str, markdown: &str, pages: &[String]) -> String {
 <article class="prose">{rendered}</article>
 </div>"#
     );
-    shell(&format!("{page} — gpui-kit"), "/docs/", &body)
+    shell(&format!("{page} — GPUI Box"), "/docs/", &body)
 }
 
 fn search(components: &[Value]) -> String {

@@ -1,0 +1,26 @@
+[package]
+name = "gpui-box-collections"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+homepage.workspace = true
+publish = true
+license = "Apache-2.0"
+repository = "https://github.com/fran0220/gpui-box"
+description = "GPUI Box collection types"
+
+[lints]
+workspace = true
+
+[lib]
+name = "collections"
+path = "src/collections.rs"
+doctest = false
+
+[features]
+test-support = []
+
+[dependencies]
+indexmap.workspace = true
+rustc-hash.workspace = true
+gpui_util.workspace = true

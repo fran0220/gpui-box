@@ -1,0 +1,38 @@
+THIRD-PARTY NOTICES — gpui-box-kit-assets
+================================================================================
+
+Geist and Geist Mono
+--------------------------------------------------------------------------------
+Source: https://vercel.com/font
+License: SIL Open Font License 1.1
+Copyright 2023 Vercel Inc.
+Reserved Font Names: "Geist" and "Geist Mono".
+Files: assets/fonts/Geist*.ttf
+License text: licenses/OFL-1.1.txt
+
+Noto Sans Symbols and Noto Sans Symbols 2
+--------------------------------------------------------------------------------
+Source: https://github.com/notofonts/notofonts.github.io
+Revision: c16b117609abbe4e60b3f2bd4433bdb3d0accb2e
+License: SIL Open Font License 1.1, no Reserved Font Name
+Copyright 2022 The Noto Project Authors
+Files: assets/fonts/KeySymbols.ttf
+License text: licenses/OFL-1.1.txt
+
+Solar Icons
+--------------------------------------------------------------------------------
+Source: Solar Icons, Linear weight, by 480 Design
+https://www.figma.com/community/file/1166831539721848736
+License: Creative Commons Attribution 4.0 International
+Attribution: “Solar Icons by 480 Design.”
+Files: Solar-derived SVGs identified by assets/SOURCE.md
+License text: licenses/CC-BY-4.0.txt
+
+Comet
+--------------------------------------------------------------------------------
+Source: https://github.com/zeronsh/comet
+Revision: fb22e269ac57331ee7aa4a9673530acf3299a886
+License: MIT
+Copyright (c) 2026 Wing
+Files: generic glyphs identified by assets/SOURCE.md
+License text: licenses/COMET-MIT.txt

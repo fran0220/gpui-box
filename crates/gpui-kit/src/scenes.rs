@@ -5109,7 +5109,7 @@ fn transport(_window: &mut Window, cx: &mut App) -> AnyElement {
 /// The cube the model scenes read: a glTF document with its own buffer
 /// inside it, so the reader is exercised on the path a host would take and
 /// nothing is fetched to draw a scene.
-const CUBE: &[u8] = include_bytes!("../../../fixtures/models/cube.gltf");
+const CUBE: &[u8] = include_bytes!("../assets/models/cube.gltf");
 
 /// A measured envelope, in the shape a host that read the samples would hand
 /// over. It is written down rather than sampled, because a scene that drew a
@@ -5491,7 +5491,7 @@ fn tool_call(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .arguments("{ \"path\": \"README.md\" }")
                 .state(ToolCallState::succeeded(
                     ToolBody::new(
-                        "# gpui-kit\n\nProduct-neutral components.\n\nEvery word is replaceable.",
+                        "# GPUI Box\n\nProduct-neutral components.\n\nEvery word is replaceable.",
                     )
                     .max_lines(2),
                 ))

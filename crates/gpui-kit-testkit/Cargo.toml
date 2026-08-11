@@ -1,11 +1,14 @@
 [package]
-name = "gpui-kit-testkit"
-description = "Semantic assertions, window capture, and visual diff helpers for GPUI"
+name = "gpui-box-kit-testkit"
+description = "GPUI Box Kit semantic assertions, window capture, and visual diff helpers"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
+
+[lib]
+name = "gpui_kit_testkit"
 
 [features]
 # Pulls in GPUI's test harness. Off by default so shipping binaries that link

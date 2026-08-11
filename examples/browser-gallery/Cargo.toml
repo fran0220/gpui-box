@@ -1,5 +1,5 @@
 [package]
-name = "gpui-kit-browser-gallery"
+name = "gpui-box-browser-gallery"
 publish = false
 edition.workspace = true
 version.workspace = true
@@ -8,6 +8,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [lib]
+name = "gpui_kit_browser_gallery"
 crate-type = ["cdylib"]
 
 [target.'cfg(target_family = "wasm")'.dependencies]

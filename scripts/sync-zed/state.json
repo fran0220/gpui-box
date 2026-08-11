@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "tool_version": "1.2.0",
+  "filter_schema_version": 1,
+  "history_algorithm": "first-parent-v1",
+  "official_url": "https://github.com/zed-industries/zed.git",
+  "official_ref": "HEAD",
+  "official_baseline": "a6a23c7b80a5cefa0487b7856335be89ace7e483",
+  "bootstrap_url": "https://github.com/fran0220/zed.git",
+  "bootstrap_revision": "0b9c8dc932b65cba2dc87464148984e93f60ae18",
+  "vendor_ref": "refs/heads/vendor/zed-gpui",
+  "bootstrap_vendor_tip": null,
+  "vendor_tip": null,
+  "last_synced_sha": null,
+  "integration_commit": null
+}

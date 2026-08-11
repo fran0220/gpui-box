@@ -1,4 +1,4 @@
-# gpui-kit contributor guidance
+# GPUI Box contributor guidance
 
 ## Boundaries
 
@@ -18,12 +18,13 @@ Components:
 Do not hide a missing GPUI primitive behind a component-specific workaround.
 When a requirement is product-neutral, will be reused by more than one
 component, or must coordinate rendering, layout, clipping, hit testing, input,
-or platform behavior, first verify whether the pinned `fran0220/zed` revision
+or platform behavior, first verify whether the imported GPUI Box framework
 already provides it. If it does not, implement the smallest complete primitive
-in that fork and consume the resulting immutable revision here.
+at the framework boundary. Reusable changes intended for Zed must remain
+traceable through `scripts/sync-zed`; never restore a Cargo Git dependency.
 
 Keep product and component policy in this repository. Node routing, port
-meaning, semantic ids, and caller-owned events belong to `gpui-kit`; generic
+meaning, semantic ids, and caller-owned events belong to GPUI Box Kit; generic
 subtree transforms, pointer capture, renderer behavior, and platform event
 delivery belong upstream. Do not add a partial upstream API that works for one
 primitive or platform while leaving its layout, clipping, accessibility bounds,
@@ -34,13 +35,12 @@ An upstream infrastructure change must:
 1. be product-neutral and documented at the primitive boundary;
 2. carry focused GPUI tests, including the affected platform-independent input
    or rendering invariants;
-3. be committed and pushed to `fran0220/zed` before this repository pins it;
-4. update the root and `tools/headless-visual` workspaces to the same immutable
-   revision;
+3. preserve an exact filtered-import receipt when it comes from Zed;
+4. keep the root and `tools/headless-visual` workspaces on the same local GPUI
+   Box package authority, without Git sources or `[patch]` overrides;
 5. update `PROVENANCE.md`, `THIRD_PARTY_NOTICES`, and compatibility documentation;
-6. pass `cargo run -p xtask -- dependencies check` and the relevant macOS and
-   Windows validation. Linux compatibility is deferred until the roadmap
-   explicitly restores it.
+6. pass `cargo run -p xtask -- dependencies check` and the relevant Linux,
+   macOS, and Windows validation.
 
 Local geometry remains appropriate when it occurs once and does not create a
 second implementation of a renderer or input primitive. Record any deliberately
@@ -114,7 +114,7 @@ cargo run -p xtask -- gate only keymap-editor   # while iterating on one compone
 ```
 
 `gate only` takes scene names and answers the same questions about those:
-`gpui-kit` builds and lints clean, the tests whose names mention them pass, the
+`gpui-box-kit` builds and lints clean, the tests whose names mention them pass, the
 generated artifacts are current, and those scenes match their baseline. It is a
 shortcut while iterating, never what a commit runs — it says nothing about the
 other workspace members, the doctests, or a scene the edit reached without
@@ -123,13 +123,11 @@ anybody predicting it.
 The visual gate on each supported native platform is
 `cargo run -p xtask -- headless check` (`headless capture` accepts). It renders
 the catalog into offscreen textures at a size it names — Metal on macOS and
-WARP on Windows —
+software adapters on Linux and Windows —
 with reduced motion and simulated time, so no window, display, dock, or
 compositor takes part and the same scene produces the same bytes on any
 machine with that renderer. Active baselines live in
-`snapshots/headless/{macos,windows}/scenes`, one set per renderer. The Linux
-directory is retained as historical evidence but is non-gating while Linux
-compatibility is deferred.
+`snapshots/headless/{macos,linux,windows}/scenes`, one set per renderer.
 
 Never hold a baseline from a real window. A window negotiates its size with
 the display it opens on, which is how `snapshots/macos` came to hold two
@@ -152,9 +150,9 @@ cargo run -p xtask -- headless capture list tree   # accept these scenes
 
 The harness lives in `tools/headless-visual` as its own workspace with
 renderer-specific dependencies and a separate lockfile. It and the root
-workspace must pin the same immutable `fran0220/zed` integration revision; run
-`cargo run -p xtask -- dependencies check` after changing it. See
-`docs/screenshot-testing.md`.
+workspace must resolve the same local GPUI Box package authority without Git
+sources or patches; run `cargo run -p xtask -- dependencies check` after
+changing it. See `docs/screenshot-testing.md`.
 
 `cargo run -p xtask -- scenes render` opens the real gallery window and writes
 to `target/scenes`. It holds no baseline and is not a gate; it is how motion
@@ -175,6 +173,6 @@ Two things a captured image does not show, both known:
   to check it:
 
   ```bash
-  cargo run -p gpui-kit-gallery -- --scene data-grid-editing \
+  cargo run -p gpui-box-gallery -- --scene data-grid-editing \
       --theme studio-light --capture /tmp/check.png
   ```
