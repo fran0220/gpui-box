@@ -52,6 +52,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Result, bail};
+use pulldown_cmark::{Event, Options, Parser};
 
 /// Sources that declare no component.
 const SKIP: &[&str] = &["scenes.rs", "lib.rs"];
@@ -833,11 +834,38 @@ fn quote(text: &str) -> String {
 }
 
 fn summary(docs: &[String]) -> String {
-    docs.iter()
+    let markdown = docs
+        .iter()
         .take_while(|line| !line.is_empty())
         .cloned()
         .collect::<Vec<_>>()
-        .join(" ")
+        .join(" ");
+    let mut plain = String::with_capacity(markdown.len());
+    let parser = Parser::new_with_broken_link_callback(
+        &markdown,
+        Options::empty(),
+        Some(|_| Some(("".into(), "".into()))),
+    );
+    for event in parser {
+        match event {
+            Event::Text(text)
+            | Event::Code(text)
+            | Event::InlineMath(text)
+            | Event::DisplayMath(text)
+            | Event::FootnoteReference(text) => plain.push_str(&text),
+            Event::SoftBreak | Event::HardBreak | Event::Rule => {
+                if plain.chars().last().is_some_and(|c| !c.is_whitespace()) {
+                    plain.push(' ');
+                }
+            }
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Html(_)
+            | Event::InlineHtml(_)
+            | Event::TaskListMarker(_) => {}
+        }
+    }
+    plain.trim().to_string()
 }
 
 #[cfg(test)]
@@ -872,6 +900,16 @@ impl Render for Select {
             vec!["new(label: impl Into<SharedString>) -> Self"]
         );
         assert_eq!(items["Badge"].options, vec!["tone(tone: Tone) -> Self"]);
+    }
+
+    #[test]
+    fn a_summary_is_plain_text_instead_of_rustdoc_markup() {
+        let docs = vec![
+            "A [`Select`](crate::controls::Select) with [`Entity`] and <b>safe</b> text."
+                .to_string(),
+        ];
+
+        assert_eq!(summary(&docs), "A Select with Entity and safe text.");
     }
 
     /// A caller needs to know whether a call chains, needs a `Context`, or

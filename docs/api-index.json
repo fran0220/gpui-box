@@ -613,7 +613,7 @@
       "kind": "view",
       "path": "gpui_kit::controls::Combobox",
       "source": "crates/gpui-kit/src/controls/combobox.rs",
-      "summary": "A [`Select`](crate::controls::select::Select) you can type into.",
+      "summary": "A Select you can type into.",
       "construct": [
         "new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self"
       ],
@@ -1284,7 +1284,7 @@
       "kind": "view",
       "path": "gpui_kit::controls::FindReplace",
       "source": "crates/gpui-kit/src/controls/search.rs",
-      "summary": "A [`SearchField`] with a replacement field and the two replace actions.",
+      "summary": "A SearchField with a replacement field and the two replace actions.",
       "construct": [
         "new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self"
       ],
@@ -1786,7 +1786,7 @@
       "kind": "builder",
       "path": "gpui_kit::display::ListRow",
       "source": "crates/gpui-kit/src/display/card.rs",
-      "summary": "One row inside a [`Card`].",
+      "summary": "One row inside a Card.",
       "construct": [
         "new() -> Self"
       ],
@@ -2893,7 +2893,7 @@
       "kind": "builder",
       "path": "gpui_kit::layout::SplitTree",
       "source": "crates/gpui-kit/src/layout/tree.rs",
-      "summary": "Draws a [`SplitLayout`] and reports what the typist asked to change.",
+      "summary": "Draws a SplitLayout and reports what the typist asked to change.",
       "construct": [
         "new(ident: impl Into<Ident>) -> Self"
       ],
@@ -3055,7 +3055,7 @@
       "kind": "builder",
       "path": "gpui_kit::navigation::Tabs",
       "source": "crates/gpui-kit/src/navigation/tabs.rs",
-      "summary": "A row of tabs. The strip publishes one [`Role::Tab`] node per tab.",
+      "summary": "A row of tabs. The strip publishes one Role::Tab node per tab.",
       "construct": [
         "new(ident: impl Into<Ident>) -> Self"
       ],
@@ -3901,7 +3901,7 @@
     {
       "name": "AsyncStatus",
       "path": "gpui_kit::state::AsyncStatus",
-      "summary": "What is happening to an [`AsyncValue`] right now.",
+      "summary": "What is happening to an AsyncValue right now.",
       "variants": [
         "Idle",
         "Loading",
@@ -4198,7 +4198,7 @@
     {
       "name": "Column",
       "path": "gpui_kit::data::Column",
-      "summary": "One column. `key` addresses the cells that belong to it and appears in every id the column publishes.",
+      "summary": "One column. key addresses the cells that belong to it and appears in every id the column publishes.",
       "variants": [],
       "construct": [
         "new(key: impl Into<SharedString>, header: impl Into<SharedString>) -> Self"
@@ -4325,7 +4325,7 @@
     {
       "name": "CostLine",
       "path": "gpui_kit::agent::CostLine",
-      "summary": "One line of a [`CostMeter`].",
+      "summary": "One line of a CostMeter.",
       "variants": [],
       "construct": [
         "new(id: impl Into<SharedString>, label: impl Into<SharedString>, reading: Reading) -> Self"
@@ -5235,7 +5235,7 @@
     {
       "name": "GraphPort",
       "path": "gpui_kit::canvas::GraphPort",
-      "summary": "A typed connection point on a [`GraphNode`].",
+      "summary": "A typed connection point on a GraphNode.",
       "variants": [],
       "construct": [
         "input(id: impl Into<SharedString>, label: impl Into<SharedString>) -> Self",
@@ -5270,7 +5270,7 @@
     {
       "name": "GraphViewport",
       "path": "gpui_kit::canvas::GraphViewport",
-      "summary": "Caller-owned pan and zoom values for a [`NodeGraph`].",
+      "summary": "Caller-owned pan and zoom values for a NodeGraph.",
       "variants": [],
       "construct": [
         "new(offset: Point<f32>, zoom: f32) -> Self"
@@ -5566,7 +5566,7 @@
     {
       "name": "KeybindingRecorderEvent",
       "path": "gpui_kit::controls::KeybindingRecorderEvent",
-      "summary": "What a [`KeybindingRecorder`] reports.",
+      "summary": "What a KeybindingRecorder reports.",
       "variants": [
         "Started",
         "Captured",
@@ -7183,7 +7183,7 @@
     {
       "name": "SelectEvent",
       "path": "gpui_kit::controls::SelectEvent",
-      "summary": "What a [`Select`] reports. The owner decides what any of it means.",
+      "summary": "What a Select reports. The owner decides what any of it means.",
       "variants": [
         "Selected",
         "Opened",
@@ -7447,7 +7447,7 @@
     {
       "name": "SplitKind",
       "path": "gpui_kit::layout::SplitKind",
-      "summary": "What one [`SplitRecord`] describes.",
+      "summary": "What one SplitRecord describes.",
       "variants": [
         "Pane",
         "Horizontal",
@@ -7493,7 +7493,7 @@
     {
       "name": "SplitPaneSpec",
       "path": "gpui_kit::layout::SplitPaneSpec",
-      "summary": "One leaf of a [`SplitLayout`]: a named place the caller puts content.",
+      "summary": "One leaf of a SplitLayout: a named place the caller puts content.",
       "variants": [],
       "construct": [
         "new(id: impl Into<SharedString>) -> Self"
@@ -7516,7 +7516,7 @@
     {
       "name": "SplitRecord",
       "path": "gpui_kit::layout::SplitRecord",
-      "summary": "One node of a [`SplitLayout`], as plain fields a host can write anywhere.",
+      "summary": "One node of a SplitLayout, as plain fields a host can write anywhere.",
       "variants": [],
       "construct": [],
       "options": [],
