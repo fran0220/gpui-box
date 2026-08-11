@@ -5,7 +5,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use gpui::{AppContext as _, Entity, IntoElement, ParentElement, TestAppContext};
+use gpui::{
+    AppContext as _, Entity, InteractiveElement, IntoElement, ParentElement, TestAppContext, div,
+    prelude::*, px, size,
+};
 use gpui_kit::prelude::*;
 use gpui_kit_testkit::harness::Harness;
 
@@ -675,6 +678,184 @@ fn a_refused_option_cannot_be_taken(cx: &mut TestAppContext) {
             .borrow()
             .iter()
             .any(|event| matches!(event, ComboboxEvent::Selected(_)))
+    );
+}
+
+fn popup_combobox_options() -> Vec<SelectOption> {
+    let mut options = Vec::new();
+    for index in 0..14 {
+        options.push(SelectOption::new(
+            format!("archive-{index:02}"),
+            format!("Archived runtime {index:02}"),
+        ));
+        options.push(SelectOption::new(
+            format!("model-{index:02}"),
+            format!("Agent model {index:02}"),
+        ));
+    }
+    options.push(SelectOption::new("unknown", "Unknown model").description(
+        "This model may not support chat in direct mode.\nChoose a chat-capable model.",
+    ));
+    options.push(SelectOption::new("managed", "Managed model").disabled(true));
+    options
+}
+
+fn popup_combobox(cx: &mut TestAppContext, near_bottom: bool) -> (Harness, Entity<Combobox>) {
+    let slot: Rc<RefCell<Option<Entity<Combobox>>>> = Rc::new(RefCell::new(None));
+    let build_slot = slot.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        let combobox = build_slot
+            .borrow_mut()
+            .get_or_insert_with(|| {
+                cx.new(|cx| {
+                    Combobox::new("models.search", window, cx)
+                        .name("All Agent models")
+                        .options(popup_combobox_options())
+                        .selected("unknown")
+                })
+            })
+            .clone();
+        let trigger = if near_bottom {
+            div()
+                .h_full()
+                .flex()
+                .flex_col()
+                .justify_end()
+                .pb(px(44.0))
+                .child(combobox)
+                .into_any_element()
+        } else {
+            div().pt(px(12.0)).child(combobox).into_any_element()
+        };
+        div()
+            .size_full()
+            .child(
+                div()
+                    .id("models.surface")
+                    .w(px(300.0))
+                    .h_full()
+                    .overflow_y_scroll()
+                    .child(trigger),
+            )
+            .into_any_element()
+    });
+    harness.snapshot();
+    let entity = slot.borrow().clone().expect("combobox was built");
+    (harness, entity)
+}
+
+fn resize_popup(harness: &mut Harness, width: f32, height: f32) {
+    harness
+        .context()
+        .simulate_resize(size(px(width), px(height)));
+    harness.frame();
+    harness.frame();
+}
+
+fn assert_popup_row_inside(inner: gpui::Bounds<gpui::Pixels>, outer: gpui::Bounds<gpui::Pixels>) {
+    let epsilon = px(0.5);
+    assert!(
+        inner.top() + epsilon >= outer.top(),
+        "{inner:?} above {outer:?}"
+    );
+    assert!(
+        inner.bottom() <= outer.bottom() + epsilon,
+        "{inner:?} below {outer:?}"
+    );
+}
+
+#[gpui::test]
+fn filtered_popup_flips_above_and_reveals_the_full_last_match(cx: &mut TestAppContext) {
+    let (mut harness, entity) = popup_combobox(cx, true);
+    resize_popup(&mut harness, 520.0, 480.0);
+    harness.update(move |_, cx| entity.update(cx, |combobox, cx| combobox.set_query("model", cx)));
+    harness.click("models.search.query");
+    harness.keystrokes("end");
+
+    let margin = harness.update(|_, cx| cx.theme().spacing.sm);
+    let trigger = harness.bounds("models.search").expect("trigger bounds");
+    let menu = harness.bounds("models.search.menu").expect("menu bounds");
+    let active = harness
+        .bounds("models.search.unknown")
+        .expect("last filtered match");
+    assert!(menu.bottom() <= trigger.top(), "the menu must flip above");
+    assert!(f32::from(menu.top()) >= margin - 0.5);
+    assert!(f32::from(menu.bottom()) <= 480.0 - margin + 0.5);
+    assert!(active.size.height > px(40.0), "the warning is multi-line");
+    assert_popup_row_inside(active, menu);
+    assert!(
+        harness
+            .node("models.search.unknown")
+            .expect("active match")
+            .hovered
+    );
+    assert!(
+        !harness
+            .node("models.search.managed")
+            .expect("disabled final match")
+            .hovered,
+        "End skips the disabled match"
+    );
+    assert!(
+        harness.node("models.search.archive-13").is_none(),
+        "the filtered positions omit non-matches"
+    );
+}
+
+#[gpui::test]
+fn narrow_filtered_popup_stays_below_and_home_end_update_scroll(cx: &mut TestAppContext) {
+    let (mut harness, entity) = popup_combobox(cx, false);
+    resize_popup(&mut harness, 360.0, 240.0);
+    let query_entity = entity.clone();
+    harness.update(move |_, cx| {
+        query_entity.update(cx, |combobox, cx| combobox.set_query("model", cx))
+    });
+    harness.click("models.search.query");
+
+    let margin = harness.update(|_, cx| cx.theme().spacing.sm);
+    let trigger = harness.bounds("models.search").expect("trigger bounds");
+    let menu = harness.bounds("models.search.menu").expect("menu bounds");
+    assert!(menu.top() >= trigger.bottom(), "the menu must remain below");
+    assert!(f32::from(menu.top()) >= margin - 0.5);
+    assert!(f32::from(menu.bottom()) <= 240.0 - margin + 0.5);
+
+    harness.keystrokes("end");
+    assert_popup_row_inside(
+        harness
+            .bounds("models.search.unknown")
+            .expect("End match bounds"),
+        harness.bounds("models.search.menu").expect("menu bounds"),
+    );
+    harness.keystrokes("home");
+    assert!(
+        harness
+            .node("models.search.model-00")
+            .expect("first filtered match")
+            .hovered
+    );
+    assert_popup_row_inside(
+        harness
+            .bounds("models.search.model-00")
+            .expect("Home match bounds"),
+        harness.bounds("models.search.menu").expect("menu bounds"),
+    );
+
+    harness.update(move |_, cx| {
+        entity.update(cx, |combobox, cx| {
+            combobox.set_selected(Some("unknown".into()), cx)
+        })
+    });
+    assert!(
+        harness
+            .node("models.search.unknown")
+            .expect("new selected match")
+            .hovered
+    );
+    assert_popup_row_inside(
+        harness
+            .bounds("models.search.unknown")
+            .expect("selected change bounds"),
+        harness.bounds("models.search.menu").expect("menu bounds"),
     );
 }
 

@@ -4,7 +4,7 @@
 
 | gpui-kit | GPUI source | Revision |
 |---|---|---|
-| 0.1.x | `https://github.com/fran0220/zed` | `ce35a66556c39f948ada12b60d2aaef579a8aa68` |
+| 0.1.x | `https://github.com/fran0220/zed` | `0b9c8dc932b65cba2dc87464148984e93f60ae18` |
 
 The workspace and the standalone headless harness depend on one immutable
 revision of the integration fork. That revision merges three independently
@@ -21,8 +21,11 @@ gpui-kit, plus whole-window pointer-exit delivery needed to retire transient
 help from the Windows native accessibility tree. It exposes hitbox pointer
 capture through fluent interactive elements so a bounded drag continues to
 receive move and release events after leaving its original bounds, including
-when a live preview redraws the window mid-gesture. The detailed, evidence-scoped
-platform matrix lives in [`accessibility.md`](accessibility.md).
+when a live preview redraws the window mid-gesture. Pending tracked-scroll
+requests are applied after current child and viewport geometry is known, so a
+variable-height active child is completely visible on its first prepaint. The
+detailed, evidence-scoped platform matrix lives in
+[`accessibility.md`](accessibility.md).
 
 The renderer graph uses crates.io `wgpu` 29.0.4 and `gpu-allocator` 0.28.0;
 there are no `fran0220/wgpu` or `fran0220/gpu-allocator` sources. GPUI's direct

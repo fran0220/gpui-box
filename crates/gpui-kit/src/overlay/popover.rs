@@ -9,7 +9,7 @@
 use std::rc::Rc;
 
 use gpui::{
-    Anchor, AnyElement, App, Context, ElementId, EventEmitter, FocusHandle, Focusable,
+    Anchor, AnyElement, App, Bounds, Context, ElementId, EventEmitter, FocusHandle, Focusable,
     InteractiveElement, IntoElement, KeyDownEvent, ParentElement, Pixels, Point, Render,
     SharedString, Styled, Window, div, prelude::*, px,
 };
@@ -187,6 +187,85 @@ pub fn card(theme: &Theme) -> gpui::Div {
 /// edge to edge.
 pub fn card_flush(theme: &Theme) -> gpui::Div {
     card(theme).p_0()
+}
+
+/// The viewport policy for a select-like popup whose trigger was measured on
+/// the preceding frame.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct MenuGeometry {
+    pub placement: Placement,
+    pub max_height: f32,
+    pub width: f32,
+}
+
+/// Resolves one menu against the actual window and trigger bounds.
+///
+/// The fallback is deliberately bounded by the whole usable viewport. It is
+/// used only before the trigger's first prepaint; that prepaint requests the
+/// corrective frame with side-specific space.
+pub(crate) fn menu_geometry(
+    window: &Window,
+    trigger: Bounds<Pixels>,
+    theme: &Theme,
+    desired_height: f32,
+    min_width: f32,
+) -> MenuGeometry {
+    let viewport = window.viewport_size();
+    let viewport_height = f32::from(viewport.height);
+    let viewport_width = f32::from(viewport.width);
+    let margin = theme.spacing.sm;
+    let gap = (theme.spacing.sm - 2.0).max(0.0);
+    let usable_width = (viewport_width - margin * 2.0).max(0.0);
+    let measured_width = f32::from(trigger.size.width);
+    let width = measured_width.max(min_width).min(usable_width);
+    let measured = measured_width > 0.0 && f32::from(trigger.size.height) > 0.0;
+
+    if !measured {
+        return MenuGeometry {
+            placement: Placement::Below,
+            max_height: desired_height.min((viewport_height - margin * 2.0 - gap).max(0.0)),
+            width,
+        };
+    }
+
+    let below = (viewport_height - margin - f32::from(trigger.bottom()) - gap).max(0.0);
+    let above = (f32::from(trigger.top()) - margin - gap).max(0.0);
+    let placement = if below >= desired_height || below >= above {
+        Placement::Below
+    } else {
+        Placement::Above
+    };
+    let available = match placement {
+        Placement::Above => above,
+        _ => below,
+    };
+
+    MenuGeometry {
+        placement,
+        max_height: desired_height.min(available),
+        width,
+    }
+}
+
+/// Paints a side-resolved menu through the canonical popover layer.
+pub(crate) fn menu_overlay(
+    ident: &Ident,
+    theme: &Theme,
+    placement: Placement,
+    content: AnyElement,
+) -> AnyElement {
+    let gap = px((theme.spacing.sm - 2.0).max(0.0));
+    let frame = div()
+        .occlude()
+        .when(placement == Placement::Below, |element| element.pt(gap))
+        .when(placement == Placement::Above, |element| element.pb(gap))
+        .child(content);
+
+    Overlay::new(ident.child("overlay"))
+        .placement(placement)
+        .window_snap_margin(px(theme.spacing.sm))
+        .child(motion::menu_in(ident.element_id(), theme, frame))
+        .into_any_element()
 }
 
 fn pinned(layer: AnyElement) -> AnyElement {

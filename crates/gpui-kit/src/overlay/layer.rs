@@ -62,6 +62,7 @@ pub struct Overlay {
     ident: Ident,
     layer: Layer,
     placement: Placement,
+    window_snap_margin: Option<Pixels>,
     scrim: bool,
     content: Option<AnyElement>,
     on_dismiss: Option<DismissHandler>,
@@ -74,6 +75,7 @@ impl std::fmt::Debug for Overlay {
             .field("ident", &self.ident)
             .field("layer", &self.layer)
             .field("placement", &self.placement)
+            .field("window_snap_margin", &self.window_snap_margin)
             .field("scrim", &self.scrim)
             .field("dismissible", &self.on_dismiss.is_some())
             .finish()
@@ -86,6 +88,7 @@ impl Overlay {
             ident: ident.into(),
             layer: Layer::Popover,
             placement: Placement::Below,
+            window_snap_margin: None,
             scrim: false,
             content: None,
             on_dismiss: None,
@@ -116,6 +119,16 @@ impl Overlay {
 
     pub fn placement(mut self, placement: Placement) -> Self {
         self.placement = placement;
+        self
+    }
+
+    /// Keeps an already side-resolved anchored surface inside the window.
+    ///
+    /// Choosing above or below remains the caller's policy because only the
+    /// caller knows the surface's effective height. This is the final collision
+    /// guard for the window edges.
+    pub(crate) fn window_snap_margin(mut self, margin: Pixels) -> Self {
+        self.window_snap_margin = Some(margin);
         self
     }
 
@@ -168,7 +181,9 @@ impl RenderOnce for Overlay {
         if let Placement::At(position) = self.placement {
             anchored = anchored.position(position);
         }
-        if self.placement == Placement::Center {
+        if let Some(margin) = self.window_snap_margin {
+            anchored = anchored.snap_to_window_with_margin(margin);
+        } else if self.placement == Placement::Center {
             anchored = anchored.snap_to_window_with_margin(px(theme.spacing.sm));
         }
 

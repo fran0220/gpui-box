@@ -2576,16 +2576,23 @@ fn ensure_form(window: &mut Window, cx: &mut App) {
             .required(true)
     });
     let region = cx.new(|cx| {
+        let mut options = (0..14)
+            .map(|index| {
+                SelectOption::new(
+                    format!("model-{index:02}"),
+                    format!("Agent model {index:02}"),
+                )
+            })
+            .collect::<Vec<_>>();
+        options.push(SelectOption::new("unknown", "Unknown model").description(
+            "This model may not support chat in direct mode.\nChoose a chat-capable model.",
+        ));
+        options.push(SelectOption::new("managed", "Managed model").disabled(true));
         Combobox::new("scene.form.region", window, cx)
-            .name("Region")
-            .options([
-                SelectOption::new("eu-west", "Europe (Ireland)"),
-                SelectOption::new("eu-north", "Europe (Stockholm)"),
-                SelectOption::new("us-east", "United States (Virginia)"),
-                SelectOption::new("ap-south", "Asia Pacific (Mumbai)").disabled(true),
-            ])
-            .selected("eu-west")
-            .placeholder("Choose a region")
+            .name("All Agent models")
+            .options(options)
+            .selected("unknown")
+            .placeholder("Choose an Agent model")
     });
     let labels = cx.new(|cx| {
         TagInput::new("scene.form.labels", window, cx)
@@ -2594,7 +2601,7 @@ fn ensure_form(window: &mut Window, cx: &mut App) {
             .max(5)
     });
     region.update(cx, |combobox, cx| {
-        combobox.set_query("eu", cx);
+        combobox.set_query("Unknown model", cx);
     });
     cx.set_global(SceneForm {
         name,
@@ -2617,7 +2624,7 @@ fn form(window: &mut Window, cx: &mut App) -> AnyElement {
 
     stack(&theme)
         .w(px(420.0))
-        .h(px(720.0))
+        .h(px(920.0))
         .child(
             FormField::new("scene.form.name.form-field", "Workspace name")
                 .control("scene.form.name")
@@ -2662,10 +2669,12 @@ fn form(window: &mut Window, cx: &mut App) -> AnyElement {
                 .child(labels),
         )
         .child(
-            FormField::new("scene.form.region.form-field", "Region")
-                .control("scene.form.region")
-                .description("Where runs in this workspace are executed.")
-                .child(region),
+            div().mt_auto().child(
+                FormField::new("scene.form.region.form-field", "All Agent models")
+                    .control("scene.form.region")
+                    .description("Choose a chat-capable model for direct runs.")
+                    .child(region),
+            ),
         )
         .into_any_element()
 }

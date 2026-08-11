@@ -47,7 +47,7 @@ gpui-kit = { git = "https://github.com/fran0220/gpui-kit", rev = "<commit>" }
 # different revision as a different crate: two copies of GPUI in one binary
 # means two sets of globals, and the theme and semantic registry this library
 # installs would be invisible to your views.
-gpui = { git = "https://github.com/fran0220/zed", rev = "ce35a66556c39f948ada12b60d2aaef579a8aa68" }
+gpui = { git = "https://github.com/fran0220/zed", rev = "0b9c8dc932b65cba2dc87464148984e93f60ae18" }
 ```
 
 If the application names `gpui_platform` or `gpui_wgpu` too, give every GPUI
@@ -308,13 +308,14 @@ harness, comparison rules, and review workflow.
 ## GPUI compatibility
 
 The workspace pins the `fran0220/zed` integration fork at
-`ce35a66556c39f948ada12b60d2aaef579a8aa68`. It combines the runtime
+`0b9c8dc932b65cba2dc87464148984e93f60ae18`. It combines the runtime
 primitives and native-surface work with the offscreen WGPU renderer and the
 Windows pointer-exit lifecycle correction, plus pointer capture that survives
-gesture redraws, the browser renderer/input/accessibility integration, and
-bounded WGPU backdrop blur on one immutable revision. WGPU 29.0.4 and gpu-allocator
-0.28.0 resolve from crates.io rather than integration forks; reusable pieces
-can be proposed upstream independently. See
+gesture redraws, first-prepaint tracked scrolling, the browser
+renderer/input/accessibility integration, and bounded WGPU backdrop blur on
+one immutable revision. WGPU 29.0.4 and gpu-allocator 0.28.0 resolve from
+crates.io rather than integration forks; reusable pieces can be proposed
+upstream independently. See
 [`docs/compatibility.md`](docs/compatibility.md).
 
 ## Documentation

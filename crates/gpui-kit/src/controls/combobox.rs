@@ -5,24 +5,29 @@
 //! where the keyboard is — and reports what was picked without moving its own
 //! answer, exactly as `Select` does.
 
+use std::cell::Cell;
+use std::rc::Rc;
+
 use gpui::{
-    AnyElement, App, AppContext as _, Context, ElementId, Entity, EventEmitter, FocusHandle,
-    Focusable, InteractiveElement, IntoElement, KeyDownEvent, MouseButton, ParentElement, Render,
-    SharedString, StatefulInteractiveElement, Styled, Subscription, Window, div,
-    prelude::FluentBuilder, px,
+    AnyElement, App, AppContext as _, Bounds, Context, Entity, EventEmitter, FocusHandle,
+    Focusable, InteractiveElement, IntoElement, KeyDownEvent, MouseButton, ParentElement, Pixels,
+    Render, ScrollHandle, SharedString, StatefulInteractiveElement, Styled, Subscription, Window,
+    div, prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TypeScale};
 
 use crate::controls::field::{FieldState, field_shell};
-use crate::controls::input::{TextInput, TextInputEvent};
+use crate::controls::input::{LineEnd, LineStart, TextInput, TextInputEvent};
 use crate::controls::select::SelectOption;
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::foundation::{
     Disableable, Ident, Pressable, Sizable, StyledExt, text as foundation_text,
 };
+use crate::layout::measure;
 use crate::motion;
+use crate::overlay::Placement;
 use crate::overlay::popover::{self, MenuKey};
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -68,6 +73,10 @@ pub struct Combobox {
     /// Whether the current answer has been put in the field. The text is the
     /// typist's afterwards, so it is written once.
     seeded: bool,
+    scroll: ScrollHandle,
+    trigger_bounds: Rc<Cell<Bounds<Pixels>>>,
+    reveal_active: bool,
+    menu_geometry: Option<popover::MenuGeometry>,
     /// Held so the query subscription lives as long as the combobox does.
     _subscriptions: Vec<Subscription>,
 }
@@ -110,6 +119,10 @@ impl Combobox {
             active: None,
             allow_custom: false,
             seeded: false,
+            scroll: ScrollHandle::new(),
+            trigger_bounds: Rc::default(),
+            reveal_active: false,
+            menu_geometry: None,
             _subscriptions: vec![subscription],
         }
     }
@@ -167,6 +180,7 @@ impl Combobox {
         }
         self.options = options;
         self.active = None;
+        self.reveal_active = true;
         cx.notify();
     }
 
@@ -175,6 +189,15 @@ impl Combobox {
     pub fn set_selected(&mut self, id: Option<SharedString>, cx: &mut Context<Self>) {
         self.selected = id;
         self.seeded = true;
+        if self.open {
+            self.active = self.selected.as_ref().and_then(|id| {
+                self.options
+                    .iter()
+                    .find(|option| &option.id == id && !option.disabled)
+                    .map(|option| option.id.clone())
+            });
+        }
+        self.reveal_active = true;
         let label = self.selected_label().unwrap_or_default();
         self.query
             .update(cx, |query, cx| query.set_text_quietly(label, cx));
@@ -268,7 +291,16 @@ impl Combobox {
         if self.disabled || self.open {
             return;
         }
+        if self.filter(cx).is_empty() {
+            self.active = self.selected.as_ref().and_then(|id| {
+                self.options
+                    .iter()
+                    .find(|option| &option.id == id && !option.disabled)
+                    .map(|option| option.id.clone())
+            });
+        }
         self.open = true;
+        self.reveal_active = true;
         cx.emit(ComboboxEvent::Opened);
         cx.notify();
     }
@@ -296,6 +328,7 @@ impl Combobox {
         // A new query is a new list, so the highlight goes back to the best
         // answer rather than staying on a row that may be gone.
         self.active = None;
+        self.reveal_active = true;
         self.open(cx);
         cx.emit(ComboboxEvent::QueryChanged(text));
         cx.notify();
@@ -357,6 +390,30 @@ impl Combobox {
             return;
         };
         self.active = Some(self.options[choosable[next]].id.clone());
+        self.reveal_active = true;
+        cx.notify();
+    }
+
+    fn edge(&mut self, from_end: bool, cx: &mut Context<Self>) {
+        let matches = self.matches(cx);
+        let index = if from_end {
+            matches
+                .iter()
+                .rev()
+                .copied()
+                .find(|index| !self.options[*index].disabled)
+        } else {
+            matches
+                .iter()
+                .copied()
+                .find(|index| !self.options[*index].disabled)
+        };
+        let next = index.map(|index| self.options[index].id.clone());
+        if next == self.active {
+            return;
+        }
+        self.active = next;
+        self.reveal_active = true;
         cx.notify();
     }
 
@@ -364,8 +421,9 @@ impl Combobox {
         if self.disabled {
             return;
         }
+        let raw = event.keystroke.key.as_str();
         let key = popover::classify_key(
-            event.keystroke.key.as_str(),
+            raw,
             event.keystroke.modifiers.platform,
             event.keystroke.modifiers.control,
         );
@@ -380,7 +438,29 @@ impl Combobox {
                 self.step(-1, cx);
                 cx.stop_propagation();
             }
+            _ if self.open && raw == "home" => {
+                self.edge(false, cx);
+                cx.stop_propagation();
+            }
+            _ if self.open && raw == "end" => {
+                self.edge(true, cx);
+                cx.stop_propagation();
+            }
             _ => {}
+        }
+    }
+
+    fn on_line_start(&mut self, _: &LineStart, _: &mut Window, cx: &mut Context<Self>) {
+        if self.open && !self.disabled {
+            self.edge(false, cx);
+            cx.stop_propagation();
+        }
+    }
+
+    fn on_line_end(&mut self, _: &LineEnd, _: &mut Window, cx: &mut Context<Self>) {
+        if self.open && !self.disabled {
+            self.edge(true, cx);
+            cx.stop_propagation();
         }
     }
 
@@ -392,43 +472,62 @@ impl Combobox {
             .unwrap_or_else(|| cx.strings().text(StringKey::SelectPlaceholder))
     }
 
-    fn menu(&self, cx: &mut Context<Self>) -> AnyElement {
+    fn menu(&mut self, geometry: popover::MenuGeometry, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let matches = self.matches(cx);
         let highlighted = self.resolved(&matches);
+        let highlighted_position = highlighted
+            .and_then(|highlighted| matches.iter().position(|index| *index == highlighted));
         let menu_ident = self.ident.child("menu");
 
-        let body = if matches.is_empty() {
+        let rows = if matches.is_empty() {
             let query = self.filter(cx);
-            EmptyState::new(
-                self.ident.child("empty"),
-                cx.strings()
-                    .format(StringKey::ComboboxNoMatch, &[query.as_ref()]),
-            )
-            .kind(EmptyKind::Empty)
-            .detail(cx.strings().text(if self.allow_custom {
-                StringKey::ComboboxCreateHint
-            } else {
-                StringKey::ComboboxClosedHint
-            }))
-            .into_any_element()
-        } else {
-            div()
-                .column()
-                .children(matches.iter().enumerate().map(|(position, index)| {
-                    self.row(*index, highlighted, position, matches.len(), cx)
+            vec![
+                EmptyState::new(
+                    self.ident.child("empty"),
+                    cx.strings()
+                        .format(StringKey::ComboboxNoMatch, &[query.as_ref()]),
+                )
+                .kind(EmptyKind::Empty)
+                .detail(cx.strings().text(if self.allow_custom {
+                    StringKey::ComboboxCreateHint
+                } else {
+                    StringKey::ComboboxClosedHint
                 }))
-                .into_any_element()
+                .into_any_element(),
+            ]
+        } else {
+            matches
+                .iter()
+                .enumerate()
+                .map(|(position, index)| self.row(*index, highlighted, position, matches.len(), cx))
+                .collect()
         };
 
-        let list = popover::card_flush(&theme)
+        if self.menu_geometry != Some(geometry) {
+            self.menu_geometry = Some(geometry);
+            self.reveal_active = true;
+        }
+        if self.reveal_active {
+            if let Some(position) = highlighted_position {
+                self.scroll.scroll_to_item(position);
+            }
+            self.reveal_active = false;
+        }
+
+        let viewport = div()
             .p(px(theme.space(Space::Xs)))
-            .min_w(px(MENU_MIN_WIDTH))
             .column()
-            .max_h(px(MENU_MAX_HEIGHT))
-            .id(menu_ident.element_id())
+            .max_h(px(geometry.max_height))
+            .id(self.ident.child("menu.scroll").element_id())
             .overflow_y_scroll()
-            .child(body)
+            .track_scroll(&self.scroll)
+            .children(rows);
+        let list = popover::card_flush(&theme)
+            .w(px(geometry.width))
+            .max_h(px(geometry.max_height))
+            .id(menu_ident.element_id())
+            .child(viewport)
             .semantic_in(
                 cx,
                 NodeSpec::new(menu_ident.semantic_id(), Role::Menu)
@@ -436,9 +535,10 @@ impl Combobox {
             )
             .into_any_element();
 
-        popover::anchored_below(
-            ElementId::from(self.ident.child("menu.anchor").semantic_id()),
+        popover::menu_overlay(
+            &self.ident.child("menu.anchor"),
             &theme,
+            geometry.placement,
             list,
         )
     }
@@ -470,6 +570,8 @@ impl Combobox {
             .child(
                 div()
                     .column()
+                    .flex_1()
+                    .min_w_0()
                     .gap(px(2.0))
                     .child(popover::menu_label(
                         &theme,
@@ -561,7 +663,17 @@ impl Render for Combobox {
         }
 
         let focused = self.query.read(cx).focus_handle(cx).is_focused(window);
-        let menu = self.open.then(|| self.menu(cx));
+        let geometry = self.open.then(|| {
+            popover::menu_geometry(
+                window,
+                self.trigger_bounds.get(),
+                &theme,
+                MENU_MAX_HEIGHT,
+                MENU_MIN_WIDTH,
+            )
+        });
+        let placement = geometry.map_or(Placement::Below, |geometry| geometry.placement);
+        let menu = geometry.map(|geometry| self.menu(geometry, cx));
         let mut spec = NodeSpec::new(self.ident.semantic_id(), Role::Combobox)
             .disabled(self.disabled)
             .invalid(self.invalid)
@@ -575,39 +687,53 @@ impl Render for Combobox {
             spec = spec.value(label);
         }
 
+        let shell = field_shell(
+            &theme,
+            self.size,
+            FieldState::default()
+                .focused(focused)
+                .invalid(self.invalid)
+                .disabled(self.disabled),
+        )
+        .id(self.ident.child("shell").element_id())
+        .when(!self.disabled, |element| {
+            element.on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|combobox, _, window, cx| {
+                    if !combobox.open {
+                        combobox.toggle(window, cx);
+                    }
+                }),
+            )
+        })
+        .child(div().flex_1().child(self.query.clone()))
+        .child(
+            icon(Icon::AltArrowDown)
+                .size(px(theme.control.get(self.size).icon_size * 0.9))
+                .text_color(theme.colors.text_muted),
+        );
+        let measured = Rc::clone(&self.trigger_bounds);
+        let trigger = div()
+            .w_full()
+            .on_children_prepainted(move |bounds, window, _| {
+                if let Some(trigger) = bounds.first() {
+                    measure::record(&measured, *trigger, window);
+                }
+            })
+            .child(shell)
+            .into_any_element();
+
         div()
             .id(self.ident.element_id())
             .column()
             .w_full()
-            .on_key_down(cx.listener(Self::on_key_down))
-            .child(
-                field_shell(
-                    &theme,
-                    self.size,
-                    FieldState::default()
-                        .focused(focused)
-                        .invalid(self.invalid)
-                        .disabled(self.disabled),
-                )
-                .id(self.ident.child("shell").element_id())
-                .when(!self.disabled, |element| {
-                    element.on_mouse_down(
-                        MouseButton::Left,
-                        cx.listener(|combobox, _, window, cx| {
-                            if !combobox.open {
-                                combobox.toggle(window, cx);
-                            }
-                        }),
-                    )
-                })
-                .child(div().flex_1().child(self.query.clone()))
-                .child(
-                    icon(Icon::AltArrowDown)
-                        .size(px(theme.control.get(self.size).icon_size * 0.9))
-                        .text_color(theme.colors.text_muted),
-                ),
-            )
-            .child(div().relative().children(menu))
+            // Home and End belong to the query while closed, but to the open
+            // list while it is visible. Capture lets the combobox make that
+            // distinction before TextInput consumes its caret action.
+            .capture_action(cx.listener(Self::on_line_start))
+            .capture_action(cx.listener(Self::on_line_end))
+            .capture_key_down(cx.listener(Self::on_key_down))
+            .child(popover::anchored_slot(placement, trigger, menu))
             .semantic_in(cx, spec)
     }
 }

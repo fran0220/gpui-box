@@ -23,7 +23,7 @@ license is stored at `licenses/COMET-MIT.txt`.
 - Upstream source: <https://github.com/zed-industries/zed>
 - Integration source: <https://github.com/fran0220/zed>
 - Upstream baseline: `a6a23c7b80a5cefa0487b7856335be89ace7e483`
-- Pinned integration revision: `ce35a66556c39f948ada12b60d2aaef579a8aa68`
+- Pinned integration revision: `0b9c8dc932b65cba2dc87464148984e93f60ae18`
 - Browser platform topic range: `058e203` through `b6755ec`
 - WGPU backdrop-blur topic head: `ce35a66556c39f948ada12b60d2aaef579a8aa68`
 - Windows pointer-exit topic head: `f9e7bd617940af337f34f0c5d90e4a83846b6ebe`
@@ -55,7 +55,10 @@ fallback, deliver pointer and keyboard events, and mirror AccessKit roles,
 focus, actions, values, and canvas-scaled bounds into browser semantic DOM. The
 WGPU backdrop-blur topic adds ordered, content-masked, rounded separable blur
 passes for native offscreen and browser rendering, with bounded work and an
-unblurred fallback for invalid or over-budget regions.
+unblurred fallback for invalid or over-budget regions. The integration head
+also applies pending tracked-scroll requests only after current child and
+viewport bounds are known, so a variable-height active child is visible during
+its first prepaint.
 Generally reusable changes remain candidates for small upstream pull requests.
 
 The Apache-2.0 text is stored at `licenses/ZED-APACHE-2.0.txt`.

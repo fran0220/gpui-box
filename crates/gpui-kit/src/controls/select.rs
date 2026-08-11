@@ -5,10 +5,13 @@
 //! renders whatever the owner decides is current, so a host that rejects a
 //! choice keeps showing the one that still holds.
 
+use std::cell::Cell;
+use std::rc::Rc;
+
 use gpui::{
-    AnyElement, App, Context, ElementId, EventEmitter, FocusHandle, Focusable, InteractiveElement,
-    IntoElement, KeyDownEvent, MouseButton, ParentElement, Render, SharedString,
-    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    AnyElement, App, Bounds, Context, EventEmitter, FocusHandle, Focusable, InteractiveElement,
+    IntoElement, KeyDownEvent, MouseButton, ParentElement, Pixels, Render, ScrollHandle,
+    SharedString, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -17,9 +20,14 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TypeScale};
 use crate::foundation::{
     Disableable, Ident, Pressable, Sizable, StyledExt, text as foundation_text,
 };
+use crate::layout::measure;
 use crate::motion;
+use crate::overlay::Placement;
 use crate::overlay::popover::{self, MenuKey};
 use crate::strings::{ActiveStrings, StringKey};
+
+const MENU_MIN_WIDTH: f32 = 180.0;
+const MENU_MAX_HEIGHT: f32 = 320.0;
 
 /// One choice, identified by business identity rather than by position.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -80,6 +88,10 @@ pub struct Select {
     open: bool,
     /// Which row the keyboard is on, which is not a choice until it is taken.
     active: Option<usize>,
+    scroll: ScrollHandle,
+    trigger_bounds: Rc<Cell<Bounds<Pixels>>>,
+    reveal_active: bool,
+    menu_geometry: Option<popover::MenuGeometry>,
 }
 
 impl std::fmt::Debug for Select {
@@ -109,6 +121,10 @@ impl Select {
             invalid: false,
             open: false,
             active: None,
+            scroll: ScrollHandle::new(),
+            trigger_bounds: Rc::default(),
+            reveal_active: false,
+            menu_geometry: None,
         }
     }
 
@@ -162,11 +178,21 @@ impl Select {
         }
         self.options = options;
         self.active = None;
+        self.reveal_active = true;
         cx.notify();
     }
 
     pub fn set_selected(&mut self, id: Option<SharedString>, cx: &mut Context<Self>) {
         self.selected = id;
+        if self.open {
+            self.active = self
+                .selected
+                .as_ref()
+                .and_then(|id| self.options.iter().position(|option| &option.id == id))
+                .filter(|index| !self.options[*index].disabled)
+                .or_else(|| self.first_selectable(0, 1));
+        }
+        self.reveal_active = true;
         cx.notify();
     }
 
@@ -202,7 +228,9 @@ impl Select {
             .selected
             .as_ref()
             .and_then(|id| self.options.iter().position(|option| &option.id == id))
+            .filter(|index| !self.options[*index].disabled)
             .or_else(|| self.first_selectable(0, 1));
+        self.reveal_active = true;
         window.focus(&self.focus_handle, cx);
         cx.emit(SelectEvent::Opened);
         cx.notify();
@@ -247,6 +275,24 @@ impl Select {
             return;
         };
         self.active = self.first_selectable(next, delta.signum());
+        self.reveal_active = true;
+        cx.notify();
+    }
+
+    fn edge(&mut self, from_end: bool, cx: &mut Context<Self>) {
+        let next = if from_end {
+            self.options
+                .len()
+                .checked_sub(1)
+                .and_then(|index| self.first_selectable(index, -1))
+        } else {
+            self.first_selectable(0, 1)
+        };
+        if next == self.active {
+            return;
+        }
+        self.active = next;
+        self.reveal_active = true;
         cx.notify();
     }
 
@@ -269,8 +315,9 @@ impl Select {
         if self.disabled {
             return;
         }
+        let raw = event.keystroke.key.as_str();
         let key = popover::classify_key(
-            event.keystroke.key.as_str(),
+            raw,
             event.keystroke.modifiers.platform,
             event.keystroke.modifiers.control,
         );
@@ -287,6 +334,14 @@ impl Select {
                 self.step(-1, cx);
                 cx.stop_propagation();
             }
+            (true, _) if raw == "home" => {
+                self.edge(false, cx);
+                cx.stop_propagation();
+            }
+            (true, _) if raw == "end" => {
+                self.edge(true, cx);
+                cx.stop_propagation();
+            }
             (true, MenuKey::Enter) => {
                 if let Some(active) = self.active {
                     self.choose(active, cx);
@@ -301,8 +356,18 @@ impl Select {
         }
     }
 
-    fn menu(&self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+    fn menu(&mut self, geometry: popover::MenuGeometry, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
+        if self.menu_geometry != Some(geometry) {
+            self.menu_geometry = Some(geometry);
+            self.reveal_active = true;
+        }
+        if self.reveal_active {
+            if let Some(active) = self.active {
+                self.scroll.scroll_to_item(active);
+            }
+            self.reveal_active = false;
+        }
         let rows = self
             .options
             .iter()
@@ -310,25 +375,30 @@ impl Select {
             .map(|(index, option)| self.row(index, option, self.options.len(), cx))
             .collect::<Vec<_>>();
 
-        let list = popover::card_flush(&theme)
+        let viewport = div()
             .p(px(theme.space(Space::Xs)))
-            .min_w(px(180.0))
             .flex()
             .flex_col()
-            .max_h(px(320.0))
-            .id(self.ident.child("menu").element_id())
+            .max_h(px(geometry.max_height))
+            .id(self.ident.child("menu.scroll").element_id())
             .overflow_y_scroll()
-            .children(rows)
+            .track_scroll(&self.scroll)
+            .children(rows);
+        let list = popover::card_flush(&theme)
+            .w(px(geometry.width))
+            .max_h(px(geometry.max_height))
+            .id(self.ident.child("menu").element_id())
+            .child(viewport)
             .semantic_in(
                 cx,
                 NodeSpec::new(self.ident.child("menu").semantic_id(), Role::Menu),
             )
             .into_any_element();
 
-        let _ = window;
-        popover::anchored_below(
-            ElementId::from(self.ident.child("menu.anchor").semantic_id()),
+        popover::menu_overlay(
+            &self.ident.child("menu.anchor"),
             &theme,
+            geometry.placement,
             list,
         )
     }
@@ -368,6 +438,8 @@ impl Select {
                 div()
                     .flex()
                     .flex_col()
+                    .flex_1()
+                    .min_w_0()
                     .gap(px(2.0))
                     .child(popover::menu_label(
                         &theme,
@@ -450,9 +522,19 @@ impl Render for Select {
             spec = spec.value(option.label.clone());
         }
 
-        let menu = self.open.then(|| self.menu(window, cx));
+        let geometry = self.open.then(|| {
+            popover::menu_geometry(
+                window,
+                self.trigger_bounds.get(),
+                &theme,
+                MENU_MAX_HEIGHT,
+                MENU_MIN_WIDTH,
+            )
+        });
+        let placement = geometry.map_or(Placement::Below, |geometry| geometry.placement);
+        let menu = geometry.map(|geometry| self.menu(geometry, cx));
 
-        div()
+        let trigger = div()
             .id(self.ident.element_id())
             .when(!self.disabled, |element| {
                 element
@@ -498,7 +580,18 @@ impl Render for Select {
                     .size(px(metrics.icon_size * 0.9))
                     .text_color(theme.colors.text_muted),
             )
-            .children(menu)
-            .semantic_in(cx, spec)
+            .semantic_in(cx, spec);
+        let measured = Rc::clone(&self.trigger_bounds);
+        let trigger = div()
+            .w_full()
+            .on_children_prepainted(move |bounds, window, _| {
+                if let Some(trigger) = bounds.first() {
+                    measure::record(&measured, *trigger, window);
+                }
+            })
+            .child(trigger)
+            .into_any_element();
+
+        popover::anchored_slot(placement, trigger, menu)
     }
 }

@@ -23,7 +23,7 @@ anyhow = "1"
 # The same major version GPUI's `render_to_image` returns, so the image value
 # crosses the crate boundary as one type.
 image = "0.25"
-gpui = { git = "https://github.com/fran0220/zed", rev = "ce35a66556c39f948ada12b60d2aaef579a8aa68", features = ["test-support"] }
+gpui = { git = "https://github.com/fran0220/zed", rev = "0b9c8dc932b65cba2dc87464148984e93f60ae18", features = ["test-support"] }
 gpui-kit = { path = "../../crates/gpui-kit", features = ["fixtures"] }
 gpui-kit-semantics = { path = "../../crates/gpui-kit-semantics" }
 gpui-kit-theme = { path = "../../crates/gpui-kit-theme" }
@@ -32,7 +32,7 @@ gpui-kit-theme = { path = "../../crates/gpui-kit-theme" }
 # Metal on macOS, wgpu elsewhere. `gpui_wgpu` additionally supplies the
 # bundled-font text system, which every platform uses so that shaping cannot
 # vary with the machine's installed fonts.
-gpui_platform = { git = "https://github.com/fran0220/zed", rev = "ce35a66556c39f948ada12b60d2aaef579a8aa68", features = ["test-support"] }
-gpui_wgpu = { git = "https://github.com/fran0220/zed", rev = "ce35a66556c39f948ada12b60d2aaef579a8aa68", features = ["test-support"] }
+gpui_platform = { git = "https://github.com/fran0220/zed", rev = "0b9c8dc932b65cba2dc87464148984e93f60ae18", features = ["test-support"] }
+gpui_wgpu = { git = "https://github.com/fran0220/zed", rev = "0b9c8dc932b65cba2dc87464148984e93f60ae18", features = ["test-support"] }
 
 [workspace]
