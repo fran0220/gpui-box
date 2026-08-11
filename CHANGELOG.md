@@ -228,6 +228,12 @@ and `xtask gate [full]`. `scenes check` is the visual regression gate; see
   which exactness could not: the sprite atlas has accumulated different state by
   the ninetieth scene of a full run, and that moves one antialiased pixel of
   `frost`.
+- `xtask gate only <scene>...` runs the part of the gate one component can
+  invalidate: `gpui-kit` clippy, the tests whose names mention those scenes, the
+  generated-artifact checks, and those scenes' baselines. The full gate compiles
+  and tests every workspace member and renders the whole catalog, which is
+  minutes of waiting for an edit to one file. It is a shortcut while iterating
+  and not what a commit runs.
 - `xtask scenes capture` and `xtask scenes check` are replaced by
   `xtask scenes render`, which writes to `target/scenes` and holds no baseline.
   A real window is still how motion and the text caret get reviewed; it is no

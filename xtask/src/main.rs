@@ -46,12 +46,13 @@ fn main() -> Result<()> {
         (Some("web"), Some("visual")) => web_visual(&rest),
         (Some("gate"), None) => gate(false),
         (Some("gate"), Some("full")) => gate(true),
+        (Some("gate"), Some("only")) => gate_only(&rest),
         _ => bail!(
             "usage: cargo xtask <dependencies check|accessibility check|tokens generate|tokens check|strings check|\
              strings generate|scenes list|scenes render [name...]|\
              headless capture [name...]|\
              headless check [name...]|web check|web build|web smoke|\
-             web visual <capture|check> [name...]|gate [full]>"
+             web visual <capture|check> [name...]|gate [full]|gate only <scene>...>"
         ),
     }
 }
@@ -939,6 +940,54 @@ fn gate(full: bool) -> Result<()> {
         headless("check", &[])?;
     }
     println!("gate passed");
+    Ok(())
+}
+
+/// Runs the part of the gate one component can invalidate.
+///
+/// The full gate compiles and tests every workspace member and renders the
+/// whole catalog, which is minutes of waiting for an edit to one file. This
+/// answers the same questions about the named scenes: the library still builds
+/// and lints clean, the tests whose names mention them still pass, the
+/// generated artifacts are still current, and those scenes still look the way
+/// the baseline says.
+///
+/// It is a shortcut while iterating, not a substitute for `gate` before a
+/// commit. It says nothing about the other members, the doctests, or a scene
+/// the edit reached without anybody predicting it.
+fn gate_only(scenes: &[String]) -> Result<()> {
+    if scenes.is_empty() {
+        bail!("usage: cargo xtask gate only <scene>...; `xtask scenes list` names them");
+    }
+    for scene in scenes {
+        if gpui_kit::scenes::find(scene).is_none() {
+            bail!("unknown scene `{scene}`; `xtask scenes list` names them");
+        }
+    }
+    step("cargo", &["fmt", "--all", "--", "--check"], None)?;
+    step(
+        "cargo",
+        &[
+            "clippy",
+            "-p",
+            "gpui-kit",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings",
+        ],
+        None,
+    )?;
+    // A scene name is also how its tests are named, which is what makes one
+    // argument enough to select both.
+    for scene in scenes {
+        step("cargo", &["test", "-p", "gpui-kit", scene], None)?;
+    }
+    tokens(true)?;
+    strings::check(&root())?;
+    api::check(&root())?;
+    headless("check", scenes)?;
+    println!("gate only {} passed", scenes.join(" "));
     Ok(())
 }
 

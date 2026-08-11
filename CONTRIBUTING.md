@@ -6,7 +6,9 @@
 4. Cover pure reducers and state transitions with unit tests.
 5. Register gallery controls in the semantic tree.
 6. Update the gallery when a component gains a visual state.
-7. Run `cargo run -p xtask -- gate`, and `gate full` before committing.
+7. While iterating on one component, `cargo run -p xtask -- gate only <scene>`
+   answers in about a minute. Run `cargo run -p xtask -- gate`, and `gate full`,
+   before committing: `gate only` says nothing about the rest of the workspace.
 8. After a UI change, run `cargo run -p xtask -- headless check`, look at every
    image it reports, and accept them with `headless capture` only once you have.
    The offscreen harness runs on macOS, Linux, and Windows; see

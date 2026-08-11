@@ -107,9 +107,17 @@ scene and returns the image.
 ## Validation
 
 ```bash
-cargo run -p xtask -- gate        # fmt, check, test, clippy, tokens
-cargo run -p xtask -- gate full   # the above, plus rustdoc and scene images
+cargo run -p xtask -- gate                      # fmt, check, test, clippy, tokens
+cargo run -p xtask -- gate full                 # the above, plus rustdoc and scene images
+cargo run -p xtask -- gate only keymap-editor   # while iterating on one component
 ```
+
+`gate only` takes scene names and answers the same questions about those:
+`gpui-kit` builds and lints clean, the tests whose names mention them pass, the
+generated artifacts are current, and those scenes match their baseline. It is a
+shortcut while iterating, never what a commit runs — it says nothing about the
+other workspace members, the doctests, or a scene the edit reached without
+anybody predicting it.
 
 The visual gate on every platform is `cargo run -p xtask -- headless check`
 (`headless capture` accepts). It renders the catalog into offscreen textures
