@@ -98,6 +98,15 @@ poll with bounded retries and backoff, and retry only the dependent publish or
 index lookup. A response saying that the exact version already exists is
 success after verifying its checksum/metadata; never attempt to overwrite it.
 
+Crates.io permits an initial burst of five brand-new crate names and then earns
+one additional new-crate publish every ten minutes. The publisher recognizes
+only that specific 429 response, waits ten minutes plus a small clock-skew
+margin, and retries the same package a bounded number of times. Before every
+retry it asks the exact-version API whether crates.io accepted the prior
+request; an accepted version is resumed only after the archive checksum and
+unyanked index entry match. Other 429 responses and all other upload failures
+stop the cohort for inspection.
+
 Pause on any other error. Determine whether crates.io accepted the upload
 before retrying. Publication is immutable and a partially published cohort is
 better documented and resumed than guessed at.

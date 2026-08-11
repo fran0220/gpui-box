@@ -5,6 +5,7 @@ use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
+    io::{self, Write as _},
     path::{Path, PathBuf},
     process::Command,
     thread,
@@ -16,6 +17,8 @@ const PUBLISH_OPT_IN: &str = "GPUI_BOX_PUBLISH";
 const CRATES_IO_USER_AGENT: &str = "gpui-box-release/0.1 (https://github.com/fran0220/gpui-box)";
 const INITIAL_RELEASE_VERSION: &str = "0.1.0";
 const INITIAL_RELEASE_COMMIT: &str = "888369c73c258567664785a761faebdc64d39d4e";
+const NEW_CRATE_RATE_LIMIT_WAIT: Duration = Duration::from_secs(10 * 60 + 5);
+const NEW_CRATE_RATE_LIMIT_RETRIES: usize = 3;
 
 struct PublicationPlan {
     packages: BTreeMap<String, Package>,
@@ -436,9 +439,31 @@ pub fn publish(root: &Path, args: &[String]) -> Result<()> {
                 .arg(root.join(&p.manifest))
                 .current_dir(root);
             apply_package_patches(&mut publish, &patches);
-            let status = publish.status()?;
+            let mut accepted = false;
+            for attempt in 0..=NEW_CRATE_RATE_LIMIT_RETRIES {
+                let output = publish.output()?;
+                io::stdout().write_all(&output.stdout)?;
+                io::stderr().write_all(&output.stderr)?;
+                if output.status.success() || remote_version_exists(&name, &p.version)? {
+                    accepted = true;
+                    break;
+                }
+                if publish_was_new_crate_rate_limited(&output.stdout, &output.stderr)
+                    && attempt < NEW_CRATE_RATE_LIMIT_RETRIES
+                {
+                    eprintln!(
+                        "crates.io rate-limited new crate {name}; waiting {} seconds before retry {} of {}",
+                        NEW_CRATE_RATE_LIMIT_WAIT.as_secs(),
+                        attempt + 1,
+                        NEW_CRATE_RATE_LIMIT_RETRIES
+                    );
+                    thread::sleep(NEW_CRATE_RATE_LIMIT_WAIT);
+                    continue;
+                }
+                break;
+            }
             ensure!(
-                status.success(),
+                accepted,
                 "cargo publish failed for {name}; check crates.io before retrying"
             );
             let mut verified = false;
@@ -463,6 +488,17 @@ pub fn publish(root: &Path, args: &[String]) -> Result<()> {
 
 fn sha256_file(path: &Path) -> Result<String> {
     Ok(format!("{:x}", Sha256::digest(fs::read(path)?)))
+}
+
+fn publish_was_new_crate_rate_limited(stdout: &[u8], stderr: &[u8]) -> bool {
+    let output = format!(
+        "{}\n{}",
+        String::from_utf8_lossy(stdout),
+        String::from_utf8_lossy(stderr)
+    )
+    .to_ascii_lowercase();
+    output.contains("429 too many requests")
+        && output.contains("published too many new crates in a short period of time")
 }
 
 fn validate_remote_coordinate(name: &str, version: &str) -> Result<()> {
@@ -1102,6 +1138,22 @@ mod tests {
         assert!(!version_exists_from_status("404", "gpui-box", "0.1.0")?);
         assert!(version_exists_from_status("403", "gpui-box", "0.1.0").is_err());
         Ok(())
+    }
+
+    #[test]
+    fn only_the_new_crate_rate_limit_is_retryable() {
+        assert!(publish_was_new_crate_rate_limited(
+            b"",
+            b"status 429 Too Many Requests): You have published too many new crates in a short period of time. Please try again later."
+        ));
+        assert!(!publish_was_new_crate_rate_limited(
+            b"",
+            b"status 429 Too Many Requests): generic throttle"
+        ));
+        assert!(!publish_was_new_crate_rate_limited(
+            b"",
+            b"status 500: You have published too many new crates in a short period of time"
+        ));
     }
 
     #[test]
