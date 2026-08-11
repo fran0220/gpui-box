@@ -190,7 +190,7 @@ pub mod prelude {
     pub use crate::foundation::{
         ActiveTheme, ControlSize, Density, Disableable, Elevation, FocusRing, HoverLift, Ident,
         Layer, Pressable, Selectable, Sizable, StyledExt, ThemeRegistry, activate_theme,
-        set_density,
+        set_density, text,
     };
     pub use crate::interaction::dnd::{
         ActiveDrag, DragItem, DropAxis, DropIntent, DropPosition, StagedDrag,

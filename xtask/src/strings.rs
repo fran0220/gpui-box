@@ -189,7 +189,7 @@ fn scan(directory: &Path) -> Result<Vec<Suspect>> {
     Ok(found)
 }
 
-fn collect(directory: &Path, into: &mut Vec<PathBuf>) -> Result<()> {
+pub(crate) fn collect(directory: &Path, into: &mut Vec<PathBuf>) -> Result<()> {
     for entry in fs::read_dir(directory)? {
         let path = entry?.path();
         if path.is_dir() {
@@ -217,7 +217,7 @@ pub fn suspects(source: &str) -> Vec<(usize, String)> {
 /// A sentence rather than an identifier: it has a letter, and either a space
 /// or a capital. `"settings.save"` is an id; `"Save"` and `"more rows"` are
 /// not.
-fn is_prose(text: &str) -> bool {
+pub(crate) fn is_prose(text: &str) -> bool {
     text.chars()
         .any(|character| character.is_ascii_alphabetic())
         && (text.contains(' ') || text.chars().any(|character| character.is_ascii_uppercase()))

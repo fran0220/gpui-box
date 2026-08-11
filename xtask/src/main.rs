@@ -14,6 +14,7 @@ mod api;
 mod dependencies;
 mod site;
 mod strings;
+mod typography;
 use gpui_kit_tokens::{
     BorderWeight, ControlSize, Density, Elevation, Layer, MotionEasing, OpacityRole, Radius, Space,
     SpringPreset, TokenDocument, bundled, contrast,
@@ -28,6 +29,7 @@ fn main() -> Result<()> {
         (Some("tokens"), Some("check")) => tokens(true),
         (Some("strings"), Some("check")) => strings::check(&root()),
         (Some("strings"), Some("generate")) => strings::generate(&root()),
+        (Some("typography"), Some("check")) => typography::check(&root()),
         (Some("api"), Some("check")) => api::check(&root()),
         (Some("api"), Some("generate")) => api::generate(&root()),
         (Some("dependencies"), Some("check")) => dependencies::check(&root(), &rest),
@@ -49,7 +51,7 @@ fn main() -> Result<()> {
         (Some("gate"), Some("only")) => gate_only(&rest),
         _ => bail!(
             "usage: cargo xtask <dependencies check|accessibility check|tokens generate|tokens check|strings check|\
-             strings generate|scenes list|scenes render [name...]|\
+             strings generate|typography check|scenes list|scenes render [name...]|\
              headless capture [name...]|\
              headless check [name...]|web check|web build|web smoke|\
              web visual <capture|check> [name...]|gate [full]|gate only <scene>...>"

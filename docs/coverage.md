@@ -186,6 +186,121 @@ the opposite: things a general-purpose library is expected to have that this
 one does not have yet. They are recorded here so that the difference between a
 decision and a debt stays visible.
 
+### Typography and visual polish audit, 2026-08-11
+
+Before changing typography, eight independent reviewers inspected all 98 Linux
+headless scenes in both Studio themes: 196 images, each 1840×2000. Every image
+was checked for (1) type hierarchy and accidental GPUI-default text, (2) line
+height and icon/chip baselines, (3) token spacing rhythm, (4) dark-theme
+contrast, (5) visibly distinct Loading, Empty, Unavailable, Error, and Ready
+states, and (6) clipping, overflow, and unconstrained full-width content. This
+is the named pre-change inventory; `clean` means no defect was visible under
+that rubric, not that every possible interaction was exercised.
+
+| Scenes | Pre-change finding |
+|---|---|
+| `accordion` | Medium: disabled title and detail are too faint in both themes. |
+| `actions` | High: dark toolbar icons, shortcuts, menu outline, and separators nearly disappear. |
+| `anchor-list` | Medium: dark explanatory copy is nearly invisible. |
+| `animated-number`, `aspect-ratio` | Clean. |
+| `approval` | Medium: dark secondary action is weak; the focus ring and labelled divider need clearance. |
+| `audio-player` | High: media-control baselines diverge and inactive rails/separators disappear, especially in dark. |
+| `auth-sign-in`, `auth-verification` | Medium: dark banner, placeholder, link, and verification-cell boundaries are too weak. |
+| `badge` | Medium: several dark semantic foreground/background pairs are hard to distinguish. |
+| `breadcrumb` | Low: the light-theme slash sits above the text baseline. |
+| `browser-panel` | Medium: the five states are distinct, but long Ready content is hard-clipped. |
+| `button` | Medium: control sizes rely on boxes more than a coherent type ladder; dark disabled labels are weak. |
+| `calendar` | Medium: dark adjacent/disabled dates and navigation are too faint; fixture explanation uses default-sized text. |
+| `card` | Medium: a two-line card stretches across nearly the full canvas. |
+| `cascader` | High: an unconstrained trigger and narrow popup disagree; dark disabled rows disappear. |
+| `choice` | High: dark unchecked and disabled controls are almost invisible. |
+| `code-view` | Medium: an intentionally long line clips without an equally visible horizontal-scroll affordance in both themes. |
+| `collapsible` | High: the dark managed section is nearly invisible. |
+| `command-palette` | Medium: dark section labels, secondary commands, and keycaps are too faint. |
+| `content` | High: the states are truthful, but dark pinned/filter/empty affordances and progress rails disappear. |
+| `context-menu` | Medium: fixture copy falls back to large default text; dark metadata is weak. |
+| `conversation` | High: duplicated long message groups and an unconstrained reading column obscure the intended scroll states. |
+| `copy-button` | Low: success is repeated as adjacent `Copied` labels. |
+| `cost-meter` | High: dark labels, refusal reasons, and unknown values are nearly invisible. |
+| `data-grid` | High: muted table structure and managed state are unreadable in dark; chip baselines and compact type are inconsistent. |
+| `data-grid-editing` | Medium: editor and cell baselines differ and the focus edge collides with a grid line. |
+| `date-range` | Medium: disabled/range dates lack contrast and adjacent-month dates lack hierarchy. |
+| `date-time` | Medium: light separators sit low and error copy touches the field. |
+| `detail` | High: labels, unknown/not-applicable values, and dark metadata are too faint. |
+| `diagnostics-list` | High: Hint and explanatory text nearly disappear; chip icon baselines diverge. |
+| `dialog` | Low: light is clean; only masked background copy is extremely faint in dark. |
+| `diff-view` | Low: top clearance and the dark split divider are weak. |
+| `document-tabs` | Medium: light helper copy and dark inactive close controls are too faint. |
+| `drag-list` | Clean. |
+| `drag-tree` | Medium: light is clean; dark status copy nearly disappears and preview content sits high. |
+| `drawer` | Medium: light is clean; the dark unchecked box is difficult to find. |
+| `dropzone` | Medium: helper copy is too faint and states move vertically when a detail line is absent. |
+| `failure-panel` | Medium: top copy clips in light; secondary failure detail is weak and icon/text centring differs. |
+| `filter-bar` | Low: light Add-filter/chip baselines differ; dark is clean. |
+| `find-replace` | High: dark explanatory copy disappears, controls are over-wide, and count/arrows are crowded. |
+| `form` | High: the Region popup covers field help; dark unselected text is too faint and errors touch fields. |
+| `frost` | High: dark frost lacks enough edge/surface evidence; light needs bottom clearance and consistent stripes. |
+| `hover-card` | Medium: helper and body copy are too faint, especially in dark. |
+| `ide-shell` | High: dark shell height leaves a large void and Empty/Unavailable claims conflict. |
+| `image-viewer` | High: metadata and disabled controls are too faint; the third viewer breaks the first two viewers' grid/container rhythm. |
+| `inline-edit` | High: dark helper text disappears, errors touch fields, and the short value gets an over-wide editor. |
+| `input` | High: read-only/disabled values are made unreadable rather than distinctly unavailable. |
+| `json-view` | Low: comment columns and selected-row extent are inconsistent; dark null/comment values are weak. |
+| `kbd` | Clean. |
+| `keybinding` | Medium: unbound/help/error text is faint and keycap/icon/row baselines vary. |
+| `keymap-editor` | High: `Defaults` and host-managed copy use GPUI's large default; chips, conflict/source text, and actions do not share a row grid. |
+| `list` | Light is clean; low in dark for title/list clearance and missing continuation affordance. |
+| `loading` | High: skeletons lack hierarchy/max-width and contrast; loaders crowd the top-left and use conflicting palettes. |
+| `log-stream` | Medium: level/inline chips sit off baseline and small status copy is faint. |
+| `markdown` | Medium: the dark unfetched state disappears; truncated repetition and embedded-block widths are unclear. |
+| `menu` | Low: shortcut gaps/insets vary and the dark section label is weak. |
+| `menubar` | Medium: shortcuts, anchors, item gaps, and dividers do not share one baseline/rhythm. |
+| `model-viewer` | High: a dark labelled divider crosses its label; metadata and disabled controls are too faint. |
+| `motion-flip` | Low: light caption contrast/button padding and dark badge centring need correction. |
+| `motion-state` | Medium: progress tracks disappear and the dark segmented strip stretches beyond its content. |
+| `node-graph` | High: edges cross labels, loose labels lack anchors, and dark node metadata is too faint. |
+| `notification-center` | High: unread markers move between action/close slots and rows without detail collapse. |
+| `offering-catalog` | Medium: type badges and source columns are inconsistent; source/banner copy is faint. |
+| `overlay` | Low: dark secondary-button separation is weak. |
+| `pagination` | High: light previous/first controls look disabled away from the first page. |
+| `permission-matrix` | Low: wrapped policy detail breaks row rhythm and dark secondary copy is weak. |
+| `popover` | Low: light unchecked-box contrast and optical centring are weak. |
+| `progress-circle`, `reading-direction` | Clean. |
+| `schema-form` | Medium: dark fields and placeholders disappear; required markers drift off baseline. |
+| `scroll-area` | Medium: the final line is cut in half and the light thumb is faint. |
+| `scroll-fade` | Clean. |
+| `scroll-shadow` | Medium: the first line is cut in half and the dark bottom shadow is weak. |
+| `search-field` | Low: light hit-chip outlines are too faint. |
+| `server-list` | Low: expanded error spacing is inconsistent and light helper copy is weak. |
+| `settings` | Medium: unavailable explanation is made unreadable, especially in dark. |
+| `sidebar` | Medium: dark managed and workspace metadata nearly disappear. |
+| `sparkline` | Medium: dark minimum/maximum values are too faint. |
+| `split-pane`, `split-tree` | High: dark dividers and drag handles nearly disappear. |
+| `status` | Medium: two short status messages stretch nearly the full canvas. |
+| `step-list` | Medium: dark status/detail text is weak and the status column is too distant. |
+| `table` | Medium: the dark managed row is nearly invisible. |
+| `tabs` | Medium: scene body falls back to large default text and dark disabled tab is too faint. |
+| `textarea` | High: dark placeholders, disabled text, and field surfaces disappear. |
+| `thinking` | Medium: dark secondary/empty copy is weak and short rows stretch full-width. |
+| `toast` | Low: bottom clearance and dark close-control contrast are marginal. |
+| `toggle` | High: dark disabled and unselected states nearly disappear. |
+| `tool-call` | Clean. |
+| `toolbar` | Medium: scene body falls back to default text; dark controls/boundaries and group spacing are weak. |
+| `tooltip` | Medium: trigger and tooltip have nearly the same visual role and no strong pointing relationship. |
+| `transport` | High: dark rails, speeds, status copy, and unknown duration disappear; control baselines and mute forms diverge. |
+| `tree` | Medium: dark ignored state is too faint and selected-row extent is ambiguous. |
+| `tree-grid` | Medium: dark structure disappears and disclosure/icon columns do not reserve consistent slots. |
+| `upload-list` | High: dark queued/refusal explanation disappears; progress/action columns and icon sizes vary. |
+| `video-player` | Medium: volume controls do not share a baseline; dark rails/help disappear and the player lacks a balanced width strategy. |
+| `wizard` | High: dark step details and Back boundary disappear; horizontal steps lack a shared title baseline. |
+
+This pass does not accept a root-level inherited font as a fix. A component can
+be embedded beneath any host text style, so each element that emits text must
+choose its own complete `TypeScale` step. The typography gate records that
+contract. It also does not turn disabled content invisible, treat a refusal as
+empty data, invent a decoder/browser/graph layout, or add application policy to
+make a fixture look fuller.
+
 ### Motion, which is where the largest gap is
 
 The primitives in `docs/motion.md` cover a value moving from one state to

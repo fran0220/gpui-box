@@ -17,7 +17,7 @@ pub use direction::{
 };
 pub use ident::Ident;
 pub use interaction::{HoverLift, Pressable};
-pub use styled_ext::{FocusRing, StyledExt};
+pub use styled_ext::{FocusRing, StyledExt, text};
 
 pub use gpui_kit_theme::{
     ActiveTheme, ControlSize, Density, Elevation, Layer, ThemeRegistry, activate_theme, set_density,

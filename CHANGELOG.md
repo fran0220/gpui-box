@@ -221,6 +221,15 @@ and `xtask gate [full]`. `scenes check` is the visual regression gate; see
   be emphasised without changing the line box it sits in; `Subtitle` is 14/20 at
   600 for a heading inside a component. Both themes carry both steps. No
   component uses them yet, so no baseline moved.
+- Visible strings now have a product-neutral `foundation::text` entry point
+  that applies one complete `TypeScale` step and the primary `TextTone`; callers
+  can override the tone or logical start/end alignment without separating size,
+  line height, and weight. `xtask typography check` rejects direct string and
+  `SharedString` children. It deliberately does not set a root font: a component
+  embedded below a host-owned text style must render identically to the same
+  component in the gallery, so inheritance is the defect rather than its fix.
+  The pre-change review of all 196 Linux theme/scene images is recorded in
+  `docs/coverage.md` before the component-family sweep changes any baseline.
 - The visual gate is `xtask headless check` on every platform, and the macOS
   baseline moved from `snapshots/macos/scenes` to
   `snapshots/headless/macos/scenes`. It used to open a real 920×1000 window and

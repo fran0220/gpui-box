@@ -1,5 +1,23 @@
-use gpui::{FontWeight, InteractiveElement, Styled, px};
+use gpui::{Div, FontWeight, InteractiveElement, ParentElement, SharedString, Styled, div, px};
 use gpui_kit_theme::{Elevation, Radius, Space, Surface, TextTone, Theme, TypeScale};
+
+/// Creates text with an explicit complete type step and primary text tone.
+///
+/// This is the only entry point for putting a string directly into the GPUI
+/// element tree. A component cannot rely on a host ancestor's font or colour:
+/// the same component must keep its metrics when embedded by itself. Callers
+/// that need a secondary colour apply [`StyledExt::text_tone`] to the returned
+/// element; callers that need edge alignment apply
+/// [`DirectionalExt::text_start`](super::DirectionalExt::text_start) or
+/// [`DirectionalExt::text_end`](super::DirectionalExt::text_end). The helper
+/// deliberately chooses no physical left/right alignment, so it does not turn
+/// a right-to-left run back into a left-to-right one.
+pub fn text(theme: &Theme, scale: TypeScale, content: impl Into<SharedString>) -> Div {
+    div()
+        .type_scale(theme, scale)
+        .text_tone(theme, TextTone::Primary)
+        .child(content.into())
+}
 
 /// Token-addressed styling helpers.
 ///
