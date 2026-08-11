@@ -11,13 +11,13 @@ use gpui::{
     Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Space, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Space, TextTone, TypeScale};
 
 use crate::datetime::adapter::{Day, SharedDateAdapter};
 use crate::datetime::calendar::{Calendar, CalendarEvent, DayMark};
 use crate::display::badge::Tone;
 use crate::display::status::StatusLine;
-use crate::foundation::{Disableable, Ident, StyledExt};
+use crate::foundation::{Disableable, Ident, StyledExt, text as foundation_text};
 use crate::strings::{ActiveStrings, StringKey};
 
 /// A range as the caller holds it: a start, and an end once there is one.
@@ -312,17 +312,19 @@ impl Render for RangePicker {
 
         let blocked_line = match &blocked {
             BlockedReport::Unchecked => Some(
-                div()
-                    .type_scale(&theme, TypeScale::Caption)
-                    .text_color(theme.colors.text_muted)
-                    .child(cx.strings().text(StringKey::RangeUncheckable))
-                    .semantic_in(
-                        cx,
-                        NodeSpec::new(self.ident.child("blocked").semantic_id(), Role::Status)
-                            .parent(self.ident.semantic_id())
-                            .value("unchecked")
-                            .text(cx.strings().text(StringKey::RangeUncheckable)),
-                    ),
+                foundation_text(
+                    &theme,
+                    TypeScale::Caption,
+                    cx.strings().text(StringKey::RangeUncheckable),
+                )
+                .text_tone(&theme, TextTone::Muted)
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(self.ident.child("blocked").semantic_id(), Role::Status)
+                        .parent(self.ident.semantic_id())
+                        .value("unchecked")
+                        .text(cx.strings().text(StringKey::RangeUncheckable)),
+                ),
             ),
             _ => None,
         };
@@ -331,7 +333,8 @@ impl Render for RangePicker {
             BlockedReport::Blocked(days) => days
                 .iter()
                 .map(|blocked| {
-                    let ident = self.ident.child(format!("blocked-{}", blocked.day.0));
+                    let blocked_id = format!("blocked-{}", blocked.day.0);
+                    let ident = self.ident.child(blocked_id);
                     let text = cx.strings().format(
                         StringKey::RangeBlockedDay,
                         &[
@@ -339,10 +342,8 @@ impl Render for RangePicker {
                             blocked.reason.as_ref(),
                         ],
                     );
-                    div()
-                        .type_scale(&theme, TypeScale::Caption)
+                    foundation_text(&theme, TypeScale::Caption, text.clone())
                         .text_color(theme.colors.warning)
-                        .child(text.clone())
                         .semantic_in(
                             cx,
                             NodeSpec::new(ident.semantic_id(), Role::Status)

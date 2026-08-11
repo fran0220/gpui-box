@@ -15,7 +15,7 @@ use gpui::{
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TextTone, Theme, TypeScale};
 
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -25,7 +25,9 @@ use crate::datetime::range::DayRange;
 use crate::display::badge::Tone;
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::foundation::direction::ActiveDirection;
-use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
+use crate::foundation::{
+    Disableable, FocusRing, Ident, Sizable, StyledExt, text as foundation_text,
+};
 use crate::motion;
 use crate::overlay::Tooltipped;
 
@@ -434,12 +436,9 @@ impl Calendar {
                 }),
             )
             .child(
-                div()
+                foundation_text(&theme, TypeScale::Label, label)
                     .flex_1()
-                    .text_align(gpui::TextAlign::Center)
-                    .type_scale(&theme, TypeScale::Label)
-                    .text_color(theme.colors.text)
-                    .child(label),
+                    .text_align(gpui::TextAlign::Center),
             )
             .child(
                 IconButton::new(
@@ -464,13 +463,11 @@ impl Calendar {
         div()
             .row()
             .children(self.adapter.weekday_labels().into_iter().map(|label| {
-                div()
+                foundation_text(theme, TypeScale::Caption, label)
                     .w(px(CELL_SIZE))
                     .flex_none()
                     .text_align(gpui::TextAlign::Center)
-                    .type_scale(theme, TypeScale::Caption)
-                    .text_color(theme.colors.text_faint)
-                    .child(label)
+                    .text_tone(theme, TextTone::Faint)
             }))
             .into_any_element()
     }
@@ -481,7 +478,8 @@ impl Calendar {
             return div().size(px(CELL_SIZE)).flex_none().into_any_element();
         };
 
-        let ident = self.ident.child(format!("day-{}", day.0));
+        let day_id = format!("day-{}", day.0);
+        let ident = self.ident.child(day_id);
         let selectability = self.adapter.is_selectable(day);
         let blocked = selectability.reason().cloned();
         let selectable = selectability.is_selectable() && !self.disabled;
@@ -523,16 +521,6 @@ impl Calendar {
             .justify_center()
             .gap(px(2.0))
             .radius(&theme, Radius::Control)
-            .type_scale(&theme, TypeScale::Label)
-            .text_color(if !selectable {
-                theme.colors.text_faint
-            } else if selected || endpoint {
-                theme.colors.text_on_accent
-            } else if cell.is_adjacent() {
-                theme.colors.text_muted
-            } else {
-                theme.colors.text
-            })
             .when_some(background, |element, color| element.bg(color))
             .when(is_today && !selected && !endpoint, |element| {
                 element
@@ -556,7 +544,16 @@ impl Calendar {
                     .opacity(theme.opacity.disabled)
                     .tip(ident.clone(), reason)
             })
-            .child(div().child(label))
+            .child(if selected || endpoint {
+                foundation_text(&theme, TypeScale::Label, label)
+                    .text_color(theme.colors.text_on_accent)
+            } else if !selectable {
+                foundation_text(&theme, TypeScale::Label, label).text_tone(&theme, TextTone::Faint)
+            } else if cell.is_adjacent() {
+                foundation_text(&theme, TypeScale::Label, label).text_tone(&theme, TextTone::Muted)
+            } else {
+                foundation_text(&theme, TypeScale::Label, label)
+            })
             .children(mark.as_ref().map(|mark| {
                 div()
                     .size(px(4.0))
@@ -659,10 +656,9 @@ impl Render for Calendar {
                 if self.navigations == 0 {
                     body.into_any_element()
                 } else {
+                    let animation_id = format!("month.{}.{}", month.0, self.navigations);
                     month_in(
-                        self.ident
-                            .child(format!("month.{}.{}", month.0, self.navigations))
-                            .element_id(),
+                        self.ident.child(animation_id).element_id(),
                         &theme,
                         self.travel,
                         body,
@@ -685,10 +681,8 @@ impl Render for Calendar {
                     .is_some_and(|grid| grid.position_of(*today).is_some())
             })
             .map(|today| {
-                div()
-                    .type_scale(&theme, TypeScale::Caption)
-                    .text_color(theme.colors.text_muted)
-                    .child(self.adapter.format_day(today))
+                foundation_text(&theme, TypeScale::Caption, self.adapter.format_day(today))
+                    .text_tone(&theme, TextTone::Muted)
                     .semantic_in(
                         cx,
                         NodeSpec::new(self.ident.child("today").semantic_id(), Role::Status)

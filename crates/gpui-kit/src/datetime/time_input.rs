@@ -11,13 +11,15 @@ use gpui::{
     div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TextTone, TypeScale};
 
 use crate::controls::field::{FieldState, field_shell};
 use crate::datetime::adapter::{Clock, SharedDateAdapter, TimeOfDay};
 use crate::foundation::direction::ActiveDirection;
 use crate::foundation::stepping::bounded_step;
-use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
+use crate::foundation::{
+    Disableable, FocusRing, Ident, Sizable, StyledExt, text as foundation_text,
+};
 use crate::strings::{ActiveStrings, StringKey};
 
 /// Which part of the time the keyboard is on.
@@ -336,11 +338,7 @@ impl Render for TimeInput {
                     .id(ident.element_id())
                     .px(px(theme.space(Space::Xs)))
                     .rounded(px(theme.radii.small))
-                    .when(active, |element| {
-                        element
-                            .bg(theme.colors.selected)
-                            .text_color(theme.colors.text)
-                    })
+                    .when(active, |element| element.bg(theme.colors.selected))
                     .when(!self.disabled, |element| {
                         element.cursor_pointer().on_click(cx.listener(
                             move |input, _, window, cx| {
@@ -349,7 +347,16 @@ impl Render for TimeInput {
                             },
                         ))
                     })
-                    .child(text.clone())
+                    .child(
+                        foundation_text(&theme, TypeScale::Body, text.clone()).text_tone(
+                            &theme,
+                            if self.disabled {
+                                TextTone::Faint
+                            } else {
+                                TextTone::Primary
+                            },
+                        ),
+                    )
                     .semantic_in(
                         cx,
                         NodeSpec::new(ident.semantic_id(), Role::Input)
@@ -368,13 +375,18 @@ impl Render for TimeInput {
                     div()
                         .row()
                         .child(cell)
-                        .child(div().text_color(theme.colors.text_faint).child(
-                            if segments[index + 1] == Segment::Meridiem {
-                                SharedString::new_static(" ")
-                            } else {
-                                SharedString::new_static(":")
-                            },
-                        ))
+                        .child(
+                            foundation_text(
+                                &theme,
+                                TypeScale::Body,
+                                if segments[index + 1] == Segment::Meridiem {
+                                    SharedString::new_static(" ")
+                                } else {
+                                    SharedString::new_static(":")
+                                },
+                            )
+                            .text_tone(&theme, TextTone::Faint),
+                        )
                         .into_any_element()
                 }
             })
@@ -395,7 +407,6 @@ impl Render for TimeInput {
                         .focused(focused)
                         .disabled(self.disabled),
                 )
-                .type_scale(&theme, TypeScale::Body)
                 .children(cells),
             )
             .semantic_in(

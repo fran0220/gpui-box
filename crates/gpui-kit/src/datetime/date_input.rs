@@ -21,7 +21,7 @@ use crate::controls::field::{FieldState, field_shell};
 use crate::controls::input::{TextInput, TextInputEvent};
 use crate::datetime::adapter::{Day, SharedDateAdapter};
 use crate::datetime::calendar::{Calendar, CalendarEvent};
-use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
+use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text as foundation_text};
 use crate::overlay::popover;
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -335,10 +335,8 @@ impl Render for DateInput {
         });
 
         let message = self.message.clone().map(|message| {
-            div()
-                .type_scale(&theme, TypeScale::Caption)
+            foundation_text(&theme, TypeScale::Caption, message.clone())
                 .text_color(theme.colors.danger)
-                .child(message.clone())
                 .semantic_in(
                     cx,
                     NodeSpec::new(self.ident.child("message").semantic_id(), Role::Status)
