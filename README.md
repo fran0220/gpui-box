@@ -1,6 +1,6 @@
 # GPUI Box
 
-GPUI Box is an independent, crates.io-ready distribution of the GPUI framework
+GPUI Box is an independent crates.io distribution of the GPUI framework
 and a product-neutral component system for native and browser-hosted Rust
 interfaces. The project lives at <https://github.com/fran0220/gpui-box>.
 It is derived from GPUI source imported from Zed, but it is **not an official

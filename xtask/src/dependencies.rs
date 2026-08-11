@@ -336,6 +336,14 @@ fn check_release_records(root: &Path, a: &Authority) -> Result<()> {
         compatibility.get("cohort").and_then(Value::as_str) == Some(&cohort),
         "compatibility.toml cohort must be {cohort}"
     );
+    let release_status = compatibility
+        .get("release_status")
+        .and_then(Value::as_str)
+        .context("compatibility.toml needs release_status")?;
+    ensure!(
+        matches!(release_status, "unreleased" | "released"),
+        "compatibility.toml has invalid release_status"
+    );
     let platform = compatibility
         .get("platform")
         .and_then(Value::as_array)
@@ -365,6 +373,30 @@ fn check_release_records(root: &Path, a: &Authority) -> Result<()> {
                 == Some("https://github.com/fran0220/gpui-box"),
         "provenance.toml has the wrong schema or public identity"
     );
+    ensure!(
+        provenance.get("release_status").and_then(Value::as_str) == Some(release_status),
+        "compatibility.toml and provenance.toml release status differ"
+    );
+    if release_status == "released" {
+        let compatibility_date = compatibility
+            .get("release_date")
+            .and_then(Value::as_str)
+            .context("released compatibility.toml needs release_date")?;
+        ensure!(
+            compatibility.get("release_version").and_then(Value::as_str) == Some(version)
+                && provenance.get("release_version").and_then(Value::as_str) == Some(version)
+                && provenance.get("release_date").and_then(Value::as_str)
+                    == Some(compatibility_date)
+                && compatibility_date.len() == 10
+                && compatibility_date.as_bytes()[4] == b'-'
+                && compatibility_date.as_bytes()[7] == b'-'
+                && compatibility_date
+                    .bytes()
+                    .enumerate()
+                    .all(|(index, byte)| matches!(index, 4 | 7) || byte.is_ascii_digit()),
+            "released compatibility/provenance records need matching authority version and YYYY-MM-DD date"
+        );
+    }
     let config: Json = serde_json::from_str(&fs::read_to_string(
         root.join("scripts/sync-zed/config.json"),
     )?)?;

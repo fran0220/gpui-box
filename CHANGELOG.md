@@ -4,11 +4,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Entries say what the library now does and what it refuses to do, because a
 refusal is the part a caller has to plan around.
 
-Nothing here has been released: there is no GPUI Box tag or confirmed registry
-entry yet. The `0.1.0` manifests describe the intended first crates.io cohort;
-see `docs/releasing.md` for the protected publication and verification runbook.
+See `docs/releasing.md` for the protected publication and verification runbook.
 
-## Unreleased
+## [Unreleased]
+
+## [0.1.0] - 2026-08-11
 
 ### Added
 
@@ -448,3 +448,6 @@ threading limits.
 calendar, time formatting, rich-text and code editing, charts, platform pickers,
 window chrome — and, separately, what is missing but intended. Read it before
 planning around a component that is not here.
+
+[Unreleased]: https://github.com/fran0220/gpui-box/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/fran0220/gpui-box/releases/tag/v0.1.0

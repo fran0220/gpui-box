@@ -8,7 +8,7 @@ and `gpui-box-kit` as `gpui_kit`. Zed crates must not be mixed into that graph.
 
 | GPUI Box cohort | Framework origin | Rust | Status |
 |---|---|---|---|
-| `0.1.x` | filtered bootstrap `fran0220/zed@0b9c8dc932b65cba2dc87464148984e93f60ae18`; official baseline `a6a23c7b80a5cefa0487b7856335be89ace7e483` | 1.97, edition 2024 | unreleased release candidate |
+| `0.1.x` | filtered bootstrap `fran0220/zed@0b9c8dc932b65cba2dc87464148984e93f60ae18`; official baseline `a6a23c7b80a5cefa0487b7856335be89ace7e483` | 1.97, edition 2024 | `0.1.0` public release |
 
 The SHAs identify imported source provenance, not Cargo Git dependencies.
 `scripts/sync-zed/state.json` records the deterministic filtered bootstrap tip,

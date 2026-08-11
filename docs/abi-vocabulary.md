@@ -631,13 +631,12 @@ action payload in a vocabulary major line is additive-only.
    accepts every prior minor, and that an older host either ignores permitted
    newer fields or receives an explicit negotiated unsupported result.
 
-Current repository practice is safe for a commit-pinned Rust library but not
-yet sufficient for this promise:
+Current repository practice is safe for the published Rust crates but not yet
+sufficient for this promise:
 
-- The workspace is `0.1.0` and is consumed by Git commit. README compatibility
-  treats Rust API, token key, and semantic id removal or rename as documented
-  breaking changes; it does not preserve them additively within a vocabulary
-  major.
+- The `0.1.x` cohort treats Rust API, token key, and semantic id removal or
+  rename as documented breaking changes; it does not preserve them additively
+  within a vocabulary major.
 - `CONTRIBUTING.md` asks for migration impact and changelog entries. It permits
   a breaking migration where the vocabulary must retain the old contract until
   a major bump.

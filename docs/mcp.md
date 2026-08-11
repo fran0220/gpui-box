@@ -7,9 +7,8 @@ cargo install gpui-box-mcp --version 0.1.0
 gpui-box-mcp --help
 ```
 
-This command is the intended registry interface; it does not assert that 0.1.0
-has already been published. For workspace development use
-`cargo build --release -p gpui-box-mcp`.
+This is the registry interface for the `0.1.0` release. For workspace
+development use `cargo build --release -p gpui-box-mcp`.
 
 The server deliberately contains no embedded static catalog. It reads the
 calling project's GPUI Box checkout: set `GPUI_BOX_ROOT` to the checkout root,

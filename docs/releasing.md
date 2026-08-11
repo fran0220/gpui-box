@@ -1,7 +1,7 @@
 # Releasing GPUI Box
 
-This is the runbook for a crates.io release. It describes the intended process;
-it does not claim that any GPUI Box version has already been published.
+This is the runbook for publishing and verifying a GPUI Box crates.io release.
+Every cohort, including the initial `0.1.0` release, follows this process.
 
 ## Cohort and authority
 
