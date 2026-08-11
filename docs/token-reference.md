@@ -28,7 +28,7 @@ Appearance: `Dark`.
 | `color.palette.neutral.300` | `#303030` |
 | `color.palette.neutral.50` | `#0a0a0a` |
 | `color.palette.neutral.500` | `#565656` |
-| `color.palette.neutral.600` | `#737373` |
+| `color.palette.neutral.600` | `#8f8f8f` |
 | `color.palette.neutral.700` | `#a1a1a1` |
 | `color.palette.neutral.800` | `#e9e9e9` |
 | `color.palette.neutral.850` | `#ebebeb` |
@@ -46,13 +46,13 @@ Appearance: `Dark`.
 | `color.surface.overlay` | `{neutral.150}` | `#1c1c1c` |
 | `color.text.primary` | `{neutral.800}` | `#e9e9e9` |
 | `color.text.muted` | `{neutral.700}` | `#a1a1a1` |
-| `color.text.faint` | `{neutral.600}` | `#737373` |
+| `color.text.faint` | `{neutral.600}` | `#8f8f8f` |
 | `color.text.onAccent` | `{neutral.ink}` | `#0e0e0e` |
 | `color.interactive.hover` | `{neutral.850}/24` | `#ebebeb24` |
 | `color.interactive.active` | `{neutral.850}/29` | `#ebebeb29` |
 | `color.interactive.selected` | `{neutral.850}/24` | `#ebebeb24` |
-| `color.interactive.hairline` | `{neutral.900}/14` | `#ffffff14` |
-| `color.interactive.hairlineStrong` | `{neutral.900}/24` | `#ffffff24` |
+| `color.interactive.hairline` | `{neutral.900}/24` | `#ffffff24` |
+| `color.interactive.hairlineStrong` | `{neutral.900}/3d` | `#ffffff3d` |
 | `color.interactive.focus` | `{indigo.400}` | `#7c86ff` |
 | `color.semantic.accent` | `{indigo.400}` | `#7c86ff` |
 | `color.semantic.accentStrong` | `{indigo.600}` | `#5865f2` |
@@ -60,9 +60,9 @@ Appearance: `Dark`.
 | `color.semantic.warning` | `{amber.500}` | `#ffb900` |
 | `color.semantic.success` | `{green.500}` | `#57c47f` |
 | `color.semantic.info` | `{cyan.400}` | `#7fb3cf` |
-| `color.loader.gradient.0` | `{loader.blue}` | `#b6d3ef` |
-| `color.loader.gradient.1` | `{loader.orange}` | `#edb185` |
-| `color.loader.gradient.2` | `{loader.pink}` | `#f888a0` |
+| `color.loader.gradient.0` | `{indigo.400}` | `#7c86ff` |
+| `color.loader.gradient.1` | `{indigo.600}` | `#5865f2` |
+| `color.loader.gradient.2` | `{indigo.400}` | `#7c86ff` |
 
 ### Spacing
 
@@ -160,7 +160,7 @@ Appearance: `Dark`.
 |---|---:|
 | `border.hairline` | 1 |
 | `border.thick` | 2 |
-| `opacity.disabled` | 0.45 |
+| `opacity.disabled` | 0.62 |
 | `opacity.muted` | 0.68 |
 | `opacity.scrim` | 0.6 |
 
@@ -181,7 +181,7 @@ Appearance: `Dark`.
 |---|---|---:|---:|
 | `text.primary` | `surface.canvas` | 16.31 | 4.5 |
 | `text.muted` | `surface.canvas` | 7.66 | 4.5 |
-| `text.faint` | `surface.canvas` | 4.18 | 3.0 |
+| `text.faint` | `surface.canvas` | 6.12 | 3.0 |
 | `semantic.danger` | `surface.canvas` | 6.85 | 3.0 |
 | `semantic.warning` | `surface.canvas` | 11.49 | 3.0 |
 | `semantic.success` | `surface.canvas` | 9.06 | 3.0 |
@@ -189,7 +189,7 @@ Appearance: `Dark`.
 | `semantic.accent` | `surface.canvas` | 6.33 | 3.0 |
 | `text.primary` | `surface.panel` | 15.04 | 4.5 |
 | `text.muted` | `surface.panel` | 7.07 | 4.5 |
-| `text.faint` | `surface.panel` | 3.85 | 3.0 |
+| `text.faint` | `surface.panel` | 5.65 | 3.0 |
 | `semantic.danger` | `surface.panel` | 6.32 | 3.0 |
 | `semantic.warning` | `surface.panel` | 10.60 | 3.0 |
 | `semantic.success` | `surface.panel` | 8.35 | 3.0 |
@@ -197,7 +197,7 @@ Appearance: `Dark`.
 | `semantic.accent` | `surface.panel` | 5.84 | 3.0 |
 | `text.primary` | `surface.raised` | 12.79 | 4.5 |
 | `text.muted` | `surface.raised` | 6.01 | 4.5 |
-| `text.faint` | `surface.raised` | 3.27 | 3.0 |
+| `text.faint` | `surface.raised` | 4.80 | 3.0 |
 | `semantic.danger` | `surface.raised` | 5.37 | 3.0 |
 | `semantic.warning` | `surface.raised` | 9.01 | 3.0 |
 | `semantic.success` | `surface.raised` | 7.10 | 3.0 |
@@ -205,7 +205,7 @@ Appearance: `Dark`.
 | `semantic.accent` | `surface.raised` | 4.96 | 3.0 |
 | `text.primary` | `surface.overlay` | 14.04 | 4.5 |
 | `text.muted` | `surface.overlay` | 6.60 | 4.5 |
-| `text.faint` | `surface.overlay` | 3.59 | 3.0 |
+| `text.faint` | `surface.overlay` | 5.27 | 3.0 |
 | `semantic.danger` | `surface.overlay` | 5.90 | 3.0 |
 | `semantic.warning` | `surface.overlay` | 9.89 | 3.0 |
 | `semantic.success` | `surface.overlay` | 7.80 | 3.0 |
@@ -269,9 +269,9 @@ Appearance: `Light`.
 | `color.semantic.warning` | `{amber.500}` | `#a76a00` |
 | `color.semantic.success` | `{green.500}` | `#237a48` |
 | `color.semantic.info` | `{cyan.400}` | `#2a6f8f` |
-| `color.loader.gradient.0` | `{loader.blue}` | `#6ba7e0` |
-| `color.loader.gradient.1` | `{loader.orange}` | `#d98442` |
-| `color.loader.gradient.2` | `{loader.pink}` | `#e2557a` |
+| `color.loader.gradient.0` | `{indigo.400}` | `#4f5bd5` |
+| `color.loader.gradient.1` | `{indigo.600}` | `#3b46b8` |
+| `color.loader.gradient.2` | `{indigo.400}` | `#4f5bd5` |
 
 ### Spacing
 

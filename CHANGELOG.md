@@ -214,6 +214,13 @@ and `xtask gate [full]`. `scenes check` is the visual regression gate; see
 
 ### Changed
 
+- Studio Dark now keeps faint text above 4.8:1 even on the raised surface,
+  strengthens hairlines that previously disappeared into dark panels, and
+  leaves disabled content visibly present while still subdued. Both Studio
+  themes now use the library's indigo accent for loader gradients instead of
+  a separate blue/orange/pink palette. These are token changes, not
+  component-local colour exceptions; the library still refuses to infer
+  semantic status colours or to make unavailable content look enabled.
 - `TypeScale` gained `Strong` and `Subtitle`. The scale ran caption 10.5, label
   12, body 13, and then jumped to title 16 at weight 600, so anything between a
   field label and a component's own name had nowhere to land and reached for

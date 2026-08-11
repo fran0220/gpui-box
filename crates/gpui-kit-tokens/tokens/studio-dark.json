@@ -16,7 +16,7 @@
         "200": "#242424",
         "300": "#303030",
         "500": "#565656",
-        "600": "#737373",
+        "600": "#8f8f8f",
         "700": "#a1a1a1",
         "800": "#e9e9e9",
         "850": "#ebebeb",
@@ -62,8 +62,8 @@
       "hover": "{neutral.850}/24",
       "active": "{neutral.850}/29",
       "selected": "{neutral.850}/24",
-      "hairline": "{neutral.900}/14",
-      "hairlineStrong": "{neutral.900}/24",
+      "hairline": "{neutral.900}/24",
+      "hairlineStrong": "{neutral.900}/3d",
       "focus": "{indigo.400}"
     },
     "semantic": {
@@ -75,7 +75,7 @@
       "info": "{cyan.400}"
     },
     "loader": {
-      "gradient": ["{loader.blue}", "{loader.orange}", "{loader.pink}"]
+      "gradient": ["{indigo.400}", "{indigo.600}", "{indigo.400}"]
     }
   },
   "space": {
@@ -105,7 +105,7 @@
     "thick": 2
   },
   "opacity": {
-    "disabled": 0.45,
+    "disabled": 0.62,
     "muted": 0.68,
     "scrim": 0.6
   },
