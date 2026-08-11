@@ -1,6 +1,6 @@
 //! Renders the scene catalog without a window system and compares the pixels.
 //!
-//! This is the visual gate on every platform. GPUI draws each scene into an
+//! This is the visual gate on supported macOS and Windows hosts. GPUI draws each scene into an
 //! offscreen texture at an exact device-pixel size and the pixels are read
 //! straight back, so no window, display, menu bar, dock, or compositor takes
 //! part. Text is shaped by cosmic-text from the fonts this repository bundles,
@@ -12,10 +12,9 @@
 //! produced two incompatible baseline sets; that is what this harness exists to
 //! prevent.
 //!
-//! The baselines live in `snapshots/headless/{macos,linux,windows}/scenes`, one
-//! set per renderer: Metal, llvmpipe, and WARP land antialiased edges
-//! differently, and pretending those were one picture would make every gate
-//! lie.
+//! Active baselines live in `snapshots/headless/{macos,windows}/scenes`, one set
+//! per renderer. The Linux/llvmpipe path and its prior images are retained for
+//! a future roadmap wave but are deliberately non-gating today.
 
 use anyhow::Result;
 

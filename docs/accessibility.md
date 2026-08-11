@@ -64,8 +64,10 @@ so its rendered semantic descendants remain its native descendants. The
 semantic id and GPUI element id are required to match. Installing the test
 registry is not a condition of platform accessibility.
 
-GPUI forwards that AccessKit tree to NSAccessibility on macOS, UI Automation on
-Windows, AT-SPI on Linux, and an invisible semantic DOM mirror in browsers. The
+GPUI can forward that AccessKit tree to NSAccessibility on macOS, UI Automation
+on Windows, AT-SPI on Linux, and an invisible semantic DOM mirror in browsers.
+Linux compatibility is currently deferred: the adapter path is recorded below
+for future roadmap work, but is not tested, supported, or release-gating. The
 rows below describe the maintained fork's adapter paths. Deterministic tests
 exercise the AccessKit tree, and the browser smoke exercises the DOM mirror's
 roles, focus, actions, and canvas-scaled bounds. The macOS smoke check
@@ -73,9 +75,9 @@ queries each running gallery by PID with `AXUIElement` after confirming that the
 invoking terminal has Accessibility permission. A platform adapter existing is
 not evidence that a particular screen reader announces every property correctly.
 
-| Capability | macOS AX | Windows UIA | Linux AT-SPI | Browser semantic DOM |
+| Capability | macOS AX | Windows UIA | Linux AT-SPI (deferred) | Browser semantic DOM |
 |---|---|---|---|---|
-| Role and accessible name | Native AX smoke verified | Bridged; native session unverified | Bridged; native session unverified | Button/dialog roles and names browser-smoke verified |
+| Role and accessible name | Native AX smoke verified | Bridged; native session unverified | Adapter exists; non-gating and unverified | Button/dialog roles and names browser-smoke verified |
 | String value and placeholder | Bridged; deterministic tree verified | Bridged; native session unverified | Bridged; native session unverified | Mirrored; text editing browser-smoke verified |
 | Disabled, invalid, required, busy | Disabled native AX smoke verified; other states deterministic only | Bridged; native session unverified | Bridged; native session unverified | Mirrored; screen-reader announcement unverified |
 | Checked, expanded, widget selection | Checked native AX smoke verified; expanded/selection deterministic only | Bridged; native session unverified | Bridged; native session unverified | Mirrored; screen-reader announcement unverified |

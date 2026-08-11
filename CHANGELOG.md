@@ -220,6 +220,11 @@ and `xtask gate [full]`. `scenes check` is the visual regression gate; see
 
 ### Changed
 
+**Supported platforms.** Linux compatibility is deferred until a future
+roadmap explicitly restores it. macOS, Windows, and Browser/WASM remain the
+supported targets; Linux CI and release gating are removed, while prior
+llvmpipe snapshots and renderer code remain as non-gating historical evidence.
+
 - Studio Dark now keeps faint text above 4.8:1 even on the raised surface,
   strengthens hairlines that previously disappeared into dark panels, and
   leaves disabled content visibly present while still subdued. Both Studio

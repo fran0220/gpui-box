@@ -55,9 +55,11 @@ crate that same URL and revision. `cargo run -p xtask -- dependencies check`
 enforces the equivalent rule across this repository's two workspaces,
 lockfiles, and compatibility declarations.
 
-Requires Rust 1.97 and edition 2024. macOS, Windows, and Linux are supported
-platforms. The component catalog is visually regression-tested through
-deterministic offscreen rendering on every platform; see
+Requires Rust 1.97 and edition 2024. macOS and Windows are the supported native
+platforms, alongside the Browser/WASM host. Linux compatibility is deferred
+until it returns to the roadmap and is not a release or visual gate. The
+supported catalog is visually regression-tested through deterministic
+offscreen rendering; see
 [`docs/compatibility.md`](docs/compatibility.md) for the platform-specific
 renderer and accessibility details.
 
@@ -293,15 +295,17 @@ cargo run -p xtask -- web smoke      # real Chromium interaction/backend/a11y sm
 cargo run -p xtask -- web visual check button input dialog node-graph
 ```
 
-The headless scene images are the visual regression gate on every platform:
+The headless scene images are the visual regression gate on macOS and Windows:
 
 ```bash
 cargo run -p xtask -- headless check
 ```
 
-The offscreen harness uses Metal on macOS and WGPU on Linux and Windows. Every
+The offscreen harness uses Metal on macOS and WGPU/WARP on Windows. Every active
 baseline is 1840 by 2000 device pixels and lives under
 `snapshots/headless/<platform>/scenes`.
+The retained Linux/llvmpipe images are historical, non-gating evidence and are
+not refreshed while Linux compatibility is deferred.
 [`docs/screenshot-testing.md`](docs/screenshot-testing.md) describes the
 harness, comparison rules, and review workflow.
 

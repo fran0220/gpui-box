@@ -39,22 +39,10 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   headless:
-    name: Headless visual gate (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, windows-2025]
-    runs-on: ${{ matrix.os }}
+    name: Headless visual gate (Windows)
+    runs-on: windows-2025
     steps:
       - uses: actions/checkout@v5
-      - name: Install Linux renderer dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential clang cmake pkg-config libfontconfig1-dev \
-            libwayland-dev libx11-xcb-dev libxkbcommon-x11-dev \
-            libvulkan1 mesa-vulkan-drivers
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.97.0
@@ -65,7 +53,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: headless-scene-check-${{ runner.os }}
+          name: headless-scene-check-windows
           path: target/headless-scene-check
           if-no-files-found: ignore
 

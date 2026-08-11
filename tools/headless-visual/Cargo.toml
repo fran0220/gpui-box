@@ -1,10 +1,9 @@
 # The headless visual gate: the scene catalog rendered and compared without a
-# window system, which is what lets every platform hold a visual baseline that
-# another machine can reproduce.
+# window system on supported macOS and Windows hosts.
 #
-# macOS renders through the Metal headless renderer, Linux and Windows through
-# wgpu software adapters. All three ask the renderer for an exact device-pixel
-# size, so no display, menu bar, dock, or compositor takes part in the result.
+# macOS renders through the Metal headless renderer and Windows through WARP.
+# The Linux path remains buildable for a future roadmap wave, but its retained
+# llvmpipe baselines are not a current compatibility or release gate.
 #
 # This package is deliberately its own workspace because its renderer
 # dependencies and lockfile are platform-specific. Its Zed source and revision

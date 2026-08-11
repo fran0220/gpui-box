@@ -36,18 +36,20 @@ wgpu and allocator edges resolve their registry Windows 0.62 dependencies.
 
 | Capability | macOS | Windows | Linux | Browser/WASM |
 |---|---|---|---|---|
-| Core components | Supported; native visual gate | Supported; headless visual gate | Supported; headless visual gate | Browser host; full WebGL2 visual gate |
-| Native frame capture | Supported | Not implemented | Not implemented | Not applicable |
-| Offscreen WGPU capture | Not used | WARP | llvmpipe | Browser canvas capture gate |
-| Edge fade | Supported | Supported | Supported | Covered by the full browser visual gate |
-| Backdrop blur | Metal | WGPU | WGPU | WebGPU and WebGL2 |
-| Native child surfaces | Supported | Supported | Not implemented | Not applicable |
+| Core components | Supported; native visual gate | Supported; headless visual gate | Deferred; non-gating | Browser host; full WebGL2 visual gate |
+| Native frame capture | Supported | Not implemented | Deferred | Not applicable |
+| Offscreen WGPU capture | Not used | WARP | Historical llvmpipe harness only | Browser canvas capture gate |
+| Edge fade | Supported | Supported | Deferred | Covered by the full browser visual gate |
+| Backdrop blur | Metal | WGPU | Deferred | WebGPU and WebGL2 |
+| Native child surfaces | Supported | Supported | Deferred | Not applicable |
 
-Core component rendering is supported and visually regression-tested on all
-three platforms. macOS uses native window capture; Windows and Linux render the
-same catalog through their deterministic offscreen WGPU backends. Native frame
-capture and some accessibility or native-child capabilities remain
-platform-specific as recorded in this table and in
+Core component rendering is supported and visually regression-tested on macOS
+and Windows. macOS uses native window capture; Windows renders the same catalog
+through its deterministic offscreen WGPU backend. Browser/WASM has its own
+catalog and smoke gates. Linux renderer code and prior llvmpipe snapshots remain
+available for a future roadmap wave, but they make no current compatibility or
+release claim. Native frame capture and some accessibility or native-child
+capabilities remain platform-specific as recorded in this table and in
 [`accessibility.md`](accessibility.md).
 
 Backdrop blur is deliberately renderer-specific: Metal and WGPU snapshot and

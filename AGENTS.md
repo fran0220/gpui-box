@@ -38,8 +38,9 @@ An upstream infrastructure change must:
 4. update the root and `tools/headless-visual` workspaces to the same immutable
    revision;
 5. update `PROVENANCE.md`, `THIRD_PARTY_NOTICES`, and compatibility documentation;
-6. pass `cargo run -p xtask -- dependencies check` and the relevant Linux,
-   macOS, and Windows validation.
+6. pass `cargo run -p xtask -- dependencies check` and the relevant macOS and
+   Windows validation. Linux compatibility is deferred until the roadmap
+   explicitly restores it.
 
 Local geometry remains appropriate when it occurs once and does not create a
 second implementation of a renderer or input primitive. Record any deliberately
@@ -119,13 +120,16 @@ shortcut while iterating, never what a commit runs — it says nothing about the
 other workspace members, the doctests, or a scene the edit reached without
 anybody predicting it.
 
-The visual gate on every platform is `cargo run -p xtask -- headless check`
-(`headless capture` accepts). It renders the catalog into offscreen textures
-at a size it names — Metal on macOS, software adapters on Linux and Windows —
+The visual gate on each supported native platform is
+`cargo run -p xtask -- headless check` (`headless capture` accepts). It renders
+the catalog into offscreen textures at a size it names — Metal on macOS and
+WARP on Windows —
 with reduced motion and simulated time, so no window, display, dock, or
 compositor takes part and the same scene produces the same bytes on any
-machine with that renderer. Baselines live in
-`snapshots/headless/{macos,linux,windows}/scenes`, one set per renderer.
+machine with that renderer. Active baselines live in
+`snapshots/headless/{macos,windows}/scenes`, one set per renderer. The Linux
+directory is retained as historical evidence but is non-gating while Linux
+compatibility is deferred.
 
 Never hold a baseline from a real window. A window negotiates its size with
 the display it opens on, which is how `snapshots/macos` came to hold two

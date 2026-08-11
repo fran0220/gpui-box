@@ -83,8 +83,9 @@ Two things a still frame cannot show, both known and neither a defect:
 - a text caret does not appear once another scene has rendered in the same run.
   Use `scenes render <scene>` to render that one scene alone in a real window.
 
-The harness in `tools/headless-visual` runs on macOS, Linux, and Windows. Every
-baseline is exactly 1840 by 2000 device pixels.
+The supported harness gates run on macOS and Windows. Every active baseline is
+exactly 1840 by 2000 device pixels. Linux compatibility is deferred; its
+retained llvmpipe images are historical and non-gating.
 
 ## If you can call tools
 

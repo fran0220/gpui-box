@@ -374,7 +374,7 @@ precisely because it is separable from the drawing.
 | Text range highlighting | `HighlightedText`, `LogStream`, `CodeView` and `DiffView` render caller-supplied ranges while constructing their text. GPUI still has no API that marks a substring of an arbitrary already-rendered text element, which blocks a generic find-in-page overlay. |
 | Writing direction | Nothing reads right-to-left. Every inset is left and right rather than start and end, so this is whole-library work that gets more expensive every batch. |
 | Number, date, and quantity formatting | Every word is now host-replaceable, but every *number* beside one is still formatted by Rust. See "Numbers a catalogue cannot fix" below. |
-| Assistive technology gaps | Basic semantics, grapheme-based editable text runs and selection actions, and explicit live-region properties now reach GPUI's AccessKit platform tree. Character geometry/native caret tracking, verified screen-reader announcement timing, native-child handoff, and native Windows/Linux session verification remain absent; see `docs/accessibility.md`. |
+| Assistive technology gaps | Basic semantics, grapheme-based editable text runs and selection actions, and explicit live-region properties now reach GPUI's AccessKit platform tree. Character geometry/native caret tracking, verified screen-reader announcement timing, native-child handoff, and native Windows session verification remain absent. Linux compatibility, including native AT-SPI validation, is deferred; see `docs/accessibility.md`. |
 | Validation vocabulary | `FormField` shows an error it is handed. When to validate, field against form, and validation still in flight have no shared shape. |
 | Composition | There is no `Slot`: a caller cannot replace a node inside a component, only configure it. |
 | Size response | No breakpoint or container query. `Toolbar` overflow is declared rather than measured, which is the same gap seen from one component. |
@@ -418,9 +418,10 @@ nothing fails when a virtualized list gets slower, and published documentation;
 the gallery is local. Publishing to a registry is impossible while GPUI is a git
 dependency.
 
-The visual regression gate is `headless check` on macOS, Linux, and Windows.
-It renders offscreen at a fixed device-pixel size, so it does not depend on a
-composited, frontmost window or the host display.
+The visual regression gate is `headless check` on supported native platforms:
+macOS and Windows. It renders offscreen at a fixed device-pixel size, so it does
+not depend on a composited, frontmost window or the host display. Linux
+compatibility is deferred; prior llvmpipe images are retained but non-gating.
 `docs/screenshot-testing.md` describes the gate and review workflow.
 
 ## Rules every covered component follows

@@ -11,8 +11,9 @@
    before committing: `gate only` says nothing about the rest of the workspace.
 8. After a UI change, run `cargo run -p xtask -- headless check`, look at every
    image it reports, and accept them with `headless capture` only once you have.
-   The offscreen harness runs on macOS, Linux, and Windows; see
-   `docs/screenshot-testing.md`, and record the result in the pull request.
+   The supported native gates run on macOS and Windows; Linux is deferred and
+   its retained baselines are non-gating. See `docs/screenshot-testing.md`, and
+   record the result in the pull request.
 9. Add a `CHANGELOG.md` entry for anything a reader of the library would
    notice. Say what it now does and what it refuses to do, not which files
    moved.

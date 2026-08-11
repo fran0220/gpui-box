@@ -16,8 +16,8 @@ implying a stronger one with a number.
 
 - `cargo run -p xtask -- gate full` passed on macOS, including the scene
   images, so the catalog renders and matches its baseline;
-- `cargo run -p xtask -- headless check` passed, so the Linux and Windows
-  renderers agree;
+- `cargo run -p xtask -- headless check` passed on Windows, so the supported
+  WARP renderer agrees with its baseline;
 - `CHANGELOG.md` describes every change since the previous tag, in terms of
   what the library now does and what it refuses to do;
 - the three load-bearing surfaces named in `README.md` — the Rust API, the
@@ -33,10 +33,12 @@ rather than being a hash somebody happened to be on.
 
 ```bash
 cargo run -p xtask -- gate full          # fmt, check, test, clippy, tokens, strings, api, docs, scenes
-cargo run -p xtask -- headless check     # the Linux and Windows baseline
+cargo run -p xtask -- headless check     # the Windows baseline on its runner
 ```
 
-Both must be green on the commit being tagged, not on a nearby one. Then write
+Both supported-platform results must be green on the commit being tagged, not
+on a nearby one. Linux compatibility is deferred and its retained snapshots do
+not participate in release acceptance. Then write
 the `CHANGELOG.md` entry, commit it, and tag that commit:
 
 ```bash

@@ -12,8 +12,9 @@ members = [
   "tools/mcp",
   "xtask",
 ]
-# Its own workspace on purpose: the Linux/Windows visual harness has
-# platform-specific renderer dependencies and keeps an independent lockfile.
+# Its own workspace on purpose: the cross-platform visual harness has
+# renderer-specific dependencies and keeps an independent lockfile. Linux
+# support remains in the harness for a future roadmap wave but is not gated.
 # Both workspaces still pin the exact same Zed integration revision.
 exclude = ["tools/headless-visual"]
 

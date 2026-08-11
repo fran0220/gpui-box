@@ -25,9 +25,9 @@ Do not use full-desktop capture for automated evidence:
 Non-macOS capture currently returns `Unsupported` from `capture_window`, and
 `render_frame` needs a platform window that implements GPUI's
 `render_to_image`, which today is macOS. The visual baseline does not go
-through either of them: every platform holds it through the headless gate
-described below, which renders without any window at all. Image writing,
-semantic assertions, and frame comparison remain portable.
+through either of them: supported native platforms hold it through the
+headless gate described below, which renders without any window at all. Image
+writing, semantic assertions, and frame comparison remain portable.
 
 ## Settle before capture
 
@@ -52,10 +52,10 @@ Visual baselines state:
 - platform and scale factor;
 - reduced-motion setting.
 
-Baselines are 1840×2000 device pixels on every platform: 920×1000 logical at a
-scale factor of 2. That is a constant, because the gate asks the renderer for
-that size rather than opening a window and accepting whatever the display
-grants.
+Active baselines are 1840×2000 device pixels on each supported native platform:
+920×1000 logical at a scale factor of 2. That is a constant, because the gate
+asks the renderer for that size rather than opening a window and accepting
+whatever the display grants.
 
 It used to be otherwise, and the cost is worth recording. The gate opened a
 real 920×1000 window and captured its drawable, whose size the platform clamps
@@ -123,7 +123,9 @@ it names and reads the pixels straight back. No window, display, menu bar,
 dock, or compositor takes part, so any machine with the same renderer produces
 the same bytes. Baselines live in `snapshots/headless/{macos,linux,windows}/scenes`,
 one set per renderer, because Metal, llvmpipe, and WARP land antialiased edges
-differently and pretending those were one picture would make every gate lie.
+differently. The macOS and Windows sets are active gates. Linux compatibility
+is deferred; its llvmpipe set is retained as historical, non-gating evidence
+and is not refreshed until the roadmap restores Linux support.
 
 Text is shaped by cosmic-text from the bundled fonts only. Loading the
 machine's own fonts would shape text differently from one machine to the next,
@@ -190,7 +192,7 @@ baselines.check("button-application-dark", frame)?;
 Keep native macOS and Windows baselines separate. `render_frame` reads a native
 window where that platform implements GPUI's readback contract; the repository
 uses the same public scene catalog with its offscreen software renderer for
-Linux and Windows CI. A downstream product may supply another product-owned
+Windows CI. A downstream product may supply another product-owned
 `Frame`, but must preserve the fixed viewport, scale, fonts, motion, pointer,
 fixture, theme, and platform in its baseline contract. A software-rendered
 gallery baseline does not replace native interaction and accessibility evidence
@@ -222,32 +224,28 @@ correlation.
 
 ## The headless gate
 
-`tools/headless-visual` renders the same catalog on Linux and Windows with no
-window system at all: GPUI's wgpu renderer draws each scene into an offscreen
-texture and the pixels are read straight back. A software adapter — llvmpipe
-on Linux, WARP on Windows — is enough, so the gate runs on a headless VM or a
-CI box with no GPU. Text is shaped by cosmic-text from the bundled Geist
-fonts only, and time is simulated. Repeated runs on Linux llvmpipe or Windows
-WARP are byte-stable, but the two adapters land some antialiased edges
-differently. Each therefore compares exactly against its own baseline rather
-than weakening one shared baseline with a cross-adapter tolerance.
+`tools/headless-visual` renders the same catalog on Windows with no window
+system at all: GPUI's wgpu renderer draws each scene into an offscreen texture
+and the pixels are read straight back. WARP is enough, so the gate runs on a
+headless VM or CI box with no GPU. Text is shaped by cosmic-text from the
+bundled Geist fonts only, and time is simulated. Repeated WARP runs are
+byte-stable and compare against the Windows baseline.
 
 ```bash
 cargo run -p xtask -- headless check     # compare against the baseline
 cargo run -p xtask -- headless capture   # accept what check reported
 ```
 
-Its baselines live in `snapshots/headless/linux/scenes` and
-`snapshots/headless/windows/scenes`, beside but distinct from the macOS one.
-CoreText, llvmpipe, and WARP land antialiased edges differently, so the three
-baselines are truthful pictures of the same catalog, not one picture forced
-through a tolerance large enough to cover every renderer. The macOS baseline
-stays authoritative for native macOS builds; each headless baseline verifies
-its own software adapter exactly.
+The active WARP baseline lives in `snapshots/headless/windows/scenes`, beside
+but distinct from the macOS one. CoreText and WARP land antialiased edges
+differently, so each supported renderer verifies its own baseline exactly. The
+retained `snapshots/headless/linux/scenes` images record the prior llvmpipe
+renderer; they are not acceptance evidence or a release requirement while
+Linux compatibility is deferred.
 
-The harness is its own Cargo workspace because its Linux/Windows renderer
-dependencies and lockfile are platform-specific. It no longer patches one GPUI
-source into another: the root workspace and harness directly pin the same
+The harness is its own Cargo workspace because its renderer dependencies and
+lockfile are platform-specific. It no longer patches one GPUI source into
+another: the root workspace and harness directly pin the same
 immutable `fran0220/zed` integration revision. That revision includes the
 offscreen renderer from
 [zed-industries/zed#62341](https://github.com/zed-industries/zed/pull/62341)
