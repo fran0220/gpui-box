@@ -8342,7 +8342,7 @@
   "scenes": [
     {
       "name": "button",
-      "capture": "cargo run -p xtask -- scenes capture button",
+      "capture": "cargo run -p xtask -- headless capture button",
       "uses": [
         "Button",
         "GradientSpinner",
@@ -8353,7 +8353,7 @@
     },
     {
       "name": "badge",
-      "capture": "cargo run -p xtask -- scenes capture badge",
+      "capture": "cargo run -p xtask -- headless capture badge",
       "uses": [
         "Badge"
       ],
@@ -8361,7 +8361,7 @@
     },
     {
       "name": "card",
-      "capture": "cargo run -p xtask -- scenes capture card",
+      "capture": "cargo run -p xtask -- headless capture card",
       "uses": [
         "Badge",
         "Card",
@@ -8371,7 +8371,7 @@
     },
     {
       "name": "status",
-      "capture": "cargo run -p xtask -- scenes capture status",
+      "capture": "cargo run -p xtask -- headless capture status",
       "uses": [
         "Callout",
         "StatusDot",
@@ -8381,7 +8381,7 @@
     },
     {
       "name": "loading",
-      "capture": "cargo run -p xtask -- scenes capture loading",
+      "capture": "cargo run -p xtask -- headless capture loading",
       "uses": [
         "GradientSpinner",
         "PulseLoader",
@@ -8391,7 +8391,7 @@
     },
     {
       "name": "choice",
-      "capture": "cargo run -p xtask -- scenes capture choice",
+      "capture": "cargo run -p xtask -- headless capture choice",
       "uses": [
         "Checkbox",
         "Radio",
@@ -8402,7 +8402,7 @@
     },
     {
       "name": "input",
-      "capture": "cargo run -p xtask -- scenes capture input",
+      "capture": "cargo run -p xtask -- headless capture input",
       "uses": [
         "Select",
         "TextArea",
@@ -8412,7 +8412,7 @@
     },
     {
       "name": "textarea",
-      "capture": "cargo run -p xtask -- scenes capture textarea",
+      "capture": "cargo run -p xtask -- headless capture textarea",
       "uses": [
         "Select",
         "TextArea",
@@ -8422,7 +8422,7 @@
     },
     {
       "name": "form",
-      "capture": "cargo run -p xtask -- scenes capture form",
+      "capture": "cargo run -p xtask -- headless capture form",
       "uses": [
         "Combobox",
         "FormField",
@@ -8435,7 +8435,7 @@
     },
     {
       "name": "auth-sign-in",
-      "capture": "cargo run -p xtask -- scenes capture auth-sign-in",
+      "capture": "cargo run -p xtask -- headless capture auth-sign-in",
       "uses": [
         "Button",
         "Callout",
@@ -8448,7 +8448,7 @@
     },
     {
       "name": "auth-verification",
-      "capture": "cargo run -p xtask -- scenes capture auth-verification",
+      "capture": "cargo run -p xtask -- headless capture auth-verification",
       "uses": [
         "Button",
         "Callout",
@@ -8460,7 +8460,7 @@
     },
     {
       "name": "actions",
-      "capture": "cargo run -p xtask -- scenes capture actions",
+      "capture": "cargo run -p xtask -- headless capture actions",
       "uses": [
         "Avatar",
         "Button",
@@ -8488,7 +8488,7 @@
     },
     {
       "name": "content",
-      "capture": "cargo run -p xtask -- scenes capture content",
+      "capture": "cargo run -p xtask -- headless capture content",
       "uses": [
         "Avatar",
         "Button",
@@ -8504,7 +8504,7 @@
     },
     {
       "name": "kbd",
-      "capture": "cargo run -p xtask -- scenes capture kbd",
+      "capture": "cargo run -p xtask -- headless capture kbd",
       "uses": [
         "Kbd"
       ],
@@ -8512,7 +8512,7 @@
     },
     {
       "name": "overlay",
-      "capture": "cargo run -p xtask -- scenes capture overlay",
+      "capture": "cargo run -p xtask -- headless capture overlay",
       "uses": [
         "Button",
         "Overlay"
@@ -8521,7 +8521,7 @@
     },
     {
       "name": "dialog",
-      "capture": "cargo run -p xtask -- scenes capture dialog",
+      "capture": "cargo run -p xtask -- headless capture dialog",
       "uses": [
         "Dialog"
       ],
@@ -8529,7 +8529,7 @@
     },
     {
       "name": "tooltip",
-      "capture": "cargo run -p xtask -- scenes capture tooltip",
+      "capture": "cargo run -p xtask -- headless capture tooltip",
       "uses": [
         "Button",
         "Tooltip"
@@ -8538,7 +8538,7 @@
     },
     {
       "name": "menu",
-      "capture": "cargo run -p xtask -- scenes capture menu",
+      "capture": "cargo run -p xtask -- headless capture menu",
       "uses": [
         "Avatar",
         "Button",
@@ -8560,7 +8560,7 @@
     },
     {
       "name": "context-menu",
-      "capture": "cargo run -p xtask -- scenes capture context-menu",
+      "capture": "cargo run -p xtask -- headless capture context-menu",
       "uses": [
         "Avatar",
         "Button",
@@ -8582,7 +8582,7 @@
     },
     {
       "name": "popover",
-      "capture": "cargo run -p xtask -- scenes capture popover",
+      "capture": "cargo run -p xtask -- headless capture popover",
       "uses": [
         "Avatar",
         "Button",
@@ -8604,7 +8604,7 @@
     },
     {
       "name": "command-palette",
-      "capture": "cargo run -p xtask -- scenes capture command-palette",
+      "capture": "cargo run -p xtask -- headless capture command-palette",
       "uses": [
         "Avatar",
         "Button",
@@ -8626,7 +8626,7 @@
     },
     {
       "name": "toast",
-      "capture": "cargo run -p xtask -- scenes capture toast",
+      "capture": "cargo run -p xtask -- headless capture toast",
       "uses": [
         "DescriptionList",
         "List",
@@ -8637,7 +8637,7 @@
     },
     {
       "name": "tabs",
-      "capture": "cargo run -p xtask -- scenes capture tabs",
+      "capture": "cargo run -p xtask -- headless capture tabs",
       "uses": [
         "Badge",
         "Icon",
@@ -8647,7 +8647,7 @@
     },
     {
       "name": "accordion",
-      "capture": "cargo run -p xtask -- scenes capture accordion",
+      "capture": "cargo run -p xtask -- headless capture accordion",
       "uses": [
         "Accordion",
         "Toggle",
@@ -8657,7 +8657,7 @@
     },
     {
       "name": "breadcrumb",
-      "capture": "cargo run -p xtask -- scenes capture breadcrumb",
+      "capture": "cargo run -p xtask -- headless capture breadcrumb",
       "uses": [
         "Breadcrumb"
       ],
@@ -8665,7 +8665,7 @@
     },
     {
       "name": "list",
-      "capture": "cargo run -p xtask -- scenes capture list",
+      "capture": "cargo run -p xtask -- headless capture list",
       "uses": [
         "List"
       ],
@@ -8673,7 +8673,7 @@
     },
     {
       "name": "table",
-      "capture": "cargo run -p xtask -- scenes capture table",
+      "capture": "cargo run -p xtask -- headless capture table",
       "uses": [
         "Badge",
         "Table"
@@ -8682,7 +8682,7 @@
     },
     {
       "name": "data-grid",
-      "capture": "cargo run -p xtask -- scenes capture data-grid",
+      "capture": "cargo run -p xtask -- headless capture data-grid",
       "uses": [
         "Badge",
         "BulkBar",
@@ -8697,7 +8697,7 @@
     },
     {
       "name": "data-grid-editing",
-      "capture": "cargo run -p xtask -- scenes capture data-grid-editing",
+      "capture": "cargo run -p xtask -- headless capture data-grid-editing",
       "uses": [
         "Badge",
         "DataGrid",
@@ -8707,7 +8707,7 @@
     },
     {
       "name": "tree-grid",
-      "capture": "cargo run -p xtask -- scenes capture tree-grid",
+      "capture": "cargo run -p xtask -- headless capture tree-grid",
       "uses": [
         "TreeGrid"
       ],
@@ -8715,7 +8715,7 @@
     },
     {
       "name": "tree",
-      "capture": "cargo run -p xtask -- scenes capture tree",
+      "capture": "cargo run -p xtask -- headless capture tree",
       "uses": [
         "Icon",
         "Toggle",
@@ -8726,7 +8726,7 @@
     },
     {
       "name": "split-pane",
-      "capture": "cargo run -p xtask -- scenes capture split-pane",
+      "capture": "cargo run -p xtask -- headless capture split-pane",
       "uses": [
         "Collapsible",
         "SplitPane",
@@ -8737,7 +8737,7 @@
     },
     {
       "name": "scroll-area",
-      "capture": "cargo run -p xtask -- scenes capture scroll-area",
+      "capture": "cargo run -p xtask -- headless capture scroll-area",
       "uses": [
         "ScrollArea"
       ],
@@ -8745,7 +8745,7 @@
     },
     {
       "name": "scroll-shadow",
-      "capture": "cargo run -p xtask -- scenes capture scroll-shadow",
+      "capture": "cargo run -p xtask -- headless capture scroll-shadow",
       "uses": [
         "ScrollArea"
       ],
@@ -8753,7 +8753,7 @@
     },
     {
       "name": "scroll-fade",
-      "capture": "cargo run -p xtask -- scenes capture scroll-fade",
+      "capture": "cargo run -p xtask -- headless capture scroll-fade",
       "uses": [
         "ScrollArea",
         "ScrollFade"
@@ -8762,7 +8762,7 @@
     },
     {
       "name": "frost",
-      "capture": "cargo run -p xtask -- scenes capture frost",
+      "capture": "cargo run -p xtask -- headless capture frost",
       "uses": [
         "Badge",
         "Card",
@@ -8773,7 +8773,7 @@
     },
     {
       "name": "toolbar",
-      "capture": "cargo run -p xtask -- scenes capture toolbar",
+      "capture": "cargo run -p xtask -- headless capture toolbar",
       "uses": [
         "Avatar",
         "Button",
@@ -8798,7 +8798,7 @@
     },
     {
       "name": "sidebar",
-      "capture": "cargo run -p xtask -- scenes capture sidebar",
+      "capture": "cargo run -p xtask -- headless capture sidebar",
       "uses": [
         "Badge",
         "Icon",
@@ -8808,7 +8808,7 @@
     },
     {
       "name": "pagination",
-      "capture": "cargo run -p xtask -- scenes capture pagination",
+      "capture": "cargo run -p xtask -- headless capture pagination",
       "uses": [
         "Pagination",
         "Select"
@@ -8817,7 +8817,7 @@
     },
     {
       "name": "drawer",
-      "capture": "cargo run -p xtask -- scenes capture drawer",
+      "capture": "cargo run -p xtask -- headless capture drawer",
       "uses": [
         "Avatar",
         "Button",
@@ -8835,7 +8835,7 @@
     },
     {
       "name": "motion-flip",
-      "capture": "cargo run -p xtask -- scenes capture motion-flip",
+      "capture": "cargo run -p xtask -- headless capture motion-flip",
       "uses": [
         "Badge",
         "Button",
@@ -8846,7 +8846,7 @@
     },
     {
       "name": "motion-state",
-      "capture": "cargo run -p xtask -- scenes capture motion-state",
+      "capture": "cargo run -p xtask -- headless capture motion-state",
       "uses": [
         "Accordion",
         "Badge",
@@ -8865,7 +8865,7 @@
     },
     {
       "name": "animated-number",
-      "capture": "cargo run -p xtask -- scenes capture animated-number",
+      "capture": "cargo run -p xtask -- headless capture animated-number",
       "uses": [
         "AnimatedNumber",
         "Button"
@@ -8874,7 +8874,7 @@
     },
     {
       "name": "drag-list",
-      "capture": "cargo run -p xtask -- scenes capture drag-list",
+      "capture": "cargo run -p xtask -- headless capture drag-list",
       "uses": [
         "List"
       ],
@@ -8882,7 +8882,7 @@
     },
     {
       "name": "drag-tree",
-      "capture": "cargo run -p xtask -- scenes capture drag-tree",
+      "capture": "cargo run -p xtask -- headless capture drag-tree",
       "uses": [
         "Icon",
         "Toggle",
@@ -8893,7 +8893,7 @@
     },
     {
       "name": "dropzone",
-      "capture": "cargo run -p xtask -- scenes capture dropzone",
+      "capture": "cargo run -p xtask -- headless capture dropzone",
       "uses": [
         "Dropzone"
       ],
@@ -8901,7 +8901,7 @@
     },
     {
       "name": "wizard",
-      "capture": "cargo run -p xtask -- scenes capture wizard",
+      "capture": "cargo run -p xtask -- headless capture wizard",
       "uses": [
         "Wizard"
       ],
@@ -8909,7 +8909,7 @@
     },
     {
       "name": "settings",
-      "capture": "cargo run -p xtask -- scenes capture settings",
+      "capture": "cargo run -p xtask -- headless capture settings",
       "uses": [
         "Badge",
         "SettingsRow",
@@ -8920,7 +8920,7 @@
     },
     {
       "name": "detail",
-      "capture": "cargo run -p xtask -- scenes capture detail",
+      "capture": "cargo run -p xtask -- headless capture detail",
       "uses": [
         "DescriptionList",
         "List",
@@ -8930,7 +8930,7 @@
     },
     {
       "name": "filter-bar",
-      "capture": "cargo run -p xtask -- scenes capture filter-bar",
+      "capture": "cargo run -p xtask -- headless capture filter-bar",
       "uses": [
         "FilterBar"
       ],
@@ -8938,7 +8938,7 @@
     },
     {
       "name": "inline-edit",
-      "capture": "cargo run -p xtask -- scenes capture inline-edit",
+      "capture": "cargo run -p xtask -- headless capture inline-edit",
       "uses": [
         "InlineEdit"
       ],
@@ -8946,7 +8946,7 @@
     },
     {
       "name": "progress-circle",
-      "capture": "cargo run -p xtask -- scenes capture progress-circle",
+      "capture": "cargo run -p xtask -- headless capture progress-circle",
       "uses": [
         "ProgressCircle"
       ],
@@ -8954,7 +8954,7 @@
     },
     {
       "name": "split-tree",
-      "capture": "cargo run -p xtask -- scenes capture split-tree",
+      "capture": "cargo run -p xtask -- headless capture split-tree",
       "uses": [
         "Icon",
         "SplitTree",
@@ -8966,7 +8966,7 @@
     },
     {
       "name": "ide-shell",
-      "capture": "cargo run -p xtask -- scenes capture ide-shell",
+      "capture": "cargo run -p xtask -- headless capture ide-shell",
       "uses": [
         "Avatar",
         "Badge",
@@ -8986,7 +8986,7 @@
     },
     {
       "name": "keybinding",
-      "capture": "cargo run -p xtask -- scenes capture keybinding",
+      "capture": "cargo run -p xtask -- headless capture keybinding",
       "uses": [
         "KeybindingRecorder",
         "SettingsRow",
@@ -8996,7 +8996,7 @@
     },
     {
       "name": "keymap-editor",
-      "capture": "cargo run -p xtask -- scenes capture keymap-editor",
+      "capture": "cargo run -p xtask -- headless capture keymap-editor",
       "uses": [
         "KeymapEditor"
       ],
@@ -9004,7 +9004,7 @@
     },
     {
       "name": "markdown",
-      "capture": "cargo run -p xtask -- scenes capture markdown",
+      "capture": "cargo run -p xtask -- headless capture markdown",
       "uses": [
         "Divider",
         "Markdown"
@@ -9013,7 +9013,7 @@
     },
     {
       "name": "conversation",
-      "capture": "cargo run -p xtask -- scenes capture conversation",
+      "capture": "cargo run -p xtask -- headless capture conversation",
       "uses": [
         "DescriptionList",
         "Divider",
@@ -9026,7 +9026,7 @@
     },
     {
       "name": "image-viewer",
-      "capture": "cargo run -p xtask -- scenes capture image-viewer",
+      "capture": "cargo run -p xtask -- headless capture image-viewer",
       "uses": [
         "Divider",
         "ImageViewer"
@@ -9035,7 +9035,7 @@
     },
     {
       "name": "transport",
-      "capture": "cargo run -p xtask -- scenes capture transport",
+      "capture": "cargo run -p xtask -- headless capture transport",
       "uses": [
         "Divider",
         "TransportBar"
@@ -9044,7 +9044,7 @@
     },
     {
       "name": "audio-player",
-      "capture": "cargo run -p xtask -- scenes capture audio-player",
+      "capture": "cargo run -p xtask -- headless capture audio-player",
       "uses": [
         "AudioPlayer",
         "Divider",
@@ -9054,7 +9054,7 @@
     },
     {
       "name": "video-player",
-      "capture": "cargo run -p xtask -- scenes capture video-player",
+      "capture": "cargo run -p xtask -- headless capture video-player",
       "uses": [
         "Divider",
         "TransportBar",
@@ -9064,7 +9064,7 @@
     },
     {
       "name": "model-viewer",
-      "capture": "cargo run -p xtask -- scenes capture model-viewer",
+      "capture": "cargo run -p xtask -- headless capture model-viewer",
       "uses": [
         "Divider",
         "ModelViewer"
@@ -9073,7 +9073,7 @@
     },
     {
       "name": "approval",
-      "capture": "cargo run -p xtask -- scenes capture approval",
+      "capture": "cargo run -p xtask -- headless capture approval",
       "uses": [
         "ApprovalPrompt",
         "Callout",
@@ -9085,7 +9085,7 @@
     },
     {
       "name": "permission-matrix",
-      "capture": "cargo run -p xtask -- scenes capture permission-matrix",
+      "capture": "cargo run -p xtask -- headless capture permission-matrix",
       "uses": [
         "Avatar",
         "Button",
@@ -9114,7 +9114,7 @@
     },
     {
       "name": "cost-meter",
-      "capture": "cargo run -p xtask -- scenes capture cost-meter",
+      "capture": "cargo run -p xtask -- headless capture cost-meter",
       "uses": [
         "ContextGauge",
         "CostMeter",
@@ -9124,7 +9124,7 @@
     },
     {
       "name": "tool-call",
-      "capture": "cargo run -p xtask -- scenes capture tool-call",
+      "capture": "cargo run -p xtask -- headless capture tool-call",
       "uses": [
         "Card",
         "ToolCallCard"
@@ -9133,7 +9133,7 @@
     },
     {
       "name": "step-list",
-      "capture": "cargo run -p xtask -- scenes capture step-list",
+      "capture": "cargo run -p xtask -- headless capture step-list",
       "uses": [
         "Card",
         "List",
@@ -9144,7 +9144,7 @@
     },
     {
       "name": "node-graph",
-      "capture": "cargo run -p xtask -- scenes capture node-graph",
+      "capture": "cargo run -p xtask -- headless capture node-graph",
       "uses": [
         "GraphNode",
         "NodeGraph",
@@ -9156,7 +9156,7 @@
     },
     {
       "name": "browser-panel",
-      "capture": "cargo run -p xtask -- scenes capture browser-panel",
+      "capture": "cargo run -p xtask -- headless capture browser-panel",
       "uses": [
         "BrowserPanel"
       ],
@@ -9164,7 +9164,7 @@
     },
     {
       "name": "thinking",
-      "capture": "cargo run -p xtask -- scenes capture thinking",
+      "capture": "cargo run -p xtask -- headless capture thinking",
       "uses": [
         "ThinkingBlock",
         "Toggle",
@@ -9174,7 +9174,7 @@
     },
     {
       "name": "json-view",
-      "capture": "cargo run -p xtask -- scenes capture json-view",
+      "capture": "cargo run -p xtask -- headless capture json-view",
       "uses": [
         "JsonView",
         "Toggle",
@@ -9184,7 +9184,7 @@
     },
     {
       "name": "schema-form",
-      "capture": "cargo run -p xtask -- scenes capture schema-form",
+      "capture": "cargo run -p xtask -- headless capture schema-form",
       "uses": [
         "Combobox",
         "FormField",
@@ -9199,7 +9199,7 @@
     },
     {
       "name": "server-list",
-      "capture": "cargo run -p xtask -- scenes capture server-list",
+      "capture": "cargo run -p xtask -- headless capture server-list",
       "uses": [
         "DescriptionList",
         "List",
@@ -9212,7 +9212,7 @@
     },
     {
       "name": "offering-catalog",
-      "capture": "cargo run -p xtask -- scenes capture offering-catalog",
+      "capture": "cargo run -p xtask -- headless capture offering-catalog",
       "uses": [
         "OfferingCatalog"
       ],
@@ -9220,7 +9220,7 @@
     },
     {
       "name": "reading-direction",
-      "capture": "cargo run -p xtask -- scenes capture reading-direction",
+      "capture": "cargo run -p xtask -- headless capture reading-direction",
       "uses": [
         "Accordion",
         "Badge",
@@ -9236,7 +9236,7 @@
     },
     {
       "name": "toggle",
-      "capture": "cargo run -p xtask -- scenes capture toggle",
+      "capture": "cargo run -p xtask -- headless capture toggle",
       "uses": [
         "Toggle",
         "ToggleGroup"
@@ -9245,7 +9245,7 @@
     },
     {
       "name": "collapsible",
-      "capture": "cargo run -p xtask -- scenes capture collapsible",
+      "capture": "cargo run -p xtask -- headless capture collapsible",
       "uses": [
         "Collapsible",
         "Toggle",
@@ -9255,7 +9255,7 @@
     },
     {
       "name": "hover-card",
-      "capture": "cargo run -p xtask -- scenes capture hover-card",
+      "capture": "cargo run -p xtask -- headless capture hover-card",
       "uses": [
         "Avatar",
         "Badge",
@@ -9283,7 +9283,7 @@
     },
     {
       "name": "menubar",
-      "capture": "cargo run -p xtask -- scenes capture menubar",
+      "capture": "cargo run -p xtask -- headless capture menubar",
       "uses": [
         "Avatar",
         "Badge",
@@ -9310,7 +9310,7 @@
     },
     {
       "name": "copy-button",
-      "capture": "cargo run -p xtask -- scenes capture copy-button",
+      "capture": "cargo run -p xtask -- headless capture copy-button",
       "uses": [
         "Avatar",
         "Badge",
@@ -9340,7 +9340,7 @@
     },
     {
       "name": "aspect-ratio",
-      "capture": "cargo run -p xtask -- scenes capture aspect-ratio",
+      "capture": "cargo run -p xtask -- headless capture aspect-ratio",
       "uses": [
         "AspectRatio"
       ],
@@ -9348,7 +9348,7 @@
     },
     {
       "name": "document-tabs",
-      "capture": "cargo run -p xtask -- scenes capture document-tabs",
+      "capture": "cargo run -p xtask -- headless capture document-tabs",
       "uses": [
         "Avatar",
         "Badge",
@@ -9372,7 +9372,7 @@
     },
     {
       "name": "search-field",
-      "capture": "cargo run -p xtask -- scenes capture search-field",
+      "capture": "cargo run -p xtask -- headless capture search-field",
       "uses": [
         "FindReplace",
         "HighlightedText",
@@ -9385,7 +9385,7 @@
     },
     {
       "name": "find-replace",
-      "capture": "cargo run -p xtask -- scenes capture find-replace",
+      "capture": "cargo run -p xtask -- headless capture find-replace",
       "uses": [
         "FindReplace",
         "HighlightedText",
@@ -9398,7 +9398,7 @@
     },
     {
       "name": "notification-center",
-      "capture": "cargo run -p xtask -- scenes capture notification-center",
+      "capture": "cargo run -p xtask -- headless capture notification-center",
       "uses": [
         "DescriptionList",
         "List",
@@ -9409,7 +9409,7 @@
     },
     {
       "name": "failure-panel",
-      "capture": "cargo run -p xtask -- scenes capture failure-panel",
+      "capture": "cargo run -p xtask -- headless capture failure-panel",
       "uses": [
         "DescriptionList",
         "FailurePanel",
@@ -9420,7 +9420,7 @@
     },
     {
       "name": "log-stream",
-      "capture": "cargo run -p xtask -- scenes capture log-stream",
+      "capture": "cargo run -p xtask -- headless capture log-stream",
       "uses": [
         "LogStream"
       ],
@@ -9428,7 +9428,7 @@
     },
     {
       "name": "diff-view",
-      "capture": "cargo run -p xtask -- scenes capture diff-view",
+      "capture": "cargo run -p xtask -- headless capture diff-view",
       "uses": [
         "DiffView"
       ],
@@ -9436,7 +9436,7 @@
     },
     {
       "name": "sparkline",
-      "capture": "cargo run -p xtask -- scenes capture sparkline",
+      "capture": "cargo run -p xtask -- headless capture sparkline",
       "uses": [
         "Sparkline"
       ],
@@ -9444,7 +9444,7 @@
     },
     {
       "name": "code-view",
-      "capture": "cargo run -p xtask -- scenes capture code-view",
+      "capture": "cargo run -p xtask -- headless capture code-view",
       "uses": [
         "CodeView"
       ],
@@ -9452,7 +9452,7 @@
     },
     {
       "name": "upload-list",
-      "capture": "cargo run -p xtask -- scenes capture upload-list",
+      "capture": "cargo run -p xtask -- headless capture upload-list",
       "uses": [
         "Dropzone",
         "GradientSpinner",
@@ -9465,7 +9465,7 @@
     },
     {
       "name": "cascader",
-      "capture": "cargo run -p xtask -- scenes capture cascader",
+      "capture": "cargo run -p xtask -- headless capture cascader",
       "uses": [
         "Cascader"
       ],
@@ -9473,7 +9473,7 @@
     },
     {
       "name": "anchor-list",
-      "capture": "cargo run -p xtask -- scenes capture anchor-list",
+      "capture": "cargo run -p xtask -- headless capture anchor-list",
       "uses": [
         "AnchorList",
         "Avatar",
@@ -9496,7 +9496,7 @@
     },
     {
       "name": "diagnostics-list",
-      "capture": "cargo run -p xtask -- scenes capture diagnostics-list",
+      "capture": "cargo run -p xtask -- headless capture diagnostics-list",
       "uses": [
         "DiagnosticsList",
         "List"
@@ -9505,7 +9505,7 @@
     },
     {
       "name": "calendar",
-      "capture": "cargo run -p xtask -- scenes capture calendar",
+      "capture": "cargo run -p xtask -- headless capture calendar",
       "uses": [
         "Button",
         "Calendar",
@@ -9518,7 +9518,7 @@
     },
     {
       "name": "date-range",
-      "capture": "cargo run -p xtask -- scenes capture date-range",
+      "capture": "cargo run -p xtask -- headless capture date-range",
       "uses": [
         "Button",
         "Calendar",
@@ -9531,7 +9531,7 @@
     },
     {
       "name": "date-time",
-      "capture": "cargo run -p xtask -- scenes capture date-time",
+      "capture": "cargo run -p xtask -- headless capture date-time",
       "uses": [
         "Button",
         "Calendar",

@@ -56,10 +56,10 @@ enforces the equivalent rule across this repository's two workspaces,
 lockfiles, and compatibility declarations.
 
 Requires Rust 1.97 and edition 2024. macOS, Windows, and Linux are supported
-platforms. The component catalog is visually regression-tested through native
-window capture on macOS and deterministic offscreen WGPU rendering on Windows
-and Linux; see [`docs/compatibility.md`](docs/compatibility.md) for the
-platform-specific renderer and accessibility details.
+platforms. The component catalog is visually regression-tested through
+deterministic offscreen rendering on every platform; see
+[`docs/compatibility.md`](docs/compatibility.md) for the platform-specific
+renderer and accessibility details.
 
 That is usually all: `gpui-kit` re-exports the assets, theme, token and
 semantics crates as `gpui_kit::{assets, theme, tokens, semantics}`, so an
@@ -132,20 +132,24 @@ unavailable and failed stay distinct;
 cargo run -p gpui-kit-gallery
 ```
 
-Capture the gallery's own window on macOS:
+Render the gallery's scenes in a real window for visual review:
 
 ```bash
-cargo run -p gpui-kit-gallery -- \
-  --density=compact --capture snapshots/macos/gallery.png
+cargo run -p xtask -- scenes render
 ```
 
-This uses the owning process and window id. It does not capture the desktop.
+This writes review images to `target/scenes`. It does not update a baseline or
+run the visual gate.
 
 ### Gallery
 
-![Actions, status, settings, and truthful states](snapshots/macos/gallery.png)
+![Actions, status, settings, and truthful states](docs/images/gallery.png)
 
-![Loading, popover, and dialog patterns](snapshots/macos/gallery-patterns.png)
+![Loading, popover, and dialog patterns](docs/images/gallery-patterns.png)
+
+These two are illustrations, not baselines. They come from a real window, so
+their size depends on the display that took them, which is exactly why the gate
+does not work this way.
 
 ## Tokens
 
@@ -284,24 +288,22 @@ does not by itself make a complete Web support claim.
 cargo run -p xtask -- dependencies check # one immutable Zed source everywhere
 cargo run -p xtask -- gate        # dependencies, fmt, check, test, clippy, generated artifacts
 cargo run -p xtask -- gate full   # the above, plus rustdoc and scene images
-cargo run -p xtask -- headless check # deterministic Linux/Windows visual gate
+cargo run -p xtask -- headless check # deterministic native visual gate
 cargo run -p xtask -- web smoke      # real Chromium interaction/backend/a11y smoke
 cargo run -p xtask -- web visual check button input dialog node-graph
 ```
 
-The scene images are the visual regression gate:
+The headless scene images are the visual regression gate on every platform:
 
 ```bash
-cargo run -p xtask -- scenes check
+cargo run -p xtask -- headless check
 ```
 
-CI runs the non-visual gate and the software-rendered headless visual gate on
-Linux and Windows. The native macOS capture needs a composited, frontmost
-window and the display the baselines came from, which a GitHub-hosted runner
-does not give, so it runs on a self-hosted runner where one is configured and
-is otherwise a step a reviewer performs and records.
-[`docs/screenshot-testing.md`](docs/screenshot-testing.md) states what it
-requires and why a job that ran it anyway would be worse than no job.
+The offscreen harness uses Metal on macOS and WGPU on Linux and Windows. Every
+baseline is 1840 by 2000 device pixels and lives under
+`snapshots/headless/<platform>/scenes`.
+[`docs/screenshot-testing.md`](docs/screenshot-testing.md) describes the
+harness, comparison rules, and review workflow.
 
 ## GPUI compatibility
 

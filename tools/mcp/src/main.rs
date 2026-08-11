@@ -1,7 +1,7 @@
 //! The catalog, as tools an agent can call.
 //!
 //! `docs/api-index.json` already answers what exists and what it is called,
-//! and `scenes capture` already answers what it looks like. Both are files and
+//! and `scenes render` already answers what it looks like. Both are files and
 //! commands, which means an agent has to know they are there, guess the right
 //! path, and parse the result. This exposes them as tools instead, so finding
 //! a component and looking at one are single calls with typed arguments.

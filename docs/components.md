@@ -911,8 +911,8 @@ of moving its own checkmark.
 
 ## Validation
 
-Every component appears in `gpui_kit::scenes`, which the gallery renders, the
-`xtask scenes capture` task photographs in every bundled theme, and
+Every component appears in `gpui_kit::scenes`, which `xtask headless check`
+renders offscreen in every bundled theme and
 `crates/gpui-kit/tests/scenes.rs` audits headlessly. Behaviour is asserted
 through simulated key and mouse input against the published semantic tree, in
 `crates/gpui-kit/tests/`.

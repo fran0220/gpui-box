@@ -33,7 +33,7 @@
 //! Scenes are read out of `scenes.rs`: each one names the types it builds, so
 //! a component carries the scenes that exercise it and each scene carries its
 //! own body as an example. That example is worth more than a written one
-//! because `gate` compiles it and `scenes check` renders it, so an example
+//! because `gate` compiles it and `headless check` renders it, so an example
 //! here cannot be stale without a gate going red.
 //!
 //! # What it gets wrong
@@ -776,7 +776,7 @@ fn render(
         out.push_str(&format!(
             "      \"capture\": {},\n",
             quote(&format!(
-                "cargo run -p xtask -- scenes capture {}",
+                "cargo run -p xtask -- headless capture {}",
                 scene.name
             ))
         ));

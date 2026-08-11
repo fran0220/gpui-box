@@ -1,11 +1,15 @@
 # The headless visual gate: the scene catalog rendered and compared without a
-# window system, which is what lets Linux and Windows machines hold a visual
-# baseline at all. macOS keeps its native gate in `xtask scenes`.
+# window system, which is what lets every platform hold a visual baseline that
+# another machine can reproduce.
 #
-# This package is deliberately its own workspace because its Linux/Windows
-# renderer dependencies and lockfile are platform-specific. Its Zed source and
-# revision must still match the root workspace exactly; `xtask dependencies
-# check` enforces that contract.
+# macOS renders through the Metal headless renderer, Linux and Windows through
+# wgpu software adapters. All three ask the renderer for an exact device-pixel
+# size, so no display, menu bar, dock, or compositor takes part in the result.
+#
+# This package is deliberately its own workspace because its renderer
+# dependencies and lockfile are platform-specific. Its Zed source and revision
+# must still match the root workspace exactly; `xtask dependencies check`
+# enforces that contract.
 
 [package]
 name = "headless-visual"
@@ -24,7 +28,10 @@ gpui-kit = { path = "../../crates/gpui-kit", features = ["fixtures"] }
 gpui-kit-semantics = { path = "../../crates/gpui-kit-semantics" }
 gpui-kit-theme = { path = "../../crates/gpui-kit-theme" }
 
-[target.'cfg(any(target_os = "linux", target_os = "windows"))'.dependencies]
+# `gpui_platform` supplies the headless renderer each platform actually ships:
+# Metal on macOS, wgpu elsewhere. `gpui_wgpu` additionally supplies the
+# bundled-font text system, which every platform uses so that shaping cannot
+# vary with the machine's installed fonts.
 gpui_platform = { git = "https://github.com/fran0220/zed", rev = "ce35a66556c39f948ada12b60d2aaef579a8aa68", features = ["test-support"] }
 gpui_wgpu = { git = "https://github.com/fran0220/zed", rev = "ce35a66556c39f948ada12b60d2aaef579a8aa68", features = ["test-support"] }
 

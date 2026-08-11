@@ -24,10 +24,10 @@ Do not use full-desktop capture for automated evidence:
 
 Non-macOS capture currently returns `Unsupported` from `capture_window`, and
 `render_frame` needs a platform window that implements GPUI's
-`render_to_image`, which today is macOS. Linux and Windows hold their own
-visual baseline through the headless gate described below, which renders
-without any window at all. Image writing, semantic assertions, and frame
-comparison remain portable.
+`render_to_image`, which today is macOS. The visual baseline does not go
+through either of them: every platform holds it through the headless gate
+described below, which renders without any window at all. Image writing,
+semantic assertions, and frame comparison remain portable.
 
 ## Settle before capture
 
@@ -52,14 +52,18 @@ Visual baselines state:
 - platform and scale factor;
 - reduced-motion setting.
 
-The gallery asks for a 920×1000 logical window. What is captured is the
-window's drawable, whose size the platform clamps to the display, so the
-committed baselines are 1842×1374 device pixels: 921×687 logical at a backing
-scale factor of 2. Those numbers describe the machine the baselines were
-captured on, not a constant. A display of another size or scale produces images
-of another size, and a comparison treats a size difference as maximally
-different — which is the first thing to check when every image is reported as
-changed.
+Baselines are 1840×2000 device pixels on every platform: 920×1000 logical at a
+scale factor of 2. That is a constant, because the gate asks the renderer for
+that size rather than opening a window and accepting whatever the display
+grants.
+
+It used to be otherwise, and the cost is worth recording. The gate opened a
+real 920×1000 window and captured its drawable, whose size the platform clamps
+to the available screen area. Two Macs with different menu bar and Dock
+geometry produced 1840×1568 and 1842×1374, so `snapshots/macos` accumulated two
+incompatible sets, a full-catalog check could not pass on either machine, and
+every wave was reviewed with a scoped check instead. The baselines described
+the machine, not the components.
 
 ## Frame comparison
 
@@ -93,50 +97,50 @@ states. The gallery renders a scene with `--scene <name>`, and
 
 ```bash
 cargo run -p xtask -- scenes list
-cargo run -p xtask -- scenes capture
+cargo run -p xtask -- scenes render          # or: scenes render list tree
 ```
 
-writes one image per scene per bundled theme under
-`snapshots/<platform>/scenes/`. One process renders the whole catalog on the
-window it launched with, because a GPUI application owns the window system for
-its lifetime and paying application startup per image cost over twenty minutes.
-A run takes an exclusive lock: two galleries capturing at once take the
-foreground from each other, and a window the platform has pushed to the
-background stops being scheduled for draws, so both runs stall on stale
-frames. Before anything is recorded, one settled frame is rendered and thrown
-away, because the platform delivers mouse events of its own while the window
-takes the foreground, and one arriving late would hover whatever sits under
-the physical cursor into the first image.
+writes one image per scene per bundled theme into `target/scenes` for a person
+to look at. One process renders the whole catalog on the window it launched
+with, because a GPUI application owns the window system for its lifetime and
+paying application startup per image cost over twenty minutes. A run takes an
+exclusive lock: two galleries rendering at once take the foreground from each
+other, and a window the platform has pushed to the background stops being
+scheduled for draws, so both runs stall on stale frames.
 
-`cargo run -p xtask -- scenes check` captures into `target/scene-check` and
-compares. Naming scenes captures or checks only those, which is what a change to
-one component needs.
+`scenes render` is a viewing tool, not the gate. It is how motion and the text
+caret get reviewed, because both need a real window. It holds no baseline.
 
-## Where the gate can run
+## The gate
 
-`scenes check` needs three things, and a machine that is missing any of them
-cannot report a visual regression truthfully:
+```bash
+cargo run -p xtask -- headless check          # or: headless check list tree
+cargo run -p xtask -- headless capture        # accept
+```
 
-1. **A macOS graphical session with Metal.** Pixels are read back from the
-   GPU rather than from the window server, but the gallery still opens a real
-   window to host the renderer and drive redraws, so a session that can open
-   one is required. The compositor's output is not consulted.
-2. **The ability to be frontmost.** A window the platform has pushed to the
-   background stops being scheduled for draws, so the run reads the previous
-   scene until it gives up; frontmost is also what lets focus rings and
-   carets render. The gallery claims the foreground for the run and reclaims
-   it whenever a poll sees an unchanged frame.
-3. **The display the baselines came from.** See the fixture contract above:
-   size and backing scale factor are part of the baseline.
+`tools/headless-visual` renders each scene into an offscreen texture at a size
+it names and reads the pixels straight back. No window, display, menu bar,
+dock, or compositor takes part, so any machine with the same renderer produces
+the same bytes. Baselines live in `snapshots/headless/{macos,linux,windows}/scenes`,
+one set per renderer, because Metal, llvmpipe, and WARP land antialiased edges
+differently and pretending those were one picture would make every gate lie.
 
-The gate therefore runs on a Mac someone can hand a display session to — a
-development machine or a self-hosted runner — rather than on an arbitrary
-hosted VM. Where no such machine is attached to CI, the gate is a step a
-reviewer performs and records in the pull request; the template asks for the
-output rather than for a claim.
+Text is shaped by cosmic-text from the bundled fonts only. Loading the
+machine's own fonts would shape text differently from one machine to the next,
+which is also why `crates/gpui-kit-assets` bundles `KeySymbols.ttf`: without
+it the macOS `⌘ ⌃ ⌥` glyphs came from whatever font the host happened to have,
+and the gate rendered them as missing-glyph boxes.
 
-Wherever it runs, a failing run's `target/scene-check` is uploaded as an
-artifact, because a difference nobody can look at is not a review.
+A comparison allows one step per channel. Exactness was tried and does not
+hold: capturing `frost` alone and capturing it as the ninetieth scene of a full
+run differ by one pixel at one step, because the sprite atlas has accumulated
+different state by then. Scoped runs agree with each other to the byte, so the
+tolerance is what makes a scoped check mean the same thing as the full one.
+Naming scenes checks or captures only those, which is what a change to one
+component needs.
+
+A failing run's `target/headless-scene-check` is uploaded as an artifact,
+because a difference nobody can look at is not a review.
 
 The same catalog is rendered headlessly by `crates/gpui-kit/tests/scenes.rs`,
 which audits every published tree, so a component cannot be reviewed visually

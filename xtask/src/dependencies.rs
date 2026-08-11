@@ -59,27 +59,11 @@ pub fn check(root: &Path, args: &[String]) -> Result<()> {
         ),
         (
             "headless gpui_platform",
-            dependency_pin(
-                &headless_manifest,
-                &[
-                    "target",
-                    "cfg(any(target_os = \"linux\", target_os = \"windows\"))",
-                    "dependencies",
-                ],
-                "gpui_platform",
-            )?,
+            dependency_pin(&headless_manifest, &["dependencies"], "gpui_platform")?,
         ),
         (
             "headless gpui_wgpu",
-            dependency_pin(
-                &headless_manifest,
-                &[
-                    "target",
-                    "cfg(any(target_os = \"linux\", target_os = \"windows\"))",
-                    "dependencies",
-                ],
-                "gpui_wgpu",
-            )?,
+            dependency_pin(&headless_manifest, &["dependencies"], "gpui_wgpu")?,
         ),
     ];
     for (label, pin) in pins {

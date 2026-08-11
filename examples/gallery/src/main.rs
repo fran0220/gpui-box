@@ -1268,7 +1268,7 @@ struct GalleryStates {
 impl Global for GalleryStates {}
 
 /// Reordering, the two pointer responses, and a counting readout.
-/// The grid, shown through the scenes the capture task and the audit use, so
+/// The grid, shown through the scenes the visual gate and the audit use, so
 /// the arrangement reviewed here is the arrangement that is tested.
 fn data_grid_section(theme: &Theme, window: &mut Window, cx: &mut App) -> gpui::AnyElement {
     let scene = |name: &str, window: &mut Window, cx: &mut App| {
@@ -1771,7 +1771,7 @@ async fn settled_frame(
 /// is already open pays it once.
 ///
 /// A window opened later is not the one the platform treats as frontmost, and
-/// scenes captured in such a window lost their focus rings and carets, so the
+/// images rendered in such a window lost their focus rings and carets, so the
 /// window the application launched with is the one that is reused.
 async fn capture_catalog(
     window: gpui::WindowHandle<Gallery>,

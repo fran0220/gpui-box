@@ -74,7 +74,7 @@ strip = "debuginfo"
 
 # Scene captures encode 160 full-window PNGs per run, and the deflate inside
 # is what a debug build spends most of its time on. Optimizing just the
-# compression crates keeps `scenes capture` fast without giving up debug
+# compression crates keeps scene rendering fast without giving up debug
 # builds for anything of ours.
 [profile.dev.package.png]
 opt-level = 3

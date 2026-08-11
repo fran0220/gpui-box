@@ -65,26 +65,26 @@ This is the part worth using, because it closes without a human in it.
 
 ```bash
 cargo run -p xtask -- gate                        # fmt, check, test, clippy, tokens, strings, api
-cargo run -p xtask -- scenes capture <scene>      # render just what changed
-cargo run -p xtask -- scenes check <scene>        # compare against the committed image
+cargo run -p xtask -- headless capture <scene>    # accept just what changed
+cargo run -p xtask -- headless check <scene>      # compare against the committed image
 ```
 
-Then **look at the PNG in `snapshots/macos/scenes/`.** A captured image is a
+Then **look at the PNG in `snapshots/headless/<platform>/scenes/`.** A captured image is a
 claim about what the component now looks like, and the only way to check a
 claim about appearance is to look. Captures are deterministic — same bytes
-every run, in any order — which is what makes `scenes check` a gate rather
+every run, in any order — which is what makes `headless check` a gate rather
 than a suggestion.
 
 Two things a still frame cannot show, both known and neither a defect:
 
 - a repeating animation is held at its first frame and a one-shot at its last,
   because a still of a moving thing is not reproducible. Review motion by
-  running the gallery;
+  running `cargo run -p xtask -- scenes render <scene>`;
 - a text caret does not appear once another scene has rendered in the same run.
-  Render that one scene alone to see it.
+  Use `scenes render <scene>` to render that one scene alone in a real window.
 
-There is a matching `headless check` for Linux and Windows, with its own
-baseline, in `tools/headless-visual`.
+The harness in `tools/headless-visual` runs on macOS, Linux, and Windows. Every
+baseline is exactly 1840 by 2000 device pixels.
 
 ## If you can call tools
 
@@ -120,7 +120,7 @@ Do not hand-edit any of these. Each has a `check` that fails when it drifts.
 | `docs/api-index.json` | `cargo run -p xtask -- api generate` |
 | `docs/token-reference.md` | `cargo run -p xtask -- tokens generate` |
 | `docs/strings-allowlist.txt` | `cargo run -p xtask -- strings generate` |
-| `snapshots/macos/scenes/*.png` | `cargo run -p xtask -- scenes capture` |
+| `snapshots/headless/<platform>/scenes/*.png` | `cargo run -p xtask -- headless capture` |
 
 ## Reference
 

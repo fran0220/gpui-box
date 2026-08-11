@@ -11,7 +11,6 @@ rust-version.workspace = true
 anyhow.workspace = true
 gpui-kit-tokens.workspace = true
 gpui-kit = { workspace = true, features = ["fixtures"] }
-png.workspace = true
 serde_json.workspace = true
 toml.workspace = true
 # The site is the one thing here that does produce HTML. `gpui-kit` takes this

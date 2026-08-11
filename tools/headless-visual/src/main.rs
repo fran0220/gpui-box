@@ -1,18 +1,21 @@
 //! Renders the scene catalog without a window system and compares the pixels.
 //!
-//! This is the visual gate for the platforms the macOS gallery cannot cover.
-//! GPUI draws each scene through its wgpu renderer into an offscreen texture
-//! and the pixels are read straight back, so no GPU hardware, compositor, or
-//! display server takes part. Text is shaped by cosmic-text from the fonts
-//! this repository bundles, and time is simulated, which together make the
-//! same scene produce the same bytes on repeated runs of one software adapter.
-//! Linux llvmpipe and Windows WARP have separate baselines because their stable
-//! output differs at antialiased edges.
+//! This is the visual gate on every platform. GPUI draws each scene into an
+//! offscreen texture at an exact device-pixel size and the pixels are read
+//! straight back, so no window, display, menu bar, dock, or compositor takes
+//! part. Text is shaped by cosmic-text from the fonts this repository bundles,
+//! and time is simulated, which together make the same scene produce the same
+//! bytes on any machine running the same renderer.
 //!
-//! The baselines live in `snapshots/headless/{linux,windows}/scenes`, beside but
-//! distinct from the macOS baseline: CoreText, llvmpipe, and WARP land
-//! antialiased edges differently, and pretending those were one picture would
-//! make every gate lie.
+//! Asking the renderer for the size is the point. A real window negotiates its
+//! size with the display it opens on, so the same catalog captured on two Macs
+//! produced two incompatible baseline sets; that is what this harness exists to
+//! prevent.
+//!
+//! The baselines live in `snapshots/headless/{macos,linux,windows}/scenes`, one
+//! set per renderer: Metal, llvmpipe, and WARP land antialiased edges
+//! differently, and pretending those were one picture would make every gate
+//! lie.
 
 use anyhow::Result;
 
@@ -27,27 +30,6 @@ fn main() -> Result<()> {
     }
 }
 
-#[cfg(not(any(target_os = "linux", target_os = "windows")))]
-mod imp {
-    use anyhow::{Result, bail};
-
-    pub fn capture(_rest: &[String]) -> Result<()> {
-        unavailable()
-    }
-
-    pub fn check(_rest: &[String]) -> Result<()> {
-        unavailable()
-    }
-
-    fn unavailable() -> Result<()> {
-        bail!(
-            "the headless visual gate runs on Linux and Windows; on macOS the native \
-             gate is `cargo run -p xtask -- scenes check`"
-        );
-    }
-}
-
-#[cfg(any(target_os = "linux", target_os = "windows"))]
 mod imp {
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -72,8 +54,14 @@ mod imp {
     /// Captures into a scratch directory and reports every image that differs
     /// from the committed one.
     ///
-    /// The comparison is exact. Each software adapter has its own baseline, so
-    /// tolerance would only hide a real change within that adapter's output.
+    /// The comparison allows one step per channel, which is what the native
+    /// gate has always allowed. Exactness was tried first and does not hold:
+    /// capturing `frost` on its own and capturing it as part of the whole
+    /// catalog differ by one pixel at one step, because the sprite atlas has
+    /// accumulated different state by the time the ninetieth scene draws.
+    /// Scoped runs agree with each other to the byte, so the tolerance buys a
+    /// scoped check that means the same thing as the full one. Anything a
+    /// component actually changed moves far further than one step.
     pub fn check(only: &[String]) -> Result<()> {
         let committed = snapshots();
         let scratch = repo_root().join("target").join("headless-scene-check");
@@ -92,7 +80,7 @@ mod imp {
                 missing.push(name);
                 continue;
             }
-            if !same_pixels(&old, &entry.path()).with_context(|| format!("compare {name}"))? {
+            if !within_one_step(&old, &entry.path()).with_context(|| format!("compare {name}"))? {
                 differing.push(name);
             }
         }
@@ -126,22 +114,39 @@ mod imp {
             .to_path_buf()
     }
 
+    /// One baseline set per renderer, because Metal, llvmpipe, and WARP land
+    /// antialiased edges differently.
     fn snapshots() -> PathBuf {
+        let renderer = if cfg!(target_os = "macos") {
+            "macos"
+        } else if cfg!(target_os = "windows") {
+            "windows"
+        } else {
+            "linux"
+        };
         repo_root()
             .join("snapshots")
             .join("headless")
-            .join(if cfg!(target_os = "windows") {
-                "windows"
-            } else {
-                "linux"
-            })
+            .join(renderer)
             .join("scenes")
     }
 
-    fn same_pixels(left: &Path, right: &Path) -> Result<bool> {
+    /// Whether two captures agree to within one step on every channel.
+    ///
+    /// A differing size is never within tolerance: the harness asks the
+    /// renderer for an exact size, so a different one means the harness itself
+    /// changed rather than the picture.
+    fn within_one_step(left: &Path, right: &Path) -> Result<bool> {
         let left = image::open(left)?.into_rgba8();
         let right = image::open(right)?.into_rgba8();
-        Ok(left.dimensions() == right.dimensions() && left.as_raw() == right.as_raw())
+        if left.dimensions() != right.dimensions() {
+            return Ok(false);
+        }
+        Ok(left
+            .as_raw()
+            .iter()
+            .zip(right.as_raw())
+            .all(|(left, right)| left.abs_diff(*right) <= 1))
     }
 
     /// Which scene the host shows.

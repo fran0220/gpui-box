@@ -7,10 +7,10 @@
 5. Register gallery controls in the semantic tree.
 6. Update the gallery when a component gains a visual state.
 7. Run `cargo run -p xtask -- gate`, and `gate full` before committing.
-8. After a UI change, run `cargo run -p xtask -- scenes check`, look at every
-   image it reports, and accept them with `scenes capture` only once you have.
-   CI cannot do this for you; see `docs/screenshot-testing.md` for why, and
-   record the result in the pull request.
+8. After a UI change, run `cargo run -p xtask -- headless check`, look at every
+   image it reports, and accept them with `headless capture` only once you have.
+   The offscreen harness runs on macOS, Linux, and Windows; see
+   `docs/screenshot-testing.md`, and record the result in the pull request.
 9. Add a `CHANGELOG.md` entry for anything a reader of the library would
    notice. Say what it now does and what it refuses to do, not which files
    moved.

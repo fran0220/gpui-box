@@ -7,11 +7,12 @@
 
 ```bash
 cargo run -p gpui-kit-gallery
-cargo run -p gpui-kit-gallery -- \
-  --density=compact --capture snapshots/macos/gallery.png
-cargo run -p gpui-kit-gallery -- \
-  --scene=lower --capture snapshots/macos/gallery-patterns.png
+cargo run -p xtask -- scenes render
+cargo run -p xtask -- scenes render button dialog
 ```
+
+`scenes render` writes real-window images to `target/scenes` for human review.
+The visual gate uses `cargo run -p xtask -- headless check` instead.
 
 Its data is deterministic fixture content, explicitly not product-backed
 evidence. The example demonstrates:

@@ -3,7 +3,7 @@
 # deploys both as one Worker.
 #
 # Everything it publishes is derived: the pages come from `docs/api-index.json`
-# and `docs/*.md`, the images come from `snapshots/macos/scenes`, and the tool
+# and `docs/*.md`, the images come from `snapshots/headless/macos/scenes`, and the tool
 # list comes from `tools/mcp/tools.json`. Nothing here is authored, so a deploy
 # cannot say something the repository does not.
 set -euo pipefail

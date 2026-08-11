@@ -214,6 +214,24 @@ and `xtask gate [full]`. `scenes check` is the visual regression gate; see
 
 ### Changed
 
+- The visual gate is `xtask headless check` on every platform, and the macOS
+  baseline moved from `snapshots/macos/scenes` to
+  `snapshots/headless/macos/scenes`. It used to open a real 920×1000 window and
+  capture the drawable, whose size the platform clamps to the available screen
+  area, so two Macs produced 1840×1568 and 1842×1374 and `snapshots/macos`
+  accumulated two incompatible sets that no machine could pass in full. Every
+  wave was therefore reviewed with a scoped check against a baseline the
+  reviewer could not reproduce. The harness now asks GPUI's Metal headless
+  renderer for an exact size, as the Linux and Windows harnesses already asked
+  their software adapters, so every baseline is 1840×2000 and a scoped check
+  means the same thing as the full one. Comparison allows one step per channel,
+  which exactness could not: the sprite atlas has accumulated different state by
+  the ninetieth scene of a full run, and that moves one antialiased pixel of
+  `frost`.
+- `xtask scenes capture` and `xtask scenes check` are replaced by
+  `xtask scenes render`, which writes to `target/scenes` and holds no baseline.
+  A real window is still how motion and the text caret get reviewed; it is no
+  longer how a baseline is recorded.
 - GPUI dependency ownership moved to the maintained `fran0220/zed` integration
   fork. The root workspace and standalone headless harness now pin the same
   immutable revision instead of combining an upstream pin with a temporary
@@ -346,6 +364,15 @@ and `xtask gate [full]`. `scenes check` is the visual regression gate; see
 
 ### Fixed
 
+- `overlay::Kbd` drew `⌘ ⌃ ⌥ ⏎ ⌦ ⌫ ␣` only where the host machine happened to
+  own a font covering them. No Geist face does, and the component relied on the
+  platform's own fallback, so the library could not draw its own keyboard
+  shortcuts unaided and no baseline could record them — the first offscreen
+  macOS run rendered them as missing-glyph boxes. `gpui-kit-assets` now bundles
+  `KeySymbols.ttf`, a seven-glyph subset of Noto Sans Symbols and Noto Sans
+  Symbols 2 renamed so it cannot shadow a full Noto family on the host.
+- `cargo doc` rejected three redundant explicit link targets in `content::DiffView`,
+  `content::LogStream`, and `media::VideoPlayer`, so `gate full` could not pass.
 - `scenes check` reported that 112 images matched after writing one of them: a
   run that failed part way still exited zero, and the check counted the images
   it had asked for rather than the ones that arrived. A gate that passes when it

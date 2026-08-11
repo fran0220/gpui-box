@@ -301,13 +301,10 @@ nothing fails when a virtualized list gets slower, and published documentation;
 the gallery is local. Publishing to a registry is impossible while GPUI is a git
 dependency.
 
-The visual regression is a gate everywhere except CI. `scenes check` needs a
-composited, frontmost window and the display the baselines came from, which a
-hosted runner does not give, so it runs on a self-hosted runner if one is
-configured and is otherwise a step a reviewer performs and records.
-`docs/screenshot-testing.md` states the three requirements; a job that ran it
-where it cannot look would report agreement it never established, which has
-happened here once already.
+The visual regression gate is `headless check` on macOS, Linux, and Windows.
+It renders offscreen at a fixed device-pixel size, so it does not depend on a
+composited, frontmost window or the host display.
+`docs/screenshot-testing.md` describes the gate and review workflow.
 
 ## Rules every covered component follows
 

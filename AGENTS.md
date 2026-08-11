@@ -111,31 +111,42 @@ cargo run -p xtask -- gate        # fmt, check, test, clippy, tokens
 cargo run -p xtask -- gate full   # the above, plus rustdoc and scene images
 ```
 
-Captures read the frame GPUI drew straight back from the GPU rather than
-asking the window server what it composited, and the gallery renders with
-reduced motion, parks the pointer, and discards one warm-up frame so stray
-platform events cannot leak into the first image. The same scene therefore
-produces the same bytes on every run and in any order — a scoped check
-matches the full-catalog baseline — which is what makes `scenes check` a gate
-rather than a suggestion. The comparison still allows one step per channel,
-because another machine's GPU or OS may rasterize an antialiased edge one
-step differently. Anything a component changed moves far further than that.
+The visual gate on every platform is `cargo run -p xtask -- headless check`
+(`headless capture` accepts). It renders the catalog into offscreen textures
+at a size it names — Metal on macOS, software adapters on Linux and Windows —
+with reduced motion and simulated time, so no window, display, dock, or
+compositor takes part and the same scene produces the same bytes on any
+machine with that renderer. Baselines live in
+`snapshots/headless/{macos,linux,windows}/scenes`, one set per renderer.
 
-While iterating on one component, capture only what it touches:
+Never hold a baseline from a real window. A window negotiates its size with
+the display it opens on, which is how `snapshots/macos` came to hold two
+incompatible sets that no machine could pass; `docs/screenshot-testing.md`
+records what that cost.
+
+A comparison allows one step per channel. Exactness does not hold even within
+one renderer: the sprite atlas has accumulated different state by the
+ninetieth scene of a full run, which moves one antialiased pixel of `frost` by
+one step. Scoped runs agree to the byte, so the tolerance is what makes a
+scoped check mean the same thing as the full one. Anything a component changed
+moves far further than one step.
+
+While iterating on one component, check only what it touches:
 
 ```bash
-cargo run -p xtask -- scenes capture list tree   # rewrite these scenes
-cargo run -p xtask -- scenes check list tree     # compare without rewriting
+cargo run -p xtask -- headless check list tree     # compare without rewriting
+cargo run -p xtask -- headless capture list tree   # accept these scenes
 ```
 
-On Linux and Windows the visual gate is `cargo run -p xtask -- headless check`
-(`headless capture` accepts), which renders the same catalog into offscreen
-textures through a software adapter — no window system or GPU — against exact
-platform baselines in `snapshots/headless/{linux,windows}/scenes`. The harness
-lives in `tools/headless-visual` as its own workspace with renderer-specific
-dependencies and a separate lockfile. It and the root workspace must pin the
-same immutable `fran0220/zed` integration revision; run `cargo run -p xtask --
-dependencies check` after changing it. See `docs/screenshot-testing.md`.
+The harness lives in `tools/headless-visual` as its own workspace with
+renderer-specific dependencies and a separate lockfile. It and the root
+workspace must pin the same immutable `fran0220/zed` integration revision; run
+`cargo run -p xtask -- dependencies check` after changing it. See
+`docs/screenshot-testing.md`.
+
+`cargo run -p xtask -- scenes render` opens the real gallery window and writes
+to `target/scenes`. It holds no baseline and is not a gate; it is how motion
+and the text caret get looked at, since both need a real window.
 
 UI changes additionally require visual inspection of the captured images. A
 changed image is a claim about what the component now looks like, so look at

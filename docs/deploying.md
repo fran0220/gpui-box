@@ -22,7 +22,7 @@ only ever draw scenes from the catalog, and the catalog is 82 scenes in two
 themes — a fixed set of 164 images that are already captured, already
 committed, and already compared pixel for pixel on every run. Because captures
 in this repository are deterministic, the bytes a hosted renderer would produce
-are the bytes in `snapshots/macos/scenes`. Rendering per request would spend a
+are the bytes in `snapshots/headless/macos/scenes`. Rendering per request would spend a
 GPU-less rasterizer, a long cold build, a request timeout and an attack surface
 to produce a file that is already there.
 
@@ -111,7 +111,7 @@ custom_domain = true
 | `/scenes/<name>` | the scene's own source, and both captured themes |
 | `/docs/<page>` | `docs/*.md` |
 | `/llms.txt`, `/api-index.json` | served as themselves, for a program |
-| `/images/<fingerprint>/*.png` | `snapshots/macos/scenes`; the content-derived directory prevents a new page from receiving an old cached capture |
+| `/images/<fingerprint>/*.png` | `snapshots/headless/macos/scenes`; the content-derived directory prevents a new page from receiving an old cached capture |
 | `/mcp` | `tools/site/worker/index.js` with `tools/mcp/tools.json` |
 
 `tools/site/public/` is generated and not committed. A generated file belongs

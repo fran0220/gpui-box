@@ -2,7 +2,7 @@
 //!
 //! Everything here is a rendering of things this repository already generates
 //! and already checks: `docs/api-index.json` for what exists and what it is
-//! called, `snapshots/macos/scenes` for what it looks like, and `docs/*.md`
+//! called, `snapshots/headless/macos/scenes` for what it looks like, and `docs/*.md`
 //! for the prose. Nothing is authored twice, so the site cannot disagree with
 //! the library — it can only be regenerated.
 //!
@@ -110,7 +110,7 @@ pub fn generate(root: &Path, out: Option<&str>) -> Result<PathBuf> {
     let images = out.join("images").join(&image_version);
     fs::create_dir_all(&images)?;
     let mut copied = 0;
-    for entry in fs::read_dir(root.join("snapshots/macos/scenes"))? {
+    for entry in fs::read_dir(root.join("snapshots/headless/macos/scenes"))? {
         let path = entry?.path();
         if path.extension().is_some_and(|e| e == "png") {
             let name = path.file_name().context("an image has a name")?;
@@ -165,7 +165,7 @@ fn write(path: &Path, body: &str) -> Result<()> {
 /// page can never pair a current API with a previous image. This is an FNV-1a
 /// content fingerprint, not a security boundary.
 fn image_version(root: &Path) -> Result<String> {
-    let mut paths = fs::read_dir(root.join("snapshots/macos/scenes"))?
+    let mut paths = fs::read_dir(root.join("snapshots/headless/macos/scenes"))?
         .map(|entry| entry.map(|entry| entry.path()))
         .collect::<std::io::Result<Vec<_>>>()?;
     paths.retain(|path| path.extension().is_some_and(|extension| extension == "png"));
@@ -321,8 +321,8 @@ fn home(components: &[Value], scenes: &[Value], image_root: &str) -> String {
   <a href="/api-index.json">index</a>, and an MCP endpoint at
   <code>/mcp</code> that answers the same questions in one call.</p>
   <pre><code>cargo run -p xtask -- gate                    # fmt, check, test, clippy, tokens, strings, api
-cargo run -p xtask -- scenes capture badge   # render what changed
-cargo run -p xtask -- scenes check badge     # compare against the committed image</code></pre>
+cargo run -p xtask -- headless check badge     # compare against the committed image
+cargo run -p xtask -- headless capture badge   # accept what changed</code></pre>
 </section>
 "#,
         count = components.len(),

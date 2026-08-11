@@ -37,8 +37,7 @@ fn main() -> Result<()> {
         (Some("site"), Some("check")) => site::check(&root()),
         (Some("accessibility"), Some("check")) => accessibility_check(),
         (Some("scenes"), Some("list")) => scenes_list(),
-        (Some("scenes"), Some("capture")) => scenes_capture(&rest),
-        (Some("scenes"), Some("check")) => scenes_check(&rest),
+        (Some("scenes"), Some("render")) => scenes_render(&rest),
         (Some("headless"), Some("capture")) => headless("capture", &rest),
         (Some("headless"), Some("check")) => headless("check", &rest),
         (Some("web"), Some("check")) => web_check(),
@@ -49,8 +48,8 @@ fn main() -> Result<()> {
         (Some("gate"), Some("full")) => gate(true),
         _ => bail!(
             "usage: cargo xtask <dependencies check|accessibility check|tokens generate|tokens check|strings check|\
-             strings generate|scenes list|scenes capture [name...]|\
-             scenes check [name...]|headless capture [name...]|\
+             strings generate|scenes list|scenes render [name...]|\
+             headless capture [name...]|\
              headless check [name...]|web check|web build|web smoke|\
              web visual <capture|check> [name...]|gate [full]>"
         ),
@@ -886,73 +885,23 @@ fn scenes_list() -> Result<()> {
     Ok(())
 }
 
-/// Renders scenes in every bundled theme to reviewable images.
+/// Renders scenes in every bundled theme to images a person can look at.
 ///
-/// Naming scenes captures only those, which is what a change to one component
-/// needs. Naming none captures the catalog.
-fn scenes_capture(only: &[String]) -> Result<()> {
-    let directory = snapshots();
+/// This opens a real window, so it is how motion and the text caret get
+/// reviewed, and it is not the gate: a window negotiates its size with the
+/// display it opens on, so two Macs produce two different pictures of the same
+/// scene. `xtask headless check` holds the baseline instead.
+///
+/// Naming scenes renders only those, which is what a change to one component
+/// needs. Naming none renders the catalog.
+fn scenes_render(only: &[String]) -> Result<()> {
+    let directory = root().join("target").join("scenes");
+    if directory.exists() {
+        fs::remove_dir_all(&directory).with_context(|| format!("clear {}", directory.display()))?;
+    }
     let count = capture_into(&directory, only)?;
-    println!("captured {count} images into {}", directory.display());
+    println!("rendered {count} images into {}", directory.display());
     Ok(())
-}
-
-/// Captures into a scratch directory and reports every image that differs from
-/// the committed one.
-///
-/// This is the visual regression gate. It only means anything because captures
-/// are deterministic: the gallery reads frames straight back from the GPU and
-/// renders with reduced motion, so neither compositing nor an animation phase
-/// leaks into a file. On one machine two runs agree to the byte.
-///
-/// Images are still compared as pixels rather than as bytes, because another
-/// machine's GPU or OS may land an antialiased edge one channel step away,
-/// and a gate that cried about a difference nobody can see would be a gate
-/// nobody reads.
-fn scenes_check(only: &[String]) -> Result<()> {
-    let committed = snapshots();
-    let scratch = root().join("target").join("scene-check");
-    if scratch.exists() {
-        fs::remove_dir_all(&scratch).with_context(|| format!("clear {}", scratch.display()))?;
-    }
-    let count = capture_into(&scratch, only)?;
-
-    let mut differing = Vec::new();
-    let mut missing = Vec::new();
-    for entry in fs::read_dir(&scratch)? {
-        let entry = entry?;
-        let name = entry.file_name();
-        let old = committed.join(&name);
-        if !old.exists() {
-            missing.push(name.to_string_lossy().into_owned());
-            continue;
-        }
-        let apart = distance(&old, &entry.path())
-            .with_context(|| format!("compare {}", name.to_string_lossy()))?;
-        if apart > NOISE {
-            differing.push((name.to_string_lossy().into_owned(), apart));
-        }
-    }
-    differing.sort();
-    missing.sort();
-
-    if differing.is_empty() && missing.is_empty() {
-        println!("{count} images match {}", committed.display());
-        return Ok(());
-    }
-    for name in &missing {
-        println!("new     {name}");
-    }
-    for (name, apart) in &differing {
-        println!("changed {name} (by {apart})");
-    }
-    bail!(
-        "{} changed and {} new image(s) under {}; review them, then run \
-         `cargo run -p xtask -- scenes capture` to accept",
-        differing.len(),
-        missing.len(),
-        scratch.display()
-    );
 }
 
 /// Runs the checks a change has to pass.
@@ -987,17 +936,19 @@ fn gate(full: bool) -> Result<()> {
             &["doc", "--no-deps", "--workspace"],
             Some(("RUSTDOCFLAGS", "-D warnings")),
         )?;
-        #[cfg(any(target_os = "linux", target_os = "windows"))]
         headless("check", &[])?;
-        #[cfg(not(any(target_os = "linux", target_os = "windows")))]
-        scenes_check(&[])?;
     }
     println!("gate passed");
     Ok(())
 }
 
-/// Runs the Linux and Windows visual gate, which lives in its own workspace
-/// with renderer-specific dependencies and an independent lockfile.
+/// Runs the visual gate, which lives in its own workspace with
+/// renderer-specific dependencies and an independent lockfile.
+///
+/// It renders offscreen at a size it names, so it is the gate on every
+/// platform. `scenes` still opens a real window, which is how motion and the
+/// text caret get looked at, but a window negotiates its size with the display
+/// it opens on and so cannot hold a baseline another machine can reproduce.
 fn headless(command: &str, only: &[String]) -> Result<()> {
     let manifest = root()
         .join("tools")
@@ -1196,56 +1147,6 @@ fn step(program: &str, args: &[&str], env: Option<(&str, &str)>) -> Result<()> {
     Ok(())
 }
 
-fn snapshots() -> PathBuf {
-    root().join("snapshots").join(platform()).join("scenes")
-}
-
-/// How far one channel may land from the committed image and still count as
-/// the same picture.
-///
-/// One step is the smallest difference the format can hold, and the renderer
-/// does land there occasionally on an antialiased edge. Anything a component
-/// actually changed moves further than this, so the tolerance costs no
-/// coverage while keeping the gate worth reading.
-const NOISE: u8 = 1;
-
-/// The largest per-channel difference between two images.
-///
-/// Images of different sizes are as far apart as it is possible to be, since
-/// there is no pixel to compare a missing pixel against.
-fn distance(left: &Path, right: &Path) -> Result<u8> {
-    let left = decode(left)?;
-    let right = decode(right)?;
-    if left.0 != right.0 {
-        return Ok(u8::MAX);
-    }
-    Ok(left
-        .1
-        .iter()
-        .zip(right.1.iter())
-        .map(|(left, right)| left.abs_diff(*right))
-        .max()
-        .unwrap_or(0))
-}
-
-/// Decodes a PNG into its dimensions and its pixels.
-fn decode(path: &Path) -> Result<((u32, u32), Vec<u8>)> {
-    let file = fs::File::open(path).with_context(|| format!("open {}", path.display()))?;
-    let decoder = png::Decoder::new(std::io::BufReader::new(file));
-    let mut reader = decoder
-        .read_info()
-        .with_context(|| format!("read {}", path.display()))?;
-    let size = reader
-        .output_buffer_size()
-        .with_context(|| format!("{} is larger than this machine can hold", path.display()))?;
-    let mut pixels = vec![0; size];
-    let info = reader
-        .next_frame(&mut pixels)
-        .with_context(|| format!("decode {}", path.display()))?;
-    pixels.truncate(info.buffer_size());
-    Ok(((info.width, info.height), pixels))
-}
-
 /// Drives one gallery process over the whole catalog.
 ///
 /// A GPUI application owns the window system for its lifetime, so the gallery
@@ -1353,16 +1254,6 @@ fn expected_images(only: &[String]) -> Vec<String> {
                 .map(move |theme| format!("{scene}-{theme}.png"))
         })
         .collect()
-}
-
-fn platform() -> &'static str {
-    if cfg!(target_os = "macos") {
-        "macos"
-    } else if cfg!(target_os = "windows") {
-        "windows"
-    } else {
-        "linux"
-    }
 }
 
 fn tokens(check: bool) -> Result<()> {

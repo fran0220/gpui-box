@@ -52,8 +52,8 @@ to the gallery, so a cold build takes tens of seconds and a warm one a few.
 
 It is not a way to build an interface without the repository. The signatures
 it returns are Rust, the scenes it renders are this catalog, and the images it
-produces come from the same renderer `scenes check` uses. It is a faster route
-to the same facts, which is the only kind of tool worth adding.
+produces come from the real-window review renderer. The visual gate renders
+the same catalog offscreen with `headless check`.
 
 Nor does it replace `gate`. The server can tell an agent what a component is
 called and show it what one looks like; only `cargo run -p xtask -- gate` can

@@ -6956,7 +6956,6 @@ dependencies = [
  "anyhow",
  "gpui-kit",
  "gpui-kit-tokens",
- "png 0.18.1",
  "pulldown-cmark",
  "serde_json",
  "toml 0.8.23",
