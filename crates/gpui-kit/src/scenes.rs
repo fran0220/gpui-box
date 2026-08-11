@@ -10,7 +10,7 @@ use gpui::{
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{Radius, Space, Theme};
+use gpui_kit_theme::{Radius, Space, TextTone, Theme, TypeScale};
 
 use crate::controls::combobox::Combobox;
 use crate::controls::input::TextInput;
@@ -579,13 +579,21 @@ fn card(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .child(
                     ListRow::new()
                         .id("scene.card.runtime")
-                        .child(div().flex_1().child("Native runtime"))
+                        .child(div().flex_1().child(crate::foundation::text(
+                            &theme,
+                            TypeScale::Label,
+                            "Native runtime",
+                        )))
                         .child(Badge::new("Ready").success()),
                 )
                 .child(
                     ListRow::new()
                         .id("scene.card.catalog")
-                        .child(div().flex_1().child("Model catalog"))
+                        .child(div().flex_1().child(crate::foundation::text(
+                            &theme,
+                            TypeScale::Label,
+                            "Model catalog",
+                        )))
                         .child(Badge::new("Stale").warning()),
                 ),
         )
@@ -819,13 +827,15 @@ fn browser_panel(_window: &mut Window, cx: &mut App) -> AnyElement {
                                 div()
                                     .size_full()
                                     .p_token(&theme, Space::Md)
-                                    .text_color(theme.colors.text)
-                                    .child("Host-owned page surface")
+                                    .child(crate::foundation::text(
+                                        &theme,
+                                        TypeScale::Subtitle,
+                                        "Host-owned page surface",
+                                    ))
                                     .child(
                                         div()
                                             .mt_token(&theme, Space::Sm)
-                                            .text_color(theme.colors.text_muted)
-                                            .child("Long page content remains clipped by the BrowserPanel viewport even when it cannot wrap naturally."),
+                                            .child(crate::foundation::text(&theme, TypeScale::Body, "Long page content remains clipped by the BrowserPanel viewport even when it cannot wrap naturally.").text_tone(&theme, TextTone::Muted)),
                                     ),
                             )
                             .on_back(|_, _| {})
@@ -866,16 +876,54 @@ fn status(_window: &mut Window, cx: &mut App) -> AnyElement {
 
 fn loading(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
+    let indicator = |title: &'static str, loader: AnyElement| {
+        div()
+            .column()
+            .items_center()
+            .justify_center()
+            .gap_token(&theme, Space::Md)
+            .w(px(220.0))
+            .h(px(112.0))
+            .p_token(&theme, Space::Md)
+            .radius(&theme, Radius::Card)
+            .surface(&theme, gpui_kit_theme::Surface::Panel)
+            .child(crate::foundation::text(&theme, TypeScale::Label, title))
+            .child(loader)
+    };
     stack(&theme)
+        .w_full()
+        .max_w(px(520.0))
         .child(
             row(&theme)
-                .child(PulseLoader::new("scene.loading.pulse").label("Loading providers"))
-                .child(GradientSpinner::new("scene.loading.spinner").label("Contacting host")),
+                .gap_token(&theme, Space::Md)
+                .child(indicator(
+                    "Loading providers",
+                    PulseLoader::new("scene.loading.pulse")
+                        .label("Loading providers")
+                        .into_any_element(),
+                ))
+                .child(indicator(
+                    "Contacting host",
+                    GradientSpinner::new("scene.loading.spinner")
+                        .label("Contacting host")
+                        .into_any_element(),
+                )),
         )
         .child(
-            Skeleton::new("scene.loading.skeleton")
-                .rows(3)
-                .label("Loading list"),
+            div()
+                .column()
+                .gap_token(&theme, Space::Sm)
+                .w_full()
+                .child(crate::foundation::text(
+                    &theme,
+                    TypeScale::Label,
+                    "Loading list",
+                ))
+                .child(
+                    Skeleton::new("scene.loading.skeleton")
+                        .rows(3)
+                        .label("Loading list"),
+                ),
         )
         .into_any_element()
 }
@@ -898,7 +946,11 @@ fn overlay(_window: &mut Window, cx: &mut App) -> AnyElement {
     stack(&theme)
         .w(px(520.0))
         .h(px(320.0))
-        .child(div().child("Content behind the dialog"))
+        .child(crate::foundation::text(
+            &theme,
+            TypeScale::Body,
+            "Content behind the dialog",
+        ))
         .child(
             Overlay::modal("scene.overlay.dialog")
                 .placement(Placement::Center)
@@ -907,7 +959,11 @@ fn overlay(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .w(px(320.0))
                         .p(px(theme.spacing.lg))
                         .gap(px(theme.spacing.sm))
-                        .child(div().child("Delete this workspace?"))
+                        .child(crate::foundation::text(
+                            &theme,
+                            TypeScale::Subtitle,
+                            "Delete this workspace?",
+                        ))
                         .child(
                             div()
                                 .row()
@@ -961,7 +1017,11 @@ fn dialog(window: &mut Window, cx: &mut App) -> AnyElement {
     stack(&theme)
         .w(px(560.0))
         .h(px(360.0))
-        .child(div().child("Content behind the dialog"))
+        .child(crate::foundation::text(
+            &theme,
+            TypeScale::Body,
+            "Content behind the dialog",
+        ))
         .child(replace)
         .into_any_element()
 }
@@ -1066,7 +1126,11 @@ fn ensure_menus(window: &mut Window, cx: &mut App) {
                     .p(px(theme.spacing.md))
                     .hairline(&theme)
                     .radius(&theme, Radius::Card)
-                    .child("Right-click this fixture row")
+                    .child(crate::foundation::text(
+                        &theme,
+                        TypeScale::Body,
+                        "Right-click this fixture row",
+                    ))
                     .into_any_element()
             })
     });
@@ -1088,7 +1152,11 @@ fn ensure_menus(window: &mut Window, cx: &mut App) {
                     .column()
                     .w(px(260.0))
                     .gap(px(theme.spacing.sm))
-                    .child("Anything can live in a popover.")
+                    .child(crate::foundation::text(
+                        &theme,
+                        TypeScale::Body,
+                        "Anything can live in a popover.",
+                    ))
                     .child(
                         Checkbox::new("scene.popover.failing")
                             .label("Failing runs only")
@@ -1116,7 +1184,11 @@ fn popover(window: &mut Window, cx: &mut App) -> AnyElement {
         .h(px(320.0))
         // The trigger keeps its place while the surface is open, because the
         // surface is anchored to it rather than laid out beside it.
-        .child(div().child("The trigger owns whether the surface is open."))
+        .child(crate::foundation::text(
+            &theme,
+            TypeScale::Body,
+            "The trigger owns whether the surface is open.",
+        ))
         .child(popover)
         .into_any_element()
 }
@@ -1141,7 +1213,11 @@ fn context_menu(window: &mut Window, cx: &mut App) -> AnyElement {
         .h(px(400.0))
         // Opening a context menu reports the row that was pointed at; what is
         // selected stays the host's answer.
-        .child(div().child("The right-click reports the row. Nothing is selected by it."))
+        .child(crate::foundation::text(
+            &theme,
+            TypeScale::Body,
+            "The right-click reports the row. Nothing is selected by it.",
+        ))
         .child(context)
         .into_any_element()
 }
@@ -1214,9 +1290,17 @@ fn toast(_window: &mut Window, cx: &mut App) -> AnyElement {
     stack(&theme)
         .w(px(560.0))
         .h(px(360.0))
-        .child(div().child("Content behind the notifications"))
+        .child(crate::foundation::text(
+            &theme,
+            TypeScale::Body,
+            "Content behind the notifications",
+        ))
         // A failure keeps its report on screen; only the success times out.
-        .child(div().child("A danger or warning toast stays until it is dismissed."))
+        .child(crate::foundation::text(
+            &theme,
+            TypeScale::Body,
+            "A danger or warning toast stays until it is dismissed.",
+        ))
         .child(layer)
         .into_any_element()
 }
@@ -1237,7 +1321,11 @@ fn tabs(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .on_select(|_, _, _| {}),
         )
         // The body belongs to the caller: tabs render the strip only.
-        .child(div().child("Runs are rendered by the caller, not by the strip."))
+        .child(crate::foundation::text(
+            &theme,
+            TypeScale::Body,
+            "Runs are rendered by the caller, not by the strip.",
+        ))
         .into_any_element()
 }
 
@@ -1404,7 +1492,11 @@ fn hit_count_sample(theme: &Theme, label: &'static str, count: HitCount) -> gpui
                 .py(px(theme.spacing.xs))
                 .hairline(theme)
                 .radius(theme, Radius::Control)
-                .child(count.name()),
+                .child(crate::foundation::text(
+                    theme,
+                    TypeScale::Label,
+                    count.name(),
+                )),
         )
 }
 
@@ -1850,18 +1942,30 @@ fn accordion(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .section(
                     AccordionSection::new("network", "Network")
                         .description("How this machine reaches a host")
-                        .body(div().child("Requests go out over the system proxy.")),
+                        .body(crate::foundation::text(
+                            &theme,
+                            TypeScale::Body,
+                            "Requests go out over the system proxy.",
+                        )),
                 )
                 .section(
                     AccordionSection::new("storage", "Storage")
                         .description("Where verified results are kept")
-                        .body(div().child("Nothing is written outside the workspace.")),
+                        .body(crate::foundation::text(
+                            &theme,
+                            TypeScale::Body,
+                            "Nothing is written outside the workspace.",
+                        )),
                 )
                 .section(
                     AccordionSection::new("policy", "Managed by policy")
                         .description("This machine cannot change these")
                         .disabled(true)
-                        .body(div().child("Set by the administrator.")),
+                        .body(crate::foundation::text(
+                            &theme,
+                            TypeScale::Body,
+                            "Set by the administrator.",
+                        )),
                 ),
         )
         .into_any_element()
@@ -1916,12 +2020,14 @@ fn list(_window: &mut Window, cx: &mut App) -> AnyElement {
     stack(&theme)
         .w(px(420.0))
         .child(
-            div()
-                .type_scale(&theme, gpui_kit_theme::TypeScale::Caption)
-                .text_color(theme.colors.text_muted)
-                .child(SharedString::from(format!(
+            crate::foundation::text(
+                &theme,
+                TypeScale::Caption,
+                SharedString::from(format!(
                     "{FIXTURE_RECORDS} fixture records; only the rendered ones publish"
-                ))),
+                )),
+            )
+            .text_tone(&theme, TextTone::Muted),
         )
         .child(
             div()
@@ -2066,12 +2172,24 @@ fn grid_detail(theme: &Theme, id: SharedString) -> AnyElement {
     div()
         .column()
         .gap(px(theme.spacing.xs))
-        .type_scale(theme, gpui_kit_theme::TypeScale::Caption)
-        .text_color(theme.colors.text_muted)
-        .child(SharedString::from(format!("Fixture detail for {id}")))
-        .child(SharedString::from(
-            "Only an opened row builds this region; the rest never ask for it.",
-        ))
+        .child(
+            crate::foundation::text(
+                theme,
+                TypeScale::Caption,
+                SharedString::from(format!("Fixture detail for {id}")),
+            )
+            .text_tone(theme, TextTone::Muted),
+        )
+        .child(
+            crate::foundation::text(
+                theme,
+                TypeScale::Body,
+                SharedString::from(
+                    "Only an opened row builds this region; the rest never ask for it.",
+                ),
+            )
+            .text_tone(theme, TextTone::Muted),
+        )
         .into_any_element()
 }
 
@@ -2125,13 +2243,15 @@ fn data_grid(_window: &mut Window, cx: &mut App) -> AnyElement {
             .on_edit(|_, _, _| {}),
         )
         .child(
-            div()
-                .type_scale(&theme, gpui_kit_theme::TypeScale::Caption)
-                .text_color(theme.colors.text_muted)
-                .child(SharedString::from(format!(
+            crate::foundation::text(
+                &theme,
+                TypeScale::Caption,
+                SharedString::from(format!(
                     "{FIXTURE_JOBS_LOADED} rows loaded of {FIXTURE_JOBS_TOTAL}; only the drawn \
                      ones publish"
-                ))),
+                )),
+            )
+            .text_tone(&theme, TextTone::Muted),
         )
         .into_any_element()
 }
@@ -2157,13 +2277,15 @@ fn data_grid_editing(_window: &mut Window, cx: &mut App) -> AnyElement {
             .on_edit(|_, _, _| {}),
         )
         .child(
-            div()
-                .type_scale(&theme, gpui_kit_theme::TypeScale::Caption)
-                .text_color(theme.colors.text_muted)
-                .child(SharedString::from(
+            crate::foundation::text(
+                &theme,
+                TypeScale::Caption,
+                SharedString::from(
                     "Escape reverts, enter commits, tab commits and moves on. The grid never \
                      writes the value.",
-                )),
+                ),
+            )
+            .text_tone(&theme, TextTone::Muted),
         )
         .into_any_element()
 }
@@ -2309,7 +2431,11 @@ fn reading_direction(_window: &mut Window, cx: &mut App) -> AnyElement {
                             .section(
                                 AccordionSection::new("network", "Network")
                                     .description("How this machine reaches a host")
-                                    .body(div().child("Requests go out over the system proxy.")),
+                                    .body(crate::foundation::text(
+                                        &theme,
+                                        TypeScale::Body,
+                                        "Requests go out over the system proxy.",
+                                    )),
                             )
                             .section(
                                 AccordionSection::new("storage", "Storage")
@@ -2569,15 +2695,12 @@ fn auth_sign_in(window: &mut Window, cx: &mut App) -> AnyElement {
     let password = cx.global::<SceneAuthSignIn>().password.clone();
     let theme = cx.theme().clone();
     let card_id = "scene.auth.sign-in.card";
-    let title = div()
-        .type_scale(&theme, gpui_kit_theme::TypeScale::Title)
-        .child("Sign in")
-        .semantic_in(
-            cx,
-            NodeSpec::new("scene.auth.sign-in.title", Role::Text)
-                .parent(card_id)
-                .text("Sign in"),
-        );
+    let title = crate::foundation::text(&theme, TypeScale::Title, "Sign in").semantic_in(
+        cx,
+        NodeSpec::new("scene.auth.sign-in.title", Role::Text)
+            .parent(card_id)
+            .text("Sign in"),
+    );
 
     stack(&theme)
         .w(px(440.0))
@@ -2655,15 +2778,12 @@ fn auth_verification(window: &mut Window, cx: &mut App) -> AnyElement {
     let code = cx.global::<SceneAuthVerification>().code.clone();
     let theme = cx.theme().clone();
     let card_id = "scene.auth.verification.card";
-    let title = div()
-        .type_scale(&theme, gpui_kit_theme::TypeScale::Title)
-        .child("Verify sign-in")
-        .semantic_in(
-            cx,
-            NodeSpec::new("scene.auth.verification.title", Role::Text)
-                .parent(card_id)
-                .text("Verify sign-in"),
-        );
+    let title = crate::foundation::text(&theme, TypeScale::Title, "Verify sign-in").semantic_in(
+        cx,
+        NodeSpec::new("scene.auth.verification.title", Role::Text)
+            .parent(card_id)
+            .text("Verify sign-in"),
+    );
 
     stack(&theme)
         .w(px(440.0))
@@ -2990,17 +3110,19 @@ fn filler(theme: &Theme, title: &'static str, lines: usize) -> gpui::Div {
         .flex_col()
         .gap(px(theme.space(Space::Xs)))
         .p(px(theme.space(Space::Md)))
-        .child(
-            div()
-                .type_scale(theme, gpui_kit_theme::TypeScale::Label)
-                .child(SharedString::from(title)),
-        );
+        .child(crate::foundation::text(
+            theme,
+            TypeScale::Label,
+            SharedString::from(title),
+        ));
     for line in 1..=lines {
         pane = pane.child(
-            div()
-                .type_scale(theme, gpui_kit_theme::TypeScale::Caption)
-                .text_color(theme.colors.text_muted)
-                .child(SharedString::from(format!("Fixture line {line:02}"))),
+            crate::foundation::text(
+                theme,
+                TypeScale::Code,
+                SharedString::from(format!("Fixture line {line:02}")),
+            )
+            .text_tone(theme, TextTone::Muted),
         );
     }
     pane
@@ -3146,11 +3268,11 @@ fn frost(_window: &mut Window, cx: &mut App) -> AnyElement {
             .column()
             .gap(px(theme.space(Space::Xs)))
             .p(px(theme.space(Space::Md)))
-            .child(
-                div()
-                    .type_scale(&theme, gpui_kit_theme::TypeScale::Label)
-                    .child(SharedString::from(title)),
-            )
+            .child(crate::foundation::text(
+                &theme,
+                TypeScale::Label,
+                SharedString::from(title),
+            ))
             .child(caption(&theme, body))
     };
     let stripes = || {
@@ -3335,7 +3457,11 @@ fn toolbar(window: &mut Window, cx: &mut App) -> AnyElement {
                 .overflow_after(4)
                 .overflow_menu(overflow),
         )
-        .child(div().child("The last two actions moved into the overflow menu."))
+        .child(crate::foundation::text(
+            &theme,
+            TypeScale::Body,
+            "The last two actions moved into the overflow menu.",
+        ))
         .into_any_element()
 }
 
@@ -3368,14 +3494,16 @@ fn sidebar(_window: &mut Window, cx: &mut App) -> AnyElement {
             .active("runs.active")
             .collapsed(collapsed)
             .footer(
-                div()
-                    .type_scale(&theme, gpui_kit_theme::TypeScale::Caption)
-                    .text_color(theme.colors.text_faint)
-                    .child(if collapsed {
+                crate::foundation::text(
+                    &theme,
+                    TypeScale::Caption,
+                    if collapsed {
                         SharedString::new_static("v0")
                     } else {
                         SharedString::new_static("Fixture workspace")
-                    }),
+                    },
+                )
+                .text_tone(&theme, TextTone::Faint),
             )
             .on_select(|_, _, _| {})
     };
@@ -3494,7 +3622,11 @@ fn drawer(window: &mut Window, cx: &mut App) -> AnyElement {
     stack(&theme)
         .w(px(620.0))
         .h(px(400.0))
-        .child(div().child("Content behind the drawer"))
+        .child(crate::foundation::text(
+            &theme,
+            TypeScale::Body,
+            "Content behind the drawer",
+        ))
         .child(filters)
         .into_any_element()
 }
@@ -3552,10 +3684,12 @@ fn motion_flip(window: &mut Window, cx: &mut App) -> AnyElement {
         )
         .child(queue)
         .child(
-            div()
-                .text_size(px(theme.typography.caption.size))
-                .text_color(theme.colors.text_muted)
-                .child("Rows land in their new slot at once and slide into it."),
+            crate::foundation::text(
+                &theme,
+                TypeScale::Body,
+                "Rows land in their new slot at once and slide into it.",
+            )
+            .text_tone(&theme, TextTone::Muted),
         )
         .into_any_element()
 }
@@ -3645,15 +3779,10 @@ fn motion_state(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .section(
                     AccordionSection::new("retention", "Retention")
                         .description("How long verified results are kept")
-                        .body(div().child("Results are kept in the workspace for 30 days.")),
+                        .body(crate::foundation::text(&theme, TypeScale::Body, "Results are kept in the workspace for 30 days.")),
                 ),
         )
-        .child(
-            div()
-                .text_size(px(theme.typography.caption.size))
-                .text_color(theme.colors.text_muted)
-                .child("Every state settles within a fifth of a second; the values are published the moment they change."),
-        )
+        .child(crate::foundation::text(&theme, TypeScale::Body, "Every state settles within a fifth of a second; the values are published the moment they change.").text_tone(&theme, TextTone::Muted))
         .into_any_element()
 }
 
@@ -3682,10 +3811,8 @@ fn animated_number(_window: &mut Window, cx: &mut App) -> AnyElement {
             .column()
             .gap(px(theme.spacing.xs))
             .child(
-                div()
-                    .text_size(px(theme.typography.caption.size))
-                    .text_color(theme.colors.text_muted)
-                    .child(label),
+                crate::foundation::text(&theme, TypeScale::Caption, label)
+                    .text_tone(&theme, TextTone::Muted),
             )
             .child(number)
     };
@@ -3720,20 +3847,20 @@ fn animated_number(_window: &mut Window, cx: &mut App) -> AnyElement {
             ),
         )
         .child(
-            div()
-                .text_size(px(theme.typography.caption.size))
-                .text_color(theme.colors.text_muted)
-                .child("The published value is the target, from the frame it changes."),
+            crate::foundation::text(
+                &theme,
+                TypeScale::Body,
+                "The published value is the target, from the frame it changes.",
+            )
+            .text_tone(&theme, TextTone::Muted),
         )
         .into_any_element()
 }
 
 /// A caption naming the state a drag scene was staged in.
 fn caption(theme: &Theme, text: impl Into<SharedString>) -> gpui::Div {
-    div()
-        .type_scale(theme, gpui_kit_theme::TypeScale::Caption)
-        .text_color(theme.colors.text_muted)
-        .child(text.into())
+    crate::foundation::text(theme, TypeScale::Caption, text.into())
+        .text_tone(theme, TextTone::Muted)
 }
 
 fn drag_list(_window: &mut Window, cx: &mut App) -> AnyElement {
@@ -3907,8 +4034,12 @@ fn wizard(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .p(px(theme.spacing.md))
                         .radius(&theme, Radius::Card)
                         .hairline(&theme)
-                        .child(SharedString::new_static(
-                            "The body of the current step belongs to the caller.",
+                        .child(crate::foundation::text(
+                            &theme,
+                            TypeScale::Body,
+                            SharedString::new_static(
+                                "The body of the current step belongs to the caller.",
+                            ),
                         )),
                 )
                 .back_to("build")
@@ -4043,10 +4174,14 @@ fn detail(_window: &mut Window, cx: &mut App) -> AnyElement {
                                 .time("09:41")
                                 .actor("scheduler")
                                 .tone(Tone::Danger)
-                                .detail(div().child(SharedString::new_static(
-                                    "The host refused the request. The refusal is shown as it \
+                                .detail(crate::foundation::text(
+                                    &theme,
+                                    TypeScale::Body,
+                                    SharedString::new_static(
+                                        "The host refused the request. The refusal is shown as it \
                                      arrived.",
-                                ))),
+                                    ),
+                                ).text_tone(&theme, TextTone::Muted)),
                         ),
                 )
                 .group(
@@ -4465,7 +4600,7 @@ mod dates {
     use std::rc::Rc;
 
     use gpui::{AnyElement, App, Entity, Global, IntoElement, Window, div, prelude::*, px};
-    use gpui_kit_theme::Space;
+    use gpui_kit_theme::{Space, TextTone, TypeScale};
 
     use crate::datetime::fixture::FixtureDateAdapter;
     use crate::datetime::{
@@ -4473,7 +4608,7 @@ mod dates {
         TimeOfDay,
     };
     use crate::display::badge::Tone;
-    use crate::foundation::ActiveTheme;
+    use crate::foundation::{ActiveTheme, StyledExt};
 
     use super::{row, stack};
 
@@ -4595,14 +4730,15 @@ mod dates {
                     .child(unknown),
             )
             .child(
-                div()
-                    .max_w(px(560.0))
-                    .text_color(theme.colors.text_muted)
-                    .child(
-                        "Every weekday name, month name, and blocked reason above came from the \
+                crate::foundation::text(
+                    &theme,
+                    TypeScale::Body,
+                    "Every weekday name, month name, and blocked reason above came from the \
                          host. The calendar on the right has no today, so it draws no ring and \
                          guesses no month.",
-                    ),
+                )
+                .max_w(px(560.0))
+                .text_tone(&theme, TextTone::Muted),
             )
             .into_any_element()
     }
@@ -4648,13 +4784,14 @@ mod dates {
                     .child(twelve),
             )
             .child(
-                div()
-                    .max_w(px(560.0))
-                    .text_color(theme.colors.text_muted)
-                    .child(
-                        "What the field could not read is still in it, and the refusal is the \
+                crate::foundation::text(
+                    &theme,
+                    TypeScale::Body,
+                    "What the field could not read is still in it, and the refusal is the \
                          adapter's own sentence.",
-                    ),
+                )
+                .max_w(px(560.0))
+                .text_tone(&theme, TextTone::Muted),
             )
             .into_any_element()
     }
@@ -4793,9 +4930,11 @@ fn scene_picture(label: &'static str, cx: &App) -> AnyElement {
         .bg(theme.colors.accent.opacity(0.35))
         .border(px(theme.borders.thick))
         .border_color(theme.colors.accent)
-        .text_color(theme.colors.text)
-        .text_size(px(theme.typography.label.size))
-        .child(SharedString::new_static(label))
+        .child(crate::foundation::text(
+            &theme,
+            TypeScale::Label,
+            SharedString::new_static(label),
+        ))
         .into_any_element()
 }
 
@@ -5729,9 +5868,8 @@ fn ensure_ordinary(window: &mut Window, cx: &mut App) {
             .name("Run 4821")
             .trigger(|_, cx| {
                 let theme = cx.theme().clone();
-                div()
+                crate::foundation::text(&theme, TypeScale::Caption, "run 4821")
                     .text_color(theme.colors.accent)
-                    .child("run 4821")
                     .into_any_element()
             })
             .content(|_, cx| {
@@ -5743,12 +5881,18 @@ fn ensure_ordinary(window: &mut Window, cx: &mut App) {
                     // reading as a filled bar.
                     .items_start()
                     .gap(px(theme.spacing.xs))
-                    .child("Nightly regression sweep")
+                    .child(crate::foundation::text(
+                        &theme,
+                        TypeScale::Strong,
+                        "Nightly regression sweep",
+                    ))
                     .child(
-                        div()
-                            .text_size(px(theme.typography.caption.size))
-                            .text_color(theme.colors.text_muted)
-                            .child("Finished in 4 minutes, 12 checks, none failed."),
+                        crate::foundation::text(
+                            &theme,
+                            TypeScale::Caption,
+                            "Finished in 4 minutes, 12 checks, none failed.",
+                        )
+                        .text_tone(&theme, TextTone::Muted),
                     )
                     .child(Badge::new("Ready").success())
                     .into_any_element()
@@ -5861,20 +6005,32 @@ fn collapsible(_window: &mut Window, cx: &mut App) -> AnyElement {
             Collapsible::new("scene.collapsible.open", "Advanced")
                 .description("Settings most runs never touch")
                 .open(true)
-                .body(div().child("Requests go out over the system proxy."))
+                .body(crate::foundation::text(
+                    &theme,
+                    TypeScale::Body,
+                    "Requests go out over the system proxy.",
+                ))
                 .on_toggle(|_, _, _| {}),
         )
         .child(
             Collapsible::new("scene.collapsible.shut", "Diagnostics")
                 .description("Nothing is collected until this is opened")
-                .body(div().child("This body is absent from the tree while it is shut."))
+                .body(crate::foundation::text(
+                    &theme,
+                    TypeScale::Body,
+                    "This body is absent from the tree while it is shut.",
+                ))
                 .on_toggle(|_, _, _| {}),
         )
         .child(
             Collapsible::new("scene.collapsible.refused", "Managed by policy")
                 .description("This machine cannot change these")
                 .disabled(true)
-                .body(div().child("Set by the administrator.")),
+                .body(crate::foundation::text(
+                    &theme,
+                    TypeScale::Body,
+                    "Set by the administrator.",
+                )),
         )
         .into_any_element()
 }
@@ -5887,7 +6043,15 @@ fn hover_card(window: &mut Window, cx: &mut App) -> AnyElement {
         .w(px(460.0))
         .h(px(300.0))
         .child(caption(&theme, "A preview the pointer can travel into"))
-        .child(row(&theme).child("Reported by").child(card))
+        .child(
+            row(&theme)
+                .child(crate::foundation::text(
+                    &theme,
+                    TypeScale::Label,
+                    "Reported by",
+                ))
+                .child(card),
+        )
         .into_any_element()
 }
 
@@ -5928,8 +6092,10 @@ fn aspect_ratio(_window: &mut Window, cx: &mut App) -> AnyElement {
             .items_center()
             .justify_center()
             .bg(theme.colors.hover)
-            .text_color(theme.colors.text_muted)
-            .child(label)
+            .child(
+                crate::foundation::text(&theme, TypeScale::Label, label)
+                    .text_tone(&theme, TextTone::Muted),
+            )
     };
     stack(&theme)
         .child(caption(&theme, "Width given, height from the ratio"))

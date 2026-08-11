@@ -52,7 +52,7 @@ impl PulseLoader {
 impl RenderOnce for PulseLoader {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme();
-        let color = theme.colors.text;
+        let color = theme.colors.accent;
         let cell_size = self.cell_size;
         let period = MotionSpec::new(
             theme.motion.pulse_ms,
