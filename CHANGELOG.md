@@ -22,7 +22,9 @@ and restores parent, non-visibility styles, extended style, and window region
 on detach while deliberately leaving the child hidden for its owner to place.
 Linux and Web retain an explicit inert layout-only contract rather than
 pretending a native view was attached. This unblocks WKWebView and WebView2
-consumers.
+consumers. The migration guide also distinguishes GPUI's inherent
+`Window::window_handle()` from `raw_window_handle::HasWindowHandle` and shows
+the fully qualified raw-handle call required by Rust method resolution.
 
 **Reproducible fork overlays.** `scripts/sync-zed` now keeps post-bootstrap fork
 work in an exact-SHA, bootstrap-rooted vendor lane distinct from official Zed

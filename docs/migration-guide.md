@@ -9,6 +9,40 @@ gpui = { package = "gpui-box", version = "0.1" }
 gpui_kit = { package = "gpui-box-kit", version = "0.1" }
 ```
 
+## Native windows and platform views
+
+GPUI has two different window-handle contracts. The inherent
+`gpui::Window::window_handle()` method returns GPUI's `AnyWindowHandle`, which
+updates a window through the application context. The
+`raw_window_handle::HasWindowHandle` implementation returns the operating
+system handle. Rust resolves an inherent method before a trait method, so
+importing `HasWindowHandle` is not enough when obtaining a Win32 or AppKit
+handle. Call the trait explicitly:
+
+```rust
+let raw = raw_window_handle::HasWindowHandle::window_handle(window)?;
+```
+
+For a native child such as WKWebView or WebView2, keep construction, navigation,
+focus, and destruction in the application, convert the native view once, and
+let GPUI own its placement:
+
+```rust
+// macOS, after constructing a retained NSView/WKWebView:
+let handle = unsafe { gpui::PlatformViewHandle::from_ns_view(native_view) };
+
+// Windows, after constructing a child HWND:
+let handle = gpui::PlatformViewHandle::from_hwnd(child_hwnd);
+
+// Both platforms:
+gpui::platform_view(handle).size_full()
+```
+
+Remove direct `addSubview`/`SetParent` placement code and per-frame native
+geometry synchronization. The application remains the native view's owner;
+GPUI owns layout, clipping, stacking, visibility, and detach timing. See the
+complete macOS example in `crates/gpui/examples/native_webview.rs`.
+
 ## 1. Inventory
 
 Classify current code:

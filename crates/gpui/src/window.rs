@@ -2090,7 +2090,14 @@ impl Window {
             .map(|view| view.clone().downcast::<E>().ok())
     }
 
-    /// Obtain a handle to the window that belongs to this context.
+    /// Obtain GPUI's [`AnyWindowHandle`] for the window that belongs to this
+    /// context.
+    ///
+    /// This is not the operating system window handle. [`Window`] also
+    /// implements [`raw_window_handle::HasWindowHandle`]; because this inherent
+    /// method has the same name as that trait method, callers that need a raw
+    /// handle must use its fully qualified form:
+    /// `raw_window_handle::HasWindowHandle::window_handle(window)`.
     pub fn window_handle(&self) -> AnyWindowHandle {
         self.handle
     }
