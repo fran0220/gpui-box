@@ -11,8 +11,8 @@ The machine-readable release record is `provenance.toml`.
 - Bootstrap revision: `0b9c8dc932b65cba2dc87464148984e93f60ae18`
 - Official baseline: `a6a23c7b80a5cefa0487b7856335be89ace7e483`
 - Filter definition: `scripts/sync-zed/config.json`
-- Sync receipt: `scripts/sync-zed/state.json`
-- History algorithm: `first-parent-v1`, deterministically replayed at release
+- Frozen import receipt: `scripts/sync-zed/state.json`
+- Historical import algorithm: `first-parent-v1`
 - License: Apache-2.0
 - Copyright: Copyright 2022–2024 Zed Industries, Inc.
 
@@ -29,10 +29,10 @@ the compatible 1.4.4 API instead of restoring Zed's Cargo Git patch.
 The committed receipt records bootstrap/vendor tip
 `c036e5bcb472b7c557c231a66d69e646285d1942`, official cursor
 `a6a23c7b80a5cefa0487b7856335be89ace7e483`, and integration merge
-`82fdda6a265e556afc65b9ff1eb200f7bda8d3fc`. Release verification reconstructs
-the filtered commits from remote source objects and proves that merge on the
-current first-parent history. Future source movement follows
-`scripts/sync-zed/README.md`. License text: `licenses/ZED-APACHE-2.0.txt`.
+`82fdda6a265e556afc65b9ff1eb200f7bda8d3fc`. The offline verifier checks the
+frozen vendor ref, commit source trailer, filtered destinations, exact merge,
+and its ancestry through the current first-parent history. The receipt is not a
+future source movement mechanism. License text: `licenses/ZED-APACHE-2.0.txt`.
 
 Post-bootstrap native PlatformView support is tracked as an independent fork
 overlay, not as official-Zed replay. Its exact linear source chain is
@@ -43,12 +43,17 @@ overlay, not as official-Zed replay. Its exact linear source chain is
 and rooted directly at the bootstrap revision. The last commit supplies the
 complete Windows redirection-backed popup-host implementation; the fork's later
 main merge and its sibling layered-child implementation are deliberately not
-part of this source lane. `provenance.toml [sync_overlay]` records the shared
-filter digest, deterministic overlay tip, and exact integration merge.
-Release verification reconstructs both lanes independently and proves their
-only vendor merge base is the filtered bootstrap. Future official sync remains
-authoritative and the overlay receipt remains as historical provenance after
-upstream convergence.
+part of this source lane. `provenance.toml [historical_overlay]` records the
+shared filter digest, deterministic overlay tip, and exact integration merge.
+Offline release verification checks every retained overlay commit, source
+trailer, parent, vendor ref, and integration marker and proves that both lanes
+meet only at the filtered bootstrap.
+
+The two-repository development model ended after this import. GPUI Box is now
+the sole development authority for GPUI, its platform implementations, media,
+and Kit. The Zed repositories and recorded SHAs remain source attribution and
+license evidence only; they are not synchronization remotes or compatibility
+targets for future framework work.
 
 The `PlatformViewHandle::keep_alive` lifetime attachment is subsequent GPUI
 Box work, not part of either imported lane. It changes no native hosting or

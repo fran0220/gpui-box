@@ -5,28 +5,28 @@ release_status = "released"
 release_version = "0.1.1"
 release_date = "2026-08-12"
 
-[upstream]
+[historical_source]
 name = "GPUI / Zed"
+mode = "frozen-historical-import"
 official_url = "https://github.com/zed-industries/zed.git"
 official_baseline = "a6a23c7b80a5cefa0487b7856335be89ace7e483"
 bootstrap_url = "https://github.com/fran0220/zed.git"
 bootstrap_revision = "0b9c8dc932b65cba2dc87464148984e93f60ae18"
-relationship = "filtered-imported-source"
+relationship = "frozen-filtered-import"
 cargo_git_dependency = false
 official_project = false
 
-[sync]
+[historical_import]
 config = "scripts/sync-zed/config.json"
 state = "scripts/sync-zed/state.json"
 filter_schema_version = 1
 history_algorithm = "first-parent-v1"
-history_bootstrapped = true
 bootstrap_vendor_tip = "c036e5bcb472b7c557c231a66d69e646285d1942"
 vendor_tip = "c036e5bcb472b7c557c231a66d69e646285d1942"
 last_synced_sha = "a6a23c7b80a5cefa0487b7856335be89ace7e483"
 integration_commit = "82fdda6a265e556afc65b9ff1eb200f7bda8d3fc"
 
-[sync_overlay]
+[historical_overlay]
 algorithm = "exact-linear-overlay-v1"
 source_url = "https://github.com/fran0220/zed.git"
 base_revision = "0b9c8dc932b65cba2dc87464148984e93f60ae18"

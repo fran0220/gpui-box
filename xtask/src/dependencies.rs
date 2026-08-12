@@ -273,20 +273,25 @@ fn check_sync(root: &Path, a: &Authority) -> Result<()> {
     let c: Json = serde_json::from_str(&fs::read_to_string(
         root.join("scripts/sync-zed/config.json"),
     )?)?;
+    ensure!(
+        c["schema_version"] == 3 && c["mode"] == "frozen-historical-import",
+        "Zed provenance config must be a frozen historical import"
+    );
     let packages = c["packages"]
         .as_object()
-        .context("sync-zed config has no packages object")?;
+        .context("historical Zed import config has no packages object")?;
     for (m, n) in packages {
         let p = a
             .package
             .iter()
             .find(|p| &p.manifest == m)
-            .with_context(|| format!("sync package {m} absent from authority"))?;
+            .with_context(|| format!("historical import package {m} absent from authority"))?;
         ensure!(
             p.name
-                == n.as_str()
-                    .with_context(|| format!("sync package identity for {m} is not a string"))?,
-            "sync identity differs for {m}"
+                == n.as_str().with_context(|| format!(
+                    "historical package identity for {m} is not a string"
+                ))?,
+            "historical import identity differs for {m}"
         );
     }
     Ok(())
@@ -404,8 +409,8 @@ fn check_release_records(root: &Path, a: &Authority) -> Result<()> {
         root.join("scripts/sync-zed/state.json"),
     )?)?;
     let upstream = provenance
-        .get("upstream")
-        .context("provenance.toml needs [upstream]")?;
+        .get("historical_source")
+        .context("provenance.toml needs [historical_source]")?;
     for (record, source) in [
         ("official_url", "official_url"),
         ("official_baseline", "official_baseline"),
@@ -414,34 +419,34 @@ fn check_release_records(root: &Path, a: &Authority) -> Result<()> {
     ] {
         ensure!(
             upstream.get(record).and_then(Value::as_str) == config[source].as_str(),
-            "provenance.toml upstream {record} differs from sync config"
+            "provenance.toml historical source {record} differs from import config"
         );
     }
     ensure!(
-        upstream
-            .get("cargo_git_dependency")
-            .and_then(Value::as_bool)
-            == Some(false)
+        upstream.get("mode").and_then(Value::as_str) == Some("frozen-historical-import")
+            && upstream
+                .get("cargo_git_dependency")
+                .and_then(Value::as_bool)
+                == Some(false)
             && upstream.get("official_project").and_then(Value::as_bool) == Some(false)
             && upstream.get("relationship").and_then(Value::as_str)
-                == Some("filtered-imported-source"),
-        "provenance.toml must describe an independent filtered source import"
+                == Some("frozen-filtered-import"),
+        "provenance.toml must describe an independent frozen source import"
     );
     let sync = provenance
-        .get("sync")
-        .context("provenance.toml needs [sync]")?;
+        .get("historical_import")
+        .context("provenance.toml needs [historical_import]")?;
     ensure!(
-        sync.get("filter_schema_version")
-            .and_then(Value::as_integer)
-            == config["filter_schema_version"].as_i64()
+        state.get("schema_version").and_then(Json::as_i64) == Some(3)
+            && state.get("mode").and_then(Json::as_str) == Some("frozen-historical-import")
+            && state.get("tool_version").and_then(Json::as_str) == Some("3.0.0")
+            && sync
+                .get("filter_schema_version")
+                .and_then(Value::as_integer)
+                == config["filter_schema_version"].as_i64()
             && sync.get("history_algorithm").and_then(Value::as_str)
                 == config["history_algorithm"].as_str(),
-        "provenance.toml sync algorithm differs from sync config"
-    );
-    let history_bootstrapped = state["vendor_tip"].as_str().is_some();
-    ensure!(
-        sync.get("history_bootstrapped").and_then(Value::as_bool) == Some(history_bootstrapped),
-        "provenance.toml sync bootstrap state differs from sync receipt"
+        "historical Zed import mode or algorithm differs across records"
     );
     for key in [
         "bootstrap_vendor_tip",
@@ -452,7 +457,29 @@ fn check_release_records(root: &Path, a: &Authority) -> Result<()> {
         let receipt = state[key].as_str().unwrap_or_default();
         ensure!(
             sync.get(key).and_then(Value::as_str) == Some(receipt),
-            "provenance.toml {key} differs from sync receipt"
+            "provenance.toml {key} differs from historical import receipt"
+        );
+    }
+    let overlay = provenance
+        .get("historical_overlay")
+        .context("provenance.toml needs [historical_overlay]")?;
+    let state_overlay = state["fork_overlay"]
+        .as_object()
+        .context("historical import state needs fork_overlay")?;
+    for key in [
+        "algorithm",
+        "source_url",
+        "base_revision",
+        "source_tip",
+        "filter_digest_sha256",
+        "base_vendor_tip",
+        "vendor_ref",
+        "vendor_tip",
+        "integration_commit",
+    ] {
+        ensure!(
+            overlay.get(key).and_then(Value::as_str) == state_overlay[key].as_str(),
+            "provenance.toml historical overlay {key} differs from receipt"
         );
     }
     let licenses = provenance

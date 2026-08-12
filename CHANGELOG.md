@@ -20,6 +20,15 @@ and Web keep an explicit no-backend state; playlists, DRM, media-track policy,
 output-device routing, custom network policy and capture remain outside the
 service.
 
+### Changed
+
+**Single-repository framework authority.** GPUI Box now develops GPUI, native
+platforms, media, and Kit directly in this repository. The former Zed sync and
+fork-overlay mutation commands have been removed. `scripts/sync-zed` retains a
+read-only, offline verifier for the exact historical mappings, vendor refs,
+source trailers, integration merges, package identities, and licenses; releases
+no longer contact either historical source repository.
+
 ## [0.1.1] - 2026-08-12
 
 ### Added

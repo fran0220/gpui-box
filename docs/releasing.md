@@ -28,10 +28,10 @@ list, is authoritative.
    the intended cohort, changelog has the release date, machine-readable
    records are current, and the worktree is clean. For an initial release,
    confirm every package name is available; for later releases, confirm the
-   expected crates.io owner set. `scripts/sync-zed/sync-zed verify --release`
-   must prove the complete official and fork-overlay filtered-history receipts,
-   both canonical vendor refs, and their ancestry through this commit; an
-   incomplete receipt cannot be released.
+   expected crates.io owner set. `scripts/sync-zed/sync-zed verify` must prove
+   the complete frozen official and fork-overlay history receipts, both
+   canonical vendor refs, and their ancestry through this commit entirely
+   offline; an incomplete receipt cannot be released.
 2. Run the platform validation required by `compatibility.toml`. Record actual
    CI job URLs/results; do not infer a platform result from another platform.
 3. Run the complete local package gate:

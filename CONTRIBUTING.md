@@ -20,8 +20,9 @@ Use public package names in commands (`gpui-box-gallery`, `gpui-box-mcp`,
 `gpui-box-kit`). Internal Cargo aliases and physical directories that still say
 `gpui-kit` are implementation details and need not be renamed.
 
-Framework source updates use the filtered workflow in
-`scripts/sync-zed/README.md`; never restore Zed as a Cargo Git dependency. New
-derived source/assets require exact URL, revision, license, and scope in
+Framework and platform work is developed directly in this repository. The
+receipt in `scripts/sync-zed/` is read-only historical provenance, not an update
+workflow; never restore Zed as a Cargo Git dependency or synchronization source.
+New derived source/assets require exact URL, revision, license, and scope in
 `PROVENANCE.md` and `THIRD_PARTY_NOTICES`. GPUI Box is independent and must not
 be presented as an official Zed project.

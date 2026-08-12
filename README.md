@@ -109,9 +109,11 @@ not claim screen-reader announcements. Exact support and limitations are in
 
 Framework source was filtered into this repository from
 `fran0220/zed@0b9c8dc932b65cba2dc87464148984e93f60ae18`, against official Zed
-baseline `a6a23c7b80a5cefa0487b7856335be89ace7e483`. Future updates use
-`scripts/sync-zed`; Zed is upstream input and a compatibility target, not a
-linked package. See [`PROVENANCE.md`](PROVENANCE.md).
+baseline `a6a23c7b80a5cefa0487b7856335be89ace7e483`. That import is frozen:
+GPUI Box now develops its framework, platforms, media, and Kit directly in this
+repository. `scripts/sync-zed` only verifies the offline historical receipt;
+Zed is neither a linked package nor an ongoing development source. See
+[`PROVENANCE.md`](PROVENANCE.md).
 
 ## License
 

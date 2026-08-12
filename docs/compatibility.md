@@ -14,10 +14,10 @@ The SHAs identify imported source provenance, not Cargo Git dependencies.
 `scripts/sync-zed/state.json` records the deterministic filtered bootstrap tip,
 the official baseline cursor, and its exact integration merge. It separately
 records the exact bootstrap-rooted fork overlay that supplies native
-PlatformView hosting. Release verification reconstructs both vendor lanes from
-remote source objects, requires their canonical refs to meet only at the
-filtered bootstrap, and proves both integration merges against the release
-commit's first-parent history.
+PlatformView hosting. Offline release verification checks both retained vendor
+refs, every recorded source trailer and parent, their unique bootstrap merge
+base, and both integration merges against the release commit's first-parent
+history. It does not contact either historical source repository.
 
 ## Platform evidence and limits
 
@@ -56,17 +56,12 @@ and automatic fallback in the pinned Playwright smoke. Its AccessKit adapter
 mirrors roles, focus, actions, values, and canvas-scaled bounds into semantic
 DOM, but the JSON semantic snapshot is only a testing/debug surface.
 
-## Upstream update contract
+## Framework development contract
 
-Zed is upstream input and a compatibility-validation object, not a dependency.
-To update it: verify `scripts/sync-zed/config.json`; sync an official full SHA;
-resolve conflicts manually; update the receipt and provenance; run
-`dependencies check`, package check, all claimed platform gates, and inspect
-changed images. Generally useful changes may still be proposed to Zed
-independently. GPUI Box remains an independent derivative and is not endorsed
-by Zed Industries.
-
-The fixed PlatformView overlay does not advance the official cursor. Future
-official sync continues from the official vendor tip; equivalent or conflicting
-upstream implementations converge only in the mainline integration. The
-overlay's source list, filtered ref, and historical receipt are never rewritten.
+GPUI Box is the sole framework and platform development authority. Changes are
+implemented, tested, documented, and released directly from this repository;
+Zed is neither a dependency, synchronization source, nor future compatibility
+target. `scripts/sync-zed` is an offline verifier for immutable historical
+attribution only. Its source list, filtered refs, and receipts are never
+advanced or rewritten. A deliberate future source port must receive a new,
+independent provenance record rather than reopening the retired import lane.

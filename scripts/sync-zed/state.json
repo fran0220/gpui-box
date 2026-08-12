@@ -1,6 +1,7 @@
 {
-  "schema_version": 2,
-  "tool_version": "2.0.0",
+  "schema_version": 3,
+  "tool_version": "3.0.0",
+  "mode": "frozen-historical-import",
   "filter_schema_version": 1,
   "history_algorithm": "first-parent-v1",
   "official_url": "https://github.com/zed-industries/zed.git",

@@ -1,5 +1,6 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
+  "mode": "frozen-historical-import",
   "filter_schema_version": 1,
   "filter_digest_sha256": "3e0af84683c4bae5f8be805ca0581f8ae297998fc0d40f967eaca9772562efdc",
   "history_algorithm": "first-parent-v1",
