@@ -331,6 +331,14 @@ pub fn check(root: &Path) -> Result<()> {
         &cargo_home,
         &packages["gpui-box-mcp"].version,
     )?;
+    // Consumers, the local registry, and its Cargo home are disposable proof
+    // inputs. Retaining them adds several gigabytes to CI cache traversal and
+    // can race rust-cache against transient crate test directories. Keep the
+    // authoritative archives on success; an early error still preserves the
+    // complete package-check tree for diagnosis.
+    for temporary in ["cargo-home", "consumers", "package", "registry"] {
+        fs::remove_dir_all(out.join(temporary))?;
+    }
     Ok(())
 }
 

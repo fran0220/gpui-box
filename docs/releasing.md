@@ -48,11 +48,13 @@ list, is authoritative.
    replacement and without GPUI Box path patches. The workspace's sole Cargo
    patch is the separately receipted `block` 0.1.6 compatibility fork; the gate
    packages that source into the temporary registry explicitly, so its result
-   does not depend on an existing developer Cargo cache. It also runs a packaged
-   `gpui::property_test`, installs the MCP binary and checks its help/version,
-   rejects retained internal dev-dependencies that would deadlock a first
-   publication, and requires exactly one `lib gpui` owned by `gpui-box`. This
-   proves registry-only resolution; it does not publish.
+   does not depend on an existing developer Cargo cache. A successful run keeps
+   only the authoritative archives under `target/package-check`; failed runs
+   retain the complete temporary registry and consumers for diagnosis. It also
+   runs a packaged `gpui::property_test`, installs the MCP binary and checks its
+   help/version, rejects retained internal dev-dependencies that would deadlock
+   a first publication, and requires exactly one `lib gpui` owned by
+   `gpui-box`. This proves registry-only resolution; it does not publish.
 4. Create and push the annotated immutable `v<version>` tag on that exact
    verified commit. The workflow and publisher both refuse an untagged commit;
    do not move the tag after this point.
