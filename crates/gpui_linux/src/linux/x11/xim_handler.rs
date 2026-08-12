@@ -4,9 +4,9 @@ use x11rb::protocol::{Event, xproto};
 use xim::{AHashMap, AttributeName, Client, ClientError, ClientHandler, InputStyle};
 
 pub enum XimCallbackEvent {
-    XimXEvent(x11rb::protocol::Event),
-    XimPreeditEvent(xproto::Window, String),
-    XimCommitEvent(xproto::Window, String),
+    XEvent(x11rb::protocol::Event),
+    Preedit(xproto::Window, String),
+    Commit(xproto::Window, String),
 }
 
 pub struct XimHandler {
@@ -73,10 +73,7 @@ impl<C: Client<XEvent = xproto::KeyPressEvent>> ClientHandler<C> for XimHandler 
         _input_context_id: u16,
         text: &str,
     ) -> Result<(), ClientError> {
-        self.last_callback_event = Some(XimCallbackEvent::XimCommitEvent(
-            self.window,
-            String::from(text),
-        ));
+        self.last_callback_event = Some(XimCallbackEvent::Commit(self.window, String::from(text)));
         Ok(())
     }
 
@@ -90,11 +87,10 @@ impl<C: Client<XEvent = xproto::KeyPressEvent>> ClientHandler<C> for XimHandler 
     ) -> Result<(), ClientError> {
         match xev.response_type {
             x11rb::protocol::xproto::KEY_PRESS_EVENT => {
-                self.last_callback_event = Some(XimCallbackEvent::XimXEvent(Event::KeyPress(xev)));
+                self.last_callback_event = Some(XimCallbackEvent::XEvent(Event::KeyPress(xev)));
             }
             x11rb::protocol::xproto::KEY_RELEASE_EVENT => {
-                self.last_callback_event =
-                    Some(XimCallbackEvent::XimXEvent(Event::KeyRelease(xev)));
+                self.last_callback_event = Some(XimCallbackEvent::XEvent(Event::KeyRelease(xev)));
             }
             _ => {}
         }
@@ -124,7 +120,7 @@ impl<C: Client<XEvent = xproto::KeyPressEvent>> ClientHandler<C> for XimHandler 
         // XIMPrimary, XIMHighlight, XIMSecondary, XIMTertiary are not specified,
         // but interchangeable as above
         // Currently there's no way to support these.
-        self.last_callback_event = Some(XimCallbackEvent::XimPreeditEvent(
+        self.last_callback_event = Some(XimCallbackEvent::Preedit(
             self.window,
             String::from(preedit_string),
         ));

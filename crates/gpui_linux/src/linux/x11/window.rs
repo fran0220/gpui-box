@@ -240,13 +240,30 @@ struct RawWindow {
 unsafe impl Send for RawWindow {}
 unsafe impl Sync for RawWindow {}
 
+type ResizeCallback = Box<dyn FnMut(Size<Pixels>, f32)>;
+
+pub(crate) struct X11WindowContext<'a> {
+    pub(crate) client: X11ClientStatePtr,
+    pub(crate) executor: ForegroundExecutor,
+    pub(crate) gpu_context: gpui_wgpu::GpuContext,
+    pub(crate) compositor_gpu: Option<CompositorGpuHint>,
+    pub(crate) xcb: &'a Rc<XCBConnection>,
+    pub(crate) client_side_decorations_supported: bool,
+    pub(crate) main_screen_index: usize,
+    pub(crate) atoms: &'a XcbAtoms,
+    pub(crate) scale_factor: f32,
+    pub(crate) appearance: WindowAppearance,
+    pub(crate) supports_xinput_gestures: bool,
+    pub(crate) is_bgr: bool,
+}
+
 #[derive(Default)]
 pub struct Callbacks {
     request_frame: Option<Box<dyn FnMut(RequestFrameOptions)>>,
     input: Option<Box<dyn FnMut(PlatformInput) -> gpui::DispatchEventResult>>,
     active_status_change: Option<Box<dyn FnMut(bool)>>,
     hovered_status_change: Option<Box<dyn FnMut(bool)>>,
-    resize: Option<Box<dyn FnMut(Size<Pixels>, f32)>>,
+    resize: Option<ResizeCallback>,
     moved: Option<Box<dyn FnMut()>>,
     should_close: Option<Box<dyn FnMut() -> bool>>,
     close: Option<Box<dyn FnOnce()>>,
@@ -412,22 +429,25 @@ pub(crate) fn handle_connection_error(err: ConnectionError) -> anyhow::Error {
 impl X11WindowState {
     pub fn new(
         handle: AnyWindowHandle,
-        client: X11ClientStatePtr,
-        executor: ForegroundExecutor,
-        gpu_context: gpui_wgpu::GpuContext,
-        compositor_gpu: Option<CompositorGpuHint>,
+        context: X11WindowContext<'_>,
         params: WindowParams,
-        xcb: &Rc<XCBConnection>,
-        client_side_decorations_supported: bool,
-        x_main_screen_index: usize,
         x_window: xproto::Window,
-        atoms: &XcbAtoms,
-        scale_factor: f32,
-        appearance: WindowAppearance,
         parent_window: Option<X11WindowStatePtr>,
-        supports_xinput_gestures: bool,
-        is_bgr: bool,
     ) -> anyhow::Result<Self> {
+        let X11WindowContext {
+            client,
+            executor,
+            gpu_context,
+            compositor_gpu,
+            xcb,
+            client_side_decorations_supported,
+            main_screen_index,
+            atoms,
+            scale_factor,
+            appearance,
+            supports_xinput_gestures,
+            is_bgr,
+        } = context;
         // Native popups are not implemented on X11 yet. Rejecting lets callers fall back to
         // gpui's in-window popovers.
         if let WindowKind::AnchoredPopup(_) = params.kind {
@@ -436,7 +456,7 @@ impl X11WindowState {
 
         let x_screen_index = params
             .display_id
-            .map_or(x_main_screen_index, |did| u64::from(did) as usize);
+            .map_or(main_screen_index, |did| u64::from(did) as usize);
 
         let visual_set = find_visuals(xcb, x_screen_index);
 
@@ -580,23 +600,23 @@ impl X11WindowState {
                 )?;
             }
 
-            if params.kind == WindowKind::Floating || params.kind == WindowKind::Dialog {
-                if let Some(parent_window) = parent_window.as_ref().map(|w| w.x_window) {
-                    // WM_TRANSIENT_FOR hint indicating the main application window. For floating windows, we set
-                    // a parent window (WM_TRANSIENT_FOR) such that the window manager knows where to
-                    // place the floating window in relation to the main window.
-                    // https://specifications.freedesktop.org/wm-spec/1.4/ar01s05.html
-                    check_reply(
-                        || "X11 ChangeProperty32 setting WM_TRANSIENT_FOR for floating window failed.",
-                        xcb.change_property32(
-                            xproto::PropMode::REPLACE,
-                            x_window,
-                            atoms.WM_TRANSIENT_FOR,
-                            xproto::AtomEnum::WINDOW,
-                            &[parent_window],
-                        ),
-                    )?;
-                }
+            if (params.kind == WindowKind::Floating || params.kind == WindowKind::Dialog)
+                && let Some(parent_window) = parent_window.as_ref().map(|w| w.x_window)
+            {
+                // WM_TRANSIENT_FOR hint indicating the main application window. For floating windows, we set
+                // a parent window (WM_TRANSIENT_FOR) such that the window manager knows where to
+                // place the floating window in relation to the main window.
+                // https://specifications.freedesktop.org/wm-spec/1.4/ar01s05.html
+                check_reply(
+                    || "X11 ChangeProperty32 setting WM_TRANSIENT_FOR for floating window failed.",
+                    xcb.change_property32(
+                        xproto::PropMode::REPLACE,
+                        x_window,
+                        atoms.WM_TRANSIENT_FOR,
+                        xproto::AtomEnum::WINDOW,
+                        &[parent_window],
+                    ),
+                )?;
             }
 
             let parent = if params.kind == WindowKind::Dialog
@@ -880,43 +900,22 @@ enum WmHintPropertyState {
 impl X11Window {
     pub fn new(
         handle: AnyWindowHandle,
-        client: X11ClientStatePtr,
-        executor: ForegroundExecutor,
-        gpu_context: gpui_wgpu::GpuContext,
-        compositor_gpu: Option<CompositorGpuHint>,
+        context: X11WindowContext<'_>,
         params: WindowParams,
-        xcb: &Rc<XCBConnection>,
-        client_side_decorations_supported: bool,
-        x_main_screen_index: usize,
         x_window: xproto::Window,
-        atoms: &XcbAtoms,
-        scale_factor: f32,
-        appearance: WindowAppearance,
         parent_window: Option<X11WindowStatePtr>,
-        supports_xinput_gestures: bool,
-        is_bgr: bool,
     ) -> anyhow::Result<Self> {
+        let xcb = Rc::clone(context.xcb);
         let ptr = X11WindowStatePtr {
             state: Rc::new(RefCell::new(X11WindowState::new(
                 handle,
-                client,
-                executor,
-                gpu_context,
-                compositor_gpu,
+                context,
                 params,
-                xcb,
-                client_side_decorations_supported,
-                x_main_screen_index,
                 x_window,
-                atoms,
-                scale_factor,
-                appearance,
                 parent_window,
-                supports_xinput_gestures,
-                is_bgr,
             )?)),
             callbacks: Rc::new(RefCell::new(Callbacks::default())),
-            xcb: xcb.clone(),
+            xcb,
             x_window,
         };
 

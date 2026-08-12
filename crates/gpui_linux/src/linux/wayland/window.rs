@@ -43,13 +43,23 @@ use gpui::{
 };
 use gpui_wgpu::{CompositorGpuHint, WgpuRenderer, WgpuSurfaceConfig, wgpu};
 
+type ResizeCallback = Box<dyn FnMut(Size<Pixels>, f32)>;
+
+pub(crate) struct WaylandWindowContext {
+    pub(crate) globals: Globals,
+    pub(crate) gpu_context: gpui_wgpu::GpuContext,
+    pub(crate) compositor_gpu: Option<CompositorGpuHint>,
+    pub(crate) client: WaylandClientStatePtr,
+    pub(crate) appearance: WindowAppearance,
+}
+
 #[derive(Default)]
 pub(crate) struct Callbacks {
     request_frame: Option<Box<dyn FnMut(RequestFrameOptions)>>,
     input: Option<Box<dyn FnMut(gpui::PlatformInput) -> gpui::DispatchEventResult>>,
     active_status_change: Option<Box<dyn FnMut(bool)>>,
     hover_status_change: Option<Box<dyn FnMut(bool)>>,
-    resize: Option<Box<dyn FnMut(Size<Pixels>, f32)>>,
+    resize: Option<ResizeCallback>,
     moved: Option<Box<dyn FnMut()>>,
     should_close: Option<Box<dyn FnMut() -> bool>>,
     close: Option<Box<dyn FnOnce()>>,
@@ -154,7 +164,7 @@ impl WaylandSurfaceState {
             };
 
             let layer_surface = layer_shell.get_layer_surface(
-                &surface,
+                surface,
                 target_output.as_ref(),
                 super::layer_shell::wayland_layer(options.layer),
                 options.namespace.clone(),
@@ -208,7 +218,7 @@ impl WaylandSurfaceState {
 
             let xdg_surface = globals
                 .wm_base
-                .get_xdg_surface(&surface, &globals.qh, surface.id());
+                .get_xdg_surface(surface, &globals.qh, surface.id());
 
             // A layer-shell parent takes a null xdg parent and is attached via the layer
             // surface. Every other surface kind has an xdg_surface to parent to directly.
@@ -245,7 +255,7 @@ impl WaylandSurfaceState {
         // All other WindowKinds result in a regular xdg surface
         let xdg_surface = globals
             .wm_base
-            .get_xdg_surface(&surface, &globals.qh, surface.id());
+            .get_xdg_surface(surface, &globals.qh, surface.id());
 
         let toplevel = xdg_surface.get_toplevel(&globals.qh, surface.id());
         let xdg_parent = parent.as_ref().and_then(|w| w.toplevel());
@@ -543,15 +553,18 @@ impl WaylandWindowState {
         handle: AnyWindowHandle,
         surface: wl_surface::WlSurface,
         surface_state: WaylandSurfaceState,
-        appearance: WindowAppearance,
         viewport: Option<wp_viewport::WpViewport>,
-        client: WaylandClientStatePtr,
-        globals: Globals,
-        gpu_context: gpui_wgpu::GpuContext,
-        compositor_gpu: Option<CompositorGpuHint>,
+        context: WaylandWindowContext,
         options: WindowParams,
         parent: Option<WaylandWindowStatePtr>,
     ) -> anyhow::Result<Self> {
+        let WaylandWindowContext {
+            globals,
+            gpu_context,
+            compositor_gpu,
+            client,
+            appearance,
+        } = context;
         let renderer = {
             let raw_window = RawWindow {
                 window: surface.id().as_ptr().cast::<c_void>(),
@@ -671,10 +684,10 @@ impl WaylandWindowState {
 
 pub(crate) struct WaylandWindow(pub WaylandWindowStatePtr);
 pub enum ImeInput {
-    InsertText(String),
-    SetMarkedText(String),
-    UnmarkText,
-    DeleteText,
+    Insert(String),
+    SetMarked(String),
+    Unmark,
+    DeleteBackward,
 }
 
 impl Drop for WaylandWindow {
@@ -737,46 +750,46 @@ impl WaylandWindow {
 
     pub fn new(
         handle: AnyWindowHandle,
-        globals: Globals,
-        gpu_context: gpui_wgpu::GpuContext,
-        compositor_gpu: Option<CompositorGpuHint>,
-        client: WaylandClientStatePtr,
+        context: WaylandWindowContext,
         params: WindowParams,
-        appearance: WindowAppearance,
         parent: Option<WaylandWindowStatePtr>,
         popup_grab: Option<(u32, wl_seat::WlSeat)>,
         target_output: Option<wl_output::WlOutput>,
     ) -> anyhow::Result<(Self, ObjectId)> {
-        let surface = globals.compositor.create_surface(&globals.qh, ());
+        let surface = context
+            .globals
+            .compositor
+            .create_surface(&context.globals.qh, ());
         let surface_state = WaylandSurfaceState::new(
             &surface,
-            &globals,
+            &context.globals,
             &params,
             parent.clone(),
             popup_grab,
             target_output,
         )?;
 
-        if let Some(fractional_scale_manager) = globals.fractional_scale_manager.as_ref() {
-            fractional_scale_manager.get_fractional_scale(&surface, &globals.qh, surface.id());
+        if let Some(fractional_scale_manager) = context.globals.fractional_scale_manager.as_ref() {
+            fractional_scale_manager.get_fractional_scale(
+                &surface,
+                &context.globals.qh,
+                surface.id(),
+            );
         }
 
-        let viewport = globals
+        let viewport = context
+            .globals
             .viewporter
             .as_ref()
-            .map(|viewporter| viewporter.get_viewport(&surface, &globals.qh, ()));
+            .map(|viewporter| viewporter.get_viewport(&surface, &context.globals.qh, ()));
 
         let this = Self(WaylandWindowStatePtr {
             state: Rc::new(RefCell::new(WaylandWindowState::new(
                 handle,
                 surface.clone(),
                 surface_state,
-                appearance,
                 viewport,
-                client,
-                globals,
-                gpu_context,
-                compositor_gpu,
+                context,
                 params,
                 parent,
             )?)),
@@ -1208,13 +1221,13 @@ impl WaylandWindowStatePtr {
                     self.rescale(scale as f32);
                 }
             }
-            wl_surface::Event::PreferredBufferScale { factor } => {
+            wl_surface::Event::PreferredBufferScale { factor }
+                if state.globals.fractional_scale_manager.is_none() =>
+            {
                 // We use `WpFractionalScale` instead to set the scale if it's available
-                if state.globals.fractional_scale_manager.is_none() {
-                    state.surface.set_buffer_scale(factor);
-                    drop(state);
-                    self.rescale(factor as f32);
-                }
+                state.surface.set_buffer_scale(factor);
+                drop(state);
+                self.rescale(factor as f32);
             }
             _ => {}
         }
@@ -1228,16 +1241,16 @@ impl WaylandWindowStatePtr {
         if let Some(mut input_handler) = state.input_handler.take() {
             drop(state);
             match ime {
-                ImeInput::InsertText(text) => {
+                ImeInput::Insert(text) => {
                     input_handler.replace_text_in_range(None, &text);
                 }
-                ImeInput::SetMarkedText(text) => {
+                ImeInput::SetMarked(text) => {
                     input_handler.replace_and_mark_text_in_range(None, &text, None);
                 }
-                ImeInput::UnmarkText => {
+                ImeInput::Unmark => {
                     input_handler.unmark_text();
                 }
-                ImeInput::DeleteText => {
+                ImeInput::DeleteBackward => {
                     if let Some(marked) = input_handler.marked_text_range() {
                         input_handler.replace_text_in_range(Some(marked), "");
                     }

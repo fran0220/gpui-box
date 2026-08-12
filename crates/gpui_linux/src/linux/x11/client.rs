@@ -56,7 +56,9 @@ use crate::linux::{
     reveal_path_internal,
     xdg_desktop_portal::{Event as XDPEvent, XDPEventSource},
 };
-use crate::linux::{LinuxCommon, LinuxKeyboardLayout, X11Window, modifiers_from_xinput_info};
+use crate::linux::{
+    LinuxCommon, LinuxKeyboardLayout, X11Window, X11WindowContext, modifiers_from_xinput_info,
+};
 
 use gpui::{
     AnyWindowHandle, Bounds, ClipboardItem, CursorStyle, DisplayId, FileDropEvent, Keystroke,
@@ -1082,8 +1084,7 @@ impl X11Client {
                                 state.pre_edit_text = compose_state
                                     .utf8()
                                     .or(keystroke_underlying_dead_key(keysym));
-                                let pre_edit =
-                                    state.pre_edit_text.clone().unwrap_or(String::default());
+                                let pre_edit = state.pre_edit_text.clone().unwrap_or_default();
                                 drop(state);
                                 window.handle_ime_preedit(pre_edit);
                                 state = self.0.borrow_mut();
@@ -1416,13 +1417,13 @@ impl X11Client {
 
     fn handle_xim_callback_event(&self, event: XimCallbackEvent) {
         match event {
-            XimCallbackEvent::XimXEvent(event) => {
+            XimCallbackEvent::XEvent(event) => {
                 self.handle_event(event);
             }
-            XimCallbackEvent::XimCommitEvent(window, text) => {
+            XimCallbackEvent::Commit(window, text) => {
                 self.xim_handle_commit(window, text);
             }
-            XimCallbackEvent::XimPreeditEvent(window, text) => {
+            XimCallbackEvent::Preedit(window, text) => {
                 self.xim_handle_preedit(window, text);
             }
         };
@@ -1623,21 +1624,23 @@ impl LinuxClient for X11Client {
             .is_some_and(|v| v.eq_ignore_ascii_case("bgr"));
         let window = X11Window::new(
             handle,
-            X11ClientStatePtr(Rc::downgrade(&self.0)),
-            state.common.foreground_executor.clone(),
-            state.gpu_context.clone(),
-            compositor_gpu,
+            X11WindowContext {
+                client: X11ClientStatePtr(Rc::downgrade(&self.0)),
+                executor: state.common.foreground_executor.clone(),
+                gpu_context: state.gpu_context.clone(),
+                compositor_gpu,
+                xcb: &xcb_connection,
+                client_side_decorations_supported,
+                main_screen_index: x_root_index,
+                atoms: &atoms,
+                scale_factor,
+                appearance,
+                supports_xinput_gestures,
+                is_bgr,
+            },
             params,
-            &xcb_connection,
-            client_side_decorations_supported,
-            x_root_index,
             x_window,
-            &atoms,
-            scale_factor,
-            appearance,
             parent_window,
-            supports_xinput_gestures,
-            is_bgr,
         )?;
         check_reply(
             || "Failed to set XdndAware property",
