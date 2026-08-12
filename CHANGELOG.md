@@ -8,6 +8,27 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-08-12
+
+### Added
+
+**Native platform views.** `PlatformViewHandle` and `platform_view` now make
+GPUI the layout, clipping, stacking, visibility, and teardown authority for a
+caller-owned native view. macOS retains and hosts `NSView` instances between
+GPUI's base and deferred-overlay planes. Windows reparents caller-owned child
+`HWND`s into a redirection-backed popup host, follows owner geometry, DPI and
+visibility, clips the host to the painted view union, preserves paint order,
+and restores parent, style, extended style, and window region on detach. Linux
+and Web retain an explicit inert layout-only contract rather than pretending a
+native view was attached. This unblocks WKWebView and WebView2 consumers.
+
+**Reproducible fork overlays.** `scripts/sync-zed` now keeps post-bootstrap fork
+work in an exact-SHA, bootstrap-rooted vendor lane distinct from official Zed
+first-parent replay. Release verification reconstructs both lanes from remote
+objects, validates the shared filter digest and exact source parent chain,
+requires both canonical refs and integration merges, and proves that the lanes
+meet only at the deterministic filtered bootstrap.
+
 ## [0.1.0] - 2026-08-11
 
 ### Added
@@ -454,5 +475,6 @@ calendar, time formatting, rich-text and code editing, charts, platform pickers,
 window chrome — and, separately, what is missing but intended. Read it before
 planning around a component that is not here.
 
-[Unreleased]: https://github.com/fran0220/gpui-box/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/fran0220/gpui-box/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/fran0220/gpui-box/releases/tag/v0.1.1
 [0.1.0]: https://github.com/fran0220/gpui-box/releases/tag/v0.1.0

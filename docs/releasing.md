@@ -130,14 +130,14 @@ dependencies, create consumers using only crates.io:
 
 ```toml
 [dependencies]
-gpui = { package = "gpui-box", version = "=0.1.0" }
-gpui_kit = { package = "gpui-box-kit", version = "=0.1.0" }
+gpui = { package = "gpui-box", version = "=0.1.1" }
+gpui_kit = { package = "gpui-box-kit", version = "=0.1.1" }
 ```
 
 Build the framework-only and framework-plus-kit smoke workspaces from the
 registry on each claimed target. Install and start
 `gpui-box-mcp --version` against a checkout and require its output to report
-`gpui-box-mcp 0.1.0`. Archive commands and results.
+`gpui-box-mcp 0.1.1`. Archive commands and results.
 Only after these pass:
 
 1. create the GitHub release at <https://github.com/fran0220/gpui-box>, linking

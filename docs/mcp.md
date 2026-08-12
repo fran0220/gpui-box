@@ -3,11 +3,11 @@
 Install the published stdio server with:
 
 ```bash
-cargo install gpui-box-mcp --version 0.1.0
+cargo install gpui-box-mcp --version 0.1.1
 gpui-box-mcp --help
 ```
 
-This is the registry interface for the `0.1.0` release. For workspace
+This is the registry interface for the `0.1.1` release. For workspace
 development use `cargo build --release -p gpui-box-mcp`.
 
 The server deliberately contains no embedded static catalog. It reads the

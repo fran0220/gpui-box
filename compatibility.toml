@@ -3,8 +3,8 @@ project = "GPUI Box"
 repository = "https://github.com/fran0220/gpui-box"
 cohort = "0.1.x"
 release_status = "released"
-release_version = "0.1.0"
-release_date = "2026-08-11"
+release_version = "0.1.1"
+release_date = "2026-08-12"
 rust_version = "1.97"
 edition = "2024"
 type_universe_package = "gpui-box"
@@ -12,7 +12,7 @@ type_universe_crate = "gpui"
 
 [[platform]]
 name = "macos"
-contract = "framework-kit-native-metal"
+contract = "framework-kit-native-metal-platform-view"
 commands = ["cargo run -p xtask -- gate full", "cargo run -p xtask -- headless check"]
 ci_gated = true
 ci_commands = ["cargo run -p xtask -- gate", "cargo doc --no-deps --workspace"]
@@ -20,7 +20,7 @@ limitations = ["visual CI requires separately configured evidence", "does not pr
 
 [[platform]]
 name = "windows"
-contract = "framework-kit-headless-warp"
+contract = "framework-kit-native-platform-view-headless-warp"
 commands = ["cargo run -p xtask -- headless check"]
 ci_gated = true
 limitations = ["native frame capture not implemented"]

@@ -38,38 +38,38 @@ exclude = ["tools/headless-visual"]
 
 [workspace.package]
 edition = "2024"
-version = "0.1.0"
+version = "0.1.1"
 license = "MIT"
 repository = "https://github.com/fran0220/gpui-box"
 homepage = "https://github.com/fran0220/gpui-box"
 rust-version = "1.97"
 
 [workspace.dependencies]
-collections = { package = "gpui-box-collections", path = "crates/collections", version = "0.1.0" }
-gpui = { package = "gpui-box", path = "crates/gpui", version = "0.1.0" }
-gpui_linux = { package = "gpui-box-linux", path = "crates/gpui_linux", version = "0.1.0" }
-gpui_macos = { package = "gpui-box-macos", path = "crates/gpui_macos", version = "0.1.0" }
-gpui_macros = { package = "gpui-box-macros", path = "crates/gpui_macros", version = "0.1.0" }
-gpui_platform = { package = "gpui-box-platform", path = "crates/gpui_platform", version = "0.1.0" }
-gpui_shared_string = { package = "gpui-box-shared-string", path = "crates/gpui_shared_string", version = "0.1.0" }
-gpui_util = { package = "gpui-box-util", path = "crates/gpui_util", version = "0.1.0" }
-gpui_web = { package = "gpui-box-web", path = "crates/gpui_web", version = "0.1.0" }
-gpui_wgpu = { package = "gpui-box-wgpu", path = "crates/gpui_wgpu", version = "0.1.0" }
-gpui_windows = { package = "gpui-box-windows", path = "crates/gpui_windows", version = "0.1.0" }
-http_client = { package = "gpui-box-http-client", path = "crates/http_client", version = "0.1.0" }
-media = { package = "gpui-box-media", path = "crates/media", version = "0.1.0" }
-refineable = { package = "gpui-box-refineable", path = "crates/refineable", version = "0.1.0" }
-derive_refineable = { package = "gpui-box-refineable-derive", path = "crates/refineable/derive_refineable", version = "0.1.0" }
-scheduler = { package = "gpui-box-scheduler", path = "crates/scheduler", version = "0.1.0" }
-sum_tree = { package = "gpui-box-sum-tree", path = "crates/sum_tree", version = "0.1.0" }
-util_macros = { package = "gpui-box-util-macros", path = "crates/util_macros", version = "0.1.0" }
-perf = { package = "perf", path = "tooling/perf", version = "0.1.0" }
-gpui-kit-assets = { package = "gpui-box-kit-assets", path = "crates/gpui-kit-assets", version = "0.1.0" }
-gpui-kit-semantics = { package = "gpui-box-kit-semantics", path = "crates/gpui-kit-semantics", version = "0.1.0" }
-gpui-kit-testkit = { package = "gpui-box-kit-testkit", path = "crates/gpui-kit-testkit", version = "0.1.0" }
-gpui-kit-theme = { package = "gpui-box-kit-theme", path = "crates/gpui-kit-theme", version = "0.1.0" }
-gpui-kit-tokens = { package = "gpui-box-kit-tokens", path = "crates/gpui-kit-tokens", version = "0.1.0" }
-gpui-kit = { package = "gpui-box-kit", path = "crates/gpui-kit", version = "0.1.0" }
+collections = { package = "gpui-box-collections", path = "crates/collections", version = "0.1.1" }
+gpui = { package = "gpui-box", path = "crates/gpui", version = "0.1.1" }
+gpui_linux = { package = "gpui-box-linux", path = "crates/gpui_linux", version = "0.1.1" }
+gpui_macos = { package = "gpui-box-macos", path = "crates/gpui_macos", version = "0.1.1" }
+gpui_macros = { package = "gpui-box-macros", path = "crates/gpui_macros", version = "0.1.1" }
+gpui_platform = { package = "gpui-box-platform", path = "crates/gpui_platform", version = "0.1.1" }
+gpui_shared_string = { package = "gpui-box-shared-string", path = "crates/gpui_shared_string", version = "0.1.1" }
+gpui_util = { package = "gpui-box-util", path = "crates/gpui_util", version = "0.1.1" }
+gpui_web = { package = "gpui-box-web", path = "crates/gpui_web", version = "0.1.1" }
+gpui_wgpu = { package = "gpui-box-wgpu", path = "crates/gpui_wgpu", version = "0.1.1" }
+gpui_windows = { package = "gpui-box-windows", path = "crates/gpui_windows", version = "0.1.1" }
+http_client = { package = "gpui-box-http-client", path = "crates/http_client", version = "0.1.1" }
+media = { package = "gpui-box-media", path = "crates/media", version = "0.1.1" }
+refineable = { package = "gpui-box-refineable", path = "crates/refineable", version = "0.1.1" }
+derive_refineable = { package = "gpui-box-refineable-derive", path = "crates/refineable/derive_refineable", version = "0.1.1" }
+scheduler = { package = "gpui-box-scheduler", path = "crates/scheduler", version = "0.1.1" }
+sum_tree = { package = "gpui-box-sum-tree", path = "crates/sum_tree", version = "0.1.1" }
+util_macros = { package = "gpui-box-util-macros", path = "crates/util_macros", version = "0.1.1" }
+perf = { package = "perf", path = "tooling/perf", version = "0.1.1" }
+gpui-kit-assets = { package = "gpui-box-kit-assets", path = "crates/gpui-kit-assets", version = "0.1.1" }
+gpui-kit-semantics = { package = "gpui-box-kit-semantics", path = "crates/gpui-kit-semantics", version = "0.1.1" }
+gpui-kit-testkit = { package = "gpui-box-kit-testkit", path = "crates/gpui-kit-testkit", version = "0.1.1" }
+gpui-kit-theme = { package = "gpui-box-kit-theme", path = "crates/gpui-kit-theme", version = "0.1.1" }
+gpui-kit-tokens = { package = "gpui-box-kit-tokens", path = "crates/gpui-kit-tokens", version = "0.1.1" }
+gpui-kit = { package = "gpui-box-kit", path = "crates/gpui-kit", version = "0.1.1" }
 accesskit = { version = "0.24.0", features = ["enumn"] }
 accesskit_macos = "0.26.0"
 accesskit_unix = "0.21.0"
