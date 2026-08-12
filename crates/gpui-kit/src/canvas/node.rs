@@ -630,7 +630,7 @@ impl RenderOnce for GraphNode {
         if self.pointer_click
             && let Some(handler) = self.on_click.as_ref()
         {
-            let click = Rc::clone(&handler);
+            let click = Rc::clone(handler);
             card.interactivity()
                 .on_click(move |_, window, cx| click(window, cx));
         }
