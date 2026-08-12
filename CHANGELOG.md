@@ -8,6 +8,18 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ## [Unreleased]
 
+### Added
+
+**Native media playback.** `media::PlatformMediaTransport` now implements the
+existing player seam with AVFoundation on macOS and Media Foundation on
+Windows. Audio and video load local files or platform-supported URLs and expose
+play, pause, seek, volume, mute and rate commands plus non-blocking snapshots of
+position, duration, buffered ranges, buffering, end and native errors. Video
+uses a retained `NSView`/child `HWND` through GPUI's platform-view host. Linux
+and Web keep an explicit no-backend state; playlists, DRM, media-track policy,
+output-device routing, custom network policy and capture remain outside the
+service.
+
 ## [0.1.1] - 2026-08-12
 
 ### Added

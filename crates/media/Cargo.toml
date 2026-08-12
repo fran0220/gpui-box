@@ -6,7 +6,7 @@ rust-version.workspace = true
 homepage.workspace = true
 publish = true
 license = "Apache-2.0"
-description = "macOS media API bindings for GPUI Box"
+description = "Native media playback and platform media bindings for GPUI Box"
 
 repository = "https://github.com/fran0220/gpui-box"
 [lints]
@@ -28,5 +28,16 @@ metal.workspace = true
 core-video.workspace = true
 objc.workspace = true
 
+[target.'cfg(target_os = "windows")'.dependencies]
+url.workspace = true
+windows = { workspace = true, features = [
+    "Win32_Media_MediaFoundation",
+    "Win32_System_Com",
+    "Win32_System_LibraryLoader",
+    "Win32_UI_WindowsAndMessaging",
+] }
+windows-core.workspace = true
+
 [build-dependencies]
 bindgen = "0.71"
+cc = "1.2"

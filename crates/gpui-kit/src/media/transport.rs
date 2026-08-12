@@ -3,16 +3,14 @@
 //! [`crate::content::TransportBar`] reports every control and applies none of
 //! them, which is right for a bar the host wires to its own player. A player
 //! *component* needs the other half: something it can ask what is true and
-//! ask to change it, without this crate holding a decoder, a clock, or a
+//! ask to change it, without the component holding a decoder, a clock, or a
 //! device.
 //!
-//! That something is [`MediaTransport`]. It is a trait rather than an
-//! implementation because there is no audio or video backend in GPUI at the
-//! pinned revision — no decoder, no output device, and no frame pump — so a
-//! component that claimed to play something would be claiming a capability
-//! nothing behind it has. The trait is the contract; an operating-system
-//! backend lands behind it additively, and the components above it do not
-//! change when it does.
+//! That something is [`MediaTransport`]. It remains a trait because callers
+//! may have their own engine and because components must not own platform
+//! policy. [`super::PlatformMediaTransport`] is the product-neutral native
+//! implementation on macOS and Windows; the components above it did not need
+//! to change when that service landed.
 //!
 //! # What a transport promises
 //!

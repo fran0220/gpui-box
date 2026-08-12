@@ -1,16 +1,28 @@
 #![allow(clippy::disallowed_methods, reason = "build scripts are exempt")]
-#[cfg(target_os = "macos")]
 fn main() {
     use std::{env, path::PathBuf, process::Command};
+
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("macos") {
+        return;
+    }
+
+    println!("cargo:rerun-if-changed=src/player/macos.m");
+    cc::Build::new()
+        .file("src/player/macos.m")
+        .flag("-fobjc-arc")
+        .compile("gpui_box_media_player");
+    println!("cargo:rustc-link-lib=framework=AppKit");
+    println!("cargo:rustc-link-lib=framework=AVFoundation");
+    println!("cargo:rustc-link-lib=framework=QuartzCore");
 
     let sdk_path = String::from_utf8(
         Command::new("xcrun")
             .args(["--sdk", "macosx", "--show-sdk-path"])
             .output()
-            .unwrap()
+            .expect("failed to query the macOS SDK path with xcrun")
             .stdout,
     )
-    .unwrap();
+    .expect("xcrun returned a non-UTF-8 macOS SDK path");
     let sdk_path = sdk_path.trim_end();
 
     println!("cargo:rerun-if-changed=src/bindings.h");
@@ -34,11 +46,8 @@ fn main() {
         .generate()
         .expect("unable to generate bindings");
 
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+    let out_path = PathBuf::from(env::var("OUT_DIR").expect("Cargo did not provide OUT_DIR"));
     bindings
         .write_to_file(out_path.join("bindings.rs"))
         .expect("couldn't write dispatch bindings");
 }
-
-#[cfg(not(target_os = "macos"))]
-fn main() {}

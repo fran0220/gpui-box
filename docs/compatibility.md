@@ -23,10 +23,10 @@ commit's first-parent history.
 
 | Platform | Current repository contract | Validation command/evidence | Limits |
 |---|---|---|---|
-| macOS | Framework, kit, Metal, and deterministic headless catalog | CI runs the all-feature native check and `cargo run -p xtask -- headless check`; real-window review remains separate | A local result is not evidence for another OS; real-window accessibility needs a logged-in host |
-| Windows | Framework/kit and deterministic WGPU/WARP headless catalog | CI runs the all-feature native check and `cargo run -p xtask -- headless check`; Windows baselines exist | Native frame capture is not implemented; detailed UIA limits are in `accessibility.md` |
-| Linux | Wayland/X11 framework code and deterministic llvmpipe headless catalog | CI runs the all-feature native check and `cargo run -p xtask -- headless check`; Linux baselines exist | AT-SPI and native behavior claims remain capability-scoped |
-| Browser/WASM | Stable, single-threaded browser gallery using the same Rust scenes | CI runs `web check` and the real Chromium `web smoke`; the visual command remains available for scoped review | No threaded COOP/COEP claim and no screen-reader announcement coverage |
+| macOS | Framework, kit, Metal, native AVFoundation audio/video playback, and deterministic headless catalog | CI runs the all-feature native check and `cargo run -p xtask -- headless check`; AVFoundation compiles and the service contract is unit-tested; real-window review remains separate | Playback supports operating-system codecs and unprotected sources; no DRM, track selection, capture, or application network policy; real-window accessibility needs a logged-in host |
+| Windows | Framework/kit, native Media Foundation audio/video playback, and deterministic WGPU/WARP headless catalog | CI runs the all-feature native check and `cargo run -p xtask -- headless check`; Windows baselines exist | Playback supports operating-system codecs and unprotected sources; this macOS checkout can compile-check but not run the Windows backend; native frame capture is not implemented |
+| Linux | Wayland/X11 framework code and deterministic llvmpipe headless catalog | CI runs the all-feature native check and `cargo run -p xtask -- headless check`; Linux baselines exist | Native media service reports no-backend; AT-SPI and native behavior claims remain capability-scoped |
+| Browser/WASM | Stable, single-threaded browser gallery using the same Rust scenes | CI runs `web check` and the real Chromium `web smoke`; the visual command remains available for scoped review | Native media service reports no-backend; no threaded COOP/COEP claim and no screen-reader announcement coverage |
 
 All four rows are mandatory CI surfaces. A release may claim only results
 recorded for its commit; the commands do not erase the explicit limitations in

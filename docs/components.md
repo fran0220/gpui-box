@@ -476,20 +476,45 @@ still offers the control that would stop it, because nothing has stopped.
 
 | Component | Kind | Reports | Notes |
 |---|---|---|---|
-| `AudioPlayer` | builder | what a control asked the transport for, and whether it was applied, refused, or unsupported | A player over `MediaTransport`, which this crate declares and does not implement. Idle, loading, no backend, failed, and ready are five renderings, and a player with no transport is a sixth that draws no scrubber at all. A waveform is drawn only from peaks the host measured |
+| `AudioPlayer` | builder | what a control asked the transport for, and whether it was applied, refused, or unsupported | A player over `MediaTransport`, with `PlatformMediaTransport` available for native playback. Idle, loading, no backend, failed, and ready are five renderings, and a player with no transport is a sixth that draws no scrubber at all. A waveform is drawn only from peaks the host measured |
 | `VideoPlayer` | builder | the same, over the same transport | The audio player plus a frame surface. A frame the host supplied publishes `frame`; a still standing in for one publishes `poster` with the reason no picture is arriving over it; neither is `none`. Frames are not asked for from a transport that has said it cannot open the media, and a player with no transport carries no controls |
 | `ModelViewer` | builder | the orbit a drag asked for, and the shading a control asked for | A bounded glTF 2.0 viewer. The document is read by `ModelScene::parse` inside `ModelBounds`, drawn flat-shaded or as a wireframe with an orbit camera, and published as the counts the reader counted. A refusal names the limit or the defect; a viewer holding nothing publishes no counts |
 | `MediaTransport`, `FixtureTransport` | type | — | The seam between a player and an operating-system backend, and the deterministic stand-in that decodes nothing. Every surface publishes `MediaOrigin`, so a fixture is never mistaken for a player |
+| `PlatformMediaTransport` | type | native media change signals through `subscribe`; component controls still report `MediaEvent` | The product-neutral native implementation of `MediaTransport`: AVFoundation on macOS and Media Foundation on Windows. `audio()` owns a decoder, output and clock; `video()` additionally owns a platform view, returned by `frame()`. `load` accepts a local file or URL, and snapshot state includes duration, position, buffered ranges, volume, mute, rate, buffering, end and native failures. Linux and Web construct the same API in explicit no-backend state |
 
-### There is no player here, and there is none upstream
+### Native playback lands behind the component seam
 
 GPUI draws images, and on macOS composites a `CVPixelBuffer` through its
-surface element. It has no decoder, no audio device, and no frame pump. So the
-players in this module are written against `MediaTransport` — `origin`,
-`snapshot`, and `apply` — and an operating-system backend lands behind that
-trait additively without changing a component above it. What is complete today
-is the component, its states, and its semantics; what is deferred is the
-backend, and `docs/coverage.md` records it as a gap rather than as a feature.
+surface element. GPUI itself still has no decoder, audio device or frame pump,
+so the player components remain written against `MediaTransport` — `origin`,
+`snapshot`, and `apply`. `PlatformMediaTransport` implements that seam without
+changing the components: AVFoundation supplies macOS audio/video and an
+`AVPlayerLayer`-backed `NSView`; Media Foundation supplies Windows audio/video
+and renders to a child `HWND`. The GPUI `platform_view` element hosts the video
+view and retains its native player until delayed detach is complete.
+
+Create the transport on the UI thread, retain it, call `load`, and rebuild the
+owning GPUI view when `subscribe` signals a native change. Native callbacks may
+arrive on a media thread, so the subscriber must marshal invalidation to the
+GPUI foreground executor rather than call UI APIs inside the callback. A video
+player supplies the transport's frame explicitly, preserving the component's
+existing truthful rule:
+
+```rust
+# use gpui_kit::prelude::*;
+let playback = PlatformMediaTransport::video();
+playback.load(MediaSource::file("walkthrough.mp4"))?;
+let frame = playback.clone();
+let player = VideoPlayer::new("walkthrough")
+    .transport(playback.shared())
+    .frame(move |_, _| frame.frame());
+# Ok::<_, NativeMediaError>(player)
+```
+
+The native service covers ordinary unprotected files and streams supported by
+the installed operating system codecs. It does not claim DRM, custom network
+policy, playlists, track/subtitle selection, output-device routing, capture,
+or Linux/Web playback.
 
 A control asks the transport and reports what came back: `MediaEvent::Applied`,
 `Refused` with the backend's own sentence, or `Unsupported`. The next frame

@@ -2175,12 +2175,14 @@ dependencies = [
  "gpui-box-kit-semantics",
  "gpui-box-kit-theme",
  "gpui-box-kit-tokens",
+ "gpui-box-media",
  "pulldown-cmark",
  "serde",
  "serde_json",
  "unicode-bidi",
  "unicode-segmentation",
  "web-time",
+ "windows 0.61.3",
 ]
 
 [[package]]
@@ -2330,12 +2332,16 @@ version = "0.1.1"
 dependencies = [
  "anyhow",
  "bindgen",
+ "cc",
  "core-foundation 0.10.1",
  "core-video",
  "ctor",
  "foreign-types",
  "metal",
  "objc",
+ "url",
+ "windows 0.61.3",
+ "windows-core 0.61.2",
 ]
 
 [[package]]

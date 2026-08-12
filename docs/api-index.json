@@ -6769,6 +6769,25 @@
       "queries": []
     },
     {
+      "name": "PlatformMediaTransport",
+      "path": "gpui_kit::media::PlatformMediaTransport",
+      "summary": "The AVFoundation or Media Foundation player used by media components.",
+      "variants": [],
+      "construct": [
+        "audio() -> Rc<Self>",
+        "video() -> Rc<Self>",
+        "shared(: &Rc<Self>) -> Rc<dyn MediaTransport>"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "load(source: impl Into<MediaSource>) -> Result<(), NativeMediaError>",
+        "subscribe(handler: impl Fn(NativeMediaEvent) + Send + Sync + 'static) -> NativeMediaSubscription",
+        "frame() -> Option<AnyElement>",
+        "player() -> &NativeMediaPlayer"
+      ]
+    },
+    {
       "name": "PopoverEvent",
       "path": "gpui_kit::overlay::PopoverEvent",
       "summary": "What a popover reports. The owner decides what any of it means.",

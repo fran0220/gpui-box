@@ -2,6 +2,13 @@
 #![allow(non_camel_case_types)]
 
 mod bindings;
+mod player;
+
+pub use player::{
+    MediaAvailability, MediaCommand, MediaCommandOutcome, MediaError, MediaErrorKind, MediaEvent,
+    MediaKind, MediaPlayer, MediaSnapshot, MediaSource, MediaSubscription, NativeVideoView,
+    PlaybackState, TimeRange,
+};
 
 #[cfg(target_os = "macos")]
 pub mod core_media {

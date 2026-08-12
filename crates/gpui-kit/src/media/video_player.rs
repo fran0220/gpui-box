@@ -2,12 +2,11 @@
 //!
 //! # What this component will not do
 //!
-//! **It does not decode a frame.** GPUI draws images, and on macOS composites
-//! a `CVPixelBuffer` through its surface element, but nothing in it decodes a
-//! video stream. So the picture is an element the host hands back per frame
-//! through [`VideoPlayer::frame`] — a `gpui::surface`, a `gpui::img`, or
-//! anything else it can build — and a host that hands back nothing has said
-//! so.
+//! **It does not decode a frame.** The picture is an element the host hands
+//! back per frame through [`VideoPlayer::frame`] — a `gpui::surface`, a
+//! `gpui::img`, [`gpui::platform_view`], or anything else it can build.
+//! [`super::PlatformMediaTransport::frame`] supplies the native macOS/Windows
+//! view; a host that hands back nothing has said so.
 //!
 //! **It does not use a poster as a frame.** A poster is one still, and a still
 //! standing in for playback is the most convincing possible lie about a player

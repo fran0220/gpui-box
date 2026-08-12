@@ -204,7 +204,7 @@ string_keys! {
     TransportPreviousTrack => "transport.previous-track", "Previous track";
     TransportNextTrack => "transport.next-track", "Next track";
 
-    // The media players, over a transport this library does not implement.
+    // The media players, over caller-provided or native platform transports.
     MediaFixture => "media.fixture", "Fixture";
     MediaNoTransport => "media.no-transport", "No player";
     MediaNoTransportDetail => "media.no-transport-detail", "No player is connected to this surface, so there is nothing to start.";

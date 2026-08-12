@@ -97,6 +97,7 @@ Pagination
 PasswordInput
 PermissionMatrix
 Placed
+PlatformMediaTransport
 Popover
 Radio
 RangePicker

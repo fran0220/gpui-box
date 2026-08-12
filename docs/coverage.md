@@ -161,12 +161,12 @@ own; both are exercised through every control and overlay that uses them.
   it drew.
 - **Playing media.** `TransportBar` reports play, pause, seek, volume, mute,
   speed and a track step, and applies none of them. `AudioPlayer` and
-  `VideoPlayer` go one step further and ask a `MediaTransport`, which this
-  crate declares and does not implement: decoding, an output device, a clock
-  that advances by itself, and where the live edge of a stream is belong to a
-  backend, and there is none in this crate and none in GPUI at the pinned
-  revision. That is why a duration nobody stated is a state rather than a zero,
-  and why a surface with no transport says so instead of drawing controls.
+  `VideoPlayer` ask a `MediaTransport`; `PlatformMediaTransport` implements it
+  with AVFoundation on macOS and Media Foundation on Windows, including the
+  native decoder, output, clock and video view. Linux and Web remain explicit
+  no-backend targets. Playlist policy, DRM, subtitle/track selection, output
+  device routing, custom network retry/cache policy and capture remain host
+  responsibilities rather than states the components invent.
 - **Reading a 3D model that is not glTF.** `ModelViewer` reads the subset of
   glTF 2.0 stated in `docs/components.md` and refuses everything else, without
   a scene-graph dependency, a material system, or a texture pipeline. Other
@@ -316,19 +316,16 @@ springs described as a duration and a bounce. Two things are left.
 | Shape in `flip` | `flip_size` records a rectangle, so position and size are continuous, but a radius, a border and a colour are not: a pill that becomes a card changes shape on the frame it changes kind. |
 | Overscroll | `motion::rubber_band` damps a pull past a boundary, but nothing in the library overscrolls: a `ScrollArea` stops dead at its end, so the band is available to a caller and used by no component here. |
 
-### A platform media backend
+### Media capabilities beyond native playback
 
-`AudioPlayer` and `VideoPlayer` are complete as components: their states, their
-controls, their semantics and their refusals are all here, and the fixture
-transport proves them. What is not here is anything that decodes: no
-implementation of `MediaTransport` reaches an operating-system player, so on
-every platform today the only transports in the tree are the host's own and the
-fixture. `VideoPlayer` will render a real frame the moment a host hands one back
-— GPUI's `surface` element composites a `CVPixelBuffer` on macOS, and a decoded
-frame can be uploaded as a `RenderImage` anywhere — so the deferred work is the
-backend behind the trait and not the surface above it. This is recorded as a gap
-rather than presented as support: a component that reports `no-backend` on every
-machine is truthful, and it is not playback.
+`PlatformMediaTransport` closes the ordinary macOS/Windows decoder, output,
+clock and native-view gap. The remaining media work is additive capability,
+not basic playback: playlist/queue ownership; audio, subtitle and accessibility
+description track selection; audio output-device switching; DRM; application
+cache/retry and authentication policy; picture-in-picture and fullscreen;
+recording/capture; frame-accurate extraction plus waveform/thumbnail generation;
+and Linux/Web backends. A platform codec refusal remains `no-backend`, while an
+unreadable source remains `failed`; neither is converted to empty media.
 
 ### Components
 

@@ -1,4 +1,4 @@
-//! Sound, moving pictures, and geometry — none of it decoded here.
+//! Sound, moving pictures, and geometry, with component and service kept apart.
 //!
 //! The three surfaces in this module are the ones a general-purpose desktop
 //! application needs and cannot assemble out of a button and a slider: a
@@ -6,12 +6,11 @@
 //! keep the posture the rest of the library keeps, which for media means
 //! something specific.
 //!
-//! **There is no player in this crate, and there is none in GPUI at the
-//! pinned revision.** GPUI draws images and, on macOS, composites a
-//! `CVPixelBuffer` through its surface element; it has no decoder, no audio
-//! device, and no frame pump. So [`AudioPlayer`] and [`VideoPlayer`] are
-//! written against [`MediaTransport`], the seam an operating-system backend
-//! lands behind, and a surface with no transport says exactly that instead of
+//! **A component is not a player service.** GPUI itself has no decoder, audio
+//! device, or frame pump. [`AudioPlayer`] and [`VideoPlayer`] therefore stay
+//! written against [`MediaTransport`], while [`PlatformMediaTransport`]
+//! implements that seam with AVFoundation on macOS and Media Foundation on
+//! Windows. A surface with no transport still says exactly that instead of
 //! drawing a transport bar that would move if anything were playing.
 //!
 //! **A progress bar is never drawn from a guess.** Position, duration, and
@@ -32,12 +31,17 @@
 pub mod audio_player;
 pub mod gltf;
 pub mod model_viewer;
+pub mod platform;
 pub mod transport;
 pub mod video_player;
 
 pub use audio_player::AudioPlayer;
 pub use gltf::{ModelBounds, ModelDefect, ModelError, ModelLimit, ModelMesh, ModelScene};
 pub use model_viewer::{ModelShading, ModelState, ModelViewer, ModelViewerEvent};
+pub use platform::{
+    MediaSource, NativeMediaError, NativeMediaEvent, NativeMediaPlayer, NativeMediaSubscription,
+    PlatformMediaTransport,
+};
 pub use transport::{
     FixtureTransport, MediaAvailability, MediaCommand, MediaEvent, MediaOrigin, MediaOutcome,
     MediaSnapshot, MediaTransport,

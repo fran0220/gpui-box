@@ -55,6 +55,10 @@ Box work, not part of either imported lane. It changes no native hosting or
 renderer behavior; it retains caller-owned native controller state until the
 existing host has detached and released its final handle clone.
 
+The `gpui-box-media` AVFoundation and Media Foundation playback services are
+also subsequent GPUI Box work. They call operating-system frameworks supplied
+by macOS and Windows and import no third-party player source or media assets.
+
 Kit text-input code under `crates/gpui-kit/src/controls/input/` follows GPUI's
 `EntityInputHandler`, UTF-8/UTF-16 conversion, shaping, caret, and selection
 architecture. The kit editing model, bindings, masking, limits, semantics, and
