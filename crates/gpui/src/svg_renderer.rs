@@ -146,11 +146,10 @@ impl SvgRenderer {
         let default_fallback_selection = usvg::FontResolver::default_fallback_selector();
         let fallback_selection = Box::new(
             move |ch: char, fonts: &[usvg::fontdb::ID], db: &mut Arc<usvg::fontdb::Database>| {
-                if is_emoji_presentation(ch) {
-                    if let Some(id) = select_emoji_font(ch, fonts, db.as_ref(), EMOJI_FONT_FAMILIES)
-                    {
-                        return Some(id);
-                    }
+                if is_emoji_presentation(ch)
+                    && let Some(id) = select_emoji_font(ch, fonts, db.as_ref(), EMOJI_FONT_FAMILIES)
+                {
+                    return Some(id);
                 }
 
                 default_fallback_selection(ch, fonts, db)

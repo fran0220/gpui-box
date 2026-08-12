@@ -187,15 +187,15 @@ fn subscribe(
         (subscriber_id, link_to_start)
     };
 
-    if let Some(mut link) = link_to_start {
-        if let Err(error) = unsafe { link.start() } {
-            let mut registry = lock_registry();
-            if let Some(entry) = registry.displays.get_mut(&display_id) {
-                entry.running = false;
-                entry.subscribers.retain(|(id, _)| *id != subscriber_id);
-            }
-            return Err(error);
+    if let Some(mut link) = link_to_start
+        && let Err(error) = unsafe { link.start() }
+    {
+        let mut registry = lock_registry();
+        if let Some(entry) = registry.displays.get_mut(&display_id) {
+            entry.running = false;
+            entry.subscribers.retain(|(id, _)| *id != subscriber_id);
         }
+        return Err(error);
     }
 
     Ok(subscriber_id)

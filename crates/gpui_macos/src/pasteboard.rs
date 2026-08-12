@@ -184,14 +184,11 @@ impl Pasteboard {
                     };
 
                     for entry in item.entries {
-                        match entry {
-                            ClipboardEntry::String(text) => {
-                                combined.text.push_str(&text.text());
-                                if combined.metadata.is_none() {
-                                    combined.metadata = text.metadata;
-                                }
+                        if let ClipboardEntry::String(text) = entry {
+                            combined.text.push_str(text.text());
+                            if combined.metadata.is_none() {
+                                combined.metadata = text.metadata;
                             }
-                            _ => {}
                         }
                     }
 

@@ -27,7 +27,7 @@ impl TestDispatcher {
             randomize_order: true,
             allow_parking: false,
             capture_pending_traces: std::env::var("PENDING_TRACES")
-                .map_or(false, |var| var == "1" || var == "true"),
+                .is_ok_and(|var| var == "1" || var == "true"),
             timeout_ticks: 0..=1000,
         }));
         Self::from_scheduler(scheduler)

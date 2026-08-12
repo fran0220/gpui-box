@@ -59,7 +59,7 @@ impl Ord for TabStopNode {
 
 impl PartialOrd for TabStopNode {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(&other))
+        Some(self.cmp(other))
     }
 }
 
@@ -126,7 +126,7 @@ impl TabStopMap {
         let item = self.next_inner(node);
 
         if let Some(item) = item {
-            self.focus_handle_for_order(&item)
+            self.focus_handle_for_order(item)
         } else {
             self.next(None)
         }
@@ -163,7 +163,7 @@ impl TabStopMap {
         let item = self.prev_inner(node);
 
         if let Some(item) = item {
-            self.focus_handle_for_order(&item)
+            self.focus_handle_for_order(item)
         } else {
             self.prev(None)
         }

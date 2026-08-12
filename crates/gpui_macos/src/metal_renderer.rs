@@ -801,16 +801,16 @@ impl MetalRenderer {
                         None,
                     );
 
-                    if did_draw {
-                        if let Err(error) = self.draw_paths_from_intermediate(
+                    if did_draw
+                        && let Err(error) = self.draw_paths_from_intermediate(
                             paths,
                             writer,
                             viewport_size,
                             command_encoder,
-                        ) {
-                            command_encoder.end_encoding();
-                            return Err(error);
-                        }
+                        )
+                    {
+                        command_encoder.end_encoding();
+                        return Err(error);
                     }
                 }
                 PrimitiveBatch::Underlines(range) => {
@@ -1874,6 +1874,12 @@ pub struct MetalHeadlessRenderer {
 }
 
 #[cfg(any(test, feature = "test-support"))]
+impl Default for MetalHeadlessRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MetalHeadlessRenderer {
     pub fn new() -> Self {
         let instance_buffer_pool = Arc::new(Mutex::new(InstanceBufferPool::default()));

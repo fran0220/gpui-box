@@ -1578,11 +1578,11 @@ impl PlatformInputHandler {
             let caret = selection.range.end;
             if let Some(caret_bounds) = bounds_for_range(caret..caret) {
                 for i in (marked_range.start..caret).rev() {
-                    if let Some(b) = bounds_for_range(i..i) {
-                        if (b.origin.y - caret_bounds.origin.y).abs() > px(0.1) {
-                            line_start = i + 1;
-                            break;
-                        }
+                    if let Some(b) = bounds_for_range(i..i)
+                        && (b.origin.y - caret_bounds.origin.y).abs() > px(0.1)
+                    {
+                        line_start = i + 1;
+                        break;
                     }
                 }
             }

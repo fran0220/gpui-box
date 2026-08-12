@@ -416,42 +416,41 @@ impl ListState {
     fn remeasure_items_with_scroll_anchor(&self, range: Range<usize>, scroll_anchor: ScrollAnchor) {
         let state = &mut *self.0.borrow_mut();
 
-        if let Some(scroll_top) = state.logical_scroll_top {
-            if range.contains(&scroll_top.item_ix) {
-                state.pending_scroll = match scroll_anchor {
-                    ScrollAnchor::Absolute => Some(PendingScroll::Absolute {
-                        item_ix: scroll_top.item_ix,
-                        offset: scroll_top.offset_in_item,
-                    }),
-                    ScrollAnchor::Proportional => {
-                        // If the scroll-top item falls within the remeasured range,
-                        // store a fractional offset so the layout can restore the
-                        // proportional scroll position after the item is re-rendered
-                        // at its new height.
-                        let mut cursor = state.items.cursor::<Count>(());
-                        cursor.seek(&Count(scroll_top.item_ix), Bias::Right);
+        if let Some(scroll_top) = state.logical_scroll_top
+            && range.contains(&scroll_top.item_ix)
+        {
+            state.pending_scroll = match scroll_anchor {
+                ScrollAnchor::Absolute => Some(PendingScroll::Absolute {
+                    item_ix: scroll_top.item_ix,
+                    offset: scroll_top.offset_in_item,
+                }),
+                ScrollAnchor::Proportional => {
+                    // If the scroll-top item falls within the remeasured range,
+                    // store a fractional offset so the layout can restore the
+                    // proportional scroll position after the item is re-rendered
+                    // at its new height.
+                    let mut cursor = state.items.cursor::<Count>(());
+                    cursor.seek(&Count(scroll_top.item_ix), Bias::Right);
 
-                        cursor
-                            .item()
-                            .and_then(|item| {
-                                item.size().map(|size| {
-                                    let fraction = if size.height.0 > 0.0 {
-                                        (scroll_top.offset_in_item.0 / size.height.0)
-                                            .clamp(0.0, 1.0)
-                                    } else {
-                                        0.0
-                                    };
+                    cursor
+                        .item()
+                        .and_then(|item| {
+                            item.size().map(|size| {
+                                let fraction = if size.height.0 > 0.0 {
+                                    (scroll_top.offset_in_item.0 / size.height.0).clamp(0.0, 1.0)
+                                } else {
+                                    0.0
+                                };
 
-                                    PendingScroll::Proportional(PendingScrollFraction {
-                                        item_ix: scroll_top.item_ix,
-                                        fraction,
-                                    })
+                                PendingScroll::Proportional(PendingScrollFraction {
+                                    item_ix: scroll_top.item_ix,
+                                    fraction,
                                 })
                             })
-                            .or_else(|| state.pending_scroll.clone())
-                    }
-                };
-            }
+                        })
+                        .or_else(|| state.pending_scroll.clone())
+                }
+            };
         }
 
         // Rebuild the tree, replacing items in the range with
@@ -1066,26 +1065,26 @@ impl StateInner {
 
                 // If there's a pending scroll adjustment for the scroll-top
                 // item, apply it.
-                if ix == 0 {
-                    if let Some(pending_scroll) = self.pending_scroll.take() {
-                        match pending_scroll {
-                            PendingScroll::Absolute { item_ix, offset }
-                                if item_ix == scroll_top.item_ix =>
-                            {
-                                scroll_top.offset_in_item = offset.min(element_size.height);
-                                self.logical_scroll_top = Some(scroll_top);
-                            }
-                            PendingScroll::Proportional(pending_scroll)
-                                if pending_scroll.item_ix == scroll_top.item_ix =>
-                            {
-                                // Ensuring proportional scroll position is
-                                // maintained after re-measuring.
-                                scroll_top.offset_in_item =
-                                    Pixels(pending_scroll.fraction * element_size.height.0);
-                                self.logical_scroll_top = Some(scroll_top);
-                            }
-                            _ => {}
+                if ix == 0
+                    && let Some(pending_scroll) = self.pending_scroll.take()
+                {
+                    match pending_scroll {
+                        PendingScroll::Absolute { item_ix, offset }
+                            if item_ix == scroll_top.item_ix =>
+                        {
+                            scroll_top.offset_in_item = offset.min(element_size.height);
+                            self.logical_scroll_top = Some(scroll_top);
                         }
+                        PendingScroll::Proportional(pending_scroll)
+                            if pending_scroll.item_ix == scroll_top.item_ix =>
+                        {
+                            // Ensuring proportional scroll position is
+                            // maintained after re-measuring.
+                            scroll_top.offset_in_item =
+                                Pixels(pending_scroll.fraction * element_size.height.0);
+                            self.logical_scroll_top = Some(scroll_top);
+                        }
+                        _ => {}
                     }
                 }
 

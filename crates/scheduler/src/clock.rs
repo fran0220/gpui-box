@@ -16,6 +16,12 @@ struct TestClockState {
     utc_now: DateTime<Utc>,
 }
 
+impl Default for TestClock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TestClock {
     pub fn new() -> Self {
         const START_TIME: &str = "2025-07-01T23:59:58-00:00";

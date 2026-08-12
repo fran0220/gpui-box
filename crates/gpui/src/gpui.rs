@@ -6,7 +6,7 @@
 
 extern crate self as gpui;
 #[doc(hidden)]
-pub static GPUI_MANIFEST_DIR: &'static str = env!("CARGO_MANIFEST_DIR");
+pub static GPUI_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 #[macro_use]
 mod action;
 mod app;

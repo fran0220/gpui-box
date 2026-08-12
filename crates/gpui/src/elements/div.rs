@@ -2317,12 +2317,13 @@ impl Interactivity {
             }
         }
 
-        if self.report_active_descendant_focus && window.a11y.is_active() {
-            if let Some(global_id) = global_id {
-                window
-                    .a11y
-                    .set_active_descendant(global_id.accesskit_node_id());
-            }
+        if self.report_active_descendant_focus
+            && window.a11y.is_active()
+            && let Some(global_id) = global_id
+        {
+            window
+                .a11y
+                .set_active_descendant(global_id.accesskit_node_id());
         }
         window.with_optional_element_state::<InteractiveElementState, _>(
             global_id,
@@ -2562,18 +2563,15 @@ impl Interactivity {
 
                                         self.paint_keyboard_listeners(window, cx);
 
-                                        if window.a11y.is_active() {
-                                            if let Some(global_id) = global_id {
-                                                if !self.a11y_action_listeners.is_empty() {
-                                                    let node_id = global_id.accesskit_node_id();
-                                                    for (action, listener) in
-                                                        self.a11y_action_listeners.drain(..)
-                                                    {
-                                                        window.on_a11y_action(
-                                                            node_id, action, listener,
-                                                        );
-                                                    }
-                                                }
+                                        if window.a11y.is_active()
+                                            && let Some(global_id) = global_id
+                                            && !self.a11y_action_listeners.is_empty()
+                                        {
+                                            let node_id = global_id.accesskit_node_id();
+                                            for (action, listener) in
+                                                self.a11y_action_listeners.drain(..)
+                                            {
+                                                window.on_a11y_action(node_id, action, listener);
                                             }
                                         }
 
@@ -2818,36 +2816,38 @@ impl Interactivity {
                 let was_hovered = hover_state
                     .as_ref()
                     .is_some_and(|state| state.borrow().element);
-                if phase == DispatchPhase::Capture && hovered != was_hovered {
-                    if let Some(hover_state) = &hover_state {
-                        hover_state.borrow_mut().element = hovered;
-                        cx.notify(current_view);
-                    }
+                if phase == DispatchPhase::Capture
+                    && hovered != was_hovered
+                    && let Some(hover_state) = &hover_state
+                {
+                    hover_state.borrow_mut().element = hovered;
+                    cx.notify(current_view);
                 }
             });
         }
 
-        if let Some(group_hover) = self.group_hover_style.as_ref() {
-            if let Some(group_hitbox_id) = GroupHitboxes::get(&group_hover.group, cx) {
-                let hover_state = element_state
-                    .as_ref()
-                    .and_then(|element| element.hover_state.as_ref())
-                    .cloned();
-                let current_view = window.current_view();
+        if let Some(group_hover) = self.group_hover_style.as_ref()
+            && let Some(group_hitbox_id) = GroupHitboxes::get(&group_hover.group, cx)
+        {
+            let hover_state = element_state
+                .as_ref()
+                .and_then(|element| element.hover_state.as_ref())
+                .cloned();
+            let current_view = window.current_view();
 
-                window.on_mouse_event(move |_: &MouseMoveEvent, phase, window, cx| {
-                    let group_hovered = group_hitbox_id.is_hovered(window);
-                    let was_group_hovered = hover_state
-                        .as_ref()
-                        .is_some_and(|state| state.borrow().group);
-                    if phase == DispatchPhase::Capture && group_hovered != was_group_hovered {
-                        if let Some(hover_state) = &hover_state {
-                            hover_state.borrow_mut().group = group_hovered;
-                            cx.notify(current_view);
-                        }
-                    }
-                });
-            }
+            window.on_mouse_event(move |_: &MouseMoveEvent, phase, window, cx| {
+                let group_hovered = group_hitbox_id.is_hovered(window);
+                let was_group_hovered = hover_state
+                    .as_ref()
+                    .is_some_and(|state| state.borrow().group);
+                if phase == DispatchPhase::Capture
+                    && group_hovered != was_group_hovered
+                    && let Some(hover_state) = &hover_state
+                {
+                    hover_state.borrow_mut().group = group_hovered;
+                    cx.notify(current_view);
+                }
+            });
         }
 
         let drag_cursor_style = self.base_style.as_ref().mouse_cursor;
@@ -3413,35 +3413,33 @@ impl Interactivity {
             }
         }
 
-        if let Some(hitbox) = hitbox {
-            if let Some(drag) = cx.active_drag.take() {
-                let mut can_drop = true;
-                if let Some(can_drop_predicate) = &self.can_drop_predicate {
-                    can_drop = can_drop_predicate(drag.value.as_ref(), window, cx);
-                }
-
-                if can_drop {
-                    for (state_type, group_drag_style) in &self.group_drag_over_styles {
-                        if let Some(group_hitbox_id) =
-                            GroupHitboxes::get(&group_drag_style.group, cx)
-                            && *state_type == drag.value.as_ref().type_id()
-                            && group_hitbox_id.is_hovered(window)
-                        {
-                            style.refine(&group_drag_style.style);
-                        }
-                    }
-
-                    for (state_type, build_drag_over_style) in &self.drag_over_styles {
-                        if *state_type == drag.value.as_ref().type_id() && hitbox.is_hovered(window)
-                        {
-                            style.refine(&build_drag_over_style(drag.value.as_ref(), window, cx));
-                        }
-                    }
-                }
-
-                style.mouse_cursor = drag.cursor_style;
-                cx.active_drag = Some(drag);
+        if let Some(hitbox) = hitbox
+            && let Some(drag) = cx.active_drag.take()
+        {
+            let mut can_drop = true;
+            if let Some(can_drop_predicate) = &self.can_drop_predicate {
+                can_drop = can_drop_predicate(drag.value.as_ref(), window, cx);
             }
+
+            if can_drop {
+                for (state_type, group_drag_style) in &self.group_drag_over_styles {
+                    if let Some(group_hitbox_id) = GroupHitboxes::get(&group_drag_style.group, cx)
+                        && *state_type == drag.value.as_ref().type_id()
+                        && group_hitbox_id.is_hovered(window)
+                    {
+                        style.refine(&group_drag_style.style);
+                    }
+                }
+
+                for (state_type, build_drag_over_style) in &self.drag_over_styles {
+                    if *state_type == drag.value.as_ref().type_id() && hitbox.is_hovered(window) {
+                        style.refine(&build_drag_over_style(drag.value.as_ref(), window, cx));
+                    }
+                }
+            }
+
+            style.mouse_cursor = drag.cursor_style;
+            cx.active_drag = Some(drag);
         }
 
         if let Some(element_state) = element_state {

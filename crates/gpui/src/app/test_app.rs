@@ -472,10 +472,10 @@ impl<V: 'static + Render> TestAppWindow<V> {
     pub fn simulate_resize(&mut self, size: Size<Pixels>) {
         let window_id = self.handle.window_id();
         let mut app = self.app.borrow_mut();
-        if let Some(Some(window)) = app.windows.get_mut(window_id) {
-            if let Some(test_window) = window.platform_window.as_test() {
-                test_window.simulate_resize(size);
-            }
+        if let Some(Some(window)) = app.windows.get_mut(window_id)
+            && let Some(test_window) = window.platform_window.as_test()
+        {
+            test_window.simulate_resize(size);
         }
         drop(app);
         self.background_executor.run_until_parked();

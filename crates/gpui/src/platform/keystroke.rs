@@ -771,6 +771,6 @@ fn unparse(modifiers: &Modifiers, key: &str) -> String {
     if modifiers.shift {
         result.push_str("shift-");
     }
-    result.push_str(&key);
+    result.push_str(key);
     result
 }

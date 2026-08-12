@@ -1055,7 +1055,7 @@ impl LeakDetector {
             if snapshot.entity_ids.contains(entity_id) {
                 continue;
             }
-            for (_, backtrace) in &data.handles {
+            for backtrace in data.handles.values() {
                 if let Some(backtrace) = backtrace {
                     let mut backtrace = backtrace.clone();
                     backtrace.resolve();
@@ -1139,12 +1139,11 @@ impl fmt::Debug for BacktraceFormatter {
         let cwd = std::env::current_dir();
         let mut print_path = move |fmt: &mut fmt::Formatter<'_>, path: BytesOrWideString<'_>| {
             let path = path.into_path_buf();
-            if style != PrintFmt::Full {
-                if let Ok(cwd) = &cwd {
-                    if let Ok(suffix) = path.strip_prefix(cwd) {
-                        return fmt::Display::fmt(&suffix.display(), fmt);
-                    }
-                }
+            if style != PrintFmt::Full
+                && let Ok(cwd) = &cwd
+                && let Ok(suffix) = path.strip_prefix(cwd)
+            {
+                return fmt::Display::fmt(&suffix.display(), fmt);
             }
             fmt::Display::fmt(&path.display(), fmt)
         };

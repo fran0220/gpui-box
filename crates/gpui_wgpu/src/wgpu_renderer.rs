@@ -2112,7 +2112,7 @@ impl WgpuRenderer {
                     PrimitiveBatch::Surfaces(_surfaces) => {}
                 }
             }
-            while let Some(blur) = pending_blurs.next() {
+            for blur in pending_blurs {
                 let Some(pass_count) =
                     planned_backdrop_blur_pass_count(blur, &mut remaining_backdrop_passes)
                 else {
@@ -2309,7 +2309,7 @@ impl WgpuRenderer {
             .context("insufficient backdrop parameter buffers")?;
         resources
             .queue
-            .write_buffer(&buffer, 0, bytemuck::bytes_of(params));
+            .write_buffer(buffer, 0, bytemuck::bytes_of(params));
         let bind_group = resources
             .device
             .create_bind_group(&wgpu::BindGroupDescriptor {

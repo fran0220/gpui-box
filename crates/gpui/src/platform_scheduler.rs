@@ -162,7 +162,7 @@ impl Scheduler for PlatformScheduler {
         >,
     ) -> Task<Box<dyn Any + Send + Sync>> {
         let session_id = self.next_session_id();
-        spawn_dedicated_thread(session_id, self, move |executor| f(executor))
+        spawn_dedicated_thread(session_id, self, f)
     }
 
     fn as_test(&self) -> Option<&TestScheduler> {

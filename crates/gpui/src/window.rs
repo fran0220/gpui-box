@@ -1601,7 +1601,7 @@ impl Window {
             let mut cx = cx.to_async();
             move || {
                 let _ = handle.update(&mut cx, |_, window, _| window.remove_window());
-                let _ = cx.update(|cx| {
+                cx.update(|cx| {
                     SystemWindowTabController::remove_tab(cx, window_id);
                 });
             }
@@ -1685,21 +1685,20 @@ impl Window {
                 };
 
                 let now = Instant::now();
-                if let Some(min_interval) = min_frame_interval {
-                    if let Some(last_frame) = last_frame_time.get()
-                        && now.duration_since(last_frame) < min_interval
-                    {
-                        // Don't lose a pending forced render to throttling.
-                        deferred_force_render |= force_render;
-                        // Must still complete the frame on platforms that require it.
-                        // On Wayland, `surface.frame()` was already called to request the
-                        // next frame callback, so we must call `surface.commit()` (via
-                        // `complete_frame`) or the compositor won't send another callback.
-                        handle
-                            .update(&mut cx, |_, window, _| window.complete_frame())
-                            .log_err();
-                        return;
-                    }
+                if let Some(min_interval) = min_frame_interval
+                    && let Some(last_frame) = last_frame_time.get()
+                    && now.duration_since(last_frame) < min_interval
+                {
+                    // Don't lose a pending forced render to throttling.
+                    deferred_force_render |= force_render;
+                    // Must still complete the frame on platforms that require it.
+                    // On Wayland, `surface.frame()` was already called to request the
+                    // next frame callback, so we must call `surface.commit()` (via
+                    // `complete_frame`) or the compositor won't send another callback.
+                    handle
+                        .update(&mut cx, |_, window, _| window.complete_frame())
+                        .log_err();
+                    return;
                 }
                 last_frame_time.set(Some(now));
 
@@ -3396,7 +3395,7 @@ impl Window {
 
         // Paint all deferred draws in priority order.
         // Since prepaint has already processed nested deferreds, we just paint them all.
-        if self.next_frame.deferred_draws.len() == 0 {
+        if self.next_frame.deferred_draws.is_empty() {
             return;
         }
 
@@ -5640,7 +5639,7 @@ impl Window {
                 .downcast_ref::<KeyDownEvent>()
                 .filter(|key_down| key_down.keystroke.key_char.is_some())
                 .and_then(|_| self.platform_window.take_input_handler())
-                .map_or(false, |mut input_handler| {
+                .is_some_and(|mut input_handler| {
                     let accepts = input_handler.accepts_text_input(self, cx);
                     self.platform_window.set_input_handler(input_handler);
                     accepts
@@ -5690,7 +5689,7 @@ impl Window {
             .map(|_| {
                 self.platform_window
                     .take_input_handler()
-                    .map_or(false, |mut input_handler| {
+                    .is_some_and(|mut input_handler| {
                         let accepts = input_handler.accepts_text_input(self, cx);
                         self.platform_window.set_input_handler(input_handler);
                         // If modifiers are not excessive (e.g. AltGr), and the input handler is accepting text input,

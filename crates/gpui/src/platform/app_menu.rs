@@ -174,11 +174,8 @@ impl MenuItem {
     ///
     /// Only for [`MenuItem::Action`], otherwise, will be ignored
     pub fn checked(mut self, checked: bool) -> Self {
-        match &mut self {
-            MenuItem::Action { checked: old, .. } => {
-                *old = checked;
-            }
-            _ => {}
+        if let MenuItem::Action { checked: old, .. } = &mut self {
+            *old = checked;
         }
         self
     }

@@ -363,40 +363,39 @@ impl<E: Element> Drawable<E> {
 
                 let bounds = window.layout_bounds(layout_id);
                 let mut pushed_a11y_node = false;
-                if window.a11y.is_active() {
-                    if let Some(global_id) = global_id.as_ref() {
-                        if let Some(role) = self.element.a11y_role() {
-                            let node_id = global_id.accesskit_node_id();
-                            let mut node = accesskit::Node::new(role);
-                            let scale = window.scale_factor();
-                            node.set_bounds(accesskit::Rect {
-                                x0: (bounds.origin.x.0 * scale) as f64,
-                                y0: (bounds.origin.y.0 * scale) as f64,
-                                x1: ((bounds.origin.x.0 + bounds.size.width.0) * scale) as f64,
-                                y1: ((bounds.origin.y.0 + bounds.size.height.0) * scale) as f64,
-                            });
-                            self.element.write_a11y_info(&mut node);
-                            window.a11y.node_bounds.insert(node_id, bounds);
-                            pushed_a11y_node = window.a11y.nodes.push(node_id, node);
-                            #[cfg(debug_assertions)]
-                            if pushed_a11y_node {
-                                let view = window
-                                    .a11y
-                                    .view_type_names
-                                    .get(&window.current_view())
-                                    .copied();
-                                let source_location = self.element.source_location();
-                                window.a11y.nodes.record_node_info(
-                                    node_id,
-                                    crate::window::a11y::debug::NodeDebugInfo {
-                                        synthetic: false,
-                                        view,
-                                        element_id: global_id.0.last().map(|id| format!("{id:?}")),
-                                        source_location,
-                                    },
-                                );
-                            }
-                        }
+                if window.a11y.is_active()
+                    && let Some(global_id) = global_id.as_ref()
+                    && let Some(role) = self.element.a11y_role()
+                {
+                    let node_id = global_id.accesskit_node_id();
+                    let mut node = accesskit::Node::new(role);
+                    let scale = window.scale_factor();
+                    node.set_bounds(accesskit::Rect {
+                        x0: (bounds.origin.x.0 * scale) as f64,
+                        y0: (bounds.origin.y.0 * scale) as f64,
+                        x1: ((bounds.origin.x.0 + bounds.size.width.0) * scale) as f64,
+                        y1: ((bounds.origin.y.0 + bounds.size.height.0) * scale) as f64,
+                    });
+                    self.element.write_a11y_info(&mut node);
+                    window.a11y.node_bounds.insert(node_id, bounds);
+                    pushed_a11y_node = window.a11y.nodes.push(node_id, node);
+                    #[cfg(debug_assertions)]
+                    if pushed_a11y_node {
+                        let view = window
+                            .a11y
+                            .view_type_names
+                            .get(&window.current_view())
+                            .copied();
+                        let source_location = self.element.source_location();
+                        window.a11y.nodes.record_node_info(
+                            node_id,
+                            crate::window::a11y::debug::NodeDebugInfo {
+                                synthetic: false,
+                                view,
+                                element_id: global_id.0.last().map(|id| format!("{id:?}")),
+                                source_location,
+                            },
+                        );
                     }
                 }
 

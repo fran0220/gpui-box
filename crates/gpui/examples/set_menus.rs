@@ -66,9 +66,9 @@ impl ViewMode {
     }
 }
 
-impl Into<SharedString> for ViewMode {
-    fn into(self) -> SharedString {
-        match self {
+impl From<ViewMode> for SharedString {
+    fn from(val: ViewMode) -> Self {
+        match val {
             ViewMode::List => "List",
             ViewMode::Grid => "Grid",
         }
