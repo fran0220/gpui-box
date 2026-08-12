@@ -63,6 +63,7 @@ pub struct WindowsWindowState {
     pub direct_manipulation: DirectManipulationHandler,
 
     pub renderer: RefCell<DirectXRenderer>,
+    pub(crate) platform_view_host: PlatformViewHost,
     /// Set when the next `draw_window` call must be treated as a forced
     /// render. Used after a GPU device-lost recovery, where the next frame
     /// must both re-enable drawing (via `mark_drawable`) and bypass the GPUI
@@ -173,6 +174,7 @@ impl WindowsWindowState {
             last_reported_capslock: Cell::new(last_reported_capslock),
             hovered: Cell::new(hovered),
             renderer: RefCell::new(renderer),
+            platform_view_host: PlatformViewHost::new(hwnd),
             force_render_pending: Cell::new(false),
             click_state,
             current_cursor: Cell::new(current_cursor),
@@ -592,8 +594,18 @@ impl rwh::HasDisplayHandle for WindowsWindow {
     }
 }
 
+/// Unhosts every platform view the window still holds, returning true once
+/// none is left attached.
+pub(crate) fn detach_all_platform_views(window: &WindowsWindowInner) -> bool {
+    window.state.platform_view_host.detach_all()
+}
+
 impl Drop for WindowsWindow {
     fn drop(&mut self) {
+        // A hosted view belongs to whoever created it, so it is handed back
+        // before the window that borrowed it goes away.
+        self.0.state.platform_view_host.destroy();
+
         // clone this `Rc` to prevent early release of the pointer
         let this = self.0.clone();
         self.0
@@ -1010,6 +1022,13 @@ impl PlatformWindow for WindowsWindow {
 
     fn create_native_surface(&self) -> anyhow::Result<Rc<dyn PlatformNativeSurface>> {
         self.state.renderer.borrow_mut().create_native_surface()
+    }
+
+    fn update_platform_views(&self, update: &PlatformViewUpdate) {
+        self.0
+            .state
+            .platform_view_host
+            .update(update, self.0.state.scale_factor.get());
     }
 
     fn sprite_atlas(&self) -> Arc<dyn PlatformAtlas> {
@@ -1459,7 +1478,7 @@ pub(crate) fn window_from_hwnd(hwnd: HWND) -> Option<Rc<WindowsWindowInner>> {
     }
 }
 
-fn get_module_handle() -> HMODULE {
+pub(crate) fn get_module_handle() -> HMODULE {
     unsafe {
         let mut h_module = std::mem::zeroed();
         GetModuleHandleExW(

@@ -9,16 +9,16 @@ use crate::{
     Hsla, InputHandler, IsZero, KeyBinding, KeyContext, KeyDownEvent, KeyEvent, Keystroke,
     KeystrokeEvent, LayoutId, LineLayoutIndex, Modifiers, ModifiersChangedEvent, MonochromeSprite,
     MouseButton, MouseEvent, MouseMoveEvent, MouseUpEvent, Path, Pixels, PlatformAtlas,
-    PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformWindow, Point, PolychromeSprite,
-    Priority, PromptButton, PromptLevel, Quad, Render, RenderGlyphParams, RenderImage,
-    RenderImageParams, RenderSvgParams, Replay, ResizeEdge, SMOOTH_SVG_SCALE_FACTOR,
-    SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y, ScaledPixels, Scene, Shadow, SharedString, Size,
-    StrikethroughStyle, Style, SubpixelSprite, SubscriberSet, Subscription, SystemWindowTab,
-    SystemWindowTabController, TabStopMap, TaffyLayoutEngine, Task, TextRenderingMode, TextStyle,
-    TextStyleRefinement, ThermalState, TransformationMatrix, Underline, UnderlineStyle,
-    WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControls, WindowDecorations,
-    WindowOptions, WindowParams, WindowTextSystem, point, prelude::*, profiler, px, rems, size,
-    transparent_black,
+    PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformViewHandle,
+    PlatformViewPlacement, PlatformViewRegistry, PlatformWindow, Point, PolychromeSprite, Priority,
+    PromptButton, PromptLevel, Quad, Render, RenderGlyphParams, RenderImage, RenderImageParams,
+    RenderSvgParams, Replay, ResizeEdge, SMOOTH_SVG_SCALE_FACTOR, SUBPIXEL_VARIANTS_X,
+    SUBPIXEL_VARIANTS_Y, ScaledPixels, Scene, Shadow, SharedString, Size, StrikethroughStyle,
+    Style, SubpixelSprite, SubscriberSet, Subscription, SystemWindowTab, SystemWindowTabController,
+    TabStopMap, TaffyLayoutEngine, Task, TextRenderingMode, TextStyle, TextStyleRefinement,
+    ThermalState, TransformationMatrix, Underline, UnderlineStyle, WindowAppearance,
+    WindowBackgroundAppearance, WindowBounds, WindowControls, WindowDecorations, WindowOptions,
+    WindowParams, WindowTextSystem, point, prelude::*, profiler, px, rems, size, transparent_black,
 };
 
 use anyhow::{Context as _, Result, anyhow};
@@ -940,6 +940,8 @@ pub(crate) struct Frame {
     pointer_capture_hitboxes: FxHashMap<GlobalElementId, HitboxId>,
     pub(crate) window_control_hitboxes: Vec<(WindowControlArea, Hitbox)>,
     pub(crate) deferred_draws: Vec<DeferredDraw>,
+    /// Natively hosted views painted by this frame, in paint order.
+    pub(crate) platform_views: Vec<PlatformViewPlacement>,
     pub(crate) input_handlers: Vec<Option<PlatformInputHandler>>,
     pub(crate) tooltip_requests: Vec<Option<TooltipRequest>>,
     pub(crate) cursor_styles: Vec<CursorStyleRequest>,
@@ -970,6 +972,7 @@ pub(crate) struct PaintIndex {
     cursor_styles_index: usize,
     accessed_element_states_index: usize,
     tab_handle_index: usize,
+    platform_views_index: usize,
     line_layout_index: LineLayoutIndex,
 }
 
@@ -988,6 +991,7 @@ impl Frame {
             pointer_capture_hitboxes: FxHashMap::default(),
             window_control_hitboxes: Vec::new(),
             deferred_draws: Vec::new(),
+            platform_views: Vec::new(),
             input_handlers: Vec::new(),
             tooltip_requests: Vec::new(),
             cursor_styles: Vec::new(),
@@ -1018,6 +1022,7 @@ impl Frame {
         self.pointer_capture_hitboxes.clear();
         self.window_control_hitboxes.clear();
         self.deferred_draws.clear();
+        self.platform_views.clear();
         self.tab_stops.clear();
         self.focus = None;
 
@@ -1130,6 +1135,7 @@ pub struct Window {
     pub(crate) image_cache_stack: Vec<AnyImageCache>,
     pub(crate) rendered_frame: Frame,
     pub(crate) next_frame: Frame,
+    platform_view_registry: PlatformViewRegistry,
     next_hitbox_id: HitboxId,
     pub(crate) next_tooltip_id: TooltipId,
     pub(crate) tooltip_bounds: Option<TooltipBounds>,
@@ -1924,6 +1930,7 @@ impl Window {
             requested_autoscroll: None,
             rendered_frame: Frame::new(DispatchTree::new(cx.keymap.clone(), cx.actions.clone())),
             next_frame: Frame::new(DispatchTree::new(cx.keymap.clone(), cx.actions.clone())),
+            platform_view_registry: PlatformViewRegistry::default(),
             next_frame_callbacks,
             next_hitbox_id: HitboxId(0),
             next_tooltip_id: TooltipId::default(),
@@ -2114,6 +2121,9 @@ impl Window {
     /// Close this window.
     pub fn remove_window(&mut self) {
         self.removed = true;
+        if let Some(update) = self.platform_view_registry.detach_all() {
+            self.platform_window.update_platform_views(&update);
+        }
     }
 
     /// Obtain the currently focused [`FocusHandle`]. If no elements are focused, returns `None`.
@@ -3043,6 +3053,7 @@ impl Window {
             self.refresh();
         }
         self.needs_present.set(true);
+        self.sync_platform_views();
 
         if let Some(draw_start) = draw_started_at {
             profiler::record_frame_timing(profiler::FrameTiming {
@@ -3190,7 +3201,7 @@ impl Window {
         // Native surfaces are composited after the root scene and before all
         // deferred/window-level overlays. Platform backends with layered scene
         // support use this boundary to render the remainder on a transparent
-        // surface above native children such as WebViews.
+        // surface above native children.
         self.next_frame.overlay_scene_start = self.next_frame.scene.len();
 
         self.paint_deferred_draws(cx);
@@ -3489,6 +3500,7 @@ impl Window {
             cursor_styles_index: self.next_frame.cursor_styles.len(),
             accessed_element_states_index: self.next_frame.accessed_element_states.len(),
             tab_handle_index: self.next_frame.tab_stops.paint_index(),
+            platform_views_index: self.next_frame.platform_views.len(),
             line_layout_index: self.text_system.layout_index(),
         }
     }
@@ -3521,6 +3533,14 @@ impl Window {
         self.next_frame.tab_stops.replay(
             &self.rendered_frame.tab_stops.insertion_history
                 [range.start.tab_handle_index..range.end.tab_handle_index],
+        );
+        // Hosted platform views are registered rather than drawn, so a reused
+        // paint range must re-register them or the views would look unmounted.
+        self.next_frame.platform_views.extend(
+            self.rendered_frame.platform_views
+                [range.start.platform_views_index..range.end.platform_views_index]
+                .iter()
+                .cloned(),
         );
 
         self.text_system
@@ -4853,6 +4873,43 @@ impl Window {
             content_mask,
             image_buffer,
         });
+    }
+
+    /// Registers a natively hosted view to occupy `bounds` for the frame being
+    /// painted. The platform layer attaches and positions the view once the
+    /// frame is complete, and hides any view that stops being painted.
+    ///
+    /// Prefer the [`crate::platform_view`] element; this is its paint step.
+    ///
+    /// This method should only be called as part of the paint phase of element
+    /// drawing.
+    pub fn paint_platform_view(&mut self, bounds: Bounds<Pixels>, handle: PlatformViewHandle) {
+        self.invalidator.debug_assert_paint();
+
+        // A view clipped away entirely — scrolled out of its container, say —
+        // registers nothing, so it is detached rather than left floating over
+        // content it no longer belongs to.
+        let bounds = bounds.intersect(&self.content_mask().bounds);
+        if bounds.size.width <= px(0.) || bounds.size.height <= px(0.) {
+            return;
+        }
+
+        self.next_frame
+            .platform_views
+            .push(PlatformViewPlacement { handle, bounds });
+    }
+
+    /// Hands the platform layer the hosted-view changes owed by the frame that
+    /// was just drawn.
+    fn sync_platform_views(&mut self) {
+        let scale_factor = self.scale_factor();
+        let Some(update) = self
+            .platform_view_registry
+            .sync(&self.rendered_frame.platform_views, scale_factor)
+        else {
+            return;
+        };
+        self.platform_window.update_platform_views(&update);
     }
 
     /// Removes an image from the sprite atlas.

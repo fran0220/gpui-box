@@ -27,10 +27,11 @@ use gpui::{
     AnyWindowHandle, BackgroundExecutor, Bounds, Capslock, CursorStyle, ExternalDragPayload,
     ExternalPaths, FileDropEvent, ForegroundExecutor, KeyDownEvent, Keystroke, Modifiers,
     ModifiersChangedEvent, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels,
-    PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformWindow, Point,
-    PromptButton, PromptLevel, RequestFrameOptions, SharedString, Size, SystemWindowTab,
-    WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowKind,
-    WindowParams, point, px, size,
+    PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformViewHandle,
+    PlatformViewUpdate, PlatformWindow, Point, PromptButton, PromptLevel, RequestFrameOptions,
+    SharedString, Size, SystemWindowTab, WindowAppearance, WindowBackgroundAppearance,
+    WindowBounds, WindowControlArea, WindowKind, WindowParams, flip_bounds_origin_y, point, px,
+    size,
 };
 #[cfg(any(test, feature = "test-support"))]
 use image::RgbaImage;
@@ -564,6 +565,9 @@ struct MacWindowState {
     native_view: NonNull<Object>,
     overlay_view: Option<NonNull<Object>>,
     overlay_input_active: Arc<AtomicBool>,
+    /// Native views hosted by `platform_view` elements, in the order they were
+    /// attached. GPUI owns their frames while they are here.
+    hosted_platform_views: Vec<PlatformViewHandle>,
     blurred_view: Option<id>,
     background_appearance: WindowBackgroundAppearance,
     cursor_style: CursorStyle,
@@ -971,6 +975,7 @@ impl MacWindow {
                 native_view: NonNull::new_unchecked(native_view),
                 overlay_view: None,
                 overlay_input_active: Arc::new(AtomicBool::new(false)),
+                hosted_platform_views: Vec::new(),
                 blurred_view: None,
                 background_appearance: WindowBackgroundAppearance::Opaque,
                 cursor_style: CursorStyle::Arrow,
@@ -1252,9 +1257,21 @@ impl MacWindow {
     }
 }
 
+/// Hides a hosted view and takes it back out of the window's view hierarchy.
+fn detach_platform_view(handle: &PlatformViewHandle) {
+    let view = handle.as_ns_view() as id;
+    unsafe {
+        let _: () = msg_send![view, setHidden: YES];
+        let _: () = msg_send![view, removeFromSuperview];
+    }
+}
+
 impl Drop for MacWindow {
     fn drop(&mut self) {
         let mut this = self.0.lock();
+        for handle in std::mem::take(&mut this.hosted_platform_views) {
+            detach_platform_view(&handle);
+        }
         this.renderer.destroy();
         let window = this.native_window;
         let sheet_parent = this.sheet_parent.take();
@@ -1901,15 +1918,92 @@ impl PlatformWindow for MacWindow {
                 setLayerContentsRedrawPolicy: NSViewLayerContentsRedrawDuringViewResize
             ];
 
-            // wry has already inserted WKWebView by the time this API is called.
-            // Adding the overlay last places it above the WebView in AppKit's
-            // back-to-front subview order.
+            // Adding the overlay last places it above hosted native views in
+            // AppKit's back-to-front subview order.
             native_view.addSubview_(overlay_view.autorelease());
             this.overlay_view = NonNull::new(overlay_view);
             this.overlay_renderer = Some(overlay_renderer);
         }
 
         Ok(())
+    }
+
+    fn update_platform_views(&self, update: &PlatformViewUpdate) {
+        // Called from `Window::draw`, which AppKit only ever runs on the main
+        // thread, so the view hierarchy is mutated inline rather than dispatched.
+        let mut this = self.0.lock();
+        if this.closed.load(Ordering::Acquire) {
+            return;
+        }
+
+        let container = this.native_view.as_ptr() as id;
+        let container_height = this.content_size().height;
+        let overlay_view = this.overlay_view.map(|view| view.as_ptr() as id);
+
+        for detached in &update.detached {
+            let Some(index) = this
+                .hosted_platform_views
+                .iter()
+                .position(|hosted| hosted.id() == *detached)
+            else {
+                continue;
+            };
+            let handle = this.hosted_platform_views.remove(index);
+            detach_platform_view(&handle);
+        }
+
+        for placement in &update.placements {
+            let view = placement.handle.as_ns_view() as id;
+            let origin = flip_bounds_origin_y(placement.bounds, container_height);
+
+            unsafe {
+                let superview: id = msg_send![view, superview];
+                if superview != container {
+                    match overlay_view {
+                        // The overlay plane draws GPUI's deferred content, so
+                        // hosted views go underneath it and above everything the
+                        // base renderer drew.
+                        Some(overlay_view) => {
+                            let _: () = msg_send![
+                                container,
+                                addSubview: view
+                                positioned: NSWindowOrderingMode::NSWindowBelow
+                                relativeTo: overlay_view
+                            ];
+                        }
+                        None => {
+                            let _: () = msg_send![
+                                container,
+                                addSubview: view
+                                positioned: NSWindowOrderingMode::NSWindowAbove
+                                relativeTo: nil
+                            ];
+                        }
+                    }
+                }
+
+                let _: () = msg_send![view, setWantsLayer: YES];
+                let _: () = msg_send![
+                    view,
+                    setFrame: NSRect::new(
+                        NSPoint::new(origin.x.to_f64(), origin.y.to_f64()),
+                        NSSize::new(
+                            placement.bounds.size.width.to_f64(),
+                            placement.bounds.size.height.to_f64(),
+                        ),
+                    )
+                ];
+                let _: () = msg_send![view, setHidden: NO];
+            }
+
+            if !this
+                .hosted_platform_views
+                .iter()
+                .any(|hosted| hosted.id() == placement.handle.id())
+            {
+                this.hosted_platform_views.push(placement.handle.clone());
+            }
+        }
     }
 
     fn sprite_atlas(&self) -> Arc<dyn PlatformAtlas> {

@@ -245,6 +245,9 @@ impl WindowsWindowInner {
             callback();
             self.state.callbacks.moved.set(Some(callback));
         }
+        // Hosted views live in a window of their own, which the desktop does
+        // not move along with the window it covers.
+        self.state.platform_view_host.sync_geometry();
         Some(0)
     }
 
@@ -270,6 +273,7 @@ impl WindowsWindowInner {
             self.state
                 .restore_from_minimized
                 .set(self.state.callbacks.request_frame.take());
+            self.state.platform_view_host.sync_geometry();
             return Some(0);
         }
 
@@ -313,6 +317,7 @@ impl WindowsWindowInner {
             callback(new_logical_size, scale_factor);
             self.state.callbacks.resize.set(Some(callback));
         }
+        self.state.platform_view_host.sync_geometry();
     }
 
     fn handle_size_move_loop(&self, handle: HWND) -> Option<isize> {
@@ -357,13 +362,27 @@ impl WindowsWindowInner {
     }
 
     fn handle_close_msg(&self) -> Option<isize> {
-        let mut callback = self.state.callbacks.should_close.take()?;
-        let should_close = callback();
-        self.state.callbacks.should_close.set(Some(callback));
-        if should_close { None } else { Some(0) }
+        let should_close = if let Some(mut callback) = self.state.callbacks.should_close.take() {
+            let should_close = callback();
+            self.state.callbacks.should_close.set(Some(callback));
+            should_close
+        } else {
+            true
+        };
+        if should_close && detach_all_platform_views(self) {
+            None
+        } else {
+            Some(0)
+        }
     }
 
     fn handle_destroy_msg(&self, handle: HWND) -> Option<isize> {
+        // Windows destroys a window's owned windows along with it, and the
+        // view host is owned by this one, so views still hosted have to be
+        // handed back before that happens — whoever created them still owns
+        // them.
+        self.state.platform_view_host.destroy();
+
         let callback = { self.state.callbacks.close.take() };
         // Re-enable parent window if this was a modal dialog
         if let Some(parent_hwnd) = self.parent_hwnd {
@@ -1317,6 +1336,7 @@ impl WindowsWindowInner {
         if wparam.0 == 1 {
             self.draw_window(handle, false);
         }
+        self.state.platform_view_host.sync_geometry();
         None
     }
 
