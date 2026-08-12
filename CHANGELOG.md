@@ -38,7 +38,11 @@ them into the CI cache. Headless CI now enters its independent workspace
 directly instead of compiling the overlapping root `xtask` graph first, and
 its deterministic build omits native window-system and media playback backends
 that no captured scene constructs. Normal framework and Kit builds retain
-those native backends by default.
+those native backends by default. The Windows cold gate now builds that reduced
+harness once and renders four disjoint scene shards in parallel instead of
+driving all 198 WARP images serially. Package validation invalidates historical
+transient proof caches and patches only each archive's actual local dependency
+closure, eliminating restore diagnostics and unused-patch warnings.
 
 **Single-repository framework authority.** GPUI Box now develops GPUI, native
 platforms, media, and Kit directly in this repository. The former Zed sync and

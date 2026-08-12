@@ -265,6 +265,15 @@ features: the harness needs the platform's offscreen renderer, while media
 scenes use the deterministic `FixtureTransport`. Normal applications keep both
 native feature sets enabled by default.
 
+Windows CI builds that harness once, uploads the executable, and assigns the
+stable scene catalog round-robin to four fresh WARP workers with
+`check --shard INDEX/COUNT`. Every scene belongs to exactly one shard, each
+worker still compares against the same committed Windows baseline, and an
+aggregate `headless (windows-2025)` check fails if the build or any shard fails.
+This parallelizes the software renderer rather than compiling the crate graph
+four times. The ordinary unsharded command remains the local and capture
+contract.
+
 ## Audit
 
 `gpui_kit_testkit::audit` reports the properties that make a tree usable:

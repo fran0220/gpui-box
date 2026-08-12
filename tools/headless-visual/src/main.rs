@@ -20,11 +20,57 @@ use anyhow::Result;
 fn main() -> Result<()> {
     let mut args = std::env::args().skip(1);
     let command = args.next();
-    let rest = args.collect::<Vec<_>>();
+    let mut scenes = Vec::new();
+    let mut shard = None;
+    while let Some(argument) = args.next() {
+        if argument == "--shard" {
+            anyhow::ensure!(shard.is_none(), "--shard may be specified only once");
+            let value = args
+                .next()
+                .ok_or_else(|| anyhow::anyhow!("--shard requires INDEX/COUNT"))?;
+            shard = Some(Shard::parse(&value)?);
+        } else if argument.starts_with('-') {
+            anyhow::bail!("unknown option `{argument}`");
+        } else {
+            scenes.push(argument);
+        }
+    }
     match command.as_deref() {
-        Some("capture") => imp::capture(&rest),
-        Some("check") => imp::check(&rest),
-        _ => anyhow::bail!("usage: headless-visual <capture|check> [scene...]"),
+        Some("capture") => imp::capture(&scenes, shard),
+        Some("check") => imp::check(&scenes, shard),
+        _ => anyhow::bail!(
+            "usage: headless-visual <capture|check> [--shard INDEX/COUNT] [scene...]"
+        ),
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct Shard {
+    index: usize,
+    count: usize,
+}
+
+impl Shard {
+    fn parse(value: &str) -> Result<Self> {
+        let (index, count) = value
+            .split_once('/')
+            .ok_or_else(|| anyhow::anyhow!("shard `{value}` must be INDEX/COUNT"))?;
+        let index = index
+            .parse::<usize>()
+            .map_err(|_| anyhow::anyhow!("shard index `{index}` is not a non-negative integer"))?;
+        let count = count
+            .parse::<usize>()
+            .map_err(|_| anyhow::anyhow!("shard count `{count}` is not a positive integer"))?;
+        anyhow::ensure!(count > 0, "shard count must be greater than zero");
+        anyhow::ensure!(
+            index < count,
+            "shard index {index} is outside a shard count of {count}"
+        );
+        Ok(Self { index, count })
+    }
+
+    fn includes(self, scene_index: usize) -> bool {
+        scene_index % self.count == self.index
     }
 }
 
@@ -43,11 +89,13 @@ mod imp {
     use gpui_kit_semantics::SemanticRegistry;
     use gpui_kit_theme::{Theme, activate_theme};
 
-    pub fn capture(only: &[String]) -> Result<()> {
+    use crate::Shard;
+
+    pub fn capture(only: &[String], shard: Option<Shard>) -> Result<()> {
         let directory = snapshots();
         fs::create_dir_all(&directory)
             .with_context(|| format!("create {}", directory.display()))?;
-        let count = capture_frames(only, |name, frame| {
+        let count = capture_frames(only, shard, |name, frame| {
             let path = directory.join(name);
             frame
                 .save(&path)
@@ -68,7 +116,7 @@ mod imp {
     /// Scoped runs agree with each other to the byte, so the tolerance buys a
     /// scoped check that means the same thing as the full one. Anything a
     /// component actually changed moves far further than one step.
-    pub fn check(only: &[String]) -> Result<()> {
+    pub fn check(only: &[String], shard: Option<Shard>) -> Result<()> {
         let committed = snapshots();
         let scratch = repo_root().join("target").join("headless-scene-check");
         if scratch.exists() {
@@ -76,7 +124,7 @@ mod imp {
         }
         let mut differing = Vec::new();
         let mut missing = Vec::new();
-        let count = capture_frames(only, |name, frame| {
+        let count = capture_frames(only, shard, |name, frame| {
             let old = committed.join(name);
             if !old.exists() {
                 missing.push(name.to_owned());
@@ -182,6 +230,7 @@ mod imp {
     /// Drives one headless window over the whole catalog.
     fn capture_frames(
         only: &[String],
+        shard: Option<Shard>,
         mut accept: impl FnMut(&str, &image::RgbaImage) -> Result<()>,
     ) -> Result<usize> {
         for name in only {
@@ -226,8 +275,8 @@ mod imp {
         // Scene outside, theme inside, matching the macOS gallery: a scene may
         // install state on its first build, so its images are taken next to
         // each other rather than a whole catalog apart.
-        for scene in gpui_kit::scenes::catalog() {
-            if !wanted(scene.name) {
+        for (scene_index, scene) in gpui_kit::scenes::catalog().into_iter().enumerate() {
+            if !wanted(scene.name) || shard.is_some_and(|shard| !shard.includes(scene_index)) {
                 continue;
             }
             for theme in gpui_kit::tokens::bundled() {
@@ -307,6 +356,36 @@ mod imp {
 
             assert!(!within_one_step(&expected, &changed));
             assert!(!within_one_step(&expected, &resized));
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shard_assigns_every_scene_to_exactly_one_worker() -> Result<()> {
+        let shards = (0..4)
+            .map(|index| Shard::parse(&format!("{index}/4")))
+            .collect::<Result<Vec<_>>>()?;
+
+        for scene in 0..gpui_kit::scenes::catalog().len() {
+            assert_eq!(
+                shards
+                    .iter()
+                    .filter(|shard| shard.includes(scene))
+                    .count(),
+                1
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn shard_rejects_invalid_coordinates() {
+        for invalid in ["", "1", "x/4", "1/x", "0/0", "4/4", "1/2/3"] {
+            assert!(Shard::parse(invalid).is_err(), "accepted `{invalid}`");
         }
     }
 }

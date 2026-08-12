@@ -141,7 +141,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-15, ubuntu-24.04, windows-2025]
+        os: [macos-15, ubuntu-24.04]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
@@ -153,16 +153,66 @@ jobs:
         with: { toolchain: 1.97.0 }
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: |
-            . -> target
-            tools/headless-visual -> target
-      - run: cargo run -p xtask -- headless check
+          workspaces: tools/headless-visual -> target
+      - run: cargo run --locked --manifest-path tools/headless-visual/Cargo.toml -- check
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: headless-release-diff-${{ runner.os }}
           path: target/headless-scene-check
           if-no-files-found: ignore
+
+  headless-windows-build:
+    name: headless build (windows-2025)
+    needs: preflight
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v5
+        with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0 }
+      - uses: dtolnay/rust-toolchain@master
+        with: { toolchain: 1.97.0 }
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tools/headless-visual -> target
+      - run: cargo build --locked --manifest-path tools/headless-visual/Cargo.toml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: headless-release-windows-executable
+          path: tools/headless-visual/target/debug/gpui-box-headless-visual.exe
+          if-no-files-found: error
+
+  headless-windows-shard:
+    name: headless shard ${{ matrix.shard }} (windows-2025)
+    needs: [preflight, headless-windows-build]
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v5
+        with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0 }
+      - uses: actions/download-artifact@v5
+        with:
+          name: headless-release-windows-executable
+          path: tools/headless-visual/target/debug
+      - run: tools/headless-visual/target/debug/gpui-box-headless-visual.exe check --shard ${{ matrix.shard }}/4
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: headless-release-diff-Windows-${{ matrix.shard }}
+          path: target/headless-scene-check
+          if-no-files-found: ignore
+
+  headless-windows:
+    name: headless (windows-2025)
+    if: always()
+    needs: [headless-windows-build, headless-windows-shard]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require the build and every shard
+        if: needs.headless-windows-build.result != 'success' || needs.headless-windows-shard.result != 'success'
+        run: exit 1
 
   web:
     needs: preflight
@@ -202,7 +252,7 @@ jobs:
 
   publish-with-token:
     if: ${{ inputs.execute && inputs.auth == 'token' }}
-    needs: [preflight, native, headless, web, semver]
+    needs: [preflight, native, headless, headless-windows, web, semver]
     runs-on: ubuntu-24.04
     environment: crates-io
     permissions:
@@ -235,7 +285,7 @@ jobs:
 
   publish-with-oidc:
     if: ${{ inputs.execute && inputs.auth == 'oidc' }}
-    needs: [preflight, native, headless, web, semver]
+    needs: [preflight, native, headless, headless-windows, web, semver]
     runs-on: ubuntu-24.04
     environment: crates-io
     permissions:
@@ -267,7 +317,7 @@ jobs:
 
   bootstrap-trusted-publishing:
     if: ${{ inputs.bootstrap_trusted_publishing }}
-    needs: [preflight, native, headless, web, semver]
+    needs: [preflight, native, headless, headless-windows, web, semver]
     runs-on: ubuntu-24.04
     environment: crates-io
     permissions:
