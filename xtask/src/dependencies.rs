@@ -8,6 +8,7 @@ use std::{
 use anyhow::{Context, Result, bail, ensure};
 use serde::Deserialize;
 use serde_json::Value as Json;
+use sha2::{Digest, Sha256};
 use toml::Value;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -141,12 +142,7 @@ pub fn check(root: &Path, args: &[String]) -> Result<()> {
     }
     check_single_gpui_library(root_packages, "root graph")?;
     check_single_gpui_library(head_packages, "headless graph")?;
-    ensure!(
-        read_toml(&root.join("tools/headless-visual/Cargo.toml"))?
-            .get("patch")
-            .is_none(),
-        "headless workspace must not contain [patch]"
-    );
+    check_vendored_block_patch(root)?;
     for lock in [
         root.join("Cargo.lock"),
         root.join("tools/headless-visual/Cargo.lock"),
@@ -160,6 +156,60 @@ pub fn check(root: &Path, args: &[String]) -> Result<()> {
     check_sync(root, &a)?;
     check_release_records(root, &a)?;
     println!("package identities, dependency graphs, compatibility, and provenance records agree");
+    Ok(())
+}
+
+fn check_vendored_block_patch(root: &Path) -> Result<()> {
+    for (manifest, expected_path) in [
+        ("Cargo.toml", "vendor/block"),
+        ("tools/headless-visual/Cargo.toml", "../../vendor/block"),
+    ] {
+        let manifest_path = root.join(manifest);
+        let value = read_toml(&manifest_path)?;
+        let patch = value
+            .get("patch")
+            .and_then(Value::as_table)
+            .with_context(|| format!("{} has no [patch] table", manifest_path.display()))?;
+        ensure!(
+            patch.len() == 1 && patch.contains_key("crates-io"),
+            "{} may patch only crates.io",
+            manifest_path.display()
+        );
+        let crates_io = patch["crates-io"].as_table().with_context(|| {
+            format!(
+                "{} [patch.crates-io] is not a table",
+                manifest_path.display()
+            )
+        })?;
+        ensure!(
+            crates_io.len() == 1,
+            "{} may contain only the audited block patch",
+            manifest_path.display()
+        );
+        let block = crates_io
+            .get("block")
+            .and_then(Value::as_table)
+            .with_context(|| format!("{} has no block patch", manifest_path.display()))?;
+        ensure!(
+            block.len() == 1 && block.get("path").and_then(Value::as_str) == Some(expected_path),
+            "{} block patch must resolve from {expected_path}",
+            manifest_path.display()
+        );
+    }
+
+    let vendored = read_toml(&root.join("vendor/block/Cargo.toml"))?;
+    ensure!(
+        vendored["package"]["name"].as_str() == Some("block")
+            && vendored["package"]["version"].as_str() == Some("0.1.6")
+            && vendored["package"]["license"].as_str() == Some("MIT"),
+        "vendored block identity must remain block 0.1.6 under MIT"
+    );
+    let source = fs::read(root.join("vendor/block/src/lib.rs"))?;
+    ensure!(
+        format!("{:x}", Sha256::digest(source))
+            == "51e54353cee1cc853e567d140d35b4a74e27d5cbdbcbe68e979269f39209906a",
+        "vendored block source differs from its audited receipt"
+    );
     Ok(())
 }
 

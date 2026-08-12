@@ -45,7 +45,9 @@ list, is authoritative.
    `package check` requires `cargo-local-registry` 0.2.12. It packages every
    publishable crate, constructs a registry under `target/package-check`, then
    builds framework-only and framework-plus-kit consumers offline with source
-   replacement and without path patches. It also runs a packaged
+   replacement and without GPUI Box path patches. The workspace's sole Cargo
+   patch is the separately receipted `block` 0.1.6 compatibility fork. It also
+   runs a packaged
    `gpui::property_test`, installs the MCP binary and checks its help/version,
    rejects retained internal dev-dependencies that would deadlock a first
    publication, and requires exactly one `lib gpui` owned by `gpui-box`. This
@@ -125,8 +127,8 @@ accepted as proof of that reviewed source.
 
 ## Post-publication acceptance
 
-From a clean environment with no workspace patches, Git sources, or path
-dependencies, create consumers using only crates.io:
+From a clean environment with no GPUI Box workspace patches, Git sources, or
+path dependencies, create consumers using only crates.io:
 
 ```toml
 [dependencies]

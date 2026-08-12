@@ -253,8 +253,10 @@ renderer verifies its own baseline.
 The harness is its own Cargo workspace because its renderer dependencies and
 lockfile are platform-specific. It resolves the same local GPUI Box package
 family as the root workspace with path-plus-version declarations and no Git
-source or `[patch]` override. `xtask dependencies check` fails if either graph,
-authority declaration, or lockfile drifts.
+source. Both workspaces apply the one audited crates.io patch for the vendored
+`block` 0.1.6 future-compatibility fix; no GPUI Box package is patched, and no
+other patch is allowed. `xtask dependencies check` fails if either graph,
+authority declaration, patch receipt, or lockfile drifts.
 
 ## Audit
 

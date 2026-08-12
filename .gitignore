@@ -1,5 +1,7 @@
 /target/
 /tools/headless-visual/target/
+/vendor/block/target/
+/vendor/block/Cargo.lock
 /.amp/
 .DS_Store
 /snapshots/**/*.actual.png

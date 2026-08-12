@@ -33,3 +33,8 @@ gpui_platform = { package = "gpui-box-platform", path = "../../crates/gpui_platf
 gpui_wgpu = { package = "gpui-box-wgpu", path = "../../crates/gpui_wgpu", version = "0.1.1", features = ["test-support"] }
 
 [workspace]
+
+# Match the root workspace's audited compatibility fork so the independent
+# visual lockfile resolves exactly the same framework dependency graph.
+[patch.crates-io]
+block = { path = "../../vendor/block" }

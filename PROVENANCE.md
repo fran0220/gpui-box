@@ -64,6 +64,28 @@ The `gpui-box-media` AVFoundation and Media Foundation playback services are
 also subsequent GPUI Box work. They call operating-system frameworks supplied
 by macOS and Windows and import no third-party player source or media assets.
 
+## P08: `block` 0.1.6 compatibility fork
+
+- Source: <https://github.com/SSheldon/rust-block>
+- Revision/tag: `47178790cfc9d4a8b092051d8b413b78bd31254a`
+  (`0.1.6`)
+- Historical parent license source:
+  <https://github.com/SSheldon/rust-objc/blob/master/LICENSE.txt>
+- License: MIT; copyright (c) Steven Sheldon
+- Local source: `vendor/block`
+
+The macOS Cocoa, Core Video, and Metal crates still resolve `block` 0.1.6,
+whose final upstream release declares `_NSConcreteStackBlock` with an empty,
+uninhabited enum. Rust warns that such an extern static will become a hard
+error. The vendored source changes only that private opaque marker to an
+inhabited zero-sized `#[repr(C)]` struct and spells the previously implicit C
+ABI explicitly on function pointers. Consumers still pass the address of the
+same external symbol through the same pointer-sized `isa` field, so no symbol,
+calling convention, block layout, or public API changes. Both Cargo workspaces
+pin this exact local source, and the dependency gate rejects any additional
+patch. Its audited `src/lib.rs` SHA-256 is
+`51e54353cee1cc853e567d140d35b4a74e27d5cbdbcbe68e979269f39209906a`.
+
 Kit text-input code under `crates/gpui-kit/src/controls/input/` follows GPUI's
 `EntityInputHandler`, UTF-8/UTF-16 conversion, shaping, caret, and selection
 architecture. The kit editing model, bindings, masking, limits, semantics, and

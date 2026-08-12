@@ -33,8 +33,9 @@ members = [
 ]
 # Its own workspace on purpose: the cross-platform visual harness has
 # renderer-specific dependencies and keeps an independent lockfile. Both
-# workspaces consume the same local GPUI Box packages.
-exclude = ["tools/headless-visual"]
+# workspaces consume the same local GPUI Box packages. The vendored `block`
+# compatibility fork is a third-party package, not a workspace member.
+exclude = ["tools/headless-visual", "vendor/block"]
 
 [workspace.package]
 edition = "2024"
@@ -314,6 +315,12 @@ unexpected_cfgs = { level = "warn", check-cfg = ["cfg(perf_enabled)", "cfg(rust_
 dbg_macro = "deny"
 todo = "warn"
 unwrap_used = "warn"
+
+# `block` 0.1.6 is the final upstream release and contains Rust
+# future-incompatibilities. Keep its API and ABI, but use the audited local
+# compatibility fork until the legacy Cocoa/Metal stack is replaced.
+[patch.crates-io]
+block = { path = "vendor/block" }
 
 [profile.release]
 lto = "thin"

@@ -25,6 +25,20 @@ use operating-system frameworks; they import no additional third-party source
 or media assets.
 License text: licenses/ZED-APACHE-2.0.txt
 
+block 0.1.6
+--------------------------------------------------------------------------------
+Source: https://github.com/SSheldon/rust-block
+Revision/tag: 47178790cfc9d4a8b092051d8b413b78bd31254a (0.1.6)
+License: MIT
+Copyright (c) Steven Sheldon
+Scope: `vendor/block`, used by the legacy Cocoa, Core Video, and Metal bindings.
+GPUI Box changes the opaque Objective-C class marker from an uninhabited enum
+to an inhabited zero-sized C struct and spells the already-default C ABI on
+function pointers explicitly. The external symbol, pointer layout, block ABI,
+and public API are unchanged. Upstream 0.1.6 is the final release and does not
+contain these Rust future-compatibility fixes.
+License text: vendor/block/LICENSE
+
 Comet
 --------------------------------------------------------------------------------
 Source: https://github.com/zeronsh/comet

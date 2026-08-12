@@ -62,3 +62,13 @@ source_location = "README.md:lowbias32"
 relationship = "translated-and-adapted"
 license = "Unlicense"
 license_text = "licenses/HASH-PROSPECTOR-UNLICENSE.txt"
+
+[[derived_source]]
+name = "block 0.1.6 compatibility fork"
+url = "https://github.com/SSheldon/rust-block"
+revision = "47178790cfc9d4a8b092051d8b413b78bd31254a"
+source_location = "vendor/block"
+relationship = "vendored-abi-neutral-future-compatibility-fix"
+license = "MIT"
+license_text = "vendor/block/LICENSE"
+source_sha256 = "51e54353cee1cc853e567d140d35b4a74e27d5cbdbcbe68e979269f39209906a"
