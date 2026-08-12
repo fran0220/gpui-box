@@ -548,7 +548,7 @@ impl WindowsWindow {
         // so check the inner result first.
         let this = context.inner.take().transpose()?;
         let hwnd = creation_result?;
-        let this = this.unwrap();
+        let this = this.expect("required framework invariant must hold");
 
         register_drag_drop(&this)?;
         set_non_rude_hwnd(hwnd, true);

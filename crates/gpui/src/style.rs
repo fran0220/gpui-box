@@ -1518,12 +1518,18 @@ mod tests {
 
         assert_eq!(
             Some(AbsoluteLength::from(px(20.0))),
-            style.text_style().unwrap().font_size
+            style
+                .text_style()
+                .expect("required framework invariant must hold")
+                .font_size
         );
 
         assert_eq!(
             Some(FontWeight::SEMIBOLD),
-            style.text_style().unwrap().font_weight
+            style
+                .text_style()
+                .expect("required framework invariant must hold")
+                .font_weight
         );
     }
 }

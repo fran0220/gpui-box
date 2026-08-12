@@ -620,7 +620,10 @@ impl SystemWindowTabController {
             return;
         };
 
-        let current_index = tabs.iter().position(|tab| tab.id == id).unwrap();
+        let current_index = tabs
+            .iter()
+            .position(|tab| tab.id == id)
+            .expect("required framework invariant must hold");
         let next_index = (current_index + 1) % tabs.len();
 
         let _ = &tabs[next_index].handle.update(cx, |_, window, _| {
@@ -635,7 +638,10 @@ impl SystemWindowTabController {
             return;
         };
 
-        let current_index = tabs.iter().position(|tab| tab.id == id).unwrap();
+        let current_index = tabs
+            .iter()
+            .position(|tab| tab.id == id)
+            .expect("required framework invariant must hold");
         let previous_index = if current_index == 0 {
             tabs.len() - 1
         } else {
@@ -1253,7 +1259,10 @@ impl App {
                     clear.clear(cx);
 
                     cx.window_handles.insert(id, window.handle);
-                    cx.windows.get_mut(id).unwrap().replace(Box::new(window));
+                    cx.windows
+                        .get_mut(id)
+                        .expect("required framework invariant must hold")
+                        .replace(Box::new(window));
                     Ok(handle)
                 }
                 Err(e) => {
@@ -1654,7 +1663,7 @@ impl App {
                     .collect::<Vec<_>>()
                 {
                     self.update_window(window, |_, window, cx| window.draw(cx).clear(cx))
-                        .unwrap();
+                        .expect("required framework invariant must hold");
                 }
 
                 if self.pending_effects.is_empty() {
@@ -1701,7 +1710,7 @@ impl App {
                                     window.blur();
                                 }
                             })
-                            .unwrap();
+                            .expect("required framework invariant must hold");
                     }
                     false
                 } else {
@@ -1805,7 +1814,10 @@ impl App {
         self.update(|cx| {
             let mut window = cx.windows.get_mut(id)?.take()?;
 
-            let root_view = window.root.clone().unwrap();
+            let root_view = window
+                .root
+                .clone()
+                .expect("required framework invariant must hold");
 
             cx.window_update_stack.push(window.handle.id);
             let result = update(root_view, &mut window, cx);
@@ -1942,7 +1954,11 @@ impl App {
     pub fn global<G: Global>(&self) -> &G {
         self.globals_by_type
             .get(&TypeId::of::<G>())
-            .map(|any_state| any_state.downcast_ref::<G>().unwrap())
+            .map(|any_state| {
+                any_state
+                    .downcast_ref::<G>()
+                    .expect("required framework invariant must hold")
+            })
             .unwrap_or_else(|| panic!("no state of type {} exists", type_name::<G>()))
     }
 
@@ -1950,7 +1966,11 @@ impl App {
     pub fn try_global<G: Global>(&self) -> Option<&G> {
         self.globals_by_type
             .get(&TypeId::of::<G>())
-            .map(|any_state| any_state.downcast_ref::<G>().unwrap())
+            .map(|any_state| {
+                any_state
+                    .downcast_ref::<G>()
+                    .expect("required framework invariant must hold")
+            })
     }
 
     /// Access the global of the given type mutably. Panics if a global for that type has not been assigned.
@@ -1973,7 +1993,7 @@ impl App {
             .entry(global_type)
             .or_insert_with(|| Box::<G>::default())
             .downcast_mut::<G>()
-            .unwrap()
+            .expect("required framework invariant must hold")
     }
 
     /// Sets the value of the global of the given type.
@@ -1998,7 +2018,7 @@ impl App {
             .remove(&global_type)
             .unwrap_or_else(|| panic!("no global added for {}", type_name::<G>()))
             .downcast()
-            .unwrap()
+            .expect("required framework invariant must hold")
     }
 
     /// Register a callback to be invoked when a global of the given type is updated.
@@ -2024,7 +2044,7 @@ impl App {
             self.globals_by_type
                 .remove(&TypeId::of::<G>())
                 .with_context(|| format!("no global registered of type {}", type_name::<G>()))
-                .unwrap(),
+                .expect("required framework invariant must hold"),
         )
     }
 
@@ -2058,7 +2078,7 @@ impl App {
                 move |any_entity: AnyEntity, window: &mut Option<&mut Window>, cx: &mut App| {
                     any_entity
                         .downcast::<T>()
-                        .unwrap()
+                        .expect("required framework invariant must hold")
                         .update(cx, |entity_state, cx| {
                             on_new(entity_state, window.as_deref_mut(), cx)
                         })
@@ -2185,7 +2205,9 @@ impl App {
             .or_default()
             .push(Rc::new(move |action, phase, cx| {
                 if phase == DispatchPhase::Bubble {
-                    let action = action.downcast_ref().unwrap();
+                    let action = action
+                        .downcast_ref()
+                        .expect("required framework invariant must hold");
                     listener(action, cx)
                 }
             }));
@@ -2587,7 +2609,11 @@ impl App {
         let task = self
             .loading_assets
             .remove(&asset_id)
-            .map(|boxed_task| *boxed_task.downcast::<Shared<Task<A::Output>>>().unwrap())
+            .map(|boxed_task| {
+                *boxed_task
+                    .downcast::<Shared<Task<A::Output>>>()
+                    .expect("required framework invariant must hold")
+            })
             .unwrap_or_else(|| {
                 is_first = true;
                 let future = A::load(source.clone(), self);
@@ -2794,7 +2820,10 @@ impl AppContext for App {
             .as_deref()
             .expect("attempted to read a window that is already on the stack");
 
-        let root_view = window.root.clone().unwrap();
+        let root_view = window
+            .root
+            .clone()
+            .expect("required framework invariant must hold");
         let view = root_view
             .downcast::<T>()
             .map_err(|_| anyhow!("root view's type has changed"))?;
@@ -2876,13 +2905,17 @@ impl<G: Global> Deref for GlobalLease<G> {
     type Target = G;
 
     fn deref(&self) -> &Self::Target {
-        self.global.downcast_ref().unwrap()
+        self.global
+            .downcast_ref()
+            .expect("required framework invariant must hold")
     }
 }
 
 impl<G: Global> DerefMut for GlobalLease<G> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.global.downcast_mut().unwrap()
+        self.global
+            .downcast_mut()
+            .expect("required framework invariant must hold")
     }
 }
 
@@ -2985,13 +3018,19 @@ impl<'a, T: 'static> GpuiBorrow<'a, T> {
 
 impl<'a, T: 'static> std::borrow::Borrow<T> for GpuiBorrow<'a, T> {
     fn borrow(&self) -> &T {
-        self.inner.as_ref().unwrap().borrow()
+        self.inner
+            .as_ref()
+            .expect("required framework invariant must hold")
+            .borrow()
     }
 }
 
 impl<'a, T: 'static> std::borrow::BorrowMut<T> for GpuiBorrow<'a, T> {
     fn borrow_mut(&mut self) -> &mut T {
-        self.inner.as_mut().unwrap().borrow_mut()
+        self.inner
+            .as_mut()
+            .expect("required framework invariant must hold")
+            .borrow_mut()
     }
 }
 
@@ -2999,19 +3038,26 @@ impl<'a, T: 'static> std::ops::Deref for GpuiBorrow<'a, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        self.inner.as_ref().unwrap()
+        self.inner
+            .as_ref()
+            .expect("required framework invariant must hold")
     }
 }
 
 impl<'a, T: 'static> std::ops::DerefMut for GpuiBorrow<'a, T> {
     fn deref_mut(&mut self) -> &mut T {
-        self.inner.as_mut().unwrap()
+        self.inner
+            .as_mut()
+            .expect("required framework invariant must hold")
     }
 }
 
 impl<'a, T> Drop for GpuiBorrow<'a, T> {
     fn drop(&mut self) {
-        let lease = self.inner.take().unwrap();
+        let lease = self
+            .inner
+            .take()
+            .expect("required framework invariant must hold");
         self.app.notify(lease.id);
         self.app.entities.end_lease(lease);
         self.app.finish_update();

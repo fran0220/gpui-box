@@ -73,7 +73,7 @@ fn open_test_window(
             })
         },
     )
-    .unwrap();
+    .expect("test setup should produce the required value");
 }
 
 fn run_example() {

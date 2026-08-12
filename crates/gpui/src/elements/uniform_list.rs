@@ -11,7 +11,7 @@ use crate::{
     StyleRefinement, Styled, Window, point, px, size,
 };
 use smallvec::SmallVec;
-use std::{cell::RefCell, cmp, ops::Range, rc::Rc, usize};
+use std::{cell::RefCell, cmp, ops::Range, rc::Rc};
 
 use super::ListHorizontalSizingBehavior;
 
@@ -367,7 +367,11 @@ impl Element for UniformList {
             height: longest_item_size.height * self.item_count,
         };
 
-        let shared_scroll_offset = self.interactivity.scroll_offset.clone().unwrap();
+        let shared_scroll_offset = self
+            .interactivity
+            .scroll_offset
+            .clone()
+            .expect("required framework invariant must hold");
         let item_height = longest_item_size.height;
         let shared_scroll_to_item = self.scroll_handle.as_mut().and_then(|handle| {
             let mut handle = handle.0.borrow_mut();
@@ -580,6 +584,8 @@ impl IntoElement for UniformList {
 pub trait UniformListDecoration {
     /// Compute the decoration element, given the visible range of list items,
     /// the bounds of the list, and the height of each item.
+    // Rendering boundaries pass distinct layout, scene, window, and application state.
+    #[allow(clippy::too_many_arguments)]
     fn compute(
         &self,
         visible_range: Range<usize>,

@@ -21,6 +21,12 @@ use std::{
     time::Duration,
 };
 
+/// Type-erased future returned by a dedicated executor entry point.
+pub type DedicatedFuture = Pin<Box<dyn Future<Output = Box<dyn Any + Send + Sync>> + 'static>>;
+
+/// Type-erased closure used to start work on a dedicated executor.
+pub type DedicatedTask = Box<dyn FnOnce(LocalExecutor) -> DedicatedFuture + Send + 'static>;
+
 /// Task priority for background tasks.
 ///
 /// Higher priority tasks are more likely to be scheduled before lower priority tasks,
@@ -129,17 +135,7 @@ pub trait Scheduler: Send + Sync {
     /// [`LocalExecutor::spawn_dedicated`] and
     /// [`BackgroundExecutor::spawn_dedicated`], which compose this method
     /// with [`Task::downcast`] to recover the closure's concrete return type.
-    fn spawn_dedicated(
-        self: Arc<Self>,
-        f: Box<
-            dyn FnOnce(
-                    LocalExecutor,
-                )
-                    -> Pin<Box<dyn Future<Output = Box<dyn Any + Send + Sync>> + 'static>>
-                + Send
-                + 'static,
-        >,
-    ) -> Task<Box<dyn Any + Send + Sync>>;
+    fn spawn_dedicated(self: Arc<Self>, f: DedicatedTask) -> Task<Box<dyn Any + Send + Sync>>;
 
     fn as_test(&self) -> Option<&TestScheduler> {
         None

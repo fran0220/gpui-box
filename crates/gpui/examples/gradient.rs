@@ -230,7 +230,7 @@ impl Render for GradientViewer {
 
                     builder.line_to(square_bounds.bottom_right());
                     builder.line_to(square_bounds.bottom_left());
-                    let path = builder.build().unwrap();
+                    let path = builder.build().expect("test setup should produce the required value");
                     window.paint_path(
                         path,
                         linear_gradient(
@@ -254,7 +254,7 @@ fn run_example() {
             },
             |_, cx| cx.new(|_| GradientViewer::new()),
         )
-        .unwrap();
+        .expect("test setup should produce the required value");
         cx.activate(true);
     });
 }

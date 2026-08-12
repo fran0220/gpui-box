@@ -210,7 +210,7 @@ impl DirectXAtlasState {
                 .CreateTexture2D(&texture_desc, None, Some(&mut texture))
                 .ok()?;
         }
-        let texture = texture.unwrap();
+        let texture = texture.expect("required framework invariant must hold");
 
         let texture_list = match kind {
             AtlasTextureKind::Monochrome => &mut self.monochrome_textures,
@@ -238,10 +238,18 @@ impl DirectXAtlasState {
         };
         if let Some(ix) = index {
             texture_list.textures[ix] = Some(atlas_texture);
-            texture_list.textures.get_mut(ix).unwrap().as_mut()
+            texture_list
+                .textures
+                .get_mut(ix)
+                .expect("required framework invariant must hold")
+                .as_mut()
         } else {
             texture_list.textures.push(Some(atlas_texture));
-            texture_list.textures.last_mut().unwrap().as_mut()
+            texture_list
+                .textures
+                .last_mut()
+                .expect("required framework invariant must hold")
+                .as_mut()
         }
     }
 
@@ -249,13 +257,13 @@ impl DirectXAtlasState {
         match id.kind {
             AtlasTextureKind::Monochrome => &self.monochrome_textures[id.index as usize]
                 .as_ref()
-                .unwrap(),
+                .expect("required framework invariant must hold"),
             AtlasTextureKind::Polychrome => &self.polychrome_textures[id.index as usize]
                 .as_ref()
-                .unwrap(),
-            AtlasTextureKind::Subpixel => {
-                &self.subpixel_textures[id.index as usize].as_ref().unwrap()
-            }
+                .expect("required framework invariant must hold"),
+            AtlasTextureKind::Subpixel => &self.subpixel_textures[id.index as usize]
+                .as_ref()
+                .expect("required framework invariant must hold"),
         }
     }
 }

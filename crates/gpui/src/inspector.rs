@@ -126,10 +126,11 @@ mod conditional {
             };
 
             let type_id = TypeId::of::<T>();
-            let mut inspector_state = active_element
-                .states
-                .remove(&type_id)
-                .map(|state| *state.downcast().unwrap());
+            let mut inspector_state = active_element.states.remove(&type_id).map(|state| {
+                *state
+                    .downcast()
+                    .expect("required framework invariant must hold")
+            });
 
             let result = f(&mut inspector_state, window);
 
@@ -214,7 +215,9 @@ mod conditional {
             self.renderers_by_type_id.insert(
                 TypeId::of::<T>(),
                 Box::new(move |id, value, window, cx| {
-                    let value = value.downcast_ref().unwrap();
+                    let value = value
+                        .downcast_ref()
+                        .expect("required framework invariant must hold");
                     f(id, value, window, cx).into_any_element()
                 }),
             );

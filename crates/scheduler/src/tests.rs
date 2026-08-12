@@ -196,7 +196,9 @@ fn test_foreground_task_can_hold_mut_borrow_across_await() {
             .detach();
 
         scheduler.run();
-        sender.unbounded_send(()).unwrap();
+        sender
+            .unbounded_send(())
+            .expect("test setup should produce the required value");
         scheduler.run();
     });
 }
@@ -211,11 +213,17 @@ fn test_send_from_bg_to_fg() {
 
         background
             .spawn(async move {
-                sender.send(42).unwrap();
+                sender
+                    .send(42)
+                    .expect("test setup should produce the required value");
             })
             .detach();
 
-        let task = foreground.spawn(async move { receiver.await.unwrap() });
+        let task = foreground.spawn(async move {
+            receiver
+                .await
+                .expect("test setup should produce the required value")
+        });
         let result = task.await;
         assert_eq!(result, 42);
     });
@@ -301,12 +309,16 @@ fn test_block() {
     scheduler
         .background()
         .spawn(async move {
-            tx.send(42).unwrap();
+            tx.send(42)
+                .expect("test setup should produce the required value");
         })
         .detach();
 
     // Block on receiving the value
-    let result = scheduler.foreground().block_on(async { rx.await.unwrap() });
+    let result = scheduler.foreground().block_on(async {
+        rx.await
+            .expect("test setup should produce the required value")
+    });
     assert_eq!(result, 42);
 }
 
@@ -320,7 +332,8 @@ fn test_parking_panics() {
     let scheduler = Arc::new(TestScheduler::new(config));
     scheduler.foreground().block_on(async {
         let (_tx, rx) = oneshot::channel::<()>();
-        rx.await.unwrap(); // This will never complete
+        rx.await
+            .expect("test setup should produce the required value"); // This will never complete
     });
 }
 
@@ -337,12 +350,16 @@ fn test_block_with_parking() {
     scheduler
         .background()
         .spawn(async move {
-            tx.send(42).unwrap();
+            tx.send(42)
+                .expect("test setup should produce the required value");
         })
         .detach();
 
     // Block on receiving the value (will park if needed)
-    let result = scheduler.foreground().block_on(async { rx.await.unwrap() });
+    let result = scheduler.foreground().block_on(async {
+        rx.await
+            .expect("test setup should produce the required value")
+    });
     assert_eq!(result, 42);
 }
 
@@ -464,7 +481,7 @@ fn test_block_with_timeout() {
         );
 
         // Now explicitly advance time and ensure the returned future can complete.
-        let mut task = timed_out.err().unwrap();
+        let mut task = timed_out.expect_err("task should still be pending after the timeout");
         scheduler.advance_clock(Duration::from_millis(100));
         scheduler.run();
 
@@ -565,7 +582,7 @@ fn test_nondeterministic_wake_detection() {
         scheduler.end_test();
     }));
     assert!(result.is_err(), "Expected end_test to panic");
-    let panic_payload = result.unwrap_err();
+    let panic_payload = result.expect_err("expected error in test scenario");
     let panic_message = panic_payload
         .downcast_ref::<String>()
         .map(|s| s.as_str())
@@ -672,7 +689,7 @@ fn test_nondeterministic_waker_drop_detection() {
         scheduler.end_test();
     }));
     assert!(result.is_err(), "Expected end_test to panic");
-    let panic_payload = result.unwrap_err();
+    let panic_payload = result.expect_err("expected error in test scenario");
     let panic_message = panic_payload
         .downcast_ref::<String>()
         .map(|s| s.as_str())

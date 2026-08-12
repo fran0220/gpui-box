@@ -259,7 +259,7 @@ pub fn perf(our_attr: TokenStream, input: TokenStream) -> TokenStream {
             // The perf harness will pass us the value in an env var. Even if we
             // have a preset value, just do this to keep the code paths unified.
             parse_quote!({
-                let iter_count = std::env::var(#ITER_ENV_VAR).unwrap().parse::<usize>().unwrap();
+                let iter_count = std::env::var(#ITER_ENV_VAR).expect("required framework invariant must hold").parse::<usize>().expect("required framework invariant must hold");
                 for _ in 0..iter_count {
                     #block
                 }

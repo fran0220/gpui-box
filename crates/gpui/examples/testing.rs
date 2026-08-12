@@ -196,7 +196,7 @@ fn run_example() {
                 counter
             },
         )
-        .unwrap();
+        .expect("test setup should produce the required value");
     });
 }
 
@@ -252,11 +252,11 @@ mod tests {
     fn test_counter_in_window(cx: &mut TestAppContext) {
         let window = cx.update(|cx| {
             cx.open_window(Default::default(), |_, cx| cx.new(|cx| Counter::new(cx)))
-                .unwrap()
+                .expect("test setup should produce the required value")
         });
 
         let mut cx = VisualTestContext::from_window(window.into(), cx);
-        let counter = window.root(&mut cx).unwrap();
+        let counter = window.root(&mut cx).expect("test setup should produce the required value");
 
         // Action dispatch depends on the element tree to resolve which action handler
         // to call, and this works exactly as you'd expect in a test.
@@ -318,7 +318,7 @@ mod tests {
 
         // Without allow_parking(), this await would panic because GPUI's
         // scheduler runs out of tasks while waiting for the external thread.
-        let result = rx.await.unwrap();
+        let result = rx.await.expect("test setup should produce the required value");
         assert_eq!(result, 42);
     }
 
@@ -327,7 +327,7 @@ mod tests {
     fn test_counter_random_operations(cx: &mut TestAppContext, mut rng: StdRng) {
         let window = cx.update(|cx| {
             cx.open_window(Default::default(), |_, cx| cx.new(|cx| Counter::new(cx)))
-                .unwrap()
+                .expect("test setup should produce the required value")
         });
         let mut cx = VisualTestContext::from_window(window.into(), cx);
 
@@ -410,7 +410,7 @@ mod tests {
         // See, networking is easy!
         impl NetworkClient {
             fn send(&self, value: i32) {
-                let mut network = self.network.state.lock().unwrap();
+                let mut network = self.network.state.lock().expect("test setup should produce the required value");
                 network.ordering.push(value);
                 if self.is_a {
                     network.b_to_a.push(value);
@@ -420,7 +420,7 @@ mod tests {
             }
 
             fn receive_all(&self) -> Vec<i32> {
-                let mut network = self.network.state.lock().unwrap();
+                let mut network = self.network.state.lock().expect("test setup should produce the required value");
                 if self.is_a {
                     network.a_to_b.drain(..).collect()
                 } else {
@@ -530,7 +530,7 @@ mod tests {
 
             // Nicely format the execution order output.
             // Run this test with `-- --nocapture` to see it!
-            let actual = network.state.lock().unwrap().ordering.clone();
+            let actual = network.state.lock().expect("test setup should produce the required value").ordering.clone();
             let spawned: Vec<_> = original_order.iter().map(|n| format!("{}", n)).collect();
             let ran: Vec<_> = actual.iter().map(|n| format!("{}", n)).collect();
             let diff: Vec<_> = original_order

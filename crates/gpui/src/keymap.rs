@@ -315,28 +315,41 @@ mod tests {
         // global bindings are enabled in all contexts
         assert_eq!(keymap.binding_enabled(&bindings[0], &[]), Some(0));
         assert_eq!(
-            keymap.binding_enabled(&bindings[0], &[KeyContext::parse("terminal").unwrap()]),
+            keymap.binding_enabled(
+                &bindings[0],
+                &[KeyContext::parse("terminal").expect("required framework invariant must hold")]
+            ),
             Some(1)
         );
 
         // contextual bindings are enabled in contexts that match their predicate
         assert_eq!(
-            keymap.binding_enabled(&bindings[1], &[KeyContext::parse("barf x=y").unwrap()]),
+            keymap.binding_enabled(
+                &bindings[1],
+                &[KeyContext::parse("barf x=y").expect("required framework invariant must hold")]
+            ),
             None
         );
         assert_eq!(
-            keymap.binding_enabled(&bindings[1], &[KeyContext::parse("pane x=y").unwrap()]),
+            keymap.binding_enabled(
+                &bindings[1],
+                &[KeyContext::parse("pane x=y").expect("required framework invariant must hold")]
+            ),
             Some(1)
         );
 
         assert_eq!(
-            keymap.binding_enabled(&bindings[2], &[KeyContext::parse("editor").unwrap()]),
+            keymap.binding_enabled(
+                &bindings[2],
+                &[KeyContext::parse("editor").expect("required framework invariant must hold")]
+            ),
             None
         );
         assert_eq!(
             keymap.binding_enabled(
                 &bindings[2],
-                &[KeyContext::parse("editor mode=full").unwrap()]
+                &[KeyContext::parse("editor mode=full")
+                    .expect("required framework invariant must hold")]
             ),
             Some(1)
         );
@@ -353,10 +366,10 @@ mod tests {
         keymap.add_bindings(bindings);
 
         let (result, pending) = keymap.bindings_for_input(
-            &[Keystroke::parse("ctrl-a").unwrap()],
+            &[Keystroke::parse("ctrl-a").expect("required framework invariant must hold")],
             &[
-                KeyContext::parse("pane").unwrap(),
-                KeyContext::parse("editor").unwrap(),
+                KeyContext::parse("pane").expect("required framework invariant must hold"),
+                KeyContext::parse("editor").expect("required framework invariant must hold"),
             ],
         );
 
@@ -382,8 +395,8 @@ mod tests {
         assert!(
             keymap
                 .bindings_for_input(
-                    &[Keystroke::parse("ctrl-a").unwrap()],
-                    &[KeyContext::parse("barf").unwrap()],
+                    &[Keystroke::parse("ctrl-a").expect("required framework invariant must hold")],
+                    &[KeyContext::parse("barf").expect("required framework invariant must hold")],
                 )
                 .0
                 .is_empty()
@@ -391,8 +404,11 @@ mod tests {
         assert!(
             !keymap
                 .bindings_for_input(
-                    &[Keystroke::parse("ctrl-a").unwrap()],
-                    &[KeyContext::parse("editor").unwrap()],
+                    &[Keystroke::parse("ctrl-a").expect("required framework invariant must hold")],
+                    &[
+                        KeyContext::parse("editor")
+                            .expect("required framework invariant must hold")
+                    ],
                 )
                 .0
                 .is_empty()
@@ -402,8 +418,9 @@ mod tests {
         assert!(
             keymap
                 .bindings_for_input(
-                    &[Keystroke::parse("ctrl-a").unwrap()],
-                    &[KeyContext::parse("editor mode=full").unwrap()],
+                    &[Keystroke::parse("ctrl-a").expect("required framework invariant must hold")],
+                    &[KeyContext::parse("editor mode=full")
+                        .expect("required framework invariant must hold")],
                 )
                 .0
                 .is_empty()
@@ -413,8 +430,8 @@ mod tests {
         assert!(
             keymap
                 .bindings_for_input(
-                    &[Keystroke::parse("ctrl-b").unwrap()],
-                    &[KeyContext::parse("barf").unwrap()],
+                    &[Keystroke::parse("ctrl-b").expect("required framework invariant must hold")],
+                    &[KeyContext::parse("barf").expect("required framework invariant must hold")],
                 )
                 .0
                 .is_empty()
@@ -432,18 +449,19 @@ mod tests {
         let mut keymap = Keymap::default();
         keymap.add_bindings(bindings);
 
-        let space = || Keystroke::parse("space").unwrap();
-        let w = || Keystroke::parse("w").unwrap();
+        let space = || Keystroke::parse("space").expect("required framework invariant must hold");
+        let w = || Keystroke::parse("w").expect("required framework invariant must hold");
 
         let space_w = [space(), w()];
         let space_w_w = [space(), w(), w()];
 
-        let workspace_context = || [KeyContext::parse("workspace").unwrap()];
+        let workspace_context =
+            || [KeyContext::parse("workspace").expect("required framework invariant must hold")];
 
         let editor_workspace_context = || {
             [
-                KeyContext::parse("workspace").unwrap(),
-                KeyContext::parse("editor").unwrap(),
+                KeyContext::parse("workspace").expect("required framework invariant must hold"),
+                KeyContext::parse("editor").expect("required framework invariant must hold"),
             ]
         };
 
@@ -529,8 +547,8 @@ mod tests {
 
         // Ensure `space` results in pending input on the workspace, but not editor
         let (result, pending) = keymap.bindings_for_input(
-            &[Keystroke::parse("ctrl-w").unwrap()],
-            &[KeyContext::parse("editor").unwrap()],
+            &[Keystroke::parse("ctrl-w").expect("required framework invariant must hold")],
+            &[KeyContext::parse("editor").expect("required framework invariant must hold")],
         );
         assert!(result.is_empty());
         assert!(pending);
@@ -545,8 +563,8 @@ mod tests {
 
         // Ensure `space` results in pending input on the workspace, but not editor
         let (result, pending) = keymap.bindings_for_input(
-            &[Keystroke::parse("ctrl-w").unwrap()],
-            &[KeyContext::parse("editor").unwrap()],
+            &[Keystroke::parse("ctrl-w").expect("required framework invariant must hold")],
+            &[KeyContext::parse("editor").expect("required framework invariant must hold")],
         );
         assert_eq!(result.len(), 1);
         assert!(!pending);
@@ -564,8 +582,8 @@ mod tests {
 
         // Ensure `space` results in pending input on the workspace, but not editor
         let (result, pending) = keymap.bindings_for_input(
-            &[Keystroke::parse("ctrl-x").unwrap()],
-            &[KeyContext::parse("editor").unwrap()],
+            &[Keystroke::parse("ctrl-x").expect("required framework invariant must hold")],
+            &[KeyContext::parse("editor").expect("required framework invariant must hold")],
         );
         assert!(result.is_empty());
         assert!(!pending);
@@ -578,8 +596,10 @@ mod tests {
         const BASE: KeyBindingMetaIndex = KeyBindingMetaIndex(2);
         const DEFAULT: KeyBindingMetaIndex = KeyBindingMetaIndex(3);
 
-        let editor_context = || [KeyContext::parse("editor").unwrap()];
-        let ctrl_x = || [Keystroke::parse("ctrl-x").unwrap()];
+        let editor_context =
+            || [KeyContext::parse("editor").expect("required framework invariant must hold")];
+        let ctrl_x =
+            || [Keystroke::parse("ctrl-x").expect("required framework invariant must hold")];
 
         // A base keymap null disables a default binding in the same context.
         let mut keymap = Keymap::default();
@@ -611,8 +631,8 @@ mod tests {
         let (result, _) = keymap.bindings_for_input(
             &ctrl_x(),
             &[
-                KeyContext::parse("workspace").unwrap(),
-                KeyContext::parse("editor").unwrap(),
+                KeyContext::parse("workspace").expect("required framework invariant must hold"),
+                KeyContext::parse("editor").expect("required framework invariant must hold"),
             ],
         );
         assert_eq!(result.len(), 1);
@@ -653,10 +673,10 @@ mod tests {
 
         // Ensure `space` results in pending input on the workspace, but not editor
         let (result, pending) = keymap.bindings_for_input(
-            &[Keystroke::parse("ctrl-x").unwrap()],
+            &[Keystroke::parse("ctrl-x").expect("required framework invariant must hold")],
             &[
-                KeyContext::parse("workspace").unwrap(),
-                KeyContext::parse("editor").unwrap(),
+                KeyContext::parse("workspace").expect("required framework invariant must hold"),
+                KeyContext::parse("editor").expect("required framework invariant must hold"),
             ],
         );
         assert_eq!(result.len(), 1);
@@ -675,10 +695,10 @@ mod tests {
 
         // Ensure `space` results in pending input on the workspace, but not editor
         let (result, pending) = keymap.bindings_for_input(
-            &[Keystroke::parse("ctrl-x").unwrap()],
+            &[Keystroke::parse("ctrl-x").expect("required framework invariant must hold")],
             &[
-                KeyContext::parse("workspace").unwrap(),
-                KeyContext::parse("editor").unwrap(),
+                KeyContext::parse("workspace").expect("required framework invariant must hold"),
+                KeyContext::parse("editor").expect("required framework invariant must hold"),
             ],
         );
         assert_eq!(result.len(), 0);
@@ -787,10 +807,10 @@ mod tests {
 
         // Test with context stack: [Workspace, Editor] (Editor is deeper)
         let (result, _) = keymap.bindings_for_input(
-            &[Keystroke::parse("cmd-r").unwrap()],
+            &[Keystroke::parse("cmd-r").expect("required framework invariant must hold")],
             &[
-                KeyContext::parse("Workspace").unwrap(),
-                KeyContext::parse("Editor").unwrap(),
+                KeyContext::parse("Workspace").expect("required framework invariant must hold"),
+                KeyContext::parse("Editor").expect("required framework invariant must hold"),
             ],
         );
 
@@ -843,8 +863,11 @@ mod tests {
         keymap.add_bindings(bindings);
 
         let (result, pending) = keymap.bindings_for_input(
-            &[Keystroke::parse("tab").unwrap()],
-            &[KeyContext::parse("Editor showing_completions edit_prediction").unwrap()],
+            &[Keystroke::parse("tab").expect("required framework invariant must hold")],
+            &[
+                KeyContext::parse("Editor showing_completions edit_prediction")
+                    .expect("required framework invariant must hold"),
+            ],
         );
 
         assert!(!pending);
@@ -915,8 +938,8 @@ mod tests {
 
         // Test with Editor context stack
         let (result, _) = keymap.bindings_for_input(
-            &[Keystroke::parse("cmd-r").unwrap()],
-            &[KeyContext::parse("Editor").unwrap()],
+            &[Keystroke::parse("cmd-r").expect("required framework invariant must hold")],
+            &[KeyContext::parse("Editor").expect("required framework invariant must hold")],
         );
 
         // User binding should take precedence over default binding

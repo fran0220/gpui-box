@@ -153,57 +153,60 @@ impl<E: IntoElement + 'static> Element for AnimationElement<E> {
         window: &mut Window,
         cx: &mut App,
     ) -> (crate::LayoutId, Self::RequestLayoutState) {
-        window.with_element_state(global_id.unwrap(), |state, window| {
-            let mut state = state.unwrap_or_else(|| AnimationState {
-                start: Instant::now(),
-                animation_ix: 0,
-            });
-            let (animation_ix, delta, done) = if cx.reduce_motion() {
-                let animation_ix = self.animations.len() - 1;
-                let delta = if self.animations[animation_ix].oneshot {
-                    1.0
-                } else {
-                    0.0
-                };
-                (animation_ix, delta, true)
-            } else {
-                let animation_ix = state.animation_ix;
-
-                let mut delta = state.start.elapsed().as_secs_f32()
-                    / self.animations[animation_ix].duration.as_secs_f32();
-
-                let mut done = false;
-                if delta > 1.0 {
-                    if self.animations[animation_ix].oneshot {
-                        if animation_ix >= self.animations.len() - 1 {
-                            done = true;
-                        } else {
-                            state.start = Instant::now();
-                            state.animation_ix += 1;
-                        }
-                        delta = 1.0;
+        window.with_element_state(
+            global_id.expect("required framework invariant must hold"),
+            |state, window| {
+                let mut state = state.unwrap_or_else(|| AnimationState {
+                    start: Instant::now(),
+                    animation_ix: 0,
+                });
+                let (animation_ix, delta, done) = if cx.reduce_motion() {
+                    let animation_ix = self.animations.len() - 1;
+                    let delta = if self.animations[animation_ix].oneshot {
+                        1.0
                     } else {
-                        delta %= 1.0;
+                        0.0
+                    };
+                    (animation_ix, delta, true)
+                } else {
+                    let animation_ix = state.animation_ix;
+
+                    let mut delta = state.start.elapsed().as_secs_f32()
+                        / self.animations[animation_ix].duration.as_secs_f32();
+
+                    let mut done = false;
+                    if delta > 1.0 {
+                        if self.animations[animation_ix].oneshot {
+                            if animation_ix >= self.animations.len() - 1 {
+                                done = true;
+                            } else {
+                                state.start = Instant::now();
+                                state.animation_ix += 1;
+                            }
+                            delta = 1.0;
+                        } else {
+                            delta %= 1.0;
+                        }
                     }
+                    (animation_ix, delta, done)
+                };
+                let delta = (self.animations[animation_ix].easing)(delta);
+
+                debug_assert!(
+                    (0.0..=1.0).contains(&delta),
+                    "delta should always be between 0 and 1"
+                );
+
+                let element = self.element.take().expect("should only be called once");
+                let mut element = (self.animator)(element, animation_ix, delta).into_any_element();
+
+                if !done {
+                    window.request_animation_frame();
                 }
-                (animation_ix, delta, done)
-            };
-            let delta = (self.animations[animation_ix].easing)(delta);
 
-            debug_assert!(
-                (0.0..=1.0).contains(&delta),
-                "delta should always be between 0 and 1"
-            );
-
-            let element = self.element.take().expect("should only be called once");
-            let mut element = (self.animator)(element, animation_ix, delta).into_any_element();
-
-            if !done {
-                window.request_animation_frame();
-            }
-
-            ((element.request_layout(window, cx), element), state)
-        })
+                ((element.request_layout(window, cx), element), state)
+            },
+        )
     }
 
     fn prepaint(
@@ -335,7 +338,7 @@ mod tests {
     ) -> usize {
         let callback_count = window
             .update(cx, |_, window, cx| window.simulate_next_frame(cx))
-            .unwrap();
+            .expect("required framework invariant must hold");
         cx.run_until_parked();
         callback_count
     }

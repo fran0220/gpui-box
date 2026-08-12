@@ -164,10 +164,7 @@ impl MouseEvent for MouseDownEvent {}
 impl MouseDownEvent {
     /// Returns true if this mouse up event should focus the element.
     pub fn is_focusing(&self) -> bool {
-        match self.button {
-            MouseButton::Left => true,
-            _ => false,
-        }
+        matches!(self.button, MouseButton::Left)
     }
 }
 
@@ -199,10 +196,7 @@ impl MouseEvent for MouseUpEvent {}
 impl MouseUpEvent {
     /// Returns true if this mouse up event should focus the element.
     pub fn is_focusing(&self) -> bool {
-        match self.button {
-            MouseButton::Left => true,
-            _ => false,
-        }
+        matches!(self.button, MouseButton::Left)
     }
 }
 
@@ -878,7 +872,7 @@ mod test {
                     focus_handle: cx.focus_handle(),
                 })
             })
-            .unwrap()
+            .expect("required framework invariant must hold")
         });
 
         cx.update(|cx| {
@@ -889,10 +883,16 @@ mod test {
             .update(cx, |test_view, window, cx| {
                 window.focus(&test_view.focus_handle, cx)
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
 
-        cx.dispatch_keystroke(*window, Keystroke::parse("a").unwrap());
-        cx.dispatch_keystroke(*window, Keystroke::parse("ctrl-g").unwrap());
+        cx.dispatch_keystroke(
+            *window,
+            Keystroke::parse("a").expect("required framework invariant must hold"),
+        );
+        cx.dispatch_keystroke(
+            *window,
+            Keystroke::parse("ctrl-g").expect("required framework invariant must hold"),
+        );
 
         window
             .update(cx, |test_view, _, _| {
@@ -900,6 +900,6 @@ mod test {
                 assert!(test_view.saw_key_down);
                 assert!(test_view.saw_action);
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
     }
 }

@@ -440,7 +440,9 @@ impl Interactivity {
         self.action_listeners.push((
             TypeId::of::<A>(),
             Box::new(move |action, phase, window, cx| {
-                let action = action.downcast_ref().unwrap();
+                let action = action
+                    .downcast_ref()
+                    .expect("required framework invariant must hold");
                 if phase == DispatchPhase::Capture {
                     (listener)(action, window, cx)
                 } else {
@@ -459,7 +461,9 @@ impl Interactivity {
         self.action_listeners.push((
             TypeId::of::<A>(),
             Box::new(move |action, phase, window, cx| {
-                let action = action.downcast_ref().unwrap();
+                let action = action
+                    .downcast_ref()
+                    .expect("required framework invariant must hold");
                 if phase == DispatchPhase::Bubble {
                     (listener)(action, window, cx)
                 }
@@ -572,7 +576,13 @@ impl Interactivity {
         self.drop_listeners.push((
             TypeId::of::<T>(),
             Box::new(move |dragged_value, window, cx| {
-                listener(dragged_value.downcast_ref().unwrap(), window, cx);
+                listener(
+                    dragged_value
+                        .downcast_ref()
+                        .expect("required framework invariant must hold"),
+                    window,
+                    cx,
+                );
             }),
         ));
     }
@@ -635,7 +645,15 @@ impl Interactivity {
         self.drag_listener = Some(DragListener {
             value: Arc::new(value),
             render: Box::new(move |value, offset, window, cx| {
-                constructor(value.downcast_ref().unwrap(), offset, window, cx).into()
+                constructor(
+                    value
+                        .downcast_ref()
+                        .expect("required framework invariant must hold"),
+                    offset,
+                    window,
+                    cx,
+                )
+                .into()
             }),
             external_payload: None,
         });
@@ -1182,7 +1200,9 @@ pub trait InteractiveElement: Sized {
             Box::new(move |currently_dragged: &dyn Any, window, cx| {
                 f(
                     StyleRefinement::default(),
-                    currently_dragged.downcast_ref::<S>().unwrap(),
+                    currently_dragged
+                        .downcast_ref::<S>()
+                        .expect("required framework invariant must hold"),
                     window,
                     cx,
                 )
@@ -2272,6 +2292,8 @@ impl Interactivity {
     }
 
     /// Commit the bounds of this element according to this interactivity state's configured styles.
+    // Rendering boundaries pass distinct layout, scene, window, and application state.
+    #[allow(clippy::too_many_arguments)]
     pub fn prepaint<R>(
         &mut self,
         global_id: Option<&GlobalElementId>,
@@ -2469,6 +2491,8 @@ impl Interactivity {
     ///
     /// the final computed style will be passed to the provided function, along
     /// with the current scroll offset
+    // Rendering boundaries pass distinct layout, scene, window, and application state.
+    #[allow(clippy::too_many_arguments)]
     pub fn paint(
         &mut self,
         global_id: Option<&GlobalElementId>,
@@ -3736,6 +3760,8 @@ pub(crate) fn register_tooltip_mouse_handlers(
 /// TODO: There's a minor bug due to the use of absolute bounds while checking during prepaint - it
 /// does not know if the hitbox is occluded. In the case where a tooltip gets displayed and then
 /// gets occluded after display, it will stick around until the mouse exits the hover bounds.
+// Rendering boundaries pass distinct layout, scene, window, and application state.
+#[allow(clippy::too_many_arguments)]
 fn handle_tooltip_mouse_move(
     active_tooltip: &Rc<RefCell<Option<ActiveTooltip>>>,
     build_tooltip: &Rc<dyn Fn(&mut Window, &mut App) -> Option<(AnyView, bool)>>,
@@ -3962,7 +3988,11 @@ impl GroupHitboxes {
     }
 
     pub fn pop(name: &SharedString, cx: &mut App) {
-        cx.default_global::<Self>().0.get_mut(name).unwrap().pop();
+        cx.default_global::<Self>()
+            .0
+            .get_mut(name)
+            .expect("required framework invariant must hold")
+            .pop();
     }
 }
 
@@ -4260,9 +4290,9 @@ impl ScrollHandle {
                         if state.overflow.y == Overflow::Scroll {
                             let child_height = bounds.size.height;
                             let viewport_height = state.bounds.size.height;
-                            if child_height > viewport_height {
-                                scroll_offset.y = state.bounds.top() - bounds.top();
-                            } else if bounds.top() + scroll_offset.y < state.bounds.top() {
+                            if child_height > viewport_height
+                                || bounds.top() + scroll_offset.y < state.bounds.top()
+                            {
                                 scroll_offset.y = state.bounds.top() - bounds.top();
                             } else if bounds.bottom() + scroll_offset.y > state.bounds.bottom() {
                                 scroll_offset.y = state.bounds.bottom() - bounds.bottom();
@@ -4277,9 +4307,9 @@ impl ScrollHandle {
                 if state.overflow.x == Overflow::Scroll {
                     let child_width = bounds.size.width;
                     let viewport_width = state.bounds.size.width;
-                    if child_width > viewport_width {
-                        scroll_offset.x = state.bounds.left() - bounds.left();
-                    } else if bounds.left() + scroll_offset.x < state.bounds.left() {
+                    if child_width > viewport_width
+                        || bounds.left() + scroll_offset.x < state.bounds.left()
+                    {
                         scroll_offset.x = state.bounds.left() - bounds.left();
                     } else if bounds.right() + scroll_offset.x > state.bounds.right() {
                         scroll_offset.x = state.bounds.right() - bounds.right();
@@ -4386,7 +4416,7 @@ mod tests {
             .into();
 
         cx.update_window(window, |_, window, cx| window.draw(cx).clear(cx))
-            .unwrap();
+            .expect("required framework invariant must hold");
         cx.update_window(window, |_, window, cx| {
             window.dispatch_event(
                 MouseDownEvent {
@@ -4427,7 +4457,7 @@ mod tests {
             );
             assert!(window.captured_hitbox().is_none());
         })
-        .unwrap();
+        .expect("required framework invariant must hold");
 
         assert_eq!(moves.get(), 1);
         assert_eq!(ups.get(), 1);
@@ -4499,7 +4529,7 @@ mod tests {
         let window = AnyWindowHandle::from(window);
 
         cx.update_window(window, |_, window, cx| window.draw(cx).clear(cx))
-            .unwrap();
+            .expect("required framework invariant must hold");
         assert_eq!(anonymous_paint_count.get(), 0);
         assert_eq!(stateful_width.get(), px(10.));
 
@@ -4507,7 +4537,7 @@ mod tests {
             cx.update_window(window, |_, window, cx| {
                 window.simulate_mouse_move(position, cx)
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
         };
 
         let initial_render_count = render_count.get();
@@ -4604,7 +4634,7 @@ mod tests {
                 window.with_element_state::<InteractiveElementState, _>(
                     global_id,
                     |state, _window| {
-                        let state = state.unwrap();
+                        let state = state.expect("required framework invariant must hold");
                         *self.captured_active_tooltip.borrow_mut() =
                             state.active_tooltip.as_ref().map(Rc::downgrade);
                         ((), state)
@@ -4739,7 +4769,7 @@ mod tests {
             .update_window(any_window, |_, window, cx| {
                 window.draw(cx).clear(cx);
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
 
         test_app
             .update_window(any_window, |_, window, cx| {
@@ -4753,13 +4783,13 @@ mod tests {
                     cx,
                 );
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
 
         test_app
             .update_window(any_window, |_, window, cx| {
                 window.draw(cx).clear(cx);
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
 
         (test_app, any_window, captured_active_tooltip)
     }
@@ -4768,8 +4798,13 @@ mod tests {
     fn tooltip_waiting_for_show_is_released_when_its_owner_disappears() {
         let (mut test_app, any_window, captured_active_tooltip) = setup_tooltip_owner_test(None);
 
-        let weak_active_tooltip = captured_active_tooltip.borrow().clone().unwrap();
-        let active_tooltip = weak_active_tooltip.upgrade().unwrap();
+        let weak_active_tooltip = captured_active_tooltip
+            .borrow()
+            .clone()
+            .expect("required framework invariant must hold");
+        let active_tooltip = weak_active_tooltip
+            .upgrade()
+            .expect("required framework invariant must hold");
         assert!(matches!(
             active_tooltip.borrow().as_ref(),
             Some(ActiveTooltip::WaitingForShow { .. })
@@ -4779,7 +4814,7 @@ mod tests {
             .update_window(any_window, |_, window, _| {
                 window.remove_window();
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
         test_app.run_until_parked();
         drop(active_tooltip);
 
@@ -4793,8 +4828,13 @@ mod tests {
         let (mut test_app, _any_window, captured_active_tooltip) =
             setup_tooltip_owner_test(Some(show_delay_override));
 
-        let weak_active_tooltip = captured_active_tooltip.borrow().clone().unwrap();
-        let active_tooltip = weak_active_tooltip.upgrade().unwrap();
+        let weak_active_tooltip = captured_active_tooltip
+            .borrow()
+            .clone()
+            .expect("required framework invariant must hold");
+        let active_tooltip = weak_active_tooltip
+            .upgrade()
+            .expect("required framework invariant must hold");
 
         test_app
             .dispatcher
@@ -4819,8 +4859,13 @@ mod tests {
     fn tooltip_is_released_when_its_owner_disappears() {
         let (mut test_app, any_window, captured_active_tooltip) = setup_tooltip_owner_test(None);
 
-        let weak_active_tooltip = captured_active_tooltip.borrow().clone().unwrap();
-        let active_tooltip = weak_active_tooltip.upgrade().unwrap();
+        let weak_active_tooltip = captured_active_tooltip
+            .borrow()
+            .clone()
+            .expect("required framework invariant must hold");
+        let active_tooltip = weak_active_tooltip
+            .upgrade()
+            .expect("required framework invariant must hold");
 
         test_app
             .dispatcher
@@ -4836,7 +4881,7 @@ mod tests {
             .update_window(any_window, |_, window, _| {
                 window.remove_window();
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
         test_app.run_until_parked();
         drop(active_tooltip);
 
@@ -4847,8 +4892,13 @@ mod tests {
     fn tooltip_hides_after_mouse_leaves_origin() {
         let (mut test_app, any_window, captured_active_tooltip) = setup_tooltip_owner_test(None);
 
-        let weak_active_tooltip = captured_active_tooltip.borrow().clone().unwrap();
-        let active_tooltip = weak_active_tooltip.upgrade().unwrap();
+        let weak_active_tooltip = captured_active_tooltip
+            .borrow()
+            .clone()
+            .expect("required framework invariant must hold");
+        let active_tooltip = weak_active_tooltip
+            .upgrade()
+            .expect("required framework invariant must hold");
 
         test_app
             .dispatcher
@@ -4872,7 +4922,7 @@ mod tests {
                     cx,
                 );
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
 
         assert!(active_tooltip.borrow().is_none());
     }
@@ -4881,8 +4931,13 @@ mod tests {
     fn tooltip_hides_after_mouse_exits_window() {
         let (mut test_app, any_window, captured_active_tooltip) = setup_tooltip_owner_test(None);
 
-        let weak_active_tooltip = captured_active_tooltip.borrow().clone().unwrap();
-        let active_tooltip = weak_active_tooltip.upgrade().unwrap();
+        let weak_active_tooltip = captured_active_tooltip
+            .borrow()
+            .clone()
+            .expect("required framework invariant must hold");
+        let active_tooltip = weak_active_tooltip
+            .upgrade()
+            .expect("required framework invariant must hold");
 
         test_app
             .dispatcher
@@ -4906,7 +4961,7 @@ mod tests {
                     cx,
                 );
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
 
         assert!(active_tooltip.borrow().is_none());
     }
@@ -4915,8 +4970,13 @@ mod tests {
     fn tooltip_does_not_show_after_mouse_exits_window() {
         let (mut test_app, any_window, captured_active_tooltip) = setup_tooltip_owner_test(None);
 
-        let weak_active_tooltip = captured_active_tooltip.borrow().clone().unwrap();
-        let active_tooltip = weak_active_tooltip.upgrade().unwrap();
+        let weak_active_tooltip = captured_active_tooltip
+            .borrow()
+            .clone()
+            .expect("required framework invariant must hold");
+        let active_tooltip = weak_active_tooltip
+            .upgrade()
+            .expect("required framework invariant must hold");
         assert!(matches!(
             active_tooltip.borrow().as_ref(),
             Some(ActiveTooltip::WaitingForShow { .. })
@@ -4934,7 +4994,7 @@ mod tests {
                     cx,
                 );
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
 
         test_app
             .dispatcher
@@ -4991,14 +5051,14 @@ mod tests {
                         cx,
                     );
                 })
-                .unwrap();
+                .expect("required framework invariant must hold");
         }
 
         test_app
             .update_window(any_window, |_, window, cx| {
                 window.draw(cx).clear(cx);
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
 
         dispatch_mouse_down_outside_target(&mut test_app, any_window);
         assert_eq!(
@@ -5015,7 +5075,7 @@ mod tests {
                 assert!(window.has_active_prompt());
                 window.draw(cx).clear(cx);
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
 
         dispatch_mouse_down_outside_target(&mut test_app, any_window);
         assert_eq!(
@@ -5140,12 +5200,12 @@ mod tests {
     /// element registers its key handlers for the next dispatched event.
     fn focus_and_draw(cx: &mut TestAppContext, window: AnyWindowHandle, handle: &FocusHandle) {
         cx.update_window(window, |_, window, cx| window.focus(handle, cx))
-            .unwrap();
+            .expect("required framework invariant must hold");
         cx.run_until_parked();
         cx.update_window(window, |_, window, cx| {
             window.draw(cx).clear(cx);
         })
-        .unwrap();
+        .expect("required framework invariant must hold");
     }
 
     #[test]
@@ -5153,7 +5213,7 @@ mod tests {
         let (mut cx, window, _clicks, focus_a, _focus_b) = setup_keyboard_activation_test();
         cx.activate_accessibility(window);
         cx.update_window(window, |_, window, cx| window.draw(cx).clear(cx))
-            .unwrap();
+            .expect("required framework invariant must hold");
         let target = cx
             .update_window(window, |_, window, _| {
                 let tree: serde_json::Value = serde_json::from_str(
@@ -5178,7 +5238,7 @@ mod tests {
                         .expect("numeric node id"),
                 )
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
         cx.dispatch_accessibility_action(
             window,
             accesskit::ActionRequest {
@@ -5192,9 +5252,9 @@ mod tests {
         cx.update_window(window, |_, window, _| {
             assert!(focus_a.is_focused(window));
         })
-        .unwrap();
+        .expect("required framework invariant must hold");
         cx.update_window(window, |_, window, cx| window.draw(cx).clear(cx))
-            .unwrap();
+            .expect("required framework invariant must hold");
         cx.update_window(window, |_, window, _| {
             let tree: serde_json::Value = serde_json::from_str(
                 &window
@@ -5205,7 +5265,7 @@ mod tests {
             let focused = tree["gpui_focus"].as_str().expect("focused debug id");
             assert_eq!(tree["nodes"][focused]["element_id"], "Name(\"a-child\")");
         })
-        .unwrap();
+        .expect("required framework invariant must hold");
     }
 
     #[test]
@@ -5213,7 +5273,7 @@ mod tests {
         let (mut cx, window, _clicks, _focus_a, _focus_b) = setup_keyboard_activation_test();
         cx.activate_accessibility(window);
         cx.update_window(window, |_, window, cx| window.draw(cx).clear(cx))
-            .unwrap();
+            .expect("required framework invariant must hold");
         let (target, expected_debug_focus) = cx
             .update_window(window, |_, window, _| {
                 let tree: serde_json::Value = serde_json::from_str(
@@ -5241,7 +5301,7 @@ mod tests {
                     debug_id.clone(),
                 )
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
         cx.dispatch_accessibility_action(
             window,
             accesskit::ActionRequest {
@@ -5252,7 +5312,7 @@ mod tests {
             },
         );
         cx.update_window(window, |_, window, cx| window.draw(cx).clear(cx))
-            .unwrap();
+            .expect("required framework invariant must hold");
 
         cx.update_window(window, |_, window, _| {
             let tree: serde_json::Value = serde_json::from_str(
@@ -5263,11 +5323,11 @@ mod tests {
             .expect("valid accessibility debug tree");
             assert_eq!(tree["gpui_focus"], expected_debug_focus);
         })
-        .unwrap();
+        .expect("required framework invariant must hold");
     }
 
     fn key_down(cx: &mut TestAppContext, window: AnyWindowHandle, key: &str) {
-        let keystroke = Keystroke::parse(key).unwrap();
+        let keystroke = Keystroke::parse(key).expect("required framework invariant must hold");
         cx.update_window(window, |_, window, cx| {
             window.dispatch_event(
                 KeyDownEvent {
@@ -5279,15 +5339,15 @@ mod tests {
                 cx,
             );
         })
-        .unwrap();
+        .expect("required framework invariant must hold");
     }
 
     fn key_up(cx: &mut TestAppContext, window: AnyWindowHandle, key: &str) {
-        let keystroke = Keystroke::parse(key).unwrap();
+        let keystroke = Keystroke::parse(key).expect("required framework invariant must hold");
         cx.update_window(window, |_, window, cx| {
             window.dispatch_event(KeyUpEvent { keystroke }.to_platform_input(), cx);
         })
-        .unwrap();
+        .expect("required framework invariant must hold");
     }
 
     /// Pressing and releasing Enter on the same focused element fires a click.
@@ -5454,7 +5514,7 @@ mod tests {
             })
             .into();
         cx.update_window(window, |_, window, cx| window.draw(cx).clear(cx))
-            .unwrap();
+            .expect("required framework invariant must hold");
 
         // Focus the *second* group's container, then advance like Tab would.
         let focused = cx
@@ -5463,7 +5523,7 @@ mod tests {
                 window.focus_next(cx);
                 window.focused(cx).map(|handle| handle.id)
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
 
         assert_eq!(focused, Some(item_b.id));
     }

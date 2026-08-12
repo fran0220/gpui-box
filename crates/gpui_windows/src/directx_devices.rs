@@ -31,7 +31,7 @@ pub(crate) fn try_to_recover_from_device_lost<T>(mut f: impl FnMut() -> Result<T
             f()
         })
         .find_or_last(Result::is_ok)
-        .unwrap()
+        .expect("required framework invariant must hold")
         .context("DirectXRenderer failed to recover from lost device after multiple attempts")
 }
 
@@ -132,7 +132,12 @@ fn get_adapter(
         )
         .log_err()
         {
-            return Ok((adapter, device, context.unwrap(), feature_level));
+            return Ok((
+                adapter,
+                device,
+                context.expect("required framework invariant must hold"),
+                feature_level,
+            ));
         }
     }
 
@@ -170,7 +175,7 @@ fn get_device(
             context,
         )?;
     }
-    let device = device.unwrap();
+    let device = device.expect("required framework invariant must hold");
     let mut data = D3D11_FEATURE_DATA_D3D10_X_HARDWARE_OPTIONS::default();
     unsafe {
         device

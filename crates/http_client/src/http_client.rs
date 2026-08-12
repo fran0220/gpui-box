@@ -444,7 +444,7 @@ impl FakeHttpClient {
             Ok(Response::builder()
                 .status(404)
                 .body(Default::default())
-                .unwrap())
+                .expect("required framework invariant must hold"))
         })
     }
 
@@ -454,7 +454,7 @@ impl FakeHttpClient {
             Ok(Response::builder()
                 .status(200)
                 .body(Default::default())
-                .unwrap())
+                .expect("required framework invariant must hold"))
         })
     }
 
@@ -464,7 +464,9 @@ impl FakeHttpClient {
         F: Fn(FakeHttpHandler, Request<AsyncBody>) -> Fut + Send + Sync + 'static,
     {
         let mut handler = self.handler.lock();
-        let old_handler = handler.take().unwrap();
+        let old_handler = handler
+            .take()
+            .expect("required framework invariant must hold");
         *handler = Some(Arc::new(move |req| {
             Box::pin(new_handler(old_handler.clone(), req))
         }));
@@ -484,7 +486,11 @@ impl HttpClient for FakeHttpClient {
         &self,
         req: Request<AsyncBody>,
     ) -> BoxFuture<'static, anyhow::Result<Response<AsyncBody>>> {
-        ((self.handler.lock().as_ref().unwrap())(req)) as _
+        ((self
+            .handler
+            .lock()
+            .as_ref()
+            .expect("required framework invariant must hold"))(req)) as _
     }
 
     fn user_agent(&self) -> Option<&HeaderValue> {

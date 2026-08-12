@@ -699,13 +699,15 @@ mod tests {
         assert!(parse_pci_id("1234").is_ok());
         assert!(parse_pci_id("123").is_err());
         assert_eq!(
-            parse_pci_id(&format!("{:x}", 0x1234)).unwrap(),
-            parse_pci_id(&format!("{:X}", 0x1234)).unwrap(),
+            parse_pci_id(&format!("{:x}", 0x1234)).expect("required framework invariant must hold"),
+            parse_pci_id(&format!("{:X}", 0x1234)).expect("required framework invariant must hold"),
         );
 
         assert_eq!(
-            parse_pci_id(&format!("{:#x}", 0x1234)).unwrap(),
-            parse_pci_id(&format!("{:#X}", 0x1234)).unwrap(),
+            parse_pci_id(&format!("{:#x}", 0x1234))
+                .expect("required framework invariant must hold"),
+            parse_pci_id(&format!("{:#X}", 0x1234))
+                .expect("required framework invariant must hold"),
         );
     }
 }

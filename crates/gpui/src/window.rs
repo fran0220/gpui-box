@@ -576,7 +576,7 @@ impl FocusHandle {
 
 impl Clone for FocusHandle {
     fn clone(&self) -> Self {
-        Self::for_id(self.id, &self.handles).unwrap()
+        Self::for_id(self.id, &self.handles).expect("required framework invariant must hold")
     }
 }
 
@@ -593,7 +593,7 @@ impl Drop for FocusHandle {
         self.handles
             .read()
             .get(self.id)
-            .unwrap()
+            .expect("required framework invariant must hold")
             .ref_count
             .fetch_sub(1, SeqCst);
     }
@@ -1901,7 +1901,9 @@ impl Window {
             platform_window.set_app_id(&app_id);
         }
 
-        platform_window.map_window().unwrap();
+        platform_window
+            .map_window()
+            .expect("required framework invariant must hold");
 
         Ok(Window {
             handle,
@@ -3002,7 +3004,10 @@ impl Window {
             self.platform_window.set_input_handler(input_handler);
         }
 
-        self.layout_engine.as_mut().unwrap().clear();
+        self.layout_engine
+            .as_mut()
+            .expect("required framework invariant must hold")
+            .clear();
         self.text_system().finish_frame();
         self.next_frame.finish(&mut self.rendered_frame);
 
@@ -3159,11 +3164,16 @@ impl Window {
         // stretches to fill the viewport unless explicitly sized, window roots
         // fill the window when their size is `auto`.
         let scale_factor = self.scale_factor();
-        let mut root_element = self.root.as_ref().unwrap().clone().into_any_element();
+        let mut root_element = self
+            .root
+            .as_ref()
+            .expect("required framework invariant must hold")
+            .clone()
+            .into_any_element();
         let root_layout_id = root_element.request_layout(self, cx);
         self.layout_engine
             .as_mut()
-            .unwrap()
+            .expect("required framework invariant must hold")
             .stretch_auto_size_to_fill(root_layout_id, root_size, scale_factor);
         root_element.prepaint_as_root(Point::default(), root_size.into(), self, cx);
 
@@ -3180,7 +3190,7 @@ impl Window {
             let prompt_layout_id = element.request_layout(self, cx);
             self.layout_engine
                 .as_mut()
-                .unwrap()
+                .expect("required framework invariant must hold")
                 .stretch_auto_size_to_fill(prompt_layout_id, root_size, scale_factor);
             element.prepaint_as_root(Point::default(), root_size.into(), self, cx);
             prompt_element = Some(element);
@@ -4058,7 +4068,7 @@ impl Window {
                         )
                     }
                 })
-                .unwrap();
+                .expect("required framework invariant must hold");
 
             let state = state_box.take().expect(
                 "reentrant call to with_element_state for the same state type and element id",
@@ -4150,7 +4160,11 @@ impl Window {
         content_mask: Option<ContentMask<Pixels>>,
     ) {
         self.invalidator.debug_assert_prepaint();
-        let parent_node = self.next_frame.dispatch_tree.active_node_id().unwrap();
+        let parent_node = self
+            .next_frame
+            .dispatch_tree
+            .active_node_id()
+            .expect("required framework invariant must hold");
         self.next_frame.deferred_draws.push(DeferredDraw {
             current_view: self.current_view(),
             parent_node,
@@ -4966,12 +4980,10 @@ impl Window {
         let rem_size = self.rem_size();
         let scale_factor = self.scale_factor();
 
-        self.layout_engine.as_mut().unwrap().request_layout(
-            style,
-            rem_size,
-            scale_factor,
-            &cx.layout_id_buffer,
-        )
+        self.layout_engine
+            .as_mut()
+            .expect("required framework invariant must hold")
+            .request_layout(style, rem_size, scale_factor, &cx.layout_id_buffer)
     }
 
     /// Add a node to the layout tree for the current frame. Instead of taking a `Style` and children,
@@ -4993,7 +5005,7 @@ impl Window {
         let scale_factor = self.scale_factor();
         self.layout_engine
             .as_mut()
-            .unwrap()
+            .expect("required framework invariant must hold")
             .request_measured_layout(style, rem_size, scale_factor, measure)
     }
 
@@ -5010,7 +5022,10 @@ impl Window {
     ) {
         self.invalidator.debug_assert_prepaint();
 
-        let mut layout_engine = self.layout_engine.take().unwrap();
+        let mut layout_engine = self
+            .layout_engine
+            .take()
+            .expect("required framework invariant must hold");
         layout_engine.compute_layout(layout_id, available_space, self, cx);
         self.layout_engine = Some(layout_engine);
     }
@@ -5026,7 +5041,7 @@ impl Window {
         let mut bounds = self
             .layout_engine
             .as_mut()
-            .unwrap()
+            .expect("required framework invariant must hold")
             .layout_bounds(layout_id, scale_factor)
             .map(Into::into);
         let snapped_offset = self.pixel_snap_point(self.element_offset());
@@ -5097,7 +5112,10 @@ impl Window {
     /// Get the entity ID for the currently rendering view
     pub fn current_view(&self) -> EntityId {
         self.invalidator.debug_assert_paint_or_prepaint();
-        self.rendered_entity_stack.last().copied().unwrap()
+        self.rendered_entity_stack
+            .last()
+            .copied()
+            .expect("required framework invariant must hold")
     }
 
     #[inline]
@@ -5511,7 +5529,9 @@ impl Window {
         // Capture phase, events bubble from back to front. Handlers for this phase are used for
         // special purposes, such as detecting events outside of a given Bounds.
         for listener in &mut mouse_listeners {
-            let listener = listener.as_mut().unwrap();
+            let listener = listener
+                .as_mut()
+                .expect("required framework invariant must hold");
             listener(event, DispatchPhase::Capture, self, cx);
             if !cx.propagate_event {
                 break;
@@ -5521,7 +5541,9 @@ impl Window {
         // Bubble phase, where most normal handlers do their work.
         if cx.propagate_event {
             for listener in mouse_listeners.iter_mut().rev() {
-                let listener = listener.as_mut().unwrap();
+                let listener = listener
+                    .as_mut()
+                    .expect("required framework invariant must hold");
                 listener(event, DispatchPhase::Bubble, self, cx);
                 if !cx.propagate_event {
                     break;
@@ -7216,7 +7238,7 @@ mod tests {
                     move |_, _, _window, cx| {
                         if !opened.replace(true) {
                             cx.open_window(WindowOptions::default(), |_, cx| cx.new(|_| EmptyView))
-                                .unwrap();
+                                .expect("required framework invariant must hold");
                         }
                     },
                 ))
@@ -7249,7 +7271,7 @@ mod tests {
         // The deferred clear must actually run once the outer draw unwinds:
         // subsequent draws of both windows work against a fresh arena.
         cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
-            .unwrap();
+            .expect("required framework invariant must hold");
     }
 
     #[gpui::test]
@@ -7265,7 +7287,7 @@ mod tests {
                     })
                 }
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
         let test_window = cx.test_window(window.into());
 
         cx.update(|_| {
@@ -7317,7 +7339,7 @@ mod tests {
                 window.draw(cx).clear(cx);
                 window.viewport_size()
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
 
         assert_eq!(child_bounds.get().size, viewport_size);
     }
@@ -7337,7 +7359,7 @@ mod tests {
         cx.update_window(window.into(), |_, window, cx| {
             window.draw(cx).clear(cx);
         })
-        .unwrap();
+        .expect("required framework invariant must hold");
 
         assert_eq!(child_bounds.get().size, size(px(300.), px(200.)));
     }
@@ -7688,7 +7710,7 @@ mod tests {
 
         window
             .update(cx, |_, window, _| window.activate_window())
-            .unwrap();
+            .expect("required framework invariant must hold");
         cx.executor().run_until_parked();
 
         window
@@ -7696,14 +7718,14 @@ mod tests {
                 let a = this.a.clone();
                 window.focus(&a, cx);
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
         cx.executor().run_until_parked();
 
         window
             .update(cx, |this, window, _| {
                 assert!(this.b.is_focused(window));
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
         assert_eq!(b_focus_count.get(), 1);
     }
 }

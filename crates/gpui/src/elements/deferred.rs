@@ -47,7 +47,11 @@ impl Element for Deferred {
         window: &mut Window,
         cx: &mut App,
     ) -> (LayoutId, ()) {
-        let layout_id = self.child.as_mut().unwrap().request_layout(window, cx);
+        let layout_id = self
+            .child
+            .as_mut()
+            .expect("required framework invariant must hold")
+            .request_layout(window, cx);
         (layout_id, ())
     }
 
@@ -60,7 +64,10 @@ impl Element for Deferred {
         window: &mut Window,
         _cx: &mut App,
     ) {
-        let child = self.child.take().unwrap();
+        let child = self
+            .child
+            .take()
+            .expect("required framework invariant must hold");
         let element_offset = window.element_offset();
         window.defer_draw(child, element_offset, self.priority, None)
     }
@@ -168,19 +175,23 @@ mod tests {
                     .get("NESTED_MENU")
                     .copied()
             })
-            .unwrap()
+            .expect("required framework invariant must hold")
             .expect("NESTED_MENU debug bounds not found");
         assert_eq!(menu_bounds.size, size(px(50.), px(50.)));
 
         // Re-render only the root view; the panel is cached, so its subtree -
         // including both deferred draw records - is reused from the previous
         // frame.
-        window.update(cx, |_, _, cx| cx.notify()).unwrap();
+        window
+            .update(cx, |_, _, cx| cx.notify())
+            .expect("required framework invariant must hold");
         cx.run_until_parked();
 
         // Reuse the subtree a second time, exercising ranges that were
         // themselves recorded during a reused frame.
-        window.update(cx, |_, _, cx| cx.notify()).unwrap();
+        window
+            .update(cx, |_, _, cx| cx.notify())
+            .expect("required framework invariant must hold");
         cx.run_until_parked();
 
         // Re-render the panel itself again to prove the popovers still draw.
@@ -188,7 +199,7 @@ mod tests {
             .update(cx, |root, _, cx| {
                 root.panel.update(cx, |_, cx| cx.notify());
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
         cx.run_until_parked();
 
         window
@@ -201,6 +212,6 @@ mod tests {
                         .contains_key("NESTED_MENU")
                 );
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
     }
 }

@@ -41,7 +41,7 @@ fn main() {
             },
             |_, cx| cx.new(|_| Example),
         )
-        .unwrap();
+        .expect("test setup should produce the required value");
         cx.activate(true);
     });
 }

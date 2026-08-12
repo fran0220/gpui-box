@@ -331,6 +331,8 @@ impl WrappedLine {
     }
 }
 
+// Rendering boundaries pass distinct layout, scene, window, and application state.
+#[allow(clippy::too_many_arguments)]
 fn paint_line(
     origin: Point<Pixels>,
     layout: &LineLayout,
@@ -577,6 +579,8 @@ fn paint_line(
     })
 }
 
+// Rendering boundaries pass distinct layout, scene, window, and application state.
+#[allow(clippy::too_many_arguments)]
 fn paint_line_background(
     origin: Point<Pixels>,
     layout: &LineLayout,

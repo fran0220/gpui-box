@@ -24,7 +24,9 @@ mod macos_build {
     }
 
     fn generate_shader_bindings() -> PathBuf {
-        let output_path = PathBuf::from(env::var("OUT_DIR").unwrap()).join("scene.h");
+        let output_path =
+            PathBuf::from(env::var("OUT_DIR").expect("required framework invariant must hold"))
+                .join("scene.h");
 
         let gpui_dir = find_gpui_crate_dir();
 
@@ -70,7 +72,9 @@ mod macos_build {
 
         let mut builder = cbindgen::Builder::new();
 
-        let crate_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+        let crate_dir = PathBuf::from(
+            env::var("CARGO_MANIFEST_DIR").expect("required framework invariant must hold"),
+        );
 
         // Source files from gpui that define types used in shaders
         let gpui_src_paths = [
@@ -112,13 +116,14 @@ mod macos_build {
             let shader_contents = std::fs::read_to_string(shader_path)?;
             let stitched_contents = format!("{header_contents}\n{shader_contents}");
             let out_path =
-                PathBuf::from(env::var("OUT_DIR").unwrap()).join("stitched_shaders.metal");
+                PathBuf::from(env::var("OUT_DIR").expect("required framework invariant must hold"))
+                    .join("stitched_shaders.metal");
             std::fs::write(&out_path, stitched_contents)?;
             Ok(out_path)
         }
         let shader_source_path = "./src/shaders.metal";
         let shader_path = PathBuf::from(shader_source_path);
-        stitch_header(header_path, &shader_path).unwrap();
+        stitch_header(header_path, &shader_path).expect("required framework invariant must hold");
         println!("cargo:rerun-if-changed={}", &shader_source_path);
     }
 
@@ -126,9 +131,12 @@ mod macos_build {
     fn compile_metal_shaders(header_path: &Path) {
         use std::process::{self, Command};
         let shader_path = "./src/shaders.metal";
-        let air_output_path = PathBuf::from(env::var("OUT_DIR").unwrap()).join("shaders.air");
+        let air_output_path =
+            PathBuf::from(env::var("OUT_DIR").expect("required framework invariant must hold"))
+                .join("shaders.air");
         let metallib_output_path =
-            PathBuf::from(env::var("OUT_DIR").unwrap()).join("shaders.metallib");
+            PathBuf::from(env::var("OUT_DIR").expect("required framework invariant must hold"))
+                .join("shaders.metallib");
         println!("cargo:rerun-if-changed={}", shader_path);
 
         let output = Command::new("xcrun")
@@ -142,12 +150,14 @@ mod macos_build {
                 "-c",
                 shader_path,
                 "-include",
-                (header_path.to_str().unwrap()),
+                (header_path
+                    .to_str()
+                    .expect("required framework invariant must hold")),
                 "-o",
             ])
             .arg(&air_output_path)
             .output()
-            .unwrap();
+            .expect("required framework invariant must hold");
 
         if !output.status.success() {
             println!(
@@ -163,7 +173,7 @@ mod macos_build {
             .arg("-o")
             .arg(metallib_output_path)
             .output()
-            .unwrap();
+            .expect("required framework invariant must hold");
 
         if !output.status.success() {
             println!(

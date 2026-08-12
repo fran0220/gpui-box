@@ -210,9 +210,7 @@ impl TabStopMap {
     }
 
     fn tab_node_for_focus_id(&self, focused_id: &FocusId) -> Option<&TabStopNode> {
-        let Some(order) = self.by_id.get(focused_id) else {
-            return None;
-        };
+        let order = self.by_id.get(focused_id)?;
         Some(order)
     }
 }
@@ -348,7 +346,9 @@ mod tests {
         let mut prev = None;
         let mut found = vec![];
         for _ in 0..expected.len() {
-            let handle = tab_index_map.next(prev.as_ref()).unwrap();
+            let handle = tab_index_map
+                .next(prev.as_ref())
+                .expect("required framework invariant must hold");
             prev = Some(handle.id);
             found.push(handle.id);
         }
@@ -418,7 +418,9 @@ mod tests {
         let tab_stop_2 = FocusHandle::new(&focus_map).tab_stop(true).tab_index(2);
         tab_index_map.insert(&tab_non_stop_1);
         tab_index_map.insert(&tab_stop_2);
-        let result = tab_index_map.next(Some(&tab_non_stop_1.id)).unwrap();
+        let result = tab_index_map
+            .next(Some(&tab_non_stop_1.id))
+            .expect("required framework invariant must hold");
         assert_eq!(result.id, tab_stop_2.id);
 
         // Check that we skip over non-stop tabs
@@ -426,7 +428,9 @@ mod tests {
         let tab_non_stop_0 = FocusHandle::new(&focus_map).tab_stop(false).tab_index(0);
         tab_index_map.insert(&tab_stop_0);
         tab_index_map.insert(&tab_non_stop_0);
-        let result = tab_index_map.next(Some(&tab_stop_0.id)).unwrap();
+        let result = tab_index_map
+            .next(Some(&tab_stop_0.id))
+            .expect("required framework invariant must hold");
         assert_eq!(result.id, tab_stop_2.id);
     }
 
@@ -438,7 +442,6 @@ mod tests {
     }
 
     impl TabStopMapTest {
-        #[must_use]
         fn new() -> Self {
             Self {
                 tab_map: TabStopMap::default(),
@@ -447,7 +450,6 @@ mod tests {
             }
         }
 
-        #[must_use]
         fn tab_non_stop(mut self, index: isize) -> Self {
             let handle = FocusHandle::new(&self.focus_map)
                 .tab_stop(false)
@@ -456,7 +458,6 @@ mod tests {
             self
         }
 
-        #[must_use]
         fn tab_stop(mut self, index: isize, expected: usize) -> Self {
             let handle = FocusHandle::new(&self.focus_map)
                 .tab_stop(true)
@@ -467,7 +468,6 @@ mod tests {
             self
         }
 
-        #[must_use]
         fn tab_group(mut self, tab_index: isize, children: impl FnOnce(Self) -> Self) -> Self {
             self.tab_map.begin_group(tab_index);
             self = children(self);
@@ -482,7 +482,8 @@ mod tests {
             let mut last_focus_id = None;
             let mut found = vec![];
             for _ in 0..self.expected.len() {
-                let handle = traverse(&self.tab_map, last_focus_id.as_ref()).unwrap();
+                let handle = traverse(&self.tab_map, last_focus_id.as_ref())
+                    .expect("required framework invariant must hold");
                 last_focus_id = Some(handle.id);
                 found.push(handle.id);
             }

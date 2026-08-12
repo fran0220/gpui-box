@@ -141,7 +141,13 @@ where
         if let Some(entry) = self.stack.last() {
             if entry.index() == entry.tree.0.items().len() - 1 {
                 if let Some(next_leaf) = self.next_leaf() {
-                    Some(next_leaf.0.items().first().unwrap())
+                    Some(
+                        next_leaf
+                            .0
+                            .items()
+                            .first()
+                            .expect("required framework invariant must hold"),
+                    )
                 } else {
                     None
                 }
@@ -179,7 +185,13 @@ where
         if let Some(entry) = self.stack.last() {
             if entry.index() == 0 {
                 if let Some(prev_leaf) = self.prev_leaf() {
-                    Some(prev_leaf.0.items().last().unwrap())
+                    Some(
+                        prev_leaf
+                            .0
+                            .items()
+                            .last()
+                            .expect("required framework invariant must hold"),
+                    )
                 } else {
                     None
                 }
@@ -249,7 +261,10 @@ where
                 self.position = D::zero(self.cx);
             }
 
-            let entry = self.stack.last_mut().unwrap();
+            let entry = self
+                .stack
+                .last_mut()
+                .expect("required framework invariant must hold");
             if !descending {
                 if entry.index() == 0 {
                     self.stack.pop();
@@ -315,7 +330,10 @@ where
 
         while !self.stack.is_empty() {
             let new_subtree = {
-                let entry = self.stack.last_mut().unwrap();
+                let entry = self
+                    .stack
+                    .last_mut()
+                    .expect("required framework invariant must hold");
                 match entry.tree.0.as_ref() {
                     Node::Internal {
                         child_trees,
@@ -381,7 +399,16 @@ where
         }
 
         self.at_end = self.stack.is_empty();
-        debug_assert!(self.stack.is_empty() || self.stack.last().unwrap().tree.0.is_leaf());
+        debug_assert!(
+            self.stack.is_empty()
+                || self
+                    .stack
+                    .last()
+                    .expect("required framework invariant must hold")
+                    .tree
+                    .0
+                    .is_leaf()
+        );
     }
 
     #[track_caller]
@@ -561,7 +588,16 @@ where
         }
 
         self.at_end = self.stack.is_empty();
-        debug_assert!(self.stack.is_empty() || self.stack.last().unwrap().tree.0.is_leaf());
+        debug_assert!(
+            self.stack.is_empty()
+                || self
+                    .stack
+                    .last()
+                    .expect("required framework invariant must hold")
+                    .tree
+                    .0
+                    .is_leaf()
+        );
 
         let mut end = self.position.clone();
         if bias == Bias::Left

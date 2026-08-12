@@ -198,8 +198,14 @@ impl DirectXRenderer {
         let direct_composition = if disable_direct_composition {
             None
         } else {
-            let composition = DirectComposition::new(devices.dxgi_device.as_ref().unwrap(), hwnd)
-                .context("Creating DirectComposition")?;
+            let composition = DirectComposition::new(
+                devices
+                    .dxgi_device
+                    .as_ref()
+                    .expect("required framework invariant must hold"),
+                hwnd,
+            )
+            .context("Creating DirectComposition")?;
             composition
                 .set_swap_chain(&resources.swap_chain)
                 .context("Setting swap chain for DirectComposition")?;
@@ -239,7 +245,10 @@ impl DirectXRenderer {
             .device_context;
         update_buffer(
             device_context,
-            self.globals.global_params_buffer.as_ref().unwrap(),
+            self.globals
+                .global_params_buffer
+                .as_ref()
+                .expect("required framework invariant must hold"),
             &[GlobalParams {
                 gamma_ratios: self.font_info.gamma_ratios,
                 viewport_size: [resources.viewport.Width, resources.viewport.Height],
@@ -333,8 +342,13 @@ impl DirectXRenderer {
         let direct_composition = if disable_direct_composition {
             None
         } else {
-            let composition =
-                DirectComposition::new(devices.dxgi_device.as_ref().unwrap(), self.hwnd)?;
+            let composition = DirectComposition::new(
+                devices
+                    .dxgi_device
+                    .as_ref()
+                    .expect("required framework invariant must hold"),
+                self.hwnd,
+            )?;
             composition.set_swap_chain(&resources.swap_chain)?;
             Some(composition)
         };
@@ -675,7 +689,10 @@ impl DirectXRenderer {
         // Clear intermediate MSAA texture
         unsafe {
             devices.device_context.ClearRenderTargetView(
-                resources.path_intermediate_msaa_view.as_ref().unwrap(),
+                resources
+                    .path_intermediate_msaa_view
+                    .as_ref()
+                    .expect("required framework invariant must hold"),
                 &[0.0; 4],
             );
             // Set intermediate MSAA texture as render target
@@ -740,7 +757,12 @@ impl DirectXRenderer {
         // disjoint, so we can copy each path's bounds individually. If this
         // batch combines different draw orders, we perform a single copy
         // for a minimal spanning rect.
-        let sprites = if paths.last().unwrap().order == first_path.order {
+        let sprites = if paths
+            .last()
+            .expect("required framework invariant must hold")
+            .order
+            == first_path.order
+        {
             paths
                 .iter()
                 .map(|path| PathSprite {
@@ -900,9 +922,13 @@ impl DirectXRenderer {
     pub(crate) fn get_font_info() -> &'static FontInfo {
         static CACHED_FONT_INFO: OnceLock<FontInfo> = OnceLock::new();
         CACHED_FONT_INFO.get_or_init(|| unsafe {
-            let factory: IDWriteFactory5 = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED).unwrap();
-            let render_params: IDWriteRenderingParams1 =
-                factory.CreateRenderingParams().unwrap().cast().unwrap();
+            let factory: IDWriteFactory5 = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED)
+                .expect("required framework invariant must hold");
+            let render_params: IDWriteRenderingParams1 = factory
+                .CreateRenderingParams()
+                .expect("required framework invariant must hold")
+                .cast()
+                .expect("required framework invariant must hold");
             FontInfo {
                 gamma_ratios: gpui::get_gamma_correction_ratios(render_params.GetGamma()),
                 grayscale_enhanced_contrast: render_params.GetGrayscaleEnhancedContrast(),
@@ -1600,13 +1626,16 @@ fn create_path_intermediate_texture(
             MiscFlags: 0,
         };
         device.CreateTexture2D(&desc, None, Some(&mut output))?;
-        output.unwrap()
+        output.expect("required framework invariant must hold")
     };
 
     let mut shader_resource_view = None;
     unsafe { device.CreateShaderResourceView(&texture, None, Some(&mut shader_resource_view))? };
 
-    Ok((texture, Some(shader_resource_view.unwrap())))
+    Ok((
+        texture,
+        Some(shader_resource_view.expect("required framework invariant must hold")),
+    ))
 }
 
 #[inline]
@@ -1633,11 +1662,14 @@ fn create_path_intermediate_msaa_texture_and_view(
             MiscFlags: 0,
         };
         device.CreateTexture2D(&desc, None, Some(&mut output))?;
-        output.unwrap()
+        output.expect("required framework invariant must hold")
     };
     let mut msaa_view = None;
     unsafe { device.CreateRenderTargetView(&msaa_texture, None, Some(&mut msaa_view))? };
-    Ok((msaa_texture, Some(msaa_view.unwrap())))
+    Ok((
+        msaa_texture,
+        Some(msaa_view.expect("required framework invariant must hold")),
+    ))
 }
 
 #[inline]
@@ -1657,7 +1689,7 @@ fn set_rasterizer_state(device: &ID3D11Device, device_context: &ID3D11DeviceCont
     let rasterizer_state = unsafe {
         let mut state = None;
         device.CreateRasterizerState(&desc, Some(&mut state))?;
-        state.unwrap()
+        state.expect("required framework invariant must hold")
     };
     unsafe { device_context.RSSetState(&rasterizer_state) };
     Ok(())
@@ -1678,7 +1710,7 @@ fn create_blend_state(device: &ID3D11Device) -> Result<ID3D11BlendState> {
     unsafe {
         let mut state = None;
         device.CreateBlendState(&desc, Some(&mut state))?;
-        Ok(state.unwrap())
+        Ok(state.expect("required framework invariant must hold"))
     }
 }
 
@@ -1699,7 +1731,7 @@ fn create_blend_state_for_subpixel_rendering(device: &ID3D11Device) -> Result<ID
     unsafe {
         let mut state = None;
         device.CreateBlendState(&desc, Some(&mut state))?;
-        Ok(state.unwrap())
+        Ok(state.expect("required framework invariant must hold"))
     }
 }
 
@@ -1719,7 +1751,7 @@ fn create_blend_state_for_path_rasterization(device: &ID3D11Device) -> Result<ID
     unsafe {
         let mut state = None;
         device.CreateBlendState(&desc, Some(&mut state))?;
-        Ok(state.unwrap())
+        Ok(state.expect("required framework invariant must hold"))
     }
 }
 
@@ -1739,7 +1771,7 @@ fn create_blend_state_for_path_sprite(device: &ID3D11Device) -> Result<ID3D11Ble
     unsafe {
         let mut state = None;
         device.CreateBlendState(&desc, Some(&mut state))?;
-        Ok(state.unwrap())
+        Ok(state.expect("required framework invariant must hold"))
     }
 }
 
@@ -1748,7 +1780,7 @@ fn create_vertex_shader(device: &ID3D11Device, bytes: &[u8]) -> Result<ID3D11Ver
     unsafe {
         let mut shader = None;
         device.CreateVertexShader(bytes, None, Some(&mut shader))?;
-        Ok(shader.unwrap())
+        Ok(shader.expect("required framework invariant must hold"))
     }
 }
 
@@ -1757,7 +1789,7 @@ fn create_fragment_shader(device: &ID3D11Device, bytes: &[u8]) -> Result<ID3D11P
     unsafe {
         let mut shader = None;
         device.CreatePixelShader(bytes, None, Some(&mut shader))?;
-        Ok(shader.unwrap())
+        Ok(shader.expect("required framework invariant must hold"))
     }
 }
 
@@ -1793,7 +1825,7 @@ fn create_buffer(
     };
     let mut buffer = None;
     unsafe { device.CreateBuffer(&desc, None, Some(&mut buffer)) }?;
-    Ok(buffer.unwrap())
+    Ok(buffer.expect("required framework invariant must hold"))
 }
 
 #[inline]
@@ -2013,7 +2045,11 @@ pub(crate) mod shader_resources {
             );
 
             let ret = D3DCompileFromFile(
-                &HSTRING::from(shader_path.to_str().unwrap()),
+                &HSTRING::from(
+                    shader_path
+                        .to_str()
+                        .expect("required framework invariant must hold"),
+                ),
                 None,
                 include_handler,
                 entry_point,
@@ -2034,7 +2070,7 @@ pub(crate) mod shader_resources {
                 log::error!("Shader compile error: {}", error_string);
                 return Err(anyhow::anyhow!("Compile error: {}", error_string));
             }
-            Ok(compile_blob.unwrap())
+            Ok(compile_blob.expect("required framework invariant must hold"))
         }
     }
 

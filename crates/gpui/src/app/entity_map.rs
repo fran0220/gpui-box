@@ -38,7 +38,7 @@ impl From<u64> for EntityId {
 impl EntityId {
     /// Converts this entity id to a [NonZeroU64]
     pub fn as_non_zero_u64(self) -> NonZeroU64 {
-        NonZeroU64::new(self.0.as_ffi()).unwrap()
+        NonZeroU64::new(self.0.as_ffi()).expect("required framework invariant must hold")
     }
 
     /// Converts this entity id to a [u64]
@@ -150,7 +150,13 @@ impl EntityMap {
 
     /// Returns an entity after moving it to the stack.
     pub fn end_lease<T>(&mut self, mut lease: Lease<T>) {
-        self.entities.insert(lease.id, lease.entity.take().unwrap());
+        self.entities.insert(
+            lease.id,
+            lease
+                .entity
+                .take()
+                .expect("required framework invariant must hold"),
+        );
     }
 
     pub fn read<T: 'static>(&self, entity: &Entity<T>) -> &T {
@@ -188,7 +194,10 @@ impl EntityMap {
 
         dropped_entity_ids
             .filter_map(|entity_id| {
-                let count = ref_counts.counts.remove(entity_id).unwrap();
+                let count = ref_counts
+                    .counts
+                    .remove(entity_id)
+                    .expect("required framework invariant must hold");
                 debug_assert_eq!(
                     count.load(SeqCst),
                     0,
@@ -221,13 +230,21 @@ impl<T: 'static> core::ops::Deref for Lease<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        self.entity.as_ref().unwrap().downcast_ref().unwrap()
+        self.entity
+            .as_ref()
+            .expect("required framework invariant must hold")
+            .downcast_ref()
+            .expect("required framework invariant must hold")
     }
 }
 
 impl<T: 'static> core::ops::DerefMut for Lease<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.entity.as_mut().unwrap().downcast_mut().unwrap()
+        self.entity
+            .as_mut()
+            .expect("required framework invariant must hold")
+            .downcast_mut()
+            .expect("required framework invariant must hold")
     }
 }
 
@@ -265,7 +282,7 @@ impl AnyEntity {
             handle_id: entity_map
                 .clone()
                 .upgrade()
-                .unwrap()
+                .expect("required framework invariant must hold")
                 .write()
                 .leak_detector
                 .handle_created(id, Some(type_name)),
@@ -328,7 +345,7 @@ impl Clone for AnyEntity {
             handle_id: self
                 .entity_map
                 .upgrade()
-                .unwrap()
+                .expect("required framework invariant must hold")
                 .write()
                 .leak_detector
                 .handle_created(self.entity_id, None),
@@ -609,7 +626,7 @@ impl AnyWeakEntity {
             handle_id: self
                 .entity_ref_counts
                 .upgrade()
-                .unwrap()
+                .expect("required framework invariant must hold")
                 .write()
                 .leak_detector
                 .handle_created(self.entity_id, None),
@@ -647,7 +664,7 @@ impl AnyWeakEntity {
     pub fn assert_released(&self) {
         self.entity_ref_counts
             .upgrade()
-            .unwrap()
+            .expect("required framework invariant must hold")
             .write()
             .leak_detector
             .assert_released(self.entity_id);
@@ -1012,13 +1029,14 @@ impl LeakDetector {
                 if let Some(mut backtrace) = backtrace {
                     backtrace.resolve();
                     let backtrace = BacktraceFormatter(backtrace);
-                    writeln!(out, "Leaked handle:\n{:?}", backtrace).unwrap();
+                    writeln!(out, "Leaked handle:\n{:?}", backtrace)
+                        .expect("required framework invariant must hold");
                 } else {
                     writeln!(
                         out,
                         "Leaked handle: (export LEAK_BACKTRACE to find allocation site)"
                     )
-                    .unwrap();
+                    .expect("required framework invariant must hold");
                 }
             }
             panic!("Handles for {} leaked:\n{out}", data.type_name);
@@ -1065,14 +1083,14 @@ impl LeakDetector {
                         "Leaked handle for entity {} ({entity_id:?}):\n{:?}",
                         data.type_name, backtrace
                     )
-                    .unwrap();
+                    .expect("required framework invariant must hold");
                 } else {
                     writeln!(
                         out,
                         "Leaked handle for entity {} ({entity_id:?}): (export LEAK_BACKTRACE to find allocation site)",
                         data.type_name
                     )
-                    .unwrap();
+                    .expect("required framework invariant must hold");
                 }
             }
         }
@@ -1103,14 +1121,14 @@ impl Drop for LeakDetector {
                         "Leaked handle for entity {} ({entity_id:?}):\n{:?}",
                         data.type_name, backtrace
                     )
-                    .unwrap();
+                    .expect("required framework invariant must hold");
                 } else {
                     writeln!(
                         out,
                         "Leaked handle for entity {} ({entity_id:?}): (export LEAK_BACKTRACE to find allocation site)",
                         data.type_name
                     )
-                    .unwrap();
+                    .expect("required framework invariant must hold");
                 }
             }
         }
@@ -1207,7 +1225,10 @@ mod test {
         assert_eq!(
             dropped
                 .into_iter()
-                .map(|(_, entity)| entity.downcast::<TestEntity>().unwrap().i)
+                .map(|(_, entity)| entity
+                    .downcast::<TestEntity>()
+                    .expect("required framework invariant must hold")
+                    .i)
                 .collect::<Vec<i32>>(),
             vec![1, 2],
         );
@@ -1232,7 +1253,10 @@ mod test {
         assert_eq!(
             dropped
                 .into_iter()
-                .map(|(_, entity)| entity.downcast::<TestEntity>().unwrap().i)
+                .map(|(_, entity)| entity
+                    .downcast::<TestEntity>()
+                    .expect("required framework invariant must hold")
+                    .i)
                 .collect::<Vec<i32>>(),
             vec![1],
         );

@@ -1,4 +1,4 @@
-use crate::{Instant, Priority, RunnableMeta, Scheduler, SessionId, Timer};
+use crate::{DedicatedTask, Instant, Priority, RunnableMeta, Scheduler, SessionId, Timer};
 use async_task::Runnable;
 use std::{
     any::Any,
@@ -185,13 +185,7 @@ impl LocalExecutor {
 /// expected by [`Scheduler::spawn_dedicated`]. The user's `Fut::Output` is
 /// boxed as `Box<dyn Any + Send + Sync>` on the dedicated side and downcast
 /// back to `Fut::Output` by [`Task::downcast`] in the wrapper.
-fn box_dedicated<F, Fut>(
-    f: F,
-) -> Box<
-    dyn FnOnce(LocalExecutor) -> Pin<Box<dyn Future<Output = Box<dyn Any + Send + Sync>> + 'static>>
-        + Send
-        + 'static,
->
+fn box_dedicated<F, Fut>(f: F) -> DedicatedTask
 where
     F: FnOnce(LocalExecutor) -> Fut + Send + 'static,
     Fut: Future + 'static,
@@ -483,7 +477,9 @@ impl<T: 'static> Future for Task<T> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         match unsafe { self.get_unchecked_mut() } {
-            Task(TaskState::Ready(val)) => Poll::Ready(val.take().unwrap()),
+            Task(TaskState::Ready(val)) => {
+                Poll::Ready(val.take().expect("required framework invariant must hold"))
+            }
             Task(TaskState::Spawned(task)) => Pin::new(task).poll(cx),
             Task(TaskState::Downcast { inner, .. }) => match Pin::new(inner.as_mut()).poll(cx) {
                 Poll::Ready(boxed_any) => Poll::Ready(

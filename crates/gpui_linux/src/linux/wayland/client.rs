@@ -240,7 +240,7 @@ impl Globals {
                         ..=wl_surface::EVT_PREFERRED_BUFFER_SCALE_SINCE,
                     (),
                 )
-                .unwrap(),
+                .expect("required framework invariant must hold"),
             cursor_shape_manager: globals.bind(&qh, 1..=1, ()).ok(),
             data_device_manager: globals
                 .bind(
@@ -250,9 +250,13 @@ impl Globals {
                 )
                 .ok(),
             primary_selection_manager: globals.bind(&qh, 1..=1, ()).ok(),
-            shm: globals.bind(&qh, 1..=1, ()).unwrap(),
+            shm: globals
+                .bind(&qh, 1..=1, ())
+                .expect("required framework invariant must hold"),
             seat,
-            wm_base: globals.bind(&qh, 1..=5, ()).unwrap(),
+            wm_base: globals
+                .bind(&qh, 1..=5, ())
+                .expect("required framework invariant must hold"),
             viewporter: globals.bind(&qh, 1..=1, ()).ok(),
             fractional_scale_manager: globals.bind(&qh, 1..=1, ()).ok(),
             decoration_manager: globals.bind(&qh, 1..=1, ()).ok(),
@@ -437,7 +441,12 @@ impl WaylandClientStatePtr {
     }
 
     pub fn get_serial(&self, kind: SerialKind) -> Serial {
-        self.0.upgrade().unwrap().borrow().serial_tracker.get(kind)
+        self.0
+            .upgrade()
+            .expect("required framework invariant must hold")
+            .borrow()
+            .serial_tracker
+            .get(kind)
     }
 
     pub fn start_external_drag(
@@ -481,8 +490,11 @@ impl WaylandClientStatePtr {
     }
 
     pub fn set_pending_activation(&self, window: ObjectId) {
-        self.0.upgrade().unwrap().borrow_mut().pending_activation =
-            Some(PendingActivation::Window(window));
+        self.0
+            .upgrade()
+            .expect("required framework invariant must hold")
+            .borrow_mut()
+            .pending_activation = Some(PendingActivation::Window(window));
     }
 
     pub fn enable_ime(&self) {
@@ -571,7 +583,10 @@ impl WaylandClientStatePtr {
     pub fn drop_window(&self, surface_id: &ObjectId) {
         let client = self.get_client();
         let mut state = client.borrow_mut();
-        let closed_window = state.windows.remove(surface_id).unwrap();
+        let closed_window = state
+            .windows
+            .remove(surface_id)
+            .expect("required framework invariant must hold");
         if let Some(window) = state.mouse_focused_window.take()
             && !window.ptr_eq(&closed_window)
         {
@@ -701,9 +716,10 @@ fn wl_output_version(version: u32) -> u32 {
 impl WaylandClient {
     pub(crate) fn new() -> Self {
         let startup_activation_token = take_startup_activation_token_from_environment();
-        let conn = Connection::connect_to_env().unwrap();
+        let conn = Connection::connect_to_env().expect("required framework invariant must hold");
 
-        let (globals, event_queue) = registry_queue_init::<WaylandClientStatePtr>(&conn).unwrap();
+        let (globals, event_queue) = registry_queue_init::<WaylandClientStatePtr>(&conn)
+            .expect("required framework invariant must hold");
         let qh = event_queue.handle();
 
         let mut seat: Option<wl_seat::WlSeat> = None;
@@ -737,7 +753,8 @@ impl WaylandClient {
             }
         });
 
-        let event_loop = EventLoop::<WaylandClientStatePtr>::try_new().unwrap();
+        let event_loop = EventLoop::<WaylandClientStatePtr>::try_new()
+            .expect("required framework invariant must hold");
 
         let (common, main_receiver, wake_receiver) = LinuxCommon::new(event_loop.get_signal());
 
@@ -757,7 +774,7 @@ impl WaylandClient {
                     }
                 }
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
 
         handle
             .insert_source(
@@ -768,12 +785,12 @@ impl WaylandClient {
                     }
                 },
             )
-            .unwrap();
+            .expect("required framework invariant must hold");
 
         let compositor_gpu = detect_compositor_gpu();
         let gpu_context = Rc::new(RefCell::new(None));
 
-        let seat = seat.unwrap();
+        let seat = seat.expect("required framework invariant must hold");
         let globals = Globals::new(
             globals,
             common.foreground_executor.clone(),
@@ -834,7 +851,7 @@ impl WaylandClient {
                     }
                 }
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
 
         let state = Rc::new(RefCell::new(WaylandClientState {
             serial_tracker: SerialTracker::new(),
@@ -914,7 +931,7 @@ impl WaylandClient {
 
         WaylandSource::new(conn, event_queue)
             .insert(handle)
-            .unwrap();
+            .expect("required framework invariant must hold");
 
         Self(state)
     }
@@ -1606,7 +1623,11 @@ impl Dispatch<xdg_activation_token_v1::XdgActivationTokenV1, ()> for WaylandClie
                     let Some(window) = get_window(&mut state, &window) else {
                         return;
                     };
-                    let activation = state.globals.activation.as_ref().unwrap();
+                    let activation = state
+                        .globals
+                        .activation
+                        .as_ref()
+                        .expect("required framework invariant must hold");
                     activation.activate(token, &window.surface());
                 }
                 None => log::error!("activation token received with no pending activation"),
@@ -1763,12 +1784,18 @@ impl Dispatch<wl_keyboard::WlKeyboard, ()> for WaylandClientStatePtr {
             } => {
                 let focused_window = state.keyboard_focused_window.clone();
 
-                let keymap_state = state.keymap_state.as_mut().unwrap();
+                let keymap_state = state
+                    .keymap_state
+                    .as_mut()
+                    .expect("required framework invariant must hold");
                 let old_layout =
                     keymap_state.serialize_layout(xkbcommon::xkb::STATE_LAYOUT_EFFECTIVE);
                 keymap_state.update_mask(mods_depressed, mods_latched, mods_locked, 0, 0, group);
                 state.modifiers = modifiers_from_xkb(keymap_state);
-                let keymap_state = state.keymap_state.as_mut().unwrap();
+                let keymap_state = state
+                    .keymap_state
+                    .as_mut()
+                    .expect("required framework invariant must hold");
                 state.capslock = capslock_from_xkb(keymap_state);
 
                 let input = PlatformInput::ModifiersChanged(ModifiersChangedEvent {
@@ -1800,7 +1827,10 @@ impl Dispatch<wl_keyboard::WlKeyboard, ()> for WaylandClientStatePtr {
                     return;
                 };
 
-                let keymap_state = state.keymap_state.as_ref().unwrap();
+                let keymap_state = state
+                    .keymap_state
+                    .as_ref()
+                    .expect("required framework invariant must hold");
                 let keycode = Keycode::from(key + MIN_KEYCODE);
                 let keysym = keymap_state.key_get_one_sym(keycode);
 
@@ -1879,8 +1909,11 @@ impl Dispatch<wl_keyboard::WlKeyboard, ()> for WaylandClientStatePtr {
                                         return TimeoutAction::Drop;
                                     }
 
-                                    let focused_window =
-                                        state.keyboard_focused_window.as_ref().unwrap().clone();
+                                    let focused_window = state
+                                        .keyboard_focused_window
+                                        .as_ref()
+                                        .expect("required framework invariant must hold")
+                                        .clone();
 
                                     drop(state);
                                     focused_window.handle_input(input.clone());
@@ -1889,7 +1922,7 @@ impl Dispatch<wl_keyboard::WlKeyboard, ()> for WaylandClientStatePtr {
                                     TimeoutAction::ToInstant(event_timestamp + repeat_interval)
                                 }
                             })
-                            .unwrap();
+                            .expect("required framework invariant must hold");
 
                         drop(state);
                         focused_window.handle_input(input);
@@ -2073,7 +2106,9 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
             wl_pointer::Event::Leave { .. } => {
                 if let Some(focused_window) = state.mouse_focused_window.clone() {
                     let input = PlatformInput::MouseExited(MouseExitEvent {
-                        position: state.mouse_location.unwrap(),
+                        position: state
+                            .mouse_location
+                            .expect("required framework invariant must hold"),
                         pressed_button: state.button_pressed,
                         modifiers: state.modifiers,
                     });
@@ -2132,7 +2167,9 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                         state.enter_token = None;
                     }
                     let input = PlatformInput::MouseMove(MouseMoveEvent {
-                        position: state.mouse_location.unwrap(),
+                        position: state
+                            .mouse_location
+                            .expect("required framework invariant must hold"),
                         pressed_button: state.button_pressed,
                         modifiers: state.modifiers,
                     });
@@ -2184,7 +2221,9 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                                 .is_some_and(|prev_button| prev_button == button)
                             && is_within_click_distance(
                                 state.click.last_location,
-                                state.mouse_location.unwrap(),
+                                state
+                                    .mouse_location
+                                    .expect("required framework invariant must hold"),
                             )
                         {
                             state.click.current_count += 1;
@@ -2194,14 +2233,18 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
 
                         state.click.last_click = Instant::now();
                         state.click.last_mouse_button = Some(button);
-                        state.click.last_location = state.mouse_location.unwrap();
+                        state.click.last_location = state
+                            .mouse_location
+                            .expect("required framework invariant must hold");
 
                         state.button_pressed = Some(button);
 
                         if let Some(window) = state.mouse_focused_window.clone() {
                             let input = PlatformInput::MouseDown(MouseDownEvent {
                                 button,
-                                position: state.mouse_location.unwrap(),
+                                position: state
+                                    .mouse_location
+                                    .expect("required framework invariant must hold"),
                                 modifiers: state.modifiers,
                                 click_count: state.click.current_count,
                                 first_mouse: state.enter_token.take().is_some(),
@@ -2216,7 +2259,9 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                         if let Some(window) = state.mouse_focused_window.clone() {
                             let input = PlatformInput::MouseUp(MouseUpEvent {
                                 button,
-                                position: state.mouse_location.unwrap(),
+                                position: state
+                                    .mouse_location
+                                    .expect("required framework invariant must hold"),
                                 modifiers: state.modifiers,
                                 click_count: state.click.current_count,
                             });
@@ -2330,7 +2375,9 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                     if let Some(continuous) = continuous {
                         if let Some(window) = state.mouse_focused_window.clone() {
                             let input = PlatformInput::ScrollWheel(ScrollWheelEvent {
-                                position: state.mouse_location.unwrap(),
+                                position: state
+                                    .mouse_location
+                                    .expect("required framework invariant must hold"),
                                 delta: ScrollDelta::Pixels(continuous),
                                 modifiers: state.modifiers,
                                 touch_phase: TouchPhase::Moved,
@@ -2342,7 +2389,9 @@ impl Dispatch<wl_pointer::WlPointer, ()> for WaylandClientStatePtr {
                         && let Some(window) = state.mouse_focused_window.clone()
                     {
                         let input = PlatformInput::ScrollWheel(ScrollWheelEvent {
-                            position: state.mouse_location.unwrap(),
+                            position: state
+                                .mouse_location
+                                .expect("required framework invariant must hold"),
                             delta: ScrollDelta::Lines(discrete),
                             modifiers: state.modifiers,
                             touch_phase: TouchPhase::Moved,
@@ -2536,7 +2585,7 @@ impl Dispatch<wl_data_device::WlDataDevice, ()> for WaylandClientStatePtr {
                     const ACTIONS: DndAction = DndAction::Copy;
                     data_offer.set_actions(ACTIONS, ACTIONS);
 
-                    let pipe = Pipe::new().unwrap();
+                    let pipe = Pipe::new().expect("required framework invariant must hold");
                     data_offer.receive(FILE_LIST_MIME_TYPE.to_string(), unsafe {
                         BorrowedFd::borrow_raw(pipe.write.as_raw_fd())
                     });
@@ -2613,7 +2662,11 @@ impl Dispatch<wl_data_device::WlDataDevice, ()> for WaylandClientStatePtr {
                 let Some(drag_window) = state.drag.window.clone() else {
                     return;
                 };
-                let data_offer = state.drag.data_offer.clone().unwrap();
+                let data_offer = state
+                    .drag
+                    .data_offer
+                    .clone()
+                    .expect("required framework invariant must hold");
                 data_offer.destroy();
 
                 state.drag.data_offer = None;
@@ -2627,7 +2680,11 @@ impl Dispatch<wl_data_device::WlDataDevice, ()> for WaylandClientStatePtr {
                 let Some(drag_window) = state.drag.window.clone() else {
                     return;
                 };
-                let data_offer = state.drag.data_offer.clone().unwrap();
+                let data_offer = state
+                    .drag
+                    .data_offer
+                    .clone()
+                    .expect("required framework invariant must hold");
                 data_offer.finish();
                 data_offer.destroy();
 

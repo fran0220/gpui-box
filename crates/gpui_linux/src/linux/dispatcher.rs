@@ -47,7 +47,7 @@ impl LinuxDispatcher {
                             profiler::save_task_timing();
                         }
                     })
-                    .unwrap()
+                    .expect("required framework invariant must hold")
             })
             .collect::<Vec<_>>();
 
@@ -85,7 +85,7 @@ impl LinuxDispatcher {
 
                 event_loop.run(None, &mut (), |_| {}).log_err();
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
 
         background_threads.push(timer_thread);
 
@@ -309,7 +309,8 @@ mod tests {
 
     #[test]
     fn calloop_works() {
-        let mut event_loop = calloop::EventLoop::try_new().unwrap();
+        let mut event_loop =
+            calloop::EventLoop::try_new().expect("required framework invariant must hold");
         let handle = event_loop.handle();
 
         let (tx, rx) = PriorityQueueCalloopReceiver::new();
@@ -334,21 +335,22 @@ mod tests {
                     data.got_closed = true;
                 }
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
 
         // nothing is sent, nothing is received
         event_loop
             .dispatch(Some(::std::time::Duration::ZERO), &mut data)
-            .unwrap();
+            .expect("required framework invariant must hold");
 
         assert!(!data.got_msg);
         assert!(!data.got_closed);
         // a message is send
 
-        tx.send(Priority::Medium, ()).unwrap();
+        tx.send(Priority::Medium, ())
+            .expect("required framework invariant must hold");
         event_loop
             .dispatch(Some(::std::time::Duration::ZERO), &mut data)
-            .unwrap();
+            .expect("required framework invariant must hold");
 
         assert!(data.got_msg);
         assert!(!data.got_closed);
@@ -357,7 +359,7 @@ mod tests {
         drop(tx);
         event_loop
             .dispatch(Some(::std::time::Duration::ZERO), &mut data)
-            .unwrap();
+            .expect("required framework invariant must hold");
 
         assert!(data.got_msg);
         assert!(data.got_closed);

@@ -107,7 +107,9 @@ impl<S: Refineable + Default> Cascade<S> {
     /// The base refinement is always present and serves as the foundation
     /// for the cascade.
     pub fn base(&mut self) -> &mut S::Refinement {
-        self.0[0].as_mut().unwrap()
+        self.0[0]
+            .as_mut()
+            .expect("required framework invariant must hold")
     }
 
     /// Sets the refinement for a specific slot in the cascade.
@@ -123,7 +125,9 @@ impl<S: Refineable + Default> Cascade<S> {
     /// Refinements are applied in order, with later slots taking precedence.
     /// Empty slots (`None`) are skipped during merging.
     pub fn merged(&self) -> S::Refinement {
-        let mut merged = self.0[0].clone().unwrap();
+        let mut merged = self.0[0]
+            .clone()
+            .expect("required framework invariant must hold");
         for refinement in self.0.iter().skip(1).flatten() {
             merged.refine(refinement);
         }

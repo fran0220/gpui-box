@@ -78,7 +78,7 @@ impl Render for SubWindow {
                                     })
                                 },
                             )
-                            .unwrap();
+                            .expect("test setup should produce the required value");
                         }))
                     })
                     .child(button("Close", |window, _| {
@@ -117,7 +117,7 @@ impl Render for WindowDemo {
                         })
                     },
                 )
-                .unwrap();
+                .expect("test setup should produce the required value");
             }))
             .child(button("Popup", move |_, cx| {
                 cx.open_window(
@@ -133,7 +133,7 @@ impl Render for WindowDemo {
                         })
                     },
                 )
-                .unwrap();
+                .expect("test setup should produce the required value");
             }))
             .child(button("Floating", move |_, cx| {
                 cx.open_window(
@@ -149,7 +149,7 @@ impl Render for WindowDemo {
                         })
                     },
                 )
-                .unwrap();
+                .expect("test setup should produce the required value");
             }))
             .child(button("Dialog", move |_, cx| {
                 cx.open_window(
@@ -165,7 +165,7 @@ impl Render for WindowDemo {
                         })
                     },
                 )
-                .unwrap();
+                .expect("test setup should produce the required value");
             }))
             .child(button("Custom Titlebar", move |_, cx| {
                 cx.open_window(
@@ -181,7 +181,7 @@ impl Render for WindowDemo {
                         })
                     },
                 )
-                .unwrap();
+                .expect("test setup should produce the required value");
             }))
             .child(button("Invisible", move |_, cx| {
                 cx.open_window(
@@ -197,7 +197,7 @@ impl Render for WindowDemo {
                         })
                     },
                 )
-                .unwrap();
+                .expect("test setup should produce the required value");
             }))
             .child(button("Unmovable", move |_, cx| {
                 cx.open_window(
@@ -214,7 +214,7 @@ impl Render for WindowDemo {
                         })
                     },
                 )
-                .unwrap();
+                .expect("test setup should produce the required value");
             }))
             .child(button("Unresizable", move |_, cx| {
                 cx.open_window(
@@ -230,7 +230,7 @@ impl Render for WindowDemo {
                         })
                     },
                 )
-                .unwrap();
+                .expect("test setup should produce the required value");
             }))
             .child(button("Unminimizable", move |_, cx| {
                 cx.open_window(
@@ -246,7 +246,7 @@ impl Render for WindowDemo {
                         })
                     },
                 )
-                .unwrap();
+                .expect("test setup should produce the required value");
             }))
             .child(button("Hide Application", |window, cx| {
                 cx.hide();
@@ -277,7 +277,7 @@ impl Render for WindowDemo {
                 );
 
                 cx.spawn(async move |_| {
-                    if answer.await.unwrap() == 0 {
+                    if answer.await.expect("test setup should produce the required value") == 0 {
                         println!("You have clicked Ok");
                     } else {
                         println!("You have clicked Cancel");
@@ -295,7 +295,7 @@ impl Render for WindowDemo {
                 );
 
                 cx.spawn(async move |_| {
-                    if answer.await.unwrap() == 0 {
+                    if answer.await.expect("test setup should produce the required value") == 0 {
                         println!("You have clicked Ok");
                     } else {
                         println!("You have clicked Cancel");
@@ -328,7 +328,7 @@ fn run_example() {
                 })
             },
         )
-        .unwrap();
+        .expect("test setup should produce the required value");
 
         cx.activate(true);
         cx.on_action(|_: &Quit, cx| cx.quit());

@@ -975,42 +975,48 @@ mod tests {
 
     #[test]
     fn test_deserialize_three_value_hex_to_rgba() {
-        let actual: Rgba = serde_json::from_value(json!("#f09")).unwrap();
+        let actual: Rgba =
+            serde_json::from_value(json!("#f09")).expect("required framework invariant must hold");
 
         assert_eq!(actual, rgba(0xff0099ff))
     }
 
     #[test]
     fn test_deserialize_four_value_hex_to_rgba() {
-        let actual: Rgba = serde_json::from_value(json!("#f09f")).unwrap();
+        let actual: Rgba =
+            serde_json::from_value(json!("#f09f")).expect("required framework invariant must hold");
 
         assert_eq!(actual, rgba(0xff0099ff))
     }
 
     #[test]
     fn test_deserialize_six_value_hex_to_rgba() {
-        let actual: Rgba = serde_json::from_value(json!("#ff0099")).unwrap();
+        let actual: Rgba = serde_json::from_value(json!("#ff0099"))
+            .expect("required framework invariant must hold");
 
         assert_eq!(actual, rgba(0xff0099ff))
     }
 
     #[test]
     fn test_deserialize_eight_value_hex_to_rgba() {
-        let actual: Rgba = serde_json::from_value(json!("#ff0099ff")).unwrap();
+        let actual: Rgba = serde_json::from_value(json!("#ff0099ff"))
+            .expect("required framework invariant must hold");
 
         assert_eq!(actual, rgba(0xff0099ff))
     }
 
     #[test]
     fn test_deserialize_eight_value_hex_with_padding_to_rgba() {
-        let actual: Rgba = serde_json::from_value(json!(" #f5f5f5ff   ")).unwrap();
+        let actual: Rgba = serde_json::from_value(json!(" #f5f5f5ff   "))
+            .expect("required framework invariant must hold");
 
         assert_eq!(actual, rgba(0xf5f5f5ff))
     }
 
     #[test]
     fn test_deserialize_eight_value_hex_with_mixed_case_to_rgba() {
-        let actual: Rgba = serde_json::from_value(json!("#DeAdbEeF")).unwrap();
+        let actual: Rgba = serde_json::from_value(json!("#DeAdbEeF"))
+            .expect("required framework invariant must hold");
 
         assert_eq!(actual, rgba(0xdeadbeef))
     }

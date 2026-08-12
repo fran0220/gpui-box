@@ -323,7 +323,12 @@ pub(crate) fn get_simple_attribute_field(ast: &DeriveInput, name: &'static str) 
             .fields
             .iter()
             .find(|field| field.attrs.iter().any(|attr| attr.path().is_ident(name)))
-            .map(|field| field.ident.clone().unwrap()),
+            .map(|field| {
+                field
+                    .ident
+                    .clone()
+                    .expect("required framework invariant must hold")
+            }),
         syn::Data::Enum(_) => None,
         syn::Data::Union(_) => None,
     }

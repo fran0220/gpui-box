@@ -79,7 +79,7 @@ pub fn key_to_native(key: &str) -> Cow<'_, str> {
         "f35" => NSF35FunctionKey,
         _ => return Cow::Borrowed(key),
     };
-    Cow::Owned(String::from_utf16(&[code]).unwrap())
+    Cow::Owned(String::from_utf16(&[code]).expect("required framework invariant must hold"))
 }
 
 unsafe fn read_modifiers(native_event: id) -> Modifiers {

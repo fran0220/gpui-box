@@ -42,7 +42,7 @@ use std::{
 /// public so that it can be used from the `property_test` macro.
 pub fn seed_strategy() -> impl Strategy<Value = u64> {
     match std::env::var("SEED") {
-        Ok(val) => Just(val.parse().unwrap()).boxed(),
+        Ok(val) => Just(val.parse().expect("required framework invariant must hold")).boxed(),
         Err(_) => any::<u64>().no_shrink().boxed(),
     }
 }

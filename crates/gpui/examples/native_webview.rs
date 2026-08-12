@@ -547,11 +547,15 @@ mod macos {
                     ..Default::default()
                 },
                 |window, cx| {
-                    let webview = Rc::new(NativeWebView::new().unwrap());
+                    let webview = Rc::new(
+                        NativeWebView::new().expect("test setup should produce the required value"),
+                    );
 
                     // GPUI inserts its transparent overlay above hosted
                     // platform views, so deferred content can cover WebKit.
-                    window.enable_scene_overlay().unwrap();
+                    window
+                        .enable_scene_overlay()
+                        .expect("test setup should produce the required value");
 
                     cx.new(|_| NativeWebViewExample {
                         webview,
@@ -562,7 +566,7 @@ mod macos {
                     })
                 },
             )
-            .unwrap();
+            .expect("test setup should produce the required value");
             cx.activate(true);
         });
     }

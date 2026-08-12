@@ -80,14 +80,16 @@ impl<T: ReceiveData> DataOffer<T> {
     }
 
     fn read_bytes(&self, connection: &Connection, mime_type: &str) -> Option<Vec<u8>> {
-        let pipe = Pipe::new().unwrap();
+        let pipe = Pipe::new().expect("required framework invariant must hold");
         self.inner.receive_data(mime_type.to_string(), unsafe {
             BorrowedFd::borrow_raw(pipe.write.as_raw_fd())
         });
         let fd = pipe.read;
         drop(pipe.write);
 
-        connection.flush().unwrap();
+        connection
+            .flush()
+            .expect("required framework invariant must hold");
 
         match read_fd_with_timeout(fd, PIPE_READ_TIMEOUT) {
             Ok(bytes) => Some(bytes),
@@ -258,6 +260,6 @@ impl Clipboard {
                     }
                 },
             )
-            .unwrap();
+            .expect("required framework invariant must hold");
     }
 }

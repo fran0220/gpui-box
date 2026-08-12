@@ -173,7 +173,7 @@ fn run_example() {
                 secondary_open: false,
             })
         })
-        .unwrap();
+        .expect("test setup should produce the required value");
         cx.activate(true);
     });
 }

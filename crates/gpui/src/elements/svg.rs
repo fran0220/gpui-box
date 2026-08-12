@@ -263,6 +263,8 @@ impl Asset for SvgAsset {
     type Source = SharedString;
     type Output = Result<Arc<[u8]>, Arc<std::io::Error>>;
 
+    // This established trait boundary preserves its public signature.
+    #[allow(clippy::manual_async_fn)]
     fn load(
         source: Self::Source,
         _cx: &mut App,

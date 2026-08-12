@@ -878,7 +878,13 @@ mod tests {
                 TruncateFrom::End,
             );
             assert_eq!(result, expected);
-            assert_eq!(dummy_runs.first().unwrap().len, result.len());
+            assert_eq!(
+                dummy_runs
+                    .first()
+                    .expect("required framework invariant must hold")
+                    .len,
+                result.len()
+            );
         }
 
         perform_test(
@@ -928,7 +934,13 @@ mod tests {
                 TruncateFrom::Start,
             );
             assert_eq!(result, expected);
-            assert_eq!(dummy_runs.first().unwrap().len, result.len());
+            assert_eq!(
+                dummy_runs
+                    .first()
+                    .expect("required framework invariant must hold")
+                    .len,
+                result.len()
+            );
         }
 
         perform_test(
@@ -1231,7 +1243,7 @@ mod tests {
                     Some(px(72.)),
                     None,
                 )
-                .unwrap();
+                .expect("required framework invariant must hold");
 
             assert_eq!(
                 lines[0].layout.wrap_boundaries(),

@@ -33,8 +33,10 @@ const EMOJI_FONT_FAMILIES: &[&str] = &[
 const EMOJI_FONT_FAMILIES: &[&str] = &[];
 
 fn is_emoji_presentation(c: char) -> bool {
-    static EMOJI_PRESENTATION_REGEX: LazyLock<regex::Regex> =
-        LazyLock::new(|| regex::Regex::new("\\p{Emoji_Presentation}").unwrap());
+    static EMOJI_PRESENTATION_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| {
+        regex::Regex::new("\\p{Emoji_Presentation}")
+            .expect("required framework invariant must hold")
+    });
     let mut buf = [0u8; 4];
     EMOJI_PRESENTATION_REGEX.is_match(c.encode_utf8(&mut buf))
 }
@@ -181,7 +183,7 @@ impl SvgRenderer {
         .map(|pixmap| {
             let mut buffer =
                 image::ImageBuffer::from_raw(pixmap.width(), pixmap.height(), pixmap.take())
-                    .unwrap();
+                    .expect("required framework invariant must hold");
 
             for pixel in buffer.chunks_exact_mut(4) {
                 swap_rgba_pa_to_bgra(pixel);
@@ -377,7 +379,11 @@ mod tests {
         ];
         for (s, expected) in cases {
             assert_eq!(
-                is_emoji_presentation(s.chars().next().unwrap()),
+                is_emoji_presentation(
+                    s.chars()
+                        .next()
+                        .expect("required framework invariant must hold")
+                ),
                 expected,
                 "for char {:?}",
                 s
@@ -421,7 +427,7 @@ mod tests {
                 stretch: usvg::fontdb::Stretch::Normal,
                 style: usvg::fontdb::Style::Normal,
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
         let lilex = db
             .query(&usvg::fontdb::Query {
                 families: &[usvg::fontdb::Family::Name("Lilex")],
@@ -429,8 +435,9 @@ mod tests {
                 stretch: usvg::fontdb::Stretch::Normal,
                 style: usvg::fontdb::Style::Normal,
             })
-            .unwrap();
-        let selected = select_emoji_font('│', &[], &db, &["IBM Plex Sans", "Lilex"]).unwrap();
+            .expect("required framework invariant must hold");
+        let selected = select_emoji_font('│', &[], &db, &["IBM Plex Sans", "Lilex"])
+            .expect("required framework invariant must hold");
 
         assert_eq!(selected, lilex);
         assert!(!font_has_char(&db, ibm_plex_sans, '│'));

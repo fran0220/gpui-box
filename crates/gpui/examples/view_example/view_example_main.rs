@@ -5,11 +5,11 @@
 //! The whole point: a text input is deceptively complicated, and `View` makes it
 //! easy to compose one. Three pieces, each shown in its own section:
 //!
-//!   * `Editor`  — the workhorse entity: cursor, blink, focus, keyboard, and a
-//!                 specialized text renderer. All the hard parts live here.
-//!   * `String`  — the data plane. `editor.text(cx)` / `value.read(cx)` get it out.
-//!   * `Input` / `TextArea` — the shaping layer. Each takes a `String` (and grows
-//!                 the editor internally) OR an `Editor` (so you can read the cursor).
+//! * `Editor`  — the workhorse entity: cursor, blink, focus, keyboard, and a
+//!   specialized text renderer. All the hard parts live here.
+//! * `String`  — the data plane. `editor.text(cx)` / `value.read(cx)` get it out.
+//! * `Input` / `TextArea` — the shaping layer. Each takes a `String` (and grows
+//!   the editor internally) OR an `Editor` (so you can read the cursor).
 //!
 //! Run: `cargo run -p gpui --example view_example`
 
@@ -153,7 +153,7 @@ fn run_example() {
             },
             |_, cx| cx.new(|_| ViewExample::new()),
         )
-        .unwrap();
+        .expect("test setup should produce the required value");
 
         cx.on_action(|_: &Quit, cx| cx.quit());
         cx.activate(true);

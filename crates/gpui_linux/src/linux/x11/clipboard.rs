@@ -969,7 +969,7 @@ impl Clipboard {
                     }
                 }
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
         *global_cb = Some(GlobalClipboard {
             inner: Arc::clone(&ctx),
             server_handle: join_handle,

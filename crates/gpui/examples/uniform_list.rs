@@ -48,7 +48,7 @@ fn run_example() {
             },
             |_, cx| cx.new(|_| UniformListExample {}),
         )
-        .unwrap();
+        .expect("test setup should produce the required value");
     });
 }
 

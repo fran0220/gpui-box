@@ -117,7 +117,7 @@ fn run_example() {
             cx.activate(false);
             cx.new(|_| AnimationExample {})
         })
-        .unwrap();
+        .expect("test setup should produce the required value");
     });
 }
 

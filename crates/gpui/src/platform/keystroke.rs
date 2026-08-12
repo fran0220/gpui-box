@@ -311,7 +311,7 @@ impl KeybindingKeystroke {
     /// Platform-specific behavior:
     /// - On macOS and Linux, this modifiers is the same as `inner.modifiers`, which is the GPUI representation of the keystroke.
     /// - On Windows, this modifiers is the display modifiers, for example, a `ctrl-@` keystroke will have `inner.modifiers` as
-    /// `Modifiers::control()` and `display_modifiers` as `Modifiers::control_shift()`.
+    ///   `Modifiers::control()` and `display_modifiers` as `Modifiers::control_shift()`.
     pub fn modifiers(&self) -> &Modifiers {
         #[cfg(target_os = "windows")]
         {
@@ -740,7 +740,11 @@ fn display_key(key: &str, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         #[cfg(target_os = "macos")]
         "platform" => '⌘',
 
-        key if key.len() == 1 => key.chars().next().unwrap().to_ascii_uppercase(),
+        key if key.len() == 1 => key
+            .chars()
+            .next()
+            .expect("required framework invariant must hold")
+            .to_ascii_uppercase(),
         key => return f.write_str(key),
     };
     f.write_char(key)

@@ -136,7 +136,7 @@ fn run_example() {
             },
             |window, cx| cx.new(|cx| HelloWorld::new(window, cx)),
         )
-        .unwrap();
+        .expect("test setup should produce the required value");
         cx.activate(true);
     });
 }

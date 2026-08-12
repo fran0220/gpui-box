@@ -495,7 +495,9 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         let inner = unsafe { Pin::new_unchecked(&mut self.get_unchecked_mut().0) };
         match inner.poll(cx) {
-            Poll::Ready(result) => Poll::Ready(result.unwrap()),
+            Poll::Ready(result) => {
+                Poll::Ready(result.expect("required framework invariant must hold"))
+            }
             Poll::Pending => Poll::Pending,
         }
     }

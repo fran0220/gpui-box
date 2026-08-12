@@ -137,7 +137,7 @@ impl Element for Anchored {
             .iter()
             .map(|id| window.layout_bounds(*id))
             .reduce(|acc, bounds| acc.union(&bounds))
-            .unwrap();
+            .expect("required framework invariant must hold");
 
         let (origin, mut desired) = self.position_mode.get_position_and_bounds(
             self.anchor_position,
@@ -338,7 +338,7 @@ mod tests {
             .update(cx, |_, window, _| {
                 window.rendered_frame.debug_bounds.get("MENU").copied()
             })
-            .unwrap()
+            .expect("required framework invariant must hold")
             .expect("MENU debug bounds not found");
 
         assert_eq!(menu_bounds.origin, point(px(100.), px(100.)));
@@ -362,7 +362,7 @@ mod tests {
                 };
                 window.dispatch_event(PlatformInput::ScrollWheel(event), cx);
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
 
         cx.run_until_parked();
 
@@ -370,7 +370,7 @@ mod tests {
             .update(cx, |_, window, _| {
                 window.rendered_frame.debug_bounds.get("MENU").copied()
             })
-            .unwrap()
+            .expect("required framework invariant must hold")
             .expect("MENU debug bounds not found");
 
         assert_eq!(menu_bounds.origin, point(px(100.), px(100.)));
@@ -389,7 +389,7 @@ mod tests {
             .update(cx, |_, window, _| {
                 window.rendered_frame.debug_bounds.get("MENU").copied()
             })
-            .unwrap()
+            .expect("required framework invariant must hold")
             .expect("MENU debug bounds not found");
 
         assert_eq!(menu_bounds.origin, point(px(100.), px(300.)));

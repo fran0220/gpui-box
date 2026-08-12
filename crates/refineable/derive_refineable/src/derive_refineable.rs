@@ -47,7 +47,14 @@ pub fn derive_refineable(input: TokenStream) -> TokenStream {
         _ => panic!("This derive macro only supports structs with named fields"),
     };
 
-    let field_names: Vec<_> = fields.iter().map(|f| f.ident.as_ref().unwrap()).collect();
+    let field_names: Vec<_> = fields
+        .iter()
+        .map(|f| {
+            f.ident
+                .as_ref()
+                .expect("required framework invariant must hold")
+        })
+        .collect();
     let field_visibilities: Vec<_> = fields.iter().map(|f| &f.vis).collect();
     let wrapped_types: Vec<_> = fields.iter().map(|f| get_wrapper_type(f, &f.ty)).collect();
 
@@ -524,7 +531,12 @@ fn is_optional_field(f: &Field) -> bool {
 fn get_wrapper_type(field: &Field, ty: &Type) -> syn::Type {
     if is_refineable_field(field) {
         let struct_name = if let Type::Path(tp) = ty {
-            tp.path.segments.last().unwrap().ident.clone()
+            tp.path
+                .segments
+                .last()
+                .expect("required framework invariant must hold")
+                .ident
+                .clone()
         } else {
             panic!("Expected struct type for a refineable field");
         };
@@ -535,7 +547,11 @@ fn get_wrapper_type(field: &Field, ty: &Type) -> syn::Type {
             format_ident!("{}Refinement", struct_name)
         };
         let generics = if let Type::Path(tp) = ty {
-            &tp.path.segments.last().unwrap().arguments
+            &tp.path
+                .segments
+                .last()
+                .expect("required framework invariant must hold")
+                .arguments
         } else {
             &syn::PathArguments::None
         };

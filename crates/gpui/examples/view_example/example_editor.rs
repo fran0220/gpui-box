@@ -493,7 +493,7 @@ impl Element for EditorText {
         for (i, line) in prepaint.lines.iter().enumerate() {
             let origin = point(bounds.left(), bounds.top() + line_height * i as f32);
             line.paint(origin, line_height, gpui::TextAlign::Left, None, window, cx)
-                .unwrap();
+                .expect("test setup should produce the required value");
         }
 
         if let Some(cursor) = prepaint.cursor.take() {

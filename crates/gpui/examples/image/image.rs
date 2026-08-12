@@ -161,7 +161,7 @@ fn run_example() {
     .run(move |cx: &mut App| {
         #[cfg(not(target_family = "wasm"))]
         {
-            let http_client = ReqwestClient::user_agent("gpui example").unwrap();
+            let http_client = ReqwestClient::user_agent("gpui example").expect("test setup should produce the required value");
             cx.set_http_client(Arc::new(http_client));
         }
 
@@ -199,7 +199,7 @@ fn run_example() {
                 asset_resource: "image/color.svg".into(),
             })
         })
-        .unwrap();
+        .expect("test setup should produce the required value");
     });
 }
 

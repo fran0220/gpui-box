@@ -35,7 +35,7 @@ fn run_example() {
         // Add menu items
         set_app_menus(cx);
         cx.open_window(WindowOptions::default(), |_, cx| cx.new(|_| SetMenus {}))
-            .unwrap();
+            .expect("test setup should produce the required value");
     });
 }
 

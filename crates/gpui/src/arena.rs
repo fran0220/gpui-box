@@ -39,7 +39,8 @@ impl Drop for Chunk {
 impl Chunk {
     fn new(chunk_size: NonZeroUsize) -> Self {
         // this only fails if chunk_size is unreasonably huge
-        let layout = alloc::Layout::from_size_align(chunk_size.get(), 1).unwrap();
+        let layout = alloc::Layout::from_size_align(chunk_size.get(), 1)
+            .expect("required framework invariant must hold");
         let start = unsafe { alloc::alloc(layout) };
         if start.is_null() {
             handle_alloc_error(layout);
@@ -95,7 +96,8 @@ impl Drop for Arena {
 
 impl Arena {
     pub fn new(chunk_size: usize) -> Self {
-        let chunk_size = NonZeroUsize::try_from(chunk_size).unwrap();
+        let chunk_size =
+            NonZeroUsize::try_from(chunk_size).expect("required framework invariant must hold");
         Self {
             chunks: vec![Chunk::new(chunk_size)],
             elements: Vec::new(),

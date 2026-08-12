@@ -183,7 +183,7 @@ fn run_example() {
                 })
             },
         )
-        .unwrap();
+        .expect("test setup should produce the required value");
         cx.activate(true);
     });
 }

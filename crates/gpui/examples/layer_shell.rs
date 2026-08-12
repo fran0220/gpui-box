@@ -52,7 +52,7 @@ mod example {
         fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
             let now = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .unwrap()
+                .expect("test setup should produce the required value")
                 .as_secs();
 
             let hours = (now / 3600) % 24;
@@ -95,7 +95,7 @@ mod example {
                 },
                 |_, cx| cx.new(LayerShellExample::new),
             )
-            .unwrap();
+            .expect("test setup should produce the required value");
         });
     }
 }

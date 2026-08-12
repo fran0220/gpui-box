@@ -233,7 +233,7 @@ impl TestAppContext {
             },
             |window, cx| cx.new(|cx| build_window(window, cx)),
         )
-        .unwrap()
+        .expect("test setup should produce the required value")
     }
 
     /// Opens a new window with a specific size.
@@ -260,7 +260,7 @@ impl TestAppContext {
             },
             |window, cx| cx.new(|cx| build_window(window, cx)),
         )
-        .unwrap()
+        .expect("test setup should produce the required value")
     }
 
     /// Adds a new window with no content.
@@ -275,7 +275,7 @@ impl TestAppContext {
                 },
                 |_, cx| cx.new(|_| Empty),
             )
-            .unwrap();
+            .expect("test setup should produce the required value");
         drop(cx);
         let cx = VisualTestContext::from_window(*window.deref(), self).into_mut();
         cx.run_until_parked();
@@ -303,9 +303,11 @@ impl TestAppContext {
                 },
                 |window, cx| cx.new(|cx| build_root_view(window, cx)),
             )
-            .unwrap();
+            .expect("test setup should produce the required value");
         drop(cx);
-        let view = window.root(self).unwrap();
+        let view = window
+            .root(self)
+            .expect("test setup should produce the required value");
         let cx = VisualTestContext::from_window(*window.deref(), self).into_mut();
         cx.run_until_parked();
 
@@ -486,7 +488,7 @@ impl TestAppContext {
             .update(self, |_, window, cx| {
                 window.dispatch_action(action.boxed_clone(), cx)
             })
-            .unwrap();
+            .expect("test setup should produce the required value");
 
         self.background_executor.run_until_parked()
     }
@@ -524,7 +526,7 @@ impl TestAppContext {
         self.update_window(window, |_, window, cx| {
             window.dispatch_keystroke(keystroke, cx)
         })
-        .unwrap();
+        .expect("test setup should produce the required value");
     }
 
     /// Activates the test window's platform accessibility adapter.
@@ -544,7 +546,7 @@ impl TestAppContext {
         self.update_window(window, |_, window, cx| {
             window.handle_a11y_action(request, cx)
         })
-        .unwrap();
+        .expect("test setup should produce the required value");
         self.run_until_parked();
     }
 
@@ -554,12 +556,12 @@ impl TestAppContext {
             .borrow_mut()
             .windows
             .get_mut(window.id)
-            .unwrap()
+            .expect("test setup should produce the required value")
             .as_deref_mut()
-            .unwrap()
+            .expect("test setup should produce the required value")
             .platform_window
             .as_test()
-            .unwrap()
+            .expect("test setup should produce the required value")
             .clone()
     }
 
@@ -631,7 +633,7 @@ impl TestAppContext {
         )
             .race()
             .await
-            .unwrap();
+            .expect("test setup should produce the required value");
     }
 
     /// Set a name for this App.
@@ -722,7 +724,10 @@ impl<V> Entity<V> {
             }),
         );
 
-        let cx = cx.this.upgrade().unwrap();
+        let cx = cx
+            .this
+            .upgrade()
+            .expect("test setup should produce the required value");
         let handle = self.downgrade();
 
         async move {
@@ -769,7 +774,7 @@ impl VisualTestContext {
     pub fn update<R>(&mut self, f: impl FnOnce(&mut Window, &mut App) -> R) -> R {
         self.cx
             .update_window(self.window, |_, window, cx| f(window, cx))
-            .unwrap()
+            .expect("test setup should produce the required value")
     }
 
     /// Creates a new VisualTestContext. You would typically shadow the passed in
@@ -966,20 +971,20 @@ impl VisualTestContext {
                 window
                     .platform_window
                     .as_test()
-                    .unwrap()
+                    .expect("test setup should produce the required value")
                     .0
                     .lock()
                     .should_close_handler
                     .take()
             })
-            .unwrap();
+            .expect("test setup should produce the required value");
         if let Some(mut handler) = handler {
             let should_close = handler();
             self.cx
                 .update_window(self.window, |_, window, _| {
                     window.platform_window.on_should_close(handler);
                 })
-                .unwrap();
+                .expect("test setup should produce the required value");
             should_close
         } else {
             false
@@ -1157,7 +1162,7 @@ impl AnyWindowHandle {
         build_view: impl FnOnce(&mut Window, &mut Context<V>) -> V,
     ) -> Entity<V> {
         self.update(cx, |_, window, cx| cx.new(|cx| build_view(window, cx)))
-            .unwrap()
+            .expect("test setup should produce the required value")
     }
 }
 
@@ -1335,7 +1340,10 @@ mod tests {
         });
         assert!(!cx.did_prompt_for_paths());
 
-        let response = receiver.await.unwrap().unwrap();
+        let response = receiver
+            .await
+            .expect("test setup should produce the required value")
+            .expect("test setup should produce the required value");
         assert_eq!(response, Some(selected));
     }
 
@@ -1352,7 +1360,10 @@ mod tests {
 
         cx.simulate_path_prompt_response(|_options| None);
 
-        let response = receiver.await.unwrap().unwrap();
+        let response = receiver
+            .await
+            .expect("test setup should produce the required value")
+            .expect("test setup should produce the required value");
         assert_eq!(response, None);
     }
 }

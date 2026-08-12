@@ -156,7 +156,10 @@ mod any_view {
         window: &mut Window,
         cx: &mut App,
     ) -> AnyElement {
-        let view = view.clone().downcast::<V>().unwrap();
+        let view = view
+            .clone()
+            .downcast::<V>()
+            .expect("required framework invariant must hold");
         // Record the view's Render type name so the accessibility debug dump can
         // attribute nodes to the view that produced them.
         #[cfg(debug_assertions)]
@@ -333,7 +336,7 @@ impl<V: View> Element for ViewElement<V> {
                         let mut element = self
                             .view
                             .take()
-                            .unwrap()
+                            .expect("required framework invariant must hold")
                             .render(window, cx)
                             .into_any_element();
                         let layout_id = element.request_layout(window, cx);
@@ -349,7 +352,7 @@ impl<V: View> Element for ViewElement<V> {
                     let mut element = self
                         .view
                         .take()
-                        .unwrap()
+                        .expect("required framework invariant must hold")
                         .render(window, cx)
                         .into_any_element();
                     let layout_id = element.request_layout(window, cx);
@@ -378,7 +381,7 @@ impl<V: View> Element for ViewElement<V> {
                 }
 
                 window.with_element_state::<ViewElementState, _>(
-                    global_id.unwrap(),
+                    global_id.expect("required framework invariant must hold"),
                     |element_state, window| {
                         let content_mask = window.content_mask();
                         let text_style = window.text_style();
@@ -406,7 +409,7 @@ impl<V: View> Element for ViewElement<V> {
                             let mut element = self
                                 .view
                                 .take()
-                                .unwrap()
+                                .expect("required framework invariant must hold")
                                 .render(window, cx)
                                 .into_any_element();
                             element.layout_as_root(bounds.size.into(), window, cx);
@@ -438,10 +441,17 @@ impl<V: View> Element for ViewElement<V> {
             window.with_id(
                 ElementId::Name(std::any::type_name::<V>().into()),
                 |window| {
-                    element.as_mut().unwrap().prepaint(window, cx);
+                    element
+                        .as_mut()
+                        .expect("required framework invariant must hold")
+                        .prepaint(window, cx);
                 },
             );
-            Some(element.take().unwrap())
+            Some(
+                element
+                    .take()
+                    .expect("required framework invariant must hold"),
+            )
         }
     }
 
@@ -461,9 +471,10 @@ impl<V: View> Element for ViewElement<V> {
                 let caching_disabled = window.is_inspector_picking(cx);
                 if self.cached_style.is_some() && !caching_disabled {
                     window.with_element_state::<ViewElementState, _>(
-                        global_id.unwrap(),
+                        global_id.expect("required framework invariant must hold"),
                         |element_state, window| {
-                            let mut element_state = element_state.unwrap();
+                            let mut element_state =
+                                element_state.expect("required framework invariant must hold");
 
                             let paint_start = window.paint_index();
 
@@ -482,7 +493,10 @@ impl<V: View> Element for ViewElement<V> {
                         },
                     )
                 } else {
-                    element.as_mut().unwrap().paint(window, cx);
+                    element
+                        .as_mut()
+                        .expect("required framework invariant must hold")
+                        .paint(window, cx);
                 }
             });
         } else {
@@ -490,7 +504,10 @@ impl<V: View> Element for ViewElement<V> {
             window.with_id(
                 ElementId::Name(std::any::type_name::<V>().into()),
                 |window| {
-                    element.as_mut().unwrap().paint(window, cx);
+                    element
+                        .as_mut()
+                        .expect("required framework invariant must hold")
+                        .paint(window, cx);
                 },
             );
         }

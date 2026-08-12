@@ -66,7 +66,7 @@ impl PaintingViewer {
         builder.line_to(point(px(130.), px(130.)));
         builder.line_to(point(px(50.), px(130.)));
         builder.close();
-        let path = builder.build().unwrap();
+        let path = builder.build().expect("test setup should produce the required value");
         let red = rgb(0xFF0000).alpha(0.5);
         lines.push((path, red.into()));
 
@@ -77,7 +77,7 @@ impl PaintingViewer {
         builder.line_to(point(px(230.), px(130.)));
         builder.line_to(point(px(150.), px(130.)));
         builder.close();
-        let path = builder.build().unwrap();
+        let path = builder.build().expect("test setup should produce the required value");
         let blue = rgb(0x0000FF).alpha(0.5);
         lines.push((path, blue.into()));
 
@@ -88,7 +88,7 @@ impl PaintingViewer {
         builder.line_to(point(px(330.), px(130.)));
         builder.line_to(point(px(250.), px(130.)));
         builder.close();
-        let path = builder.build().unwrap();
+        let path = builder.build().expect("test setup should produce the required value");
         let green = rgb(0x00FF00).alpha(0.5);
         lines.push((path, green.into()));
 
@@ -99,7 +99,7 @@ impl PaintingViewer {
         builder.line_to(point(px(430.), px(130.)));
         builder.line_to(point(px(350.), px(130.)));
         builder.close();
-        let path = builder.build().unwrap();
+        let path = builder.build().expect("test setup should produce the required value");
         let black = rgb(0x000000).alpha(0.5);
         lines.push((path, black.into()));
 
@@ -123,7 +123,7 @@ impl PaintingViewer {
             point(center.x + radius, center.y),
         );
         builder.close();
-        let path = builder.build().unwrap();
+        let path = builder.build().expect("test setup should produce the required value");
         let red1 = rgb(0xFF0000).alpha(0.5);
         lines.push((path, red1.into()));
 
@@ -146,7 +146,7 @@ impl PaintingViewer {
             point(center.x + radius, center.y),
         );
         builder.close();
-        let path = builder.build().unwrap();
+        let path = builder.build().expect("test setup should produce the required value");
         let red2 = rgb(0xFF0000).alpha(0.5);
         lines.push((path, red2.into()));
 
@@ -157,7 +157,7 @@ impl PaintingViewer {
         let mut builder: PathBuilder = builder.into();
         builder.translate(point(px(10.), px(200.)));
         builder.scale(0.9);
-        let path = builder.build().unwrap();
+        let path = builder.build().expect("test setup should produce the required value");
         lines.push((path, gpui::black().into()));
 
         // draw a lightening bolt ⚡
@@ -171,7 +171,7 @@ impl PaintingViewer {
             ],
             false,
         );
-        let path = builder.build().unwrap();
+        let path = builder.build().expect("test setup should produce the required value");
         lines.push((path, rgb(0x1d4ed8).into()));
 
         // draw a ⭐
@@ -187,7 +187,7 @@ impl PaintingViewer {
         builder.line_to(point(px(270.), px(260.)));
         builder.line_to(point(px(330.), px(260.)));
         builder.line_to(point(px(350.), px(200.)));
-        let path = builder.build().unwrap();
+        let path = builder.build().expect("test setup should produce the required value");
         lines.push((
             path,
             linear_gradient(
@@ -218,7 +218,7 @@ impl PaintingViewer {
             square_bounds.top_right() + point(px(0.0), vertical_offset),
         );
         builder.line_to(square_bounds.bottom_left());
-        let path = builder.build().unwrap();
+        let path = builder.build().expect("test setup should produce the required value");
         lines.push((
             path,
             linear_gradient(
@@ -265,7 +265,7 @@ impl PaintingViewer {
             builder.arc_to(center, px(0.), false, false, end);
             builder.line_to(pie_center);
             builder.close();
-            let path = builder.build().unwrap();
+            let path = builder.build().expect("test setup should produce the required value");
             lines.push((path, color.into()));
         }
 
@@ -281,7 +281,7 @@ impl PaintingViewer {
                 px(420.0 + (i as f32 * 10.0).sin() * 40.0),
             ));
         }
-        let path = builder.build().unwrap();
+        let path = builder.build().expect("test setup should produce the required value");
         lines.push((path, gpui::green().into()));
 
         Self {
@@ -450,7 +450,7 @@ fn run_example() {
             },
             |window, cx| cx.new(|cx| PaintingViewer::new(window, cx)),
         )
-        .unwrap();
+        .expect("test setup should produce the required value");
         cx.on_window_closed(|cx, _window_id| {
             cx.quit();
         })

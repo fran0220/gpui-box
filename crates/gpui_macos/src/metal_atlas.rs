@@ -185,9 +185,9 @@ impl MetalAtlasState {
             texture_list.textures.push(Some(atlas_texture));
             texture_list.textures.last_mut()
         }
-        .unwrap()
+        .expect("required framework invariant must hold")
         .as_mut()
-        .unwrap()
+        .expect("required framework invariant must hold")
     }
 
     fn texture(&self, id: AtlasTextureId) -> &MetalAtlasTexture {
@@ -196,7 +196,9 @@ impl MetalAtlasState {
             AtlasTextureKind::Polychrome => &self.polychrome_textures,
             AtlasTextureKind::Subpixel => unreachable!(),
         };
-        textures[id.index as usize].as_ref().unwrap()
+        textures[id.index as usize]
+            .as_ref()
+            .expect("required framework invariant must hold")
     }
 }
 

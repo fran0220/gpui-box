@@ -208,7 +208,7 @@ fn run_example() {
             cx.activate(false);
             cx.new(|_| ImageLoadingExample {})
         })
-        .unwrap();
+        .expect("test setup should produce the required value");
     });
 }
 

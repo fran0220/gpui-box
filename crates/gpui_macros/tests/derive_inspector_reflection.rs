@@ -82,18 +82,24 @@ fn test_derive_inspector_reflection() {
     // Invoke methods by name
     let num = Number(5);
 
-    let doubled = find_method::<Number>("double").unwrap().invoke(num.clone());
+    let doubled = find_method::<Number>("double")
+        .expect("test setup should produce the required value")
+        .invoke(num.clone());
     assert_eq!(doubled, Number(10));
 
-    let tripled = find_method::<Number>("triple").unwrap().invoke(num.clone());
+    let tripled = find_method::<Number>("triple")
+        .expect("test setup should produce the required value")
+        .invoke(num.clone());
     assert_eq!(tripled, Number(15));
 
     let incremented = find_method::<Number>("increment")
-        .unwrap()
+        .expect("test setup should produce the required value")
         .invoke(num.clone());
     assert_eq!(incremented, Number(6));
 
-    let quadrupled = find_method::<Number>("quadruple").unwrap().invoke(num);
+    let quadrupled = find_method::<Number>("quadruple")
+        .expect("test setup should produce the required value")
+        .invoke(num);
     assert_eq!(quadrupled, Number(20));
 
     // Try to invoke a non-existent method
@@ -110,24 +116,29 @@ fn test_derive_inspector_reflection() {
     assert_eq!(result, Some(Number(63))); // (10 * 2 + 1) * 3 = 63
 
     // Test documentationumentation capture
-    let double_method = find_method::<Number>("double").unwrap();
+    let double_method =
+        find_method::<Number>("double").expect("test setup should produce the required value");
     assert_eq!(double_method.documentation, Some("Doubles the value"));
 
-    let triple_method = find_method::<Number>("triple").unwrap();
+    let triple_method =
+        find_method::<Number>("triple").expect("test setup should produce the required value");
     assert_eq!(triple_method.documentation, Some("Triples the value"));
 
-    let increment_method = find_method::<Number>("increment").unwrap();
+    let increment_method =
+        find_method::<Number>("increment").expect("test setup should produce the required value");
     assert_eq!(
         increment_method.documentation,
         Some("Increments the value by one\n\nThis method has a default implementation")
     );
 
-    let quadruple_method = find_method::<Number>("quadruple").unwrap();
+    let quadruple_method =
+        find_method::<Number>("quadruple").expect("test setup should produce the required value");
     assert_eq!(
         quadruple_method.documentation,
         Some("Quadruples the value by doubling twice")
     );
 
-    let add_one_method = find_method::<Number>("add_one").unwrap();
+    let add_one_method =
+        find_method::<Number>("add_one").expect("test setup should produce the required value");
     assert_eq!(add_one_method.documentation, Some("Adds one to the value"));
 }

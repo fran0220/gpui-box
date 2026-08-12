@@ -541,24 +541,36 @@ mod tests {
         let mut expected = KeyContext::default();
         expected.add("baz");
         expected.set("foo", "bar");
-        assert_eq!(KeyContext::parse("baz foo=bar").unwrap(), expected);
-        assert_eq!(KeyContext::parse("baz foo = bar").unwrap(), expected);
         assert_eq!(
-            KeyContext::parse("  baz foo   =   bar baz").unwrap(),
+            KeyContext::parse("baz foo=bar").expect("required framework invariant must hold"),
             expected
         );
-        assert_eq!(KeyContext::parse(" baz foo = bar").unwrap(), expected);
+        assert_eq!(
+            KeyContext::parse("baz foo = bar").expect("required framework invariant must hold"),
+            expected
+        );
+        assert_eq!(
+            KeyContext::parse("  baz foo   =   bar baz")
+                .expect("required framework invariant must hold"),
+            expected
+        );
+        assert_eq!(
+            KeyContext::parse(" baz foo = bar").expect("required framework invariant must hold"),
+            expected
+        );
     }
 
     #[test]
     fn test_parse_identifiers() {
         // Identifiers
         assert_eq!(
-            KeyBindingContextPredicate::parse("abc12").unwrap(),
+            KeyBindingContextPredicate::parse("abc12")
+                .expect("required framework invariant must hold"),
             Identifier("abc12".into())
         );
         assert_eq!(
-            KeyBindingContextPredicate::parse("_1a").unwrap(),
+            KeyBindingContextPredicate::parse("_1a")
+                .expect("required framework invariant must hold"),
             Identifier("_1a".into())
         );
     }
@@ -566,11 +578,13 @@ mod tests {
     #[test]
     fn test_parse_negations() {
         assert_eq!(
-            KeyBindingContextPredicate::parse("!abc").unwrap(),
+            KeyBindingContextPredicate::parse("!abc")
+                .expect("required framework invariant must hold"),
             Not(Box::new(Identifier("abc".into())))
         );
         assert_eq!(
-            KeyBindingContextPredicate::parse(" ! ! abc").unwrap(),
+            KeyBindingContextPredicate::parse(" ! ! abc")
+                .expect("required framework invariant must hold"),
             Not(Box::new(Not(Box::new(Identifier("abc".into())))))
         );
     }
@@ -578,16 +592,18 @@ mod tests {
     #[test]
     fn test_parse_equality_operators() {
         assert_eq!(
-            KeyBindingContextPredicate::parse("a == b").unwrap(),
+            KeyBindingContextPredicate::parse("a == b")
+                .expect("required framework invariant must hold"),
             Equal("a".into(), "b".into())
         );
         assert_eq!(
-            KeyBindingContextPredicate::parse("c!=d").unwrap(),
+            KeyBindingContextPredicate::parse("c!=d")
+                .expect("required framework invariant must hold"),
             NotEqual("c".into(), "d".into())
         );
         assert_eq!(
             KeyBindingContextPredicate::parse("c == !d")
-                .unwrap_err()
+                .expect_err("validated operation must fail at this boundary")
                 .to_string(),
             "operands of == must be identifiers"
         );
@@ -596,14 +612,16 @@ mod tests {
     #[test]
     fn test_parse_boolean_operators() {
         assert_eq!(
-            KeyBindingContextPredicate::parse("a || b").unwrap(),
+            KeyBindingContextPredicate::parse("a || b")
+                .expect("required framework invariant must hold"),
             Or(
                 Box::new(Identifier("a".into())),
                 Box::new(Identifier("b".into()))
             )
         );
         assert_eq!(
-            KeyBindingContextPredicate::parse("a || !b && c").unwrap(),
+            KeyBindingContextPredicate::parse("a || !b && c")
+                .expect("required framework invariant must hold"),
             Or(
                 Box::new(Identifier("a".into())),
                 Box::new(And(
@@ -613,7 +631,8 @@ mod tests {
             )
         );
         assert_eq!(
-            KeyBindingContextPredicate::parse("a && b || c&&d").unwrap(),
+            KeyBindingContextPredicate::parse("a && b || c&&d")
+                .expect("required framework invariant must hold"),
             Or(
                 Box::new(And(
                     Box::new(Identifier("a".into())),
@@ -626,7 +645,8 @@ mod tests {
             )
         );
         assert_eq!(
-            KeyBindingContextPredicate::parse("a == b && c || d == e && f").unwrap(),
+            KeyBindingContextPredicate::parse("a == b && c || d == e && f")
+                .expect("required framework invariant must hold"),
             Or(
                 Box::new(And(
                     Box::new(Equal("a".into(), "b".into())),
@@ -639,7 +659,8 @@ mod tests {
             )
         );
         assert_eq!(
-            KeyBindingContextPredicate::parse("a && b && c && d").unwrap(),
+            KeyBindingContextPredicate::parse("a && b && c && d")
+                .expect("required framework invariant must hold"),
             And(
                 Box::new(And(
                     Box::new(And(
@@ -656,7 +677,8 @@ mod tests {
     #[test]
     fn test_parse_parenthesized_expressions() {
         assert_eq!(
-            KeyBindingContextPredicate::parse("a && (b == c || d != e)").unwrap(),
+            KeyBindingContextPredicate::parse("a && (b == c || d != e)")
+                .expect("required framework invariant must hold"),
             And(
                 Box::new(Identifier("a".into())),
                 Box::new(Or(
@@ -666,7 +688,8 @@ mod tests {
             ),
         );
         assert_eq!(
-            KeyBindingContextPredicate::parse(" ( a || b ) ").unwrap(),
+            KeyBindingContextPredicate::parse(" ( a || b ) ")
+                .expect("required framework invariant must hold"),
             Or(
                 Box::new(Identifier("a".into())),
                 Box::new(Identifier("b".into())),
@@ -691,23 +714,29 @@ mod tests {
 
         #[track_caller]
         fn assert_is_superset(a: &str, b: &str, result: bool) {
-            let a = KeyBindingContextPredicate::parse(a).unwrap();
-            let b = KeyBindingContextPredicate::parse(b).unwrap();
+            let a = KeyBindingContextPredicate::parse(a)
+                .expect("required framework invariant must hold");
+            let b = KeyBindingContextPredicate::parse(b)
+                .expect("required framework invariant must hold");
             assert_eq!(a.is_superset(&b), result, "({a:?}).is_superset({b:?})");
         }
     }
 
     #[test]
     fn test_child_operator() {
-        let predicate = KeyBindingContextPredicate::parse("parent > child").unwrap();
+        let predicate = KeyBindingContextPredicate::parse("parent > child")
+            .expect("required framework invariant must hold");
 
-        let parent_context = KeyContext::try_from("parent").unwrap();
-        let child_context = KeyContext::try_from("child").unwrap();
+        let parent_context =
+            KeyContext::try_from("parent").expect("required framework invariant must hold");
+        let child_context =
+            KeyContext::try_from("child").expect("required framework invariant must hold");
 
         let contexts = vec![parent_context.clone(), child_context.clone()];
         assert!(predicate.eval(&contexts));
 
-        let grandparent_context = KeyContext::try_from("grandparent").unwrap();
+        let grandparent_context =
+            KeyContext::try_from("grandparent").expect("required framework invariant must hold");
 
         let contexts = vec![
             grandparent_context,
@@ -716,7 +745,8 @@ mod tests {
         ];
         assert!(predicate.eval(&contexts));
 
-        let other_context = KeyContext::try_from("other").unwrap();
+        let other_context =
+            KeyContext::try_from("other").expect("required framework invariant must hold");
 
         let contexts = vec![other_context.clone(), child_context.clone()];
         assert!(!predicate.eval(&contexts));
@@ -728,29 +758,37 @@ mod tests {
         assert!(!predicate.eval(slice::from_ref(&child_context)));
         assert!(!predicate.eval(&[parent_context]));
 
-        let zany_predicate = KeyBindingContextPredicate::parse("child > child").unwrap();
+        let zany_predicate = KeyBindingContextPredicate::parse("child > child")
+            .expect("required framework invariant must hold");
         assert!(!zany_predicate.eval(slice::from_ref(&child_context)));
         assert!(zany_predicate.eval(&[child_context.clone(), child_context]));
     }
 
     #[test]
     fn test_not_operator() {
-        let not_predicate = KeyBindingContextPredicate::parse("!editor").unwrap();
-        let editor_context = KeyContext::try_from("editor").unwrap();
-        let workspace_context = KeyContext::try_from("workspace").unwrap();
-        let parent_context = KeyContext::try_from("parent").unwrap();
-        let child_context = KeyContext::try_from("child").unwrap();
+        let not_predicate = KeyBindingContextPredicate::parse("!editor")
+            .expect("required framework invariant must hold");
+        let editor_context =
+            KeyContext::try_from("editor").expect("required framework invariant must hold");
+        let workspace_context =
+            KeyContext::try_from("workspace").expect("required framework invariant must hold");
+        let parent_context =
+            KeyContext::try_from("parent").expect("required framework invariant must hold");
+        let child_context =
+            KeyContext::try_from("child").expect("required framework invariant must hold");
 
         assert!(not_predicate.eval(slice::from_ref(&workspace_context)));
         assert!(!not_predicate.eval(slice::from_ref(&editor_context)));
         assert!(!not_predicate.eval(&[editor_context.clone(), workspace_context.clone()]));
         assert!(!not_predicate.eval(&[workspace_context.clone(), editor_context.clone()]));
 
-        let complex_not = KeyBindingContextPredicate::parse("!editor && workspace").unwrap();
+        let complex_not = KeyBindingContextPredicate::parse("!editor && workspace")
+            .expect("required framework invariant must hold");
         assert!(complex_not.eval(slice::from_ref(&workspace_context)));
         assert!(!complex_not.eval(&[editor_context.clone(), workspace_context.clone()]));
 
-        let not_mode_predicate = KeyBindingContextPredicate::parse("!(mode == full)").unwrap();
+        let not_mode_predicate = KeyBindingContextPredicate::parse("!(mode == full)")
+            .expect("required framework invariant must hold");
         let mut mode_context = KeyContext::default();
         mode_context.set("mode", "full");
         assert!(!not_mode_predicate.eval(&[mode_context.clone()]));
@@ -759,24 +797,30 @@ mod tests {
         other_mode_context.set("mode", "partial");
         assert!(not_mode_predicate.eval(&[other_mode_context]));
 
-        let not_descendant = KeyBindingContextPredicate::parse("!(parent > child)").unwrap();
+        let not_descendant = KeyBindingContextPredicate::parse("!(parent > child)")
+            .expect("required framework invariant must hold");
         assert!(not_descendant.eval(slice::from_ref(&parent_context)));
         assert!(not_descendant.eval(slice::from_ref(&child_context)));
         assert!(!not_descendant.eval(&[parent_context.clone(), child_context.clone()]));
 
-        let not_descendant = KeyBindingContextPredicate::parse("parent > !child").unwrap();
+        let not_descendant = KeyBindingContextPredicate::parse("parent > !child")
+            .expect("required framework invariant must hold");
         assert!(!not_descendant.eval(slice::from_ref(&parent_context)));
         assert!(!not_descendant.eval(slice::from_ref(&child_context)));
         assert!(!not_descendant.eval(&[parent_context, child_context]));
 
-        let double_not = KeyBindingContextPredicate::parse("!!editor").unwrap();
+        let double_not = KeyBindingContextPredicate::parse("!!editor")
+            .expect("required framework invariant must hold");
         assert!(double_not.eval(slice::from_ref(&editor_context)));
         assert!(!double_not.eval(slice::from_ref(&workspace_context)));
 
         // Test complex descendant cases
-        let workspace_context = KeyContext::try_from("Workspace").unwrap();
-        let pane_context = KeyContext::try_from("Pane").unwrap();
-        let editor_context = KeyContext::try_from("Editor").unwrap();
+        let workspace_context =
+            KeyContext::try_from("Workspace").expect("required framework invariant must hold");
+        let pane_context =
+            KeyContext::try_from("Pane").expect("required framework invariant must hold");
+        let editor_context =
+            KeyContext::try_from("Editor").expect("required framework invariant must hold");
 
         // Workspace > Pane > Editor
         let workspace_pane_editor = vec![
@@ -786,25 +830,29 @@ mod tests {
         ];
 
         // Pane > (Pane > Editor) - should not match
-        let pane_pane_editor = KeyBindingContextPredicate::parse("Pane > (Pane > Editor)").unwrap();
+        let pane_pane_editor = KeyBindingContextPredicate::parse("Pane > (Pane > Editor)")
+            .expect("required framework invariant must hold");
         assert!(!pane_pane_editor.eval(&workspace_pane_editor));
 
         let workspace_pane_editor_predicate =
-            KeyBindingContextPredicate::parse("Workspace > Pane > Editor").unwrap();
+            KeyBindingContextPredicate::parse("Workspace > Pane > Editor")
+                .expect("required framework invariant must hold");
         assert!(workspace_pane_editor_predicate.eval(&workspace_pane_editor));
 
         // (Pane > Pane) > Editor - should not match
-        let pane_pane_then_editor =
-            KeyBindingContextPredicate::parse("(Pane > Pane) > Editor").unwrap();
+        let pane_pane_then_editor = KeyBindingContextPredicate::parse("(Pane > Pane) > Editor")
+            .expect("required framework invariant must hold");
         assert!(!pane_pane_then_editor.eval(&workspace_pane_editor));
 
         // Pane > !Workspace - should match
-        let pane_not_workspace = KeyBindingContextPredicate::parse("Pane > !Workspace").unwrap();
+        let pane_not_workspace = KeyBindingContextPredicate::parse("Pane > !Workspace")
+            .expect("required framework invariant must hold");
         assert!(pane_not_workspace.eval(&[pane_context.clone(), editor_context.clone()]));
         assert!(!pane_not_workspace.eval(&[pane_context.clone(), workspace_context.clone()]));
 
         // !Workspace - shouldn't match when Workspace is in the context
-        let not_workspace = KeyBindingContextPredicate::parse("!Workspace").unwrap();
+        let not_workspace = KeyBindingContextPredicate::parse("!Workspace")
+            .expect("required framework invariant must hold");
         assert!(!not_workspace.eval(slice::from_ref(&workspace_context)));
         assert!(not_workspace.eval(slice::from_ref(&pane_context)));
         assert!(not_workspace.eval(slice::from_ref(&editor_context)));
@@ -884,7 +932,8 @@ mod tests {
         for (predicate, expected) in test_cases {
             let actual = predicate.to_string();
             assert_eq!(actual, expected);
-            let parsed = KeyBindingContextPredicate::parse(&actual).unwrap();
+            let parsed = KeyBindingContextPredicate::parse(&actual)
+                .expect("required framework invariant must hold");
             assert_eq!(parsed, *predicate);
         }
     }

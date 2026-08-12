@@ -377,8 +377,8 @@ impl MetalRenderer {
         let command_queue = device.new_command_queue();
         let sprite_atlas = shared_sprite_atlas
             .unwrap_or_else(|| Arc::new(MetalAtlas::new(device.clone(), is_apple_gpu)));
-        let core_video_texture_cache =
-            CVMetalTextureCache::new(None, device.clone(), None).unwrap();
+        let core_video_texture_cache = CVMetalTextureCache::new(None, device.clone(), None)
+            .expect("required framework invariant must hold");
 
         Self {
             device,
@@ -731,7 +731,9 @@ impl MetalRenderer {
                 .peek()
                 .is_some_and(|blur| blur.order <= batch_first_order(scene, &batch))
             {
-                let blur = *pending_blurs.next().unwrap();
+                let blur = *pending_blurs
+                    .next()
+                    .expect("required framework invariant must hold");
                 command_encoder.end_encoding();
                 let (scratch, blurred) = self.ensure_backdrop_scratch(texture);
                 let blit = command_buffer.new_blit_command_encoder();
@@ -878,7 +880,7 @@ impl MetalRenderer {
         let color_attachment = render_pass_descriptor
             .color_attachments()
             .object_at(0)
-            .unwrap();
+            .expect("required framework invariant must hold");
         color_attachment.set_load_action(metal::MTLLoadAction::Clear);
         color_attachment.set_clear_color(metal::MTLClearColor::new(0., 0., 0., 0.));
 
@@ -945,8 +947,12 @@ impl MetalRenderer {
             self.backdrop_blurred = Some(self.device.new_texture(&descriptor));
         }
         (
-            self.backdrop_scratch.clone().unwrap(),
-            self.backdrop_blurred.clone().unwrap(),
+            self.backdrop_scratch
+                .clone()
+                .expect("required framework invariant must hold"),
+            self.backdrop_blurred
+                .clone()
+                .expect("required framework invariant must hold"),
         )
     }
 
@@ -1155,7 +1161,12 @@ impl MetalRenderer {
         // batch combines different draw orders, we perform a single copy
         // for a minimal spanning rect.
         let sprites;
-        if paths.last().unwrap().order == first_path.order {
+        if paths
+            .last()
+            .expect("required framework invariant must hold")
+            .order
+            == first_path.order
+        {
             sprites = paths
                 .iter()
                 .map(|path| PathSprite {
@@ -1386,7 +1397,7 @@ impl MetalRenderer {
                     surface.image_buffer.get_height_of_plane(0),
                     0,
                 )
-                .unwrap();
+                .expect("required framework invariant must hold");
             let cb_cr_texture = self
                 .core_video_texture_cache
                 .create_texture_from_image(
@@ -1397,7 +1408,7 @@ impl MetalRenderer {
                     surface.image_buffer.get_height_of_plane(1),
                     1,
                 )
-                .unwrap();
+                .expect("required framework invariant must hold");
 
             command_encoder.set_vertex_bytes(
                 SurfaceInputIndex::TextureSize as u64,
@@ -1435,7 +1446,7 @@ fn new_command_encoder_for_texture<'a>(
     let color_attachment = render_pass_descriptor
         .color_attachments()
         .object_at(0)
-        .unwrap();
+        .expect("required framework invariant must hold");
     color_attachment.set_texture(Some(texture));
     color_attachment.set_store_action(metal::MTLStoreAction::Store);
     if let Some(clear_color) = clear_color {
@@ -1506,7 +1517,10 @@ fn build_pipeline_state(
     descriptor.set_label(label);
     descriptor.set_vertex_function(Some(vertex_fn.as_ref()));
     descriptor.set_fragment_function(Some(fragment_fn.as_ref()));
-    let color_attachment = descriptor.color_attachments().object_at(0).unwrap();
+    let color_attachment = descriptor
+        .color_attachments()
+        .object_at(0)
+        .expect("required framework invariant must hold");
     color_attachment.set_pixel_format(pixel_format);
     color_attachment.set_blending_enabled(true);
     color_attachment.set_rgb_blend_operation(metal::MTLBlendOperation::Add);
@@ -1540,7 +1554,10 @@ fn build_pipeline_state_no_blend(
     descriptor.set_label(label);
     descriptor.set_vertex_function(Some(vertex_fn.as_ref()));
     descriptor.set_fragment_function(Some(fragment_fn.as_ref()));
-    let color_attachment = descriptor.color_attachments().object_at(0).unwrap();
+    let color_attachment = descriptor
+        .color_attachments()
+        .object_at(0)
+        .expect("required framework invariant must hold");
     color_attachment.set_pixel_format(pixel_format);
     color_attachment.set_blending_enabled(false);
 
@@ -1587,7 +1604,10 @@ fn build_path_sprite_pipeline_state(
     descriptor.set_label(label);
     descriptor.set_vertex_function(Some(vertex_fn.as_ref()));
     descriptor.set_fragment_function(Some(fragment_fn.as_ref()));
-    let color_attachment = descriptor.color_attachments().object_at(0).unwrap();
+    let color_attachment = descriptor
+        .color_attachments()
+        .object_at(0)
+        .expect("required framework invariant must hold");
     color_attachment.set_pixel_format(pixel_format);
     color_attachment.set_blending_enabled(true);
     color_attachment.set_rgb_blend_operation(metal::MTLBlendOperation::Add);
@@ -1626,7 +1646,10 @@ fn build_path_rasterization_pipeline_state(
         descriptor.set_raster_sample_count(path_sample_count as _);
         descriptor.set_alpha_to_coverage_enabled(false);
     }
-    let color_attachment = descriptor.color_attachments().object_at(0).unwrap();
+    let color_attachment = descriptor
+        .color_attachments()
+        .object_at(0)
+        .expect("required framework invariant must hold");
     color_attachment.set_pixel_format(pixel_format);
     color_attachment.set_blending_enabled(true);
     color_attachment.set_rgb_blend_operation(metal::MTLBlendOperation::Add);
@@ -1880,6 +1903,7 @@ impl Default for MetalHeadlessRenderer {
     }
 }
 
+#[cfg(any(test, feature = "test-support"))]
 impl MetalHeadlessRenderer {
     pub fn new() -> Self {
         let instance_buffer_pool = Arc::new(Mutex::new(InstanceBufferPool::default()));

@@ -63,7 +63,7 @@ fn run_example() {
                 })
             },
         )
-        .unwrap();
+        .expect("test setup should produce the required value");
 
         bounds.origin.x += bounds.size.width;
 
@@ -80,7 +80,7 @@ fn run_example() {
                 })
             },
         )
-        .unwrap();
+        .expect("test setup should produce the required value");
     });
 }
 

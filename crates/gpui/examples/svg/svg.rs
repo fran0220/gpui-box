@@ -84,7 +84,7 @@ fn run_example() {
                 },
                 |_, cx| cx.new(|_| SvgExample),
             )
-            .unwrap();
+            .expect("test setup should produce the required value");
             cx.activate(true);
         });
 }

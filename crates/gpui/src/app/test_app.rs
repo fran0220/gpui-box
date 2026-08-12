@@ -163,7 +163,7 @@ impl TestApp {
                 },
                 |window, cx| cx.new(|cx| build_view(window, cx)),
             )
-            .unwrap()
+            .expect("test setup should produce the required value")
         });
 
         TestAppWindow {
@@ -182,7 +182,7 @@ impl TestApp {
     ) -> TestAppWindow<V> {
         let handle = self.update(|cx| {
             cx.open_window(options, |window, cx| cx.new(|cx| build_view(window, cx)))
-                .unwrap()
+                .expect("test setup should produce the required value")
         });
 
         TestAppWindow {
@@ -377,19 +377,20 @@ impl<V: 'static + Render> TestAppWindow<V> {
             // TODO: expose title through Window API
             None
         })
-        .unwrap()
+        .expect("test setup should produce the required value")
     }
 
     /// Simulate a keystroke.
     pub fn simulate_keystroke(&mut self, keystroke: &str) {
-        let keystroke = Keystroke::parse(keystroke).unwrap();
+        let keystroke =
+            Keystroke::parse(keystroke).expect("test setup should produce the required value");
         {
             let mut app = self.app.borrow_mut();
             let any_handle: AnyWindowHandle = self.handle.into();
             app.update_window(any_handle, |_, window, cx| {
                 window.dispatch_keystroke(keystroke, cx);
             })
-            .unwrap();
+            .expect("test setup should produce the required value");
         }
         self.background_executor.run_until_parked();
     }
@@ -463,7 +464,7 @@ impl<V: 'static + Render> TestAppWindow<V> {
             app.update_window(any_handle, |_, window, cx| {
                 window.dispatch_event(platform_input, cx);
             })
-            .unwrap();
+            .expect("test setup should produce the required value");
         }
         self.background_executor.run_until_parked();
     }
@@ -488,7 +489,7 @@ impl<V: 'static + Render> TestAppWindow<V> {
         app.update_window(any_handle, |_, window, cx| {
             window.draw(cx).clear(cx);
         })
-        .unwrap();
+        .expect("test setup should produce the required value");
     }
 }
 

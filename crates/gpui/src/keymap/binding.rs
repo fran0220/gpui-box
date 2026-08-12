@@ -31,8 +31,11 @@ impl Clone for KeyBinding {
 impl KeyBinding {
     /// Construct a new keybinding from the given data. Panics on parse error.
     pub fn new<A: Action>(keystrokes: &str, action: A, context: Option<&str>) -> Self {
-        let context_predicate =
-            context.map(|context| KeyBindingContextPredicate::parse(context).unwrap().into());
+        let context_predicate = context.map(|context| {
+            KeyBindingContextPredicate::parse(context)
+                .expect("required framework invariant must hold")
+                .into()
+        });
         Self::load(
             keystrokes,
             Box::new(action),
@@ -41,7 +44,7 @@ impl KeyBinding {
             None,
             &DummyKeyboardMapper,
         )
-        .unwrap()
+        .expect("required framework invariant must hold")
     }
 
     /// Load a keybinding from the given raw data.

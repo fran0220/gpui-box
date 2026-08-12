@@ -1270,26 +1270,31 @@ mod tests {
 
         #[test]
         fn reads_data_written_before_close() {
-            let mut pipe = filedescriptor::Pipe::new().unwrap();
-            pipe.write.write_all(b"hello clipboard").unwrap();
+            let mut pipe =
+                filedescriptor::Pipe::new().expect("required framework invariant must hold");
+            pipe.write
+                .write_all(b"hello clipboard")
+                .expect("required framework invariant must hold");
             drop(pipe.write);
 
-            let bytes = read_fd_with_timeout(pipe.read, PIPE_READ_TIMEOUT).unwrap();
+            let bytes = read_fd_with_timeout(pipe.read, PIPE_READ_TIMEOUT)
+                .expect("required framework invariant must hold");
             assert_eq!(bytes, b"hello clipboard");
         }
 
         #[test]
         fn returns_empty_when_writer_closes_without_writing() {
-            let pipe = filedescriptor::Pipe::new().unwrap();
+            let pipe = filedescriptor::Pipe::new().expect("required framework invariant must hold");
             drop(pipe.write);
 
-            let bytes = read_fd_with_timeout(pipe.read, PIPE_READ_TIMEOUT).unwrap();
+            let bytes = read_fd_with_timeout(pipe.read, PIPE_READ_TIMEOUT)
+                .expect("required framework invariant must hold");
             assert!(bytes.is_empty());
         }
 
         #[test]
         fn times_out_when_writer_never_writes() {
-            let pipe = filedescriptor::Pipe::new().unwrap();
+            let pipe = filedescriptor::Pipe::new().expect("required framework invariant must hold");
             let _open_writer = pipe.write;
 
             let timeout = Duration::from_millis(50);
@@ -1297,7 +1302,7 @@ mod tests {
             let result = read_fd_with_timeout(pipe.read, timeout);
             let elapsed = started.elapsed();
 
-            let err = result.unwrap_err();
+            let err = result.expect_err("validated operation must fail at this boundary");
             assert!(
                 err.to_string().contains("timed out"),
                 "unexpected error: {err}"
@@ -1307,11 +1312,15 @@ mod tests {
 
         #[test]
         fn times_out_when_writer_stalls_after_partial_write() {
-            let mut pipe = filedescriptor::Pipe::new().unwrap();
-            pipe.write.write_all(b"partial").unwrap();
+            let mut pipe =
+                filedescriptor::Pipe::new().expect("required framework invariant must hold");
+            pipe.write
+                .write_all(b"partial")
+                .expect("required framework invariant must hold");
             let _open_writer = pipe.write;
 
-            let err = read_fd_with_timeout(pipe.read, Duration::from_millis(50)).unwrap_err();
+            let err = read_fd_with_timeout(pipe.read, Duration::from_millis(50))
+                .expect_err("validated operation must fail at this boundary");
             assert!(
                 err.to_string().contains("timed out"),
                 "unexpected error: {err}"
@@ -1320,7 +1329,7 @@ mod tests {
 
         #[test]
         fn slow_writer_resets_deadline_between_chunks() {
-            let pipe = filedescriptor::Pipe::new().unwrap();
+            let pipe = filedescriptor::Pipe::new().expect("required framework invariant must hold");
             let chunks = 12;
             let gap = Duration::from_millis(40);
             let timeout = Duration::from_millis(400);
@@ -1330,30 +1339,42 @@ mod tests {
                 move || {
                     for _ in 0..chunks {
                         std::thread::sleep(gap);
-                        write.write_all(&[b'x'; 1000]).unwrap();
+                        write
+                            .write_all(&[b'x'; 1000])
+                            .expect("required framework invariant must hold");
                     }
                 }
             });
             // The total transfer (~480ms) exceeds the timeout; this only
             // passes because the timeout is re-armed per chunk.
-            let bytes = read_fd_with_timeout(pipe.read, timeout).unwrap();
-            writer.join().unwrap();
+            let bytes = read_fd_with_timeout(pipe.read, timeout)
+                .expect("required framework invariant must hold");
+            writer
+                .join()
+                .expect("required framework invariant must hold");
             assert_eq!(bytes, vec![b'x'; 1000 * chunks]);
         }
 
         #[test]
         fn reads_payload_larger_than_pipe_capacity() {
-            let pipe = filedescriptor::Pipe::new().unwrap();
+            let pipe = filedescriptor::Pipe::new().expect("required framework invariant must hold");
             // Exceeds the 64 KiB pipe capacity, forcing the writer to block.
             let payload = vec![b'z'; 1024 * 1024];
 
             let writer = std::thread::spawn({
                 let mut write = pipe.write;
                 let payload = payload.clone();
-                move || write.write_all(&payload).unwrap()
+                move || {
+                    write
+                        .write_all(&payload)
+                        .expect("required framework invariant must hold")
+                }
             });
-            let bytes = read_fd_with_timeout(pipe.read, PIPE_READ_TIMEOUT).unwrap();
-            writer.join().unwrap();
+            let bytes = read_fd_with_timeout(pipe.read, PIPE_READ_TIMEOUT)
+                .expect("required framework invariant must hold");
+            writer
+                .join()
+                .expect("required framework invariant must hold");
             assert_eq!(bytes, payload);
         }
     }

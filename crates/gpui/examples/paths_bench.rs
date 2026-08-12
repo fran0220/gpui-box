@@ -34,7 +34,7 @@ impl PaintingViewer {
             builder.line_to(point(px(270.), px(160.)));
             builder.line_to(point(px(330.), px(160.)));
             builder.line_to(point(px(350.), px(100.)));
-            let path = builder.build().unwrap();
+            let path = builder.build().expect("test setup should produce the required value");
             lines.push((
                 path,
                 linear_gradient(
@@ -89,7 +89,7 @@ fn run_example() {
             },
             |window, cx| cx.new(|cx| PaintingViewer::new(window, cx)),
         )
-        .unwrap();
+        .expect("test setup should produce the required value");
         cx.activate(true);
     });
 }

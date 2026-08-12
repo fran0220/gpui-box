@@ -236,12 +236,21 @@ impl WindowsPlatform {
             executor: self.foreground_executor.clone(),
             current_cursor: self.inner.state.current_cursor.get(),
             cursor_visible: self.inner.state.cursor_visible.clone(),
-            drop_target_helper: self.drop_target_helper.clone().unwrap(),
+            drop_target_helper: self
+                .drop_target_helper
+                .clone()
+                .expect("required framework invariant must hold"),
             validation_number: self.inner.validation_number,
             main_receiver: self.inner.main_receiver.clone(),
             platform_window_handle: self.handle,
             disable_direct_composition: self.disable_direct_composition,
-            directx_devices: self.inner.state.directx_devices.borrow().clone().unwrap(),
+            directx_devices: self
+                .inner
+                .state
+                .directx_devices
+                .borrow()
+                .clone()
+                .expect("required framework invariant must hold"),
             invalidate_devices: self.invalidate_devices.clone(),
             draw_coordinator: self.inner.state.draw_coordinator.clone(),
         }
@@ -351,7 +360,7 @@ impl WindowsPlatform {
                     }
                 }
             })
-            .unwrap();
+            .expect("required framework invariant must hold");
     }
 }
 
@@ -1001,7 +1010,7 @@ impl WindowsPlatformInner {
         let index = lock
             .iter()
             .position(|handle| handle.as_raw() == target_window)
-            .unwrap();
+            .expect("required framework invariant must hold");
         lock.remove(index);
 
         lock.is_empty()

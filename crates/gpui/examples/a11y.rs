@@ -243,7 +243,7 @@ fn run_example() {
             },
             |window, cx| cx.new(|cx| A11yDemo::new(window, cx)),
         )
-        .unwrap();
+        .expect("test setup should produce the required value");
 
         cx.activate(true);
     });

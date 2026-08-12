@@ -111,7 +111,7 @@ fn run_example() {
             },
             |_window, cx| cx.new(|_cx| PatternExample),
         )
-        .unwrap();
+        .expect("test setup should produce the required value");
 
         cx.activate(true);
     });

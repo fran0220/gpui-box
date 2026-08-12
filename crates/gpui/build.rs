@@ -19,5 +19,5 @@ fn embed_resource() {
     println!("cargo:rerun-if-changed={}", rc_file.display());
     embed_resource::compile(rc_file, embed_resource::NONE)
         .manifest_required()
-        .unwrap();
+        .expect("required framework invariant must hold");
 }

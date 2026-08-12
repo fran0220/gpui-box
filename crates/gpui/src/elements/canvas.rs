@@ -68,7 +68,12 @@ impl<T: 'static> Element for Canvas<T> {
         window: &mut Window,
         cx: &mut App,
     ) -> Option<T> {
-        Some(self.prepaint.take().unwrap()(bounds, window, cx))
+        Some(self
+            .prepaint
+            .take()
+            .expect("required framework invariant must hold")(
+            bounds, window, cx,
+        ))
     }
 
     fn paint(
@@ -81,9 +86,16 @@ impl<T: 'static> Element for Canvas<T> {
         window: &mut Window,
         cx: &mut App,
     ) {
-        let prepaint = prepaint.take().unwrap();
+        let prepaint = prepaint
+            .take()
+            .expect("required framework invariant must hold");
         style.paint(bounds, window, cx, |window, cx| {
-            (self.paint.take().unwrap())(bounds, prepaint, window, cx)
+            (self
+                .paint
+                .take()
+                .expect("required framework invariant must hold"))(
+                bounds, prepaint, window, cx
+            )
         });
     }
 }

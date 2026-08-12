@@ -218,14 +218,20 @@ impl DispatchTree {
     }
 
     pub fn set_focus_id(&mut self, focus_id: FocusId) {
-        let node_id = *self.node_stack.last().unwrap();
+        let node_id = *self
+            .node_stack
+            .last()
+            .expect("required framework invariant must hold");
         self.nodes[node_id.0].focus_id = Some(focus_id);
         self.focusable_node_ids.insert(focus_id, node_id);
     }
 
     pub fn set_view_id(&mut self, view_id: EntityId) {
         if self.view_stack.last().copied() != Some(view_id) {
-            let node_id = *self.node_stack.last().unwrap();
+            let node_id = *self
+                .node_stack
+                .last()
+                .expect("required framework invariant must hold");
             self.nodes[node_id.0].view_id = Some(view_id);
             self.view_node_ids.insert(view_id, node_id);
             self.view_stack.push(view_id);
@@ -233,7 +239,10 @@ impl DispatchTree {
     }
 
     pub fn pop_node(&mut self) {
-        let node = &self.nodes[self.active_node_id().unwrap().0];
+        let node = &self.nodes[self
+            .active_node_id()
+            .expect("required framework invariant must hold")
+            .0];
         if node.context.is_some() {
             self.context_stack.pop();
         }
@@ -545,7 +554,10 @@ impl DispatchTree {
             let (bindings, _, _) = self.bindings_for_input(&input[0..=last], dispatch_path);
             if !bindings.is_empty() {
                 to_replay.push(Replay {
-                    keystroke: input.drain(0..=last).next_back().unwrap(),
+                    keystroke: input
+                        .drain(0..=last)
+                        .next_back()
+                        .expect("required framework invariant must hold"),
                     bindings,
                 });
                 break;
@@ -600,7 +612,9 @@ impl DispatchTree {
     }
 
     fn active_node(&mut self) -> &mut DispatchNode {
-        let active_node_id = self.active_node_id().unwrap();
+        let active_node_id = self
+            .active_node_id()
+            .expect("required framework invariant must hold");
         &mut self.nodes[active_node_id.0]
     }
 
@@ -659,8 +673,8 @@ mod tests {
         )]);
 
         let contexts = vec![
-            KeyContext::parse("Workspace").unwrap(),
-            KeyContext::parse("ProjectPanel").unwrap(),
+            KeyContext::parse("Workspace").expect("required framework invariant must hold"),
+            KeyContext::parse("ProjectPanel").expect("required framework invariant must hold"),
         ];
 
         let keybinding = tree.bindings_for_action(&TestAction, &contexts);
@@ -685,8 +699,9 @@ mod tests {
         ]);
 
         let contexts = vec![
-            KeyContext::parse("Workspace").unwrap(),
-            KeyContext::parse("Editor showing_completions edit_prediction").unwrap(),
+            KeyContext::parse("Workspace").expect("required framework invariant must hold"),
+            KeyContext::parse("Editor showing_completions edit_prediction")
+                .expect("required framework invariant must hold"),
         ];
 
         let bindings = tree.bindings_for_action(&TestAction, &contexts);
@@ -717,8 +732,8 @@ mod tests {
         ]);
 
         let contexts = vec![
-            KeyContext::parse("Workspace").unwrap(),
-            KeyContext::parse("Editor").unwrap(),
+            KeyContext::parse("Workspace").expect("required framework invariant must hold"),
+            KeyContext::parse("Editor").expect("required framework invariant must hold"),
         ];
 
         let bindings = tree.bindings_for_action(&TestAction, &contexts);
@@ -742,8 +757,8 @@ mod tests {
         // SecondaryTestAction stands in for the editor/base action (e.g.
         // editor::AddSelectionBelow), TestAction for the picker action.
         let contexts = vec![
-            KeyContext::parse("Picker").unwrap(),
-            KeyContext::parse("Editor").unwrap(),
+            KeyContext::parse("Picker").expect("required framework invariant must hold"),
+            KeyContext::parse("Editor").expect("required framework invariant must hold"),
         ];
 
         // Default keymap (picker binding) followed by a base keymap that binds
@@ -805,7 +820,11 @@ mod tests {
             key: &str,
             path: &DispatchPath,
         ) -> DispatchResult {
-            tree.dispatch_key(pending, Keystroke::parse(key).unwrap(), path)
+            tree.dispatch_key(
+                pending,
+                Keystroke::parse(key).expect("required framework invariant must hold"),
+                path,
+            )
         }
 
         let dispatch_path: DispatchPath = SmallVec::new();
@@ -819,7 +838,9 @@ mod tests {
         assert!(!result.pending_has_binding);
 
         let node_id = tree.push_node();
-        tree.set_key_context(KeyContext::parse("ContextB").unwrap());
+        tree.set_key_context(
+            KeyContext::parse("ContextB").expect("required framework invariant must hold"),
+        );
         tree.pop_node();
 
         let dispatch_path = tree.dispatch_path(node_id);

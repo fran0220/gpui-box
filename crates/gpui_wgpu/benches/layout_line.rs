@@ -49,14 +49,18 @@ fn bench_layout_line(c: &mut Criterion) {
     let system = CosmicTextSystem::new_without_system_fonts("Lilex");
     system
         .add_fonts(vec![Cow::Borrowed(LILEX), Cow::Borrowed(IBM_PLEX)])
-        .unwrap();
+        .expect("test setup should produce the required value");
 
-    let font_id_no_fallback = system.font_id(&font("Lilex")).unwrap();
+    let font_id_no_fallback = system
+        .font_id(&font("Lilex"))
+        .expect("test setup should produce the required value");
 
     let font_id_with_fallback = {
         let mut f = font("Lilex");
         f.fallbacks = Some(FontFallbacks::from_fonts(vec!["IBM Plex Sans".to_string()]));
-        system.font_id(&f).unwrap()
+        system
+            .font_id(&f)
+            .expect("test setup should produce the required value")
     };
 
     let text = code_text();

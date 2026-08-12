@@ -384,13 +384,13 @@ fn run_example() {
                     })
                 },
             )
-            .unwrap();
+            .expect("test setup should produce the required value");
 
         window
             .update(cx, |_view, _window, cx| {
                 cx.activate(true);
             })
-            .unwrap();
+            .expect("test setup should produce the required value");
     });
 }
 

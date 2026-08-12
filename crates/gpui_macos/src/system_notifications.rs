@@ -100,6 +100,9 @@ impl SystemNotificationState {
     }
 }
 
+type NotificationCategories =
+    HashMap<Vec<SystemNotificationAction>, (SharedString, Retained<UNNotificationCategory>)>;
+
 struct NotificationCenter {
     center: Retained<UNUserNotificationCenter>,
     /// The center's `delegate` property is weak; keeping the delegate retained
@@ -108,9 +111,7 @@ struct NotificationCenter {
     /// The union of every action set registered so far. Categories are shared
     /// by notifications with identical actions because macOS replaces the
     /// entire registered set whenever a category is added.
-    categories: RefCell<
-        HashMap<Vec<SystemNotificationAction>, (SharedString, Retained<UNNotificationCategory>)>,
-    >,
+    categories: RefCell<NotificationCategories>,
     authorization_requested: Cell<bool>,
 }
 

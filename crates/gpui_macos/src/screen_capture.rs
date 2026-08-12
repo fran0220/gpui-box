@@ -99,12 +99,17 @@ impl ScreenCaptureSource for MacScreenCaptureSource {
             let delegate: id = msg_send![delegate, init];
             let output: id = msg_send![output, init];
 
-            output.as_mut().unwrap().set_ivar(
-                FRAME_CALLBACK_IVAR,
-                Box::into_raw(Box::new(frame_callback)) as *mut c_void,
-            );
+            output
+                .as_mut()
+                .expect("required framework invariant must hold")
+                .set_ivar(
+                    FRAME_CALLBACK_IVAR,
+                    Box::into_raw(Box::new(frame_callback)) as *mut c_void,
+                );
 
-            let meta = self.metadata().unwrap();
+            let meta = self
+                .metadata()
+                .expect("required framework invariant must hold");
             let _: id = msg_send![configuration, setWidth: meta.resolution.width.0 as i64];
             let _: id = msg_send![configuration, setHeight: meta.resolution.height.0 as i64];
             let stream: id = msg_send![stream, initWithFilter:filter configuration:configuration delegate:delegate];
@@ -286,7 +291,8 @@ pub(crate) fn get_sources() -> oneshot::Receiver<Result<Vec<Rc<dyn ScreenCapture
 
 #[ctor(unsafe)]
 unsafe fn build_classes() {
-    let mut decl = ClassDecl::new("GPUIStreamDelegate", class!(NSObject)).unwrap();
+    let mut decl = ClassDecl::new("GPUIStreamDelegate", class!(NSObject))
+        .expect("required framework invariant must hold");
     unsafe {
         decl.add_method(
             sel!(outputVideoEffectDidStartForStream:),
@@ -302,7 +308,8 @@ unsafe fn build_classes() {
         );
         DELEGATE_CLASS = decl.register();
 
-        let mut decl = ClassDecl::new("GPUIStreamOutput", class!(NSObject)).unwrap();
+        let mut decl = ClassDecl::new("GPUIStreamOutput", class!(NSObject))
+            .expect("required framework invariant must hold");
         decl.add_method(
             sel!(stream:didOutputSampleBuffer:ofType:),
             stream_did_output_sample_buffer_of_type

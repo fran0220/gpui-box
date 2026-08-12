@@ -241,7 +241,7 @@ impl PlatformWindow for TestWindow {
             .lock()
             .platform
             .upgrade()
-            .unwrap()
+            .expect("required framework invariant must hold")
             .set_active_window(Some(self.clone()))
     }
 

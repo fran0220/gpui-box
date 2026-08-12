@@ -179,13 +179,15 @@ mod tests {
         let tag = "release/2.3.5";
         let repo_name_with_owner = "microsoft/vscode-eslint";
 
-        let tarball = build_asset_url(repo_name_with_owner, tag, AssetKind::TarGz).unwrap();
+        let tarball = build_asset_url(repo_name_with_owner, tag, AssetKind::TarGz)
+            .expect("required framework invariant must hold");
         assert_eq!(
             tarball,
             "https://github.com/microsoft/vscode-eslint/archive/refs/tags/release%2F2.3.5.tar.gz"
         );
 
-        let zip = build_asset_url(repo_name_with_owner, tag, AssetKind::Zip).unwrap();
+        let zip = build_asset_url(repo_name_with_owner, tag, AssetKind::Zip)
+            .expect("required framework invariant must hold");
         assert_eq!(
             zip,
             "https://github.com/microsoft/vscode-eslint/archive/refs/tags/release%2F2.3.5.zip"

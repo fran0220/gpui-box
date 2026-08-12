@@ -342,7 +342,8 @@ impl Platform for TestPlatform {
 
     fn restart(&self, path: Option<PathBuf>) {
         if let Some(tx) = self.expect_restart.take() {
-            tx.send(path).unwrap();
+            tx.send(path)
+                .expect("required framework invariant must hold");
         }
     }
 
@@ -587,6 +588,12 @@ impl TestScreenCaptureSource {
     /// Create a fake screen capture source, for testing.
     pub fn new() -> Self {
         Self {}
+    }
+}
+
+impl Default for TestScreenCaptureSource {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

@@ -23,7 +23,10 @@
 //! );
 //! let records = layout.to_records();
 //! // ... the host writes `records` out field by field, and reads them back ...
-//! assert_eq!(SplitLayout::from_records(&records).unwrap(), layout);
+//! assert_eq!(
+//!     SplitLayout::from_records(&records).expect("records were produced by this layout"),
+//!     layout
+//! );
 //! ```
 //!
 //! # Minimums propagate

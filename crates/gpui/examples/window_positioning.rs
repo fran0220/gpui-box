@@ -92,7 +92,7 @@ fn run_example() {
                     bounds,
                 })
             })
-            .unwrap();
+            .expect("test setup should produce the required value");
 
             let bounds = Bounds {
                 origin: screen.bounds().top_right()
@@ -107,7 +107,7 @@ fn run_example() {
                     bounds,
                 })
             })
-            .unwrap();
+            .expect("test setup should produce the required value");
 
             let bounds = Bounds {
                 origin: screen.bounds().bottom_left()
@@ -122,7 +122,7 @@ fn run_example() {
                     bounds,
                 })
             })
-            .unwrap();
+            .expect("test setup should produce the required value");
 
             let bounds = Bounds {
                 origin: screen.bounds().bottom_right()
@@ -137,7 +137,7 @@ fn run_example() {
                     bounds,
                 })
             })
-            .unwrap();
+            .expect("test setup should produce the required value");
 
             let bounds = Bounds {
                 origin: point(screen.bounds().center().x - size.center().x, margin_offset),
@@ -151,7 +151,7 @@ fn run_example() {
                     bounds,
                 })
             })
-            .unwrap();
+            .expect("test setup should produce the required value");
 
             let bounds = Bounds {
                 origin: point(margin_offset, screen.bounds().center().y - size.center().y),
@@ -165,7 +165,7 @@ fn run_example() {
                     bounds,
                 })
             })
-            .unwrap();
+            .expect("test setup should produce the required value");
 
             let bounds = Bounds {
                 origin: point(
@@ -182,7 +182,7 @@ fn run_example() {
                     bounds,
                 })
             })
-            .unwrap();
+            .expect("test setup should produce the required value");
 
             let bounds = Bounds {
                 origin: point(
@@ -199,7 +199,7 @@ fn run_example() {
                     bounds,
                 })
             })
-            .unwrap();
+            .expect("test setup should produce the required value");
 
             let bounds = Bounds {
                 origin: point(
@@ -216,7 +216,7 @@ fn run_example() {
                     bounds,
                 })
             })
-            .unwrap();
+            .expect("test setup should produce the required value");
         }
     });
 }

@@ -63,7 +63,10 @@ mod any_image_cache {
         window: &mut Window,
         cx: &mut App,
     ) -> Option<Result<Arc<RenderImage>, ImageCacheError>> {
-        let image_cache = image_cache.clone().downcast::<I>().unwrap();
+        let image_cache = image_cache
+            .clone()
+            .downcast::<I>()
+            .expect("required framework invariant must hold");
         image_cache.update(cx, |image_cache, cx| image_cache.load(resource, window, cx))
     }
 }

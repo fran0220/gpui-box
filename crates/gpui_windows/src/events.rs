@@ -1675,9 +1675,14 @@ fn process_key(vkey: VIRTUAL_KEY, scan_code: u16) -> (Option<String>, bool) {
     }
 
     let c = &buffer_c[..result_c.unsigned_abs() as usize];
-    let key_char = String::from_utf16(c)
-        .ok()
-        .filter(|s| !s.is_empty() && !s.chars().next().unwrap().is_control());
+    let key_char = String::from_utf16(c).ok().filter(|s| {
+        !s.is_empty()
+            && !s
+                .chars()
+                .next()
+                .expect("required framework invariant must hold")
+                .is_control()
+    });
 
     if result_c < 0 {
         return (key_char, true);

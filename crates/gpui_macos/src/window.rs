@@ -156,7 +156,8 @@ unsafe fn build_classes() {
         WINDOW_CLASS = build_window_class("GPUIWindow", class!(NSWindow));
         PANEL_CLASS = build_window_class("GPUIPanel", class!(NSPanel));
         VIEW_CLASS = {
-            let mut decl = ClassDecl::new("GPUIView", class!(NSView)).unwrap();
+            let mut decl = ClassDecl::new("GPUIView", class!(NSView))
+                .expect("required framework invariant must hold");
             decl.add_ivar::<*mut c_void>(WINDOW_STATE_IVAR);
             decl.add_method(sel!(dealloc), dealloc_view as extern "C" fn(&Object, Sel));
 
@@ -246,7 +247,9 @@ unsafe fn build_classes() {
                 make_backing_layer as extern "C" fn(&Object, Sel) -> id,
             );
 
-            decl.add_protocol(Protocol::get("CALayerDelegate").unwrap());
+            decl.add_protocol(
+                Protocol::get("CALayerDelegate").expect("required framework invariant must hold"),
+            );
             decl.add_method(
                 sel!(viewDidChangeBackingProperties),
                 view_did_change_backing_properties as extern "C" fn(&Object, Sel),
@@ -260,7 +263,9 @@ unsafe fn build_classes() {
                 display_layer as extern "C" fn(&Object, Sel, id),
             );
 
-            decl.add_protocol(Protocol::get("NSTextInputClient").unwrap());
+            decl.add_protocol(
+                Protocol::get("NSTextInputClient").expect("required framework invariant must hold"),
+            );
             decl.add_method(
                 sel!(validAttributesForMarkedText),
                 valid_attributes_for_marked_text as extern "C" fn(&Object, Sel) -> id,
@@ -325,7 +330,8 @@ unsafe fn build_classes() {
             decl.register()
         };
         OVERLAY_VIEW_CLASS = {
-            let mut decl = ClassDecl::new("GPUIOverlayView", class!(NSView)).unwrap();
+            let mut decl = ClassDecl::new("GPUIOverlayView", class!(NSView))
+                .expect("required framework invariant must hold");
             decl.add_ivar::<*mut c_void>(WINDOW_STATE_IVAR);
             decl.add_ivar::<*mut c_void>(OVERLAY_INPUT_IVAR);
             decl.add_method(
@@ -361,7 +367,8 @@ unsafe fn build_classes() {
             decl.register()
         };
         BLURRED_VIEW_CLASS = {
-            let mut decl = ClassDecl::new("BlurredView", class!(NSVisualEffectView)).unwrap();
+            let mut decl = ClassDecl::new("BlurredView", class!(NSVisualEffectView))
+                .expect("required framework invariant must hold");
             decl.add_method(
                 sel!(initWithFrame:),
                 blurred_view_init_with_frame as extern "C" fn(&Object, Sel, NSRect) -> id,
@@ -423,7 +430,8 @@ pub(crate) unsafe fn set_active_window_cursor_style(style: CursorStyle) {
 
 unsafe fn build_window_class(name: &'static str, superclass: &Class) -> *const Class {
     unsafe {
-        let mut decl = ClassDecl::new(name, superclass).unwrap();
+        let mut decl =
+            ClassDecl::new(name, superclass).expect("required framework invariant must hold");
         decl.add_ivar::<*mut c_void>(WINDOW_STATE_IVAR);
         decl.add_method(sel!(dealloc), dealloc_window as extern "C" fn(&Object, Sel));
 
@@ -499,7 +507,9 @@ unsafe fn build_window_class(name: &'static str, superclass: &Class) -> *const C
             conclude_drag_operation as extern "C" fn(&Object, Sel, id),
         );
 
-        decl.add_protocol(Protocol::get("NSDraggingSource").unwrap());
+        decl.add_protocol(
+            Protocol::get("NSDraggingSource").expect("required framework invariant must hold"),
+        );
         decl.add_method(
             sel!(draggingSession:sourceOperationMaskForDraggingContext:),
             dragging_session_source_operation_mask
@@ -557,6 +567,9 @@ struct TrafficLightButtons {
     zoom: Retained<Objc2NSButton>,
 }
 
+type WindowEventCallback = Box<dyn FnMut(PlatformInput) -> gpui::DispatchEventResult>;
+type WindowResizeCallback = Box<dyn FnMut(Size<Pixels>, f32)>;
+
 struct MacWindowState {
     handle: AnyWindowHandle,
     foreground_executor: ForegroundExecutor,
@@ -577,9 +590,9 @@ struct MacWindowState {
     overlay_renderer: Option<renderer::Renderer>,
     renderer_context: renderer::Context,
     request_frame_callback: Option<Box<dyn FnMut(RequestFrameOptions)>>,
-    event_callback: Option<Box<dyn FnMut(PlatformInput) -> gpui::DispatchEventResult>>,
+    event_callback: Option<WindowEventCallback>,
     activate_callback: Option<Box<dyn FnMut(bool)>>,
-    resize_callback: Option<Box<dyn FnMut(Size<Pixels>, f32)>>,
+    resize_callback: Option<WindowResizeCallback>,
     moved_callback: Option<Box<dyn FnMut()>>,
     should_close_callback: Option<Box<dyn FnMut() -> bool>>,
     close_callback: Option<Box<dyn FnOnce()>>,
@@ -1534,7 +1547,11 @@ impl PlatformWindow for MacWindow {
             let block = ConcreteBlock::new(move |answer: NSInteger| {
                 let _: () = msg_send![alert, release];
                 if let Some(done_tx) = done_tx.take() {
-                    let _ = done_tx.send(answer.try_into().unwrap());
+                    let _ = done_tx.send(
+                        answer
+                            .try_into()
+                            .expect("required framework invariant must hold"),
+                    );
                 }
             });
             let block = block.copy();

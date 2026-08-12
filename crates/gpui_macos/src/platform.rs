@@ -72,14 +72,16 @@ static mut APP_DELEGATE_CLASS: *const Class = ptr::null();
 unsafe fn build_classes() {
     unsafe {
         APP_CLASS = {
-            let mut decl = ClassDecl::new("GPUIApplication", class!(NSApplication)).unwrap();
+            let mut decl = ClassDecl::new("GPUIApplication", class!(NSApplication))
+                .expect("required framework invariant must hold");
             decl.add_ivar::<*mut c_void>(MAC_PLATFORM_IVAR);
             decl.register()
         }
     };
     unsafe {
         APP_DELEGATE_CLASS = {
-            let mut decl = ClassDecl::new("GPUIApplicationDelegate", class!(NSResponder)).unwrap();
+            let mut decl = ClassDecl::new("GPUIApplicationDelegate", class!(NSResponder))
+                .expect("required framework invariant must hold");
             decl.add_ivar::<*mut c_void>(MAC_PLATFORM_IVAR);
             decl.add_method(
                 sel!(applicationWillFinishLaunching:),
@@ -165,6 +167,9 @@ unsafe fn build_classes() {
 
 pub struct MacPlatform(Mutex<MacPlatformState>);
 
+type MenuCommandCallback = Box<dyn FnMut(&dyn Action)>;
+type ValidateMenuCommandCallback = Box<dyn FnMut(&dyn Action) -> bool>;
+
 pub(crate) struct MacPlatformState {
     background_executor: BackgroundExecutor,
     foreground_executor: ForegroundExecutor,
@@ -179,8 +184,8 @@ pub(crate) struct MacPlatformState {
     on_system_wake: Option<Box<dyn FnMut()>>,
     system_wake_observer_registered: bool,
     quit: Option<Box<dyn FnMut()>>,
-    menu_command: Option<Box<dyn FnMut(&dyn Action)>>,
-    validate_menu_command: Option<Box<dyn FnMut(&dyn Action) -> bool>>,
+    menu_command: Option<MenuCommandCallback>,
+    validate_menu_command: Option<ValidateMenuCommandCallback>,
     will_open_menu: Option<Box<dyn FnMut()>>,
     menu_actions: Vec<Box<dyn Action>>,
     open_urls: Option<Box<dyn FnMut(Vec<String>)>>,
@@ -550,7 +555,9 @@ impl Platform for MacPlatform {
                     // and get the path to the executable itself.
                     .and_then(|path| (path.extension()?.to_str()? == "app").then_some(path))
             })
-            .unwrap_or_else(|| std::env::current_exe().unwrap());
+            .unwrap_or_else(|| {
+                std::env::current_exe().expect("required framework invariant must hold")
+            });
 
         // Wait until this process has exited and then re-open this path.
         let script = r#"
@@ -1242,7 +1249,8 @@ impl Platform for MacPlatform {
 unsafe fn path_from_objc(path: id) -> PathBuf {
     let len = msg_send![path, lengthOfBytesUsingEncoding: NSUTF8StringEncoding];
     let bytes = unsafe { path.UTF8String() as *const u8 };
-    let path = str::from_utf8(unsafe { slice::from_raw_parts(bytes, len) }).unwrap();
+    let path = str::from_utf8(unsafe { slice::from_raw_parts(bytes, len) })
+        .expect("required framework invariant must hold");
     PathBuf::from(path)
 }
 

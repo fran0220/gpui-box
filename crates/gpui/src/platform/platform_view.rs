@@ -757,8 +757,9 @@ mod tests {
 
     #[test]
     fn platform_view_registry_detaches_views_that_stop_painting() {
-        let mut registry = PlatformViewRegistry::default();
-        registry.hosted = vec![id(1), id(2)];
+        let mut registry = PlatformViewRegistry {
+            hosted: vec![id(1), id(2)],
+        };
 
         let update = registry
             .sync(&[], 2.0)
@@ -967,8 +968,9 @@ mod tests {
 
     #[test]
     fn platform_view_registry_detaches_everything_on_teardown() {
-        let mut registry = PlatformViewRegistry::default();
-        registry.hosted = vec![id(5), id(6)];
+        let mut registry = PlatformViewRegistry {
+            hosted: vec![id(5), id(6)],
+        };
 
         let update = registry.detach_all().expect("hosted views need detaching");
 

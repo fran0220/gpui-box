@@ -19,9 +19,11 @@ mod shader_compilation {
     };
 
     pub fn compile_shaders() {
-        let shader_path =
-            PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap()).join("src/shaders.hlsl");
-        let out_dir = std::env::var("OUT_DIR").unwrap();
+        let shader_path = PathBuf::from(
+            std::env::var("CARGO_MANIFEST_DIR").expect("required framework invariant must hold"),
+        )
+        .join("src/shaders.hlsl");
+        let out_dir = std::env::var("OUT_DIR").expect("required framework invariant must hold");
 
         println!("cargo:rerun-if-changed={}", shader_path.display());
 
@@ -50,19 +52,26 @@ mod shader_compilation {
                 module,
                 &out_dir,
                 &fxc_path,
-                shader_path.to_str().unwrap(),
+                shader_path
+                    .to_str()
+                    .expect("required framework invariant must hold"),
                 &rust_binding_path,
             );
         }
 
         {
-            let shader_path = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap())
-                .join("src/color_text_raster.hlsl");
+            let shader_path = PathBuf::from(
+                std::env::var("CARGO_MANIFEST_DIR")
+                    .expect("required framework invariant must hold"),
+            )
+            .join("src/color_text_raster.hlsl");
             compile_shader_for_module(
                 "emoji_rasterization",
                 &out_dir,
                 &fxc_path,
-                shader_path.to_str().unwrap(),
+                shader_path
+                    .to_str()
+                    .expect("required framework invariant must hold"),
                 &rust_binding_path,
             );
         }
@@ -217,9 +226,13 @@ mod shader_compilation {
     fn generate_rust_binding(const_name: &str, head_file: &str, output_path: &str) {
         let header_content = fs::read_to_string(head_file).expect("Failed to read header file");
         let const_definition = {
-            let global_var_start = header_content.find("const BYTE").unwrap();
+            let global_var_start = header_content
+                .find("const BYTE")
+                .expect("required framework invariant must hold");
             let global_var = &header_content[global_var_start..];
-            let equal = global_var.find('=').unwrap();
+            let equal = global_var
+                .find('=')
+                .expect("required framework invariant must hold");
             global_var[equal + 1..].trim()
         };
         let rust_binding = format!(

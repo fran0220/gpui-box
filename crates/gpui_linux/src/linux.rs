@@ -47,7 +47,7 @@ pub fn current_platform(headless: bool) -> Rc<dyn gpui::Platform> {
         "X11" => Rc::new(LinuxPlatform {
             inner: X11Client::new()
                 .context("Failed to initialize X11 client.")
-                .unwrap(),
+                .expect("required framework invariant must hold"),
         }),
 
         "Headless" => Rc::new(LinuxPlatform {

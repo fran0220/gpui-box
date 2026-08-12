@@ -147,7 +147,10 @@ impl LineLayout {
             .enumerate()
             .flat_map(move |(run_ix, run)| {
                 run.glyphs.iter().enumerate().map(move |(glyph_ix, glyph)| {
-                    let character = text[glyph.index..].chars().next().unwrap();
+                    let character = text[glyph.index..]
+                        .chars()
+                        .next()
+                        .expect("required framework invariant must hold");
                     (
                         WrapBoundary { run_ix, glyph_ix },
                         character,
@@ -353,7 +356,7 @@ impl WrappedLineLayout {
                 Ok(self
                     .unwrapped_layout
                     .index_for_x(position_in_unwrapped_line.x)
-                    .unwrap())
+                    .expect("required framework invariant must hold"))
             }
         }
     }

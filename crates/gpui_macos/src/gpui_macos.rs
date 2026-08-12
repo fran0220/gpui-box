@@ -74,7 +74,9 @@ impl NSStringExt for id {
             if cstr.is_null() {
                 ""
             } else {
-                CStr::from_ptr(cstr as *mut c_char).to_str().unwrap()
+                CStr::from_ptr(cstr as *mut c_char)
+                    .to_str()
+                    .expect("required framework invariant must hold")
             }
         }
     }

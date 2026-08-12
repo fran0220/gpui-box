@@ -92,6 +92,8 @@ pub trait Element: 'static + IntoElement {
 
     /// Once layout has been completed, this method will be called to paint the element to the screen.
     /// The state argument is the same state that was returned from [`Element::request_layout()`].
+    // Rendering boundaries pass distinct layout, scene, window, and application state.
+    #[allow(clippy::too_many_arguments)]
     fn paint(
         &mut self,
         id: Option<&GlobalElementId>,
@@ -358,7 +360,13 @@ impl<E: Element> Drawable<E> {
             } => {
                 if let Some(element_id) = self.element.id() {
                     window.element_id_stack.push(element_id);
-                    debug_assert_eq!(&*global_id.as_ref().unwrap().0, &*window.element_id_stack);
+                    debug_assert_eq!(
+                        &*global_id
+                            .as_ref()
+                            .expect("required framework invariant must hold")
+                            .0,
+                        &*window.element_id_stack
+                    );
                 }
 
                 let bounds = window.layout_bounds(layout_id);
@@ -470,7 +478,13 @@ impl<E: Element> Drawable<E> {
             } => {
                 if let Some(element_id) = self.element.id() {
                     window.element_id_stack.push(element_id);
-                    debug_assert_eq!(&*global_id.as_ref().unwrap().0, &*window.element_id_stack);
+                    debug_assert_eq!(
+                        &*global_id
+                            .as_ref()
+                            .expect("required framework invariant must hold")
+                            .0,
+                        &*window.element_id_stack
+                    );
                 }
 
                 window.next_frame.dispatch_tree.set_active_node(node_id);

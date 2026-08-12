@@ -71,7 +71,7 @@ fn run_example() {
             },
             |_, cx| cx.new(|_| HolyGrailExample {}),
         )
-        .unwrap();
+        .expect("test setup should produce the required value");
         cx.activate(true);
     });
 }

@@ -558,7 +558,10 @@ impl Element for TextElement {
         if let Some(selection) = prepaint.selection.take() {
             window.paint_quad(selection)
         }
-        let line = prepaint.line.take().unwrap();
+        let line = prepaint
+            .line
+            .take()
+            .expect("test setup should produce the required value");
         line.paint(
             bounds.origin,
             window.line_height(),
@@ -567,7 +570,7 @@ impl Element for TextElement {
             window,
             cx,
         )
-        .unwrap();
+        .expect("test setup should produce the required value");
 
         if focus_handle.is_focused(window)
             && let Some(cursor) = prepaint.cursor.take()
@@ -738,8 +741,10 @@ fn run_example() {
                     })
                 },
             )
-            .unwrap();
-        let view = window.update(cx, |_, _, cx| cx.entity()).unwrap();
+            .expect("test setup should produce the required value");
+        let view = window
+            .update(cx, |_, _, cx| cx.entity())
+            .expect("test setup should produce the required value");
         cx.observe_keystrokes(move |ev, _, cx| {
             view.update(cx, |view, cx| {
                 view.recent_keystrokes.push(ev.keystroke.clone());
@@ -759,7 +764,7 @@ fn run_example() {
                 window.focus(&view.text_input.focus_handle(cx), cx);
                 cx.activate(true);
             })
-            .unwrap();
+            .expect("test setup should produce the required value");
         cx.on_action(|_: &Quit, cx| cx.quit());
         cx.bind_keys([KeyBinding::new("cmd-q", Quit, None)]);
     });

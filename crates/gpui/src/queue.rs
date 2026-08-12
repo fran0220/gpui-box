@@ -286,7 +286,8 @@ impl<T> PriorityQueueReceiver<T> {
     ///
     /// If the sender was dropped
     pub fn pop(&mut self) -> Result<T, RecvError> {
-        self.pop_inner(true).map(|e| e.unwrap())
+        self.pop_inner(true)
+            .map(|e| e.expect("required framework invariant must hold"))
     }
 
     /// Returns an iterator over the elements of the queue
@@ -400,11 +401,16 @@ mod tests {
     #[test]
     fn all_tasks_get_yielded() {
         let (tx, mut rx) = PriorityQueueReceiver::new();
-        tx.send(Priority::Medium, 20).unwrap();
-        tx.send(Priority::High, 30).unwrap();
-        tx.send(Priority::Low, 10).unwrap();
-        tx.send(Priority::Medium, 21).unwrap();
-        tx.send(Priority::High, 31).unwrap();
+        tx.send(Priority::Medium, 20)
+            .expect("required framework invariant must hold");
+        tx.send(Priority::High, 30)
+            .expect("required framework invariant must hold");
+        tx.send(Priority::Low, 10)
+            .expect("required framework invariant must hold");
+        tx.send(Priority::Medium, 21)
+            .expect("required framework invariant must hold");
+        tx.send(Priority::High, 31)
+            .expect("required framework invariant must hold");
 
         drop(tx);
 
@@ -418,12 +424,14 @@ mod tests {
     fn new_high_prio_task_get_scheduled_quickly() {
         let (tx, mut rx) = PriorityQueueReceiver::new();
         for _ in 0..100 {
-            tx.send(Priority::Low, 1).unwrap();
+            tx.send(Priority::Low, 1)
+                .expect("required framework invariant must hold");
         }
 
-        assert_eq!(rx.pop().unwrap(), 1);
-        tx.send(Priority::High, 3).unwrap();
-        assert_eq!(rx.pop().unwrap(), 3);
-        assert_eq!(rx.pop().unwrap(), 1);
+        assert_eq!(rx.pop().expect("required framework invariant must hold"), 1);
+        tx.send(Priority::High, 3)
+            .expect("required framework invariant must hold");
+        assert_eq!(rx.pop().expect("required framework invariant must hold"), 3);
+        assert_eq!(rx.pop().expect("required framework invariant must hold"), 1);
     }
 }

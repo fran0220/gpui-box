@@ -689,7 +689,10 @@ impl WgpuRenderer {
                     resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                         buffer: &globals_buffer,
                         offset: 0,
-                        size: Some(NonZeroU64::new(globals_size).unwrap()),
+                        size: Some(
+                            NonZeroU64::new(globals_size)
+                                .expect("required framework invariant must hold"),
+                        ),
                     }),
                 },
                 wgpu::BindGroupEntry {
@@ -697,7 +700,10 @@ impl WgpuRenderer {
                     resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                         buffer: &globals_buffer,
                         offset: gamma_offset,
-                        size: Some(NonZeroU64::new(gamma_size).unwrap()),
+                        size: Some(
+                            NonZeroU64::new(gamma_size)
+                                .expect("required framework invariant must hold"),
+                        ),
                     }),
                 },
             ],
@@ -712,7 +718,10 @@ impl WgpuRenderer {
                     resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                         buffer: &globals_buffer,
                         offset: path_globals_offset,
-                        size: Some(NonZeroU64::new(globals_size).unwrap()),
+                        size: Some(
+                            NonZeroU64::new(globals_size)
+                                .expect("required framework invariant must hold"),
+                        ),
                     }),
                 },
                 wgpu::BindGroupEntry {
@@ -720,7 +729,10 @@ impl WgpuRenderer {
                     resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                         buffer: &globals_buffer,
                         offset: gamma_offset,
-                        size: Some(NonZeroU64::new(gamma_size).unwrap()),
+                        size: Some(
+                            NonZeroU64::new(gamma_size)
+                                .expect("required framework invariant must hold"),
+                        ),
                     }),
                 },
             ],
@@ -1674,7 +1686,12 @@ impl WgpuRenderer {
             .map_err(|error| anyhow::anyhow!("Failed to receive headless mapping result: {error}"))?
             .map_err(|error| anyhow::anyhow!("Failed to map headless readback buffer: {error}"))?;
 
-        if let Some(error) = self.last_error.lock().unwrap().take() {
+        if let Some(error) = self
+            .last_error
+            .lock()
+            .expect("required framework invariant must hold")
+            .take()
+        {
             anyhow::bail!("GPU error during headless rendering: {error}");
         }
 
@@ -1770,7 +1787,11 @@ impl WgpuRenderer {
             return false;
         }
 
-        let last_error = self.last_error.lock().unwrap().take();
+        let last_error = self
+            .last_error
+            .lock()
+            .expect("required framework invariant must hold")
+            .take();
         if let Some(error) = last_error {
             self.failed_frame_count += 1;
             log::error!(
@@ -1830,7 +1851,10 @@ impl WgpuRenderer {
                 return false;
             }
             wgpu::CurrentSurfaceTexture::Validation => {
-                *self.last_error.lock().unwrap() =
+                *self
+                    .last_error
+                    .lock()
+                    .expect("required framework invariant must hold") =
                     Some("Surface texture validation error".to_string());
                 return false;
             }
@@ -2209,6 +2233,8 @@ impl WgpuRenderer {
         })
     }
 
+    // Rendering boundaries pass distinct layout, scene, window, and application state.
+    #[allow(clippy::too_many_arguments)]
     fn draw_backdrop_blur(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -2292,6 +2318,8 @@ impl WgpuRenderer {
         Ok(())
     }
 
+    // Rendering boundaries pass distinct layout, scene, window, and application state.
+    #[allow(clippy::too_many_arguments)]
     fn draw_backdrop_pass(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -2915,7 +2943,10 @@ impl WgpuRenderer {
             surface
         } else {
             let ctx_ref = gpu_context.borrow();
-            let instance = &ctx_ref.as_ref().unwrap().instance;
+            let instance = &ctx_ref
+                .as_ref()
+                .expect("required framework invariant must hold")
+                .instance;
             create_surface(instance, window_handle.as_raw())?
         };
 

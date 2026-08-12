@@ -672,7 +672,9 @@ fn generate_custom_value_setter(
     let method_name = format_ident!("{}", prefix);
 
     let mut iter = fields.iter();
-    let last = iter.next_back().unwrap();
+    let last = iter
+        .next_back()
+        .expect("required framework invariant must hold");
     let field_assignments = iter
         .map(|field_tokens| {
             quote! {

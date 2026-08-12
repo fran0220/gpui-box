@@ -27,7 +27,7 @@ impl ImageGallery {
 
         let t = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("test setup should produce the required value")
             .as_millis();
 
         self.image_key = format!("{}", t);
@@ -216,7 +216,7 @@ impl ImageCache for SimpleLruCache {
         let fut = AssetLogger::<ImageAssetLoader>::load(resource.clone(), cx);
         let task = cx.background_executor().spawn(fut).shared();
         if self.usages.len() == self.max_items {
-            let oldest = self.usages.pop().unwrap();
+            let oldest = self.usages.pop().expect("test setup should produce the required value");
             let mut image = self
                 .cache
                 .remove(&oldest)
@@ -256,7 +256,7 @@ fn run_example() {
     app.run(move |cx: &mut App| {
         #[cfg(not(target_family = "wasm"))]
         {
-            let http_client = ReqwestClient::user_agent("gpui example").unwrap();
+            let http_client = ReqwestClient::user_agent("gpui example").expect("test setup should produce the required value");
             cx.set_http_client(Arc::new(http_client));
         }
 
@@ -289,7 +289,7 @@ fn run_example() {
                 image_cache: RetainAllImageCache::new(ctx),
             })
         })
-        .unwrap();
+        .expect("test setup should produce the required value");
     });
 }
 

@@ -169,19 +169,29 @@ impl BackgroundExecutor {
     /// In tests, run an arbitrary number of tasks (determined by the SEED environment variable)
     #[cfg(any(test, feature = "test-support"))]
     pub fn simulate_random_delay(&self) -> impl Future<Output = ()> + use<> {
-        self.dispatcher.as_test().unwrap().simulate_random_delay()
+        self.dispatcher
+            .as_test()
+            .expect("required framework invariant must hold")
+            .simulate_random_delay()
     }
 
     /// In tests, move time forward. This does not run any tasks, but does make `timer`s ready.
     #[cfg(any(test, feature = "test-support"))]
     pub fn advance_clock(&self, duration: Duration) {
-        self.dispatcher.as_test().unwrap().advance_clock(duration)
+        self.dispatcher
+            .as_test()
+            .expect("required framework invariant must hold")
+            .advance_clock(duration)
     }
 
     /// In tests, run one task.
     #[cfg(any(test, feature = "test-support"))]
     pub fn tick(&self) -> bool {
-        self.dispatcher.as_test().unwrap().scheduler().tick()
+        self.dispatcher
+            .as_test()
+            .expect("required framework invariant must hold")
+            .scheduler()
+            .tick()
     }
 
     /// In tests, run tasks until the scheduler would park.
@@ -192,7 +202,11 @@ impl BackgroundExecutor {
     /// make progress), we advance the clock to the next timer when no runnable tasks remain.
     #[cfg(any(test, feature = "test-support"))]
     pub fn run_until_parked(&self) {
-        let scheduler = self.dispatcher.as_test().unwrap().scheduler();
+        let scheduler = self
+            .dispatcher
+            .as_test()
+            .expect("required framework invariant must hold")
+            .scheduler();
         scheduler.run();
     }
 
@@ -201,7 +215,7 @@ impl BackgroundExecutor {
     pub fn allow_parking(&self) {
         self.dispatcher
             .as_test()
-            .unwrap()
+            .expect("required framework invariant must hold")
             .scheduler()
             .allow_parking();
 
@@ -215,7 +229,7 @@ impl BackgroundExecutor {
     pub fn set_block_on_ticks(&self, range: std::ops::RangeInclusive<usize>) {
         self.dispatcher
             .as_test()
-            .unwrap()
+            .expect("required framework invariant must hold")
             .scheduler()
             .set_timeout_ticks(range);
     }
@@ -225,7 +239,7 @@ impl BackgroundExecutor {
     pub fn forbid_parking(&self) {
         self.dispatcher
             .as_test()
-            .unwrap()
+            .expect("required framework invariant must hold")
             .scheduler()
             .forbid_parking();
     }
@@ -233,7 +247,11 @@ impl BackgroundExecutor {
     /// In tests, returns the rng used by the dispatcher.
     #[cfg(any(test, feature = "test-support"))]
     pub fn rng(&self) -> scheduler::SharedRng {
-        self.dispatcher.as_test().unwrap().scheduler().rng()
+        self.dispatcher
+            .as_test()
+            .expect("required framework invariant must hold")
+            .scheduler()
+            .rng()
     }
 
     /// How many CPUs are available to the dispatcher.
@@ -448,7 +466,10 @@ impl<'a> Scope<'a> {
     where
         F: Future<Output = ()> + Send + 'a,
     {
-        let tx = self.tx.clone().unwrap();
+        let tx = self
+            .tx
+            .clone()
+            .expect("required framework invariant must hold");
 
         // SAFETY: The 'a lifetime is guaranteed to outlive any of these futures because
         // dropping this `Scope` blocks until all of the futures have resolved.
@@ -467,7 +488,9 @@ impl<'a> Scope<'a> {
 
 impl Drop for Scope<'_> {
     fn drop(&mut self) {
-        self.tx.take().unwrap();
+        self.tx
+            .take()
+            .expect("required framework invariant must hold");
 
         // Wait until the channel is closed, which means that all of the spawned
         // futures have resolved.

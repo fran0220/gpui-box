@@ -210,7 +210,7 @@ fn run_example() {
             },
             |window, cx| cx.new(|cx| Example::new(window, cx)),
         )
-        .unwrap();
+        .expect("test setup should produce the required value");
 
         cx.activate(true);
     });

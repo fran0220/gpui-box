@@ -37,7 +37,7 @@ fn run_example() {
             },
             |_, cx| cx.new(|_| GifViewer::new(gif_path)),
         )
-        .unwrap();
+        .expect("test setup should produce the required value");
         cx.activate(true);
     });
 }

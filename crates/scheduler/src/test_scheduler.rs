@@ -51,11 +51,18 @@ impl TestScheduler {
         mut f: impl AsyncFnMut(Arc<TestScheduler>) -> R,
     ) -> Vec<R> {
         let num_iterations = std::env::var("ITERATIONS")
-            .map(|iterations| iterations.parse().unwrap())
+            .map(|iterations| {
+                iterations
+                    .parse()
+                    .expect("test setup should produce the required value")
+            })
             .unwrap_or(default_iterations);
 
         let seed = std::env::var("SEED")
-            .map(|seed| seed.parse().unwrap())
+            .map(|seed| {
+                seed.parse()
+                    .expect("test setup should produce the required value")
+            })
             .unwrap_or(0);
 
         let interactive = !std::env::var("SCHEDULER_NONINTERACTIVE").is_ok();
@@ -476,7 +483,8 @@ impl TestScheduler {
         } else if self.state.lock().capture_pending_traces {
             let mut pending_traces = String::new();
             for (_, trace) in mem::take(&mut self.state.lock().pending_traces) {
-                writeln!(pending_traces, "{:?}", exclude_wakers_from_trace(trace)).unwrap();
+                writeln!(pending_traces, "{:?}", exclude_wakers_from_trace(trace))
+                    .expect("test setup should produce the required value");
             }
             panic!("Parking forbidden. Pending traces:\n{}", pending_traces);
         } else {

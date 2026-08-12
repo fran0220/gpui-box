@@ -1133,6 +1133,12 @@ pub trait PlatformTextSystem: Send + Sync {
 #[expect(missing_docs)]
 pub struct NoopTextSystem;
 
+impl Default for NoopTextSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[expect(missing_docs)]
 impl NoopTextSystem {
     #[allow(dead_code)]
@@ -1209,8 +1215,12 @@ impl PlatformTextSystem for NoopTextSystem {
         let metrics = self.font_metrics(FontId(0));
         let em_width = font_size
             * self
-                .advance(FontId(0), self.glyph_for_char(FontId(0), 'm').unwrap())
-                .unwrap()
+                .advance(
+                    FontId(0),
+                    self.glyph_for_char(FontId(0), 'm')
+                        .expect("required framework invariant must hold"),
+                )
+                .expect("required framework invariant must hold")
                 .width
             / metrics.units_per_em as f32;
         let mut glyphs = Vec::new();
@@ -2698,7 +2708,8 @@ impl ClipboardString {
     /// Return a new clipboard item with the metadata replaced by the given metadata,
     /// after serializing it as JSON.
     pub fn with_json_metadata<T: Serialize>(mut self, metadata: T) -> Self {
-        self.metadata = Some(serde_json::to_string(&metadata).unwrap());
+        self.metadata =
+            Some(serde_json::to_string(&metadata).expect("required framework invariant must hold"));
         self
     }
 
@@ -2752,11 +2763,15 @@ mod image_tests {
             include_bytes!("../examples/image/exif-orientation-rotate-180.jpg").to_vec(),
         );
 
-        let render_image = image.to_image_data(SvgRenderer::new(Arc::new(()))).unwrap();
+        let render_image = image
+            .to_image_data(SvgRenderer::new(Arc::new(())))
+            .expect("required framework invariant must hold");
 
         assert_eq!(render_image.size(0), size(16.into(), 32.into()));
 
-        let bytes = render_image.as_bytes(0).unwrap();
+        let bytes = render_image
+            .as_bytes(0)
+            .expect("required framework invariant must hold");
         assert_eq!(&bytes[..4], &[255, 255, 255, 255]);
         assert_eq!(&bytes[(16 * 32 - 1) * 4..], &[0, 0, 0, 255]);
     }
@@ -2771,8 +2786,12 @@ mod image_tests {
                 .to_vec(),
         );
 
-        let render_image = image.to_image_data(SvgRenderer::new(Arc::new(()))).unwrap();
-        let bytes = render_image.as_bytes(0).unwrap();
+        let render_image = image
+            .to_image_data(SvgRenderer::new(Arc::new(())))
+            .expect("required framework invariant must hold");
+        let bytes = render_image
+            .as_bytes(0)
+            .expect("required framework invariant must hold");
 
         for pixel in bytes.chunks_exact(4) {
             assert_eq!(pixel, &[0xF8, 0xBD, 0x38, 0xFF]);
@@ -2787,7 +2806,8 @@ mod tests {
 
     #[test]
     fn test_window_button_layout_parse_standard() {
-        let layout = WindowButtonLayout::parse("close,minimize:maximize").unwrap();
+        let layout = WindowButtonLayout::parse("close,minimize:maximize")
+            .expect("required framework invariant must hold");
         assert_eq!(
             layout.left,
             [
@@ -2801,7 +2821,8 @@ mod tests {
 
     #[test]
     fn test_window_button_layout_parse_right_only() {
-        let layout = WindowButtonLayout::parse("minimize,maximize,close").unwrap();
+        let layout = WindowButtonLayout::parse("minimize,maximize,close")
+            .expect("required framework invariant must hold");
         assert_eq!(layout.left, [None, None, None]);
         assert_eq!(
             layout.right,
@@ -2815,7 +2836,8 @@ mod tests {
 
     #[test]
     fn test_window_button_layout_parse_left_only() {
-        let layout = WindowButtonLayout::parse("close,minimize,maximize:").unwrap();
+        let layout = WindowButtonLayout::parse("close,minimize,maximize:")
+            .expect("required framework invariant must hold");
         assert_eq!(
             layout.left,
             [
@@ -2829,7 +2851,8 @@ mod tests {
 
     #[test]
     fn test_window_button_layout_parse_with_whitespace() {
-        let layout = WindowButtonLayout::parse(" close , minimize : maximize ").unwrap();
+        let layout = WindowButtonLayout::parse(" close , minimize : maximize ")
+            .expect("required framework invariant must hold");
         assert_eq!(
             layout.left,
             [
@@ -2843,21 +2866,23 @@ mod tests {
 
     #[test]
     fn test_window_button_layout_parse_empty() {
-        let layout = WindowButtonLayout::parse("").unwrap();
+        let layout = WindowButtonLayout::parse("").expect("required framework invariant must hold");
         assert_eq!(layout.left, [None, None, None]);
         assert_eq!(layout.right, [None, None, None]);
     }
 
     #[test]
     fn test_window_button_layout_parse_intentionally_empty() {
-        let layout = WindowButtonLayout::parse(":").unwrap();
+        let layout =
+            WindowButtonLayout::parse(":").expect("required framework invariant must hold");
         assert_eq!(layout.left, [None, None, None]);
         assert_eq!(layout.right, [None, None, None]);
     }
 
     #[test]
     fn test_window_button_layout_parse_invalid_buttons() {
-        let layout = WindowButtonLayout::parse("close,invalid,minimize:maximize,foo").unwrap();
+        let layout = WindowButtonLayout::parse("close,invalid,minimize:maximize,foo")
+            .expect("required framework invariant must hold");
         assert_eq!(
             layout.left,
             [
@@ -2871,7 +2896,8 @@ mod tests {
 
     #[test]
     fn test_window_button_layout_parse_deduplicates_same_side_buttons() {
-        let layout = WindowButtonLayout::parse("close,close,minimize").unwrap();
+        let layout = WindowButtonLayout::parse("close,close,minimize")
+            .expect("required framework invariant must hold");
         assert_eq!(
             layout.right,
             [
@@ -2885,7 +2911,8 @@ mod tests {
 
     #[test]
     fn test_window_button_layout_parse_deduplicates_buttons_across_sides() {
-        let layout = WindowButtonLayout::parse("close:maximize,close,minimize").unwrap();
+        let layout = WindowButtonLayout::parse("close:maximize,close,minimize")
+            .expect("required framework invariant must hold");
         assert_eq!(layout.left, [Some(WindowButton::Close), None, None]);
         assert_eq!(
             layout.right,
@@ -2910,14 +2937,16 @@ mod tests {
 
     #[test]
     fn test_window_button_layout_parse_gnome_style() {
-        let layout = WindowButtonLayout::parse("close").unwrap();
+        let layout =
+            WindowButtonLayout::parse("close").expect("required framework invariant must hold");
         assert_eq!(layout.left, [None, None, None]);
         assert_eq!(layout.right, [Some(WindowButton::Close), None, None]);
     }
 
     #[test]
     fn test_window_button_layout_parse_elementary_style() {
-        let layout = WindowButtonLayout::parse("close:maximize").unwrap();
+        let layout = WindowButtonLayout::parse("close:maximize")
+            .expect("required framework invariant must hold");
         assert_eq!(layout.left, [Some(WindowButton::Close), None, None]);
         assert_eq!(layout.right, [Some(WindowButton::Maximize), None, None]);
     }
@@ -2934,7 +2963,8 @@ mod tests {
         ];
 
         for case in cases {
-            let layout = WindowButtonLayout::parse(case).unwrap();
+            let layout =
+                WindowButtonLayout::parse(case).expect("required framework invariant must hold");
             assert_eq!(layout.format(), case, "Round-trip failed for: {}", case);
         }
     }
@@ -2952,7 +2982,8 @@ mod tests {
             ]
         );
 
-        let round_tripped = WindowButtonLayout::parse(&layout.format()).unwrap();
+        let round_tripped = WindowButtonLayout::parse(&layout.format())
+            .expect("required framework invariant must hold");
         assert_eq!(round_tripped, layout);
     }
 
