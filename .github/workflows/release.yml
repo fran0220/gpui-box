@@ -187,16 +187,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
     runs-on: windows-2025
     steps:
       - uses: actions/checkout@v5
         with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0 }
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@v7
         with:
           name: headless-release-windows-executable
           path: tools/headless-visual/target/debug
-      - run: tools/headless-visual/target/debug/gpui-box-headless-visual.exe check --shard ${{ matrix.shard }}/4
+      - run: tools/headless-visual/target/debug/gpui-box-headless-visual.exe check --shard ${{ matrix.shard }}/8
       - if: failure()
         uses: actions/upload-artifact@v7
         with:
@@ -269,7 +269,7 @@ jobs:
           test -z "$(git -C release status --porcelain)"
       - uses: dtolnay/rust-toolchain@master
         with: { toolchain: 1.97.0 }
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@v7
         with:
           name: gpui-box-${{ inputs.version }}-${{ needs.preflight.outputs.release_commit }}-crates
           path: release/target/package-check/archives
@@ -303,7 +303,7 @@ jobs:
           test -z "$(git -C release status --porcelain)"
       - uses: dtolnay/rust-toolchain@master
         with: { toolchain: 1.97.0 }
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@v7
         with:
           name: gpui-box-${{ inputs.version }}-${{ needs.preflight.outputs.release_commit }}-crates
           path: release/target/package-check/archives

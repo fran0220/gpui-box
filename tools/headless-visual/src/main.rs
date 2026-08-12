@@ -279,6 +279,7 @@ mod imp {
             if !wanted(scene.name) || shard.is_some_and(|shard| !shard.includes(scene_index)) {
                 continue;
             }
+            let scene_started = Instant::now();
             for theme in gpui_kit::tokens::bundled() {
                 let id = theme.meta.id.clone();
                 let known = cx.update(|cx| {
@@ -298,6 +299,7 @@ mod imp {
                 accept(&name, &frame)?;
                 count += 1;
             }
+            println!("rendered scene `{}` in {:.2?}", scene.name, scene_started.elapsed());
         }
         println!(
             "rendered and compared {count} images in {:.2?}",
@@ -366,8 +368,8 @@ mod tests {
 
     #[test]
     fn shard_assigns_every_scene_to_exactly_one_worker() -> Result<()> {
-        let shards = (0..4)
-            .map(|index| Shard::parse(&format!("{index}/4")))
+        let shards = (0..8)
+            .map(|index| Shard::parse(&format!("{index}/8")))
             .collect::<Result<Vec<_>>>()?;
 
         for scene in 0..gpui_kit::scenes::catalog().len() {

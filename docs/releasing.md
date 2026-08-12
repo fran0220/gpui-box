@@ -70,8 +70,8 @@ list, is authoritative.
    their platform-specific all-feature warning proof, while macOS also runs
    platform tests, without rerunning the Linux gate;
    the headless jobs do not repeat the authority checks. Windows builds the
-   visual executable once and fans its stable catalog out over four WARP
-   shards, with the required platform check aggregating all four. Neither
+   visual executable once and fans its stable catalog out over eight WARP
+   shards, with the required platform check aggregating all eight. Neither
    publisher job can start unless every one of those jobs and the SemVer matrix
    succeeds.
    Preflight peels the annotated tag once;
