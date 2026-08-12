@@ -14,6 +14,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with: { toolchain: 1.97.0, components: "rustfmt, clippy" }
       - uses: Swatinem/rust-cache@v2
+      - name: Fetch canonical source-provenance refs
+        run: git fetch origin refs/heads/vendor/zed-gpui:refs/heads/vendor/zed-gpui refs/heads/vendor/zed-gpui-fork-overlay:refs/heads/vendor/zed-gpui-fork-overlay
       - run: scripts/sync-zed/sync-zed verify --release
       - run: python3 -m unittest discover -s scripts/sync-zed/tests -v
       - run: python3 -m unittest discover -s scripts/release/tests -v

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -16,10 +17,13 @@ ROOT = HERE.parent.parent
 CONFIG = HERE / "config.json"
 STATE = HERE / "state.json"
 PROVENANCE = ROOT / "provenance.toml"
-VERSION = "1.2.0"
+VERSION = "2.0.0"
 HISTORY_ALGORITHM = "first-parent-v1"
+OVERLAY_ALGORITHM = "exact-linear-overlay-v1"
 SHA = re.compile(r"^[0-9a-f]{40}$")
+SHA256 = re.compile(r"^[0-9a-f]{64}$")
 RECEIPT_KEYS = ("bootstrap_vendor_tip", "vendor_tip", "last_synced_sha", "integration_commit")
+OVERLAY_DYNAMIC_KEYS = ("base_vendor_tip", "vendor_tip", "integration_commit")
 
 
 class SyncError(RuntimeError):
@@ -66,7 +70,7 @@ def package_name(path):
 
 
 def validate_config(config):
-    if config.get("schema_version") != 1:
+    if config.get("schema_version") != 2:
         raise SyncError("unsupported config schema")
     if config.get("filter_schema_version") != 1:
         raise SyncError("unsupported filter schema")
@@ -88,6 +92,39 @@ def validate_config(config):
         seen_source.add(source); seen_dest.add(dest)
     if not config.get("mappings"):
         raise SyncError("at least one mapping is required")
+    digest = filter_digest(config["mappings"])
+    if config.get("filter_digest_sha256") != digest:
+        raise SyncError("filter_digest_sha256 differs from canonical mappings")
+    overlay = config.get("fork_overlay")
+    if not isinstance(overlay, dict):
+        raise SyncError("fork_overlay definition is required")
+    if overlay.get("algorithm") != OVERLAY_ALGORITHM:
+        raise SyncError("unsupported fork overlay algorithm")
+    if overlay.get("source_url") != config.get("bootstrap_url"):
+        raise SyncError("fork overlay source_url must equal bootstrap_url")
+    if overlay.get("base_revision") != config.get("bootstrap_revision"):
+        raise SyncError("fork overlay base_revision must equal bootstrap_revision")
+    if overlay.get("vendor_ref") == config.get("vendor_ref"):
+        raise SyncError("official and fork overlay vendor refs must differ")
+    for key in ("vendor_ref",):
+        value = overlay.get(key, "")
+        if not value.startswith("refs/heads/vendor/") or ".." in value:
+            raise SyncError(f"unsafe fork overlay {key}: {value}")
+    revisions = overlay.get("source_revisions")
+    if not isinstance(revisions, list) or not revisions:
+        raise SyncError("fork overlay source_revisions must be a nonempty list")
+    if len(set(revisions)) != len(revisions):
+        raise SyncError("fork overlay source_revisions contains duplicates")
+    for revision in revisions:
+        if not isinstance(revision, str) or not SHA.fullmatch(revision):
+            raise SyncError("fork overlay source_revisions must contain full lowercase SHAs")
+
+
+def filter_digest(mappings):
+    encoded = json.dumps(
+        mappings, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def remap(path, mappings):
@@ -104,12 +141,52 @@ def require_clean():
         raise SyncError("worktree must be clean and fully committed")
 
 
+def init_bare(path):
+    run(
+        ["git", "init", "--bare", "--object-format=sha1", str(path)],
+        env=deterministic_env(),
+    )
+
+
 def fetch_temp(url, revision=None):
     temp = tempfile.TemporaryDirectory(prefix="sync-zed-")
-    run(["git", "init", "--bare", temp.name])
+    init_bare(temp.name)
     spec = revision or "HEAD"
     run(["git", "-C", temp.name, "fetch", "--quiet", "--no-tags", url, spec])
     return temp, run(["git", "-C", temp.name, "rev-parse", "FETCH_HEAD"]).stdout.strip()
+
+
+def fetch_overlay_source(config):
+    overlay = config["fork_overlay"]
+    temp = tempfile.TemporaryDirectory(prefix="sync-zed-overlay-source-")
+    init_bare(temp.name)
+    requested = [overlay["base_revision"], *overlay["source_revisions"]]
+    for index, revision in enumerate(requested):
+        target = f"refs/source-overlay/{index}-{revision}"
+        run([
+            "git", "-C", temp.name, "fetch", "--quiet", "--no-tags",
+            overlay["source_url"], f"{revision}:{target}",
+        ])
+        resolved = run(["git", "-C", temp.name, "rev-parse", target]).stdout.strip()
+        if resolved != revision:
+            temp.cleanup()
+            raise SyncError(f"fork overlay remote did not resolve exact revision {revision}")
+    validate_overlay_source_chain(temp.name, config)
+    return temp
+
+
+def validate_overlay_source_chain(repo, config):
+    overlay = config["fork_overlay"]
+    expected_parent = overlay["base_revision"]
+    for revision in overlay["source_revisions"]:
+        parents = run([
+            "git", "-C", str(repo), "show", "-s", "--format=%P", revision
+        ]).stdout.split()
+        if parents != [expected_parent]:
+            raise SyncError(
+                f"fork overlay source {revision} must have exactly parent {expected_parent}"
+            )
+        expected_parent = revision
 
 
 def source_entries(repo, commit, mappings):
@@ -141,12 +218,12 @@ def filtered_tree(repo, commit, mappings, object_dir):
         return run(["git", "write-tree"], cwd=object_dir, env=env).stdout.strip()
 
 
-def commit_message(repo, commit):
+def commit_message(repo, commit, trailer="zed-upstream"):
     message = run(
         ["git", "-C", str(repo), "show", "-s", "--format=%B", commit],
         env=deterministic_env(),
     ).stdout.rstrip()
-    return f"{message}\n\nzed-upstream: {commit}\n"
+    return f"{message}\n\n{trailer}: {commit}\n"
 
 
 def integration_message(subject, vendor_tip, cursor):
@@ -155,6 +232,17 @@ def integration_message(subject, vendor_tip, cursor):
         f"zed-sync-algorithm: {HISTORY_ALGORITHM}\n"
         f"zed-vendor-tip: {vendor_tip}\n"
         f"zed-upstream-cursor: {cursor}\n"
+    )
+
+
+def overlay_integration_message(config, vendor_tip, base_vendor_tip):
+    overlay = config["fork_overlay"]
+    return (
+        "chore(sync): integrate Zed fork PlatformView overlay\n\n"
+        f"zed-overlay-algorithm: {overlay['algorithm']}\n"
+        f"zed-overlay-base-vendor-tip: {base_vendor_tip}\n"
+        f"zed-overlay-vendor-tip: {vendor_tip}\n"
+        f"zed-overlay-source-tip: {overlay['source_revisions'][-1]}\n"
     )
 
 
@@ -185,6 +273,41 @@ def integration_markers(repo, commit):
     return values
 
 
+def overlay_integration_markers(repo, commit):
+    message = run([
+        "git", "-C", str(repo), "show", "-s", "--format=%B", commit
+    ]).stdout
+    names = (
+        "zed-overlay-algorithm",
+        "zed-overlay-base-vendor-tip",
+        "zed-overlay-vendor-tip",
+        "zed-overlay-source-tip",
+    )
+    values = {}
+    for line in message.splitlines():
+        for name in names:
+            prefix = name + ": "
+            if line.startswith(prefix):
+                if name in values:
+                    raise SyncError(f"duplicate {name} marker in integration {commit}")
+                values[name] = line[len(prefix):]
+    if not values:
+        return None
+    missing = [name for name in names if name not in values]
+    if missing:
+        raise SyncError(
+            f"incomplete overlay integration markers in {commit}: missing {', '.join(missing)}"
+        )
+    if values["zed-overlay-algorithm"] != OVERLAY_ALGORITHM:
+        raise SyncError(f"invalid zed-overlay-algorithm marker in integration {commit}")
+    for name in names[1:]:
+        if not SHA.fullmatch(values[name]):
+            raise SyncError(f"invalid {name} marker in integration {commit}")
+    if integration_markers(repo, commit) is not None:
+        raise SyncError(f"integration {commit} carries both official and overlay markers")
+    return values
+
+
 def is_synthetic_vendor_commit(repo, commit):
     message = run([
         "git", "-C", str(repo), "show", "-s", "--format=%B", commit
@@ -197,7 +320,26 @@ def is_synthetic_vendor_commit(repo, commit):
     return bool(trailers) and SHA.fullmatch(trailers[-1]) is not None
 
 
-def commit_filtered(repo, upstream, parent, config, object_dir=ROOT):
+def is_synthetic_overlay_commit(repo, commit):
+    message = run([
+        "git", "-C", str(repo), "show", "-s", "--format=%B", commit
+    ]).stdout
+    trailers = [
+        line[len("zed-fork-overlay-upstream: "):]
+        for line in message.splitlines()
+        if line.startswith("zed-fork-overlay-upstream: ")
+    ]
+    return bool(trailers) and SHA.fullmatch(trailers[-1]) is not None
+
+
+def commit_filtered(
+    repo,
+    upstream,
+    parent,
+    config,
+    object_dir=ROOT,
+    trailer="zed-upstream",
+):
     # Import objects, but no refs, so the resulting vendor commit remains valid after
     # the temporary source repository disappears.
     run(["git", "fetch", "--quiet", "--no-tags", str(repo), upstream], cwd=object_dir)
@@ -216,82 +358,125 @@ def commit_filtered(repo, upstream, parent, config, object_dir=ROOT):
         env[key] = value
     args = ["git", "commit-tree", tree]
     if parent: args += ["-p", parent]
-    oid = run(args, cwd=object_dir, env=env, input_text=commit_message(repo, upstream)).stdout.strip()
+    oid = run(
+        args,
+        cwd=object_dir,
+        env=env,
+        input_text=commit_message(repo, upstream, trailer=trailer),
+    ).stdout.strip()
     return oid, True
 
 
-def provenance_sync_values():
+def provenance_section_values(section):
     values = {}
-    in_sync = False
-    for line in PROVENANCE.read_text().splitlines():
+    in_section = False
+    lines = PROVENANCE.read_text().splitlines()
+    index = 0
+    while index < len(lines):
+        line = lines[index]
         stripped = line.strip()
-        if stripped.startswith("["):
-            in_sync = stripped == "[sync]"
+        if re.fullmatch(r"\[[a-z_]+\]", stripped):
+            in_section = stripped == f"[{section}]"
+            index += 1
             continue
-        if not in_sync:
+        if not in_section or not stripped or stripped.startswith("#"):
+            index += 1
             continue
-        match = re.fullmatch(r'([a-z_]+)\s*=\s*("[^"]*"|true|false|[0-9]+)', stripped)
+        match = re.match(r"^([a-z0-9_]+)\s*=\s*(.*)$", stripped)
         if not match:
-            continue
+            raise SyncError(f"cannot parse provenance [{section}] line: {stripped}")
         key, raw = match.groups()
         if key in values:
-            raise SyncError(f"duplicate provenance [sync] key: {key}")
+            raise SyncError(f"duplicate provenance [{section}] key: {key}")
+        if raw.startswith("["):
+            while not raw.rstrip().endswith("]"):
+                index += 1
+                if index >= len(lines):
+                    raise SyncError(f"unterminated provenance [{section}] array: {key}")
+                raw += "\n" + lines[index].strip()
+            raw = re.sub(r",\s*]$", "]", raw)
         if raw.startswith('"'):
+            values[key] = json.loads(raw)
+        elif raw.startswith("["):
             values[key] = json.loads(raw)
         elif raw in ("true", "false"):
             values[key] = raw == "true"
-        else:
+        elif re.fullmatch(r"[0-9]+", raw):
             values[key] = int(raw)
+        else:
+            raise SyncError(f"unsupported provenance [{section}] value: {key}")
+        index += 1
     return values
 
 
 def provenance_errors(config, state):
-    actual = provenance_sync_values()
-    expected = {
+    actual_sync = provenance_section_values("sync")
+    expected_sync = {
         "filter_schema_version": config["filter_schema_version"],
         "history_algorithm": config["history_algorithm"],
         "history_bootstrapped": state["vendor_tip"] is not None,
         **{key: state[key] or "" for key in RECEIPT_KEYS},
     }
-    return [
+    errors = [
         f"provenance.toml [sync] {key} differs from the sync receipt"
-        for key, value in expected.items()
-        if actual.get(key) != value
+        for key, value in expected_sync.items()
+        if actual_sync.get(key) != value
     ]
-
-
-def write_receipt(config, state):
-    replacements = {
-        "history_bootstrapped": "true" if state["vendor_tip"] is not None else "false",
-        **{key: json.dumps(state[key] or "") for key in RECEIPT_KEYS},
+    actual_overlay = provenance_section_values("sync_overlay")
+    overlay = state["fork_overlay"]
+    expected_overlay = {
+        key: value or "" for key, value in overlay.items()
     }
-    lines = PROVENANCE.read_text().splitlines()
-    in_sync = False
+    errors.extend(
+        f"provenance.toml [sync_overlay] {key} differs from the overlay receipt"
+        for key, value in expected_overlay.items()
+        if actual_overlay.get(key) != value
+    )
+    return errors
+
+
+def replace_section_scalars(lines, section, replacements):
+    in_section = False
     found = set()
     for index, line in enumerate(lines):
         stripped = line.strip()
-        if stripped.startswith("["):
-            in_sync = stripped == "[sync]"
+        if re.fullmatch(r"\[[a-z_]+\]", stripped):
+            in_section = stripped == f"[{section}]"
             continue
-        if not in_sync:
+        if not in_section:
             continue
-        match = re.match(r"^([a-z_]+)\s*=", stripped)
+        match = re.match(r"^([a-z0-9_]+)\s*=", stripped)
         if match and match.group(1) in replacements:
             key = match.group(1)
             if key in found:
-                raise SyncError(f"duplicate provenance [sync] key: {key}")
+                raise SyncError(f"duplicate provenance [{section}] key: {key}")
             lines[index] = f"{key} = {replacements[key]}"
             found.add(key)
     missing = set(replacements) - found
     if missing:
         raise SyncError(
-            "provenance.toml is missing sync receipt keys: " + ", ".join(sorted(missing))
+            f"provenance.toml is missing [{section}] receipt keys: "
+            + ", ".join(sorted(missing))
         )
+
+
+def write_receipt(config, state):
+    sync_replacements = {
+        "history_bootstrapped": "true" if state["vendor_tip"] is not None else "false",
+        **{key: json.dumps(state[key] or "") for key in RECEIPT_KEYS},
+    }
+    lines = PROVENANCE.read_text().splitlines()
+    replace_section_scalars(lines, "sync", sync_replacements)
+    overlay_replacements = {
+        key: json.dumps(state["fork_overlay"][key] or "")
+        for key in OVERLAY_DYNAMIC_KEYS
+    }
+    replace_section_scalars(lines, "sync_overlay", overlay_replacements)
     expected_static = {
         "filter_schema_version": config["filter_schema_version"],
         "history_algorithm": config["history_algorithm"],
     }
-    actual_static = provenance_sync_values()
+    actual_static = provenance_section_values("sync")
     for key, value in expected_static.items():
         if actual_static.get(key) != value:
             raise SyncError(f"provenance.toml [sync] {key} differs from sync config")
@@ -328,6 +513,37 @@ def validate_state(config, state, release=False):
     present = [state.get(key) is not None for key in RECEIPT_KEYS]
     if any(present) and not all(present):
         errors.append("receipt coordinates must be either all null or all full SHAs")
+    overlay_config = config["fork_overlay"]
+    overlay = state.get("fork_overlay")
+    if not isinstance(overlay, dict):
+        errors.append("state fork_overlay receipt is required")
+        return errors
+    expected_overlay = {
+        "algorithm": overlay_config["algorithm"],
+        "source_url": overlay_config["source_url"],
+        "base_revision": overlay_config["base_revision"],
+        "source_revisions": overlay_config["source_revisions"],
+        "source_tip": overlay_config["source_revisions"][-1],
+        "filter_schema_version": config["filter_schema_version"],
+        "filter_digest_sha256": config["filter_digest_sha256"],
+        "vendor_ref": overlay_config["vendor_ref"],
+    }
+    for key, expected in expected_overlay.items():
+        if overlay.get(key) != expected:
+            errors.append(f"state/config disagree on fork_overlay.{key}")
+    if not SHA256.fullmatch(overlay.get("filter_digest_sha256", "")):
+        errors.append("invalid fork_overlay filter_digest_sha256")
+    for key in OVERLAY_DYNAMIC_KEYS:
+        value = overlay.get(key)
+        if value is not None and not SHA.fullmatch(value):
+            errors.append(f"invalid fork_overlay coordinate {key}: {value}")
+        if release and not SHA.fullmatch(value or ""):
+            errors.append(f"release overlay receipt requires {key}")
+    overlay_present = [overlay.get(key) is not None for key in OVERLAY_DYNAMIC_KEYS]
+    if any(overlay_present) and not all(overlay_present):
+        errors.append("overlay receipt coordinates must be either all null or all full SHAs")
+    if overlay.get("base_vendor_tip") is not None and overlay.get("base_vendor_tip") != state.get("bootstrap_vendor_tip"):
+        errors.append("fork_overlay.base_vendor_tip must equal bootstrap_vendor_tip")
     return errors
 
 
@@ -355,7 +571,7 @@ def official_revisions(repo, start, end, mappings):
 
 def replay_vendor_history(config, bootstrap_repo, bootstrap_revision, official_repo, cursor):
     with tempfile.TemporaryDirectory(prefix="sync-zed-replay-") as replay:
-        run(["git", "init", "--bare", replay])
+        init_bare(replay)
         bootstrap_tip, _ = commit_filtered(
             bootstrap_repo, bootstrap_revision, None, config, object_dir=replay
         )
@@ -367,6 +583,46 @@ def replay_vendor_history(config, bootstrap_repo, bootstrap_revision, official_r
                 official_repo, revision, parent, config, object_dir=replay
             )
         return bootstrap_tip, parent
+
+
+def build_overlay_replay(config, source_repo):
+    replay = tempfile.TemporaryDirectory(prefix="sync-zed-overlay-replay-")
+    init_bare(replay.name)
+    bootstrap_tip, _ = commit_filtered(
+        source_repo,
+        config["bootstrap_revision"],
+        None,
+        config,
+        object_dir=replay.name,
+    )
+    parent = bootstrap_tip
+    for revision in config["fork_overlay"]["source_revisions"]:
+        parent, changed = commit_filtered(
+            source_repo,
+            revision,
+            parent,
+            config,
+            object_dir=replay.name,
+            trailer="zed-fork-overlay-upstream",
+        )
+        if not changed:
+            replay.cleanup()
+            raise SyncError(f"configured fork overlay source is a filtered no-op: {revision}")
+    return replay, bootstrap_tip, parent
+
+
+def overlay_replay_errors(config, state, source_repo):
+    replay, expected_bootstrap, expected_overlay = build_overlay_replay(config, source_repo)
+    replay.cleanup()
+    errors = []
+    overlay = state["fork_overlay"]
+    if state["bootstrap_vendor_tip"] != expected_bootstrap:
+        errors.append("fork overlay replay bootstrap differs from bootstrap_vendor_tip")
+    if overlay["base_vendor_tip"] != expected_bootstrap:
+        errors.append("fork overlay base_vendor_tip differs from deterministic bootstrap")
+    if overlay["vendor_tip"] != expected_overlay:
+        errors.append("fork overlay vendor_tip differs from deterministic exact-chain replay")
+    return errors
 
 
 def replay_errors(config, state, bootstrap_repo, bootstrap_revision, official_repo, cursor):
@@ -383,6 +639,17 @@ def replay_errors(config, state, bootstrap_repo, bootstrap_revision, official_re
             "vendor_tip differs from deterministic replay of official first-parent history"
         )
     return errors
+
+
+def exact_ref_errors(ref, expected, label, repo=ROOT):
+    result = run(
+        ["git", "-C", str(repo), "rev-parse", "--verify", ref], check=False
+    )
+    if result.returncode:
+        return [f"missing canonical {label} ref: {ref}"]
+    if result.stdout.strip() != expected:
+        return [f"canonical {label} ref differs from receipt: {ref}"]
+    return []
 
 
 def integration_errors(state, head, repo=ROOT):
@@ -449,6 +716,81 @@ def integration_errors(state, head, repo=ROOT):
     return errors
 
 
+def overlay_integration_errors(config, state, head, repo=ROOT):
+    errors = []
+    overlay = state["fork_overlay"]
+    commits = {
+        "bootstrap_vendor_tip": state["bootstrap_vendor_tip"],
+        "fork_overlay.vendor_tip": overlay["vendor_tip"],
+        "fork_overlay.integration_commit": overlay["integration_commit"],
+    }
+    for key, commit in commits.items():
+        if not commit_exists(commit, repo):
+            errors.append(f"overlay receipt commit does not exist: {key}={commit}")
+    if errors:
+        return errors
+    if not is_ancestor(state["bootstrap_vendor_tip"], overlay["vendor_tip"], repo):
+        errors.append("fork overlay vendor tip does not descend from bootstrap vendor tip")
+    merge_bases = run([
+        "git", "-C", str(repo), "merge-base", "--all",
+        state["vendor_tip"], overlay["vendor_tip"],
+    ]).stdout.splitlines()
+    if merge_bases != [state["bootstrap_vendor_tip"]]:
+        errors.append("official and fork overlay vendor lanes must meet only at bootstrap_vendor_tip")
+    parents = run([
+        "git", "-C", str(repo), "show", "-s", "--format=%P", overlay["integration_commit"]
+    ]).stdout.split()
+    if len(parents) != 2:
+        errors.append("fork overlay integration_commit must be an exact two-parent merge")
+    elif parents[1] != overlay["vendor_tip"]:
+        errors.append("fork overlay integration_commit must merge overlay vendor_tip as second parent")
+    history = run([
+        "git", "-C", str(repo), "rev-list", "--first-parent", head
+    ]).stdout.splitlines()
+    if overlay["integration_commit"] not in history:
+        errors.append("fork overlay integration_commit is not on HEAD's first-parent history")
+        return errors
+    try:
+        markers = overlay_integration_markers(repo, overlay["integration_commit"])
+    except SyncError as exc:
+        errors.append(str(exc))
+        markers = None
+    expected_markers = {
+        "zed-overlay-algorithm": overlay["algorithm"],
+        "zed-overlay-base-vendor-tip": overlay["base_vendor_tip"],
+        "zed-overlay-vendor-tip": overlay["vendor_tip"],
+        "zed-overlay-source-tip": overlay["source_tip"],
+    }
+    if markers is None:
+        errors.append("fork overlay integration_commit is missing overlay markers")
+    elif markers != expected_markers:
+        errors.append("fork overlay integration markers disagree with the receipt")
+    receipt_index = history.index(overlay["integration_commit"])
+    newest_marked = None
+    for commit in history[:receipt_index + 1]:
+        try:
+            candidate = overlay_integration_markers(repo, commit)
+        except SyncError as exc:
+            errors.append(str(exc))
+            continue
+        if candidate is not None:
+            newest_marked = commit
+            break
+    if newest_marked != overlay["integration_commit"]:
+        errors.append("the newest marked fork overlay integration is not the receipt integration")
+    for commit in history[:receipt_index]:
+        candidate_parents = run([
+            "git", "-C", str(repo), "show", "-s", "--format=%P", commit
+        ]).stdout.split()
+        if any(is_synthetic_overlay_commit(repo, parent) for parent in candidate_parents[1:]):
+            errors.append(
+                f"newer unrecorded fork overlay integration appears on first-parent history: {commit}"
+            )
+    errors.extend(exact_ref_errors(config["vendor_ref"], state["vendor_tip"], "official vendor", repo))
+    errors.extend(exact_ref_errors(overlay["vendor_ref"], overlay["vendor_tip"], "fork overlay vendor", repo))
+    return errors
+
+
 def verify(args):
     if args.release and args.no_source_check:
         raise SyncError("--no-source-check is forbidden for release verification")
@@ -469,6 +811,7 @@ def verify(args):
     if args.release and not errors:
         head = run(["git", "rev-parse", "HEAD"]).stdout.strip()
         errors.extend(integration_errors(state, head))
+        errors.extend(overlay_integration_errors(config, state, head))
     if not args.no_source_check:
         bootstrap_temp, revision = fetch_temp(
             config["bootstrap_url"], config["bootstrap_revision"]
@@ -498,6 +841,14 @@ def verify(args):
                             official_temp.name,
                             cursor,
                         ))
+                    if not errors:
+                        overlay_temp = fetch_overlay_source(config)
+                        try:
+                            errors.extend(overlay_replay_errors(
+                                config, state, overlay_temp.name
+                            ))
+                        finally:
+                            overlay_temp.cleanup()
                 except SyncError as exc:
                     errors.append(str(exc))
                 finally:
@@ -584,9 +935,153 @@ def sync(args):
     finally: temp.cleanup()
 
 
+def finalize_overlay_receipt(config, state, overlay_tip, integration):
+    overlay = state["fork_overlay"]
+    markers = overlay_integration_markers(ROOT, integration)
+    expected = {
+        "zed-overlay-algorithm": overlay["algorithm"],
+        "zed-overlay-base-vendor-tip": state["bootstrap_vendor_tip"],
+        "zed-overlay-vendor-tip": overlay_tip,
+        "zed-overlay-source-tip": overlay["source_tip"],
+    }
+    if markers != expected:
+        raise SyncError("cannot finalize fork overlay: integration markers are not exact")
+    parents = run(["git", "show", "-s", "--format=%P", integration]).stdout.split()
+    if len(parents) != 2 or parents[1] != overlay_tip:
+        raise SyncError("cannot finalize fork overlay: integration has the wrong parents")
+    current_ref = run(["git", "rev-parse", "--verify", overlay["vendor_ref"]], check=False)
+    if current_ref.returncode:
+        run(["git", "update-ref", overlay["vendor_ref"], overlay_tip, "0" * 40])
+    elif current_ref.stdout.strip() != overlay_tip:
+        raise SyncError("fork overlay vendor ref exists at an unexpected commit")
+    overlay.update(
+        base_vendor_tip=state["bootstrap_vendor_tip"],
+        vendor_tip=overlay_tip,
+        integration_commit=integration,
+    )
+    write_receipt(config, state)
+    run(["git", "add", str(STATE.relative_to(ROOT)), str(PROVENANCE.relative_to(ROOT))])
+    run(["git", "commit", "-m", "chore(sync): record Zed fork overlay receipt"])
+    print(f"integrated fork overlay {overlay_tip}; nothing was pushed")
+
+
+def continue_overlay(config, state, expected_tip):
+    unresolved = run(["git", "diff", "--name-only", "--diff-filter=U"]).stdout.splitlines()
+    if unresolved:
+        raise SyncError("cannot continue fork overlay with unresolved paths: " + ", ".join(unresolved))
+    merge_head = run(["git", "rev-parse", "-q", "--verify", "MERGE_HEAD"], check=False)
+    if not merge_head.returncode:
+        if merge_head.stdout.strip() != expected_tip:
+            raise SyncError("MERGE_HEAD is not the deterministic fork overlay tip")
+        merge_message_path = run(["git", "rev-parse", "--git-path", "MERGE_MSG"]).stdout.strip()
+        message = Path(merge_message_path).read_text()
+        expected_message = overlay_integration_message(
+            config, expected_tip, state["bootstrap_vendor_tip"]
+        )
+        for marker in expected_message.splitlines()[2:]:
+            if marker and message.splitlines().count(marker) != 1:
+                raise SyncError(f"MERGE_MSG is missing exact overlay marker: {marker}")
+        if "zed-sync-algorithm:" in message:
+            raise SyncError("MERGE_MSG mixes official and fork overlay markers")
+        run(["git", "commit", "--no-edit"])
+        integration = run(["git", "rev-parse", "HEAD"]).stdout.strip()
+    else:
+        integration = None
+        for commit in run(["git", "rev-list", "--first-parent", "HEAD"]).stdout.splitlines():
+            markers = overlay_integration_markers(ROOT, commit)
+            if markers is not None:
+                integration = commit
+                break
+        if integration is None:
+            raise SyncError("no committed fork overlay integration is available to continue")
+    finalize_overlay_receipt(config, state, expected_tip, integration)
+
+
+def overlay(args):
+    config, state = load(CONFIG), load(STATE)
+    validate_config(config)
+    errors = validate_state(config, state)
+    errors.extend(provenance_errors(config, state))
+    if errors:
+        raise SyncError("invalid state:\n- " + "\n- ".join(errors))
+    receipt = state["fork_overlay"]
+    if all(receipt[key] is not None for key in OVERLAY_DYNAMIC_KEYS):
+        head = run(["git", "rev-parse", "HEAD"]).stdout.strip()
+        errors = overlay_integration_errors(config, state, head)
+        if errors:
+            raise SyncError("recorded fork overlay is invalid:\n- " + "\n- ".join(errors))
+        print(f"fork overlay already integrated at {receipt['vendor_tip']}")
+        return
+    if not args.continue_overlay:
+        require_clean()
+    source = fetch_overlay_source(config)
+    replay = None
+    try:
+        replay, bootstrap_tip, overlay_tip = build_overlay_replay(config, source.name)
+        if bootstrap_tip != state["bootstrap_vendor_tip"]:
+            raise SyncError("fork overlay deterministic bootstrap differs from receipt")
+        print(
+            f"fork overlay source count={len(config['fork_overlay']['source_revisions'])} "
+            f"source_tip={config['fork_overlay']['source_revisions'][-1]} "
+            f"vendor_tip={overlay_tip}"
+        )
+        if args.dry_run:
+            print("fork overlay dry run completed without repository mutations")
+            return
+        if args.continue_overlay:
+            continue_overlay(config, state, overlay_tip)
+            return
+        errors = exact_ref_errors(
+            config["vendor_ref"], state["vendor_tip"], "official vendor"
+        )
+        if errors:
+            raise SyncError("\n".join(errors))
+        existing = run([
+            "git", "rev-parse", "--verify", receipt["vendor_ref"]
+        ], check=False)
+        if not existing.returncode and existing.stdout.strip() != overlay_tip:
+            raise SyncError("fork overlay vendor ref already exists at an unexpected commit")
+        scratch = f"refs/heads/sync/zed-overlay-{receipt['source_tip'][:12]}"
+        scratch_current = run(["git", "rev-parse", "--verify", scratch], check=False)
+        if not scratch_current.returncode and scratch_current.stdout.strip() != overlay_tip:
+            raise SyncError("fork overlay scratch ref exists at an unexpected commit")
+        run([
+            "git", "fetch", "--quiet", "--no-tags", replay.name,
+            f"{overlay_tip}:{scratch}",
+        ])
+        merge_bases = run([
+            "git", "merge-base", "--all", "HEAD", overlay_tip
+        ]).stdout.splitlines()
+        if merge_bases != [state["bootstrap_vendor_tip"]]:
+            raise SyncError("HEAD and fork overlay must meet only at bootstrap_vendor_tip")
+        message = overlay_integration_message(
+            config, overlay_tip, state["bootstrap_vendor_tip"]
+        )
+        result = run([
+            "git", "merge", "--no-ff", "--no-commit", "-m", message, scratch
+        ], check=False)
+        if result.returncode:
+            if not run(["git", "rev-parse", "-q", "--verify", "MERGE_HEAD"], check=False).returncode:
+                raise SyncError(
+                    "fork overlay merge stopped with conflicts preserved; resolve them and run "
+                    "sync-zed overlay --continue"
+                )
+            raise SyncError(f"fork overlay merge failed before starting:\n{result.stderr.strip()}")
+        run(["git", "commit", "--no-edit"])
+        integration = run(["git", "rev-parse", "HEAD"]).stdout.strip()
+        finalize_overlay_receipt(config, state, overlay_tip, integration)
+    finally:
+        if replay is not None:
+            replay.cleanup()
+        source.cleanup()
+
+
 def status(_args):
     state = load(STATE)
-    print(json.dumps({k: state[k] for k in ("vendor_ref", *RECEIPT_KEYS)}, indent=2))
+    print(json.dumps({
+        "official": {k: state[k] for k in ("vendor_ref", *RECEIPT_KEYS)},
+        "fork_overlay": state["fork_overlay"],
+    }, indent=2))
 
 
 def main(argv=None):
@@ -594,6 +1089,11 @@ def main(argv=None):
     subs = parser.add_subparsers(dest="command", required=True)
     p = subs.add_parser("bootstrap"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(func=bootstrap)
     p = subs.add_parser("sync"); p.add_argument("--ref", default="HEAD"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(func=sync)
+    p = subs.add_parser("overlay")
+    group = p.add_mutually_exclusive_group()
+    group.add_argument("--dry-run", action="store_true")
+    group.add_argument("--continue", dest="continue_overlay", action="store_true")
+    p.set_defaults(func=overlay, dry_run=False, continue_overlay=False)
     p = subs.add_parser("verify"); p.add_argument("--release", action="store_true"); p.add_argument("--no-source-check", action="store_true", help=argparse.SUPPRESS); p.set_defaults(func=verify)
     p = subs.add_parser("status"); p.set_defaults(func=status)
     args = parser.parse_args(argv)

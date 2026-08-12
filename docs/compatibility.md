@@ -12,9 +12,12 @@ and `gpui-box-kit` as `gpui_kit`. Zed crates must not be mixed into that graph.
 
 The SHAs identify imported source provenance, not Cargo Git dependencies.
 `scripts/sync-zed/state.json` records the deterministic filtered bootstrap tip,
-the official baseline cursor, and its exact integration merge. Release
-verification reconstructs those commits from the two upstream repositories and
-proves the receipt against the release commit's first-parent history.
+the official baseline cursor, and its exact integration merge. It separately
+records the exact bootstrap-rooted fork overlay that supplies native
+PlatformView hosting. Release verification reconstructs both vendor lanes from
+remote source objects, requires their canonical refs to meet only at the
+filtered bootstrap, and proves both integration merges against the release
+commit's first-parent history.
 
 ## Platform evidence and limits
 
@@ -62,3 +65,8 @@ resolve conflicts manually; update the receipt and provenance; run
 changed images. Generally useful changes may still be proposed to Zed
 independently. GPUI Box remains an independent derivative and is not endorsed
 by Zed Industries.
+
+The fixed PlatformView overlay does not advance the official cursor. Future
+official sync continues from the official vendor tip; equivalent or conflicting
+upstream implementations converge only in the mainline integration. The
+overlay's source list, filtered ref, and historical receipt are never rewritten.

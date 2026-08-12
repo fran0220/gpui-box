@@ -26,6 +26,24 @@ vendor_tip = "c036e5bcb472b7c557c231a66d69e646285d1942"
 last_synced_sha = "a6a23c7b80a5cefa0487b7856335be89ace7e483"
 integration_commit = "82fdda6a265e556afc65b9ff1eb200f7bda8d3fc"
 
+[sync_overlay]
+algorithm = "exact-linear-overlay-v1"
+source_url = "https://github.com/fran0220/zed.git"
+base_revision = "0b9c8dc932b65cba2dc87464148984e93f60ae18"
+source_revisions = [
+  "1755444d8efd9c7b34d8f2fbe36a327b85ca4e9b",
+  "f212b120ede8c5ffcc5c60ebe1ac92d64fab9db7",
+  "7bcda540a22cf9e8bbd946f954c8f28f266e452b",
+  "b46bf740a55c53612b14120f5dfbb7ceec463261",
+]
+source_tip = "b46bf740a55c53612b14120f5dfbb7ceec463261"
+filter_schema_version = 1
+filter_digest_sha256 = "3e0af84683c4bae5f8be805ca0581f8ae297998fc0d40f967eaca9772562efdc"
+base_vendor_tip = ""
+vendor_ref = "refs/heads/vendor/zed-gpui-fork-overlay"
+vendor_tip = ""
+integration_commit = ""
+
 [licenses]
 framework = "Apache-2.0"
 kit = "MIT"

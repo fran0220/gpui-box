@@ -34,6 +34,22 @@ the filtered commits from remote source objects and proves that merge on the
 current first-parent history. Future source movement follows
 `scripts/sync-zed/README.md`. License text: `licenses/ZED-APACHE-2.0.txt`.
 
+Post-bootstrap native PlatformView support is tracked as an independent fork
+overlay, not as official-Zed replay. Its exact linear source chain is
+`1755444d8efd9c7b34d8f2fbe36a327b85ca4e9b`,
+`f212b120ede8c5ffcc5c60ebe1ac92d64fab9db7`,
+`7bcda540a22cf9e8bbd946f954c8f28f266e452b`, and
+`b46bf740a55c53612b14120f5dfbb7ceec463261`, each fetched from the same fork
+and rooted directly at the bootstrap revision. The last commit supplies the
+complete Windows redirection-backed popup-host implementation; the fork's later
+main merge and its sibling layered-child implementation are deliberately not
+part of this source lane. `provenance.toml [sync_overlay]` records the shared
+filter digest, deterministic overlay tip, and exact integration merge.
+Release verification reconstructs both lanes independently and proves their
+only vendor merge base is the filtered bootstrap. Future official sync remains
+authoritative and the overlay receipt remains as historical provenance after
+upstream convergence.
+
 Kit text-input code under `crates/gpui-kit/src/controls/input/` follows GPUI's
 `EntityInputHandler`, UTF-8/UTF-16 conversion, shaping, caret, and selection
 architecture. The kit editing model, bindings, masking, limits, semantics, and

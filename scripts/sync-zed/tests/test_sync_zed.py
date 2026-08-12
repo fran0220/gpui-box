@@ -60,6 +60,24 @@ class UnitTests(unittest.TestCase):
         }
         return config, bootstrap, bootstrap_revision, official, cursor, unrelated
 
+    def overlay_fixture(self, directory):
+        source = Path(directory) / "fork"
+        self.init_repo(source)
+        bootstrap = self.commit_file(source, "bootstrap", "bootstrap")
+        revisions = [
+            self.commit_file(source, value, f"overlay {value}")
+            for value in ("one", "two", "three", "four")
+        ]
+        config = {
+            "bootstrap_revision": bootstrap,
+            "mappings": [{"source": "src", "destination": "vendor/src"}],
+            "fork_overlay": {
+                "base_revision": bootstrap,
+                "source_revisions": revisions,
+            },
+        }
+        return config, source, bootstrap, revisions
+
     def integration_fixture(self, directory, marker_vendor=None):
         repo = Path(directory) / "repository"
         self.init_repo(repo)
@@ -122,6 +140,18 @@ class UnitTests(unittest.TestCase):
         config = json.loads((MODULE.parent / "config.json").read_text())
         config["official_baseline"] = "abc"
         with self.assertRaises(sync_zed.SyncError):
+            sync_zed.validate_config(config)
+
+    def test_config_validation_rejects_a_stale_filter_digest(self):
+        config = json.loads((MODULE.parent / "config.json").read_text())
+        config["filter_digest_sha256"] = "0" * 64
+        with self.assertRaisesRegex(sync_zed.SyncError, "canonical mappings"):
+            sync_zed.validate_config(config)
+
+    def test_config_validation_rejects_duplicate_overlay_revisions(self):
+        config = json.loads((MODULE.parent / "config.json").read_text())
+        config["fork_overlay"]["source_revisions"][1] = config["fork_overlay"]["source_revisions"][0]
+        with self.assertRaisesRegex(sync_zed.SyncError, "duplicates"):
             sync_zed.validate_config(config)
 
     def test_nested_and_arbitrary_remapping(self):
@@ -213,6 +243,15 @@ class UnitTests(unittest.TestCase):
             sync_zed.validate_state(config, state),
         )
 
+    def test_partial_overlay_receipt_is_never_accepted(self):
+        config = json.loads((MODULE.parent / "config.json").read_text())
+        state = json.loads((MODULE.parent / "state.json").read_text())
+        state["fork_overlay"]["base_vendor_tip"] = state["bootstrap_vendor_tip"]
+        self.assertIn(
+            "overlay receipt coordinates must be either all null or all full SHAs",
+            sync_zed.validate_state(config, state),
+        )
+
     def test_receipt_writer_updates_state_and_machine_provenance_together(self):
         with tempfile.TemporaryDirectory() as directory:
             config = json.loads((MODULE.parent / "config.json").read_text())
@@ -268,6 +307,66 @@ class UnitTests(unittest.TestCase):
             self.assertTrue(sync_zed.replay_errors(
                 config, state, bootstrap, revision, official, cursor
             ))
+
+    def test_overlay_source_chain_requires_exact_single_parents(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config, source, _, revisions = self.overlay_fixture(directory)
+            sync_zed.validate_overlay_source_chain(source, config)
+            config["fork_overlay"]["source_revisions"] = [
+                revisions[0], revisions[2], revisions[3]
+            ]
+            with self.assertRaisesRegex(sync_zed.SyncError, "must have exactly parent"):
+                sync_zed.validate_overlay_source_chain(source, config)
+
+    def test_overlay_replay_is_bootstrap_rooted_and_one_to_one(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config, source, _, revisions = self.overlay_fixture(directory)
+            replay, bootstrap_tip, overlay_tip = sync_zed.build_overlay_replay(config, source)
+            try:
+                commits = self.git(
+                    replay.name, "rev-list", "--reverse", f"{bootstrap_tip}..{overlay_tip}"
+                ).splitlines()
+                self.assertEqual(len(commits), len(revisions))
+                self.assertEqual(
+                    self.git(replay.name, "show", "-s", "--format=%P", commits[0]),
+                    bootstrap_tip,
+                )
+                trailers = [
+                    self.git(replay.name, "show", "-s", "--format=%B", commit).splitlines()[-1]
+                    for commit in commits
+                ]
+                self.assertEqual(
+                    trailers,
+                    [f"zed-fork-overlay-upstream: {revision}" for revision in revisions],
+                )
+            finally:
+                replay.cleanup()
+
+    def test_overlay_replay_rejects_a_configured_filtered_noop(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config, source, _, _ = self.overlay_fixture(directory)
+            (source / "unmapped").write_text("does not affect the filter")
+            subprocess.run(["git", "-C", str(source), "add", "unmapped"], check=True)
+            subprocess.run(
+                ["git", "-C", str(source), "commit", "-q", "-m", "filtered noop"],
+                check=True,
+            )
+            noop = self.git(source, "rev-parse", "HEAD")
+            config["fork_overlay"]["source_revisions"].append(noop)
+            with self.assertRaisesRegex(sync_zed.SyncError, "filtered no-op"):
+                sync_zed.build_overlay_replay(config, source)
+
+    def test_overlay_marker_parser_rejects_partial_markers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory) / "repository"
+            self.init_repo(repo)
+            commit = self.commit_file(
+                repo,
+                "partial",
+                f"partial\n\nzed-overlay-algorithm: {sync_zed.OVERLAY_ALGORITHM}",
+            )
+            with self.assertRaisesRegex(sync_zed.SyncError, "incomplete overlay"):
+                sync_zed.overlay_integration_markers(repo, commit)
 
     def test_replay_rejects_an_unrelated_but_existing_official_cursor(self):
         with tempfile.TemporaryDirectory() as directory:

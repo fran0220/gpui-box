@@ -79,6 +79,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with: { toolchain: 1.97.0, components: "rustfmt, clippy" }
       - uses: Swatinem/rust-cache@v2
+      - name: Fetch canonical source-provenance refs
+        run: git fetch origin refs/heads/vendor/zed-gpui:refs/heads/vendor/zed-gpui refs/heads/vendor/zed-gpui-fork-overlay:refs/heads/vendor/zed-gpui-fork-overlay
       - run: cargo install cargo-local-registry --version 0.2.12 --locked
       - run: cargo install cargo-cyclonedx --version 0.5.9 --locked
       - run: scripts/sync-zed/sync-zed verify --release
