@@ -20,7 +20,7 @@ jobs:
       - run: cargo deny --all-features check licenses sources
       - name: Generate reproducible CycloneDX 1.5 SBOMs
         run: SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)" cargo cyclonedx --all --all-features --format json --spec-version 1.5
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: cyclonedx-sbom
           path: "**/*.cdx.json"
