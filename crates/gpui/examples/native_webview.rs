@@ -8,18 +8,16 @@ mod macos {
     use std::rc::Rc;
 
     use cocoa::{
-        appkit::NSView,
         base::{YES, id, nil},
         foundation::{NSPoint, NSRect, NSSize, NSString},
     };
     use gpui::{
-        App, Bounds, Context, Div, Element, ElementId, GlobalElementId, IntoElement, LayoutId,
-        MouseButton, Pixels, Stateful, Style, Window, WindowBounds, WindowOptions, deferred, div,
-        prelude::*, px, relative, rgb, size,
+        App, Bounds, Context, Div, IntoElement, MouseButton, PlatformViewHandle, Stateful, Window,
+        WindowBounds, WindowOptions, deferred, div, platform_view, prelude::*, px, relative, rgb,
+        size,
     };
     use gpui_platform::application;
     use objc::{class, msg_send, sel, sel_impl};
-    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 
     #[link(name = "WebKit", kind = "framework")]
     unsafe extern "C" {}
@@ -27,20 +25,12 @@ mod macos {
     const PAGE: &str = include_str!("native_webview.html");
 
     struct NativeWebView {
-        parent: id,
         view: id,
+        handle: PlatformViewHandle,
     }
 
     impl NativeWebView {
-        fn new(window: &Window) -> anyhow::Result<Self> {
-            let window_handle = HasWindowHandle::window_handle(window).map_err(|error| {
-                anyhow::anyhow!("failed to get AppKit window handle: {error:?}")
-            })?;
-            let parent = match window_handle.as_raw() {
-                RawWindowHandle::AppKit(handle) => handle.ns_view.as_ptr() as id,
-                _ => anyhow::bail!("native_webview requires an AppKit window"),
-            };
-
+        fn new() -> anyhow::Result<Self> {
             unsafe {
                 let configuration: id = msg_send![class!(WKWebViewConfiguration), new];
                 let view: id = msg_send![class!(WKWebView), alloc];
@@ -74,28 +64,14 @@ mod macos {
 
                 let html = NSString::alloc(nil).init_str(PAGE);
                 let _: id = msg_send![view, loadHTMLString: html baseURL: nil];
-                parent.addSubview_(view);
-
                 let _: () = msg_send![html, release];
                 let _: () = msg_send![configuration, release];
 
-                Ok(Self { parent, view })
-            }
-        }
-
-        fn set_bounds(&self, bounds: Bounds<Pixels>) {
-            unsafe {
-                let parent_bounds = NSView::bounds(self.parent);
-                let frame = NSRect::new(
-                    NSPoint::new(
-                        f64::from(bounds.origin.x),
-                        parent_bounds.size.height
-                            - f64::from(bounds.origin.y)
-                            - f64::from(bounds.size.height),
-                    ),
-                    NSSize::new(f64::from(bounds.size.width), f64::from(bounds.size.height)),
-                );
-                let _: () = msg_send![self.view, setFrame: frame];
+                // SAFETY: `view` is a live WKWebView (and therefore NSView),
+                // constructed on AppKit's main thread. GPUI retains it and is
+                // the only code that attaches or positions it from here on.
+                let handle = PlatformViewHandle::from_ns_view(view.cast());
+                Ok(Self { view, handle })
             }
         }
 
@@ -103,7 +79,8 @@ mod macos {
             unsafe {
                 let window: id = msg_send![self.view, window];
                 if !window.is_null() {
-                    let _: bool = msg_send![window, makeFirstResponder: self.parent];
+                    let content_view: id = msg_send![window, contentView];
+                    let _: bool = msg_send![window, makeFirstResponder: content_view];
                 }
             }
         }
@@ -112,71 +89,11 @@ mod macos {
     impl Drop for NativeWebView {
         fn drop(&mut self) {
             unsafe {
-                NSView::removeFromSuperview(self.view);
+                // The handle and any frame-owned clones keep the view alive
+                // until GPUI has detached it. This releases only our original
+                // ownership from `initWithFrame:configuration:`.
                 let _: () = msg_send![self.view, release];
             }
-        }
-    }
-
-    struct NativeWebViewElement {
-        webview: Rc<NativeWebView>,
-    }
-
-    impl IntoElement for NativeWebViewElement {
-        type Element = Self;
-
-        fn into_element(self) -> Self::Element {
-            self
-        }
-    }
-
-    impl Element for NativeWebViewElement {
-        type RequestLayoutState = ();
-        type PrepaintState = ();
-
-        fn id(&self) -> Option<ElementId> {
-            None
-        }
-
-        fn source_location(&self) -> Option<&'static core::panic::Location<'static>> {
-            None
-        }
-
-        fn request_layout(
-            &mut self,
-            _id: Option<&GlobalElementId>,
-            _inspector_id: Option<&gpui::InspectorElementId>,
-            window: &mut Window,
-            cx: &mut App,
-        ) -> (LayoutId, Self::RequestLayoutState) {
-            let mut style = Style::default();
-            style.size.width = relative(1.).into();
-            style.size.height = relative(1.).into();
-            (window.request_layout(style, [], cx), ())
-        }
-
-        fn prepaint(
-            &mut self,
-            _id: Option<&GlobalElementId>,
-            _inspector_id: Option<&gpui::InspectorElementId>,
-            bounds: Bounds<Pixels>,
-            _request_layout: &mut Self::RequestLayoutState,
-            _window: &mut Window,
-            _cx: &mut App,
-        ) -> Self::PrepaintState {
-            self.webview.set_bounds(bounds);
-        }
-
-        fn paint(
-            &mut self,
-            _id: Option<&GlobalElementId>,
-            _inspector_id: Option<&gpui::InspectorElementId>,
-            _bounds: Bounds<Pixels>,
-            _request_layout: &mut Self::RequestLayoutState,
-            _prepaint: &mut Self::PrepaintState,
-            _window: &mut Window,
-            _cx: &mut App,
-        ) {
         }
     }
 
@@ -464,9 +381,7 @@ mod macos {
                                 .relative()
                                 .flex_1()
                                 .min_h_0()
-                                .child(NativeWebViewElement {
-                                    webview: self.webview.clone(),
-                                })
+                                .child(platform_view(self.webview.handle.clone()).size_full())
                                 .when(self.about_active, |content| {
                                     content.child(
                                         deferred(
@@ -632,10 +547,10 @@ mod macos {
                     ..Default::default()
                 },
                 |window, cx| {
-                    let webview = Rc::new(NativeWebView::new(window).unwrap());
+                    let webview = Rc::new(NativeWebView::new().unwrap());
 
-                    // Insert the transparent GPUI overlay after the native
-                    // WebView so AppKit places it above the browser view.
+                    // GPUI inserts its transparent overlay above hosted
+                    // platform views, so deferred content can cover WebKit.
                     window.enable_scene_overlay().unwrap();
 
                     cx.new(|_| NativeWebViewExample {

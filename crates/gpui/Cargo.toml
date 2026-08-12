@@ -263,6 +263,10 @@ name = "mouse_pressure"
 path = "examples/mouse_pressure.rs"
 
 [[example]]
+name = "native_webview"
+path = "examples/native_webview.rs"
+
+[[example]]
 name = "a11y"
 path = "examples/a11y.rs"
 
