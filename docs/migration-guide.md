@@ -43,6 +43,18 @@ geometry synchronization. The application remains the native view's owner;
 GPUI owns layout, clipping, stacking, visibility, and detach timing. See the
 complete macOS example in `crates/gpui/examples/native_webview.rs`.
 
+When a controller or service destroys the native view on drop, attach that
+owner to the handle so the detach frame cannot race destruction:
+
+```rust
+let handle = unsafe { gpui::PlatformViewHandle::from_hwnd(child_hwnd) }
+    .keep_alive(native_controller.clone());
+```
+
+`keep_alive` does not transfer native ownership to GPUI. It retains the
+caller-owned value until the platform host drops its final handle clone, on the
+window's platform thread.
+
 ## 1. Inventory
 
 Classify current code:

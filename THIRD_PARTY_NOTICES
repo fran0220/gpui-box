@@ -17,7 +17,8 @@ Copyright 2022–2024 Zed Industries, Inc.
 Scope: filtered imported GPUI framework/support source, including platform,
 renderer, accessibility, input, and browser support. It is not a linked Git
 dependency. The official replay and exact post-bootstrap fork-overlay receipts
-are in scripts/sync-zed/ and provenance.toml.
+are in scripts/sync-zed/ and provenance.toml. The later platform-view lifetime
+attachment is GPUI Box work and is not represented as imported Zed source.
 License text: licenses/ZED-APACHE-2.0.txt
 
 Comet

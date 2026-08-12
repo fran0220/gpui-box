@@ -50,6 +50,11 @@ only vendor merge base is the filtered bootstrap. Future official sync remains
 authoritative and the overlay receipt remains as historical provenance after
 upstream convergence.
 
+The `PlatformViewHandle::keep_alive` lifetime attachment is subsequent GPUI
+Box work, not part of either imported lane. It changes no native hosting or
+renderer behavior; it retains caller-owned native controller state until the
+existing host has detached and released its final handle clone.
+
 Kit text-input code under `crates/gpui-kit/src/controls/input/` follows GPUI's
 `EntityInputHandler`, UTF-8/UTF-16 conversion, shaping, caret, and selection
 architecture. The kit editing model, bindings, masking, limits, semantics, and

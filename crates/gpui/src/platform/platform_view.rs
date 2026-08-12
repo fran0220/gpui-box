@@ -12,7 +12,23 @@
 //! without a window.
 
 use crate::{Bounds, DevicePixels, Pixels, Point, point, px, size, util::round_to_device_pixel};
-use std::fmt;
+use std::{any::Any, fmt, rc::Rc};
+
+/// Caller-owned state that must outlive every clone of a platform view handle.
+///
+/// This is separate from native ownership: AppKit retains its `NSView`, while
+/// Win32 has no equivalent retain operation. A media player, web view, or other
+/// native controller often owns resources beyond the view itself, so the
+/// handle keeps that controller alive until the platform layer has detached
+/// and forgotten its last clone.
+#[derive(Clone, Default)]
+struct PlatformViewLifetime(Option<Rc<dyn Any>>);
+
+impl PlatformViewLifetime {
+    fn keep<T: 'static>(&mut self, owner: Rc<T>) {
+        self.0 = Some(owner);
+    }
+}
 
 /// The stable identity of a hosted platform view.
 ///
@@ -36,9 +52,9 @@ impl fmt::Debug for PlatformViewId {
 
 #[cfg(target_os = "macos")]
 mod handle {
-    use super::PlatformViewId;
+    use super::{PlatformViewId, PlatformViewLifetime};
     use objc::{msg_send, runtime::Object, sel, sel_impl};
-    use std::{ffi::c_void, fmt, ptr::NonNull};
+    use std::{ffi::c_void, fmt, ptr::NonNull, rc::Rc};
 
     /// A retained reference to a native view hosted inside a GPUI window.
     ///
@@ -49,6 +65,7 @@ mod handle {
     /// is an AppKit view, and AppKit only promises main-thread safety.
     pub struct PlatformViewHandle {
         view: NonNull<Object>,
+        lifetime: PlatformViewLifetime,
     }
 
     impl PlatformViewHandle {
@@ -65,7 +82,22 @@ mod handle {
             unsafe {
                 let _: *mut Object = msg_send![view.as_ptr(), retain];
             }
-            Self { view }
+            Self {
+                view,
+                lifetime: PlatformViewLifetime::default(),
+            }
+        }
+
+        /// Keeps caller-owned native state alive for as long as this handle or
+        /// any clone remains retained by GPUI's platform-view host.
+        ///
+        /// Use this when the view alone does not own the controller or service
+        /// that makes it valid. The owner is released on the thread that drops
+        /// the final handle, which for a painted platform view is the window's
+        /// platform thread.
+        pub fn keep_alive<T: 'static>(mut self, owner: Rc<T>) -> Self {
+            self.lifetime.keep(owner);
+            self
         }
 
         /// Returns the hosted `NSView` pointer without transferring ownership.
@@ -84,7 +116,10 @@ mod handle {
             unsafe {
                 let _: *mut Object = msg_send![self.view.as_ptr(), retain];
             }
-            Self { view: self.view }
+            Self {
+                view: self.view,
+                lifetime: self.lifetime.clone(),
+            }
         }
     }
 
@@ -115,8 +150,8 @@ mod handle {
 
 #[cfg(target_os = "windows")]
 mod handle {
-    use super::PlatformViewId;
-    use std::fmt;
+    use super::{PlatformViewId, PlatformViewLifetime};
+    use std::{fmt, rc::Rc};
     use windows::Win32::Foundation::HWND;
 
     /// A non-owning reference to a child `HWND` hosted inside a GPUI window.
@@ -129,6 +164,7 @@ mod handle {
     #[derive(Clone)]
     pub struct PlatformViewHandle {
         hwnd: HWND,
+        lifetime: PlatformViewLifetime,
     }
 
     impl PlatformViewHandle {
@@ -148,7 +184,21 @@ mod handle {
                 !hwnd.is_invalid(),
                 "PlatformViewHandle::from_hwnd requires a non-null HWND"
             );
-            Self { hwnd }
+            Self {
+                hwnd,
+                lifetime: PlatformViewLifetime::default(),
+            }
+        }
+
+        /// Keeps caller-owned native state alive for as long as this handle or
+        /// any clone remains retained by GPUI's platform-view host.
+        ///
+        /// Win32 window handles have no retain operation. Use this for an owner
+        /// that destroys the child `HWND` on drop, so destruction cannot race
+        /// the frame that detaches the view.
+        pub fn keep_alive<T: 'static>(mut self, owner: Rc<T>) -> Self {
+            self.lifetime.keep(owner);
+            self
         }
 
         /// Returns the hosted child `HWND` without transferring ownership.
@@ -181,8 +231,12 @@ mod handle {
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 mod handle {
-    use super::PlatformViewId;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use super::{PlatformViewId, PlatformViewLifetime};
+    use std::{
+        fmt,
+        rc::Rc,
+        sync::atomic::{AtomicUsize, Ordering},
+    };
 
     /// An inert stand-in for a natively hosted view.
     ///
@@ -190,9 +244,10 @@ mod handle {
     /// [`PlatformViewHandle`] still compiles; it does not refer to or host a
     /// native view. Painting the [`crate::platform_view`] element with one only
     /// reserves layout space.
-    #[derive(Clone, PartialEq, Eq, Debug)]
+    #[derive(Clone)]
     pub struct PlatformViewHandle {
         id: PlatformViewId,
+        lifetime: PlatformViewLifetime,
     }
 
     impl Default for PlatformViewHandle {
@@ -207,7 +262,15 @@ mod handle {
             static NEXT_ID: AtomicUsize = AtomicUsize::new(1);
             Self {
                 id: PlatformViewId(NEXT_ID.fetch_add(1, Ordering::Relaxed)),
+                lifetime: PlatformViewLifetime::default(),
             }
+        }
+
+        /// Keeps caller-owned state alive for the same lifetime cross-platform
+        /// code would give a native view and every clone of its handle.
+        pub fn keep_alive<T: 'static>(mut self, owner: Rc<T>) -> Self {
+            self.lifetime.keep(owner);
+            self
         }
 
         /// Returns this handle's stable identity.
@@ -215,6 +278,22 @@ mod handle {
             self.id
         }
     }
+
+    impl fmt::Debug for PlatformViewHandle {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("PlatformViewHandle")
+                .field("id", &self.id())
+                .finish()
+        }
+    }
+
+    impl PartialEq for PlatformViewHandle {
+        fn eq(&self, other: &Self) -> bool {
+            self.id() == other.id()
+        }
+    }
+
+    impl Eq for PlatformViewHandle {}
 }
 
 pub use handle::PlatformViewHandle;
@@ -547,6 +626,15 @@ impl<A> PlatformViewHosting<A> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::Cell;
+
+    struct DropProbe(Rc<Cell<bool>>);
+
+    impl Drop for DropProbe {
+        fn drop(&mut self) {
+            self.0.set(true);
+        }
+    }
     use crate::size;
 
     fn id(value: usize) -> PlatformViewId {
@@ -626,6 +714,21 @@ mod tests {
         let ids = [id(1), id(2), id(1), id(3)];
 
         assert_eq!(last_placement_indices(&ids), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn platform_view_lifetime_waits_for_the_last_handle_clone() {
+        let dropped = Rc::new(Cell::new(false));
+        let owner = Rc::new(DropProbe(Rc::clone(&dropped)));
+        let mut lifetime = PlatformViewLifetime::default();
+        lifetime.keep(owner);
+        let platform_clone = lifetime.clone();
+
+        drop(lifetime);
+        assert!(!dropped.get(), "the platform still retains one handle");
+
+        drop(platform_clone);
+        assert!(dropped.get(), "the last handle releases its native owner");
     }
 
     #[test]
