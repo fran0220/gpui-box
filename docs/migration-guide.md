@@ -32,7 +32,7 @@ let GPUI own its placement:
 let handle = unsafe { gpui::PlatformViewHandle::from_ns_view(native_view) };
 
 // Windows, after constructing a child HWND:
-let handle = gpui::PlatformViewHandle::from_hwnd(child_hwnd);
+let handle = unsafe { gpui::PlatformViewHandle::from_hwnd(child_hwnd) };
 
 // Both platforms:
 gpui::platform_view(handle).size_full()
