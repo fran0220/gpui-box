@@ -25,6 +25,7 @@ const NEW_CRATE_RATE_LIMIT_RETRIES: usize = 3;
 struct PublicationPlan {
     packages: BTreeMap<String, Package>,
     order: Vec<String>,
+    dependencies: BTreeMap<String, BTreeSet<String>>,
     external: BTreeSet<String>,
 }
 
@@ -94,6 +95,7 @@ fn publication_plan(root: &Path) -> Result<PublicationPlan> {
             }
         }
     }
+    let dependencies = edges.clone();
     let mut order = Vec::new();
     while !edges.is_empty() {
         let ready = edges
@@ -115,6 +117,7 @@ fn publication_plan(root: &Path) -> Result<PublicationPlan> {
     Ok(PublicationPlan {
         packages,
         order,
+        dependencies,
         external,
     })
 }
@@ -129,10 +132,34 @@ fn dependency_is_published(dependency: &Value) -> Result<bool> {
     Ok(!(dependency["path"].as_str().is_some() && requirement == "*"))
 }
 
-fn package_patches(root: &Path, packages: &BTreeMap<String, Package>) -> Result<Vec<String>> {
-    packages
-        .values()
-        .map(|package| {
+fn package_patches(
+    root: &Path,
+    packages: &BTreeMap<String, Package>,
+    dependencies: &BTreeMap<String, BTreeSet<String>>,
+    name: &str,
+) -> Result<Vec<String>> {
+    let mut required = BTreeSet::new();
+    let mut pending = dependencies
+        .get(name)
+        .with_context(|| format!("publication graph lacks package {name}"))?
+        .clone();
+    while let Some(dependency) = pending.pop_first() {
+        if required.insert(dependency.clone()) {
+            pending.extend(
+                dependencies
+                    .get(&dependency)
+                    .with_context(|| format!("publication graph lacks package {dependency}"))?
+                    .iter()
+                    .cloned(),
+            );
+        }
+    }
+    required
+        .into_iter()
+        .map(|dependency| {
+            let package = packages
+                .get(&dependency)
+                .with_context(|| format!("publication graph names unknown package {dependency}"))?;
             let manifest = root.join(&package.manifest);
             let parent = manifest
                 .parent()
@@ -154,16 +181,19 @@ fn apply_package_patches(command: &mut Command, patches: &[String]) {
 
 pub fn check(root: &Path) -> Result<()> {
     let PublicationPlan {
-        packages, order, ..
+        packages,
+        order,
+        dependencies,
+        ..
     } = publication_plan(root)?;
     let out = root.join("target/package-check");
     if out.exists() {
         fs::remove_dir_all(&out)?
     }
     fs::create_dir_all(out.join("archives"))?;
-    let patches = package_patches(root, &packages)?;
     for name in &order {
         let p = &packages[name];
+        let patches = package_patches(root, &packages, &dependencies, name)?;
         let mut cmd = Command::new("cargo");
         cmd.args([
             "package",
@@ -380,7 +410,10 @@ pub fn publish(root: &Path, args: &[String]) -> Result<()> {
         "refusing to publish without GPUI_BOX_PUBLISH=1"
     );
     let PublicationPlan {
-        packages, order, ..
+        packages,
+        order,
+        dependencies,
+        ..
     } = publication_plan(root)?;
     let versions: BTreeSet<_> = packages.values().map(|p| p.version.as_str()).collect();
     ensure!(
@@ -427,7 +460,6 @@ pub fn publish(root: &Path, args: &[String]) -> Result<()> {
         );
     }
 
-    let patches = package_patches(root, &packages)?;
     let reproduction = root.join("target/publish-reproduction");
     if reproduction.exists() {
         fs::remove_dir_all(&reproduction)?;
@@ -435,6 +467,7 @@ pub fn publish(root: &Path, args: &[String]) -> Result<()> {
 
     for name in order {
         let p = &packages[&name];
+        let patches = package_patches(root, &packages, &dependencies, &name)?;
         let archive = root
             .join("target/package-check/archives")
             .join(format!("{name}-{}.crate", p.version));
@@ -1120,6 +1153,38 @@ mod tests {
         assert!(dependency_is_published(
             &json!({"kind":"build","name":"build","path":"/workspace/build","req":"*"})
         )?);
+        Ok(())
+    }
+
+    #[test]
+    fn package_patches_include_only_transitive_dependencies() -> Result<()> {
+        let package = |name: &str| Package {
+            manifest: format!("crates/{name}/Cargo.toml"),
+            name: name.into(),
+            lib: None,
+            cohort: "framework".into(),
+            version: "0.1.0".into(),
+            license: "MIT".into(),
+            publish: true,
+            layer: 0,
+        };
+        let packages = ["leaf", "middle", "root", "unrelated"]
+            .into_iter()
+            .map(|name| (name.into(), package(name)))
+            .collect();
+        let dependencies = BTreeMap::from([
+            ("leaf".into(), BTreeSet::new()),
+            ("middle".into(), BTreeSet::from(["leaf".into()])),
+            ("root".into(), BTreeSet::from(["middle".into()])),
+            ("unrelated".into(), BTreeSet::new()),
+        ]);
+
+        let patches = package_patches(Path::new("/workspace"), &packages, &dependencies, "root")?;
+
+        assert_eq!(patches.len(), 2);
+        assert!(patches.iter().any(|patch| patch.contains(".leaf.path=")));
+        assert!(patches.iter().any(|patch| patch.contains(".middle.path=")));
+        assert!(patches.iter().all(|patch| !patch.contains("unrelated")));
         Ok(())
     }
 

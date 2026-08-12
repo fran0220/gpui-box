@@ -102,5 +102,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with: { toolchain: 1.97.0 }
       - uses: Swatinem/rust-cache@v2
+        with:
+          # Older package-check caches retained a transient Cargo home whose
+          # extracted sources contain broken test-fixture symlinks. Use a clean
+          # namespace now that package check deletes that proof tree on success.
+          shared-key: package-clean-v1
       - run: cargo install cargo-local-registry --version 0.2.12 --locked
       - run: cargo run -p xtask -- package check

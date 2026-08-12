@@ -18,3 +18,13 @@
   authority; historical repository URLs and vendor refs are immutable evidence,
   while all project-owned framework, platform, media, Kit, and tooling code is
   developed in this repository over public registry dependencies.
+
+## 2026-08-12: CI cache cleanup must also invalidate polluted restore keys
+
+- Deleting transient package proof trees before cache save does not repair an
+  older cache that already contains them: rust-cache can emit annotations while
+  restoring that cache before the check starts. Give the corrected lifecycle a
+  fresh shared key in every workflow that runs the proof.
+- A package-cohort patch list should contain only the package's transitive local
+  dependencies. Passing every cohort member to every `cargo package` succeeds,
+  but floods the proof log with truthful "patch was not used" warnings.
