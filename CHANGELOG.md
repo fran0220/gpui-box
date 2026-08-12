@@ -30,7 +30,9 @@ rerunning the full gate on macOS. `xtask web gate` builds and prepares Chromium
 once for the browser checks. Passing headless frames are compared in memory;
 only changed or new images are PNG-encoded for review. Routine local builds
 retain source-line backtraces while omitting the variable-level debug data that
-made accumulated build artifacts unnecessarily large.
+made accumulated build artifacts unnecessarily large. The registry-only
+package gate now materializes the patched `block` crate from its vendored source
+instead of accidentally depending on a warm developer Cargo cache.
 
 **Single-repository framework authority.** GPUI Box now develops GPUI, native
 platforms, media, and Kit directly in this repository. The former Zed sync and

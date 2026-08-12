@@ -17,6 +17,8 @@ const PUBLISH_OPT_IN: &str = "GPUI_BOX_PUBLISH";
 const CRATES_IO_USER_AGENT: &str = "gpui-box-release/0.1 (https://github.com/fran0220/gpui-box)";
 const INITIAL_RELEASE_VERSION: &str = "0.1.0";
 const INITIAL_RELEASE_COMMIT: &str = "888369c73c258567664785a761faebdc64d39d4e";
+const VENDORED_BLOCK_NAME: &str = "block";
+const VENDORED_BLOCK_VERSION: &str = "0.1.6";
 const NEW_CRATE_RATE_LIMIT_WAIT: Duration = Duration::from_secs(10 * 60 + 5);
 const NEW_CRATE_RATE_LIMIT_RETRIES: usize = 3;
 
@@ -201,6 +203,45 @@ pub fn check(root: &Path) -> Result<()> {
         );
         check_normalized(&String::from_utf8(manifest.stdout)?, p, &packages)?;
     }
+    // The workspace lock records the audited `block` fork as a path package,
+    // so cargo-local-registry cannot download it from crates.io. Package that
+    // exact source explicitly instead of relying on a developer's Cargo cache.
+    let block_manifest = root.join("vendor/block/Cargo.toml");
+    let block: toml::Value = toml::from_str(&fs::read_to_string(&block_manifest)?)?;
+    let block_package = &block["package"];
+    let block_name = block_package["name"]
+        .as_str()
+        .context("vendored block manifest has no package name")?;
+    let block_version = block_package["version"]
+        .as_str()
+        .context("vendored block manifest has no package version")?;
+    ensure!(
+        block_name == VENDORED_BLOCK_NAME && block_version == VENDORED_BLOCK_VERSION,
+        "vendored compatibility fork must be {VENDORED_BLOCK_NAME} {VENDORED_BLOCK_VERSION}, found {block_name} {block_version}"
+    );
+    let block_status = Command::new("cargo")
+        .args([
+            "package",
+            "--allow-dirty",
+            "--locked",
+            "--no-verify",
+            "--manifest-path",
+        ])
+        .arg(&block_manifest)
+        .env("CARGO_TARGET_DIR", &out)
+        .status()?;
+    ensure!(
+        block_status.success(),
+        "cargo package failed for {block_name}"
+    );
+    let block_archive = out
+        .join("package")
+        .join(format!("{block_name}-{block_version}.crate"));
+    ensure!(
+        block_archive.is_file(),
+        "missing {}",
+        block_archive.display()
+    );
     let version = Command::new("cargo-local-registry")
         .arg("--version")
         .output();
@@ -221,8 +262,9 @@ pub fn check(root: &Path) -> Result<()> {
         "local registry sync failed; partial registry retained at {}",
         registry.display()
     );
-    // Sync may copy path packages from its cache. The archives produced above are
-    // authoritative, so always replace both bytes and their index records.
+    // The archives produced above are authoritative, so always replace both
+    // bytes and their index records after sync has populated crates.io inputs.
+    insert_archive(&registry, &block_archive)?;
     for name in &order {
         let p = &packages[name];
         insert_archive(

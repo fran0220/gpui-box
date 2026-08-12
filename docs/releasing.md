@@ -46,8 +46,9 @@ list, is authoritative.
    publishable crate, constructs a registry under `target/package-check`, then
    builds framework-only and framework-plus-kit consumers offline with source
    replacement and without GPUI Box path patches. The workspace's sole Cargo
-   patch is the separately receipted `block` 0.1.6 compatibility fork. It also
-   runs a packaged
+   patch is the separately receipted `block` 0.1.6 compatibility fork; the gate
+   packages that source into the temporary registry explicitly, so its result
+   does not depend on an existing developer Cargo cache. It also runs a packaged
    `gpui::property_test`, installs the MCP binary and checks its help/version,
    rejects retained internal dev-dependencies that would deadlock a first
    publication, and requires exactly one `lib gpui` owned by `gpui-box`. This
