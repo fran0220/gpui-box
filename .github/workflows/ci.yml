@@ -87,7 +87,7 @@ jobs:
           workspaces: tools/headless-visual -> target
       - run: cargo run --locked --manifest-path tools/headless-visual/Cargo.toml -- check
       - if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: headless-diff-${{ runner.os }}
           path: target/headless-scene-check
@@ -104,7 +104,7 @@ jobs:
         with:
           workspaces: tools/headless-visual -> target
       - run: cargo build --locked --manifest-path tools/headless-visual/Cargo.toml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: headless-windows-executable
           path: tools/headless-visual/target/debug/gpui-box-headless-visual.exe
@@ -120,13 +120,13 @@ jobs:
     runs-on: windows-2025
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           name: headless-windows-executable
           path: tools/headless-visual/target/debug
       - run: tools/headless-visual/target/debug/gpui-box-headless-visual.exe check --shard ${{ matrix.shard }}/4
       - if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: headless-diff-Windows-${{ matrix.shard }}
           path: target/headless-scene-check

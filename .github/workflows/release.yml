@@ -99,12 +99,12 @@ jobs:
       - run: cargo run -p xtask -- package check
       - name: Generate reproducible CycloneDX 1.5 SBOMs
         run: SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)" cargo cyclonedx --all --all-features --format json --spec-version 1.5
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: gpui-box-${{ inputs.version }}-${{ steps.tag.outputs.release_commit }}-crates
           path: target/package-check/archives/*.crate
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: gpui-box-${{ inputs.version }}-${{ steps.tag.outputs.release_commit }}-sbom
           path: "**/*.cdx.json"
@@ -156,7 +156,7 @@ jobs:
           workspaces: tools/headless-visual -> target
       - run: cargo run --locked --manifest-path tools/headless-visual/Cargo.toml -- check
       - if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: headless-release-diff-${{ runner.os }}
           path: target/headless-scene-check
@@ -175,7 +175,7 @@ jobs:
         with:
           workspaces: tools/headless-visual -> target
       - run: cargo build --locked --manifest-path tools/headless-visual/Cargo.toml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: headless-release-windows-executable
           path: tools/headless-visual/target/debug/gpui-box-headless-visual.exe
@@ -192,13 +192,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0 }
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           name: headless-release-windows-executable
           path: tools/headless-visual/target/debug
       - run: tools/headless-visual/target/debug/gpui-box-headless-visual.exe check --shard ${{ matrix.shard }}/4
       - if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: headless-release-diff-Windows-${{ matrix.shard }}
           path: target/headless-scene-check
@@ -269,7 +269,7 @@ jobs:
           test -z "$(git -C release status --porcelain)"
       - uses: dtolnay/rust-toolchain@master
         with: { toolchain: 1.97.0 }
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           name: gpui-box-${{ inputs.version }}-${{ needs.preflight.outputs.release_commit }}-crates
           path: release/target/package-check/archives
@@ -303,7 +303,7 @@ jobs:
           test -z "$(git -C release status --porcelain)"
       - uses: dtolnay/rust-toolchain@master
         with: { toolchain: 1.97.0 }
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           name: gpui-box-${{ inputs.version }}-${{ needs.preflight.outputs.release_commit }}-crates
           path: release/target/package-check/archives
