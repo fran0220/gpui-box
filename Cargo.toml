@@ -322,13 +322,23 @@ unwrap_used = "warn"
 [patch.crates-io]
 block = { path = "vendor/block" }
 
+# Backtraces need source locations, but routine builds and tests do not need
+# every local variable encoded into this large native dependency graph. This
+# substantially reduces link time and long-lived target size. Override with
+# `CARGO_PROFILE_DEV_DEBUG=full` (or TEST) for a debugger session.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.test]
+debug = "line-tables-only"
+
 [profile.release]
 lto = "thin"
 codegen-units = 1
 strip = "debuginfo"
 
-# Scene captures encode 160 full-window PNGs per run, and the deflate inside
-# is what a debug build spends most of its time on. Optimizing just the
+# Full scene captures encode the whole catalog, and the deflate inside is what
+# a debug build spends most of its time on. Optimizing just the
 # compression crates keeps scene rendering fast without giving up debug
 # builds for anything of ours.
 [profile.dev.package.png]

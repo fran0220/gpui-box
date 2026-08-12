@@ -27,6 +27,10 @@ on:
 permissions:
   contents: read
 
+env:
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+
 concurrency:
   group: release-${{ inputs.version }}
   cancel-in-progress: false
@@ -85,8 +89,9 @@ jobs:
       - run: cargo install cargo-cyclonedx --version 0.5.9 --locked
       - run: scripts/sync-zed/sync-zed verify
       - run: python3 -m unittest discover -s scripts/sync-zed/tests -v
-      - run: cargo run -p xtask -- dependencies check
       - run: cargo run -p xtask -- gate
+      - run: cargo doc --no-deps --workspace
+        env: { RUSTDOCFLAGS: "-D warnings" }
       - run: cargo run -p xtask -- package check
       - name: Generate reproducible CycloneDX 1.5 SBOMs
         run: SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)" cargo cyclonedx --all --all-features --format json --spec-version 1.5
@@ -106,7 +111,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-15, ubuntu-24.04, windows-2025]
+        # Linux is already covered by the preflight authority gate.
+        os: [macos-15, windows-2025]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
@@ -115,9 +121,13 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev libegl1-mesa-dev libfontconfig1-dev libudev-dev libvulkan-dev libwayland-dev libx11-dev libx11-xcb-dev libxcb-randr0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-x11-dev mesa-vulkan-drivers
       - uses: dtolnay/rust-toolchain@master
-        with: { toolchain: 1.97.0 }
+        with: { toolchain: 1.97.0, components: "clippy" }
       - uses: Swatinem/rust-cache@v2
-      - run: cargo check --workspace --all-targets --all-features --locked
+      - name: Run the macOS platform tests formerly covered by the full gate
+        if: runner.os == 'macOS'
+        run: cargo test --workspace --all-features --locked
+      - name: Reject platform-specific warnings
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: Compile Direct3D release shaders
         if: runner.os == 'Windows'
         run: cargo check -p gpui-box-windows --release --locked
@@ -138,6 +148,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with: { toolchain: 1.97.0 }
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            tools/headless-visual -> target
       - run: cargo run -p xtask -- headless check
       - if: failure()
         uses: actions/upload-artifact@v4
@@ -145,17 +159,6 @@ jobs:
           name: headless-release-diff-${{ runner.os }}
           path: target/headless-scene-check
           if-no-files-found: ignore
-
-  macos-full:
-    needs: preflight
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v5
-        with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0 }
-      - uses: dtolnay/rust-toolchain@master
-        with: { toolchain: 1.97.0, components: "rustfmt, clippy" }
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo run -p xtask -- gate full
 
   web:
     needs: preflight
@@ -168,10 +171,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
         with: { tool: "wasm-bindgen-cli@0.2.126" }
-      - run: cargo run -p xtask -- web check
-      - run: cargo run -p xtask -- web build
-      - run: cargo run -p xtask -- web smoke
-      - run: cargo run -p xtask -- web visual check button input dialog node-graph
+      - run: cargo run -p xtask -- web gate button input dialog node-graph
 
   semver:
     needs: preflight
@@ -198,7 +198,7 @@ jobs:
 
   publish-with-token:
     if: ${{ inputs.execute && inputs.auth == 'token' }}
-    needs: [preflight, native, headless, macos-full, web, semver]
+    needs: [preflight, native, headless, web, semver]
     runs-on: ubuntu-24.04
     environment: crates-io
     permissions:
@@ -231,7 +231,7 @@ jobs:
 
   publish-with-oidc:
     if: ${{ inputs.execute && inputs.auth == 'oidc' }}
-    needs: [preflight, native, headless, macos-full, web, semver]
+    needs: [preflight, native, headless, web, semver]
     runs-on: ubuntu-24.04
     environment: crates-io
     permissions:
@@ -263,7 +263,7 @@ jobs:
 
   bootstrap-trusted-publishing:
     if: ${{ inputs.bootstrap_trusted_publishing }}
-    needs: [preflight, native, headless, macos-full, web, semver]
+    needs: [preflight, native, headless, web, semver]
     runs-on: ubuntu-24.04
     environment: crates-io
     permissions:

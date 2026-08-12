@@ -18,8 +18,9 @@ repository = "https://github.com/fran0220/gpui-box"
 [dependencies]
 anyhow = "1"
 # The same major version GPUI's `render_to_image` returns, so the image value
-# crosses the crate boundary as one type.
-image = "0.25"
+# crosses the crate boundary as one type. The harness itself only reads and
+# writes PNG; do not pull the image crate's AVIF encoder into this workspace.
+image = { version = "0.25", default-features = false, features = ["png"] }
 gpui = { package = "gpui-box", path = "../../crates/gpui", version = "0.1.1", features = ["test-support"] }
 gpui-kit = { package = "gpui-box-kit", path = "../../crates/gpui-kit", version = "0.1.1", features = ["fixtures"] }
 gpui-kit-semantics = { package = "gpui-box-kit-semantics", path = "../../crates/gpui-kit-semantics", version = "0.1.1" }
@@ -38,3 +39,23 @@ gpui_wgpu = { package = "gpui-box-wgpu", path = "../../crates/gpui_wgpu", versio
 # visual lockfile resolves exactly the same framework dependency graph.
 [patch.crates-io]
 block = { path = "../../vendor/block" }
+
+# A baseline capture must encode every frame. Keep the harness itself in a
+# source-located dev profile while compiling only its PNG compression path with
+# optimization; this workspace does not inherit the root workspace's profiles.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.test]
+debug = "line-tables-only"
+
+[profile.dev.package.png]
+opt-level = 3
+[profile.dev.package.fdeflate]
+opt-level = 3
+[profile.dev.package.miniz_oxide]
+opt-level = 3
+[profile.dev.package.flate2]
+opt-level = 3
+[profile.dev.package.crc32fast]
+opt-level = 3

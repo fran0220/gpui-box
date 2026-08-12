@@ -55,6 +55,7 @@ fn main() -> Result<()> {
         (Some("web"), Some("build")) => web_build(),
         (Some("web"), Some("smoke")) => web_smoke(),
         (Some("web"), Some("visual")) => web_visual(&rest),
+        (Some("web"), Some("gate")) => web_gate(&rest),
         (Some("gate"), None) => gate(false),
         (Some("gate"), Some("full")) => gate(true),
         (Some("gate"), Some("only")) => gate_only(&rest),
@@ -63,7 +64,8 @@ fn main() -> Result<()> {
              strings generate|typography check|scenes list|scenes render [name...]|\
              headless capture [name...]|\
              headless check [name...]|web check|web build|web smoke|\
-             web visual <capture|check> [name...]|gate [full]|gate only <scene>...>"
+             web visual <capture|check> [name...]|web gate [scene...]|\
+             gate [full]|gate only <scene>...>"
         ),
     }
 }
@@ -1062,12 +1064,15 @@ fn headless(command: &str, only: &[String]) -> Result<()> {
 
 const WASM_TARGET: &str = "wasm32-unknown-unknown";
 const WASM_BINDGEN_VERSION: &str = "0.2.126";
+const WASM_DENY_WARNINGS: &str = "target.wasm32-unknown-unknown.rustflags=['-Dwarnings']";
 
 fn web_check() -> Result<()> {
     step(
         env!("CARGO"),
         &[
             "check",
+            "--config",
+            WASM_DENY_WARNINGS,
             "-p",
             "gpui-box-kit",
             "--lib",
@@ -1085,6 +1090,8 @@ fn web_build() -> Result<()> {
         env!("CARGO"),
         &[
             "build",
+            "--config",
+            WASM_DENY_WARNINGS,
             "-p",
             "gpui-box-browser-gallery",
             "--target",
@@ -1138,6 +1145,11 @@ fn web_build() -> Result<()> {
 
 fn web_smoke() -> Result<()> {
     web_build()?;
+    web_prepare()?;
+    web_smoke_prepared()
+}
+
+fn web_prepare() -> Result<()> {
     let package = root().join("examples/browser-gallery");
     let package = package.to_string_lossy();
     step("npm", &["--prefix", package.as_ref(), "ci"], None)?;
@@ -1153,7 +1165,12 @@ fn web_smoke() -> Result<()> {
             "chromium",
         ],
         None,
-    )?;
+    )
+}
+
+fn web_smoke_prepared() -> Result<()> {
+    let package = root().join("examples/browser-gallery");
+    let package = package.to_string_lossy();
     let config = root().join("examples/browser-gallery/playwright.config.mjs");
     let config = config.to_string_lossy();
     step(
@@ -1177,23 +1194,13 @@ fn web_visual(args: &[String]) -> Result<()> {
         bail!("usage: cargo xtask web visual <capture|check> [scene...]");
     };
     web_build()?;
+    web_prepare()?;
+    web_visual_prepared(command, &args[1..])
+}
+
+fn web_visual_prepared(command: &str, scenes: &[String]) -> Result<()> {
     let package = root().join("examples/browser-gallery");
     let package = package.to_string_lossy();
-    step("npm", &["--prefix", package.as_ref(), "ci"], None)?;
-    step(
-        "npm",
-        &[
-            "--prefix",
-            package.as_ref(),
-            "exec",
-            "--",
-            "playwright",
-            "install",
-            "chromium",
-        ],
-        None,
-    )?;
-
     let config = root().join("examples/browser-gallery/visual.config.mjs");
     let mut playwright = Command::new("npm");
     playwright
@@ -1211,13 +1218,24 @@ fn web_visual(args: &[String]) -> Result<()> {
     if command == "capture" {
         playwright.arg("--update-snapshots");
     }
-    if args.len() > 1 {
-        playwright.env("GPUI_KIT_WEB_SCENES", args[1..].join(","));
+    if !scenes.is_empty() {
+        playwright.env("GPUI_KIT_WEB_SCENES", scenes.join(","));
     }
     let status = playwright.status().context("run browser visual gate")?;
     if !status.success() {
         bail!("browser visual {command} failed");
     }
+    Ok(())
+}
+
+/// Runs the complete browser proof after preparing its build and browser once.
+fn web_gate(scenes: &[String]) -> Result<()> {
+    web_check()?;
+    web_build()?;
+    web_prepare()?;
+    web_smoke_prepared()?;
+    web_visual_prepared("check", scenes)?;
+    println!("web gate passed");
     Ok(())
 }
 

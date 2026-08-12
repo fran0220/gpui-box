@@ -150,8 +150,10 @@ tolerance is what makes a scoped check mean the same thing as the full one.
 Naming scenes checks or captures only those, which is what a change to one
 component needs.
 
-A failing run's `target/headless-scene-check` is uploaded as an artifact,
-because a difference nobody can look at is not a review.
+A failing run writes only its changed or new actual images to
+`target/headless-scene-check`, which CI uploads as an artifact. Passing frames
+are compared directly from memory instead of being PNG-encoded and decoded
+again; a difference nobody can look at is still not a review.
 
 The same catalog is rendered headlessly by `crates/gpui-kit/tests/scenes.rs`,
 which audits every published tree, so a component cannot be reviewed visually

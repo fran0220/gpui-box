@@ -167,6 +167,7 @@ impl WgpuContext {
         ))
     }
 
+    #[cfg(not(target_family = "wasm"))]
     fn from_adapter_and_device(
         instance: wgpu::Instance,
         adapter: wgpu::Adapter,

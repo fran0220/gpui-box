@@ -8,9 +8,12 @@
    action/assertion target a stable business-derived semantic id.
 4. Cover reducers and transitions with tests and add gallery states when a
    component gains visible behavior.
-5. Iterate with `cargo run -p xtask -- gate only <scene>`, then run
-   `cargo run -p xtask -- gate` and `gate full` before committing.
-6. For UI changes run `headless check`, inspect every reported image, and use
+5. Iterate on visible components with `cargo run -p xtask -- gate only
+   <scene>`. Before committing, run `cargo run -p xtask -- gate` for changes
+   that cannot affect rendering, or run `cargo run -p xtask -- gate full`
+   instead when they can. `gate full` already includes the regular gate; do not
+   run both back to back.
+6. For UI changes inspect every image reported by `headless check`, and use
    `headless capture` only after review. macOS, Linux, and Windows each carry an
    active renderer-specific CI baseline.
 7. Add a reader-facing changelog entry. Rust API, token-key, and semantic-id
@@ -26,3 +29,12 @@ workflow; never restore Zed as a Cargo Git dependency or synchronization source.
 New derived source/assets require exact URL, revision, license, and scope in
 `PROVENANCE.md` and `THIRD_PARTY_NOTICES`. GPUI Box is independent and must not
 be presented as an official Zed project.
+
+Routine dev and test profiles retain source locations for backtraces while
+omitting variable-level debug data, which reduces this native workspace's
+target size and link time. For an interactive debugger session, opt back
+in explicitly with `CARGO_PROFILE_DEV_DEBUG=full` or
+`CARGO_PROFILE_TEST_DEBUG=full`. The two Cargo workspaces have separate target
+directories; avoid an unconditional `cargo clean`, and clean the root and
+`tools/headless-visual` workspace separately only when their artifacts are no
+longer useful.

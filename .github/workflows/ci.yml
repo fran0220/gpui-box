@@ -1,7 +1,20 @@
 name: CI
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
 permissions:
   contents: read
+
+env:
+  # CI never attaches a debugger. Omitting debug information makes the large
+  # GPUI dependency graph faster to link and small enough to cache reliably.
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   authority:
@@ -19,7 +32,6 @@ jobs:
       - run: scripts/sync-zed/sync-zed verify
       - run: python3 -m unittest discover -s scripts/sync-zed/tests -v
       - run: python3 -m unittest discover -s scripts/release/tests -v
-      - run: cargo run -p xtask -- dependencies check
       - run: cargo run -p xtask -- gate
       - run: cargo doc --no-deps --workspace
         env: { RUSTDOCFLAGS: "-D warnings" }
@@ -28,7 +40,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-15, ubuntu-24.04, windows-2025]
+        # The authority job is the Linux all-feature native gate.
+        os: [macos-15, windows-2025]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
@@ -52,10 +65,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
         with: { tool: "wasm-bindgen-cli@0.2.126" }
-      - run: cargo run -p xtask -- web check
-      - run: cargo run -p xtask -- web build
-      - run: cargo run -p xtask -- web smoke
-      - run: cargo run -p xtask -- web visual check button input dialog node-graph
+      - run: cargo run -p xtask -- web gate button input dialog node-graph
 
   headless:
     strategy:
@@ -71,6 +81,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with: { toolchain: 1.97.0 }
       - uses: Swatinem/rust-cache@v2
+        with:
+          # The command builds xtask in the root workspace, then the renderer
+          # in its deliberately independent workspace and target directory.
+          workspaces: |
+            . -> target
+            tools/headless-visual -> target
       - run: cargo run -p xtask -- headless check
       - if: failure()
         uses: actions/upload-artifact@v4
@@ -90,18 +106,3 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo install cargo-local-registry --version 0.2.12 --locked
       - run: cargo run -p xtask -- package check
-
-  # Real-window capture is intentionally self-hosted: unlike the headless gate,
-  # it needs a logged-in composited macOS session, a frontmost window, and the
-  # exact display scale used by the legacy real-window baselines.
-  visual:
-    if: ${{ vars.VISUAL_RUNNER != '' }}
-    runs-on: ${{ vars.VISUAL_RUNNER }}
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@master
-        with: { toolchain: 1.97.0 }
-      - run: cargo run -p xtask -- scenes check
-      - if: failure()
-        uses: actions/upload-artifact@v4
-        with: { name: scene-check, path: target/scene-check }

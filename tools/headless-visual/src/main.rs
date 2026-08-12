@@ -30,7 +30,7 @@ fn main() -> Result<()> {
 
 mod imp {
     use std::fs;
-    use std::path::{Path, PathBuf};
+    use std::path::PathBuf;
     use std::sync::{Arc, Mutex};
 
     use anyhow::{Context as _, Result, bail};
@@ -44,7 +44,14 @@ mod imp {
 
     pub fn capture(only: &[String]) -> Result<()> {
         let directory = snapshots();
-        let count = capture_into(&directory, only)?;
+        fs::create_dir_all(&directory)
+            .with_context(|| format!("create {}", directory.display()))?;
+        let count = capture_frames(only, |name, frame| {
+            let path = directory.join(name);
+            frame
+                .save(&path)
+                .with_context(|| format!("write {}", path.display()))
+        })?;
         println!("captured {count} images into {}", directory.display());
         Ok(())
     }
@@ -66,22 +73,28 @@ mod imp {
         if scratch.exists() {
             fs::remove_dir_all(&scratch).with_context(|| format!("clear {}", scratch.display()))?;
         }
-        let count = capture_into(&scratch, only)?;
-
         let mut differing = Vec::new();
         let mut missing = Vec::new();
-        for entry in fs::read_dir(&scratch)? {
-            let entry = entry?;
-            let name = entry.file_name().to_string_lossy().into_owned();
-            let old = committed.join(&name);
+        let count = capture_frames(only, |name, frame| {
+            let old = committed.join(name);
             if !old.exists() {
-                missing.push(name);
-                continue;
+                missing.push(name.to_owned());
+            } else {
+                let expected = image::open(&old)
+                    .with_context(|| format!("read {}", old.display()))?
+                    .into_rgba8();
+                if within_one_step(&expected, frame) {
+                    return Ok(());
+                }
+                differing.push(name.to_owned());
             }
-            if !within_one_step(&old, &entry.path()).with_context(|| format!("compare {name}"))? {
-                differing.push(name);
-            }
-        }
+            fs::create_dir_all(&scratch)
+                .with_context(|| format!("create {}", scratch.display()))?;
+            let actual = scratch.join(name);
+            frame
+                .save(&actual)
+                .with_context(|| format!("write {}", actual.display()))
+        })?;
         differing.sort();
         missing.sort();
 
@@ -134,17 +147,14 @@ mod imp {
     /// A differing size is never within tolerance: the harness asks the
     /// renderer for an exact size, so a different one means the harness itself
     /// changed rather than the picture.
-    fn within_one_step(left: &Path, right: &Path) -> Result<bool> {
-        let left = image::open(left)?.into_rgba8();
-        let right = image::open(right)?.into_rgba8();
+    fn within_one_step(left: &image::RgbaImage, right: &image::RgbaImage) -> bool {
         if left.dimensions() != right.dimensions() {
-            return Ok(false);
+            return false;
         }
-        Ok(left
-            .as_raw()
+        left.as_raw()
             .iter()
             .zip(right.as_raw())
-            .all(|(left, right)| left.abs_diff(*right) <= 1))
+            .all(|(left, right)| left.abs_diff(*right) <= 1)
     }
 
     /// Which scene the host shows.
@@ -169,13 +179,15 @@ mod imp {
     }
 
     /// Drives one headless window over the whole catalog.
-    fn capture_into(directory: &Path, only: &[String]) -> Result<usize> {
+    fn capture_frames(
+        only: &[String],
+        mut accept: impl FnMut(&str, &image::RgbaImage) -> Result<()>,
+    ) -> Result<usize> {
         for name in only {
             if gpui_kit::scenes::find(name).is_none() {
                 bail!("unknown scene `{name}`");
             }
         }
-        fs::create_dir_all(directory).with_context(|| format!("create {}", directory.display()))?;
 
         // Only the bundled fonts take part. Loading the machine's own fonts
         // would shape text differently from one machine to the next, and the
@@ -226,10 +238,8 @@ mod imp {
                 *SCENE.lock().expect("scene name is never poisoned") = Some(scene.name);
                 let frame = settled_image(&mut cx, window)
                     .with_context(|| format!("capture scene `{}` in `{id}`", scene.name))?;
-                let path = directory.join(format!("{}-{id}.png", scene.name));
-                frame
-                    .save(&path)
-                    .with_context(|| format!("write {}", path.display()))?;
+                let name = format!("{}-{id}.png", scene.name);
+                accept(&name, &frame)?;
                 count += 1;
             }
         }
@@ -263,5 +273,29 @@ mod imp {
             previous = Some(frame);
         }
         bail!("the scene did not settle within 32 draws");
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use image::{Rgba, RgbaImage};
+
+        #[test]
+        fn comparison_allows_one_channel_step() {
+            let expected = RgbaImage::from_pixel(1, 1, Rgba([10, 20, 30, 255]));
+            let actual = RgbaImage::from_pixel(1, 1, Rgba([11, 19, 30, 254]));
+
+            assert!(within_one_step(&expected, &actual));
+        }
+
+        #[test]
+        fn comparison_rejects_larger_changes_and_sizes() {
+            let expected = RgbaImage::from_pixel(1, 1, Rgba([10, 20, 30, 255]));
+            let changed = RgbaImage::from_pixel(1, 1, Rgba([12, 20, 30, 255]));
+            let resized = RgbaImage::from_pixel(2, 1, Rgba([10, 20, 30, 255]));
+
+            assert!(!within_one_step(&expected, &changed));
+            assert!(!within_one_step(&expected, &resized));
+        }
     }
 }

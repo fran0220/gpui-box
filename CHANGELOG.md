@@ -22,6 +22,16 @@ service.
 
 ### Changed
 
+**Faster validation.** CI now runs once per pull-request commit, cancels
+superseded runs, omits debugger data, and caches both Cargo workspaces used by
+the headless renderer. Platform jobs no longer repeat the Linux authority
+gate, and the release workflow composes the same independent proofs instead of
+rerunning the full gate on macOS. `xtask web gate` builds and prepares Chromium
+once for the browser checks. Passing headless frames are compared in memory;
+only changed or new images are PNG-encoded for review. Routine local builds
+retain source-line backtraces while omitting the variable-level debug data that
+made accumulated build artifacts unnecessarily large.
+
 **Single-repository framework authority.** GPUI Box now develops GPUI, native
 platforms, media, and Kit directly in this repository. The former Zed sync and
 fork-overlay mutation commands have been removed. `scripts/sync-zed` retains a

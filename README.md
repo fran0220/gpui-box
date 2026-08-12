@@ -87,18 +87,22 @@ token keys, and stable semantic ids are all compatibility surfaces.
 ```bash
 cargo run -p gpui-box-gallery
 cargo run -p xtask -- scenes render
-cargo run -p xtask -- gate
-cargo run -p xtask -- gate full
+cargo run -p xtask -- gate              # complete non-visual proof
+cargo run -p xtask -- gate full         # gate + rustdoc + native visual catalog
 cargo run -p xtask -- headless check
 cargo run -p xtask -- web check
 cargo run -p xtask -- web build
 cargo run -p xtask -- web smoke
 cargo run -p xtask -- web visual check button input dialog node-graph
+cargo run -p xtask -- web gate button input dialog node-graph
 cargo run -p xtask -- package plan
 cargo run -p xtask -- package check
 ```
 
 `scenes render` writes real-window review images; it is not a baseline gate.
+Run `gate full` instead of, not after, `gate` when a change can affect rendered
+output. The standalone web commands remain useful while iterating; `web gate`
+builds and prepares Chromium once before running the complete browser proof.
 Headless baselines and CI gates cover macOS, Linux, and Windows, and the native
 matrix compiles every feature on all three. Browser CI cross-checks WASM and
 drives a real Chromium smoke. Browser validation is single-threaded and does

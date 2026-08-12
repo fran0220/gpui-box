@@ -62,9 +62,13 @@ list, is authoritative.
    publication proof; a per-crate dry-run cannot resolve not-yet-published
    cohort dependencies. The workflow validates the exact tag on all three
    native targets, checks all three renderer-specific headless baselines, runs
-   the full macOS gate, and runs the WASM build, Chromium smoke, and browser
-   visual baseline. Neither publisher job can start unless every one of those
-   jobs and the SemVer matrix succeeds. Preflight peels the annotated tag once;
+   the Linux authority gate and rustdoc, and runs the WASM build, Chromium
+   smoke, and browser visual baseline. The macOS and Windows native jobs add
+   their platform-specific all-feature warning proof, while macOS also runs
+   platform tests, without rerunning the Linux gate;
+   the headless jobs do not repeat the authority checks. Neither publisher job
+   can start unless every one of those jobs and the SemVer matrix succeeds.
+   Preflight peels the annotated tag once;
    every downstream checkout and the archive artifact name are bound to that
    exact commit SHA, so moving the tag later can only fail publication, never
    switch the commit being validated.
