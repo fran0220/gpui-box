@@ -1,10 +1,12 @@
 #![allow(clippy::disallowed_methods, reason = "build scripts are exempt")]
 fn main() {
-    use std::{env, path::PathBuf, process::Command};
+    #[cfg(all(feature = "native-playback", target_os = "macos"))]
+    build_macos();
+}
 
-    if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("macos") {
-        return;
-    }
+#[cfg(all(feature = "native-playback", target_os = "macos"))]
+fn build_macos() {
+    use std::{env, path::PathBuf, process::Command};
 
     println!("cargo:rerun-if-changed=src/player/macos.m");
     cc::Build::new()

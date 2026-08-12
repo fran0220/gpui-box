@@ -13,3 +13,8 @@
   fork commit. A complete filtered import proves that no file was dropped from
   that revision; it does not prove that the revision includes capabilities
   added later and already required by a downstream project.
+- Do not describe the frozen Zed provenance receipt as a two-repository
+  development model. GPUI Box is the only development, build, test, and release
+  authority; historical repository URLs and vendor refs are immutable evidence,
+  while all project-owned framework, platform, media, Kit, and tooling code is
+  developed in this repository over public registry dependencies.

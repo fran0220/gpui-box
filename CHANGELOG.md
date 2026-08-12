@@ -34,7 +34,11 @@ made accumulated build artifacts unnecessarily large. The registry-only
 package gate now materializes the patched `block` crate from its vendored source
 instead of accidentally depending on a warm developer Cargo cache, and removes
 multi-gigabyte temporary consumers after a successful proof rather than feeding
-them into the CI cache.
+them into the CI cache. Headless CI now enters its independent workspace
+directly instead of compiling the overlapping root `xtask` graph first, and
+its deterministic build omits native window-system and media playback backends
+that no captured scene constructs. Normal framework and Kit builds retain
+those native backends by default.
 
 **Single-repository framework authority.** GPUI Box now develops GPUI, native
 platforms, media, and Kit directly in this repository. The former Zed sync and

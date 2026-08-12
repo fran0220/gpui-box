@@ -82,12 +82,10 @@ jobs:
         with: { toolchain: 1.97.0 }
       - uses: Swatinem/rust-cache@v2
         with:
-          # The command builds xtask in the root workspace, then the renderer
-          # in its deliberately independent workspace and target directory.
-          workspaces: |
-            . -> target
-            tools/headless-visual -> target
-      - run: cargo run -p xtask -- headless check
+          # CI enters the visual workspace directly. Building the root xtask
+          # first would compile the same GPUI/Kit graph into a second target.
+          workspaces: tools/headless-visual -> target
+      - run: cargo run --locked --manifest-path tools/headless-visual/Cargo.toml -- check
       - if: failure()
         uses: actions/upload-artifact@v4
         with:

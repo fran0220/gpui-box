@@ -22,7 +22,7 @@ anyhow = "1"
 # writes PNG; do not pull the image crate's AVIF encoder into this workspace.
 image = { version = "0.25", default-features = false, features = ["png"] }
 gpui = { package = "gpui-box", path = "../../crates/gpui", version = "0.1.1", features = ["test-support"] }
-gpui-kit = { package = "gpui-box-kit", path = "../../crates/gpui-kit", version = "0.1.1", features = ["fixtures"] }
+gpui-kit = { package = "gpui-box-kit", path = "../../crates/gpui-kit", version = "0.1.1", default-features = false, features = ["fixtures"] }
 gpui-kit-semantics = { package = "gpui-box-kit-semantics", path = "../../crates/gpui-kit-semantics", version = "0.1.1" }
 gpui-kit-theme = { package = "gpui-box-kit-theme", path = "../../crates/gpui-kit-theme", version = "0.1.1" }
 
@@ -30,7 +30,7 @@ gpui-kit-theme = { package = "gpui-box-kit-theme", path = "../../crates/gpui-kit
 # Metal on macOS, wgpu elsewhere. `gpui_wgpu` additionally supplies the
 # bundled-font text system, which every platform uses so that shaping cannot
 # vary with the machine's installed fonts.
-gpui_platform = { package = "gpui-box-platform", path = "../../crates/gpui_platform", version = "0.1.1", features = ["test-support"] }
+gpui_platform = { package = "gpui-box-platform", path = "../../crates/gpui_platform", version = "0.1.1", default-features = false, features = ["test-support"] }
 gpui_wgpu = { package = "gpui-box-wgpu", path = "../../crates/gpui_wgpu", version = "0.1.1", features = ["test-support"] }
 
 [workspace]

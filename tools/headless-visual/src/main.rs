@@ -32,6 +32,7 @@ mod imp {
     use std::fs;
     use std::path::PathBuf;
     use std::sync::{Arc, Mutex};
+    use std::time::Instant;
 
     use anyhow::{Context as _, Result, bail};
     use gpui::{
@@ -189,6 +190,7 @@ mod imp {
             }
         }
 
+        let initialization_started = Instant::now();
         // Only the bundled fonts take part. Loading the machine's own fonts
         // would shape text differently from one machine to the next, and the
         // exact per-adapter comparison above depends on there being no such
@@ -213,8 +215,13 @@ mod imp {
                 cx.new(|_| Host)
             })?
             .into();
+        println!(
+            "headless renderer initialized in {:.2?}",
+            initialization_started.elapsed()
+        );
 
         let wanted = |name: &str| only.is_empty() || only.iter().any(|only| only == name);
+        let rendering_started = Instant::now();
         let mut count = 0;
         // Scene outside, theme inside, matching the macOS gallery: a scene may
         // install state on its first build, so its images are taken next to
@@ -243,6 +250,10 @@ mod imp {
                 count += 1;
             }
         }
+        println!(
+            "rendered and compared {count} images in {:.2?}",
+            rendering_started.elapsed()
+        );
         Ok(count)
     }
 

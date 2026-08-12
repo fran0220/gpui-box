@@ -17,27 +17,46 @@ name = "media"
 path = "src/media.rs"
 doctest = false
 
+[features]
+default = ["native-playback"]
+# Keep the product-neutral player contract available to deterministic tests
+# and unsupported targets without compiling an operating-system decoder. The
+# normal crate keeps native playback on by default.
+native-playback = [
+    "dep:bindgen",
+    "dep:cc",
+    "dep:core-foundation",
+    "dep:core-video",
+    "dep:ctor",
+    "dep:foreign-types",
+    "dep:metal",
+    "dep:objc",
+    "dep:url",
+    "dep:windows",
+    "dep:windows-core",
+]
+
 [dependencies]
 anyhow.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
-core-foundation.workspace = true
-ctor.workspace = true
-foreign-types.workspace = true
-metal.workspace = true
-core-video.workspace = true
-objc.workspace = true
+core-foundation = { workspace = true, optional = true }
+ctor = { workspace = true, optional = true }
+foreign-types = { workspace = true, optional = true }
+metal = { workspace = true, optional = true }
+core-video = { workspace = true, optional = true }
+objc = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-url.workspace = true
-windows = { workspace = true, features = [
+url = { workspace = true, optional = true }
+windows = { workspace = true, optional = true, features = [
     "Win32_Media_MediaFoundation",
     "Win32_System_Com",
     "Win32_System_LibraryLoader",
     "Win32_UI_WindowsAndMessaging",
 ] }
-windows-core.workspace = true
+windows-core = { workspace = true, optional = true }
 
-[build-dependencies]
-bindgen = "0.71"
-cc = "1.2"
+[target.'cfg(target_os = "macos")'.build-dependencies]
+bindgen = { version = "0.71", optional = true }
+cc = { version = "1.2", optional = true }

@@ -32,10 +32,10 @@ use std::{
     },
 };
 
-#[cfg(target_os = "macos")]
+#[cfg(all(feature = "native-playback", target_os = "macos"))]
 mod macos;
 mod unsupported;
-#[cfg(target_os = "windows")]
+#[cfg(all(feature = "native-playback", target_os = "windows"))]
 mod windows;
 
 /// Whether a player should open audio only or expose a native video view.
@@ -254,7 +254,13 @@ impl EventHub {
         }
     }
 
-    #[cfg(any(test, target_os = "macos", target_os = "windows"))]
+    #[cfg(any(
+        test,
+        all(
+            feature = "native-playback",
+            any(target_os = "macos", target_os = "windows")
+        )
+    ))]
     fn emit(&self, event: MediaEvent) {
         let handlers = self
             .handlers
@@ -307,7 +313,10 @@ pub struct NativeVideoView {
 }
 
 impl NativeVideoView {
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(all(
+        feature = "native-playback",
+        any(target_os = "macos", target_os = "windows")
+    ))]
     unsafe fn from_ptr(raw: *mut c_void) -> Option<Self> {
         NonNull::new(raw).map(|raw| Self {
             raw,
@@ -330,14 +339,17 @@ impl fmt::Debug for NativeVideoView {
 }
 
 enum Backend {
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(all(
+        feature = "native-playback",
+        any(target_os = "macos", target_os = "windows")
+    ))]
     Native(platform::Player),
     Unavailable(unsupported::Player),
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(all(feature = "native-playback", target_os = "macos"))]
 use macos as platform;
-#[cfg(target_os = "windows")]
+#[cfg(all(feature = "native-playback", target_os = "windows"))]
 use windows as platform;
 
 /// One native audio or video player.
@@ -368,12 +380,18 @@ impl MediaPlayer {
     /// failures, so a UI always has a truthful state to render.
     pub fn new(kind: MediaKind) -> Self {
         let events = Arc::new(EventHub::default());
-        #[cfg(any(target_os = "macos", target_os = "windows"))]
+        #[cfg(all(
+            feature = "native-playback",
+            any(target_os = "macos", target_os = "windows")
+        ))]
         let backend = match platform::Player::new(kind, Arc::clone(&events)) {
             Ok(player) => Backend::Native(player),
             Err(error) => Backend::Unavailable(unsupported::Player::failed(error)),
         };
-        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        #[cfg(not(all(
+            feature = "native-playback",
+            any(target_os = "macos", target_os = "windows")
+        )))]
         let backend = Backend::Unavailable(unsupported::Player::no_backend());
 
         Self {
@@ -391,7 +409,10 @@ impl MediaPlayer {
     /// Replaces the current source and begins opening it asynchronously.
     pub fn load(&self, source: MediaSource) -> Result<(), MediaError> {
         match &self.backend {
-            #[cfg(any(target_os = "macos", target_os = "windows"))]
+            #[cfg(all(
+                feature = "native-playback",
+                any(target_os = "macos", target_os = "windows")
+            ))]
             Backend::Native(player) => player.load(source),
             Backend::Unavailable(player) => {
                 let _ = source;
@@ -403,7 +424,10 @@ impl MediaPlayer {
     /// Applies a playback command without waiting for decoding or rendering.
     pub fn command(&self, command: MediaCommand) -> MediaCommandOutcome {
         match &self.backend {
-            #[cfg(any(target_os = "macos", target_os = "windows"))]
+            #[cfg(all(
+                feature = "native-playback",
+                any(target_os = "macos", target_os = "windows")
+            ))]
             Backend::Native(player) => player.command(command),
             Backend::Unavailable(_) => {
                 let _ = command;
@@ -415,7 +439,10 @@ impl MediaPlayer {
     /// Reads native state without opening, decoding, or blocking for media.
     pub fn snapshot(&self) -> MediaSnapshot {
         match &self.backend {
-            #[cfg(any(target_os = "macos", target_os = "windows"))]
+            #[cfg(all(
+                feature = "native-playback",
+                any(target_os = "macos", target_os = "windows")
+            ))]
             Backend::Native(player) => player.snapshot(),
             Backend::Unavailable(player) => player.snapshot(),
         }
@@ -425,7 +452,10 @@ impl MediaPlayer {
     /// return `None`.
     pub fn native_video_view(&self) -> Option<NativeVideoView> {
         match &self.backend {
-            #[cfg(any(target_os = "macos", target_os = "windows"))]
+            #[cfg(all(
+                feature = "native-playback",
+                any(target_os = "macos", target_os = "windows")
+            ))]
             Backend::Native(player) => player.native_video_view(),
             Backend::Unavailable(_) => None,
         }

@@ -11,9 +11,13 @@ rust-version.workspace = true
 name = "gpui_kit"
 
 [features]
+default = ["native-media"]
 # The reference calendar the datetime scenes and tests run on. Off by default,
 # so a host cannot reach a fixture calendar from the component path.
 fixtures = []
+# Native playback remains the normal component contract. Deterministic visual
+# harnesses can disable it while retaining the same player and transport types.
+native-media = ["media/native-playback"]
 
 [dependencies]
 unicode-segmentation.workspace = true
@@ -23,7 +27,7 @@ gpui-kit-assets.workspace = true
 gpui-kit-semantics.workspace = true
 gpui-kit-theme.workspace = true
 gpui-kit-tokens.workspace = true
-media.workspace = true
+media = { workspace = true, default-features = false }
 pulldown-cmark.workspace = true
 # Parsing only, for the bounded glTF reader in `media::gltf`. Nothing here
 # serializes, and nothing here resolves a URI.

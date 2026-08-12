@@ -3,13 +3,16 @@
 
 pub use gpui::Platform;
 
+#[cfg(feature = "native-platform")]
 use std::rc::Rc;
 
 /// Returns a background executor for the current platform.
+#[cfg(feature = "native-platform")]
 pub fn background_executor() -> gpui::BackgroundExecutor {
     current_platform(true).background_executor()
 }
 
+#[cfg(feature = "native-platform")]
 pub fn application() -> gpui::Application {
     #[cfg(target_family = "wasm")]
     {
@@ -20,11 +23,12 @@ pub fn application() -> gpui::Application {
     gpui::Application::with_platform(current_platform(false))
 }
 
+#[cfg(feature = "native-platform")]
 pub fn headless() -> gpui::Application {
     gpui::Application::with_platform(current_platform(true))
 }
 
-#[cfg(target_family = "wasm")]
+#[cfg(all(feature = "native-platform", target_family = "wasm"))]
 pub use gpui_web::WebBackendPreference;
 
 /// Creates a browser application using the requested graphics backend.
@@ -32,7 +36,7 @@ pub use gpui_web::WebBackendPreference;
 /// Browser applications are single-threaded by default and build on the repository's stable
 /// toolchain. Enable `web-multithreaded` explicitly to compile the experimental worker-backed
 /// dispatcher; that path currently requires a nightly toolchain and Wasm atomics build flags.
-#[cfg(target_family = "wasm")]
+#[cfg(all(feature = "native-platform", target_family = "wasm"))]
 pub fn application_with_web_backend(backend_preference: WebBackendPreference) -> gpui::Application {
     let platform = Rc::new(gpui_web::WebPlatform::new_with_backend(
         cfg!(feature = "web-multithreaded"),
@@ -43,7 +47,7 @@ pub fn application_with_web_backend(backend_preference: WebBackendPreference) ->
 }
 
 /// Unlike `application`, this function returns a single-threaded web application.
-#[cfg(target_family = "wasm")]
+#[cfg(all(feature = "native-platform", target_family = "wasm"))]
 pub fn single_threaded_web() -> gpui::Application {
     let platform = Rc::new(gpui_web::WebPlatform::new(false));
     let http_client = std::sync::Arc::new(platform.fetch_http_client());
@@ -52,13 +56,14 @@ pub fn single_threaded_web() -> gpui::Application {
 
 /// Initializes panic hooks and logging for the web platform.
 /// Call this before running the application in a wasm_bindgen entrypoint.
-#[cfg(target_family = "wasm")]
+#[cfg(all(feature = "native-platform", target_family = "wasm"))]
 pub fn web_init() {
     console_error_panic_hook::set_once();
     gpui_web::init_logging();
 }
 
 /// Returns the default [`Platform`] for the current OS.
+#[cfg(feature = "native-platform")]
 pub fn current_platform(headless: bool) -> Rc<dyn Platform> {
     #[cfg(target_os = "macos")]
     {
@@ -176,7 +181,7 @@ mod test_text_system_tests {
     }
 }
 
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(all(test, feature = "native-platform", target_os = "macos"))]
 mod tests {
     use super::*;
     use gpui::{AppContext, Empty, VisualTestAppContext};

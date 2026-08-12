@@ -17,8 +17,9 @@ name = "gpui_platform"
 path = "src/gpui_platform.rs"
 
 [features]
-default = []
+default = ["native-platform"]
 font-kit = ["gpui_macos/font-kit"]
+native-platform = ["dep:gpui_linux", "dep:gpui_macos", "dep:gpui_web", "dep:gpui_windows"]
 web-multithreaded = ["gpui_web/multithreaded"]
 test-support = [
     "gpui/test-support",
@@ -37,15 +38,15 @@ gpui_wgpu = { workspace = true, optional = true }
 log.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
-gpui_macos.workspace = true
+gpui_macos = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-gpui_windows.workspace = true
+gpui_windows = { workspace = true, optional = true }
 gpui = { workspace = true, features = ["windows-manifest"] }
 
 [target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
-gpui_linux.workspace = true
+gpui_linux = { workspace = true, optional = true }
 
 [target.'cfg(target_family = "wasm")'.dependencies]
-gpui_web.workspace = true
+gpui_web = { workspace = true, optional = true }
 console_error_panic_hook.workspace = true

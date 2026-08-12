@@ -258,7 +258,12 @@ family as the root workspace with path-plus-version declarations and no Git
 source. Both workspaces apply the one audited crates.io patch for the vendored
 `block` 0.1.6 future-compatibility fix; no GPUI Box package is patched, and no
 other patch is allowed. `xtask dependencies check` fails if either graph,
-authority declaration, patch receipt, or lockfile drifts.
+authority declaration, patch receipt, or lockfile drifts. CI invokes this
+workspace directly so a cold visual job does not first build the overlapping
+root `xtask` graph. It also disables native window-system and media playback
+features: the harness needs the platform's offscreen renderer, while media
+scenes use the deterministic `FixtureTransport`. Normal applications keep both
+native feature sets enabled by default.
 
 ## Audit
 

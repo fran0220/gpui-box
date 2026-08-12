@@ -6,7 +6,13 @@ pub(super) struct Player {
 }
 
 impl Player {
-    #[cfg(any(test, not(any(target_os = "macos", target_os = "windows"))))]
+    #[cfg(any(
+        test,
+        not(all(
+            feature = "native-playback",
+            any(target_os = "macos", target_os = "windows")
+        ))
+    ))]
     pub(super) fn no_backend() -> Self {
         Self {
             error: MediaError::new(
@@ -17,7 +23,10 @@ impl Player {
         }
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(all(
+        feature = "native-playback",
+        any(target_os = "macos", target_os = "windows")
+    ))]
     pub(super) fn failed(error: MediaError) -> Self {
         Self {
             error,
