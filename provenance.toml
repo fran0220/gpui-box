@@ -39,10 +39,10 @@ source_revisions = [
 source_tip = "b46bf740a55c53612b14120f5dfbb7ceec463261"
 filter_schema_version = 1
 filter_digest_sha256 = "3e0af84683c4bae5f8be805ca0581f8ae297998fc0d40f967eaca9772562efdc"
-base_vendor_tip = ""
+base_vendor_tip = "c036e5bcb472b7c557c231a66d69e646285d1942"
 vendor_ref = "refs/heads/vendor/zed-gpui-fork-overlay"
-vendor_tip = ""
-integration_commit = ""
+vendor_tip = "0af0b404aa00b0b137c29e8d6a11030c32da8f0a"
+integration_commit = "da073c703bbc16f24e69967bafad67036f150ecb"
 
 [licenses]
 framework = "Apache-2.0"
