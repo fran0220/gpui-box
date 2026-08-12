@@ -1551,13 +1551,7 @@ fn create_swap_chain(
     Ok(swap_chain)
 }
 
-#[inline]
-fn create_resources(
-    devices: &DirectXRendererDevices,
-    swap_chain: &IDXGISwapChain1,
-    width: u32,
-    height: u32,
-) -> Result<(
+type CreatedResources = (
     ID3D11Texture2D,
     Option<ID3D11RenderTargetView>,
     ID3D11Texture2D,
@@ -1565,7 +1559,15 @@ fn create_resources(
     ID3D11Texture2D,
     Option<ID3D11RenderTargetView>,
     D3D11_VIEWPORT,
-)> {
+);
+
+#[inline]
+fn create_resources(
+    devices: &DirectXRendererDevices,
+    swap_chain: &IDXGISwapChain1,
+    width: u32,
+    height: u32,
+) -> Result<CreatedResources> {
     let (render_target, render_target_view) =
         create_render_target_and_its_view(swap_chain, &devices.device)?;
     let (path_intermediate_texture, path_intermediate_srv) =
@@ -2033,7 +2035,7 @@ pub(crate) mod shader_resources {
             let mut compile_blob = None;
             let mut error_blob = None;
             let shader_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join(&format!("src/{}", shader_name))
+                .join(format!("src/{}", shader_name))
                 .canonicalize()?;
 
             let entry_point = PCSTR::from_raw(entry.as_ptr());

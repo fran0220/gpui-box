@@ -934,6 +934,7 @@ fn gate(full: bool) -> Result<()> {
             "clippy",
             "--workspace",
             "--all-targets",
+            "--all-features",
             "--",
             "-D",
             "warnings",
@@ -961,6 +962,7 @@ fn future_compatibility_check() -> Result<()> {
         "check",
         "--workspace",
         "--all-targets",
+        "--all-features",
         "--future-incompat-report",
     ];
     println!("== cargo {}", args.join(" "));

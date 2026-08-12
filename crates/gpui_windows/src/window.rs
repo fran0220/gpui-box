@@ -34,6 +34,12 @@ use gpui::*;
 
 pub(crate) struct WindowsWindow(pub Rc<WindowsWindowInner>);
 
+type RequestFrameCallback = Box<dyn FnMut(RequestFrameOptions)>;
+type WindowEventCallback = Box<dyn FnMut(PlatformInput) -> DispatchEventResult>;
+type WindowStatusCallback = Box<dyn FnMut(bool)>;
+type WindowResizeCallback = Box<dyn FnMut(Size<Pixels>, f32)>;
+type HitTestWindowControlCallback = Box<dyn FnMut() -> Option<WindowControlArea>>;
+
 impl std::ops::Deref for WindowsWindow {
     type Target = WindowsWindowInner;
 
@@ -51,7 +57,7 @@ pub struct WindowsWindowState {
     pub appearance: Cell<WindowAppearance>,
     pub background_appearance: Cell<WindowBackgroundAppearance>,
     pub scale_factor: Cell<f32>,
-    pub restore_from_minimized: Cell<Option<Box<dyn FnMut(RequestFrameOptions)>>>,
+    pub restore_from_minimized: Cell<Option<RequestFrameCallback>>,
 
     pub callbacks: Callbacks,
     pub input_handler: Cell<Option<PlatformInputHandler>>,
@@ -111,16 +117,8 @@ pub(crate) struct WindowsWindowInner {
 impl WindowsWindowState {
     fn new(
         hwnd: HWND,
-        directx_devices: &DirectXDevices,
         window_params: &CREATESTRUCTW,
-        current_cursor: Option<HCURSOR>,
-        cursor_visible: Arc<AtomicBool>,
-        display: WindowsDisplay,
-        min_size: Option<Size<Pixels>>,
-        appearance: WindowAppearance,
-        disable_direct_composition: bool,
-        invalidate_devices: Arc<AtomicBool>,
-        draw_coordinator: Rc<DrawCoordinator>,
+        context: &WindowCreateContext,
     ) -> Result<Self> {
         let scale_factor = {
             let monitor_dpi = unsafe { GetDpiForWindow(hwnd) } as f32;
@@ -140,8 +138,12 @@ impl WindowsWindowState {
         };
         let border_offset = WindowBorderOffset::default();
         let restore_from_minimized = None;
-        let renderer = DirectXRenderer::new(hwnd, directx_devices, disable_direct_composition)
-            .context("Creating DirectX renderer")?;
+        let renderer = DirectXRenderer::new(
+            hwnd,
+            &context.directx_devices,
+            context.disable_direct_composition,
+        )
+        .context("Creating DirectX renderer")?;
         let callbacks = Callbacks::default();
         let input_handler = None;
         let pending_surrogate = None;
@@ -161,11 +163,11 @@ impl WindowsWindowState {
             logical_size: Cell::new(logical_size),
             fullscreen_restore_bounds: Cell::new(fullscreen_restore_bounds),
             border_offset,
-            appearance: Cell::new(appearance),
+            appearance: Cell::new(context.appearance),
             background_appearance: Cell::new(WindowBackgroundAppearance::Opaque),
             scale_factor: Cell::new(scale_factor),
             restore_from_minimized: Cell::new(restore_from_minimized),
-            min_size,
+            min_size: context.min_size,
             callbacks,
             input_handler: Cell::new(input_handler),
             ime_enabled: Cell::new(true),
@@ -177,15 +179,15 @@ impl WindowsWindowState {
             platform_view_host: PlatformViewHost::new(hwnd),
             force_render_pending: Cell::new(false),
             click_state,
-            current_cursor: Cell::new(current_cursor),
-            cursor_visible,
+            current_cursor: Cell::new(context.current_cursor),
+            cursor_visible: context.cursor_visible.clone(),
             nc_button_pressed: Cell::new(nc_button_pressed),
-            display: Cell::new(display),
+            display: Cell::new(context.display),
             fullscreen: Cell::new(fullscreen),
             initial_placement: Cell::new(initial_placement),
             hwnd,
-            invalidate_devices,
-            draw_coordinator,
+            invalidate_devices: context.invalidate_devices.clone(),
+            draw_coordinator: context.draw_coordinator.clone(),
             direct_manipulation,
             a11y: RefCell::new(None),
         })
@@ -252,19 +254,7 @@ impl WindowsWindowState {
 
 impl WindowsWindowInner {
     fn new(context: &mut WindowCreateContext, hwnd: HWND, cs: &CREATESTRUCTW) -> Result<Rc<Self>> {
-        let state = WindowsWindowState::new(
-            hwnd,
-            &context.directx_devices,
-            cs,
-            context.current_cursor,
-            context.cursor_visible.clone(),
-            context.display,
-            context.min_size,
-            context.appearance,
-            context.disable_direct_composition,
-            context.invalidate_devices.clone(),
-            context.draw_coordinator.clone(),
-        )?;
+        let state = WindowsWindowState::new(hwnd, cs, context)?;
 
         Ok(Rc::new(Self {
             hwnd,
@@ -306,7 +296,7 @@ impl WindowsWindowInner {
                         unsafe { GetWindowRect(this.hwnd, &mut rc) }
                             .context("failed to get window rect")
                             .log_err();
-                        let _ = this.state.fullscreen.set(Some(StyleAndBounds {
+                        this.state.fullscreen.set(Some(StyleAndBounds {
                             style,
                             x: rc.left,
                             y: rc.top,
@@ -379,15 +369,15 @@ impl WindowsWindowInner {
 
 #[derive(Default)]
 pub(crate) struct Callbacks {
-    pub(crate) request_frame: Cell<Option<Box<dyn FnMut(RequestFrameOptions)>>>,
-    pub(crate) input: Cell<Option<Box<dyn FnMut(PlatformInput) -> DispatchEventResult>>>,
-    pub(crate) active_status_change: Cell<Option<Box<dyn FnMut(bool)>>>,
-    pub(crate) hovered_status_change: Cell<Option<Box<dyn FnMut(bool)>>>,
-    pub(crate) resize: Cell<Option<Box<dyn FnMut(Size<Pixels>, f32)>>>,
+    pub(crate) request_frame: Cell<Option<RequestFrameCallback>>,
+    pub(crate) input: Cell<Option<WindowEventCallback>>,
+    pub(crate) active_status_change: Cell<Option<WindowStatusCallback>>,
+    pub(crate) hovered_status_change: Cell<Option<WindowStatusCallback>>,
+    pub(crate) resize: Cell<Option<WindowResizeCallback>>,
     pub(crate) moved: Cell<Option<Box<dyn FnMut()>>>,
     pub(crate) should_close: Cell<Option<Box<dyn FnMut() -> bool>>>,
     pub(crate) close: Cell<Option<Box<dyn FnOnce()>>>,
-    pub(crate) hit_test_window_control: Cell<Option<Box<dyn FnMut() -> Option<WindowControlArea>>>>,
+    pub(crate) hit_test_window_control: Cell<Option<HitTestWindowControlCallback>>,
     pub(crate) appearance_changed: Cell<Option<Box<dyn FnMut()>>>,
 }
 
@@ -724,9 +714,11 @@ impl PlatformWindow for WindowsWindow {
             .executor
             .spawn(async move {
                 unsafe {
-                    let mut config = TASKDIALOGCONFIG::default();
-                    config.cbSize = std::mem::size_of::<TASKDIALOGCONFIG>() as _;
-                    config.hwndParent = handle;
+                    let mut config = TASKDIALOGCONFIG {
+                        cbSize: std::mem::size_of::<TASKDIALOGCONFIG>() as _,
+                        hwndParent: handle,
+                        ..Default::default()
+                    };
                     let title;
                     let main_icon;
                     match level {
@@ -1348,7 +1340,7 @@ struct StyleAndBounds {
 }
 
 #[repr(C)]
-struct WINDOWCOMPOSITIONATTRIBDATA {
+struct WindowCompositionAttributeData {
     attrib: u32,
     pv_data: *mut std::ffi::c_void,
     cb_data: usize,
@@ -1585,16 +1577,12 @@ fn dwm_set_window_composition_attribute(hwnd: HWND, backdrop_type: u32) {
     }
 
     unsafe {
-        let result = DwmSetWindowAttribute(
+        let _ = DwmSetWindowAttribute(
             hwnd,
             DWMWA_SYSTEMBACKDROP_TYPE,
             &backdrop_type as *const _ as *const _,
             std::mem::size_of_val(&backdrop_type) as u32,
         );
-
-        if !result.is_ok() {
-            return;
-        }
     }
 }
 
@@ -1608,7 +1596,7 @@ fn set_window_composition_attribute(hwnd: HWND, color: Option<Color>, state: u32
 
     unsafe {
         type SetWindowCompositionAttributeType =
-            unsafe extern "system" fn(HWND, *mut WINDOWCOMPOSITIONATTRIBDATA) -> BOOL;
+            unsafe extern "system" fn(HWND, *mut WindowCompositionAttributeData) -> BOOL;
         let module_name = PCSTR::from_raw(c"user32.dll".as_ptr() as *const u8);
         if let Some(user32) = GetModuleHandleA(module_name)
             .context("Unable to get user32.dll handle")
@@ -1635,7 +1623,7 @@ fn set_window_composition_attribute(hwnd: HWND, color: Option<Color>, state: u32
                     | ((color.3 as u32) << 24),
                 animation_id: 0,
             };
-            let mut data = WINDOWCOMPOSITIONATTRIBDATA {
+            let mut data = WindowCompositionAttributeData {
                 attrib: 0x13,
                 pv_data: &accent as *const _ as *mut _,
                 cb_data: std::mem::size_of::<AccentPolicy>(),

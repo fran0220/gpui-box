@@ -133,7 +133,7 @@ fn add_dock_menu(
 fn add_recent_folders(
     list: &ICustomDestinationList,
     entries: &[SmallVec<[PathBuf; 2]>],
-    removed: &Vec<SmallVec<[PathBuf; 2]>>,
+    removed: &[SmallVec<[PathBuf; 2]>],
 ) -> anyhow::Result<()> {
     unsafe {
         let tasks: IObjectCollection =

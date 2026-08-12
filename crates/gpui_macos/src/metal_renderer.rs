@@ -256,7 +256,7 @@ impl MetalRenderer {
     ) -> Self {
         #[cfg(feature = "runtime_shaders")]
         let library = device
-            .new_library_with_source(&SHADERS_SOURCE_FILE, &metal::CompileOptions::new())
+            .new_library_with_source(SHADERS_SOURCE_FILE, &metal::CompileOptions::new())
             .expect("error building metal library");
         #[cfg(not(feature = "runtime_shaders"))]
         let library = device

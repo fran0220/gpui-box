@@ -75,14 +75,18 @@ pub(crate) struct WindowsPlatformState {
     directx_devices: RefCell<Option<DirectXDevices>>,
 }
 
+type OpenUrlsCallback = Box<dyn FnMut(Vec<String>)>;
+type AppMenuActionCallback = Box<dyn FnMut(&dyn Action)>;
+type ValidateAppMenuCommandCallback = Box<dyn FnMut(&dyn Action) -> bool>;
+
 #[derive(Default)]
 struct PlatformCallbacks {
-    open_urls: Cell<Option<Box<dyn FnMut(Vec<String>)>>>,
+    open_urls: Cell<Option<OpenUrlsCallback>>,
     quit: Cell<Option<Box<dyn FnMut()>>>,
     reopen: Cell<Option<Box<dyn FnMut()>>>,
-    app_menu_action: Cell<Option<Box<dyn FnMut(&dyn Action)>>>,
+    app_menu_action: Cell<Option<AppMenuActionCallback>>,
     will_open_app_menu: Cell<Option<Box<dyn FnMut()>>>,
-    validate_app_menu_command: Cell<Option<Box<dyn FnMut(&dyn Action) -> bool>>>,
+    validate_app_menu_command: Cell<Option<ValidateAppMenuCommandCallback>>,
     keyboard_layout_change: Cell<Option<Box<dyn FnMut()>>>,
     system_wake: Cell<Option<Box<dyn FnMut()>>>,
 }
@@ -337,18 +341,17 @@ impl WindowsPlatform {
                 let vsync_provider = VSyncProvider::new();
                 loop {
                     vsync_provider.wait_for_vsync();
-                    if check_device_lost(&directx_device.device)
-                        || invalidate_devices.fetch_and(false, Ordering::Acquire)
-                    {
-                        if let Err(err) = handle_gpu_device_lost(
+                    if (check_device_lost(&directx_device.device)
+                        || invalidate_devices.fetch_and(false, Ordering::Acquire))
+                        && let Err(err) = handle_gpu_device_lost(
                             &mut directx_device,
                             platform_window.as_raw(),
                             validation_number,
                             &all_windows,
                             &text_system,
-                        ) {
-                            panic!("Device lost: {err}");
-                        }
+                        )
+                    {
+                        panic!("Device lost: {err}");
                     }
                     let Some(all_windows) = all_windows.upgrade() else {
                         break;
@@ -1057,12 +1060,14 @@ impl WindowsPlatformInner {
                     }
                     // Allow the main loop to process other gpui events before going back into `run_foreground_task`
                     unsafe {
-                        if let Err(_) = PostMessageW(
+                        if PostMessageW(
                             Some(self.dispatcher.platform_window_handle.as_raw()),
                             WM_GPUI_TASK_DISPATCHED_ON_MAIN_THREAD,
                             WPARAM(self.validation_number),
                             LPARAM(0),
-                        ) {
+                        )
+                        .is_err()
+                        {
                             self.dispatcher.wake_posted.store(false, Ordering::Release);
                         };
                     }
@@ -1418,7 +1423,7 @@ fn handle_gpu_device_lost(
     }
 
     if let Some(text_system) = text_system.upgrade() {
-        text_system.handle_gpu_lost(&directx_devices)?;
+        text_system.handle_gpu_lost(directx_devices)?;
     }
     if let Some(all_windows) = all_windows.upgrade() {
         for window in all_windows.read().iter() {

@@ -39,27 +39,6 @@ fn a11y_window_focus_state_for_message(message: u32) -> Option<bool> {
     }
 }
 
-#[cfg(test)]
-mod a11y_focus_tests {
-    use super::a11y_window_focus_state_for_message;
-    use windows::Win32::UI::WindowsAndMessaging::{
-        WM_ACTIVATE, WM_ENTERMENULOOP, WM_ENTERSIZEMOVE, WM_EXITMENULOOP, WM_EXITSIZEMOVE,
-        WM_KILLFOCUS, WM_SETFOCUS,
-    };
-
-    #[test]
-    fn keyboard_focus_and_modal_loop_messages_drive_accesskit_host_focus() {
-        for message in [WM_SETFOCUS, WM_EXITMENULOOP, WM_EXITSIZEMOVE] {
-            assert_eq!(a11y_window_focus_state_for_message(message), Some(true));
-        }
-        for message in [WM_KILLFOCUS, WM_ENTERMENULOOP, WM_ENTERSIZEMOVE] {
-            assert_eq!(a11y_window_focus_state_for_message(message), Some(false));
-        }
-
-        assert_eq!(a11y_window_focus_state_for_message(WM_ACTIVATE), None);
-    }
-}
-
 /// Coordinates window draws on the UI thread. Owned by the platform and
 /// shared with every window (like `WindowsPlatformState::cursor_visible`),
 /// because the coordination is inherently cross-window: while window A is
@@ -1148,8 +1127,7 @@ impl WindowsWindowInner {
             if handled {
                 return Some(0);
             }
-        } else {
-        };
+        }
 
         // Since these are handled in handle_nc_mouse_up_msg we must prevent the default window proc
         if button == MouseButton::Left {
@@ -1192,7 +1170,6 @@ impl WindowsWindowInner {
             if handled {
                 return Some(0);
             }
-        } else {
         }
 
         let last_pressed = self.state.nc_button_pressed.take();
@@ -1343,12 +1320,7 @@ impl WindowsWindowInner {
     fn handle_device_lost(&self, lparam: LPARAM) -> Option<isize> {
         let devices = lparam.0 as *const DirectXDevices;
         let devices = unsafe { &*devices };
-        if let Err(err) = self
-            .state
-            .renderer
-            .borrow_mut()
-            .handle_device_lost(&devices)
-        {
+        if let Err(err) = self.state.renderer.borrow_mut().handle_device_lost(devices) {
             panic!("Device lost: {err}");
         }
         // Make sure the first `draw_window` after recovery (whether it comes
@@ -1385,13 +1357,13 @@ impl WindowsWindowInner {
         self.state.direct_manipulation.update();
 
         let events = self.state.direct_manipulation.drain_events();
-        if !events.is_empty() {
-            if let Some(mut func) = self.state.callbacks.input.take() {
-                for event in events {
-                    func(event);
-                }
-                self.state.callbacks.input.set(Some(func));
+        if !events.is_empty()
+            && let Some(mut func) = self.state.callbacks.input.take()
+        {
+            for event in events {
+                func(event);
             }
+            self.state.callbacks.input.set(Some(func));
         }
 
         let force_render = force_render || self.state.force_render_pending.take();
@@ -1862,5 +1834,26 @@ fn notify_frame_changed(handle: HWND) {
                 | SWP_NOZORDER,
         )
         .log_err();
+    }
+}
+
+#[cfg(test)]
+mod a11y_focus_tests {
+    use super::a11y_window_focus_state_for_message;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        WM_ACTIVATE, WM_ENTERMENULOOP, WM_ENTERSIZEMOVE, WM_EXITMENULOOP, WM_EXITSIZEMOVE,
+        WM_KILLFOCUS, WM_SETFOCUS,
+    };
+
+    #[test]
+    fn keyboard_focus_and_modal_loop_messages_drive_accesskit_host_focus() {
+        for message in [WM_SETFOCUS, WM_EXITMENULOOP, WM_EXITSIZEMOVE] {
+            assert_eq!(a11y_window_focus_state_for_message(message), Some(true));
+        }
+        for message in [WM_KILLFOCUS, WM_ENTERMENULOOP, WM_ENTERSIZEMOVE] {
+            assert_eq!(a11y_window_focus_state_for_message(message), Some(false));
+        }
+
+        assert_eq!(a11y_window_focus_state_for_message(WM_ACTIVATE), None);
     }
 }

@@ -27,7 +27,8 @@ use std::{
 
 use anyhow::{Context as _, Result};
 use gpui::{
-    PlatformViewHosting, PlatformViewId, PlatformViewUpdate, platform_view_physical_bounds,
+    PlatformViewHandle, PlatformViewHosting, PlatformViewId, PlatformViewUpdate,
+    platform_view_physical_bounds,
 };
 use gpui_util::ResultExt;
 use windows::{
@@ -41,11 +42,12 @@ use plan::{PhysicalRect, SavedViewState, ViewOp};
 
 /// The Win32 state a hosted view had before GPUI took over its frame, plus the
 /// window that state belongs to.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct HostedView {
-    /// The child window, kept as a raw value so the hosting bookkeeping stays
-    /// comparable and copyable.
-    hwnd: isize,
+    /// Retains any caller-owned controller until the child is detached. The
+    /// previous rendered frame is cleared before this host receives its detach
+    /// update, so that frame cannot own this lifetime on the host's behalf.
+    handle: PlatformViewHandle,
     saved: SavedViewState,
 }
 
@@ -143,8 +145,8 @@ impl PlatformViewHost {
         let hosted = self.hosting.borrow_mut().detach_all();
         let mut stranded = Vec::new();
         for (id, view) in hosted {
-            let unhosted = unhost_view(view);
-            if unhosted.is_err() && !view_can_be_forgotten(view, self.host.get()) {
+            let unhosted = unhost_view(&view);
+            if unhosted.is_err() && !view_can_be_forgotten(&view, self.host.get()) {
                 stranded.push((id, view));
             }
             unhosted.log_err();
@@ -175,11 +177,11 @@ impl PlatformViewHost {
     fn detach(&self, detached: &[PlatformViewId]) {
         let mut hosting = self.hosting.borrow_mut();
         for id in detached {
-            let Some(view) = hosting.attributes(*id).copied() else {
+            let Some(view) = hosting.attributes(*id).cloned() else {
                 continue;
             };
-            let unhosted = unhost_view(view);
-            if unhosted.is_ok() || view_can_be_forgotten(view, self.host.get()) {
+            let unhosted = unhost_view(&view);
+            if unhosted.is_ok() || view_can_be_forgotten(&view, self.host.get()) {
                 hosting.detach(*id);
             }
             unhosted.log_err();
@@ -194,7 +196,7 @@ impl PlatformViewHost {
             if hosting.contains(id) {
                 continue;
             }
-            match host_view(host, placement.handle.as_hwnd()) {
+            match host_view(host, placement.handle.clone()) {
                 Ok(view) => hosting.attach(id, view),
                 Err(error) => log::error!("failed to host a platform view: {error:#}"),
             }
@@ -211,10 +213,9 @@ impl PlatformViewHost {
         let mut below: Option<HWND> = None;
         for placement in &update.placements {
             let id = placement.handle.id();
-            let Some(view) = hosting.attributes(id).copied() else {
+            let Some(hwnd) = hosting.attributes(id).map(|view| view.handle.as_hwnd()) else {
                 continue;
             };
-            let hwnd = hwnd_from(view.hwnd);
             let moved = hosting.place(id, placement.bounds, scale_factor);
             rects.push(PhysicalRect::from_bounds(platform_view_physical_bounds(
                 placement.bounds,
@@ -302,7 +303,8 @@ impl PlatformViewHost {
 
 /// Reads what a child window must get back at detach and moves it under the
 /// host.
-fn host_view(host: HWND, hwnd: HWND) -> Result<HostedView> {
+fn host_view(host: HWND, handle: PlatformViewHandle) -> Result<HostedView> {
+    let hwnd = handle.as_hwnd();
     anyhow::ensure!(
         unsafe { IsWindow(Some(hwnd)) }.as_bool(),
         "platform view HWND is no longer valid"
@@ -315,7 +317,7 @@ fn host_view(host: HWND, hwnd: HWND) -> Result<HostedView> {
     );
     let parent = unsafe { GetAncestor(hwnd, GA_PARENT) };
     let view = HostedView {
-        hwnd: hwnd.0 as isize,
+        handle,
         saved: SavedViewState {
             parent: (!parent.is_invalid()).then_some(parent.0 as isize),
             style,
@@ -336,8 +338,8 @@ fn host_view(host: HWND, hwnd: HWND) -> Result<HostedView> {
 }
 
 /// Puts a hosted view back exactly as it was before GPUI took its frame.
-fn unhost_view(view: HostedView) -> Result<()> {
-    let hwnd = hwnd_from(view.hwnd);
+fn unhost_view(view: &HostedView) -> Result<()> {
+    let hwnd = view.handle.as_hwnd();
     if !unsafe { IsWindow(Some(hwnd)) }.as_bool() {
         release_region(view.saved.region);
         return Ok(());
@@ -354,8 +356,8 @@ fn unhost_view(view: HostedView) -> Result<()> {
 
 /// Whether a view that refused to be unhosted can be dropped from the
 /// bookkeeping anyway: it is gone, or it is no longer ours to put back.
-fn view_can_be_forgotten(view: HostedView, host: Option<HWND>) -> bool {
-    let hwnd = hwnd_from(view.hwnd);
+fn view_can_be_forgotten(view: &HostedView, host: Option<HWND>) -> bool {
+    let hwnd = view.handle.as_hwnd();
     if !unsafe { IsWindow(Some(hwnd)) }.as_bool() {
         return true;
     }
@@ -516,6 +518,15 @@ fn register_host_window_class() {
 mod tests {
     use super::*;
     use gpui::{Bounds, point, px, size};
+    use std::{cell::Cell, rc::Rc};
+
+    struct DropProbe(Rc<Cell<bool>>);
+
+    impl Drop for DropProbe {
+        fn drop(&mut self) {
+            self.0.set(true);
+        }
+    }
 
     fn create_test_window(parent: Option<HWND>, style: WINDOW_STYLE) -> HWND {
         unsafe {
@@ -537,6 +548,10 @@ mod tests {
         }
     }
 
+    fn view_handle(hwnd: HWND) -> PlatformViewHandle {
+        unsafe { PlatformViewHandle::from_hwnd(hwnd) }
+    }
+
     #[test]
     fn hosting_reparents_places_and_fully_restores_a_child_window() {
         let original_parent = create_test_window(None, WINDOW_STYLE::default());
@@ -553,7 +568,7 @@ mod tests {
         let original_style = unsafe { get_window_long(child, GWL_STYLE) };
         let original_ex_style = unsafe { get_window_long(child, GWL_EXSTYLE) };
 
-        let view = host_view(host, child).expect("failed to host child HWND");
+        let view = host_view(host, view_handle(child)).expect("failed to host child HWND");
         place_view(
             child,
             None,
@@ -584,7 +599,7 @@ mod tests {
         assert_eq!((origin.x, origin.y), (20, 40));
         assert_eq!((rect.right - rect.left, rect.bottom - rect.top), (200, 100));
 
-        unhost_view(view).expect("failed to unhost child HWND");
+        unhost_view(&view).expect("failed to unhost child HWND");
 
         assert_eq!(unsafe { GetAncestor(child, GA_PARENT) }, original_parent);
         assert_eq!(
@@ -616,11 +631,11 @@ mod tests {
         let host = create_test_window(None, WINDOW_STYLE::default());
         let child = create_test_window(Some(original_parent), WS_CHILD | WS_VISIBLE);
 
-        let view = host_view(host, child).expect("failed to host child HWND");
+        let view = host_view(host, view_handle(child)).expect("failed to host child HWND");
         unsafe { DestroyWindow(child) }.expect("failed to destroy child HWND");
 
-        assert!(view_can_be_forgotten(view, Some(host)));
-        unhost_view(view).expect("unhosting a destroyed view is not an error");
+        assert!(view_can_be_forgotten(&view, Some(host)));
+        unhost_view(&view).expect("unhosting a destroyed view is not an error");
 
         unsafe {
             DestroyWindow(host).expect("failed to destroy host HWND");
@@ -633,11 +648,41 @@ mod tests {
         let host = create_test_window(None, WINDOW_STYLE::default());
         let popup = create_test_window(None, WS_POPUP);
 
-        assert!(host_view(host, popup).is_err());
+        assert!(host_view(host, view_handle(popup)).is_err());
 
         unsafe {
             DestroyWindow(popup).expect("failed to destroy popup HWND");
             DestroyWindow(host).expect("failed to destroy host HWND");
+        }
+    }
+
+    #[test]
+    fn hosting_retains_the_view_owner_until_after_detach() {
+        let original_parent = create_test_window(None, WINDOW_STYLE::default());
+        let host = create_test_window(None, WINDOW_STYLE::default());
+        let child = create_test_window(Some(original_parent), WS_CHILD | WS_VISIBLE);
+        let dropped = Rc::new(Cell::new(false));
+        let owner = Rc::new(DropProbe(Rc::clone(&dropped)));
+        let handle = view_handle(child).keep_alive(owner);
+        let id = handle.id();
+        let view = host_view(host, handle).expect("failed to host child HWND");
+        let mut hosting = PlatformViewHosting::default();
+        hosting.attach(id, view);
+
+        assert!(!dropped.get(), "the native host retains the controller");
+        let view = hosting.detach(id).expect("hosted view");
+        unhost_view(&view).expect("failed to unhost child HWND");
+        assert!(
+            !dropped.get(),
+            "detach finishes before releasing the controller"
+        );
+        drop(view);
+        assert!(dropped.get(), "the detached view releases the controller");
+
+        unsafe {
+            DestroyWindow(child).expect("failed to destroy child HWND");
+            DestroyWindow(host).expect("failed to destroy host HWND");
+            DestroyWindow(original_parent).expect("failed to destroy original parent HWND");
         }
     }
 }

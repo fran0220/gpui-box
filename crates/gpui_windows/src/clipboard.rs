@@ -112,11 +112,12 @@ pub(crate) fn read_from_clipboard() -> Option<ClipboardItem> {
                 entries.push(entry);
                 have_image = true;
             }
-        } else if !have_files && format == CF_HDROP.0 as u32 {
-            if let Some(entry) = read_files() {
-                entries.push(entry);
-                have_files = true;
-            }
+        } else if !have_files
+            && format == CF_HDROP.0 as u32
+            && let Some(entry) = read_files()
+        {
+            entries.push(entry);
+            have_files = true;
         }
     }
 
@@ -205,10 +206,11 @@ fn write_image(item: &Image) -> Result<()> {
 
     // Also provide a PNG copy for broad compatibility.
     // SVG can't be rasterized by the image crate, so skip it.
-    if item.format != ImageFormat::Svg && native_format != Some(*CLIPBOARD_PNG_FORMAT) {
-        if let Some(png_bytes) = convert_to_png(item.bytes(), item.format) {
-            set_clipboard_bytes(&png_bytes, *CLIPBOARD_PNG_FORMAT)?;
-        }
+    if item.format != ImageFormat::Svg
+        && native_format != Some(*CLIPBOARD_PNG_FORMAT)
+        && let Some(png_bytes) = convert_to_png(item.bytes(), item.format)
+    {
+        set_clipboard_bytes(&png_bytes, *CLIPBOARD_PNG_FORMAT)?;
     }
     Ok(())
 }

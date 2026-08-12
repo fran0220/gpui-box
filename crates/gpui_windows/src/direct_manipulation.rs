@@ -52,13 +52,13 @@ impl DirectManipulationHandler {
                     | DIRECTMANIPULATION_VIEWPORT_OPTIONS_DISABLEPIXELSNAPPING,
             )?;
 
-            let mut rect = RECT {
+            let rect = RECT {
                 left: 0,
                 top: 0,
                 right: DEFAULT_VIEWPORT_SIZE,
                 bottom: DEFAULT_VIEWPORT_SIZE,
             };
-            viewport.SetViewportRect(&mut rect)?;
+            viewport.SetViewportRect(&rect)?;
 
             manager.Activate(window)?;
             viewport.Enable()?;
@@ -224,22 +224,21 @@ impl IDirectManipulationViewportEventHandler_Impl for DirectManipulationEventHan
 
             // Reset the content transform so the viewport is ready for the next gesture.
             // ZoomToRect triggers a second RUNNING -> READY cycle, so prevent an infinite loop here.
-            if self.last_scale.get() != 1.0
+            if (self.last_scale.get() != 1.0
                 || self.last_x_offset.get() != 0.0
-                || self.last_y_offset.get() != 0.0
+                || self.last_y_offset.get() != 0.0)
+                && let Some(viewport) = viewport.as_ref()
             {
-                if let Some(viewport) = viewport.as_ref() {
-                    unsafe {
-                        viewport
-                            .ZoomToRect(
-                                0.0,
-                                0.0,
-                                DEFAULT_VIEWPORT_SIZE as f32,
-                                DEFAULT_VIEWPORT_SIZE as f32,
-                                false,
-                            )
-                            .log_err();
-                    }
+                unsafe {
+                    viewport
+                        .ZoomToRect(
+                            0.0,
+                            0.0,
+                            DEFAULT_VIEWPORT_SIZE as f32,
+                            DEFAULT_VIEWPORT_SIZE as f32,
+                            false,
+                        )
+                        .log_err();
                 }
             }
 
