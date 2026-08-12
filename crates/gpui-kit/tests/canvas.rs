@@ -7,8 +7,8 @@ use std::{
 };
 
 use gpui::{
-    Modifiers, MouseButton, ScrollDelta, ScrollWheelEvent, TestAppContext, TouchPhase, div, point,
-    prelude::*, px,
+    Modifiers, MouseButton, ScrollDelta, ScrollWheelEvent, SharedString, TestAppContext,
+    TouchPhase, div, point, prelude::*, px,
 };
 use gpui_kit::prelude::*;
 use gpui_kit_testkit::harness::Harness;
@@ -17,6 +17,10 @@ type Calls = Rc<RefCell<Vec<NodeGraphEvent>>>;
 
 fn port_id(node: &str, port: &str) -> String {
     format!("graph-port:{}:{}:{}:{}", node.len(), node, port.len(), port)
+}
+
+fn edge_id(edge: &str) -> String {
+    format!("graph-edge:{}:{}", edge.len(), edge)
 }
 
 fn editor(cx: &mut TestAppContext) -> (Harness, Calls) {
@@ -34,6 +38,7 @@ fn editor(cx: &mut TestAppContext) -> (Harness, Calls) {
                     .node(
                         GraphNode::new("graph.source", "Source")
                             .width(160.0)
+                            .selected(true)
                             .port(GraphPort::input("config", "Config"))
                             .port(GraphPort::output("records", "Records")),
                         80.0,
@@ -46,6 +51,11 @@ fn editor(cx: &mut TestAppContext) -> (Harness, Calls) {
                             .port(GraphPort::output("done", "Done")),
                         420.0,
                         80.0,
+                    )
+                    .edge(
+                        GraphEdge::new("graph.source", "graph.target")
+                            .id("graph.connection")
+                            .ports("records", "records"),
                     )
                     .on_event(move |event, _, _| sink.borrow_mut().push(event.clone())),
             )
@@ -306,6 +316,134 @@ fn a_node_drag_does_not_also_activate_the_nodes_click(cx: &mut TestAppContext) {
         .context()
         .simulate_mouse_up(end, MouseButton::Left, Modifiers::none());
     assert_eq!(clicks.get(), 1, "dragging emits no click action");
+}
+
+#[gpui::test]
+fn node_clicks_propose_single_and_extended_selection_without_applying_it(cx: &mut TestAppContext) {
+    let (mut harness, calls) = editor(cx);
+    harness.click("graph.target");
+    assert!(calls.borrow().iter().any(|event| matches!(
+        event,
+        NodeGraphEvent::SelectionChanged { ids }
+            if ids.as_slice() == [SharedString::from("graph.target")]
+    )));
+    assert!(!harness.node("graph.target").expect("target").selected);
+
+    calls.borrow_mut().clear();
+    let target = harness.point_in("graph.target");
+    harness.context().simulate_mouse_down(
+        target,
+        MouseButton::Left,
+        Modifiers {
+            shift: true,
+            ..Modifiers::none()
+        },
+    );
+    harness.context().simulate_mouse_up(
+        target,
+        MouseButton::Left,
+        Modifiers {
+            shift: true,
+            ..Modifiers::none()
+        },
+    );
+    assert!(calls.borrow().iter().any(|event| matches!(
+        event,
+        NodeGraphEvent::SelectionChanged { ids }
+            if ids.as_slice()
+                == [
+                    SharedString::from("graph.source"),
+                    SharedString::from("graph.target"),
+                ]
+    )));
+}
+
+#[gpui::test]
+fn blank_canvas_click_proposes_clearing_selection(cx: &mut TestAppContext) {
+    let (mut harness, calls) = editor(cx);
+    let bounds = harness.bounds("graph").expect("graph bounds");
+    let blank = point(bounds.left() + px(24.0), bounds.bottom() - px(24.0));
+    harness
+        .context()
+        .simulate_mouse_down(blank, MouseButton::Left, Modifiers::none());
+    harness
+        .context()
+        .simulate_mouse_up(blank, MouseButton::Left, Modifiers::none());
+    assert!(calls.borrow().iter().any(|event| matches!(
+        event,
+        NodeGraphEvent::SelectionChanged { ids } if ids.is_empty()
+    )));
+}
+
+#[gpui::test]
+fn focused_node_delete_key_proposes_deletion(cx: &mut TestAppContext) {
+    let (mut harness, calls) = editor(cx);
+    harness.click("graph.source");
+    calls.borrow_mut().clear();
+    harness.keystrokes("delete");
+    assert!(calls.borrow().iter().any(|event| matches!(
+        event,
+        NodeGraphEvent::NodeDeleted { id } if id == "graph.source"
+    )));
+    assert!(harness.node("graph.source").is_some());
+}
+
+#[gpui::test]
+fn edge_action_proposes_disconnect_without_mutating_topology(cx: &mut TestAppContext) {
+    let (mut harness, calls) = editor(cx);
+    let action = edge_id("graph.connection");
+    let semantic = harness.node(&action).expect("edge action is published");
+    assert_eq!(semantic.text.as_deref(), Some("Disconnect"));
+    assert_eq!(semantic.value.as_deref(), Some("graph.connection"));
+
+    harness.click(&action);
+    assert!(
+        calls.borrow().iter().any(|event| matches!(
+            event,
+            NodeGraphEvent::DisconnectRequested { id } if id == "graph.connection"
+        )),
+        "events: {:?}",
+        calls.borrow()
+    );
+    assert!(
+        harness.node(&action).is_some(),
+        "the edge remains until the caller applies the proposal"
+    );
+}
+
+#[gpui::test]
+fn thumbnail_slot_publishes_caller_content_and_participates_in_measurement(
+    cx: &mut TestAppContext,
+) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        div()
+            .w(px(420.0))
+            .h(px(320.0))
+            .child(
+                NodeGraph::new("picture-graph").node(
+                    GraphNode::new("picture-node", "Picture")
+                        .width(180.0)
+                        .thumbnail(
+                            div()
+                                .size_full()
+                                .bg(gpui::red())
+                                .child("caller-owned preview"),
+                        )
+                        .thumbnail_ratio(1.0),
+                    40.0,
+                    40.0,
+                ),
+            )
+            .into_any_element()
+    });
+    harness.frame();
+    harness.frame();
+    let node = harness.bounds("picture-node").expect("node");
+    let thumbnail = harness
+        .node("picture-node.thumbnail")
+        .expect("thumbnail semantic slot");
+    assert_eq!(thumbnail.text.as_deref(), Some("Picture"));
+    assert!(f32::from(node.size.height) > 190.0, "bounds: {node:?}");
 }
 
 #[gpui::test]

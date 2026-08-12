@@ -27,6 +27,9 @@ use super::edge::PortSide;
 /// eye can compare two steps without measuring them.
 pub const NODE_WIDTH: f32 = 216.0;
 
+/// The shape of a thumbnail whose caller did not state another one.
+const DEFAULT_THUMBNAIL_RATIO: f32 = 16.0 / 9.0;
+
 /// Whether a port receives or produces data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PortDirection {
@@ -239,13 +242,15 @@ impl Diff {
     }
 }
 
-type ClickHandler = Rc<dyn Fn(&mut Window, &mut App)>;
+pub(crate) type ClickHandler = Rc<dyn Fn(&mut Window, &mut App)>;
 
 /// A step of a run, as a card on the canvas.
 #[derive(IntoElement)]
 pub struct GraphNode {
     ident: Ident,
     title: SharedString,
+    thumbnail: Option<AnyElement>,
+    thumbnail_ratio: f32,
     /// What the step is doing now, for a step that is doing something.
     action: Option<SharedString>,
     state: NodeState,
@@ -258,6 +263,7 @@ pub struct GraphNode {
     declared_height: Option<f32>,
     pointer_click: bool,
     on_click: Option<ClickHandler>,
+    on_delete: Option<ClickHandler>,
 }
 
 impl std::fmt::Debug for GraphNode {
@@ -266,6 +272,7 @@ impl std::fmt::Debug for GraphNode {
             .debug_struct("GraphNode")
             .field("ident", &self.ident)
             .field("title", &self.title)
+            .field("has_thumbnail", &self.thumbnail.is_some())
             .field("state", &self.state)
             .field("metrics", &self.metrics.len())
             .finish_non_exhaustive()
@@ -277,6 +284,8 @@ impl GraphNode {
         Self {
             ident: ident.into(),
             title: title.into(),
+            thumbnail: None,
+            thumbnail_ratio: DEFAULT_THUMBNAIL_RATIO,
             action: None,
             state: NodeState::default(),
             metrics: Vec::new(),
@@ -288,7 +297,27 @@ impl GraphNode {
             declared_height: None,
             pointer_click: true,
             on_click: None,
+            on_delete: None,
         }
+    }
+
+    /// Supplies the caller-owned visual preview for this node.
+    ///
+    /// The slot fills the card's content width and keeps a 16:9 ratio unless
+    /// [`GraphNode::thumbnail_ratio`] states another one. The element may be
+    /// an image, a video still, a waveform, or any other visual the caller can
+    /// render; this component does not fetch or decode it.
+    pub fn thumbnail(mut self, thumbnail: impl IntoElement) -> Self {
+        self.thumbnail = Some(thumbnail.into_any_element());
+        self
+    }
+
+    /// Sets the thumbnail width divided by its height.
+    pub fn thumbnail_ratio(mut self, ratio: f32) -> Self {
+        if ratio.is_finite() && ratio > 0.0 {
+            self.thumbnail_ratio = ratio;
+        }
+        self
     }
 
     /// What the step is doing right now, in the caller's words.
@@ -356,12 +385,28 @@ impl GraphNode {
         self.state
     }
 
+    pub(crate) fn node_selected(&self) -> bool {
+        self.selected
+    }
+
     pub(crate) fn graph_ports(&self) -> &[GraphPort] {
         &self.ports
     }
 
     pub(crate) fn click_handler(&self) -> Option<ClickHandler> {
         self.on_click.clone()
+    }
+
+    /// Adds the keyboard actions owned by a graph while leaving pointer
+    /// click-versus-drag arbitration on the graph's outer card.
+    pub(crate) fn graph_handlers(
+        mut self,
+        on_activate: ClickHandler,
+        on_delete: ClickHandler,
+    ) -> Self {
+        self.on_click = Some(on_activate);
+        self.on_delete = Some(on_delete);
+        self
     }
 
     /// Configures this card for graph display. Dimensions remain logical world
@@ -399,6 +444,9 @@ impl GraphNode {
     /// detail a reader will read as meaningful.
     pub(crate) fn measured_height(&self, theme: &gpui_kit_theme::Theme) -> f32 {
         let mut rows = vec![theme.typography.label.line_height];
+        if self.thumbnail.is_some() {
+            rows.push((self.width - theme.spacing.sm * 2.0).max(0.0) / self.thumbnail_ratio);
+        }
         if self.action.is_some() {
             rows.push(theme.typography.caption.line_height);
         }
@@ -516,6 +564,22 @@ impl RenderOnce for GraphNode {
                 .children(figures)
         });
 
+        let thumbnail = self.thumbnail.map(|thumbnail| {
+            div()
+                .w_full()
+                .flex_none()
+                .aspect_ratio(self.thumbnail_ratio)
+                .overflow_hidden()
+                .rounded(px(theme.radius(Radius::Control) * self.display_zoom))
+                .child(thumbnail)
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(self.ident.child("thumbnail").semantic_id(), Role::Image)
+                        .parent(self.ident.semantic_id())
+                        .text(self.title.clone()),
+                )
+        });
+
         let card = div()
             .w(px(metrics.width))
             .when_some(metrics.height, |element, height| element.h(px(height)))
@@ -534,13 +598,14 @@ impl RenderOnce for GraphNode {
                 element.shadow(theme.selected_ring())
             })
             .child(header)
+            .children(thumbnail)
             .children(action)
             .children(strip);
 
         // A node that takes a click is a button and a node that does not is a
         // group, so the role is decided before the spec is built rather than
         // patched afterwards.
-        let role = if self.on_click.is_some() {
+        let role = if self.on_click.is_some() || self.on_delete.is_some() {
             Role::Button
         } else {
             Role::Group
@@ -552,9 +617,9 @@ impl RenderOnce for GraphNode {
             .busy(self.state == NodeState::Running)
             .invalid(self.state == NodeState::Failed);
 
-        let Some(handler) = self.on_click else {
+        if self.on_click.is_none() && self.on_delete.is_none() {
             return card.semantic_in(cx, spec).into_any_element();
-        };
+        }
 
         let mut card = card
             .id(self.ident.element_id())
@@ -562,15 +627,30 @@ impl RenderOnce for GraphNode {
             .tab_index(0)
             .focus_ring(&theme)
             .pressable(cx);
-        if self.pointer_click {
+        if self.pointer_click
+            && let Some(handler) = self.on_click.as_ref()
+        {
             let click = Rc::clone(&handler);
             card.interactivity()
                 .on_click(move |_, window, cx| click(window, cx));
         }
+        let activate = self.on_click;
+        let delete = self.on_delete;
         card.interactivity().on_key_down(move |event, window, cx| {
-            if matches!(event.keystroke.key.as_str(), "enter" | "space") {
-                handler(window, cx);
-                cx.stop_propagation();
+            match event.keystroke.key.as_str() {
+                "enter" | "space" => {
+                    if let Some(handler) = &activate {
+                        handler(window, cx);
+                        cx.stop_propagation();
+                    }
+                }
+                "backspace" | "delete" => {
+                    if let Some(handler) = &delete {
+                        handler(window, cx);
+                        cx.stop_propagation();
+                    }
+                }
+                _ => {}
             }
         });
         card.semantic_in(cx, spec).into_any_element()
@@ -694,6 +774,24 @@ mod tests {
             node.declared_height,
         );
         assert_eq!(metrics.height, Some(280.0));
+    }
+
+    #[test]
+    fn a_thumbnail_has_a_predictable_default_shape_in_graph_geometry() {
+        let theme = theme();
+        let plain = GraphNode::new("plain", "Plain").measured_height(&theme);
+        let thumbnail = GraphNode::new("picture", "Picture")
+            .thumbnail(div())
+            .measured_height(&theme);
+        let expected =
+            (NODE_WIDTH - theme.spacing.sm * 2.0) / DEFAULT_THUMBNAIL_RATIO + theme.spacing.xs;
+        assert!((thumbnail - plain - expected).abs() < 0.001);
+
+        let square = GraphNode::new("square", "Square")
+            .thumbnail(div())
+            .thumbnail_ratio(1.0)
+            .measured_height(&theme);
+        assert!(square > thumbnail);
     }
 
     #[test]

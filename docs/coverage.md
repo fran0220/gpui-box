@@ -53,7 +53,11 @@ Ready remain five distinct answers.
 
 `NodeGraph` places nothing. The caller positions every node, because where a
 step belongs is a claim about the run rather than a fact about the component,
-and a layout algorithm here would make that claim for every host at once.
+and a layout algorithm here would make that claim for every host at once. A
+node may carry a caller-rendered thumbnail, whose pixels the graph neither
+fetches nor decodes. Selection, movement, deletion, connection, disconnection,
+pan, and zoom are all controlled proposals: the caller remains authoritative
+for the selection, topology, positions, and viewport shown on the next frame.
 
 ## Systems, which span more than one component
 

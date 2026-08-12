@@ -13,12 +13,13 @@ use gpui::{
     AnyElement, App, Bounds, InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels,
     Point, RenderOnce, ScrollDelta, SharedString, Styled, Window, canvas, div, point, px, size,
 };
+use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TypeScale};
 use web_time::Instant;
 
 use crate::display::empty::EmptyState;
-use crate::foundation::{Ident, StyledExt};
+use crate::foundation::{FocusRing, Ident, Pressable, StyledExt};
 use crate::layout::measure;
 use crate::motion::keyed;
 use crate::strings::{ActiveStrings, StringKey};
@@ -61,16 +62,22 @@ impl Default for GraphViewport {
 pub enum NodeGraphEvent {
     /// Proposes a pan or zoom change.
     ViewportChanged(GraphViewport),
+    /// Proposes the complete caller-owned node selection.
+    SelectionChanged { ids: Vec<SharedString> },
     /// Proposes a new world-space position for a node.
     NodeMoved {
         id: SharedString,
         position: Point<f32>,
     },
+    /// Proposes deleting a node by business identity.
+    NodeDeleted { id: SharedString },
     /// Proposes a new output-to-input connection.
     ConnectionRequested {
         from: GraphEndpoint,
         to: GraphEndpoint,
     },
+    /// Proposes removing one controlled edge by its stable identity.
+    DisconnectRequested { id: SharedString },
 }
 
 type EventHandler = Rc<dyn Fn(&NodeGraphEvent, &mut Window, &mut App)>;
@@ -80,12 +87,14 @@ enum Gesture {
     Pan {
         at: Point<Pixels>,
         viewport: GraphViewport,
+        moved: bool,
     },
     Node {
         at: Point<Pixels>,
         id: SharedString,
         position: Point<f32>,
         moved: bool,
+        extend_selection: bool,
     },
     Connect {
         from: GraphEndpoint,
@@ -135,6 +144,27 @@ fn composite_id(prefix: &str, parts: &[&str]) -> SharedString {
         id.push_str(part);
     }
     id.into()
+}
+
+fn selection_after(
+    selected: &[SharedString],
+    id: &SharedString,
+    extend: bool,
+) -> Vec<SharedString> {
+    if !extend {
+        return vec![id.clone()];
+    }
+    if selected.contains(id) {
+        selected
+            .iter()
+            .filter(|selected| *selected != id)
+            .cloned()
+            .collect()
+    } else {
+        let mut next = selected.to_vec();
+        next.push(id.clone());
+        next
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -439,12 +469,12 @@ impl NodeGraph {
 
     fn routable_geometry(&self, nodes: &[NodeGeometry]) -> Vec<RoutedEdge> {
         let counts = self.edges.iter().fold(HashMap::new(), |mut m, e| {
-            *m.entry(e.identity()).or_insert(0usize) += 1;
+            *m.entry(e.edge_id()).or_insert(0usize) += 1;
             m
         });
         self.edges
             .iter()
-            .filter(|edge| counts.get(&edge.identity()) == Some(&1))
+            .filter(|edge| counts.get(&edge.edge_id()) == Some(&1))
             .filter_map(|edge| {
                 let from = nodes.iter().find(|n| &n.id == edge.from())?;
                 let to = nodes.iter().find(|n| &n.id == edge.to())?;
@@ -585,6 +615,7 @@ impl RenderOnce for NodeGraph {
                     down.borrow_mut().gesture = Some(Gesture::Pan {
                         at: event.position,
                         viewport,
+                        moved: false,
                     });
                     cx.stop_propagation();
                 });
@@ -593,7 +624,12 @@ impl RenderOnce for NodeGraph {
             frame = frame.on_mouse_move(move |event, window, cx| {
                 let mut state = moving.borrow_mut();
                 state.pointer = Some(event.position);
-                if let Some(Gesture::Pan { at, viewport }) = state.gesture {
+                if let Some(Gesture::Pan {
+                    at,
+                    viewport,
+                    moved,
+                }) = state.gesture.as_mut()
+                {
                     if event.pressed_button != Some(MouseButton::Left) {
                         state.gesture = None;
                         return;
@@ -602,6 +638,7 @@ impl RenderOnce for NodeGraph {
                         f32::from(event.position.x - at.x),
                         f32::from(event.position.y - at.y),
                     );
+                    *moved |= delta.x.abs().max(delta.y.abs()) >= 4.0;
                     move_report(
                         &NodeGraphEvent::ViewportChanged(GraphViewport {
                             offset: point(viewport.offset.x + delta.x, viewport.offset.y + delta.y),
@@ -613,8 +650,16 @@ impl RenderOnce for NodeGraph {
                 }
             });
             let up = Rc::clone(&gesture);
-            frame = frame.on_mouse_up(MouseButton::Left, move |_, _, _| {
-                up.borrow_mut().gesture = None
+            let up_report = Rc::clone(&report);
+            frame = frame.on_mouse_up(MouseButton::Left, move |_, window, cx| {
+                let gesture = up.borrow_mut().gesture.take();
+                if matches!(gesture, Some(Gesture::Pan { moved: false, .. })) {
+                    up_report(
+                        &NodeGraphEvent::SelectionChanged { ids: Vec::new() },
+                        window,
+                        cx,
+                    );
+                }
             });
             let wheel_report = Rc::clone(&report);
             let wheel_bounds = Rc::clone(&measured);
@@ -877,6 +922,81 @@ impl RenderOnce for NodeGraph {
             })
             .collect();
 
+        let edge_actions: Vec<AnyElement> = self
+            .on_event
+            .as_ref()
+            .map(|report| {
+                routes
+                    .iter()
+                    .map(|routed| {
+                        let id = routed.edge.edge_id();
+                        let semantic_id = composite_id("graph-edge", &[id.as_ref()]);
+                        let at = world_to_screen(routed.route.midpoint(), viewport);
+                        let size = 18.0 * viewport.zoom;
+                        let report_pointer = Rc::clone(report);
+                        let pointer_id = id.clone();
+                        let report_key = Rc::clone(report);
+                        let key_id = id.clone();
+                        div()
+                            .id(semantic_id.clone())
+                            .absolute()
+                            .left(px(at.x - size * 0.5))
+                            .top(px(at.y - size * 0.5))
+                            .w(px(size))
+                            .h(px(size))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .rounded_full()
+                            .border_1()
+                            .border_color(theme.colors.hairline_strong)
+                            .bg(theme.colors.canvas)
+                            .cursor_pointer()
+                            .tab_index(0)
+                            .focus_ring(&theme)
+                            .pressable(cx)
+                            .hover(|style| style.bg(theme.colors.hover))
+                            .child(
+                                icon(Icon::Close)
+                                    .size(px(9.0 * viewport.zoom))
+                                    .text_color(theme.colors.text_muted),
+                            )
+                            .on_mouse_down_with_pointer_capture(MouseButton::Left, |_, _, cx| {
+                                cx.stop_propagation()
+                            })
+                            .on_mouse_up(MouseButton::Left, move |_, window, cx| {
+                                report_pointer(
+                                    &NodeGraphEvent::DisconnectRequested {
+                                        id: pointer_id.clone(),
+                                    },
+                                    window,
+                                    cx,
+                                );
+                                cx.stop_propagation();
+                            })
+                            .on_key_down(move |event, window, cx| {
+                                if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                                    report_key(
+                                        &NodeGraphEvent::DisconnectRequested { id: key_id.clone() },
+                                        window,
+                                        cx,
+                                    );
+                                    cx.stop_propagation();
+                                }
+                            })
+                            .semantic_in(
+                                cx,
+                                NodeSpec::new(semantic_id, Role::Button)
+                                    .parent(self.ident.semantic_id())
+                                    .text(cx.strings().text(StringKey::CanvasDisconnect))
+                                    .value(id),
+                            )
+                            .into_any_element()
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
         let mut ports = Vec::new();
         for node in &geometry {
             let Some(placed) = self
@@ -1070,6 +1190,12 @@ impl RenderOnce for NodeGraph {
         }
 
         let report = self.on_event.clone();
+        let selected: Vec<SharedString> = self
+            .nodes
+            .iter()
+            .filter(|placed| placed.node.node_selected())
+            .map(|placed| placed.node.ident().semantic_id())
+            .collect();
         let cards: Vec<AnyElement> = self
             .nodes
             .into_iter()
@@ -1085,15 +1211,46 @@ impl RenderOnce for NodeGraph {
                 let measurement = node_measurements.get(&id).cloned();
                 let click = placed.node.click_handler();
                 let pointer_click = report.is_none();
+                let node = if let Some(report) = report.as_ref() {
+                    let activate_report = Rc::clone(report);
+                    let activate_id = id.clone();
+                    let activate_selected = selected.clone();
+                    let activate_click = click.clone();
+                    let delete_report = Rc::clone(report);
+                    let delete_id = id.clone();
+                    placed.node.graph_handlers(
+                        Rc::new(move |window, cx| {
+                            activate_report(
+                                &NodeGraphEvent::SelectionChanged {
+                                    ids: selection_after(&activate_selected, &activate_id, false),
+                                },
+                                window,
+                                cx,
+                            );
+                            if let Some(click) = &activate_click {
+                                click(window, cx);
+                            }
+                        }),
+                        Rc::new(move |window, cx| {
+                            delete_report(
+                                &NodeGraphEvent::NodeDeleted {
+                                    id: delete_id.clone(),
+                                },
+                                window,
+                                cx,
+                            );
+                        }),
+                    )
+                } else {
+                    placed.node
+                };
                 let mut card = div()
                     .absolute()
                     .left(px(screen.x))
                     .top(px(screen.y))
-                    .w(px(placed.node.node_width() * viewport.zoom))
+                    .w(px(node.node_width() * viewport.zoom))
                     .child(
-                        placed
-                            .node
-                            .display_at(viewport.zoom, height)
+                        node.display_at(viewport.zoom, height)
                             .pointer_click(pointer_click),
                     );
                 if let Some(measurement) = measurement {
@@ -1124,11 +1281,14 @@ impl RenderOnce for NodeGraph {
                                 id: drag_id.clone(),
                                 position: start,
                                 moved: false,
+                                extend_selection: event.modifiers.shift
+                                    || event.modifiers.secondary(),
                             });
                             cx.stop_propagation();
                         },
                     );
                     let moving = Rc::clone(&gesture);
+                    let move_report = Rc::clone(&report);
                     card = card.on_mouse_move(move |event, window, cx| {
                         let mut state = moving.borrow_mut();
                         if event.pressed_button != Some(MouseButton::Left) {
@@ -1141,6 +1301,7 @@ impl RenderOnce for NodeGraph {
                                 id,
                                 position,
                                 moved,
+                                ..
                             }) => {
                                 let screen_delta = point(
                                     f32::from(event.position.x - at.x),
@@ -1158,16 +1319,30 @@ impl RenderOnce for NodeGraph {
                             _ => return,
                         };
                         drop(state);
-                        report(&NodeGraphEvent::NodeMoved { id, position }, window, cx);
+                        move_report(&NodeGraphEvent::NodeMoved { id, position }, window, cx);
                         cx.stop_propagation();
                     });
                     let up = Rc::clone(&gesture);
+                    let current_selection = selected.clone();
                     card = card.on_mouse_up(MouseButton::Left, move |_, window, cx| {
                         let gesture = up.borrow_mut().gesture.take();
-                        if matches!(gesture, Some(Gesture::Node { moved: false, .. }))
-                            && let Some(click) = &click
+                        if let Some(Gesture::Node {
+                            id,
+                            moved: false,
+                            extend_selection,
+                            ..
+                        }) = gesture
                         {
-                            click(window, cx);
+                            report(
+                                &NodeGraphEvent::SelectionChanged {
+                                    ids: selection_after(&current_selection, &id, extend_selection),
+                                },
+                                window,
+                                cx,
+                            );
+                            if let Some(click) = &click {
+                                click(window, cx);
+                            }
                         }
                         cx.stop_propagation();
                     });
@@ -1182,6 +1357,7 @@ impl RenderOnce for NodeGraph {
             .children(edge_labels)
             .children(cards)
             .children(ports)
+            .children(edge_actions)
             .semantic_in(cx, spec.value(viewport_value("ready", viewport)))
             .into_any_element()
     }

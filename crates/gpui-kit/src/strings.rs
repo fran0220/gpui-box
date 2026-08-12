@@ -185,6 +185,9 @@ string_keys! {
     MessageShowMoreMany => "message.show-more-many", "{0} more lines";
     TimeUnknown => "time.unknown", "Time unknown";
 
+    // The node graph editor.
+    CanvasDisconnect => "canvas.disconnect", "Disconnect";
+
     // Transport bar.
     TransportBuffered => "transport.buffered", "Buffered";
     TransportTimeUnknown => "transport.time-unknown", "Time unknown";

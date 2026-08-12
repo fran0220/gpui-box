@@ -154,7 +154,12 @@ impl GraphEdge {
     pub(crate) fn edge_lane(&self) -> i16 {
         self.lane
     }
-    pub(crate) fn identity(&self) -> SharedString {
+    /// The stable identity used for interaction and duplicate rejection.
+    ///
+    /// An explicit identity supplied with [`GraphEdge::id`] is returned as-is.
+    /// Otherwise the endpoint, port, kind, and lane identities form an
+    /// unambiguous compatibility identity.
+    pub fn edge_id(&self) -> SharedString {
         if let Some(id) = &self.id {
             return id.clone();
         }
@@ -862,14 +867,14 @@ mod tests {
             .feedback();
         let other = GraphEdge::new("x", "y");
         assert_eq!(
-            a.identity(),
+            a.edge_id(),
             GraphEdge::new("one", "two")
                 .ports("out", "in")
                 .lane(3)
                 .feedback()
-                .identity()
+                .edge_id()
         );
-        assert_ne!(a.identity(), other.identity());
+        assert_ne!(a.edge_id(), other.edge_id());
         assert_eq!(a.from(), "one");
         assert_eq!(a.to(), "two");
         assert_eq!(a.kind(), EdgeKind::Feedback);
@@ -879,7 +884,7 @@ mod tests {
         assert!(a.is_active());
         assert_eq!(a.edge_lane(), 3);
         assert_eq!(
-            a.clone().id("business").identity(),
+            a.clone().id("business").edge_id(),
             SharedString::from("business")
         );
     }
