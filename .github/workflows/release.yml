@@ -19,7 +19,7 @@ on:
         type: choice
         options: [token, oidc]
       bootstrap_trusted_publishing:
-        description: Configure OIDC, enforce trusted-publishing-only, and revoke the bootstrap token
+        description: Configure OIDC and enforce trusted-publishing-only after initial publication
         required: true
         default: false
         type: boolean
@@ -290,8 +290,12 @@ jobs:
         run: test -n "$CARGO_REGISTRY_TOKEN"
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-io-auth.outputs.token }}
-      - name: Enforce trusted publishing and revoke the bootstrap token
-        run: python3 scripts/release/trusted_publishing.py harden-and-revoke
+      - name: Enforce trusted-publishing-only for every crate
+        run: python3 scripts/release/trusted_publishing.py harden
         env:
           GPUI_BOX_TRUSTPUB_BOOTSTRAP: "1"
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+      - name: Require out-of-band bootstrap-token revocation
+        run: |
+          echo "crates.io scoped tokens cannot call either token-revocation endpoint."
+          echo "Revoke the bootstrap token in crates.io Account Settings, then delete the CI secret."

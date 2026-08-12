@@ -164,11 +164,15 @@ that `fran0220` is an individual owner, and that each crate has either zero or
 exactly one matching GitHub publisher. It refuses conflicting or duplicate
 configurations because the crates.io create endpoint is not idempotent. It then
 uses the official action to exchange the `release.yml` OIDC identity for a
-short-lived token, enables trusted-publishing-only mode on every crate, and
-revokes the bootstrap token through crates.io's current-token endpoint. Only
-after that workflow succeeds, delete the now-invalid secret from the GitHub
-environment and any external secret stores. Later publication runs use
-`auth=oidc`; token authentication exists only for first-publication recovery.
+short-lived token and enables trusted-publishing-only mode on every crate.
+Scoped crates.io tokens cannot revoke themselves: both token-management
+endpoints have no selectable endpoint scope and reject scoped API-token
+authentication. After the workflow succeeds, revoke the bootstrap token from
+crates.io **Account Settings → API Tokens** using the owner's browser session,
+verify that it disappeared, then delete the now-invalid secret from the GitHub
+environment and any external secret stores. Never report revocation from the
+workflow's hardening result alone. Later publication runs use `auth=oidc`;
+token authentication exists only for first-publication recovery.
 
 There is no crates.io baseline for the first version, so the release workflow
 explicitly skips semantic-version comparison only for `0.1.0`. Every later

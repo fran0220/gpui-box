@@ -191,7 +191,7 @@ def configure(registry: Registry, packages: list[Package]) -> None:
         print(f"{package.name}: {states[package.name]}")
 
 
-def harden_and_revoke(registry: Registry, packages: list[Package]) -> None:
+def harden(registry: Registry, packages: list[Package]) -> None:
     for package in packages:
         require_one_exact_config(registry, package)
     for package in packages:
@@ -203,13 +203,11 @@ def harden_and_revoke(registry: Registry, packages: list[Package]) -> None:
         if response is None or response.get("crate", {}).get("trustpub_only") is not True:
             raise RegistryError(f"{package.name} did not enable trusted-publishing-only mode")
         print(f"{package.name}: trusted-publishing-only")
-    registry.request("DELETE", "/tokens/current", expected=(204,))
-    print("bootstrap token: revoked")
 
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices=("configure", "harden-and-revoke"))
+    parser.add_argument("mode", choices=("configure", "harden"))
     parser.add_argument(
         "--authority",
         type=Path,
@@ -223,7 +221,7 @@ def main(argv: list[str]) -> int:
     if args.mode == "configure":
         configure(registry, packages)
     else:
-        harden_and_revoke(registry, packages)
+        harden(registry, packages)
     return 0
 
 

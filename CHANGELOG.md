@@ -18,9 +18,11 @@ caller-owned native view. macOS retains and hosts `NSView` instances between
 GPUI's base and deferred-overlay planes. Windows reparents caller-owned child
 `HWND`s into a redirection-backed popup host, follows owner geometry, DPI and
 visibility, clips the host to the painted view union, preserves paint order,
-and restores parent, style, extended style, and window region on detach. Linux
-and Web retain an explicit inert layout-only contract rather than pretending a
-native view was attached. This unblocks WKWebView and WebView2 consumers.
+and restores parent, non-visibility styles, extended style, and window region
+on detach while deliberately leaving the child hidden for its owner to place.
+Linux and Web retain an explicit inert layout-only contract rather than
+pretending a native view was attached. This unblocks WKWebView and WebView2
+consumers.
 
 **Reproducible fork overlays.** `scripts/sync-zed` now keeps post-bootstrap fork
 work in an exact-SHA, bootstrap-rooted vendor lane distinct from official Zed

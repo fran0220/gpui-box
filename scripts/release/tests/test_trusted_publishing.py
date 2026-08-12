@@ -47,8 +47,6 @@ class FakeRegistry:
             return 200, {"github_config": config}
         if path.startswith("/crates/") and method == "PATCH":
             return 200, {"crate": {"trustpub_only": True}}
-        if path == "/tokens/current" and method == "DELETE":
-            return 204, None
         raise AssertionError((method, path))
 
 
@@ -94,20 +92,19 @@ class TrustedPublishingTests(unittest.TestCase):
             MODULE.configure(registry, packages)
         self.assertFalse(any(request[0] == "POST" for request in registry.requests))
 
-    def test_hardening_verifies_all_configs_before_mutation_and_revokes_last(self):
+    def test_hardening_verifies_all_configs_before_mutation(self):
         packages = [MODULE.Package("one", "0.1.0"), MODULE.Package("two", "0.1.0")]
         registry = FakeRegistry()
         registry.configs = {
             package.name: [MODULE.desired_for(package)] for package in packages
         }
-        MODULE.harden_and_revoke(registry, packages)
+        MODULE.harden(registry, packages)
         mutations = [request[:2] for request in registry.requests if request[0] != "GET"]
         self.assertEqual(
             mutations,
             [
                 ("PATCH", "/crates/one"),
                 ("PATCH", "/crates/two"),
-                ("DELETE", "/tokens/current"),
             ],
         )
 
