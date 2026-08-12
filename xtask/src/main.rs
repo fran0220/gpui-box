@@ -924,38 +924,16 @@ fn scenes_render(only: &[String]) -> Result<()> {
 fn gate(full: bool) -> Result<()> {
     step("cargo", &["fmt", "--all", "--", "--check"], None)?;
     dependencies::check(&root(), &[])?;
-    step("cargo", &["check", "--workspace", "--all-targets"], None)?;
+    future_compatibility_check()?;
     step("cargo", &["test", "--workspace"], None)?;
-    // The framework subtree is a filtered upstream import and keeps its
-    // upstream lint posture. Run Clippy across it, then make warnings fatal for
-    // the GPUI Box-owned kit, catalogs, and release tooling.
-    step("cargo", &["clippy", "--workspace", "--all-targets"], None)?;
+    // GPUI Box owns the complete framework and kit source. A warning anywhere
+    // in the workspace is therefore a gate failure rather than upstream debt.
     step(
         "cargo",
         &[
             "clippy",
-            "-p",
-            "gpui-box-kit",
-            "-p",
-            "gpui-box-kit-assets",
-            "-p",
-            "gpui-box-kit-semantics",
-            "-p",
-            "gpui-box-kit-testkit",
-            "-p",
-            "gpui-box-kit-theme",
-            "-p",
-            "gpui-box-kit-tokens",
-            "-p",
-            "gpui-box-browser-gallery",
-            "-p",
-            "gpui-box-gallery",
-            "-p",
-            "gpui-box-mcp",
-            "-p",
-            "xtask",
+            "--workspace",
             "--all-targets",
-            "--no-deps",
             "--",
             "-D",
             "warnings",
@@ -975,6 +953,32 @@ fn gate(full: bool) -> Result<()> {
         headless("check", &[])?;
     }
     println!("gate passed");
+    Ok(())
+}
+
+fn future_compatibility_check() -> Result<()> {
+    let args = [
+        "check",
+        "--workspace",
+        "--all-targets",
+        "--future-incompat-report",
+    ];
+    println!("== cargo {}", args.join(" "));
+    let output = Command::new("cargo")
+        .args(args)
+        .current_dir(root())
+        .output()
+        .context("run Cargo future-incompatibility check")?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    print!("{stdout}");
+    eprint!("{stderr}");
+    if !output.status.success() {
+        bail!("cargo {} failed", args.join(" "));
+    }
+    if !stderr.contains("0 dependencies had future-incompatible warnings") {
+        bail!("Cargo reported future-incompatible dependencies");
+    }
     Ok(())
 }
 
