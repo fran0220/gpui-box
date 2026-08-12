@@ -120,7 +120,7 @@ jobs:
     runs-on: windows-2025
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           name: headless-windows-executable
           path: tools/headless-visual/target/debug

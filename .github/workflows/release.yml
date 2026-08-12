@@ -192,7 +192,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0 }
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           name: headless-release-windows-executable
           path: tools/headless-visual/target/debug
@@ -269,7 +269,7 @@ jobs:
           test -z "$(git -C release status --porcelain)"
       - uses: dtolnay/rust-toolchain@master
         with: { toolchain: 1.97.0 }
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           name: gpui-box-${{ inputs.version }}-${{ needs.preflight.outputs.release_commit }}-crates
           path: release/target/package-check/archives
@@ -303,7 +303,7 @@ jobs:
           test -z "$(git -C release status --porcelain)"
       - uses: dtolnay/rust-toolchain@master
         with: { toolchain: 1.97.0 }
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           name: gpui-box-${{ inputs.version }}-${{ needs.preflight.outputs.release_commit }}-crates
           path: release/target/package-check/archives
