@@ -16,6 +16,8 @@ class UnitTests(unittest.TestCase):
         state = json.loads((MODULE.parent / "state.json").read_text())
         for key in sync_zed.RECEIPT_KEYS:
             state[key] = None
+        for key in sync_zed.OVERLAY_DYNAMIC_KEYS:
+            state["fork_overlay"][key] = None
         return state
 
     def git(self, repo, *args):
@@ -246,6 +248,8 @@ class UnitTests(unittest.TestCase):
     def test_partial_overlay_receipt_is_never_accepted(self):
         config = json.loads((MODULE.parent / "config.json").read_text())
         state = json.loads((MODULE.parent / "state.json").read_text())
+        for key in sync_zed.OVERLAY_DYNAMIC_KEYS:
+            state["fork_overlay"][key] = None
         state["fork_overlay"]["base_vendor_tip"] = state["bootstrap_vendor_tip"]
         self.assertIn(
             "overlay receipt coordinates must be either all null or all full SHAs",
