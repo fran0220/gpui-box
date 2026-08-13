@@ -21,6 +21,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
+use gpui_kit_tokens::{
+    Color, Elevation, InteractiveColor, Radius, SemanticColor, Space, Surface, TextTone,
+    TokenDocument, bundled,
+};
 use pulldown_cmark::{Options, Parser, html};
 use serde_json::Value;
 
@@ -44,7 +48,7 @@ pub fn generate(root: &Path, out: Option<&str>) -> Result<PathBuf> {
     let image_version = image_version(root)?;
     let image_root = format!("/images/{image_version}");
 
-    write(&out.join("assets/site.css"), STYLE)?;
+    write(&out.join("assets/site.css"), &site_style())?;
     write(&out.join("assets/site.js"), SCRIPT)?;
     write(&out.join("image-version.txt"), &image_version)?;
     write(
@@ -688,6 +692,145 @@ fn as_string(value: &Value) -> String {
     value.as_str().unwrap_or_default().to_string()
 }
 
+/// Projects the typed token authority into the browser shell.
+///
+/// The static site remains DOM so its documentation can be selected, searched,
+/// linked, and indexed. Its visual roles still come from exactly the same
+/// documents as the GPUI components instead of being copied into a second
+/// theme in CSS.
+fn site_style() -> String {
+    let mut css = String::from(
+        "/* @generated token projection; edit crates/gpui-kit-tokens/tokens/*.json */\n",
+    );
+    for (index, document) in bundled().into_iter().enumerate() {
+        let selector = if index == 0 {
+            format!(":root, [data-theme=\"{}\"]", document.meta.id)
+        } else {
+            format!("[data-theme=\"{}\"]", document.meta.id)
+        };
+        css.push_str(&theme_css(&selector, document));
+    }
+    css.push('\n');
+    css.push_str(STYLE);
+    css
+}
+
+fn theme_css(selector: &str, tokens: &TokenDocument) -> String {
+    let mut css = format!("{selector} {{\n");
+    for (name, color) in [
+        ("canvas", tokens.surface(Surface::Canvas)),
+        ("sunken", tokens.surface(Surface::Sunken)),
+        ("panel", tokens.surface(Surface::Panel)),
+        ("raised", tokens.surface(Surface::Raised)),
+        ("overlay", tokens.surface(Surface::Overlay)),
+        ("text", tokens.text(TextTone::Primary)),
+        ("muted", tokens.text(TextTone::Muted)),
+        ("faint", tokens.text(TextTone::Faint)),
+        ("on-accent", tokens.text(TextTone::OnAccent)),
+        ("hover", tokens.interactive(InteractiveColor::Hover)),
+        ("active", tokens.interactive(InteractiveColor::Active)),
+        ("selected", tokens.interactive(InteractiveColor::Selected)),
+        ("hairline", tokens.interactive(InteractiveColor::Hairline)),
+        (
+            "hairline-strong",
+            tokens.interactive(InteractiveColor::HairlineStrong),
+        ),
+        ("focus", tokens.interactive(InteractiveColor::Focus)),
+        ("accent", tokens.semantic(SemanticColor::Accent)),
+        (
+            "accent-strong",
+            tokens.semantic(SemanticColor::AccentStrong),
+        ),
+        ("success", tokens.semantic(SemanticColor::Success)),
+        ("warning", tokens.semantic(SemanticColor::Warning)),
+        ("danger", tokens.semantic(SemanticColor::Danger)),
+        ("info", tokens.semantic(SemanticColor::Info)),
+    ] {
+        css.push_str(&format!("  --{name}: {};\n", color_css(color)));
+    }
+    css.push_str(&format!(
+        "  --canvas-glass: {};\n  --accent-wash: {};\n  --success-wash: {};\n",
+        color_css(with_alpha(tokens.surface(Surface::Canvas), 0.82)),
+        color_css(with_alpha(tokens.semantic(SemanticColor::Accent), 0.16)),
+        color_css(with_alpha(tokens.semantic(SemanticColor::Success), 0.16)),
+    ));
+    let overlay = tokens.elevation(Elevation::Overlay);
+    css.push_str(&format!(
+        "  --shadow-overlay: 0 {}px {}px {}px {};\n",
+        overlay.y,
+        overlay.blur,
+        overlay.spread,
+        color_css(overlay.color),
+    ));
+    for (name, step) in [
+        ("xs", Space::Xs),
+        ("sm", Space::Sm),
+        ("md", Space::Md),
+        ("lg", Space::Lg),
+        ("xl", Space::Xl),
+        ("xxl", Space::Xxl),
+    ] {
+        css.push_str(&format!("  --space-{name}: {}px;\n", tokens.spacing(step)));
+    }
+    for (name, step) in [
+        ("small", Radius::Small),
+        ("control", Radius::Control),
+        ("card", Radius::Card),
+        ("dialog", Radius::Dialog),
+        ("bubble", Radius::Bubble),
+        ("pill", Radius::Pill),
+    ] {
+        css.push_str(&format!("  --radius-{name}: {}px;\n", tokens.radius(step)));
+    }
+    css.push_str(&format!(
+        "  --sans: {};\n  --mono: {};\n",
+        font_css(&tokens.typography.sans, "sans-serif"),
+        font_css(&tokens.typography.mono, "monospace")
+    ));
+    css.push_str(&format!(
+        "  --motion-quick: {}ms;\n  --motion-standard: cubic-bezier({}, {}, {}, {});\n",
+        tokens.motion.duration_ms.quick,
+        tokens.motion.easing.standard[0],
+        tokens.motion.easing.standard[1],
+        tokens.motion.easing.standard[2],
+        tokens.motion.easing.standard[3],
+    ));
+    css.push_str("}\n");
+    css
+}
+
+fn font_css(tokens: &gpui_kit_tokens::FontTokens, generic: &str) -> String {
+    [
+        tokens.family.as_str(),
+        tokens.fallback_macos.as_str(),
+        tokens.fallback_windows.as_str(),
+        tokens.fallback_linux.as_str(),
+    ]
+    .into_iter()
+    .map(|family| format!("\"{}\"", family.replace('"', "\\\"")))
+    .chain([generic.to_string()])
+    .collect::<Vec<_>>()
+    .join(", ")
+}
+
+fn color_css(color: Color) -> String {
+    let channel = |value: f32| (value.clamp(0.0, 1.0) * 255.0).round() as u8;
+    let red = channel(color.red);
+    let green = channel(color.green);
+    let blue = channel(color.blue);
+    if (color.alpha - 1.0).abs() < f32::EPSILON {
+        format!("#{red:02x}{green:02x}{blue:02x}")
+    } else {
+        let alpha = format!("{:.3}", color.alpha.clamp(0.0, 1.0));
+        let alpha = alpha.trim_end_matches('0').trim_end_matches('.');
+        format!("rgba({red}, {green}, {blue}, {alpha})")
+    }
+}
+
+fn with_alpha(color: Color, alpha: f32) -> Color {
+    Color { alpha, ..color }
+}
+
 const STYLE: &str = include_str!("site/site.css");
 const SCRIPT: &str = include_str!("site/site.js");
 
@@ -729,5 +872,16 @@ mod tests {
         assert_eq!(out, "into_any_element");
         let out = highlight("scene_Name");
         assert!(!out.contains("<i class=\"t\">"), "{out}");
+    }
+
+    #[test]
+    fn site_css_is_projected_from_bundled_tokens() {
+        let css = site_style();
+        assert!(css.contains(":root, [data-theme=\"studio-dark\"]"));
+        assert!(css.contains("[data-theme=\"studio-light\"]"));
+        assert!(css.contains("--canvas: #0a0a0a;"));
+        assert!(css.contains("--canvas: #eeeef1;"));
+        assert!(css.contains("--radius-card: 12px;"));
+        assert!(css.contains("--motion-quick: 150ms;"));
     }
 }
