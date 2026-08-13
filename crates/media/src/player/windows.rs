@@ -1,6 +1,9 @@
-use std::sync::{
-    Arc, Mutex,
-    atomic::{AtomicBool, AtomicU8, Ordering},
+use std::{
+    cell::{Cell, RefCell},
+    sync::{
+        Arc, Mutex, RwLock,
+        atomic::{AtomicU64, Ordering},
+    },
 };
 
 use url::Url;
@@ -34,52 +37,146 @@ const READY: u8 = 2;
 const FAILED: u8 = 3;
 const NO_BACKEND: u8 = 4;
 
-#[derive(Default)]
-struct CallbackState {
-    availability: AtomicU8,
-    buffering: AtomicBool,
-    ended: AtomicBool,
-    error: Mutex<Option<MediaError>>,
+#[derive(Clone)]
+struct ReportedState {
+    availability: u8,
+    buffering: bool,
+    ended: bool,
+    error: Option<MediaError>,
 }
 
-impl CallbackState {
-    fn set_error(&self, kind: MediaErrorKind, message: impl Into<String>) {
-        self.availability.store(
-            if kind == MediaErrorKind::NoBackend {
-                NO_BACKEND
-            } else {
-                FAILED
-            },
-            Ordering::Release,
-        );
-        *self.error.lock().expect("media error mutex poisoned") =
-            Some(MediaError::new(kind, message));
+impl Default for ReportedState {
+    fn default() -> Self {
+        Self {
+            availability: IDLE,
+            buffering: false,
+            ended: false,
+            error: None,
+        }
     }
 }
 
-#[implement(IMFMediaEngineNotify)]
-struct MediaEngineNotify {
-    state: Arc<CallbackState>,
-    events: Arc<EventHub>,
+#[derive(Default)]
+struct CallbackState {
+    next_generation: AtomicU64,
+    active_generation: RwLock<u64>,
+    reported: Mutex<ReportedState>,
 }
 
-#[allow(non_snake_case)]
-impl IMFMediaEngineNotify_Impl for MediaEngineNotify_Impl {
-    fn EventNotify(&self, event: u32, param1: usize, param2: u32) -> windows::core::Result<()> {
+impl CallbackState {
+    fn begin_load(&self) -> u64 {
+        let generation = self.next_generation.fetch_add(1, Ordering::Relaxed) + 1;
+        let mut active = self
+            .active_generation
+            .write()
+            .expect("media generation lock poisoned");
+        let mut reported = self
+            .reported
+            .lock()
+            .expect("media callback state mutex poisoned");
+        *active = generation;
+        *reported = ReportedState {
+            availability: LOADING,
+            ..ReportedState::default()
+        };
+        generation
+    }
+
+    fn fail(&self, generation: u64, kind: MediaErrorKind, message: impl Into<String>) {
+        let active = self
+            .active_generation
+            .read()
+            .expect("media generation lock poisoned");
+        if *active != generation {
+            return;
+        }
+        let mut reported = self
+            .reported
+            .lock()
+            .expect("media callback state mutex poisoned");
+        reported.availability = if kind == MediaErrorKind::NoBackend {
+            NO_BACKEND
+        } else {
+            FAILED
+        };
+        reported.buffering = false;
+        reported.ended = false;
+        reported.error = Some(MediaError::new(kind, message));
+    }
+
+    fn reported(&self) -> ReportedState {
+        self.reported
+            .lock()
+            .expect("media callback state mutex poisoned")
+            .clone()
+    }
+
+    fn is_ready(&self) -> bool {
+        self.reported
+            .lock()
+            .expect("media callback state mutex poisoned")
+            .availability
+            == READY
+    }
+
+    fn clear_ended(&self) {
+        self.reported
+            .lock()
+            .expect("media callback state mutex poisoned")
+            .ended = false;
+    }
+
+    fn invalidate(&self) {
+        let generation = self.next_generation.fetch_add(1, Ordering::Relaxed) + 1;
+        *self
+            .active_generation
+            .write()
+            .expect("media generation lock poisoned") = generation;
+    }
+
+    fn transition(
+        &self,
+        generation: u64,
+        event: u32,
+        param1: usize,
+        param2: u32,
+    ) -> Option<MediaEvent> {
+        let active = self
+            .active_generation
+            .read()
+            .expect("media generation lock poisoned");
+        if *active != generation {
+            return None;
+        }
+
+        let mut reported = self
+            .reported
+            .lock()
+            .expect("media callback state mutex poisoned");
         match event {
             value if value == MF_MEDIA_ENGINE_EVENT_LOADSTART.0 as u32 => {
-                self.state.availability.store(LOADING, Ordering::Release);
-                self.state.ended.store(false, Ordering::Release);
+                if reported.availability != LOADING {
+                    return None;
+                }
+                *reported = ReportedState {
+                    availability: LOADING,
+                    ..ReportedState::default()
+                };
             }
             value
-                if value == MF_MEDIA_ENGINE_EVENT_LOADEDMETADATA.0 as u32
-                    || value == MF_MEDIA_ENGINE_EVENT_LOADEDDATA.0 as u32
-                    || value == MF_MEDIA_ENGINE_EVENT_CANPLAY.0 as u32
+                if value == MF_MEDIA_ENGINE_EVENT_CANPLAY.0 as u32
                     || value == MF_MEDIA_ENGINE_EVENT_CANPLAYTHROUGH.0 as u32 =>
             {
-                self.state.availability.store(READY, Ordering::Release);
+                if matches!(reported.availability, LOADING | READY) {
+                    reported.availability = READY;
+                } else {
+                    return None;
+                }
             }
             value if value == MF_MEDIA_ENGINE_EVENT_ERROR.0 as u32 => {
+                if !matches!(reported.availability, LOADING | READY) {
+                    return None;
+                }
                 let kind = if param1 as i32 == MF_MEDIA_ENGINE_ERR_SRC_NOT_SUPPORTED.0 {
                     MediaErrorKind::NoBackend
                 } else {
@@ -94,35 +191,114 @@ impl IMFMediaEngineNotify_Impl for MediaEngineNotify_Impl {
                         error.message()
                     )
                 };
-                self.state.set_error(kind, detail);
+                reported.availability = if kind == MediaErrorKind::NoBackend {
+                    NO_BACKEND
+                } else {
+                    FAILED
+                };
+                reported.buffering = false;
+                reported.ended = false;
+                reported.error = Some(MediaError::new(kind, detail));
             }
             value
                 if value == MF_MEDIA_ENGINE_EVENT_WAITING.0 as u32
                     || value == MF_MEDIA_ENGINE_EVENT_STALLED.0 as u32
                     || value == MF_MEDIA_ENGINE_EVENT_BUFFERINGSTARTED.0 as u32 =>
             {
-                self.state.buffering.store(true, Ordering::Release);
+                if reported.availability == READY {
+                    reported.buffering = true;
+                } else {
+                    return None;
+                }
             }
             value
                 if value == MF_MEDIA_ENGINE_EVENT_PLAYING.0 as u32
                     || value == MF_MEDIA_ENGINE_EVENT_BUFFERINGENDED.0 as u32 =>
             {
-                self.state.buffering.store(false, Ordering::Release);
-                self.state.ended.store(false, Ordering::Release);
+                if reported.availability == READY {
+                    reported.buffering = false;
+                    reported.ended = false;
+                } else {
+                    return None;
+                }
             }
             value if value == MF_MEDIA_ENGINE_EVENT_ENDED.0 as u32 => {
-                self.state.ended.store(true, Ordering::Release);
-                self.events.emit(MediaEvent::Ended);
-                return Ok(());
+                if reported.availability == READY {
+                    reported.buffering = false;
+                    reported.ended = true;
+                } else {
+                    return None;
+                }
             }
-            value if value == MF_MEDIA_ENGINE_EVENT_EMPTIED.0 as u32 => {
-                self.state.availability.store(IDLE, Ordering::Release);
-                self.state.buffering.store(false, Ordering::Release);
-                self.state.ended.store(false, Ordering::Release);
+            value
+                if value == MF_MEDIA_ENGINE_EVENT_EMPTIED.0 as u32
+                    && reported.availability == READY =>
+            {
+                reported.availability = FAILED;
+                reported.buffering = false;
+                reported.ended = false;
+                reported.error = Some(MediaError::new(
+                    MediaErrorKind::Open,
+                    "Media Foundation emptied the active media source.",
+                ));
             }
-            _ => {}
+            _ => return None,
         }
-        self.events.emit(MediaEvent::Changed);
+        Some(
+            if event == MF_MEDIA_ENGINE_EVENT_ENDED.0 as u32 && reported.ended {
+                MediaEvent::Ended
+            } else {
+                MediaEvent::Changed
+            },
+        )
+    }
+}
+
+#[derive(Clone, Copy)]
+struct PlaybackSettings {
+    volume: f64,
+    muted: bool,
+    rate: f64,
+}
+
+impl Default for PlaybackSettings {
+    fn default() -> Self {
+        Self {
+            volume: 1.0,
+            muted: false,
+            rate: 1.0,
+        }
+    }
+}
+
+struct Engine {
+    engine: IMFMediaEngine,
+    _notify: IMFMediaEngineNotify,
+}
+
+impl Drop for Engine {
+    fn drop(&mut self) {
+        let _ = unsafe { self.engine.Shutdown() };
+    }
+}
+
+#[implement(IMFMediaEngineNotify)]
+struct MediaEngineNotify {
+    generation: u64,
+    state: Arc<CallbackState>,
+    events: Arc<EventHub>,
+}
+
+#[allow(non_snake_case)]
+impl IMFMediaEngineNotify_Impl for MediaEngineNotify_Impl {
+    fn EventNotify(&self, event: u32, param1: usize, param2: u32) -> windows::core::Result<()> {
+        let Some(event) = self
+            .state
+            .transition(self.generation, event, param1, param2)
+        else {
+            return Ok(());
+        };
+        self.events.emit(event);
         Ok(())
     }
 }
@@ -257,9 +433,12 @@ impl Drop for VideoWindows {
 }
 
 pub(super) struct Player {
-    engine: IMFMediaEngine,
-    _notify: IMFMediaEngineNotify,
+    engine: RefCell<Option<Engine>>,
+    factory: IMFMediaEngineClassFactory,
+    kind: MediaKind,
+    events: Arc<EventHub>,
     state: Arc<CallbackState>,
+    settings: Cell<PlaybackSettings>,
     video_windows: Option<VideoWindows>,
     _media_foundation: MediaFoundation,
     _com: ComApartment,
@@ -270,45 +449,21 @@ impl Player {
         let com = ComApartment::initialize()?;
         let media_foundation = MediaFoundation::acquire()?;
         let state = Arc::new(CallbackState::default());
-        let notify: IMFMediaEngineNotify = MediaEngineNotify {
-            state: Arc::clone(&state),
-            events,
-        }
-        .into();
         let video_windows = matches!(kind, MediaKind::Video)
             .then(VideoWindows::new)
             .transpose()?;
-
-        let mut attributes = None;
-        unsafe { MFCreateAttributes(&mut attributes, 2) }.map_err(open_error)?;
-        let attributes = attributes.expect("MFCreateAttributes returned no attribute store");
-        unsafe { attributes.SetUnknown(&MF_MEDIA_ENGINE_CALLBACK, &notify) }.map_err(open_error)?;
-        if let Some(windows) = &video_windows {
-            unsafe {
-                attributes.SetUINT64(
-                    &MF_MEDIA_ENGINE_PLAYBACK_HWND,
-                    windows.view.0 as usize as u64,
-                )
-            }
-            .map_err(open_error)?;
-        }
-
         let factory: IMFMediaEngineClassFactory = unsafe {
             CoCreateInstance(&CLSID_MFMediaEngineClassFactory, None, CLSCTX_INPROC_SERVER)
         }
         .map_err(open_error)?;
-        let flags = if matches!(kind, MediaKind::Audio) {
-            MF_MEDIA_ENGINE_AUDIOONLY.0 as u32
-        } else {
-            0
-        };
-        let engine = unsafe { factory.CreateInstance(flags, &attributes) }.map_err(open_error)?;
-        unsafe { engine.SetPreload(MF_MEDIA_ENGINE_PRELOAD_AUTOMATIC) }.map_err(open_error)?;
 
         Ok(Self {
-            engine,
-            _notify: notify,
+            engine: RefCell::new(None),
+            factory,
+            kind,
+            events,
             state,
+            settings: Cell::new(PlaybackSettings::default()),
             video_windows,
             _media_foundation: media_foundation,
             _com: com,
@@ -316,28 +471,37 @@ impl Player {
     }
 
     pub(super) fn load(&self, source: MediaSource) -> Result<(), MediaError> {
-        let source = source_url(source)?;
-        self.state.availability.store(LOADING, Ordering::Release);
-        self.state.buffering.store(false, Ordering::Release);
-        self.state.ended.store(false, Ordering::Release);
-        *self.state.error.lock().expect("media error mutex poisoned") = None;
-        let result: windows::core::Result<()> = (|| unsafe {
-            self.engine.SetSource(&BSTR::from(source.as_str()))?;
-            self.engine.Load()
-        })();
-        if let Err(error) = result {
-            let error = open_error(error);
-            self.state.set_error(error.kind(), error.message());
-            return Err(error);
+        let generation = self.state.begin_load();
+        drop(self.engine.borrow_mut().take());
+        let source = source_url(source).inspect_err(|error| {
+            self.state.fail(generation, error.kind(), error.message());
+            self.events.emit(MediaEvent::Changed);
+        })?;
+        let engine = self.create_engine(generation).and_then(|engine| {
+            let result: windows::core::Result<()> = (|| unsafe {
+                engine.engine.SetSource(&BSTR::from(source.as_str()))?;
+                engine.engine.Load()
+            })();
+            result.map(|()| engine).map_err(open_error)
+        });
+        match engine {
+            Ok(engine) => {
+                *self.engine.borrow_mut() = Some(engine);
+                Ok(())
+            }
+            Err(error) => {
+                self.state.fail(generation, error.kind(), error.message());
+                self.events.emit(MediaEvent::Changed);
+                Err(error)
+            }
         }
-        Ok(())
     }
 
     pub(super) fn command(&self, command: MediaCommand) -> MediaCommandOutcome {
         if matches!(
             command,
             MediaCommand::Play | MediaCommand::Pause | MediaCommand::Seek(_)
-        ) && self.state.availability.load(Ordering::Acquire) != READY
+        ) && !self.state.is_ready()
         {
             return MediaCommandOutcome::Refused(MediaError::new(
                 MediaErrorKind::Playback,
@@ -356,62 +520,139 @@ impl Player {
                 "The playback command contains an invalid numeric value.",
             ));
         }
+
+        let mut settings = self.settings.get();
+        let engine = self.engine.borrow();
+        let Some(engine) = engine.as_ref() else {
+            match command {
+                MediaCommand::SetVolume(volume) => settings.volume = volume.clamp(0.0, 1.0),
+                MediaCommand::SetMuted(muted) => settings.muted = muted,
+                MediaCommand::SetRate(rate) => settings.rate = rate,
+                MediaCommand::Play | MediaCommand::Pause | MediaCommand::Seek(_) => {
+                    return MediaCommandOutcome::Refused(MediaError::new(
+                        MediaErrorKind::Playback,
+                        "There is no active media source.",
+                    ));
+                }
+            }
+            self.settings.set(settings);
+            return MediaCommandOutcome::Applied;
+        };
+
+        if let MediaCommand::Seek(seconds) = command {
+            let duration = unsafe { engine.engine.GetDuration() };
+            if !duration.is_finite() || duration <= 0.0 || seconds > duration {
+                return MediaCommandOutcome::Refused(MediaError::new(
+                    MediaErrorKind::Playback,
+                    "The active media source does not have a seekable duration.",
+                ));
+            }
+        }
+        if matches!(command, MediaCommand::Play) && unsafe { engine.engine.GetDuration() } == 0.0 {
+            return MediaCommandOutcome::Refused(MediaError::new(
+                MediaErrorKind::Playback,
+                "The media source has no playable duration.",
+            ));
+        }
+
         let result: windows::core::Result<()> = (|| unsafe {
             match command {
                 MediaCommand::Play => {
-                    if self.state.ended.swap(false, Ordering::AcqRel) {
-                        self.engine.SetCurrentTime(0.0)?;
+                    if self.state.reported().ended {
+                        engine.engine.SetCurrentTime(0.0)?;
+                        self.state.clear_ended();
                     }
-                    self.engine.Play()
+                    engine.engine.SetPlaybackRate(settings.rate)?;
+                    engine.engine.Play()
                 }
-                MediaCommand::Pause => self.engine.Pause(),
+                MediaCommand::Pause => engine.engine.Pause(),
                 MediaCommand::Seek(seconds) => {
-                    self.state.ended.store(false, Ordering::Release);
-                    self.engine.SetCurrentTime(seconds)
+                    engine.engine.SetCurrentTime(seconds)?;
+                    self.state.clear_ended();
+                    Ok(())
                 }
-                MediaCommand::SetVolume(volume) => self.engine.SetVolume(volume.clamp(0.0, 1.0)),
-                MediaCommand::SetMuted(muted) => self.engine.SetMuted(muted),
+                MediaCommand::SetVolume(volume) => {
+                    let volume = volume.clamp(0.0, 1.0);
+                    engine.engine.SetVolume(volume)?;
+                    settings.volume = volume;
+                    Ok(())
+                }
+                MediaCommand::SetMuted(muted) => {
+                    engine.engine.SetMuted(muted)?;
+                    settings.muted = muted;
+                    Ok(())
+                }
                 MediaCommand::SetRate(rate) => {
-                    self.engine.SetDefaultPlaybackRate(rate)?;
-                    self.engine.SetPlaybackRate(rate)
+                    engine.engine.SetDefaultPlaybackRate(rate)?;
+                    if let Err(error) = engine.engine.SetPlaybackRate(rate) {
+                        let _ = engine.engine.SetDefaultPlaybackRate(settings.rate);
+                        return Err(error);
+                    }
+                    settings.rate = rate;
+                    Ok(())
                 }
             }
         })();
         match result {
-            Ok(()) => MediaCommandOutcome::Applied,
+            Ok(()) => {
+                self.settings.set(settings);
+                MediaCommandOutcome::Applied
+            }
             Err(error) => MediaCommandOutcome::Refused(playback_error(error)),
         }
     }
 
     pub(super) fn snapshot(&self) -> MediaSnapshot {
-        let availability = match self.state.availability.load(Ordering::Acquire) {
+        let reported = self.state.reported();
+        let engine = self.engine.borrow();
+        let native = engine.as_ref().map(|engine| &engine.engine);
+        let raw_duration = native.map(|engine| unsafe { engine.GetDuration() });
+        let zero_duration = reported.availability == READY && raw_duration == Some(0.0);
+        let availability = match reported.availability {
             IDLE => MediaAvailability::Idle,
             LOADING => MediaAvailability::Loading,
+            READY if zero_duration => MediaAvailability::Failed(MediaError::new(
+                MediaErrorKind::Open,
+                "The media source has no playable duration.",
+            )),
             READY => MediaAvailability::Ready,
-            NO_BACKEND => MediaAvailability::NoBackend(self.current_error()),
-            _ => MediaAvailability::Failed(self.current_error()),
+            NO_BACKEND => MediaAvailability::NoBackend(current_error(&reported)),
+            _ => MediaAvailability::Failed(current_error(&reported)),
         };
-        let state = if self.state.ended.load(Ordering::Acquire) {
+        let settings = self.settings.get();
+        let state = if reported.ended {
             PlaybackState::Ended
-        } else if self.state.buffering.load(Ordering::Acquire) {
+        } else if reported.buffering {
             PlaybackState::Buffering
-        } else if unsafe { self.engine.IsPaused().as_bool() } {
-            PlaybackState::Paused
-        } else {
+        } else if reported.availability == READY
+            && native.is_some_and(|engine| unsafe { !engine.IsPaused().as_bool() })
+        {
             PlaybackState::Playing
+        } else {
+            PlaybackState::Paused
         };
-        let duration = unsafe { self.engine.GetDuration() };
+        let duration = raw_duration.and_then(finite_positive);
         MediaSnapshot {
             availability,
             state,
-            position: finite_nonnegative(unsafe { self.engine.GetCurrentTime() }).unwrap_or(0.0),
-            duration: finite_nonnegative(duration).filter(|duration| *duration > 0.0),
-            volume: unsafe { self.engine.GetVolume() }.clamp(0.0, 1.0),
-            muted: unsafe { self.engine.GetMuted().as_bool() },
-            rate: finite_nonnegative(unsafe { self.engine.GetPlaybackRate() })
-                .filter(|rate| *rate > 0.0)
-                .unwrap_or(1.0),
-            buffered: self.buffered(),
+            position: native
+                .and_then(|engine| finite_nonnegative(unsafe { engine.GetCurrentTime() }))
+                .unwrap_or(0.0),
+            duration,
+            volume: native
+                .map(|engine| unsafe { engine.GetVolume() }.clamp(0.0, 1.0))
+                .unwrap_or(settings.volume),
+            muted: native
+                .map(|engine| unsafe { engine.GetMuted().as_bool() })
+                .unwrap_or(settings.muted),
+            rate: if state == PlaybackState::Playing {
+                native
+                    .and_then(|engine| finite_positive(unsafe { engine.GetPlaybackRate() }))
+                    .unwrap_or(settings.rate)
+            } else {
+                settings.rate
+            },
+            buffered: native.map(buffered).unwrap_or_default(),
         }
     }
 
@@ -420,40 +661,77 @@ impl Player {
         unsafe { NativeVideoView::from_ptr(view.0.cast()) }
     }
 
-    fn current_error(&self) -> MediaError {
-        self.state
-            .error
-            .lock()
-            .expect("media error mutex poisoned")
-            .clone()
-            .unwrap_or_else(|| {
-                MediaError::new(MediaErrorKind::Open, "Media Foundation playback failed.")
-            })
-    }
-
-    fn buffered(&self) -> Vec<TimeRange> {
-        let Ok(ranges) = (unsafe { self.engine.GetBuffered() }) else {
-            return Vec::new();
-        };
-        let mut buffered = Vec::with_capacity(unsafe { ranges.GetLength() } as usize);
-        for index in 0..unsafe { ranges.GetLength() } {
-            let (Ok(start), Ok(end)) = (unsafe { ranges.GetStart(index) }, unsafe {
-                ranges.GetEnd(index)
-            }) else {
-                continue;
-            };
-            if start.is_finite() && end.is_finite() {
-                buffered.push(TimeRange::new(start.max(0.0), end.max(0.0)));
-            }
+    fn create_engine(&self, generation: u64) -> Result<Engine, MediaError> {
+        let notify: IMFMediaEngineNotify = MediaEngineNotify {
+            generation,
+            state: Arc::clone(&self.state),
+            events: Arc::clone(&self.events),
         }
-        buffered
+        .into();
+        let mut attributes = None;
+        unsafe { MFCreateAttributes(&mut attributes, 2) }.map_err(open_error)?;
+        let attributes = attributes.expect("MFCreateAttributes returned no attribute store");
+        unsafe { attributes.SetUnknown(&MF_MEDIA_ENGINE_CALLBACK, &notify) }.map_err(open_error)?;
+        if let Some(windows) = &self.video_windows {
+            unsafe {
+                attributes.SetUINT64(
+                    &MF_MEDIA_ENGINE_PLAYBACK_HWND,
+                    windows.view.0 as usize as u64,
+                )
+            }
+            .map_err(open_error)?;
+        }
+        let flags = if matches!(self.kind, MediaKind::Audio) {
+            MF_MEDIA_ENGINE_AUDIOONLY.0 as u32
+        } else {
+            0
+        };
+        let engine =
+            unsafe { self.factory.CreateInstance(flags, &attributes) }.map_err(open_error)?;
+        unsafe { engine.SetPreload(MF_MEDIA_ENGINE_PRELOAD_AUTOMATIC) }.map_err(open_error)?;
+        let settings = self.settings.get();
+        let configure: windows::core::Result<()> = (|| unsafe {
+            engine.SetVolume(settings.volume)?;
+            engine.SetMuted(settings.muted)?;
+            engine.SetDefaultPlaybackRate(settings.rate)
+        })();
+        configure.map_err(open_error)?;
+        Ok(Engine {
+            engine,
+            _notify: notify,
+        })
     }
 }
 
 impl Drop for Player {
     fn drop(&mut self) {
-        let _ = unsafe { self.engine.Shutdown() };
+        self.state.invalidate();
+        drop(self.engine.get_mut().take());
     }
+}
+
+fn current_error(reported: &ReportedState) -> MediaError {
+    reported.error.clone().unwrap_or_else(|| {
+        MediaError::new(MediaErrorKind::Open, "Media Foundation playback failed.")
+    })
+}
+
+fn buffered(engine: &IMFMediaEngine) -> Vec<TimeRange> {
+    let Ok(ranges) = (unsafe { engine.GetBuffered() }) else {
+        return Vec::new();
+    };
+    let mut buffered = Vec::with_capacity(unsafe { ranges.GetLength() } as usize);
+    for index in 0..unsafe { ranges.GetLength() } {
+        let (Ok(start), Ok(end)) = (unsafe { ranges.GetStart(index) }, unsafe {
+            ranges.GetEnd(index)
+        }) else {
+            continue;
+        };
+        if start.is_finite() && end.is_finite() {
+            buffered.push(TimeRange::new(start.max(0.0), end.max(0.0)));
+        }
+    }
+    buffered
 }
 
 fn source_url(source: MediaSource) -> Result<Url, MediaError> {
@@ -477,6 +755,10 @@ fn finite_nonnegative(value: f64) -> Option<f64> {
     (value.is_finite() && value >= 0.0).then_some(value)
 }
 
+fn finite_positive(value: f64) -> Option<f64> {
+    (value.is_finite() && value > 0.0).then_some(value)
+}
+
 fn open_error(error: WindowsError) -> MediaError {
     MediaError::new(
         MediaErrorKind::Open,
@@ -495,4 +777,73 @@ fn playback_error(error: WindowsError) -> MediaError {
             error.message()
         ),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn source_generations_isolate_stale_callbacks() {
+        let state = CallbackState::default();
+        let first = state.begin_load();
+        assert_eq!(
+            state.transition(first, MF_MEDIA_ENGINE_EVENT_CANPLAY.0 as u32, 0, 0),
+            Some(MediaEvent::Changed)
+        );
+        let second = state.begin_load();
+        assert_eq!(
+            state.transition(first, MF_MEDIA_ENGINE_EVENT_ENDED.0 as u32, 0, 0),
+            None
+        );
+        assert_eq!(state.reported().availability, LOADING);
+        assert!(!state.reported().ended);
+        assert_eq!(
+            state.transition(second, MF_MEDIA_ENGINE_EVENT_CANPLAY.0 as u32, 0, 0),
+            Some(MediaEvent::Changed)
+        );
+        assert_eq!(state.reported().availability, READY);
+    }
+
+    #[test]
+    fn terminal_events_cannot_erase_a_failure() {
+        let state = CallbackState::default();
+        let generation = state.begin_load();
+        state.fail(generation, MediaErrorKind::Open, "decoder failed");
+        assert_eq!(
+            state.transition(generation, MF_MEDIA_ENGINE_EVENT_EMPTIED.0 as u32, 0, 0),
+            None
+        );
+        let reported = state.reported();
+        assert_eq!(reported.availability, FAILED);
+        assert_eq!(
+            reported.error.expect("failure remains").message(),
+            "decoder failed"
+        );
+    }
+
+    #[test]
+    fn empty_active_source_becomes_a_failure() {
+        let state = CallbackState::default();
+        let generation = state.begin_load();
+        state.transition(generation, MF_MEDIA_ENGINE_EVENT_CANPLAY.0 as u32, 0, 0);
+        state.transition(generation, MF_MEDIA_ENGINE_EVENT_EMPTIED.0 as u32, 0, 0);
+        let reported = state.reported();
+        assert_eq!(reported.availability, FAILED);
+        assert!(
+            reported
+                .error
+                .expect("empty active source has an error")
+                .message()
+                .contains("emptied")
+        );
+    }
+
+    #[test]
+    fn invalid_durations_are_not_exposed_as_seekable() {
+        assert_eq!(finite_positive(0.0), None);
+        assert_eq!(finite_positive(f64::NAN), None);
+        assert_eq!(finite_positive(f64::INFINITY), None);
+        assert_eq!(finite_positive(3.5), Some(3.5));
+    }
 }

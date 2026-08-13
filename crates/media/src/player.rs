@@ -505,6 +505,28 @@ mod tests {
     }
 
     #[test]
+    fn subscriptions_accept_native_callback_threads() {
+        let hub = Arc::new(EventHub::default());
+        let calls = Arc::new(AtomicUsize::new(0));
+        let subscription = hub.subscribe({
+            let calls = Arc::clone(&calls);
+            Arc::new(move |_| {
+                calls.fetch_add(1, Ordering::Relaxed);
+            })
+        });
+        let callback_hub = Arc::clone(&hub);
+        std::thread::spawn(move || callback_hub.emit(MediaEvent::Changed))
+            .join()
+            .expect("native callback thread completes");
+        assert_eq!(calls.load(Ordering::Relaxed), 1);
+        drop(subscription);
+        std::thread::spawn(move || hub.emit(MediaEvent::Changed))
+            .join()
+            .expect("callback thread completes after unsubscribe");
+        assert_eq!(calls.load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
     fn ranges_are_ordered_for_native_backends() {
         assert_eq!(TimeRange::new(8.0, 3.0), TimeRange::new(3.0, 8.0));
     }

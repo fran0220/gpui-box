@@ -127,9 +127,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with: { toolchain: 1.97.0, components: "clippy" }
       - uses: Swatinem/rust-cache@v2
-      - name: Run the macOS platform tests formerly covered by the full gate
+      - name: Run native media lifecycle tests
+        run: cargo test -p gpui-box-media --all-features --locked
+      - name: Run the remaining macOS platform tests formerly covered by the full gate
         if: runner.os == 'macOS'
-        run: cargo test --workspace --all-features --locked
+        run: cargo test --workspace --all-features --locked --exclude gpui-box-media
       - name: Reject platform-specific warnings
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: Compile Direct3D release shaders

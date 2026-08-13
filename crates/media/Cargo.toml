@@ -17,6 +17,12 @@ name = "media"
 path = "src/media.rs"
 doctest = false
 
+[[test]]
+name = "native_media"
+path = "tests/native_media.rs"
+harness = false
+required-features = ["native-playback"]
+
 [features]
 default = ["native-playback"]
 # Keep the product-neutral player contract available to deterministic tests

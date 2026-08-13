@@ -41,6 +41,12 @@ pub(super) struct Player {
 
 impl Player {
     pub(super) fn new(kind: MediaKind, events: Arc<EventHub>) -> Result<Self, MediaError> {
+        if !unsafe { gpui_media_player_is_main_thread() } {
+            return Err(MediaError::new(
+                MediaErrorKind::Open,
+                "AVFoundation media players must be created on the macOS main thread.",
+            ));
+        }
         let event_context = Arc::into_raw(events);
         let raw = unsafe {
             gpui_media_player_create(
@@ -60,24 +66,37 @@ impl Player {
     }
 
     pub(super) fn load(&self, source: MediaSource) -> Result<(), MediaError> {
-        let (source, is_file) = match source {
-            MediaSource::File(path) => (
-                path.into_os_string().into_string().map_err(|_| {
+        let converted = match source {
+            MediaSource::File(path) => path
+                .into_os_string()
+                .into_string()
+                .map(|path| (path, true))
+                .map_err(|_| {
                     MediaError::new(
                         MediaErrorKind::InvalidSource,
                         "AVFoundation requires a UTF-8 local media path.",
                     )
-                })?,
-                true,
-            ),
-            MediaSource::Url(url) => (url, false),
+                }),
+            MediaSource::Url(url) => Ok((url, false)),
         };
-        let source = CString::new(source).map_err(|_| {
-            MediaError::new(
-                MediaErrorKind::InvalidSource,
-                "The media source contains a null byte.",
-            )
-        })?;
+        let (source, is_file) = match converted {
+            Ok(source) => source,
+            Err(error) => {
+                self.fail_load(&error);
+                return Err(error);
+            }
+        };
+        let source = match CString::new(source) {
+            Ok(source) => source,
+            Err(_) => {
+                let error = MediaError::new(
+                    MediaErrorKind::InvalidSource,
+                    "The media source contains a null byte.",
+                );
+                self.fail_load(&error);
+                return Err(error);
+            }
+        };
         let loaded = unsafe {
             if is_file {
                 gpui_media_player_load_file(self.raw.as_ptr(), source.as_ptr())
@@ -116,7 +135,7 @@ impl Player {
             ));
         }
 
-        unsafe {
+        let applied = unsafe {
             match command {
                 MediaCommand::Play => gpui_media_player_play(self.raw.as_ptr()),
                 MediaCommand::Pause => gpui_media_player_pause(self.raw.as_ptr()),
@@ -129,8 +148,12 @@ impl Player {
                 }
                 MediaCommand::SetRate(rate) => gpui_media_player_set_rate(self.raw.as_ptr(), rate),
             }
+        };
+        if applied {
+            MediaCommandOutcome::Applied
+        } else {
+            MediaCommandOutcome::Refused(self.error(MediaErrorKind::Playback))
         }
-        MediaCommandOutcome::Applied
     }
 
     pub(super) fn snapshot(&self) -> MediaSnapshot {
@@ -148,13 +171,22 @@ impl Player {
             }
             _ => MediaAvailability::Failed(error()),
         };
-        let state = match raw.playback {
-            1 => PlaybackState::Playing,
-            2 => PlaybackState::Buffering,
-            3 => PlaybackState::Ended,
-            _ => PlaybackState::Paused,
+        let ready = availability.is_ready();
+        let state = if ready {
+            match raw.playback {
+                1 => PlaybackState::Playing,
+                2 => PlaybackState::Buffering,
+                3 => PlaybackState::Ended,
+                _ => PlaybackState::Paused,
+            }
+        } else {
+            PlaybackState::Paused
         };
-        let range_count = unsafe { gpui_media_player_buffered_count(self.raw.as_ptr()) };
+        let range_count = if ready {
+            unsafe { gpui_media_player_buffered_count(self.raw.as_ptr()) }
+        } else {
+            0
+        };
         let mut buffered = Vec::with_capacity(range_count);
         for index in 0..range_count {
             let mut start = 0.0;
@@ -209,6 +241,13 @@ impl Player {
             },
         )
     }
+
+    fn fail_load(&self, error: &MediaError) {
+        let message = CString::new(error.message()).expect("media errors never contain null bytes");
+        unsafe {
+            gpui_media_player_fail_load(self.raw.as_ptr(), 2, message.as_ptr());
+        }
+    }
 }
 
 impl Drop for Player {
@@ -225,6 +264,7 @@ fn finite_nonnegative(value: f64) -> Option<f64> {
 }
 
 unsafe extern "C" {
+    fn gpui_media_player_is_main_thread() -> bool;
     fn gpui_media_player_create(
         video: bool,
         callback: Option<EventCallback>,
@@ -234,12 +274,13 @@ unsafe extern "C" {
     fn gpui_media_player_view(player: *mut c_void) -> *mut c_void;
     fn gpui_media_player_load_file(player: *mut c_void, path: *const c_char) -> bool;
     fn gpui_media_player_load_url(player: *mut c_void, url: *const c_char) -> bool;
-    fn gpui_media_player_play(player: *mut c_void);
-    fn gpui_media_player_pause(player: *mut c_void);
-    fn gpui_media_player_seek(player: *mut c_void, seconds: f64);
-    fn gpui_media_player_set_volume(player: *mut c_void, volume: f64);
-    fn gpui_media_player_set_muted(player: *mut c_void, muted: bool);
-    fn gpui_media_player_set_rate(player: *mut c_void, rate: f64);
+    fn gpui_media_player_fail_load(player: *mut c_void, kind: c_int, message: *const c_char);
+    fn gpui_media_player_play(player: *mut c_void) -> bool;
+    fn gpui_media_player_pause(player: *mut c_void) -> bool;
+    fn gpui_media_player_seek(player: *mut c_void, seconds: f64) -> bool;
+    fn gpui_media_player_set_volume(player: *mut c_void, volume: f64) -> bool;
+    fn gpui_media_player_set_muted(player: *mut c_void, muted: bool) -> bool;
+    fn gpui_media_player_set_rate(player: *mut c_void, rate: f64) -> bool;
     fn gpui_media_player_snapshot(player: *mut c_void, snapshot: *mut RawSnapshot);
     fn gpui_media_player_buffered_count(player: *mut c_void) -> usize;
     fn gpui_media_player_buffered_range(
@@ -253,4 +294,36 @@ unsafe extern "C" {
         buffer: *mut c_char,
         capacity: usize,
     ) -> c_int;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn worker_thread_construction_is_rejected_before_appkit_use() {
+        std::thread::spawn(|| {
+            assert!(!unsafe { gpui_media_player_is_main_thread() });
+            let result = Player::new(MediaKind::Video, Arc::new(EventHub::default()));
+            let error = match result {
+                Ok(_) => panic!("a worker thread must not construct an AppKit media view"),
+                Err(error) => error,
+            };
+            assert_eq!(error.kind(), MediaErrorKind::Open);
+            assert!(error.message().contains("main thread"));
+        })
+        .join()
+        .expect("main-thread construction guard test completes");
+    }
+
+    #[test]
+    fn invalid_durations_are_not_exposed() {
+        assert_eq!(finite_nonnegative(f64::NAN), None);
+        assert_eq!(finite_nonnegative(f64::INFINITY), None);
+        assert_eq!(finite_nonnegative(-1.0), None);
+        assert_eq!(
+            finite_nonnegative(0.0).filter(|duration| *duration > 0.0),
+            None
+        );
+    }
 }

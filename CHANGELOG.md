@@ -18,7 +18,13 @@ position, duration, buffered ranges, buffering, end and native errors. Video
 uses a retained `NSView`/child `HWND` through GPUI's platform-view host. Linux
 and Web keep an explicit no-backend state; playlists, DRM, media-track policy,
 output-device routing, custom network policy and capture remain outside the
-service.
+service. Source replacements invalidate callbacks from the prior decoder;
+failed replacements and terminal errors remain failures, and seek or restart
+state changes only after the native operation succeeds. AVFoundation creation
+and teardown are main-thread confined, while Media Foundation and caller-owned
+COM apartment lifetimes remain balanced across concurrent players. Native CI
+executes load, playback, seek, end, restart, audio setting, replacement, and
+teardown behavior on both macOS and Windows.
 
 ### Changed
 
