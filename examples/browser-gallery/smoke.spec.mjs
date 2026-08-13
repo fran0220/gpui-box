@@ -43,6 +43,10 @@ async function settle(page) {
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
+async function selection(page) {
+  return JSON.parse(await page.evaluate(() => window.gpuiBoxSelection));
+}
+
 test("ordinary control uses the catalog component and stable semantics", async ({ page }, testInfo) => {
   await openScene(page, testInfo, "button");
   const { renderer } = testInfo.project.metadata;
@@ -203,4 +207,50 @@ test("AccessKit DOM mirrors role, focus, action, and canvas-scaled bounds", asyn
   expect(Math.abs(bounds.y - (canvas.y + primary.bounds.y))).toBeLessThanOrEqual(1);
   expect(Math.abs(bounds.width - primary.bounds.width)).toBeLessThanOrEqual(2);
   expect(Math.abs(bounds.height - primary.bounds.height)).toBeLessThanOrEqual(2);
+});
+
+test("playground filters, selects, themes, syncs its URL, and reflows narrowly", async ({ page }, testInfo) => {
+  const { backend, renderer } = testInfo.project.metadata;
+  await page.goto(`/index.html?mode=playground&scene=button&theme=studio-light&backend=${backend}`);
+  await page.waitForFunction(() => window.gpuiKitGalleryReady === true);
+  await expect(page.locator("canvas")).toHaveAttribute("data-gpui-renderer", renderer);
+  expect(await node(page, "browser.playground.title")).toBeDefined();
+  expect((await node(page, "browser.playground.scenes")).value).toBe("99");
+
+  const query = await node(page, "browser.playground.search.query");
+  await pointer(page, "pointerdown", center(query), 1);
+  await pointer(page, "pointerup", center(query), 0);
+  await page.keyboard.type("badge");
+  await expect.poll(async () => (await node(page, "browser.playground.scenes")).value).toBe("1");
+
+  const badge = await node(page, "browser.playground.scenes.badge");
+  await pointer(page, "pointerdown", center(badge), 1);
+  await pointer(page, "pointerup", center(badge), 0);
+  await expect.poll(async () => (await selection(page)).scene).toBe("badge");
+  await expect.poll(() => new URL(page.url()).searchParams.get("scene")).toBe("badge");
+
+  const dark = await node(page, "browser.playground.theme.studio-dark");
+  await pointer(page, "pointerdown", center(dark), 1);
+  await pointer(page, "pointerup", center(dark), 0);
+  await expect.poll(async () => (await selection(page)).theme).toBe("studio-dark");
+  await expect.poll(() => new URL(page.url()).searchParams.get("theme")).toBe("studio-dark");
+
+  await pointer(page, "pointerdown", center(await node(page, "browser.playground.search.query")), 1);
+  await pointer(page, "pointerup", center(await node(page, "browser.playground.search.query")), 0);
+  await page.keyboard.press("Control+A");
+  await page.keyboard.type("button");
+  const button = await node(page, "browser.playground.scenes.button");
+  await pointer(page, "pointerdown", center(button), 1);
+  await pointer(page, "pointerup", center(button), 0);
+  await expect.poll(async () => (await selection(page)).scene).toBe("button");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await settle(page);
+  const navigation = await node(page, "browser.playground.scenes");
+  const preview = await node(page, "browser.playground.preview");
+  const lastButton = await node(page, "scene.button.link");
+  expect(navigation.bounds.width).toBeLessThanOrEqual(390);
+  expect(preview.bounds.y).toBeGreaterThan(navigation.bounds.y);
+  expect(lastButton.bounds.x + lastButton.bounds.width)
+    .toBeLessThanOrEqual(preview.bounds.x + preview.bounds.width);
 });

@@ -6,25 +6,71 @@
     <title>GPUI Box browser gallery</title>
     <style>
       html, body {
-        width: 920px;
-        height: 1000px;
+        width: 100%;
+        height: 100%;
         margin: 0;
         overflow: hidden;
         background: #111318;
       }
+      html.embed, html.embed body {
+        width: 920px;
+        height: 1000px;
+      }
+      html.embed body { transform-origin: top left; }
       canvas { display: block; }
+      #loading {
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+        display: grid;
+        place-items: center;
+        color: #a1a1a1;
+        font: 13px/1.5 system-ui, sans-serif;
+      }
     </style>
   </head>
   <body>
+    <div id="loading" role="status">Loading the live GPUI surface…</div>
     <script type="module">
       const query = new URLSearchParams(location.search);
+      const embedded = query.get("embed") === "1";
+      const playgroundPath = location.pathname === "/playground/" ||
+        location.pathname.endsWith("/playground/index.html");
+      const mode = query.get("mode") || (playgroundPath && !embedded ? "playground" : "scene");
+      if (embedded) {
+        document.documentElement.classList.add("embed");
+        const fit = () => {
+          document.body.style.transform = `scale(${innerWidth / 920})`;
+        };
+        addEventListener("resize", fit);
+        fit();
+      }
       window.gpuiBoxConfig = {
         scene: query.get("scene") || "button",
         theme: query.get("theme") || "studio-light",
         backend: query.get("backend") || "auto",
+        mode,
+      };
+      window.gpuiBoxSelectionChanged = (scene, theme) => {
+        window.gpuiBoxSelection = JSON.stringify({ scene, theme });
+        if (mode !== "playground") return;
+        const url = new URL(location.href);
+        url.searchParams.set("scene", scene);
+        url.searchParams.set("theme", theme);
+        if (playgroundPath) url.searchParams.delete("mode");
+        else url.searchParams.set("mode", "playground");
+        history.replaceState(null, "", url);
+        document.title = `${scene} — GPUI Box playground`;
       };
       const { default: init } = await import("./gpui_kit_browser_gallery.js");
-      await init();
+      try {
+        await init();
+        document.getElementById("loading")?.remove();
+      } catch (error) {
+        const loading = document.getElementById("loading");
+        if (loading) loading.textContent = `The live GPUI surface could not start: ${error}`;
+        throw error;
+      }
     </script>
   </body>
 </html>
