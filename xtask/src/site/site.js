@@ -39,3 +39,24 @@
     }
   });
 })();
+
+// A live scene is an enhancement over its committed capture. Keep the static
+// image visible until the embedded GPUI surface has rendered its first semantic
+// frame; a renderer failure therefore leaves useful content rather than a
+// blank rectangle.
+(function () {
+  function markReady(frame) {
+    var host = frame.closest(".live-embed");
+    if (!host) return;
+    frame.removeAttribute("tabindex");
+    host.classList.add("is-ready");
+  }
+
+  window.addEventListener("message", function (event) {
+    if (event.origin !== window.location.origin) return;
+    if (!event.data || event.data.type !== "gpui-box-ready") return;
+    Array.prototype.forEach.call(document.querySelectorAll(".live-frame"), function (frame) {
+      if (frame.contentWindow === event.source) markReady(frame);
+    });
+  });
+})();

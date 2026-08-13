@@ -31,8 +31,13 @@ use serde_json::Value;
 /// Prose worth publishing. `strings-allowlist.txt` and `api-index.json` are
 /// machine artifacts, and `llms.txt` is served as itself rather than as a page.
 const OMIT: &[&str] = &["strings-allowlist.txt", "api-index.json", "llms.txt"];
+const BROWSER_GALLERY_FILES: &[&str] = &[
+    "index.html",
+    "gpui_kit_browser_gallery.js",
+    "gpui_kit_browser_gallery_bg.wasm",
+];
 
-pub fn generate(root: &Path, out: Option<&str>) -> Result<PathBuf> {
+pub fn generate(root: &Path, out: Option<&str>, browser_gallery: &Path) -> Result<PathBuf> {
     let out = out
         .map(PathBuf::from)
         .unwrap_or_else(|| root.join("target").join("site"));
@@ -124,6 +129,7 @@ pub fn generate(root: &Path, out: Option<&str>) -> Result<PathBuf> {
     }
 
     write(&out.join("assets/search.json"), &search(&components))?;
+    copy_browser_gallery(browser_gallery, &out.join("playground"))?;
 
     println!(
         "site: {} components, {} scenes, {} pages, {copied} images ({image_version}) -> {}",
@@ -138,10 +144,33 @@ pub fn generate(root: &Path, out: Option<&str>) -> Result<PathBuf> {
 /// Builds into a scratch directory and throws it away. The site's inputs are
 /// gate-checked already, so what is left to prove is that they still render.
 pub fn check(root: &Path) -> Result<()> {
+    let browser_gallery = root
+        .join("target")
+        .join("site-check-browser-gallery-fixture");
+    if browser_gallery.exists() {
+        fs::remove_dir_all(&browser_gallery)?;
+    }
+    fs::create_dir_all(&browser_gallery)?;
+    for name in BROWSER_GALLERY_FILES {
+        write(&browser_gallery.join(name), "site-check fixture\n")?;
+    }
+    let result = check_with_browser(root, &browser_gallery);
+    let cleanup: Result<()> = fs::remove_dir_all(&browser_gallery).map_err(Into::into);
+    result.and(cleanup)
+}
+
+/// Checks the complete publishable site against an actual browser build.
+pub fn check_with_browser(root: &Path, browser_gallery: &Path) -> Result<()> {
     let out = root.join("target").join("site-check");
-    generate(root, out.to_str())?;
-    fs::remove_dir_all(&out)?;
-    println!("site builds");
+    let result = generate(root, out.to_str(), browser_gallery).map(|_| ());
+    let cleanup: Result<()> = if out.exists() {
+        fs::remove_dir_all(&out)
+    } else {
+        Ok(())
+    }
+    .map_err(Into::into);
+    result.and(cleanup)?;
+    println!("site and browser playground build");
     Ok(())
 }
 
@@ -159,6 +188,20 @@ fn index(root: &Path) -> Result<Value> {
 fn write(path: &Path, body: &str) -> Result<()> {
     fs::create_dir_all(path.parent().context("a page has a directory")?)?;
     fs::write(path, body)?;
+    Ok(())
+}
+
+fn copy_browser_gallery(source: &Path, destination: &Path) -> Result<()> {
+    fs::create_dir_all(destination)?;
+    for name in BROWSER_GALLERY_FILES {
+        let from = source.join(name);
+        fs::copy(&from, destination.join(name)).with_context(|| {
+            format!(
+                "copy browser gallery asset {}; run `cargo run -p xtask -- web build` first",
+                from.display()
+            )
+        })?;
+    }
     Ok(())
 }
 
@@ -195,6 +238,7 @@ fn shell(title: &str, active: &str, body: &str) -> String {
     let nav = [
         ("/components/", "Components"),
         ("/scenes/", "Scenes"),
+        ("/playground/", "Playground"),
         ("/docs/", "Docs"),
     ]
     .iter()
@@ -282,8 +326,16 @@ fn home(components: &[Value], scenes: &[Value], image_root: &str) -> String {
   is replaceable, and every state is the state it claims to be.</p>
   <p class="cta">
     <a class="button" href="/components/">Browse {count} components</a>
+    <a class="button quiet" href="/playground/">Open the playground</a>
     <a class="button quiet" href="/llms.txt">Read the contracts</a>
   </p>
+</section>
+
+<section class="live">
+  <h2>Rendered by GPUI, in this page</h2>
+  <p class="lead">The documentation stays searchable static HTML. This surface
+  is the actual Rust scene running through GPUI's browser renderer.</p>
+  {live}
 </section>
 
 <section class="stats">
@@ -332,6 +384,7 @@ cargo run -p xtask -- headless capture badge   # accept what changed</code></pre
         count = components.len(),
         scenes_count = scenes.len(),
         images = scenes.len() * 2,
+        live = live_embed("node-graph", "studio-dark", image_root, false),
     );
     shell("GPUI Box — native desktop components for GPUI", "/", &body)
 }
@@ -509,6 +562,12 @@ fn scene_page(scene: &Value, components: &[Value], image_root: &str) -> String {
         r#"<p class="crumb"><a href="/scenes/">Scenes</a></p>
 <h1>{name}</h1>
 <p class="note">Builds {uses}</p>
+<h2>Live GPUI surface</h2>
+<p class="note">Loaded lazily from the same Rust scene. Until it is ready, or
+if this browser cannot start a renderer, the verified static capture remains.</p>
+{live}
+<p class="note"><a href="/playground/?scene={name}&amp;theme=studio-dark">Open {name} at full size in the playground</a></p>
+<h2>Verified captures</h2>
 <div class="themes">
   <figure><img src="{image_root}/{name}-studio-dark.png" alt="{name} in the dark theme"><figcaption>studio-dark</figcaption></figure>
   <figure><img src="{image_root}/{name}-studio-light.png" alt="{name} in the light theme"><figcaption>studio-light</figcaption></figure>
@@ -520,8 +579,24 @@ Run the gallery to review motion.</p>
 <pre class="code"><code>{example}</code></pre>
 "#,
         example = highlight(&string(scene, "example")),
+        live = live_embed(&name, "studio-dark", image_root, true),
     );
     shell(&format!("{name} — GPUI Box scenes"), "/scenes/", &body)
+}
+
+fn live_embed(scene: &str, theme: &str, image_root: &str, detail: bool) -> String {
+    let size = if detail { " detail" } else { "" };
+    format!(
+        r#"<div class="live-embed{size}" data-live-scene="{scene}">
+  <a class="live-fallback" href="/playground/?scene={scene}&amp;theme={theme}">
+    <img src="{image_root}/{scene}-{theme}.png" alt="The verified {scene} scene in {theme}">
+    <span>Open {scene} in the playground</span>
+  </a>
+  <iframe class="live-frame" loading="lazy" tabindex="-1"
+    title="Live GPUI Box {scene} scene"
+    src="/playground/?scene={scene}&amp;theme={theme}&amp;embed=1"></iframe>
+</div>"#
+    )
 }
 
 fn doc_list(pages: &[String]) -> String {
@@ -883,5 +958,47 @@ mod tests {
         assert!(css.contains("--canvas: #eeeef1;"));
         assert!(css.contains("--radius-card: 12px;"));
         assert!(css.contains("--motion-quick: 150ms;"));
+    }
+
+    #[test]
+    fn embeds_keep_fallbacks() {
+        let html = live_embed("button", "studio-dark", "/images/revision", true);
+        assert!(html.contains("class=\"live-embed detail\""), "{html}");
+        assert!(
+            html.contains("/images/revision/button-studio-dark.png"),
+            "{html}"
+        );
+        assert!(html.contains("loading=\"lazy\""), "{html}");
+        assert!(
+            html.contains("title=\"Live GPUI Box button scene\""),
+            "{html}"
+        );
+        assert!(
+            html.contains("/playground/?scene=button&amp;theme=studio-dark&amp;embed=1"),
+            "{html}"
+        );
+    }
+
+    #[test]
+    fn browser_gallery_bundle_is_copied_as_one_playground() {
+        let fixture = std::env::temp_dir().join(format!(
+            "gpui-box-site-browser-fixture-{}",
+            std::process::id()
+        ));
+        let destination = fixture.join("output");
+        let _ = fs::remove_dir_all(&fixture);
+        fs::create_dir_all(&fixture).expect("create browser fixture");
+        for name in BROWSER_GALLERY_FILES {
+            write(&fixture.join(name), name).expect("write browser fixture");
+        }
+
+        copy_browser_gallery(&fixture, &destination).expect("copy browser gallery");
+        for name in BROWSER_GALLERY_FILES {
+            assert_eq!(
+                fs::read_to_string(destination.join(name)).expect("read copied asset"),
+                *name
+            );
+        }
+        fs::remove_dir_all(&fixture).expect("remove browser fixture");
     }
 }

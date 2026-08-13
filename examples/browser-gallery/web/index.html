@@ -66,6 +66,16 @@
       try {
         await init();
         document.getElementById("loading")?.remove();
+        const announceReady = () => {
+          if (window.gpuiKitGalleryReady !== true) {
+            requestAnimationFrame(announceReady);
+            return;
+          }
+          if (embedded && parent !== window) {
+            parent.postMessage({ type: "gpui-box-ready", scene: window.gpuiBoxConfig.scene }, location.origin);
+          }
+        };
+        announceReady();
       } catch (error) {
         const loading = document.getElementById("loading");
         if (loading) loading.textContent = `The live GPUI surface could not start: ${error}`;

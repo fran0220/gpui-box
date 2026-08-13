@@ -9,11 +9,12 @@ same catalog and MCP implementation.
 tools/site/deploy.sh
 ```
 
-The script checks the API index, generates the site, copies the shared MCP tool
-description, and deploys one Cloudflare Worker. `/` serves people and `/mcp`
-serves agents. Hosted `render_scene` returns committed catalog captures rather
-than compiling per request; the stdio server in [`mcp.md`](mcp.md) is required
-for working-copy rendering.
+The script checks the API index, builds the browser gallery, generates the
+static catalog around it, copies the shared MCP tool description, and deploys
+one Cloudflare Worker. `/` serves people, `/playground/` serves the full GPUI
+surface, and `/mcp` serves agents. Hosted `render_scene` returns committed
+catalog captures rather than compiling per request; the stdio server in
+[`mcp.md`](mcp.md) is required for working-copy rendering.
 
 ```json
 {
@@ -53,10 +54,13 @@ so these custom domains are the production routes.
 |---|---|
 | `/` and `/components/*` | generated from `docs/api-index.json` |
 | `/scenes/*` | canonical scene source and committed theme captures |
+| `/playground/*` | release WASM browser gallery, also embedded lazily by catalog pages |
 | `/docs/*` | public documentation |
 | `/llms.txt`, `/api-index.json` | machine-readable catalog inputs |
 | `/images/*` | fingerprinted macOS scene captures |
 | `/mcp` | `tools/site/worker/index.js` and `tools/mcp/tools.json` |
 
-`tools/site/public/` is generated and uncommitted. `cargo run -p xtask -- site
-check` builds it in scratch space without deploying.
+`tools/site/public/` is generated and uncommitted. Both `site generate` and
+`site check` require the `wasm32-unknown-unknown` target and the locked
+`wasm-bindgen-cli` version; `cargo run -p xtask -- site check` builds the
+complete output in scratch space without deploying.

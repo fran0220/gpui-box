@@ -43,9 +43,18 @@ fn main() -> Result<()> {
             package::publish(&release_root, &rest)
         }
         (Some("site"), Some("generate")) => {
-            site::generate(&root(), rest.first().map(String::as_str)).map(|_| ())
+            web_build()?;
+            site::generate(
+                &root(),
+                rest.first().map(String::as_str),
+                &root().join("target/browser-gallery"),
+            )
+            .map(|_| ())
         }
-        (Some("site"), Some("check")) => site::check(&root()),
+        (Some("site"), Some("check")) => {
+            web_build()?;
+            site::check_with_browser(&root(), &root().join("target/browser-gallery"))
+        }
         (Some("accessibility"), Some("check")) => accessibility_check(),
         (Some("scenes"), Some("list")) => scenes_list(),
         (Some("scenes"), Some("render")) => scenes_render(&rest),
@@ -60,7 +69,7 @@ fn main() -> Result<()> {
         (Some("gate"), Some("full")) => gate(true),
         (Some("gate"), Some("only")) => gate_only(&rest),
         _ => bail!(
-            "usage: cargo xtask <dependencies check|package plan|package check|package publish --execute|accessibility check|tokens generate|tokens check|strings check|\
+            "usage: cargo xtask <dependencies check|package plan|package check|package publish --execute|site generate [output]|site check|accessibility check|tokens generate|tokens check|strings check|\
              strings generate|typography check|scenes list|scenes render [name...]|\
              headless capture [name...]|\
              headless check [name...]|web check|web build|web smoke|\
@@ -1146,7 +1155,8 @@ fn web_build() -> Result<()> {
 fn web_smoke() -> Result<()> {
     web_build()?;
     web_prepare()?;
-    web_smoke_prepared()
+    web_smoke_prepared()?;
+    web_site_smoke_prepared()
 }
 
 fn web_prepare() -> Result<()> {
@@ -1187,6 +1197,39 @@ fn web_smoke_prepared() -> Result<()> {
         ],
         None,
     )
+}
+
+fn web_site_smoke_prepared() -> Result<()> {
+    let output = root().join("target/site-browser-smoke");
+    let browser_gallery = root().join("target/browser-gallery");
+    let result = (|| {
+        site::generate(&root(), output.to_str(), &browser_gallery)?;
+        let package = root().join("examples/browser-gallery");
+        let package = package.to_string_lossy();
+        let config = root().join("examples/browser-gallery/site.config.mjs");
+        let config = config.to_string_lossy();
+        step(
+            "npm",
+            &[
+                "--prefix",
+                package.as_ref(),
+                "exec",
+                "--",
+                "playwright",
+                "test",
+                "--config",
+                config.as_ref(),
+            ],
+            None,
+        )
+    })();
+    let cleanup: Result<()> = if output.exists() {
+        fs::remove_dir_all(&output)
+    } else {
+        Ok(())
+    }
+    .map_err(Into::into);
+    result.and(cleanup)
 }
 
 fn web_visual(args: &[String]) -> Result<()> {
@@ -1234,6 +1277,7 @@ fn web_gate(scenes: &[String]) -> Result<()> {
     web_build()?;
     web_prepare()?;
     web_smoke_prepared()?;
+    web_site_smoke_prepared()?;
     web_visual_prepared("check", scenes)?;
     println!("web gate passed");
     Ok(())

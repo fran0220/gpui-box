@@ -95,6 +95,8 @@ cargo run -p xtask -- web build
 cargo run -p xtask -- web smoke
 cargo run -p xtask -- web visual check button input dialog node-graph
 cargo run -p xtask -- web gate button input dialog node-graph
+cargo run -p xtask -- site check
+cargo run -p xtask -- site generate
 cargo run -p xtask -- package plan
 cargo run -p xtask -- package check
 ```
@@ -102,7 +104,10 @@ cargo run -p xtask -- package check
 `scenes render` writes real-window review images; it is not a baseline gate.
 Run `gate full` instead of, not after, `gate` when a change can affect rendered
 output. The standalone web commands remain useful while iterating; `web gate`
-builds and prepares Chromium once before running the complete browser proof.
+builds and prepares Chromium once before checking the gallery, static-site
+embeds, full playground route, and scoped visual proof. `site generate` bundles
+that browser build with the static catalog rather than replacing searchable
+documentation with a canvas.
 Headless baselines and CI gates cover macOS, Linux, and Windows, and the native
 matrix compiles every feature on all three. Browser CI cross-checks WASM and
 drives a real Chromium smoke. Browser validation is single-threaded and does

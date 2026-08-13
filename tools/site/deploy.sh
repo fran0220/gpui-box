@@ -3,8 +3,9 @@
 # deploys both as one Worker.
 #
 # Everything it publishes is derived: the pages come from `docs/api-index.json`
-# and `docs/*.md`, the images come from `snapshots/headless/macos/scenes`, and the tool
-# list comes from `tools/mcp/tools.json`. Nothing here is authored, so a deploy
+# and `docs/*.md`, the images come from `snapshots/headless/macos/scenes`, the
+# live playground comes from the browser-gallery WASM build, and the tool list
+# comes from `tools/mcp/tools.json`. Nothing here is authored twice, so a deploy
 # cannot say something the repository does not.
 set -euo pipefail
 
@@ -20,6 +21,8 @@ fi
 # would publish signatures that no longer compile.
 cargo run -q -p xtask -- api check
 
+# `site generate` builds and bundles the browser gallery before projecting the
+# static catalog, so the Worker receives one self-contained output directory.
 cargo run -q -p xtask -- site generate tools/site/public
 
 # The tool surface is shared with the stdio server rather than written twice.
