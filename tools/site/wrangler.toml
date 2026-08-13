@@ -31,6 +31,9 @@ custom_domain = true
 [assets]
 directory = "public"
 binding = "ASSETS"
+# Static assets run first by default. Route MCP requests through the Worker so
+# POST remains JSON-RPC while GET /mcp/ can still serve the human page.
+run_worker_first = ["/mcp", "/mcp/*"]
 # The site's own 404 rather than the Worker's, and a page for a path that was
 # written without `.html`.
 not_found_handling = "404-page"
