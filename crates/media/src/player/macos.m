@@ -41,9 +41,6 @@ typedef struct GPBXMediaSnapshot {
 @property(nonatomic, strong) AVPlayer *player;
 @property(nonatomic, strong) GPBXMediaPlayerView *view;
 @property(nonatomic, strong) AVPlayerItem *observedItem;
-@property(nonatomic, strong) id statusObservation;
-@property(nonatomic, strong) id loadedRangesObservation;
-@property(nonatomic, strong) id bufferEmptyObservation;
 @property(nonatomic, strong) id endObserver;
 @property(nonatomic, strong) id timeObserver;
 @property(nonatomic, strong) NSError *loadError;
@@ -61,6 +58,7 @@ typedef struct GPBXMediaSnapshot {
 - (BOOL)loadURL:(NSURL *)url;
 - (NSError *)errorWithCode:(GPBXMediaErrorCode)code message:(NSString *)message;
 - (void)failReplacementWithCode:(GPBXMediaErrorCode)code message:(NSString *)message;
+- (void)pollStatusForGeneration:(uint64_t)generation;
 - (void)emitForGeneration:(uint64_t)generation event:(int)event;
 - (void)invalidate;
 @end
@@ -125,12 +123,6 @@ typedef struct GPBXMediaSnapshot {
 }
 
 - (void)removeItemObservers {
-    [_statusObservation invalidate];
-    [_loadedRangesObservation invalidate];
-    [_bufferEmptyObservation invalidate];
-    _statusObservation = nil;
-    _loadedRangesObservation = nil;
-    _bufferEmptyObservation = nil;
     if (_endObserver != nil) {
         [[NSNotificationCenter defaultCenter] removeObserver:_endObserver];
         _endObserver = nil;
@@ -180,24 +172,6 @@ typedef struct GPBXMediaSnapshot {
     uint64_t generation = _generation;
     _observedItem = item;
     __weak GPBXMediaPlayer *weakSelf = self;
-    void (^changed)(AVPlayerItem *, NSDictionary<NSKeyValueChangeKey, id> *) =
-        ^(AVPlayerItem *changedItem, NSDictionary<NSKeyValueChangeKey, id> *change) {
-          (void)changedItem;
-          (void)change;
-          GPBXMediaPlayer *strongSelf = weakSelf;
-          if (strongSelf != nil) {
-              [strongSelf emitForGeneration:generation event:0];
-          }
-        };
-    _statusObservation = [item observeValueForKeyPath:@"status"
-                                              options:NSKeyValueObservingOptionNew
-                                        changeHandler:changed];
-    _loadedRangesObservation = [item observeValueForKeyPath:@"loadedTimeRanges"
-                                                    options:NSKeyValueObservingOptionNew
-                                              changeHandler:changed];
-    _bufferEmptyObservation = [item observeValueForKeyPath:@"playbackBufferEmpty"
-                                                   options:NSKeyValueObservingOptionNew
-                                             changeHandler:changed];
     _endObserver = [[NSNotificationCenter defaultCenter]
         addObserverForName:AVPlayerItemDidPlayToEndTimeNotification
                     object:item
@@ -212,8 +186,27 @@ typedef struct GPBXMediaSnapshot {
                   }
                 }];
     [_player replaceCurrentItemWithPlayerItem:item];
-    [self emitForGeneration:generation event:0];
+    [self pollStatusForGeneration:generation];
     return YES;
+}
+
+- (void)pollStatusForGeneration:(uint64_t)generation {
+    NSCAssert([NSThread isMainThread], @"native media status polling must run on the main thread");
+    if (_invalidated || generation != _generation || _observedItem == nil) {
+        return;
+    }
+    if (_observedItem.status != AVPlayerItemStatusUnknown) {
+        [self emitForGeneration:generation event:0];
+        return;
+    }
+    __weak GPBXMediaPlayer *weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 20 * NSEC_PER_MSEC),
+                   dispatch_get_main_queue(), ^{
+                     GPBXMediaPlayer *strongSelf = weakSelf;
+                     if (strongSelf != nil) {
+                         [strongSelf pollStatusForGeneration:generation];
+                     }
+                   });
 }
 
 - (void)emitForGeneration:(uint64_t)generation event:(int)event {
