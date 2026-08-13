@@ -6,7 +6,7 @@ but maintained and released independently of Zed. GPUI Box is not an official
 Zed project.
 
 The framework is pre-1.0 and may make breaking changes between releases. Version
-0.1.1 requires Rust 1.97 or newer.
+0.1.2 requires Rust 1.97 or newer.
 
 ## Getting Started
 
@@ -15,8 +15,8 @@ Use package aliases so application code keeps the familiar `gpui` and
 
 ```toml
 [dependencies]
-gpui = { package = "gpui-box", version = "0.1.1" }
-gpui_platform = { package = "gpui-box-platform", version = "0.1.1", features = ["font-kit", "wayland", "x11"] }
+gpui = { package = "gpui-box", version = "0.1.2" }
+gpui_platform = { package = "gpui-box-platform", version = "0.1.2", features = ["font-kit", "wayland", "x11"] }
 ```
 
 `gpui-box` and the `gpui-box-*` platform crates are released as one compatible
@@ -51,14 +51,14 @@ Single-platform applications can trim it:
   without it, the fallback text system lays text out but renders no glyphs.
 
   ```toml
-  gpui_platform = { package = "gpui-box-platform", version = "0.1.1", features = ["font-kit"] }
+  gpui_platform = { package = "gpui-box-platform", version = "0.1.2", features = ["font-kit"] }
   ```
 
 - **Linux / FreeBSD** — enable `wayland`, `x11`, or both. These features also
   enable the renderer and text system.
 
   ```toml
-  gpui_platform = { package = "gpui-box-platform", version = "0.1.1", features = ["wayland", "x11"] }
+  gpui_platform = { package = "gpui-box-platform", version = "0.1.2", features = ["wayland", "x11"] }
   ```
 
 - **Windows** — no `gpui-box-platform` features are required. Windowing uses

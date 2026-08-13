@@ -41,12 +41,12 @@ imports while resolving the GPUI Box packages:
 
 ```toml
 [dependencies]
-gpui = { package = "gpui-box", version = "0.1.1" }
-gpui_platform = { package = "gpui-box-platform", version = "0.1.1" }
-gpui_kit = { package = "gpui-box-kit", version = "0.1.1" }
+gpui = { package = "gpui-box", version = "0.1.2" }
+gpui_platform = { package = "gpui-box-platform", version = "0.1.2" }
+gpui_kit = { package = "gpui-box-kit", version = "0.1.2" }
 
 [dev-dependencies]
-gpui_kit_testkit = { package = "gpui-box-kit-testkit", version = "0.1.1", features = ["test-support"] }
+gpui_kit_testkit = { package = "gpui-box-kit-testkit", version = "0.1.2", features = ["test-support"] }
 ```
 
 Do not add another GPUI implementation to the same application. Every

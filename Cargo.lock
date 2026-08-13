@@ -2315,7 +2315,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-box"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "accesskit",
  "anyhow",
@@ -2408,7 +2408,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-box-browser-gallery"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "gpui-box",
  "gpui-box-kit",
@@ -2422,7 +2422,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-box-collections"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "gpui-box-util",
  "indexmap",
@@ -2431,7 +2431,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-box-gallery"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "gpui-box",
@@ -2447,7 +2447,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-box-http-client"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "async-compression",
@@ -2466,7 +2466,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-box-kit"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "gpui-box",
  "gpui-box-kit",
@@ -2487,7 +2487,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-box-kit-assets"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "gpui-box",
  "tracing",
@@ -2495,7 +2495,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-box-kit-semantics"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "gpui-box",
  "serde",
@@ -2504,7 +2504,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-box-kit-testkit"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "core-graphics 0.24.0",
  "gpui-box",
@@ -2519,7 +2519,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-box-kit-theme"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "gpui-box",
  "gpui-box-kit-tokens",
@@ -2528,7 +2528,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-box-kit-tokens"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "jsonschema",
  "serde",
@@ -2538,7 +2538,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-box-linux"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "accesskit",
  "accesskit_unix",
@@ -2589,7 +2589,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-box-macos"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "accesskit",
  "accesskit_macos",
@@ -2637,7 +2637,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-box-macros"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "gpui-box",
  "heck 0.5.0",
@@ -2648,7 +2648,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-box-mcp"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "serde_json",
@@ -2656,7 +2656,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-box-media"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "bindgen",
@@ -2674,7 +2674,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-box-platform"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "console_error_panic_hook",
  "gpui-box",
@@ -2688,14 +2688,14 @@ dependencies = [
 
 [[package]]
 name = "gpui-box-refineable"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "gpui-box-refineable-derive",
 ]
 
 [[package]]
 name = "gpui-box-refineable-derive"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2704,7 +2704,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-box-scheduler"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "async-task",
  "backtrace",
@@ -2718,7 +2718,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-box-shared-string"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "schemars",
  "serde",
@@ -2727,7 +2727,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-box-sum-tree"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "ctor",
  "heapless",
@@ -2740,7 +2740,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-box-util"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "log",
@@ -2749,7 +2749,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-box-util-macros"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "quote",
  "syn 2.0.119",
@@ -2757,7 +2757,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-box-web"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",
@@ -2779,7 +2779,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-box-wgpu"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -2812,7 +2812,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-box-windows"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "accesskit",
  "accesskit_windows",
@@ -4415,7 +4415,7 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 
 [[package]]
 name = "perf"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "gpui-box-collections",
  "serde",
@@ -7533,7 +7533,7 @@ checksum = "ec7a2a501ed189703dba8b08142f057e887dfc4b2cc4db2d343ac6376ba3e0b9"
 
 [[package]]
 name = "xtask"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "gpui-box-kit",

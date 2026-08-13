@@ -8,6 +8,8 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-08-13
+
 ### Added
 
 **Native media playback.** `media::PlatformMediaTransport` now implements the
@@ -540,6 +542,7 @@ calendar, time formatting, rich-text and code editing, charts, platform pickers,
 window chrome — and, separately, what is missing but intended. Read it before
 planning around a component that is not here.
 
-[Unreleased]: https://github.com/fran0220/gpui-box/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/fran0220/gpui-box/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/fran0220/gpui-box/releases/tag/v0.1.2
 [0.1.1]: https://github.com/fran0220/gpui-box/releases/tag/v0.1.1
 [0.1.0]: https://github.com/fran0220/gpui-box/releases/tag/v0.1.0
