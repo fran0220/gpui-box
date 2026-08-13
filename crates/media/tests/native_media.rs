@@ -29,12 +29,22 @@ fn main() {
 
     main_thread_construction_and_native_view();
     zero_duration_is_not_ready(&empty);
+    #[cfg(target_os = "macos")]
     source_replacement_and_controls(&playable);
+    #[cfg(target_os = "windows")]
+    let playback_backend = source_replacement_and_controls(&playable);
     callback_teardown(&playable);
     #[cfg(target_os = "windows")]
-    com_and_media_foundation_lifetimes(&playable);
+    com_and_media_foundation_lifetimes(&playable, playback_backend);
 
     fs::remove_dir_all(directory).expect("remove native media test directory");
+}
+
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PlaybackBackend {
+    Ready,
+    Unavailable,
 }
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
@@ -80,7 +90,7 @@ fn main_thread_construction_and_native_view() {
 }
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
-fn source_replacement_and_controls(playable: &Path) {
+fn source_replacement_and_controls(playable: &Path) -> PlaybackBackend {
     let player = MediaPlayer::new(MediaKind::Audio);
     let changes = Arc::new(AtomicUsize::new(0));
     let _subscription = player.subscribe({
@@ -93,7 +103,14 @@ fn source_replacement_and_controls(playable: &Path) {
     player
         .load(MediaSource::file(playable))
         .expect("native backend accepts PCM wave source");
-    wait_until_ready(&player, "playable source");
+    if wait_until_ready(&player, "playable source") == PlaybackBackend::Unavailable {
+        assert!(matches!(
+            player.command(MediaCommand::Play),
+            MediaCommandOutcome::Refused(_)
+        ));
+        failed_replacement_remains_terminal(&player, &changes);
+        return PlaybackBackend::Unavailable;
+    }
     let ready = player.snapshot();
     let duration = ready.duration.expect("PCM wave duration is known");
     assert!(duration > 0.9 && duration < 1.1, "duration was {duration}");
@@ -152,6 +169,12 @@ fn source_replacement_and_controls(playable: &Path) {
         player.snapshot().state == PlaybackState::Paused
     });
 
+    failed_replacement_remains_terminal(&player, &changes);
+    PlaybackBackend::Ready
+}
+
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+fn failed_replacement_remains_terminal(player: &MediaPlayer, changes: &AtomicUsize) {
     let invalid = player
         .load(MediaSource::url("invalid\0replacement"))
         .expect_err("a null-containing replacement is invalid");
@@ -196,7 +219,7 @@ fn callback_teardown(playable: &Path) {
 }
 
 #[cfg(target_os = "windows")]
-fn com_and_media_foundation_lifetimes(playable: &Path) {
+fn com_and_media_foundation_lifetimes(playable: &Path, expected: PlaybackBackend) {
     use windows::Win32::System::Com::{
         APTTYPE, APTTYPEQUALIFIER, COINIT_MULTITHREADED, CoGetApartmentType, CoInitializeEx,
         CoUninitialize,
@@ -215,7 +238,11 @@ fn com_and_media_foundation_lifetimes(playable: &Path) {
     second
         .load(MediaSource::file(playable))
         .expect("remaining player keeps Media Foundation alive");
-    wait_until_ready(&second, "second player after first drops");
+    assert_eq!(
+        wait_until_ready(&second, "second player after first drops"),
+        expected,
+        "Media Foundation backend availability changed between concurrent players"
+    );
     drop(second);
     unsafe { CoUninitialize() };
 }
@@ -233,13 +260,24 @@ fn wait_for(description: &str, mut predicate: impl FnMut() -> bool) {
 }
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
-fn wait_until_ready(player: &MediaPlayer, description: &str) {
+fn wait_until_ready(player: &MediaPlayer, description: &str) -> PlaybackBackend {
     let deadline = Instant::now() + Duration::from_secs(10);
     while Instant::now() < deadline {
         let snapshot = player.snapshot();
         match snapshot.availability {
-            MediaAvailability::Ready => return,
-            MediaAvailability::Failed(error) | MediaAvailability::NoBackend(error) => {
+            MediaAvailability::Ready => return PlaybackBackend::Ready,
+            MediaAvailability::NoBackend(error) => {
+                #[cfg(target_os = "windows")]
+                {
+                    eprintln!(
+                        "{description} reached truthful no-backend on this Windows host: {error}"
+                    );
+                    return PlaybackBackend::Unavailable;
+                }
+                #[cfg(target_os = "macos")]
+                panic!("{description} has no native playback backend: {error}");
+            }
+            MediaAvailability::Failed(error) => {
                 panic!("{description} failed instead of becoming ready: {error}")
             }
             MediaAvailability::Idle | MediaAvailability::Loading => {

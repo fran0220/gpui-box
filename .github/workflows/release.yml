@@ -127,10 +127,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with: { toolchain: 1.97.0, components: "clippy" }
       - uses: Swatinem/rust-cache@v2
-      - name: Provision a Windows playback endpoint
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: scripts/ci/install-windows-audio.ps1
       - name: Run native media lifecycle tests
         run: cargo test -p gpui-box-media --all-features --locked
       - name: Run the remaining macOS platform tests formerly covered by the full gate

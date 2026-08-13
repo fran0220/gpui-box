@@ -26,9 +26,9 @@ state changes only after the native operation succeeds. AVFoundation creation
 and teardown are main-thread confined, while Media Foundation and caller-owned
 COM apartment lifetimes remain balanced across concurrent players. Native CI
 executes load, playback, seek, end, restart, audio setting, replacement, and
-teardown behavior on both macOS and Windows; the hosted Windows runner installs
-a checksum-pinned signed virtual playback endpoint because its base image has
-no audio device.
+teardown behavior on macOS and audio-equipped Windows hosts. The audio-less
+hosted Windows runner additionally proves that an unavailable native sink is a
+truthful no-backend state rather than a bad-source failure.
 
 ### Changed
 

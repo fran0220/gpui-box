@@ -179,7 +179,12 @@ impl CallbackState {
                 if !matches!(reported.availability, LOADING | READY) {
                     return None;
                 }
-                let kind = if param1 as i32 == MF_MEDIA_ENGINE_ERR_SRC_NOT_SUPPORTED.0 {
+                let hresult = HRESULT(param2 as i32);
+                let kind = if param1 as i32 == MF_MEDIA_ENGINE_ERR_SRC_NOT_SUPPORTED.0
+                    || hresult == MF_E_CANNOT_CREATE_SINK
+                    || hresult == MF_E_NO_AUDIO_PLAYBACK_DEVICE
+                    || hresult == MF_E_AUDIO_SERVICE_NOT_RUNNING
+                {
                     MediaErrorKind::NoBackend
                 } else {
                     MediaErrorKind::Open
@@ -187,7 +192,7 @@ impl CallbackState {
                 let detail = if param2 == 0 {
                     format!("Media Foundation error category {param1}.")
                 } else {
-                    let error = WindowsError::from_hresult(HRESULT(param2 as i32));
+                    let error = WindowsError::from_hresult(hresult);
                     format!(
                         "Media Foundation could not play the source: {}",
                         error.message()
@@ -821,6 +826,27 @@ mod tests {
         assert_eq!(
             reported.error.expect("failure remains").message(),
             "decoder failed"
+        );
+    }
+
+    #[test]
+    fn an_unavailable_media_sink_is_not_reported_as_a_bad_source() {
+        let state = CallbackState::default();
+        let generation = state.begin_load();
+        assert_eq!(
+            state.transition(
+                generation,
+                MF_MEDIA_ENGINE_EVENT_ERROR.0 as u32,
+                0,
+                MF_E_CANNOT_CREATE_SINK.0 as u32,
+            ),
+            Some(MediaEvent::Changed)
+        );
+        let reported = state.reported();
+        assert_eq!(reported.availability, NO_BACKEND);
+        assert_eq!(
+            reported.error.expect("missing sink has an error").kind(),
+            MediaErrorKind::NoBackend
         );
     }
 
