@@ -93,9 +93,7 @@ fn source_replacement_and_controls(playable: &Path) {
     player
         .load(MediaSource::file(playable))
         .expect("native backend accepts PCM wave source");
-    wait_for("playable source to become ready", || {
-        matches!(player.snapshot().availability, MediaAvailability::Ready)
-    });
+    wait_until_ready(&player, "playable source");
     let ready = player.snapshot();
     let duration = ready.duration.expect("PCM wave duration is known");
     assert!(duration > 0.9 && duration < 1.1, "duration was {duration}");
@@ -217,9 +215,7 @@ fn com_and_media_foundation_lifetimes(playable: &Path) {
     second
         .load(MediaSource::file(playable))
         .expect("remaining player keeps Media Foundation alive");
-    wait_for("second player to become ready after first drops", || {
-        matches!(second.snapshot().availability, MediaAvailability::Ready)
-    });
+    wait_until_ready(&second, "second player after first drops");
     drop(second);
     unsafe { CoUninitialize() };
 }
@@ -234,6 +230,27 @@ fn wait_for(description: &str, mut predicate: impl FnMut() -> bool) {
         pump_for(Duration::from_millis(10));
     }
     panic!("timed out waiting for {description}");
+}
+
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+fn wait_until_ready(player: &MediaPlayer, description: &str) {
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while Instant::now() < deadline {
+        let snapshot = player.snapshot();
+        match snapshot.availability {
+            MediaAvailability::Ready => return,
+            MediaAvailability::Failed(error) | MediaAvailability::NoBackend(error) => {
+                panic!("{description} failed instead of becoming ready: {error}")
+            }
+            MediaAvailability::Idle | MediaAvailability::Loading => {
+                pump_for(Duration::from_millis(10));
+            }
+        }
+    }
+    panic!(
+        "timed out waiting for {description} to become ready: {:?}",
+        player.snapshot()
+    );
 }
 
 #[cfg(target_os = "macos")]

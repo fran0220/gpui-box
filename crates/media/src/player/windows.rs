@@ -164,7 +164,9 @@ impl CallbackState {
                 };
             }
             value
-                if value == MF_MEDIA_ENGINE_EVENT_CANPLAY.0 as u32
+                if value == MF_MEDIA_ENGINE_EVENT_LOADEDMETADATA.0 as u32
+                    || value == MF_MEDIA_ENGINE_EVENT_LOADEDDATA.0 as u32
+                    || value == MF_MEDIA_ENGINE_EVENT_CANPLAY.0 as u32
                     || value == MF_MEDIA_ENGINE_EVENT_CANPLAYTHROUGH.0 as u32 =>
             {
                 if matches!(reported.availability, LOADING | READY) {
