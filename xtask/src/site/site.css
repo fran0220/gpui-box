@@ -123,6 +123,7 @@ a { color: var(--accent); }
 }
 
 .scene-card .tile { margin: 0; }
+.scene-body { min-width: 0; }
 .scene-body h3 { margin: 0 0 8px; font-family: var(--mono); font-size: 16px; }
 .themes.compact { margin: 12px 0; }
 
