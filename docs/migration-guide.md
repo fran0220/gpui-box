@@ -43,6 +43,12 @@ geometry synchronization. The application remains the native view's owner;
 GPUI owns layout, clipping, stacking, visibility, and detach timing. See the
 complete macOS example in `crates/gpui/examples/native_webview.rs`.
 
+A partially visible view retains the full frame GPUI laid out. GPUI applies the
+current content mask through a clipped AppKit container or the Windows host
+region, so scrolling crops native content rather than changing its layout. A
+view painted more than once uses its last paint and native views are restacked
+in paint order every time that order changes.
+
 When a controller or service destroys the native view on drop, attach that
 owner to the handle so the detach frame cannot race destruction:
 

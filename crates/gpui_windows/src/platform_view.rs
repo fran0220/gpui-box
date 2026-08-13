@@ -218,7 +218,7 @@ impl PlatformViewHost {
             };
             let moved = hosting.place(id, placement.bounds, scale_factor);
             rects.push(PhysicalRect::from_bounds(platform_view_physical_bounds(
-                placement.bounds,
+                placement.clip_bounds(),
                 scale_factor,
             )));
 
@@ -517,7 +517,7 @@ fn register_host_window_class() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gpui::{Bounds, point, px, size};
+    use gpui::{Bounds, PlatformViewPlacement, PlatformViewUpdate, point, px, size};
     use std::{cell::Cell, rc::Rc};
 
     struct DropProbe(Rc<Cell<bool>>);
@@ -622,6 +622,89 @@ mod tests {
         unsafe {
             DestroyWindow(host).expect("failed to destroy host HWND");
             DestroyWindow(original_parent).expect("failed to destroy original parent HWND");
+        }
+    }
+
+    #[test]
+    fn hosting_clips_without_resizing_the_child_window() {
+        let owner = create_test_window(None, WS_VISIBLE);
+        let original_parent = create_test_window(None, WINDOW_STYLE::default());
+        let child = create_test_window(Some(original_parent), WS_CHILD | WS_VISIBLE);
+        unsafe {
+            SetWindowPos(
+                owner,
+                None,
+                0,
+                0,
+                300,
+                200,
+                SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOZORDER,
+            )
+            .expect("failed to size test owner");
+        }
+        let host = PlatformViewHost::new(owner);
+        let full_bounds = Bounds {
+            origin: point(px(10.), px(20.)),
+            size: size(px(100.), px(80.)),
+        };
+        let clip_bounds = Bounds {
+            origin: point(px(30.), px(35.)),
+            size: size(px(50.), px(40.)),
+        };
+        host.update(
+            &PlatformViewUpdate {
+                placements: vec![PlatformViewPlacement::new(
+                    view_handle(child),
+                    full_bounds,
+                    clip_bounds,
+                )],
+                detached: Vec::new(),
+            },
+            1.,
+        );
+
+        let native_host = host.host.get().expect("the platform host was created");
+        let mut child_rect = RECT::default();
+        unsafe { GetWindowRect(child, &mut child_rect) }.expect("failed to read child bounds");
+        let mut child_origin = POINT {
+            x: child_rect.left,
+            y: child_rect.top,
+        };
+        unsafe { ScreenToClient(native_host, &mut child_origin) }
+            .ok()
+            .expect("failed to map child origin");
+        assert_eq!((child_origin.x, child_origin.y), (10, 20));
+        assert_eq!(
+            (
+                child_rect.right - child_rect.left,
+                child_rect.bottom - child_rect.top
+            ),
+            (100, 80),
+            "the child keeps its full layout size"
+        );
+
+        let mut region = RECT::default();
+        assert_ne!(
+            unsafe { GetWindowRgnBox(native_host, &mut region) },
+            RGN_ERROR
+        );
+        assert_eq!(
+            region,
+            RECT {
+                left: 30,
+                top: 35,
+                right: 80,
+                bottom: 75,
+            },
+            "the host region, not the child frame, carries GPUI's clip"
+        );
+
+        host.destroy();
+        assert_eq!(unsafe { GetAncestor(child, GA_PARENT) }, original_parent);
+        unsafe {
+            DestroyWindow(child).expect("failed to destroy child HWND");
+            DestroyWindow(original_parent).expect("failed to destroy original parent HWND");
+            DestroyWindow(owner).expect("failed to destroy owner HWND");
         }
     }
 

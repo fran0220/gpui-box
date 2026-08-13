@@ -22,6 +22,12 @@ service.
 
 ### Changed
 
+**Truthful native-view clipping.** A partially clipped `platform_view` now
+keeps its full layout frame while the platform host crops it to GPUI's visible
+rectangle. macOS uses a masking container and reapplies GPUI paint order to
+existing views; Windows keeps full child `HWND` geometry and clips the popup
+host region. Scrolling no longer resizes native video or web content.
+
 **Catalog site.** The public site now keeps compose, scenes, and components on
 the home page. Scenes list the components they build. The only standalone pages
 are Docs and MCP. The former playground is `/compose/` and is embedded on the

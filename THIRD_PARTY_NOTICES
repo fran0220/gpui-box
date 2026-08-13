@@ -19,7 +19,8 @@ renderer, accessibility, input, and browser support. It is not a linked Git
 dependency. The frozen official and post-bootstrap fork-overlay receipts are in
 scripts/sync-zed/ and provenance.toml and are verified entirely offline; they
 are attribution records, not active update lanes. The later platform-view lifetime
-attachment is GPUI Box work and is not represented as imported Zed source.
+attachment, full-frame clipping, and macOS restacking are GPUI Box work and are
+not represented as imported Zed source.
 The AVFoundation and Media Foundation playback services are GPUI Box work and
 use operating-system frameworks; they import no additional third-party source
 or media assets.

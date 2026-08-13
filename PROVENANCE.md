@@ -60,6 +60,11 @@ Box work, not part of either imported lane. It changes no native hosting or
 renderer behavior; it retains caller-owned native controller state until the
 existing host has detached and released its final handle clone.
 
+The full-frame platform-view clipping and macOS restacking implementation is
+also subsequent GPUI Box work. It extends the product-neutral host contract on
+both native platforms and imports no platform-view source from Zed or another
+project.
+
 The `gpui-box-media` AVFoundation and Media Foundation playback services are
 also subsequent GPUI Box work. They call operating-system frameworks supplied
 by macOS and Windows and import no third-party player source or media assets.

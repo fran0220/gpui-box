@@ -28,10 +28,10 @@ use gpui::{
     ExternalPaths, FileDropEvent, ForegroundExecutor, KeyDownEvent, Keystroke, Modifiers,
     ModifiersChangedEvent, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels,
     PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformViewHandle,
-    PlatformViewUpdate, PlatformWindow, Point, PromptButton, PromptLevel, RequestFrameOptions,
-    SharedString, Size, SystemWindowTab, WindowAppearance, WindowBackgroundAppearance,
-    WindowBounds, WindowControlArea, WindowKind, WindowParams, flip_bounds_origin_y, point, px,
-    size,
+    PlatformViewHosting, PlatformViewUpdate, PlatformWindow, Point, PromptButton, PromptLevel,
+    RequestFrameOptions, SharedString, Size, SystemWindowTab, WindowAppearance,
+    WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowKind, WindowParams,
+    flip_bounds_origin_y, platform_view_content_origin, point, px, size,
 };
 #[cfg(any(test, feature = "test-support"))]
 use image::RgbaImage;
@@ -567,6 +567,22 @@ struct TrafficLightButtons {
     zoom: Retained<Objc2NSButton>,
 }
 
+struct HostedPlatformView {
+    handle: PlatformViewHandle,
+    /// A full-size native view lives inside this clipped container, so scrolling
+    /// crops its content instead of changing the layout the native controller
+    /// sees.
+    container: NonNull<Object>,
+}
+
+impl Drop for HostedPlatformView {
+    fn drop(&mut self) {
+        unsafe {
+            let _: () = msg_send![self.container.as_ptr(), release];
+        }
+    }
+}
+
 type WindowEventCallback = Box<dyn FnMut(PlatformInput) -> gpui::DispatchEventResult>;
 type WindowResizeCallback = Box<dyn FnMut(Size<Pixels>, f32)>;
 
@@ -578,9 +594,9 @@ struct MacWindowState {
     native_view: NonNull<Object>,
     overlay_view: Option<NonNull<Object>>,
     overlay_input_active: Arc<AtomicBool>,
-    /// Native views hosted by `platform_view` elements, in the order they were
-    /// attached. GPUI owns their frames while they are here.
-    hosted_platform_views: Vec<PlatformViewHandle>,
+    /// Native views hosted by `platform_view` elements, in GPUI paint order.
+    /// GPUI owns their full frames and visible clips while they are here.
+    hosted_platform_views: PlatformViewHosting<HostedPlatformView>,
     blurred_view: Option<id>,
     background_appearance: WindowBackgroundAppearance,
     cursor_style: CursorStyle,
@@ -988,7 +1004,7 @@ impl MacWindow {
                 native_view: NonNull::new_unchecked(native_view),
                 overlay_view: None,
                 overlay_input_active: Arc::new(AtomicBool::new(false)),
-                hosted_platform_views: Vec::new(),
+                hosted_platform_views: PlatformViewHosting::default(),
                 blurred_view: None,
                 background_appearance: WindowBackgroundAppearance::Opaque,
                 cursor_style: CursorStyle::Arrow,
@@ -1270,20 +1286,24 @@ impl MacWindow {
     }
 }
 
-/// Hides a hosted view and takes it back out of the window's view hierarchy.
-fn detach_platform_view(handle: &PlatformViewHandle) {
-    let view = handle.as_ns_view() as id;
+/// Hides a hosted view and takes its clipped container back out of the window's
+/// view hierarchy.
+fn detach_platform_view(hosted: HostedPlatformView) {
+    let view = hosted.handle.as_ns_view() as id;
+    let container = hosted.container.as_ptr() as id;
     unsafe {
         let _: () = msg_send![view, setHidden: YES];
         let _: () = msg_send![view, removeFromSuperview];
+        let _: () = msg_send![container, setHidden: YES];
+        let _: () = msg_send![container, removeFromSuperview];
     }
 }
 
 impl Drop for MacWindow {
     fn drop(&mut self) {
         let mut this = self.0.lock();
-        for handle in std::mem::take(&mut this.hosted_platform_views) {
-            detach_platform_view(&handle);
+        for (_, hosted) in this.hosted_platform_views.detach_all() {
+            detach_platform_view(hosted);
         }
         this.renderer.destroy();
         let window = this.native_window;
@@ -1958,52 +1978,62 @@ impl PlatformWindow for MacWindow {
         let overlay_view = this.overlay_view.map(|view| view.as_ptr() as id);
 
         for detached in &update.detached {
-            let Some(index) = this
-                .hosted_platform_views
-                .iter()
-                .position(|hosted| hosted.id() == *detached)
-            else {
-                continue;
-            };
-            let handle = this.hosted_platform_views.remove(index);
-            detach_platform_view(&handle);
+            if let Some(hosted) = this.hosted_platform_views.detach(*detached) {
+                detach_platform_view(hosted);
+            }
         }
 
+        let mut attached = false;
         for placement in &update.placements {
-            let view = placement.handle.as_ns_view() as id;
-            let origin = flip_bounds_origin_y(placement.bounds, container_height);
+            let id = placement.handle.id();
+            if !this.hosted_platform_views.contains(id) {
+                let view = placement.handle.as_ns_view() as id;
+                let container: id = unsafe { msg_send![class!(NSView), alloc] };
+                let container = unsafe {
+                    NSView::initWithFrame_(
+                        container,
+                        NSRect::new(NSPoint::new(0., 0.), NSSize::new(0., 0.)),
+                    )
+                };
+                assert!(
+                    !container.is_null(),
+                    "failed to create platform-view clip container"
+                );
+
+                unsafe {
+                    let _: () = msg_send![view, setHidden: YES];
+                    let _: () = msg_send![container, setWantsLayer: YES];
+                    let layer: id = msg_send![container, layer];
+                    let _: () = msg_send![layer, setMasksToBounds: YES];
+                    let _: () = msg_send![container, addSubview: view];
+                }
+                this.hosted_platform_views.attach(
+                    id,
+                    HostedPlatformView {
+                        handle: placement.handle.clone(),
+                        container: NonNull::new(container)
+                            .expect("NSView initialization returned null"),
+                    },
+                );
+                attached = true;
+            }
+
+            let clip_bounds = placement.clip_bounds();
+            let clip_origin = flip_bounds_origin_y(clip_bounds, container_height);
+            let content_origin = platform_view_content_origin(placement.bounds, clip_bounds);
+            let hosted = this
+                .hosted_platform_views
+                .attributes(id)
+                .expect("the platform view was attached above");
+            let view = hosted.handle.as_ns_view() as id;
+            let clip_container = hosted.container.as_ptr() as id;
 
             unsafe {
-                let superview: id = msg_send![view, superview];
-                if superview != container {
-                    match overlay_view {
-                        // The overlay plane draws GPUI's deferred content, so
-                        // hosted views go underneath it and above everything the
-                        // base renderer drew.
-                        Some(overlay_view) => {
-                            let _: () = msg_send![
-                                container,
-                                addSubview: view
-                                positioned: NSWindowOrderingMode::NSWindowBelow
-                                relativeTo: overlay_view
-                            ];
-                        }
-                        None => {
-                            let _: () = msg_send![
-                                container,
-                                addSubview: view
-                                positioned: NSWindowOrderingMode::NSWindowAbove
-                                relativeTo: nil
-                            ];
-                        }
-                    }
-                }
-
                 let _: () = msg_send![view, setWantsLayer: YES];
                 let _: () = msg_send![
                     view,
                     setFrame: NSRect::new(
-                        NSPoint::new(origin.x.to_f64(), origin.y.to_f64()),
+                        NSPoint::new(content_origin.x.to_f64(), content_origin.y.to_f64()),
                         NSSize::new(
                             placement.bounds.size.width.to_f64(),
                             placement.bounds.size.height.to_f64(),
@@ -2011,14 +2041,68 @@ impl PlatformWindow for MacWindow {
                     )
                 ];
                 let _: () = msg_send![view, setHidden: NO];
+                let _: () = msg_send![
+                    clip_container,
+                    setFrame: NSRect::new(
+                        NSPoint::new(clip_origin.x.to_f64(), clip_origin.y.to_f64()),
+                        NSSize::new(
+                            clip_bounds.size.width.to_f64(),
+                            clip_bounds.size.height.to_f64(),
+                        ),
+                    )
+                ];
+                let _: () = msg_send![clip_container, setHidden: NO];
             }
+        }
 
-            if !this
-                .hosted_platform_views
-                .iter()
-                .any(|hosted| hosted.id() == placement.handle.id())
-            {
-                this.hosted_platform_views.push(placement.handle.clone());
+        let order = update
+            .placements
+            .iter()
+            .map(|placement| placement.handle.id())
+            .collect::<Vec<_>>();
+        let restacked = this.hosted_platform_views.restack(&order);
+        if attached || restacked {
+            let mut below = None;
+            for id in this.hosted_platform_views.ids() {
+                let hosted = this
+                    .hosted_platform_views
+                    .attributes(id)
+                    .expect("the stacking order contains only hosted views");
+                let clip_container = hosted.container.as_ptr() as id;
+                unsafe {
+                    match below {
+                        Some(below) => {
+                            let _: () = msg_send![
+                                container,
+                                addSubview: clip_container
+                                positioned: NSWindowOrderingMode::NSWindowAbove
+                                relativeTo: below
+                            ];
+                        }
+                        None => match overlay_view {
+                            // The overlay plane draws GPUI's deferred content,
+                            // so hosted views go underneath it and above
+                            // everything the base renderer drew.
+                            Some(overlay_view) => {
+                                let _: () = msg_send![
+                                    container,
+                                    addSubview: clip_container
+                                    positioned: NSWindowOrderingMode::NSWindowBelow
+                                    relativeTo: overlay_view
+                                ];
+                            }
+                            None => {
+                                let _: () = msg_send![
+                                    container,
+                                    addSubview: clip_container
+                                    positioned: NSWindowOrderingMode::NSWindowAbove
+                                    relativeTo: nil
+                                ];
+                            }
+                        },
+                    }
+                }
+                below = Some(clip_container);
             }
         }
     }

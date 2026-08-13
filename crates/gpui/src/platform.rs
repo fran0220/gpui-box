@@ -93,8 +93,8 @@ pub use keystroke::*;
 pub(crate) use platform_view::PlatformViewRegistry;
 pub use platform_view::{
     PlatformViewHandle, PlatformViewHosting, PlatformViewId, PlatformViewPlacement,
-    PlatformViewUpdate, flip_bounds_origin_y, platform_view_physical_bounds,
-    snap_platform_view_bounds,
+    PlatformViewUpdate, flip_bounds_origin_y, platform_view_content_origin,
+    platform_view_physical_bounds, snap_platform_view_bounds,
 };
 
 #[cfg(any(test, feature = "test-support"))]

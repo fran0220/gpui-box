@@ -52,7 +52,7 @@ impl fmt::Debug for PlatformViewId {
 
 #[cfg(target_os = "macos")]
 mod handle {
-    use super::{PlatformViewId, PlatformViewLifetime};
+    use super::{Bounds, Pixels, PlatformViewId, PlatformViewLifetime};
     use objc::{msg_send, runtime::Object, sel, sel_impl};
     use std::{ffi::c_void, fmt, ptr::NonNull, rc::Rc};
 
@@ -66,6 +66,7 @@ mod handle {
     pub struct PlatformViewHandle {
         view: NonNull<Object>,
         lifetime: PlatformViewLifetime,
+        clip_bounds: Option<Bounds<Pixels>>,
     }
 
     impl PlatformViewHandle {
@@ -85,6 +86,7 @@ mod handle {
             Self {
                 view,
                 lifetime: PlatformViewLifetime::default(),
+                clip_bounds: None,
             }
         }
 
@@ -109,6 +111,15 @@ mod handle {
         pub fn id(&self) -> PlatformViewId {
             PlatformViewId(self.view.as_ptr() as usize)
         }
+
+        pub(super) fn with_clip_bounds(mut self, clip_bounds: Bounds<Pixels>) -> Self {
+            self.clip_bounds = Some(clip_bounds);
+            self
+        }
+
+        pub(super) fn clip_bounds(&self) -> Option<Bounds<Pixels>> {
+            self.clip_bounds
+        }
     }
 
     impl Clone for PlatformViewHandle {
@@ -119,6 +130,7 @@ mod handle {
             Self {
                 view: self.view,
                 lifetime: self.lifetime.clone(),
+                clip_bounds: self.clip_bounds,
             }
         }
     }
@@ -150,7 +162,7 @@ mod handle {
 
 #[cfg(target_os = "windows")]
 mod handle {
-    use super::{PlatformViewId, PlatformViewLifetime};
+    use super::{Bounds, Pixels, PlatformViewId, PlatformViewLifetime};
     use std::{fmt, rc::Rc};
     use windows::Win32::Foundation::HWND;
 
@@ -165,6 +177,7 @@ mod handle {
     pub struct PlatformViewHandle {
         hwnd: HWND,
         lifetime: PlatformViewLifetime,
+        clip_bounds: Option<Bounds<Pixels>>,
     }
 
     impl PlatformViewHandle {
@@ -187,6 +200,7 @@ mod handle {
             Self {
                 hwnd,
                 lifetime: PlatformViewLifetime::default(),
+                clip_bounds: None,
             }
         }
 
@@ -210,6 +224,15 @@ mod handle {
         pub fn id(&self) -> PlatformViewId {
             PlatformViewId(self.hwnd.0 as usize)
         }
+
+        pub(super) fn with_clip_bounds(mut self, clip_bounds: Bounds<Pixels>) -> Self {
+            self.clip_bounds = Some(clip_bounds);
+            self
+        }
+
+        pub(super) fn clip_bounds(&self) -> Option<Bounds<Pixels>> {
+            self.clip_bounds
+        }
     }
 
     impl fmt::Debug for PlatformViewHandle {
@@ -231,7 +254,7 @@ mod handle {
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 mod handle {
-    use super::{PlatformViewId, PlatformViewLifetime};
+    use super::{Bounds, Pixels, PlatformViewId, PlatformViewLifetime};
     use std::{
         fmt,
         rc::Rc,
@@ -248,6 +271,7 @@ mod handle {
     pub struct PlatformViewHandle {
         id: PlatformViewId,
         lifetime: PlatformViewLifetime,
+        clip_bounds: Option<Bounds<Pixels>>,
     }
 
     impl Default for PlatformViewHandle {
@@ -263,6 +287,7 @@ mod handle {
             Self {
                 id: PlatformViewId(NEXT_ID.fetch_add(1, Ordering::Relaxed)),
                 lifetime: PlatformViewLifetime::default(),
+                clip_bounds: None,
             }
         }
 
@@ -276,6 +301,15 @@ mod handle {
         /// Returns this handle's stable identity.
         pub fn id(&self) -> PlatformViewId {
             self.id
+        }
+
+        pub(super) fn with_clip_bounds(mut self, clip_bounds: Bounds<Pixels>) -> Self {
+            self.clip_bounds = Some(clip_bounds);
+            self
+        }
+
+        pub(super) fn clip_bounds(&self) -> Option<Bounds<Pixels>> {
+            self.clip_bounds
         }
     }
 
@@ -303,12 +337,45 @@ pub use handle::PlatformViewHandle;
 /// Bounds use GPUI's window coordinate space: logical pixels with the origin at
 /// the window's top-left corner and y growing downwards. They are already
 /// snapped to the display's device-pixel grid.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct PlatformViewPlacement {
     /// The hosted view.
     pub handle: PlatformViewHandle,
     /// Where the view belongs within the window.
     pub bounds: Bounds<Pixels>,
+}
+
+impl PlatformViewPlacement {
+    /// Records a view's full layout rectangle and the visible rectangle left by
+    /// clipping. The clip is constrained to the layout rectangle.
+    pub fn new(
+        handle: PlatformViewHandle,
+        bounds: Bounds<Pixels>,
+        clip_bounds: Bounds<Pixels>,
+    ) -> Self {
+        Self {
+            handle: handle.with_clip_bounds(clip_bounds.intersect(&bounds)),
+            bounds,
+        }
+    }
+
+    /// The visible part of [`bounds`](Self::bounds) after GPUI's nested content
+    /// masks were applied.
+    ///
+    /// Native hosts keep the view at its full layout bounds and crop it to this
+    /// rectangle. Resizing the view itself to this rectangle would change the
+    /// content's layout instead of clipping it.
+    pub fn clip_bounds(&self) -> Bounds<Pixels> {
+        self.handle.clip_bounds().unwrap_or(self.bounds)
+    }
+}
+
+impl PartialEq for PlatformViewPlacement {
+    fn eq(&self, other: &Self) -> bool {
+        self.handle == other.handle
+            && self.bounds == other.bounds
+            && self.clip_bounds() == other.clip_bounds()
+    }
 }
 
 /// The platform-view work owed by a single drawn frame.
@@ -358,9 +425,12 @@ impl PlatformViewRegistry {
             .collect::<Vec<_>>();
         let placements = last_placement_indices(&painted_ids)
             .into_iter()
-            .map(|index| PlatformViewPlacement {
-                handle: painted[index].handle.clone(),
-                bounds: snap_platform_view_bounds(painted[index].bounds, scale_factor),
+            .map(|index| {
+                PlatformViewPlacement::new(
+                    painted[index].handle.clone(),
+                    snap_platform_view_bounds(painted[index].bounds, scale_factor),
+                    snap_platform_view_bounds(painted[index].clip_bounds(), scale_factor),
+                )
             })
             .collect::<Vec<_>>();
         let detached = detached_ids(&self.hosted, &painted_ids);
@@ -445,6 +515,22 @@ pub fn flip_bounds_origin_y(bounds: Bounds<Pixels>, container_height: Pixels) ->
     point(
         bounds.origin.x,
         container_height - bounds.origin.y - bounds.size.height,
+    )
+}
+
+/// Places a full-size native view inside a clipped, non-flipped native
+/// container.
+///
+/// Both inputs use GPUI's top-left-origin window coordinates. The returned
+/// point uses the clip container's bottom-left-origin coordinates, as AppKit
+/// does for an ordinary `NSView`.
+pub fn platform_view_content_origin(
+    bounds: Bounds<Pixels>,
+    clip_bounds: Bounds<Pixels>,
+) -> Point<Pixels> {
+    point(
+        bounds.left() - clip_bounds.left(),
+        clip_bounds.bottom() - bounds.bottom(),
     )
 }
 
@@ -710,6 +796,37 @@ mod tests {
     }
 
     #[test]
+    fn clipped_platform_view_keeps_full_content_geometry() {
+        let bounds = Bounds {
+            origin: point(px(10.0), px(20.0)),
+            size: size(px(100.0), px(80.0)),
+        };
+
+        assert_eq!(
+            platform_view_content_origin(
+                bounds,
+                Bounds {
+                    origin: point(px(30.0), px(20.0)),
+                    size: size(px(80.0), px(80.0)),
+                }
+            ),
+            point(px(-20.0), px(0.0)),
+            "a left clip shifts the full view left inside its container"
+        );
+        assert_eq!(
+            platform_view_content_origin(
+                bounds,
+                Bounds {
+                    origin: point(px(10.0), px(20.0)),
+                    size: size(px(100.0), px(50.0)),
+                }
+            ),
+            point(px(0.0), px(-30.0)),
+            "a bottom clip shifts the full view down inside its container"
+        );
+    }
+
+    #[test]
     fn platform_view_deduplication_keeps_the_last_paint_of_a_view() {
         let ids = [id(1), id(2), id(1), id(3)];
 
@@ -776,13 +893,17 @@ mod tests {
     fn platform_view_registry_retains_frame_placement_and_handle_identity() {
         let mut registry = PlatformViewRegistry::default();
         let handle = PlatformViewHandle::inert();
-        let placement = PlatformViewPlacement {
-            handle: handle.clone(),
-            bounds: Bounds {
+        let placement = PlatformViewPlacement::new(
+            handle.clone(),
+            Bounds {
                 origin: point(px(10.3), px(20.4)),
                 size: size(px(100.2), px(50.1)),
             },
-        };
+            Bounds {
+                origin: point(px(15.2), px(25.3)),
+                size: size(px(80.1), px(40.2)),
+            },
+        );
 
         let update = registry
             .sync(&[placement], 2.0)
@@ -795,6 +916,13 @@ mod tests {
             point(px(10.5), px(20.5))
         );
         assert_eq!(update.placements[0].bounds.size, size(px(100.), px(50.)));
+        assert_eq!(
+            update.placements[0].clip_bounds(),
+            Bounds {
+                origin: point(px(15.0), px(25.5)),
+                size: size(px(80.5), px(40.0)),
+            }
+        );
         assert!(update.detached.is_empty());
 
         let detached = registry

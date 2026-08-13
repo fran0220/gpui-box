@@ -4909,14 +4909,14 @@ impl Window {
         // A view clipped away entirely — scrolled out of its container, say —
         // registers nothing, so it is detached rather than left floating over
         // content it no longer belongs to.
-        let bounds = bounds.intersect(&self.content_mask().bounds);
-        if bounds.size.width <= px(0.) || bounds.size.height <= px(0.) {
+        let clip_bounds = bounds.intersect(&self.content_mask().bounds);
+        if clip_bounds.size.width <= px(0.) || clip_bounds.size.height <= px(0.) {
             return;
         }
 
         self.next_frame
             .platform_views
-            .push(PlatformViewPlacement { handle, bounds });
+            .push(PlatformViewPlacement::new(handle, bounds, clip_bounds));
     }
 
     /// Hands the platform layer the hosted-view changes owed by the frame that

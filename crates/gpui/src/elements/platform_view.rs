@@ -27,6 +27,13 @@ pub struct PlatformView {
 /// scene overlay is enabled, deferred and window-level overlay content is drawn
 /// on a separate surface above hosted views.
 ///
+/// # Clipping
+///
+/// GPUI keeps the native view at its full layout bounds and applies the current
+/// rectangular content mask separately. Scrolling therefore crops the native
+/// content instead of resizing and reflowing it. A fully clipped view is
+/// detached for that frame.
+///
 /// # Platforms
 ///
 /// macOS and Windows host native views. Elsewhere the element still lays out,
