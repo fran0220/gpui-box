@@ -22,6 +22,12 @@ service.
 
 ### Changed
 
+**Catalog site.** The public site now keeps compose, scenes, and components on
+the home page. Scenes list the components they build. The only standalone pages
+are Docs and MCP. The former playground is `/compose/` and is embedded on the
+home page in both themes. Dark navigation uses primary text so the links stay
+readable. Old `/components/`, `/scenes/`, and `/playground/` URLs redirect.
+
 **Faster validation.** CI now runs once per pull-request commit, cancels
 superseded runs, omits debugger data, and caches both Cargo workspaces used by
 the headless renderer. Platform jobs no longer repeat the Linux authority

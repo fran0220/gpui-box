@@ -1,9 +1,10 @@
 // The catalog, on the public internet.
 //
 // One Worker serves two things that are really one thing: a site a person
-// reads at `/`, and an MCP endpoint an agent calls at `/mcp`. Both answer out
-// of `api-index.json`, which is generated from the source and checked by the
-// gate, so the page and the tool cannot disagree about a signature.
+// reads at `/` and `/mcp/`, and an MCP endpoint an agent POSTs at `/mcp`.
+// Both answer out of `api-index.json`, which is generated from the source and
+// checked by the gate, so the page and the tool cannot disagree about a
+// signature.
 //
 // It renders nothing. `render_scene` returns the capture the gate already
 // committed, and that is not a downgrade: scene captures in this repository
@@ -27,9 +28,11 @@ export default {
     if (url.pathname === "/mcp") {
       return mcp(request, env);
     }
-    // A well-known alias, so a client that appends its own path still lands.
     if (url.pathname === "/mcp/") {
-      return Response.redirect(new URL("/mcp", url).toString(), 308);
+      if (request.method === "GET" || request.method === "HEAD") {
+        return env.ASSETS.fetch(request);
+      }
+      return mcp(request, env);
     }
     return env.ASSETS.fetch(request);
   },

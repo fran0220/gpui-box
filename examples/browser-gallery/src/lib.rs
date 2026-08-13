@@ -258,13 +258,13 @@ impl BrowserGallery {
             .py(px(theme.spacing.sm))
             .bg(theme.colors.panel)
             .child(
-                text(&theme, TypeScale::Title, "GPUI Box playground")
+                text(&theme, TypeScale::Title, "GPUI Box compose")
                     .mr(px(theme.spacing.sm))
                     .semantic_in(
                         cx,
                         NodeSpec::new("browser.playground.title", Role::Heading)
                             .level(1)
-                            .text("GPUI Box playground"),
+                            .text("GPUI Box compose"),
                     ),
             )
             .children(theme_buttons)
@@ -297,7 +297,7 @@ impl BrowserGallery {
             )
             .semantic_in(
                 cx,
-                NodeSpec::new("browser.playground.root", Role::Window).text("GPUI Box playground"),
+                NodeSpec::new("browser.playground.root", Role::Window).text("GPUI Box compose"),
             )
             .into_any_element()
     }

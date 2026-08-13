@@ -40,5 +40,6 @@ crate installation alone cannot render. The server reads and renders but does
 not edit files; it does not replace `cargo run -p xtask -- gate`.
 
 The hosted endpoint at <https://gpui-box.origingame.dev/mcp> is different: it
-serves the currently deployed static catalog and committed images. See
+serves the currently deployed static catalog and committed images. A browser
+GET lands on the human MCP page; agents POST JSON-RPC to the same path. See
 [`deploying.md`](deploying.md).

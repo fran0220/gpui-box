@@ -11,10 +11,12 @@ tools/site/deploy.sh
 
 The script checks the API index, builds the browser gallery, generates the
 static catalog around it, copies the shared MCP tool description, and deploys
-one Cloudflare Worker. `/` serves people, `/playground/` serves the full GPUI
-surface, and `/mcp` serves agents. Hosted `render_scene` returns committed
-catalog captures rather than compiling per request; the stdio server in
-[`mcp.md`](mcp.md) is required for working-copy rendering.
+one Cloudflare Worker. `/` is the catalog home: compose, scenes, and
+components. `/docs/` and `/mcp/` are the only other pages. `/compose/` is the
+full GPUI surface, also embedded twice on the home page so both themes stay
+visible. Agents POST JSON-RPC to `/mcp`. Hosted `render_scene` returns
+committed catalog captures rather than compiling per request; the stdio server
+in [`mcp.md`](mcp.md) is required for working-copy rendering.
 
 ```json
 {
@@ -52,13 +54,13 @@ so these custom domains are the production routes.
 
 | Path | Source |
 |---|---|
-| `/` and `/components/*` | generated from `docs/api-index.json` |
-| `/scenes/*` | canonical scene source and committed theme captures |
-| `/playground/*` | release WASM browser gallery, also embedded lazily by catalog pages |
+| `/` | catalog home: compose, scenes with their components, and the component list |
+| `/compose/*` | release WASM browser gallery, also embedded lazily in both themes |
 | `/docs/*` | public documentation |
+| `/mcp/` | human catalog page; POST `/mcp` remains the JSON-RPC endpoint |
 | `/llms.txt`, `/api-index.json` | machine-readable catalog inputs |
 | `/images/*` | fingerprinted macOS scene captures |
-| `/mcp` | `tools/site/worker/index.js` and `tools/mcp/tools.json` |
+| `/components/*`, `/scenes/*`, `/playground/` | compatibility redirects onto the home or compose surface |
 
 `tools/site/public/` is generated and uncommitted. Both `site generate` and
 `site check` require the `wasm32-unknown-unknown` target and the locked

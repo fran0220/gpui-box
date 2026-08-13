@@ -4,7 +4,7 @@
 #
 # Everything it publishes is derived: the pages come from `docs/api-index.json`
 # and `docs/*.md`, the images come from `snapshots/headless/macos/scenes`, the
-# live playground comes from the browser-gallery WASM build, and the tool list
+# live compose surface comes from the browser-gallery WASM build, and the tool list
 # comes from `tools/mcp/tools.json`. Nothing here is authored twice, so a deploy
 # cannot say something the repository does not.
 set -euo pipefail

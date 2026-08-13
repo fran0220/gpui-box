@@ -105,7 +105,7 @@ cargo run -p xtask -- package check
 Run `gate full` instead of, not after, `gate` when a change can affect rendered
 output. The standalone web commands remain useful while iterating; `web gate`
 builds and prepares Chromium once before checking the gallery, static-site
-embeds, full playground route, and scoped visual proof. `site generate` bundles
+embeds, full compose route, and scoped visual proof. `site generate` bundles
 that browser build with the static catalog rather than replacing searchable
 documentation with a canvas.
 Headless baselines and CI gates cover macOS, Linux, and Windows, and the native

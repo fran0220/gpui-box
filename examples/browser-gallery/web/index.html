@@ -34,9 +34,11 @@
     <script type="module">
       const query = new URLSearchParams(location.search);
       const embedded = query.get("embed") === "1";
-      const playgroundPath = location.pathname === "/playground/" ||
+      const composePath = location.pathname === "/compose/" ||
+        location.pathname.endsWith("/compose/index.html") ||
+        location.pathname === "/playground/" ||
         location.pathname.endsWith("/playground/index.html");
-      const mode = query.get("mode") || (playgroundPath && !embedded ? "playground" : "scene");
+      const mode = query.get("mode") || (composePath && !embedded ? "playground" : "scene");
       if (embedded) {
         document.documentElement.classList.add("embed");
         const fit = () => {
@@ -57,10 +59,10 @@
         const url = new URL(location.href);
         url.searchParams.set("scene", scene);
         url.searchParams.set("theme", theme);
-        if (playgroundPath) url.searchParams.delete("mode");
+        if (composePath) url.searchParams.delete("mode");
         else url.searchParams.set("mode", "playground");
         history.replaceState(null, "", url);
-        document.title = `${scene} — GPUI Box playground`;
+        document.title = `${scene} — GPUI Box compose`;
       };
       const { default: init } = await import("./gpui_kit_browser_gallery.js");
       try {

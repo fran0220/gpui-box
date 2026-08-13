@@ -42,9 +42,10 @@ header nav a,
 header .repo {
   padding: 5px 11px;
   border-radius: var(--radius-control);
-  color: var(--muted);
+  color: var(--text);
   text-decoration: none;
   font-size: 14px;
+  font-weight: 560;
   transition: background var(--motion-quick) var(--motion-standard), color var(--motion-quick) var(--motion-standard);
 }
 
@@ -82,6 +83,61 @@ a { color: var(--accent); }
 }
 
 .button.quiet { background: var(--raised); color: var(--text); }
+
+.compose { margin: 44px 0; }
+.compose-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  margin: 0 0 16px;
+}
+.compose-search {
+  display: grid;
+  gap: 6px;
+  min-width: min(100%, 280px);
+  flex: 1;
+}
+.compose-search span {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 560;
+}
+.compose-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.catalog { margin: 56px 0; }
+
+.scene-stack { display: flex; flex-direction: column; gap: 18px; }
+
+.scene-card {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) 1fr;
+  gap: 18px;
+  padding: 14px;
+  border-radius: var(--radius-card);
+  background: var(--panel);
+}
+
+.scene-card .tile { margin: 0; }
+.scene-body h3 { margin: 0 0 8px; font-family: var(--mono); font-size: 16px; }
+.themes.compact { margin: 12px 0; }
+
+.row-head { display: flex; align-items: center; gap: 10px; }
+.row { display: block; }
+.row .summary { margin: 6px 0 8px; }
+
+.mcp-tools { list-style: none; padding: 0; display: grid; gap: 10px; }
+.mcp-tools li {
+  background: var(--panel);
+  border-radius: var(--radius-card);
+  padding: 12px 14px;
+}
+.mcp-tools b { display: block; font-family: var(--mono); margin-bottom: 4px; }
+.mcp-tools span { color: var(--muted); font-size: 14px; }
 
 .live { margin: 44px 0; }
 
@@ -197,37 +253,40 @@ a { color: var(--accent); }
 .rules li { margin-bottom: 10px; }
 .rules b { color: var(--text); }
 
-#filter {
+#filter,
+#compose-filter,
+#scene-filter,
+#component-filter {
   width: 100%;
   padding: 11px 14px;
   margin: 4px 0 18px;
   border: 0;
   border-radius: var(--radius-control);
-  background: var(--panel);
+  background: var(--raised);
   color: var(--text);
   font-family: inherit;
   font-size: 15px;
   outline: none;
 }
 
-#filter:focus { box-shadow: 0 0 0 2px var(--accent); }
+#filter:focus,
+#compose-filter:focus,
+#scene-filter:focus,
+#component-filter:focus { box-shadow: 0 0 0 2px var(--accent); }
 
 .rows { display: flex; flex-direction: column; gap: 2px; }
 
 .row {
-  display: grid;
-  grid-template-columns: 200px 78px 1fr;
-  align-items: baseline;
-  gap: 12px;
-  padding: 11px 14px;
-  border-radius: var(--radius-control);
-  text-decoration: none;
+  display: block;
+  padding: 16px 16px 8px;
+  border-radius: var(--radius-card);
+  background: var(--panel);
   color: var(--text);
 }
 
-.row:hover { background: var(--panel); }
-.row .summary { color: var(--faint); font-size: 14px; }
-.row b { font-family: var(--mono); font-size: 14px; font-weight: 500; }
+.row + .row { margin-top: 10px; }
+.row .summary { color: var(--muted); font-size: 14px; }
+.row b { font-family: var(--mono); font-size: 15px; font-weight: 560; }
 
 /* Tone is a block of colour rather than an outline, as in the library. */
 .kind {
@@ -339,8 +398,8 @@ footer {
   .doc { grid-template-columns: 1fr; }
   .doc aside { position: static; }
   .themes { grid-template-columns: 1fr; }
-  .row { grid-template-columns: 1fr auto; }
-  .row .summary { grid-column: 1 / -1; }
+  .compose-grid { grid-template-columns: 1fr; }
+  .scene-card { grid-template-columns: 1fr; }
   .hero h1 { font-size: 32px; }
   ul.docs { columns: 1; }
 }

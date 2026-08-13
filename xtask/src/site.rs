@@ -70,26 +70,28 @@ pub fn generate(root: &Path, out: Option<&str>, browser_gallery: &Path) -> Resul
         &home(&components, &scenes, &image_root),
     )?;
     write(
+        &out.join("mcp/index.html"),
+        &mcp_page(root, &components, &scenes)?,
+    )?;
+
+    write(
         &out.join("components/index.html"),
-        &component_list(&components),
+        &redirect_page("/#components"),
     )?;
     for component in &components {
         let name = string(component, "name");
         write(
             &out.join(format!("components/{name}.html")),
-            &component_page(component, &scenes, &image_root),
+            &redirect_page(&format!("/?component={name}#components")),
         )?;
     }
 
-    write(
-        &out.join("scenes/index.html"),
-        &scene_list(&scenes, &image_root),
-    )?;
+    write(&out.join("scenes/index.html"), &redirect_page("/#scenes"))?;
     for scene in &scenes {
         let name = string(scene, "name");
         write(
             &out.join(format!("scenes/{name}.html")),
-            &scene_page(scene, &components, &image_root),
+            &redirect_page(&format!("/?scene={name}#compose")),
         )?;
     }
 
@@ -128,8 +130,15 @@ pub fn generate(root: &Path, out: Option<&str>, browser_gallery: &Path) -> Resul
         }
     }
 
-    write(&out.join("assets/search.json"), &search(&components))?;
-    copy_browser_gallery(browser_gallery, &out.join("playground"))?;
+    write(
+        &out.join("assets/search.json"),
+        &search(&components, &scenes),
+    )?;
+    copy_browser_gallery(browser_gallery, &out.join("compose"))?;
+    write(
+        &out.join("playground/index.html"),
+        &redirect_page("/compose/"),
+    )?;
 
     println!(
         "site: {} components, {} scenes, {} pages, {copied} images ({image_version}) -> {}",
@@ -170,7 +179,7 @@ pub fn check_with_browser(root: &Path, browser_gallery: &Path) -> Result<()> {
     }
     .map_err(Into::into);
     result.and(cleanup)?;
-    println!("site and browser playground build");
+    println!("site and browser compose build");
     Ok(())
 }
 
@@ -236,9 +245,10 @@ fn image_version(root: &Path) -> Result<String> {
 
 fn shell(title: &str, active: &str, body: &str) -> String {
     let nav = [
-        ("/components/", "Components"),
-        ("/scenes/", "Scenes"),
-        ("/playground/", "Playground"),
+        ("/#compose", "Compose"),
+        ("/#scenes", "Scenes"),
+        ("/#components", "Components"),
+        ("/mcp/", "MCP"),
         ("/docs/", "Docs"),
     ]
     .iter()
@@ -280,13 +290,33 @@ fn shell(title: &str, active: &str, body: &str) -> String {
     )
 }
 
+fn redirect_page(target: &str) -> String {
+    let escaped = escape(target);
+    format!(
+        r#"<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="0; url={escaped}">
+<link rel="canonical" href="{escaped}">
+<title>Redirecting — GPUI Box</title>
+<script>location.replace({js});</script>
+</head>
+<body>
+<p>This page now lives on the catalog home. <a href="{escaped}">Continue</a>.</p>
+</body>
+</html>
+"#,
+        js = Value::from(target)
+    )
+}
+
 fn home(components: &[Value], scenes: &[Value], image_root: &str) -> String {
     let builders = components
         .iter()
         .filter(|c| string(c, "kind") == "builder")
         .count();
     let views = components.len() - builders;
-
     let featured = [
         "node-graph",
         "ide-shell",
@@ -304,38 +334,24 @@ fn home(components: &[Value], scenes: &[Value], image_root: &str) -> String {
         "settings",
         "failure-panel",
     ];
-    let tiles = featured
+    let featured_name = featured
         .iter()
-        .filter(|name| scenes.iter().any(|s| string(s, "name") == **name))
-        .map(|name| {
-            format!(
-                r#"<a class="tile" href="/scenes/{name}">
-  <img loading="lazy" src="{image_root}/{name}-studio-dark.png" alt="The {name} scene">
-  <span>{name}</span>
-</a>"#
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
+        .copied()
+        .find(|name| scenes.iter().any(|scene| string(scene, "name") == *name))
+        .unwrap_or("button");
 
     let body = format!(
-        r#"<section class="hero">
+        r##"<section class="hero">
   <h1>Native desktop components for GPUI.</h1>
   <p class="lead">A design system, component library, semantic automation layer
   and visual test kit. Surfaces group with colour rather than lines, every word
   is replaceable, and every state is the state it claims to be.</p>
   <p class="cta">
-    <a class="button" href="/components/">Browse {count} components</a>
-    <a class="button quiet" href="/playground/">Open the playground</a>
-    <a class="button quiet" href="/llms.txt">Read the contracts</a>
+    <a class="button" href="#compose">Compose a scene</a>
+    <a class="button quiet" href="#scenes">Browse {scenes_count} scenes</a>
+    <a class="button quiet" href="/mcp/">Open MCP</a>
+    <a class="button quiet" href="/docs/">Read the docs</a>
   </p>
-</section>
-
-<section class="live">
-  <h2>Rendered by GPUI, in this page</h2>
-  <p class="lead">The documentation stays searchable static HTML. This surface
-  is the actual Rust scene running through GPUI's browser renderer.</p>
-  {live}
 </section>
 
 <section class="stats">
@@ -345,8 +361,47 @@ fn home(components: &[Value], scenes: &[Value], image_root: &str) -> String {
   <div><b>{images}</b><span>gate-checked images</span></div>
 </section>
 
-<section class="gallery">
-{tiles}
+<section id="compose" class="compose">
+  <h2>Compose</h2>
+  <p class="lead">The documentation stays searchable static HTML. These two
+  surfaces are the same Rust scene, live in both themes. Until a renderer is
+  ready, or if this browser cannot start one, the verified capture remains.</p>
+  <div class="compose-toolbar">
+    <label class="compose-search">
+      <span>Scene</span>
+      <input id="compose-filter" type="search" list="compose-scenes" placeholder="Filter {scenes_count} scenes" autocomplete="off">
+    </label>
+    <datalist id="compose-scenes">{scene_options}</datalist>
+    <a class="button quiet" id="compose-full" href="/compose/?scene={featured}&amp;theme=studio-dark">Open full compose</a>
+  </div>
+  <div class="compose-grid">
+    {dark}
+    {light}
+  </div>
+</section>
+
+<section id="scenes" class="catalog">
+  <h2>Scenes</h2>
+  <p class="lead">{scenes_count} canonical renderings, each captured in both
+  themes and compared pixel for pixel on every run. Open one to compose it live
+  and see the components it builds.</p>
+  <input id="scene-filter" type="search" placeholder="Filter scenes" autocomplete="off">
+  <div class="scene-stack">
+{scene_cards}
+  </div>
+  <p id="scenes-empty" class="empty" hidden>Nothing matches.</p>
+</section>
+
+<section id="components" class="catalog">
+  <h2>Components</h2>
+  <p class="lead">A <b>builder</b> is <code>RenderOnce</code>: construct and
+  mount it in one expression. A <b>view</b> survives a frame, so it is held in
+  an <code>Entity</code>. Both report an intent and apply nothing.</p>
+  <input id="component-filter" type="search" placeholder="Filter {count} components" autocomplete="off">
+  <div class="rows">
+{component_rows}
+  </div>
+  <p id="components-empty" class="empty" hidden>Nothing matches.</p>
 </section>
 
 <section class="rules">
@@ -368,75 +423,66 @@ fn home(components: &[Value], scenes: &[Value], image_root: &str) -> String {
     business identity rather than list position.</li>
   </ol>
 </section>
-
-<section class="loop">
-  <h2>Built for an agent as much as for a person</h2>
-  <p class="lead">The API on this site is generated from the source and checked
-  by the gate, so it cannot drift from the library. There is a
-  <a href="/llms.txt">llms.txt</a>, a machine-readable
-  <a href="/api-index.json">index</a>, and an MCP endpoint at
-  <code>/mcp</code> that answers the same questions in one call.</p>
-  <pre><code>cargo run -p xtask -- gate                    # fmt, check, test, clippy, tokens, strings, api
-cargo run -p xtask -- headless check badge     # compare against the committed image
-cargo run -p xtask -- headless capture badge   # accept what changed</code></pre>
-</section>
-"#,
+"##,
         count = components.len(),
         scenes_count = scenes.len(),
         images = scenes.len() * 2,
-        live = live_embed("node-graph", "studio-dark", image_root, false),
+        featured = featured_name,
+        scene_options = scene_options(scenes),
+        scene_cards = scene_cards(scenes, components, image_root),
+        component_rows = component_rows(components),
+        dark = live_embed(featured_name, "studio-dark", image_root, false),
+        light = live_embed(featured_name, "studio-light", image_root, false),
     );
     shell("GPUI Box — native desktop components for GPUI", "/", &body)
 }
 
-fn component_list(components: &[Value]) -> String {
-    let rows = components
+fn component_rows(components: &[Value]) -> String {
+    components
         .iter()
         .map(|component| {
             let name = string(component, "name");
             let kind = string(component, "kind");
             format!(
-                r#"<a class="row" href="/components/{name}" data-search="{search}">
-  <b>{name}</b><span class="kind {kind}">{kind}</span>
-  <span class="summary">{summary}</span>
-</a>"#,
+                r#"<article class="row" id="component-{anchor}" data-component="{name}" data-search="{search}">
+  <div class="row-head">
+    <b>{name}</b><span class="kind {kind}">{kind}</span>
+  </div>
+  <p class="summary">{summary}</p>
+  <p class="note">{held}</p>
+  <pre class="path"><code>use {path};</code></pre>
+  {sections}
+  <p class="source">Source: <a href="https://github.com/fran0220/gpui-box/blob/main/{source}">{source}</a></p>
+</article>"#,
+                anchor = slug(&name),
                 summary = escape(&string(component, "summary")),
-                search = escape(&format!("{name} {kind} {}", string(component, "summary")))
-                    .to_lowercase(),
+                held = if kind == "view" {
+                    "A view survives a frame. Hold it in an <code>Entity</code> with \
+                     <code>cx.new(..)</code> and reach it with <code>.update(..)</code>."
+                } else {
+                    "A builder is <code>RenderOnce</code>. Construct and mount it in one \
+                     expression."
+                },
+                path = escape(&string(component, "path")),
+                source = escape(&string(component, "source")),
+                sections = component_sections(component),
+                search = escape(&format!(
+                    "{name} {kind} {} {}",
+                    string(component, "summary"),
+                    array(component, "scenes")
+                        .iter()
+                        .map(as_string)
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                ))
+                .to_lowercase(),
             )
         })
         .collect::<Vec<_>>()
-        .join("\n");
-
-    let body = format!(
-        r#"<h1>Components</h1>
-<p class="lead">A <b>builder</b> is <code>RenderOnce</code>: construct and mount it
-in one expression. A <b>view</b> survives a frame, so it is held in an
-<code>Entity</code>. Both report an intent and apply nothing — the host decides,
-which is why a refused change is visible as the control not moving.</p>
-<input id="filter" type="search" placeholder="Filter {count} components" autocomplete="off">
-<div class="rows">
-{rows}
-</div>
-<p id="empty" class="empty" hidden>Nothing matches.</p>
-"#,
-        count = components.len()
-    );
-    shell("Components — GPUI Box", "/components/", &body)
+        .join("\n")
 }
 
-fn component_page(component: &Value, scenes: &[Value], image_root: &str) -> String {
-    let name = string(component, "name");
-    let kind = string(component, "kind");
-
-    let held = if kind == "view" {
-        "A view survives a frame. Hold it in an <code>Entity</code> with \
-         <code>cx.new(..)</code> and reach it with <code>.update(..)</code>."
-    } else {
-        "A builder is <code>RenderOnce</code>. Construct and mount it in one \
-         expression."
-    };
-
+fn component_sections(component: &Value) -> String {
     let mut sections = String::new();
     for (key, title, note) in [
         ("construct", "Construct", ""),
@@ -453,7 +499,7 @@ fn component_page(component: &Value, scenes: &[Value], image_root: &str) -> Stri
             continue;
         }
         sections.push_str(&format!(
-            "<h2>{title}</h2>{}<pre class=\"sig\"><code>{}</code></pre>",
+            "<h3>{title}</h3>{}<pre class=\"sig\"><code>{}</code></pre>",
             if note.is_empty() {
                 String::new()
             } else {
@@ -470,7 +516,7 @@ fn component_page(component: &Value, scenes: &[Value], image_root: &str) -> Stri
     let reports = array(component, "reports");
     if !reports.is_empty() {
         sections.push_str(&format!(
-            "<h2>Reports</h2><p class=\"note\">The variants of the event it emits. \
+            "<h3>Reports</h3><p class=\"note\">The variants of the event it emits. \
              It never applies the change itself.</p><ul class=\"variants\">{}</ul>",
             reports
                 .iter()
@@ -482,121 +528,141 @@ fn component_page(component: &Value, scenes: &[Value], image_root: &str) -> Stri
 
     let used_in = array(component, "scenes");
     if !used_in.is_empty() {
-        let shots = used_in
-            .iter()
-            .map(as_string)
-            .filter(|scene| scenes.iter().any(|s| string(s, "name") == *scene))
-            .map(|scene| {
-                format!(
-                    r#"<a class="tile" href="/scenes/{scene}">
-  <img loading="lazy" src="{image_root}/{scene}-studio-dark.png" alt="The {scene} scene">
-  <span>{scene}</span>
-</a>"#
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
         sections.push_str(&format!(
-            "<h2>Rendered by</h2><p class=\"note\">Each of these compiles and is \
-             captured by the gate, so the code behind them is verified rather \
-             than written.</p><div class=\"gallery\">{shots}</div>"
+            "<p class=\"note\">Rendered by {}.</p>",
+            used_in
+                .iter()
+                .map(as_string)
+                .map(|scene| format!("<a href=\"/?scene={scene}#compose\">{scene}</a>"))
+                .collect::<Vec<_>>()
+                .join(" ")
         ));
     }
-
-    let body = format!(
-        r#"<p class="crumb"><a href="/components/">Components</a></p>
-<h1>{name} <span class="kind {kind}">{kind}</span></h1>
-<p class="lead">{summary}</p>
-<p class="note">{held}</p>
-<pre class="path"><code>use {path};</code></pre>
-{sections}
-<p class="source">Source: <a href="https://github.com/fran0220/gpui-box/blob/main/{source}">{source}</a></p>
-"#,
-        summary = escape(&string(component, "summary")),
-        path = escape(&string(component, "path")),
-        source = escape(&string(component, "source")),
-    );
-    shell(&format!("{name} — GPUI Box"), "/components/", &body)
+    sections
 }
 
-fn scene_list(scenes: &[Value], image_root: &str) -> String {
-    let tiles = scenes
+fn scene_options(scenes: &[Value]) -> String {
+    scenes
         .iter()
         .map(|scene| {
             let name = string(scene, "name");
+            format!("<option value=\"{name}\">")
+        })
+        .collect::<Vec<_>>()
+        .join("")
+}
+
+fn scene_cards(scenes: &[Value], components: &[Value], image_root: &str) -> String {
+    scenes
+        .iter()
+        .map(|scene| {
+            let name = string(scene, "name");
+            let uses = array(scene, "uses")
+                .iter()
+                .map(as_string)
+                .filter(|used| components.iter().any(|component| string(component, "name") == *used))
+                .map(|used| {
+                    format!(
+                        "<a href=\"/?component={used}#component-{anchor}\">{used}</a>",
+                        anchor = slug(&used)
+                    )
+                })
+                .collect::<Vec<_>>();
+            let search = escape(&format!(
+                "{name} {}",
+                array(scene, "uses")
+                    .iter()
+                    .map(as_string)
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ))
+            .to_lowercase();
             format!(
-                r#"<a class="tile" href="/scenes/{name}">
-  <img loading="lazy" src="{image_root}/{name}-studio-dark.png" alt="The {name} scene">
-  <span>{name}</span>
-</a>"#
+                r##"<article class="scene-card" id="scene-{name}" data-scene="{name}" data-search="{search}">
+  <a class="tile" href="/?scene={name}#compose">
+    <img loading="lazy" src="{image_root}/{name}-studio-dark.png" alt="The {name} scene in studio-dark">
+    <span>{name}</span>
+  </a>
+  <div class="scene-body">
+    <h3>{name}</h3>
+    <p class="note">Builds {uses}</p>
+    <div class="themes compact">
+      <figure><img loading="lazy" src="{image_root}/{name}-studio-dark.png" alt="{name} in the dark theme"><figcaption>studio-dark</figcaption></figure>
+      <figure><img loading="lazy" src="{image_root}/{name}-studio-light.png" alt="{name} in the light theme"><figcaption>studio-light</figcaption></figure>
+    </div>
+    <pre class="code"><code>{example}</code></pre>
+  </div>
+</article>"##,
+                uses = if uses.is_empty() {
+                    "no catalogued components".to_string()
+                } else {
+                    uses.join(" ")
+                },
+                example = highlight(&string(scene, "example")),
             )
         })
         .collect::<Vec<_>>()
-        .join("\n");
-
-    let body = format!(
-        r#"<h1>Scenes</h1>
-<p class="lead">{count} canonical renderings, each captured in both themes and
-compared pixel for pixel on every run. A scene is also the example: the code
-below each one is what the gate compiled to produce the image above it.</p>
-<div class="gallery wide">
-{tiles}
-</div>
-"#,
-        count = scenes.len()
-    );
-    shell("Scenes — GPUI Box", "/scenes/", &body)
-}
-
-fn scene_page(scene: &Value, components: &[Value], image_root: &str) -> String {
-    let name = string(scene, "name");
-    let uses = array(scene, "uses")
-        .iter()
-        .map(as_string)
-        .filter(|used| components.iter().any(|c| string(c, "name") == *used))
-        .map(|used| format!("<a href=\"/components/{used}.html\">{used}</a>"))
-        .collect::<Vec<_>>()
-        .join(" ");
-
-    let body = format!(
-        r#"<p class="crumb"><a href="/scenes/">Scenes</a></p>
-<h1>{name}</h1>
-<p class="note">Builds {uses}</p>
-<h2>Live GPUI surface</h2>
-<p class="note">Loaded lazily from the same Rust scene. Until it is ready, or
-if this browser cannot start a renderer, the verified static capture remains.</p>
-{live}
-<p class="note"><a href="/playground/?scene={name}&amp;theme=studio-dark">Open {name} at full size in the playground</a></p>
-<h2>Verified captures</h2>
-<div class="themes">
-  <figure><img src="{image_root}/{name}-studio-dark.png" alt="{name} in the dark theme"><figcaption>studio-dark</figcaption></figure>
-  <figure><img src="{image_root}/{name}-studio-light.png" alt="{name} in the light theme"><figcaption>studio-light</figcaption></figure>
-</div>
-<h2>The code that drew it</h2>
-<p class="note">A still frame holds a repeating animation at its first frame and
-a one-shot at its last, because a still of a moving thing is not reproducible.
-Run the gallery to review motion.</p>
-<pre class="code"><code>{example}</code></pre>
-"#,
-        example = highlight(&string(scene, "example")),
-        live = live_embed(&name, "studio-dark", image_root, true),
-    );
-    shell(&format!("{name} — GPUI Box scenes"), "/scenes/", &body)
+        .join("\n")
 }
 
 fn live_embed(scene: &str, theme: &str, image_root: &str, detail: bool) -> String {
     let size = if detail { " detail" } else { "" };
     format!(
-        r#"<div class="live-embed{size}" data-live-scene="{scene}">
-  <a class="live-fallback" href="/playground/?scene={scene}&amp;theme={theme}">
+        r#"<div class="live-embed{size}" data-live-scene="{scene}" data-live-theme="{theme}">
+  <a class="live-fallback" href="/compose/?scene={scene}&amp;theme={theme}">
     <img src="{image_root}/{scene}-{theme}.png" alt="The verified {scene} scene in {theme}">
-    <span>Open {scene} in the playground</span>
+    <span>Open {scene} in {theme}</span>
   </a>
   <iframe class="live-frame" loading="lazy" tabindex="-1"
-    title="Live GPUI Box {scene} scene"
-    src="/playground/?scene={scene}&amp;theme={theme}&amp;embed=1"></iframe>
+    title="Live GPUI Box {scene} scene in {theme}"
+    src="/compose/?scene={scene}&amp;theme={theme}&amp;embed=1"></iframe>
 </div>"#
     )
+}
+
+fn mcp_page(root: &Path, components: &[Value], scenes: &[Value]) -> Result<String> {
+    let tools = fs::read_to_string(root.join("tools/mcp/tools.json"))
+        .context("tools/mcp/tools.json is missing")?;
+    let tools: Value = serde_json::from_str(&tools)?;
+    let items = tools
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|tool| {
+            format!(
+                "<li><b>{}</b><span>{}</span></li>",
+                escape(&string(tool, "name")),
+                escape(&string(tool, "description"))
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("");
+    let body = format!(
+        r#"<h1>MCP</h1>
+<p class="lead">The same catalog, answered for an agent. Hosted
+<code>render_scene</code> returns the committed capture. Working-copy rendering
+needs the stdio server from a checkout.</p>
+<pre><code>{{
+  "mcpServers": {{
+    "gpui-box": {{ "url": "https://gpui-box.origingame.dev/mcp" }}
+  }}
+}}</code></pre>
+<p class="note">People read this page. Agents POST JSON-RPC to
+<code>/mcp</code>. A GET there is refused because that endpoint opens no
+stream.</p>
+<h2>Tools</h2>
+<ul class="mcp-tools">{items}</ul>
+<section class="stats">
+  <div><b>{components}</b><span>indexed components</span></div>
+  <div><b>{scenes}</b><span>verified scenes</span></div>
+</section>
+<p class="note">Also published as <a href="/llms.txt">llms.txt</a> and
+<a href="/api-index.json">api-index.json</a>.</p>
+"#,
+        components = components.len(),
+        scenes = scenes.len(),
+    );
+    Ok(shell("MCP — GPUI Box", "/mcp/", &body))
 }
 
 fn doc_list(pages: &[String]) -> String {
@@ -638,25 +704,49 @@ fn doc_page(page: &str, markdown: &str, pages: &[String]) -> String {
     shell(&format!("{page} — GPUI Box"), "/docs/", &body)
 }
 
-fn search(components: &[Value]) -> String {
-    let entries = components
-        .iter()
-        .map(|component| {
-            format!(
-                "{{\"n\":{},\"k\":{},\"s\":{}}}",
-                Value::from(string(component, "name")),
-                Value::from(string(component, "kind")),
-                Value::from(string(component, "summary"))
+fn search(components: &[Value], scenes: &[Value]) -> String {
+    let components = components.iter().map(|component| {
+        format!(
+            r#"{{"kind":"component","n":{},"k":{},"s":{}}}"#,
+            Value::from(string(component, "name")),
+            Value::from(string(component, "kind")),
+            Value::from(string(component, "summary"))
+        )
+    });
+    let scenes = scenes.iter().map(|scene| {
+        format!(
+            r#"{{"kind":"scene","n":{},"s":{}}}"#,
+            Value::from(string(scene, "name")),
+            Value::from(
+                array(scene, "uses")
+                    .iter()
+                    .map(as_string)
+                    .collect::<Vec<_>>()
+                    .join(" "),
             )
-        })
-        .collect::<Vec<_>>()
-        .join(",");
-    format!("[{entries}]")
+        )
+    });
+    format!(
+        "[{}]",
+        components.chain(scenes).collect::<Vec<_>>().join(",")
+    )
 }
 
 // ---------------------------------------------------------------------------
 // Text
 // ---------------------------------------------------------------------------
+
+fn slug(text: &str) -> String {
+    text.chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() {
+                character.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect()
+}
 
 fn escape(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
@@ -970,17 +1060,17 @@ mod tests {
         );
         assert!(html.contains("loading=\"lazy\""), "{html}");
         assert!(
-            html.contains("title=\"Live GPUI Box button scene\""),
+            html.contains("title=\"Live GPUI Box button scene in studio-dark\""),
             "{html}"
         );
         assert!(
-            html.contains("/playground/?scene=button&amp;theme=studio-dark&amp;embed=1"),
+            html.contains("/compose/?scene=button&amp;theme=studio-dark&amp;embed=1"),
             "{html}"
         );
     }
 
     #[test]
-    fn browser_gallery_bundle_is_copied_as_one_playground() {
+    fn browser_gallery_bundle_is_copied_as_one_compose() {
         let fixture = std::env::temp_dir().join(format!(
             "gpui-box-site-browser-fixture-{}",
             std::process::id()
@@ -1000,5 +1090,55 @@ mod tests {
             );
         }
         fs::remove_dir_all(&fixture).expect("remove browser fixture");
+    }
+
+    #[test]
+    fn home_keeps_compose_scenes_and_components_on_one_page() {
+        let component = serde_json::json!({
+            "name": "Button",
+            "kind": "builder",
+            "path": "gpui_kit::Button",
+            "source": "crates/gpui-kit/src/controls/button.rs",
+            "summary": "A labeled action.",
+            "construct": ["new(ident: impl Into<Ident>) -> Self"],
+            "options": [],
+            "commands": [],
+            "queries": [],
+            "reports": [],
+            "scenes": ["button"]
+        });
+        let scene = serde_json::json!({
+            "name": "button",
+            "uses": ["Button"],
+            "example": "fn button() {}"
+        });
+        let html = home(&[component], &[scene], "/images/revision");
+        assert!(html.contains("href=\"/#compose\">Compose</a>"), "{html}");
+        assert!(html.contains("href=\"/#scenes\">Scenes</a>"), "{html}");
+        assert!(
+            html.contains("href=\"/#components\">Components</a>"),
+            "{html}"
+        );
+        assert!(html.contains("href=\"/mcp/\">MCP</a>"), "{html}");
+        assert!(html.contains("href=\"/docs/\">Docs</a>"), "{html}");
+        assert!(!html.contains("Playground"), "{html}");
+        assert!(html.contains("id=\"compose\""), "{html}");
+        assert!(html.contains("data-live-theme=\"studio-dark\""), "{html}");
+        assert!(html.contains("data-live-theme=\"studio-light\""), "{html}");
+        assert!(html.contains("id=\"scene-button\""), "{html}");
+        assert!(html.contains("id=\"component-button\""), "{html}");
+        assert!(
+            html.contains("href=\"/?component=Button#component-button\">Button</a>"),
+            "{html}"
+        );
+        assert!(STYLE.contains("color: var(--text);"), "{STYLE}");
+    }
+
+    #[test]
+    fn old_catalog_paths_redirect_onto_the_home_or_compose() {
+        let home = redirect_page("/#scenes");
+        assert!(home.contains("url=/#scenes"), "{home}");
+        let compose = redirect_page("/compose/");
+        assert!(compose.contains("url=/compose/"), "{compose}");
     }
 }

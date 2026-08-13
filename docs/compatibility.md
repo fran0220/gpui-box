@@ -26,7 +26,7 @@ history. It does not contact either historical source repository.
 | macOS | Framework, kit, Metal, native AVFoundation audio/video playback, and deterministic headless catalog | CI runs the all-feature native check and `cargo run -p xtask -- headless check`; AVFoundation compiles and the service contract is unit-tested; real-window review remains separate | Playback supports operating-system codecs and unprotected sources; no DRM, track selection, capture, or application network policy; real-window accessibility needs a logged-in host |
 | Windows | Framework/kit, native Media Foundation audio/video playback, and deterministic WGPU/WARP headless catalog | CI runs the all-feature native check and `cargo run -p xtask -- headless check`; Windows baselines exist | Playback supports operating-system codecs and unprotected sources; this macOS checkout can compile-check but not run the Windows backend; native frame capture is not implemented |
 | Linux | Wayland/X11 framework code and deterministic llvmpipe headless catalog | CI runs the all-feature native check and `cargo run -p xtask -- headless check`; Linux baselines exist | Native media service reports no-backend; AT-SPI and native behavior claims remain capability-scoped |
-| Browser/WASM | Stable, single-threaded browser gallery, hosted playground, and lazy catalog embeds using the same Rust scenes | CI runs `web check` and the real Chromium gallery/site smoke; the visual command remains available for scoped review | Native media service reports no-backend; no threaded COOP/COEP claim and no screen-reader announcement coverage |
+| Browser/WASM | Stable, single-threaded browser gallery, hosted compose surface, and lazy catalog embeds using the same Rust scenes | CI runs `web check` and the real Chromium gallery/site smoke; the visual command remains available for scoped review | Native media service reports no-backend; no threaded COOP/COEP claim and no screen-reader announcement coverage |
 
 All four rows are mandatory CI surfaces. A release may claim only results
 recorded for its commit; the commands do not erase the explicit limitations in
@@ -51,12 +51,12 @@ cargo run -p xtask -- web smoke
 cargo run -p xtask -- web visual check button input dialog node-graph
 ```
 
-The browser host is not a DOM rewrite. Static catalog pages remain selectable,
-indexable HTML and retain committed captures as fallbacks; the live GPUI scene
-is a lazy enhancement, while `/playground/` is the complete interactive
-surface. The pinned Playwright smoke covers forced WebGL2, forced WebGPU,
-automatic fallback, catalog embedding, static deep links, and the playground
-route. Its AccessKit adapter mirrors roles, focus, actions, values, and
+The browser host is not a DOM rewrite. The catalog home remains selectable,
+indexable HTML and retains committed captures as fallbacks; the live GPUI scene
+is a lazy enhancement shown in both themes, while `/compose/` is the complete
+interactive surface. The pinned Playwright smoke covers forced WebGL2, forced
+WebGPU, automatic fallback, catalog embedding, static deep links, and the
+compose route. Its AccessKit adapter mirrors roles, focus, actions, values, and
 canvas-scaled bounds into semantic DOM, but the JSON semantic snapshot is only
 a testing/debug surface.
 
