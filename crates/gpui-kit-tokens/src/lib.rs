@@ -186,10 +186,26 @@ impl TokenDocument {
             ("effect.edgeFadeBand", self.effect.edge_fade_band),
             ("effect.glowBlur", self.effect.glow_blur),
             ("effect.glassBlur", self.effect.glass_blur),
+            ("effect.glassBevel", self.effect.glass_bevel),
+            ("effect.glassRefraction", self.effect.glass_refraction),
+            (
+                "effect.glassMergeDistance",
+                self.effect.glass_merge_distance,
+            ),
         ] {
             if value < 0.0 {
                 return invalid(path, "must not be negative");
             }
+        }
+
+        if self.effect.glass_specular_sharpness < 1.0 {
+            return invalid("effect.glassSpecularSharpness", "must be at least 1");
+        }
+
+        // A press that thins the glass would read as the surface receding
+        // from the finger that pushed it.
+        if self.effect.glass_press_depth < 1.0 {
+            return invalid("effect.glassPressDepth", "must be at least 1");
         }
 
         for (path, value) in [
@@ -197,6 +213,17 @@ impl TokenDocument {
             ("effect.focusRingAlpha", self.effect.focus_ring_alpha),
             ("effect.glowAlpha", self.effect.glow_alpha),
             ("effect.glassAlpha", self.effect.glass_alpha),
+            ("effect.glassLiquidAlpha", self.effect.glass_liquid_alpha),
+            ("effect.glassDispersion", self.effect.glass_dispersion),
+            ("effect.glassSpecular", self.effect.glass_specular),
+            (
+                "effect.glassContrastFlipLow",
+                self.effect.glass_contrast_flip_low,
+            ),
+            (
+                "effect.glassContrastFlipHigh",
+                self.effect.glass_contrast_flip_high,
+            ),
             ("opacity.disabled", self.opacity.disabled),
             ("opacity.muted", self.opacity.muted),
             ("opacity.scrim", self.opacity.scrim),
@@ -204,6 +231,15 @@ impl TokenDocument {
             if !(0.0..=1.0).contains(&value) {
                 return invalid(path, "must be between 0 and 1");
             }
+        }
+
+        // A flip band that crosses over is a theme asking for the oscillation
+        // the band exists to prevent.
+        if self.effect.glass_contrast_flip_low > self.effect.glass_contrast_flip_high {
+            return invalid(
+                "effect.glassContrastFlipLow",
+                "must not be above effect.glassContrastFlipHigh",
+            );
         }
 
         for preset in SpringPreset::ALL {
@@ -1170,6 +1206,43 @@ pub struct EffectTokens {
     pub glass_alpha: f32,
     /// How far a frosted surface blurs what is behind it, in pixels.
     pub glass_blur: f32,
+    /// How much of a glass surface is tint when the optics are what makes it
+    /// legible rather than the fill.
+    ///
+    /// This is well below `glassAlpha` on purpose. A frosted surface has only
+    /// its fill to separate it from the backdrop, so the fill must be strong;
+    /// a surface that bends, splits and lights its edge is read by those, and
+    /// a fill strong enough to stand alone would cover them.
+    pub glass_liquid_alpha: f32,
+    /// How far in from its edge a glass surface's bevel reaches, in pixels.
+    /// This is the band the optics act in: refraction, dispersion and the
+    /// specular rim all fall to nothing once the surface is this deep.
+    pub glass_bevel: f32,
+    /// How far the bevel displaces what is behind it, as a fraction of the
+    /// bevel. Read as the thickness of the glass body.
+    pub glass_refraction: f32,
+    /// How far apart the red and blue samples land at the bevel, as a fraction
+    /// of the refraction offset. Zero is a colourless bend.
+    pub glass_dispersion: f32,
+    /// Peak brightness of the rim highlight.
+    pub glass_specular: f32,
+    /// How tight that highlight is. Larger is smaller and harder.
+    pub glass_specular_sharpness: f32,
+    /// Where the light that makes the highlight is, in radians clockwise from
+    /// straight up. A surface that tracks the pointer starts here.
+    pub glass_light_angle: f32,
+    /// How close two glass surfaces in a group must be to join into one body,
+    /// in pixels.
+    pub glass_merge_distance: f32,
+    /// Backdrop luminance below which a glass surface carries light content,
+    /// and above which it carries dark. The two are apart rather than equal on
+    /// purpose: a single threshold makes a surface over a backdrop sitting on
+    /// it flip back and forth, and the gap is what stops that.
+    pub glass_contrast_flip_low: f32,
+    pub glass_contrast_flip_high: f32,
+    /// How much thicker a pressable glass surface reads while pressed, as a
+    /// factor on its refraction. 1 is a surface that does not deform.
+    pub glass_press_depth: f32,
 }
 
 #[cfg(test)]

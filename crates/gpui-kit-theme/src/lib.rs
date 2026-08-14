@@ -249,6 +249,17 @@ pub struct Effects {
     pub glow_blur: f32,
     pub glass_alpha: f32,
     pub glass_blur: f32,
+    pub glass_liquid_alpha: f32,
+    pub glass_bevel: f32,
+    pub glass_refraction: f32,
+    pub glass_dispersion: f32,
+    pub glass_specular: f32,
+    pub glass_specular_sharpness: f32,
+    pub glass_light_angle: f32,
+    pub glass_merge_distance: f32,
+    pub glass_contrast_flip_low: f32,
+    pub glass_contrast_flip_high: f32,
+    pub glass_press_depth: f32,
 }
 
 impl Theme {
@@ -424,6 +435,17 @@ impl Theme {
                 glow_blur: tokens.effect.glow_blur,
                 glass_alpha: tokens.effect.glass_alpha,
                 glass_blur: tokens.effect.glass_blur,
+                glass_liquid_alpha: tokens.effect.glass_liquid_alpha,
+                glass_bevel: tokens.effect.glass_bevel,
+                glass_refraction: tokens.effect.glass_refraction,
+                glass_dispersion: tokens.effect.glass_dispersion,
+                glass_specular: tokens.effect.glass_specular,
+                glass_specular_sharpness: tokens.effect.glass_specular_sharpness,
+                glass_light_angle: tokens.effect.glass_light_angle,
+                glass_merge_distance: tokens.effect.glass_merge_distance,
+                glass_contrast_flip_low: tokens.effect.glass_contrast_flip_low,
+                glass_contrast_flip_high: tokens.effect.glass_contrast_flip_high,
+                glass_press_depth: tokens.effect.glass_press_depth,
             },
         }
     }

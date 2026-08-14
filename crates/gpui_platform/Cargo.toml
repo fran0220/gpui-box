@@ -24,6 +24,7 @@ web-multithreaded = ["gpui_web/multithreaded"]
 test-support = [
     "gpui/test-support",
     "gpui_macos/test-support",
+    "gpui_windows/test-support",
     "dep:gpui_wgpu",
     "gpui_wgpu/test-support",
 ]

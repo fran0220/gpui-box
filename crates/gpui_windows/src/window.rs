@@ -1000,6 +1000,15 @@ impl PlatformWindow for WindowsWindow {
             .log_err();
     }
 
+    #[cfg(any(test, feature = "test-support"))]
+    fn render_to_image(&self, scene: &Scene) -> anyhow::Result<image::RgbaImage> {
+        self.state.renderer.borrow_mut().render_to_image(scene)
+    }
+
+    fn backdrop_luminance(&self, slot: u32) -> Option<f32> {
+        self.state.renderer.borrow_mut().backdrop_luminance(slot)
+    }
+
     fn draw_layered(&self, scene: &Scene, overlay_start: usize) {
         self.state
             .renderer

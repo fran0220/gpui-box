@@ -196,6 +196,17 @@
     "glowAlpha": 0.22,
     "glowBlur": 12,
     "glassAlpha": 0.78,
-    "glassBlur": 24
+    "glassBlur": 24,
+    "glassLiquidAlpha": 0.34,
+    "glassBevel": 18,
+    "glassRefraction": 0.9,
+    "glassDispersion": 0.12,
+    "glassSpecular": 0.28,
+    "glassSpecularSharpness": 12,
+    "glassLightAngle": 0.7853982,
+    "glassMergeDistance": 28,
+    "glassContrastFlipLow": 0.42,
+    "glassContrastFlipHigh": 0.58,
+    "glassPressDepth": 1.5
   }
 }

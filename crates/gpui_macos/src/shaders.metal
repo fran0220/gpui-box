@@ -1300,57 +1300,174 @@ float4 fill_color(Background background,
   return color;
 }
 
-struct BackdropBlurVertexOutput {
+struct BackdropGlassVertexOutput {
   float4 position [[position]];
-  uint blur_id [[flat]];
+  uint glass_id [[flat]];
   float clip_distance [[clip_distance]][4];
 };
 
-struct BackdropBlurFragmentInput {
+struct BackdropGlassFragmentInput {
   float4 position [[position]];
-  uint blur_id [[flat]];
+  uint glass_id [[flat]];
 };
 
-vertex BackdropBlurVertexOutput backdrop_blur_vertex(
-    uint unit_vertex_id [[vertex_id]], uint blur_id [[instance_id]],
-    constant float2 *unit_vertices [[buffer(BackdropBlurInputIndex_Vertices)]],
-    constant BackdropBlur *blurs [[buffer(BackdropBlurInputIndex_Blurs)]],
+// Signed distance to one lobe. This is `quad_sdf` with the lobe's own bounds
+// and radii; it is written out rather than reused so that the loop below has
+// nothing between it and the arithmetic `glass_field` in scene.rs performs.
+float glass_lobe_sdf(float2 point, GlassLobe_ScaledPixels lobe) {
+  return quad_sdf(point, lobe.bounds, lobe.corner_radii);
+}
+
+// The polynomial smooth minimum. Mirrors `glass_smooth_min` in scene.rs.
+float glass_smooth_min(float a, float b, float smoothing) {
+  if (smoothing <= 0.) {
+    return min(a, b);
+  }
+  float h = max(smoothing - abs(a - b), 0.) / smoothing;
+  return min(a, b) - h * h * smoothing * 0.25;
+}
+
+// Distance to the surface's shape. Mirrors the `union` helper inside
+// `glass_field` in scene.rs, including the first-lobe special case that keeps
+// a single-lobe surface exactly equal to its own `quad_sdf`.
+//
+// `single` selects the shape the instance already carries over the lobe array,
+// which is what `BackdropGlass::shape` does on the CPU side. Doing it here
+// rather than at the call sites keeps the distance and the four differenced
+// samples of it going through one piece of arithmetic.
+float glass_sdf(float2 point, BackdropGlass glass, constant GlassLobe_ScaledPixels *lobes,
+                bool single, uint lobe_count, float smoothing) {
+  if (single) {
+    return quad_sdf(point, glass.bounds, glass.corner_radii);
+  }
+  float distance = glass_lobe_sdf(point, lobes[0]);
+  for (uint index = 1; index < lobe_count; index++) {
+    distance =
+        glass_smooth_min(distance, glass_lobe_sdf(point, lobes[index]), smoothing);
+  }
+  return distance;
+}
+
+vertex BackdropGlassVertexOutput backdrop_glass_vertex(
+    uint unit_vertex_id [[vertex_id]], uint glass_id [[instance_id]],
+    constant float2 *unit_vertices [[buffer(BackdropGlassInputIndex_Vertices)]],
+    constant BackdropGlass *surfaces [[buffer(BackdropGlassInputIndex_Surfaces)]],
     constant Size_DevicePixels *viewport_size
-    [[buffer(BackdropBlurInputIndex_ViewportSize)]]) {
+    [[buffer(BackdropGlassInputIndex_ViewportSize)]]) {
   float2 unit_vertex = unit_vertices[unit_vertex_id];
-  BackdropBlur blur = blurs[blur_id];
+  BackdropGlass glass = surfaces[glass_id];
   float4 device_position =
-      to_device_position(unit_vertex, blur.bounds, viewport_size);
-  float4 clip_distance = distance_from_clip_rect(unit_vertex, blur.bounds,
-                                                 blur.content_mask.bounds);
-  return BackdropBlurVertexOutput{
+      to_device_position(unit_vertex, glass.bounds, viewport_size);
+  float4 clip_distance = distance_from_clip_rect(unit_vertex, glass.bounds,
+                                                 glass.content_mask.bounds);
+  return BackdropGlassVertexOutput{
       device_position,
-      blur_id,
+      glass_id,
       {clip_distance.x, clip_distance.y, clip_distance.z, clip_distance.w}};
 }
 
-fragment float4 backdrop_blur_fragment(
-    BackdropBlurFragmentInput input [[stage_in]],
-    constant BackdropBlur *blurs [[buffer(BackdropBlurInputIndex_Blurs)]],
+fragment float4 backdrop_glass_fragment(
+    BackdropGlassFragmentInput input [[stage_in]],
+    constant BackdropGlass *surfaces [[buffer(BackdropGlassInputIndex_Surfaces)]],
     constant Size_DevicePixels *viewport_size
-    [[buffer(BackdropBlurInputIndex_ViewportSize)]],
+    [[buffer(BackdropGlassInputIndex_ViewportSize)]],
     texture2d<float> source_texture
-    [[texture(BackdropBlurInputIndex_SourceTexture)]]) {
+    [[texture(BackdropGlassInputIndex_SourceTexture)]]) {
   constexpr sampler source_sampler(coord::normalized, address::clamp_to_edge,
                                    filter::linear);
-  BackdropBlur blur = blurs[input.blur_id];
+  BackdropGlass glass = surfaces[input.glass_id];
+  // The lobes stay in constant space: `glass` above is a thread-space copy,
+  // and a pointer into it would be the wrong address space.
+  constant GlassLobe_ScaledPixels *lobes = surfaces[input.glass_id].lobes;
+  // Mirrors `BackdropGlass::shape`: no lobes means the surface is the single
+  // rounded rect it already named, which `glass_sdf` reads from the instance
+  // rather than from the array.
+  bool single = glass.lobe_count == 0;
+  uint lobe_count = single ? 1u : min(glass.lobe_count, 8u);
+  float smoothing = glass.material.smoothing;
+  float2 point = input.position.xy;
 
-  // Rounded-rect clip: blending is disabled on this pipeline (the blur
-  // REPLACES the region), so fragments outside must discard, not return 0.
-  float distance = quad_sdf(input.position.xy, blur.bounds, blur.corner_radii);
+  float distance =
+      glass_sdf(point, glass, lobes, single, lobe_count, smoothing);
+
+  // Blending is disabled on this pipeline (the surface REPLACES the region),
+  // so fragments outside the shape must discard, not return 0.
   if (distance > 0.) {
     discard_fragment();
   }
 
-  // The snapshot was gaussian-blurred on the GPU (MPSImageGaussianBlur)
-  // before this pass — one clean sample.
   float2 viewport =
       float2((float)viewport_size->width, (float)viewport_size->height);
-  float2 uv = input.position.xy / viewport;
-  return source_texture.sample(source_sampler, uv);
+  float2 uv = point / viewport;
+
+  // The snapshot was gaussian-blurred on the GPU (MPSImageGaussianBlur)
+  // before this pass. Without optics that is the whole answer.
+  float bevel = glass.material.bevel;
+  float refraction = glass.material.refraction;
+  float specular = glass.material.specular;
+  if ((bevel <= 0. || refraction == 0.) && specular <= 0.) {
+    return source_texture.sample(source_sampler, uv);
+  }
+
+  // The gradient by central differences, on the same half-pixel stencil as
+  // `glass_field` in scene.rs. See that function for why the normal is
+  // differenced in all four implementations rather than derived in each.
+  const float epsilon = 0.5;
+  float2 gradient = float2(
+      glass_sdf(point + float2(epsilon, 0.), glass, lobes, single, lobe_count,
+                smoothing) -
+          glass_sdf(point - float2(epsilon, 0.), glass, lobes, single,
+                    lobe_count, smoothing),
+      glass_sdf(point + float2(0., epsilon), glass, lobes, single, lobe_count,
+                smoothing) -
+          glass_sdf(point - float2(0., epsilon), glass, lobes, single,
+                    lobe_count, smoothing));
+  float gradient_length = length(gradient);
+  gradient = gradient_length > 0. ? gradient / gradient_length : float2(0.);
+
+  // The bevel: 0 at the rim rising to 1 once the surface is `bevel` pixels
+  // deep. `height` is how flat the glass is here, so `1 - height` is how much
+  // of the slope is left to bend light with.
+  float height = bevel > 0. ? saturate(-distance / bevel) : 1.;
+  float slope = 1. - height;
+  float smooth_slope = slope * slope * (3. - 2. * slope);
+
+  // The surface normal of that bevel, in three dimensions: the flatter the
+  // glass the more the normal points at the viewer.
+  float3 normal = normalize(float3(gradient * smooth_slope, max(height, 0.001)));
+
+  float4 color;
+  if (bevel > 0. && refraction != 0.) {
+    // Refraction displaces the sample along the normal. The offset is a
+    // fraction of the bevel, so a deeper bevel bends further, and it vanishes
+    // in the middle where the glass is flat.
+    float2 offset = normal.xy * refraction * bevel * smooth_slope / viewport;
+    float dispersion = glass.material.dispersion;
+    if (dispersion > 0.) {
+      // Dispersion splits the channels along the same offset, which is what
+      // makes a rim read as glass rather than as a smear.
+      float4 red = source_texture.sample(source_sampler, uv + offset * (1. + dispersion));
+      float4 green = source_texture.sample(source_sampler, uv + offset);
+      float4 blue = source_texture.sample(source_sampler, uv + offset * (1. - dispersion));
+      color = float4(red.r, green.g, blue.b, green.a);
+    } else {
+      color = source_texture.sample(source_sampler, uv + offset);
+    }
+  } else {
+    color = source_texture.sample(source_sampler, uv);
+  }
+
+  if (specular > 0.) {
+    // The light sits on the unit sphere at `light_angle`, measured clockwise
+    // from straight up, tilted towards the viewer so a flat surface is lit
+    // rather than black.
+    float angle = glass.material.light_angle;
+    float3 light = normalize(float3(sin(angle), -cos(angle), 0.6));
+    float lobe_value = saturate(dot(normal, light));
+    float highlight = pow(lobe_value, glass.material.specular_sharpness) *
+                      specular * smooth_slope;
+    color = float4(saturate(color.rgb + highlight), color.a);
+  }
+
+  return color;
 }

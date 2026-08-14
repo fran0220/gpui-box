@@ -1014,6 +1014,14 @@ pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
     fn render_to_image(&self, _scene: &Scene) -> Result<RgbaImage> {
         anyhow::bail!("render_to_image not implemented for this platform")
     }
+
+    /// The luminance the renderer read back for this probe slot, or `None`
+    /// while no probed surface has completed a frame in it — including on a
+    /// renderer that takes no probes at all, which is how the absence of the
+    /// capability is reported rather than hidden.
+    fn backdrop_luminance(&self, _slot: u32) -> Option<f32> {
+        None
+    }
 }
 
 /// A renderer for headless windows that can produce real rendered output.
@@ -1035,6 +1043,12 @@ pub trait PlatformHeadlessRenderer {
 
     /// Returns the sprite atlas used by this renderer.
     fn sprite_atlas(&self) -> Arc<dyn PlatformAtlas>;
+
+    /// The luminance this renderer read back for a probe slot, with the same
+    /// meaning as [`PlatformWindow::backdrop_luminance`].
+    fn backdrop_luminance(&mut self, _slot: u32) -> Option<f32> {
+        None
+    }
 }
 
 /// Type alias for runnables with metadata.

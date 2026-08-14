@@ -2338,6 +2338,10 @@ impl PlatformWindow for MacWindow {
         this.renderer.render_to_image(scene)
     }
 
+    fn backdrop_luminance(&self, slot: u32) -> Option<f32> {
+        self.0.lock().renderer.backdrop_luminance(slot)
+    }
+
     fn a11y_init(&self, callbacks: gpui::A11yCallbacks) {
         let mut lock = self.0.lock();
 

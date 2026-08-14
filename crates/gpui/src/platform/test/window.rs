@@ -364,6 +364,14 @@ impl PlatformWindow for TestWindow {
         }
     }
 
+    fn backdrop_luminance(&self, slot: u32) -> Option<f32> {
+        let mut state = self.0.lock();
+        state
+            .renderer
+            .as_mut()
+            .and_then(|renderer| renderer.backdrop_luminance(slot))
+    }
+
     fn as_test(&mut self) -> Option<&mut TestWindow> {
         Some(self)
     }

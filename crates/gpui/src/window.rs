@@ -2,23 +2,24 @@
 use crate::Inspector;
 use crate::{
     Action, AnyDrag, AnyElement, AnyImageCache, AnyTooltip, AnyView, App, AppContext, Arena, Asset,
-    AsyncWindowContext, AtlasTile, AvailableSpace, BackdropBlur, Background, BorderStyle, Bounds,
+    AsyncWindowContext, AtlasTile, AvailableSpace, BackdropGlass, Background, BorderStyle, Bounds,
     BoxShadow, Capslock, Context, Corners, CursorHideMode, CursorStyle, Decorations, DevicePixels,
     DispatchActionListener, DispatchNodeId, DispatchTree, DisplayId, Edges, Effect, Entity,
-    EntityId, EventEmitter, FileDropEvent, FontId, Global, GlobalElementId, GlyphId, GpuSpecs,
-    Hsla, InputHandler, IsZero, KeyBinding, KeyContext, KeyDownEvent, KeyEvent, Keystroke,
-    KeystrokeEvent, LayoutId, LineLayoutIndex, Modifiers, ModifiersChangedEvent, MonochromeSprite,
-    MouseButton, MouseEvent, MouseMoveEvent, MouseUpEvent, Path, Pixels, PlatformAtlas,
-    PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformViewHandle,
-    PlatformViewPlacement, PlatformViewRegistry, PlatformWindow, Point, PolychromeSprite, Priority,
-    PromptButton, PromptLevel, Quad, Render, RenderGlyphParams, RenderImage, RenderImageParams,
-    RenderSvgParams, Replay, ResizeEdge, SMOOTH_SVG_SCALE_FACTOR, SUBPIXEL_VARIANTS_X,
-    SUBPIXEL_VARIANTS_Y, ScaledPixels, Scene, Shadow, SharedString, Size, StrikethroughStyle,
-    Style, SubpixelSprite, SubscriberSet, Subscription, SystemWindowTab, SystemWindowTabController,
-    TabStopMap, TaffyLayoutEngine, Task, TextRenderingMode, TextStyle, TextStyleRefinement,
-    ThermalState, TransformationMatrix, Underline, UnderlineStyle, WindowAppearance,
-    WindowBackgroundAppearance, WindowBounds, WindowControls, WindowDecorations, WindowOptions,
-    WindowParams, WindowTextSystem, point, prelude::*, profiler, px, rems, size, transparent_black,
+    EntityId, EventEmitter, FileDropEvent, FontId, GlassLobe, GlassMaterial, Global,
+    GlobalElementId, GlyphId, GpuSpecs, Hsla, InputHandler, IsZero, KeyBinding, KeyContext,
+    KeyDownEvent, KeyEvent, Keystroke, KeystrokeEvent, LayoutId, LineLayoutIndex, MAX_GLASS_LOBES,
+    Modifiers, ModifiersChangedEvent, MonochromeSprite, MouseButton, MouseEvent, MouseMoveEvent,
+    MouseUpEvent, Path, Pixels, PlatformAtlas, PlatformDisplay, PlatformInput,
+    PlatformInputHandler, PlatformViewHandle, PlatformViewPlacement, PlatformViewRegistry,
+    PlatformWindow, Point, PolychromeSprite, Priority, PromptButton, PromptLevel, Quad, Render,
+    RenderGlyphParams, RenderImage, RenderImageParams, RenderSvgParams, Replay, ResizeEdge,
+    SMOOTH_SVG_SCALE_FACTOR, SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y, ScaledPixels, Scene, Shadow,
+    SharedString, Size, StrikethroughStyle, Style, SubpixelSprite, SubscriberSet, Subscription,
+    SystemWindowTab, SystemWindowTabController, TabStopMap, TaffyLayoutEngine, Task,
+    TextRenderingMode, TextStyle, TextStyleRefinement, ThermalState, TransformationMatrix,
+    Underline, UnderlineStyle, WindowAppearance, WindowBackgroundAppearance, WindowBounds,
+    WindowControls, WindowDecorations, WindowOptions, WindowParams, WindowTextSystem, point,
+    prelude::*, profiler, px, rems, size, transparent_black,
 };
 
 use anyhow::{Context as _, Result, anyhow};
@@ -2550,6 +2551,20 @@ impl Window {
             .render_to_image(&self.rendered_frame.scene)
     }
 
+    /// The mean luminance of the blurred backdrop a probed glass surface
+    /// covered, in `0..=1`, or `None` while the slot holds no completed
+    /// reading.
+    ///
+    /// A surface fills a slot by setting [`crate::GlassMaterial::probe`]. The
+    /// renderer copies the reading back without stalling the frame that took
+    /// it, so the value describes the backdrop one frame ago: a caller that
+    /// flips its own contrast on it must expect the flip to land a frame
+    /// after the backdrop moved, and `None` on any renderer that takes no
+    /// probes — the honest reading for a backdrop nobody measured.
+    pub fn backdrop_luminance(&self, slot: u32) -> Option<f32> {
+        self.platform_window.backdrop_luminance(slot)
+    }
+
     /// Set the content size of the window.
     pub fn resize(&mut self, size: Size<Pixels>) {
         self.platform_window.resize(size);
@@ -4329,16 +4344,55 @@ impl Window {
 
     /// Paint a within-window backdrop blur: everything already painted
     /// beneath `bounds` is snapshotted and painted back gaussian-blurred
-    /// inside the rounded rect (frosted-glass popovers). Metal and WGPU
-    /// renderers support it; other renderers, invalid radii, and blur regions
-    /// beyond a renderer's bounded per-frame budget fall back to an unblurred
-    /// backdrop. Callers should keep a translucent fill over it. Content
-    /// painted AFTER this call composites on top of the blur.
+    /// inside the rounded rect (frosted-glass popovers). Metal, WGPU and
+    /// DirectX renderers support it; other renderers, invalid radii, and blur
+    /// regions beyond a renderer's bounded per-frame budget fall back to an
+    /// unblurred backdrop. Callers should keep a translucent fill over it.
+    /// Content painted AFTER this call composites on top of the blur.
+    ///
+    /// This is [`Window::paint_backdrop_glass`] with [`GlassMaterial::FROSTED`]
+    /// and no lobes: the backdrop is blurred and nothing about it is bent,
+    /// split or lit.
     pub fn paint_backdrop_blur(
         &mut self,
         bounds: Bounds<Pixels>,
         corner_radii: Corners<Pixels>,
         blur_radius: Pixels,
+    ) {
+        self.paint_backdrop_glass(
+            bounds,
+            corner_radii,
+            blur_radius,
+            GlassMaterial::frosted(),
+            &[],
+        );
+    }
+
+    /// Paint a within-window glass surface: everything already painted beneath
+    /// `bounds` is snapshotted, gaussian-blurred, and painted back through the
+    /// surface's shape and `material`.
+    ///
+    /// `lobes` is the shape. An empty slice means the surface is the single
+    /// rounded rect named by `bounds` and `corner_radii`, which is the common
+    /// case; several lobes are joined by [`GlassMaterial::smoothing`] into one
+    /// body, and `bounds` must then be their union's bounding box because that
+    /// is the region the renderer rasterizes and the blur is clipped to. Lobes
+    /// past [`MAX_GLASS_LOBES`] are dropped.
+    ///
+    /// The optics are a renderer capability, not a paintable colour. Where a
+    /// renderer has none, the blur is painted without them rather than the
+    /// surface being skipped, on the same reasoning as the blur itself:
+    /// a legible surface beats a hole. `material` is sanitized on the way in,
+    /// so a value computed from an animation cannot produce one.
+    ///
+    /// Content painted AFTER this call composites on top.
+    pub fn paint_backdrop_glass(
+        &mut self,
+        bounds: Bounds<Pixels>,
+        corner_radii: Corners<Pixels>,
+        blur_radius: Pixels,
+        material: GlassMaterial<Pixels>,
+        lobes: &[GlassLobe<Pixels>],
     ) {
         self.invalidator.debug_assert_paint();
         if !blur_radius.0.is_finite() || blur_radius.0 < 0.0 {
@@ -4360,12 +4414,26 @@ impl Window {
             inset: 0,
             pad: 0,
         });
-        self.next_frame.scene.insert_backdrop_blur(BackdropBlur {
+
+        // Every length the surface carries is scaled here, the material's and
+        // the lobes' along with the bounds': a caller states one surface in
+        // one unit, and a bevel that stayed logical while the shape it bevels
+        // did not would be half as deep on a retina display as on any other.
+        let mut stored = [GlassLobe::<ScaledPixels>::default(); MAX_GLASS_LOBES];
+        let lobe_count = lobes.len().min(MAX_GLASS_LOBES);
+        for (slot, lobe) in stored.iter_mut().zip(&lobes[..lobe_count]) {
+            *slot = lobe.scale(scale_factor);
+        }
+
+        self.next_frame.scene.insert_backdrop_glass(BackdropGlass {
             order: 0,
             blur_radius: blur_radius.scale(scale_factor),
             bounds: bounds.scale(scale_factor),
             content_mask,
             corner_radii: corner_radii.scale(scale_factor),
+            material: material.scale(scale_factor),
+            lobes: stored,
+            lobe_count: lobe_count as u32,
         });
     }
 

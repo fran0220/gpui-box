@@ -218,10 +218,10 @@ pub mod prelude {
     };
     pub use crate::overlay::{
         Command, CommandPalette, CommandPaletteEvent, ContextMenu, ContextMenuEvent, Dialog,
-        DialogEvent, Drawer, DrawerEvent, Edge, FocusTrap, Frost, HoverCard, HoverCardEvent, Kbd,
-        Menu, MenuEvent, MenuItem, Menubar, MenubarEvent, MenubarMenu, Notification,
-        NotificationCenter, NotificationCenterEvent, Overlay, Placement, Popover, PopoverEvent,
-        Toast, ToastCorner, ToastLayer, Tooltip, Tooltipped, UnreadCount,
+        DialogEvent, Drawer, DrawerEvent, Edge, FocusTrap, Frost, Glass, GlassGroup, GlassPreset,
+        HoverCard, HoverCardEvent, Kbd, Menu, MenuEvent, MenuItem, Menubar, MenubarEvent,
+        MenubarMenu, Notification, NotificationCenter, NotificationCenterEvent, Overlay, Placement,
+        Popover, PopoverEvent, Toast, ToastCorner, ToastLayer, Tooltip, Tooltipped, UnreadCount,
     };
     pub use crate::state::{AsyncStatus, AsyncValue, Loadable};
     pub use crate::strings::{ActiveStrings, StringKey, Strings, reset_strings, set_strings};

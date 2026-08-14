@@ -1361,6 +1361,36 @@
       ]
     },
     {
+      "name": "Glass",
+      "kind": "builder",
+      "path": "gpui_kit::overlay::Glass",
+      "source": "crates/gpui-kit/src/overlay/glass.rs",
+      "summary": "A glass surface: blurred and bent backdrop, tinted fill, caller's content.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "surface(surface: Surface) -> Self",
+        "radius(radius: Radius) -> Self",
+        "blur(blur: f32) -> Self",
+        "preset(preset: GlassPreset) -> Self",
+        "refraction(refraction: f32) -> Self",
+        "dispersion(dispersion: f32) -> Self",
+        "specular(specular: f32) -> Self",
+        "light_angle(radians: f32) -> Self",
+        "track_pointer(track_pointer: bool) -> Self",
+        "pressable(pressable: bool) -> Self",
+        "adaptive(adaptive: bool) -> Self",
+        "child(child: impl IntoElement) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "glass"
+      ]
+    },
+    {
       "name": "GradientSpinner",
       "kind": "builder",
       "path": "gpui_kit::display::GradientSpinner",
@@ -5203,6 +5233,23 @@
       ]
     },
     {
+      "name": "GlassPreset",
+      "path": "gpui_kit::overlay::GlassPreset",
+      "summary": "How a glass surface responds to light.",
+      "variants": [
+        "Frosted",
+        "Liquid",
+        "Lens"
+      ],
+      "construct": [],
+      "options": [
+        "tint_alpha(theme: &Theme) -> f32",
+        "material(theme: &Theme) -> GlassMaterial<Pixels>"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "GraphEdge",
       "path": "gpui_kit::canvas::GraphEdge",
       "summary": "A controlled connection between two graph nodes.",
@@ -8840,6 +8887,14 @@
         "ListRow"
       ],
       "example": "fn frost(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let card = |title: &'static str, body: &'static str| {\n        div()\n            .column()\n            .gap(px(theme.space(Space::Xs)))\n            .p(px(theme.space(Space::Md)))\n            .child(crate::foundation::text(\n                &theme,\n                TypeScale::Label,\n                SharedString::from(title),\n            ))\n            .child(caption(&theme, body))\n    };\n    let stripes = || {\n        div()\n            .absolute()\n            .top(px(56.0))\n            .left(px(100.0))\n            .w(px(330.0))\n            .h(px(64.0))\n            .flex()\n            .overflow_hidden()\n            .children((0..22).map(|index| {\n                div()\n                    .flex_none()\n                    .w(px(15.0))\n                    .h(px(64.0))\n                    .bg(if index % 2 == 0 {\n                        theme.colors.accent\n                    } else {\n                        theme.colors.canvas\n                    })\n            }))\n    };\n    stack(&theme)\n        .w(px(480.0))\n        .child(caption(&theme, \"A floating surface on glass\"))\n        .child(\n            div()\n                .relative()\n                .h(px(200.0))\n                .hairline(&theme)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(stripes())\n                .child(filler(&theme, \"Document\", 8))\n                .child(\n                    div()\n                        .absolute()\n                        .top(px(48.0))\n                        .left(px(120.0))\n                        .w(px(240.0))\n                        .child(\n                            Frost::new(\"scene.frost.popover\")\n                                .radius(Radius::Card)\n                                .child(card(\n                                    \"Rename\",\n                                    \"The page behind stays visible, out of focus\",\n                                )),\n                        ),\n                ),\n        )\n        .child(caption(&theme, \"The same glass over a panel surface\"))\n        .child(\n            div()\n                .relative()\n                .h(px(160.0))\n                .hairline(&theme)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(stripes())\n                .child(filler(&theme, \"Files\", 6))\n                .child(\n                    div()\n                        .absolute()\n                        .top(px(32.0))\n                        .left(px(120.0))\n                        .w(px(280.0))\n                        .child(\n                            Frost::new(\"scene.frost.rail\")\n                                .surface(gpui_kit_theme::Surface::Panel)\n                                .radius(Radius::Dialog)\n                                .blur(32.0)\n                                .child(card(\"Rail\", \"The striped backdrop stays out of focus\")),\n                        ),\n                ),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "glass",
+      "capture": "cargo run -p xtask -- headless capture glass",
+      "uses": [
+        "Glass"
+      ],
+      "example": "fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let label = |title: &'static str, body: &'static str| {\n        div()\n            .column()\n            .gap(px(theme.space(Space::Xs)))\n            .p(px(theme.space(Space::Md)))\n            .child(crate::foundation::text(\n                &theme,\n                TypeScale::Label,\n                SharedString::from(title),\n            ))\n            .child(caption(&theme, body))\n    };\n\n    // A checkerboard bends far more legibly than a flat fill: a straight edge\n    // running under the rim is what makes refraction readable in a still.\n    let checkerboard =\n        |width: f32, height: f32| {\n            let columns = (width / 48.0).ceil() as usize;\n            let rows = (height / 48.0).ceil() as usize;\n            div()\n                .absolute()\n                .top(px(0.0))\n                .left(px(0.0))\n                .w(px(width))\n                .h(px(height))\n                .column()\n                .overflow_hidden()\n                .children((0..rows).map(|row| {\n                    div()\n                        .flex()\n                        .flex_none()\n                        .h(px(48.0))\n                        .children((0..columns).map(move |column| {\n                            div().flex_none().w(px(48.0)).h(px(48.0)).bg(\n                                if (row + column) % 2 == 0 {\n                                    theme.colors.accent\n                                } else {\n                                    theme.colors.canvas\n                                },\n                            )\n                        }))\n                }))\n        };\n\n    let plate =\n        |ident: &'static str, preset: GlassPreset, title: &'static str, body: &'static str| {\n            div()\n                .relative()\n                .h(px(150.0))\n                .w(px(460.0))\n                .hairline(&theme)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(checkerboard(460.0, 150.0))\n                .child(\n                    div()\n                        .absolute()\n                        .top(px(28.0))\n                        .left(px(90.0))\n                        .w(px(280.0))\n                        .child(\n                            Glass::new(ident)\n                                .preset(preset)\n                                .radius(Radius::Dialog)\n                                .child(label(title, body)),\n                        ),\n                )\n        };\n\n    stack(&theme)\n        .w(px(900.0))\n        .child(caption(&theme, \"Frosted: blurred, and nothing bent\"))\n        .child(plate(\n            \"scene.glass.frosted\",\n            GlassPreset::Frosted,\n            \"Frosted\",\n            \"The control the others are read against\",\n        ))\n        .child(caption(&theme, \"Lens: the edge bends the backdrop\"))\n        .child(plate(\n            \"scene.glass.lens\",\n            GlassPreset::Lens,\n            \"Lens\",\n            \"The squares bend at the rim and run straight inside\",\n        ))\n        .child(caption(\n            &theme,\n            \"Liquid: the bend, its colour, and the light\",\n        ))\n        .child(plate(\n            \"scene.glass.liquid\",\n            GlassPreset::Liquid,\n            \"Liquid\",\n            \"Dispersion at the rim and a highlight from the top right\",\n        ))\n        // The last two demonstrations sit side by side so the whole scene\n        // stays inside the window a real display can give the gallery, which\n        // is where the DirectX renderer gets looked at.\n        .child(\n            div()\n                .flex()\n                .flex_row()\n                .gap(px(theme.space(Space::Md)))\n                .child(\n                    div()\n                        .column()\n                        .gap(px(theme.space(Space::Sm)))\n                        .child(caption(&theme, \"Fused: two panes joined into one body\"))\n                        .child(\n                            div()\n                                .relative()\n                                .h(px(150.0))\n                                .w(px(440.0))\n                                .hairline(&theme)\n                                .radius(&theme, Radius::Card)\n                                .overflow_hidden()\n                                .child(checkerboard(440.0, 150.0))\n                                .child(\n                                    div().absolute().top(px(40.0)).left(px(40.0)).child(\n                                        GlassGroup::new(\"scene.glass.fused\")\n                                            .preset(GlassPreset::Liquid)\n                                            .radius(Radius::Dialog)\n                                            .gap(12.0)\n                                            .pane(\n                                                \"scene.glass.fused.left\",\n                                                label(\"Left\", \"One lobe of the body\"),\n                                            )\n                                            .pane(\n                                                \"scene.glass.fused.right\",\n                                                label(\"Right\", \"Joined across the gap\"),\n                                            ),\n                                    ),\n                                ),\n                        ),\n                )\n                .child(\n                    div()\n                        .column()\n                        .gap(px(theme.space(Space::Sm)))\n                        .child(caption(&theme, \"Adaptive: the tint deepens when opposed\"))\n                        .child(\n                            div()\n                                .relative()\n                                .h(px(150.0))\n                                .w(px(440.0))\n                                .hairline(&theme)\n                                .radius(&theme, Radius::Card)\n                                .overflow_hidden()\n                                .child(\n                                    div()\n                                        .absolute()\n                                        .top(px(0.0))\n                                        .left(px(0.0))\n                                        .w(px(220.0))\n                                        .h(px(150.0))\n                                        .bg(gpui::white()),\n                                )\n                                .child(\n                                    div()\n                                        .absolute()\n                                        .top(px(0.0))\n                                        .left(px(220.0))\n                                        .w(px(220.0))\n                                        .h(px(150.0))\n                                        .bg(gpui::black()),\n                                )\n                                .child(\n                                    div()\n                                        .absolute()\n                                        .top(px(28.0))\n                                        .left(px(15.0))\n                                        .w(px(190.0))\n                                        .child(\n                                            Glass::new(\"scene.glass.adaptive.bright\")\n                                                .preset(GlassPreset::Liquid)\n                                                .radius(Radius::Dialog)\n                                                .adaptive(true)\n                                                .child(label(\n                                                    \"Bright\",\n                                                    \"The reading lands next frame\",\n                                                )),\n                                        ),\n                                )\n                                .child(\n                                    div()\n                                        .absolute()\n                                        .top(px(28.0))\n                                        .left(px(235.0))\n                                        .w(px(190.0))\n                                        .child(\n                                            Glass::new(\"scene.glass.adaptive.dark\")\n                                                .preset(GlassPreset::Liquid)\n                                                .radius(Radius::Dialog)\n                                                .adaptive(true)\n                                                .child(label(\"Dark\", \"The same glass, other side\")),\n                                        ),\n                                ),\n                        ),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "toolbar",

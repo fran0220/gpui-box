@@ -2,8 +2,10 @@ use crate::{CompositorGpuHint, WgpuAtlas, WgpuContext};
 use anyhow::{Context as _, Result};
 use bytemuck::{Pod, Zeroable};
 use gpui::{
-    AtlasTextureId, BackdropBlur, Background, Bounds, DevicePixels, DrawOrder, GpuSpecs, Path,
+    AtlasTextureId, BackdropGlass, Background, Bounds, DevicePixels, DrawOrder, GpuSpecs,
+    LUMINANCE_PROBE_SAMPLES, MAX_GLASS_LOBES, MAX_LUMINANCE_PROBES, NO_LUMINANCE_PROBE, Path,
     Point, PrimitiveBatch, ScaledPixels, Scene, Size, get_gamma_correction_ratios,
+    probe_sample_luminance,
 };
 use log::warn;
 #[cfg(not(target_family = "wasm"))]
@@ -15,13 +17,14 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 const MAX_INSTANCE_BUFFER_SIZE: u64 = 256 * 1024 * 1024;
-const MAX_BLUR_SIGMA_PER_PASS: f32 = 64.0 / 3.0;
-// Backdrop blur uses two full-frame render passes per variance-splitting iteration,
-// plus one composite pass per region. Keep both individual radii and aggregate
-// frame work bounded; unsupported regions fall back to their unblurred backdrop.
-const MAX_BACKDROP_BLUR_ITERATIONS_PER_REGION: u32 = 16;
-const MAX_BACKDROP_BLUR_RENDER_PASSES_PER_FRAME: usize = 64;
-const MAX_BACKDROP_BLUR_PARAMETER_BUFFERS: usize = MAX_BACKDROP_BLUR_RENDER_PASSES_PER_FRAME + 1;
+// Backdrop blur uses two full-frame render passes per variance-splitting
+// iteration, plus one composite pass per region. How many iterations one
+// radius needs is `BackdropGlass::gaussian_pass_count`, which this renderer
+// shares with DirectX; how much of a frame all of them together may spend is
+// this renderer's own budget, because it is a property of its pass encoding.
+// Unsupported regions fall back to their unblurred backdrop.
+const MAX_BACKDROP_GLASS_RENDER_PASSES_PER_FRAME: usize = 64;
+const MAX_BACKDROP_GLASS_PARAMETER_BUFFERS: usize = MAX_BACKDROP_GLASS_RENDER_PASSES_PER_FRAME + 1;
 
 const INSTANCE_TEXTURE_TEXEL_SIZE: u64 = 16;
 
@@ -71,6 +74,12 @@ const WEBGL_SHADERS: &str = concat!(
     include_str!("shaders.wgsl"),
     include_str!("shaders_webgl.wgsl"),
 );
+
+/// The glass surface passes: the separable gaussian, the composite that paints
+/// the surface back through its shape and material, and the final copy to the
+/// swapchain. Named rather than included at the pipeline so that the tests can
+/// validate it without a device.
+const BACKDROP_GLASS_SHADERS: &str = include_str!("backdrop_glass.wgsl");
 
 /// Subpixel text rendering requires dual-source blending, which WebGL2 lacks, so
 /// this variant only ever runs with the storage-buffer transport. The `enable`
@@ -205,6 +214,16 @@ struct WgpuBindGroupLayouts {
     backdrop: wgpu::BindGroupLayout,
 }
 
+/// One lobe as the shader reads it: bounds then radii, in the same order as
+/// [`gpui::GlassLobe`]. Sixteen bytes each half, so the array below satisfies
+/// the uniform address space's stride rule without padding between elements.
+#[repr(C)]
+#[derive(Clone, Copy, Default, Pod, Zeroable)]
+struct BackdropLobe {
+    bounds: [f32; 4],
+    radii: [f32; 4],
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 struct BackdropParams {
@@ -214,7 +233,20 @@ struct BackdropParams {
     viewport: [f32; 2],
     direction: [f32; 2],
     sigma: f32,
+    /// `GlassMaterial::bevel`, `refraction`, `dispersion`, `smoothing`.
+    bevel: f32,
+    refraction: f32,
+    dispersion: f32,
+    /// `GlassMaterial::specular`, `light_angle`, `specular_sharpness`.
+    specular: f32,
+    light_angle: f32,
+    specular_sharpness: f32,
+    smoothing: f32,
+    /// How many entries of `lobes` are real; 0 means the surface is the single
+    /// rounded rect named by `bounds` and `radii`.
+    lobe_count: u32,
     pad: [u32; 3],
+    lobes: [BackdropLobe; MAX_GLASS_LOBES],
 }
 
 struct BackdropPassResources {
@@ -226,12 +258,31 @@ struct BackdropTextures {
     scene_view: wgpu::TextureView,
     _horizontal: wgpu::Texture,
     horizontal_view: wgpu::TextureView,
-    _vertical: wgpu::Texture,
+    /// Kept nameable rather than view-only: the luminance probe copies its
+    /// sample texels out of the blurred result this texture holds.
+    vertical: wgpu::Texture,
     vertical_view: wgpu::TextureView,
     width: u32,
     height: u32,
     format: wgpu::TextureFormat,
 }
+
+/// A probe readback whose frame has been submitted but whose buffer has not
+/// been read yet. Held for exactly one frame in the common case: the map
+/// completes while the next frame is being encoded, and that frame's collect
+/// folds it into the slot values without ever waiting.
+struct ProbeInflight {
+    buffer: wgpu::Buffer,
+    requests: Vec<u32>,
+    /// Whether the texels came back blue-first, decided by the texture format
+    /// the frame sampled, not by the text subpixel order.
+    bgra: bool,
+    mapped: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+/// One probe sample's stride in the readback buffer. A texel is 4 bytes; the
+/// rest is the copy offset alignment the downlevel backends ask for.
+const PROBE_SAMPLE_STRIDE: usize = 256;
 
 /// Shared GPU context reference, used to coordinate device recovery across multiple windows.
 pub type GpuContext = Rc<RefCell<Option<WgpuContext>>>;
@@ -306,6 +357,8 @@ pub struct WgpuRenderer {
     device_lost: std::sync::Arc<std::sync::atomic::AtomicBool>,
     surface_configured: bool,
     needs_redraw: bool,
+    probe_inflight: Option<ProbeInflight>,
+    probe_values: [Option<f32>; MAX_LUMINANCE_PROBES],
 }
 
 impl WgpuRenderer {
@@ -792,6 +845,8 @@ impl WgpuRenderer {
             device_lost: context.device_lost_flag(),
             surface_configured: true,
             needs_redraw: false,
+            probe_inflight: None,
+            probe_values: [None; MAX_LUMINANCE_PROBES],
         })
     }
 
@@ -1057,8 +1112,8 @@ impl WgpuRenderer {
             None
         };
         let backdrop_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("backdrop_blur_shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("backdrop_blur.wgsl").into()),
+            label: Some("backdrop_glass_shader"),
+            source: wgpu::ShaderSource::Wgsl(BACKDROP_GLASS_SHADERS.into()),
         });
 
         let blend_mode = match alpha_mode {
@@ -1433,7 +1488,7 @@ impl WgpuRenderer {
             if let Some(textures) = resources.backdrop_textures.as_ref() {
                 textures._scene.destroy();
                 textures._horizontal.destroy();
-                textures._vertical.destroy();
+                textures.vertical.destroy();
             }
 
             if let Some(surface) = resources.surface.as_ref() {
@@ -1476,7 +1531,7 @@ impl WgpuRenderer {
     }
 
     fn ensure_backdrop_resources(&mut self, required_passes: usize) {
-        let required_passes = required_passes.min(MAX_BACKDROP_BLUR_PARAMETER_BUFFERS);
+        let required_passes = required_passes.min(MAX_BACKDROP_GLASS_PARAMETER_BUFFERS);
         if required_passes == 0 {
             return;
         }
@@ -1504,8 +1559,11 @@ impl WgpuRenderer {
                     sample_count: 1,
                     dimension: wgpu::TextureDimension::D2,
                     format,
+                    // COPY_SRC is for the luminance probe, which copies its
+                    // sample texels out of the blurred result.
                     usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-                        | wgpu::TextureUsages::TEXTURE_BINDING,
+                        | wgpu::TextureUsages::TEXTURE_BINDING
+                        | wgpu::TextureUsages::COPY_SRC,
                     view_formats: &[],
                 });
                 let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -1519,7 +1577,7 @@ impl WgpuRenderer {
                 scene_view,
                 _horizontal: horizontal,
                 horizontal_view,
-                _vertical: vertical,
+                vertical,
                 vertical_view,
                 width,
                 height,
@@ -1951,22 +2009,41 @@ impl WgpuRenderer {
                 )
             })?;
 
-        let mut remaining_backdrop_passes = MAX_BACKDROP_BLUR_RENDER_PASSES_PER_FRAME;
+        let mut remaining_backdrop_passes = MAX_BACKDROP_GLASS_RENDER_PASSES_PER_FRAME;
         let backdrop_pass_count = scene
-            .backdrop_blurs
+            .backdrop_glass
             .iter()
-            .filter_map(|blur| {
-                planned_backdrop_blur_pass_count(blur, &mut remaining_backdrop_passes)
+            .filter_map(|glass| {
+                planned_backdrop_glass_pass_count(glass, &mut remaining_backdrop_passes)
             })
-            .map(backdrop_blur_render_pass_count)
+            .map(backdrop_glass_render_pass_count)
             .sum::<usize>();
         let required_backdrop_passes = if backdrop_pass_count == 0 {
             0
         } else {
             backdrop_pass_count + 1
         };
-        debug_assert!(required_backdrop_passes <= MAX_BACKDROP_BLUR_PARAMETER_BUFFERS);
+        debug_assert!(required_backdrop_passes <= MAX_BACKDROP_GLASS_PARAMETER_BUFFERS);
         self.ensure_backdrop_resources(required_backdrop_passes);
+        self.collect_probes();
+
+        let probe_buffer = (required_backdrop_passes > 0
+            && scene
+                .backdrop_glass
+                .iter()
+                .any(|glass| glass.material.probe != NO_LUMINANCE_PROBE))
+        .then(|| {
+            self.resources()
+                .device
+                .create_buffer(&wgpu::BufferDescriptor {
+                    label: Some("backdrop_probe_readback"),
+                    size: (MAX_LUMINANCE_PROBES * LUMINANCE_PROBE_SAMPLES * PROBE_SAMPLE_STRIDE)
+                        as u64,
+                    usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+                    mapped_at_creation: false,
+                })
+        });
+        let mut probe_requests: Vec<u32> = Vec::new();
 
         let mut encoder =
             self.resources()
@@ -2014,27 +2091,27 @@ impl WgpuRenderer {
                 ..Default::default()
             });
 
-            let mut pending_blurs = scene.backdrop_blurs.iter().peekable();
-            let mut remaining_backdrop_passes = MAX_BACKDROP_BLUR_RENDER_PASSES_PER_FRAME;
+            let mut pending_glass = scene.backdrop_glass.iter().peekable();
+            let mut remaining_backdrop_passes = MAX_BACKDROP_GLASS_RENDER_PASSES_PER_FRAME;
             for batch in scene.batches() {
-                while pending_blurs
+                while pending_glass
                     .peek()
-                    .is_some_and(|blur| blur.order <= batch_first_order(scene, &batch))
+                    .is_some_and(|glass| glass.order <= batch_first_order(scene, &batch))
                 {
-                    let Some(blur) = pending_blurs.next() else {
+                    let Some(glass) = pending_glass.next() else {
                         break;
                     };
                     let Some(pass_count) =
-                        planned_backdrop_blur_pass_count(blur, &mut remaining_backdrop_passes)
+                        planned_backdrop_glass_pass_count(glass, &mut remaining_backdrop_passes)
                     else {
                         continue;
                     };
                     drop(pass);
-                    self.draw_backdrop_blur(
+                    self.draw_backdrop_glass(
                         &mut encoder,
                         &mut backdrop_pass_resources,
                         &mut params_buffers,
-                        blur,
+                        glass,
                         pass_count,
                         render_view,
                         &backdrop_textures
@@ -2046,6 +2123,12 @@ impl WgpuRenderer {
                             .context("backdrop textures unavailable")?
                             .2,
                     )?;
+                    self.encode_probe_copy(
+                        &mut encoder,
+                        glass,
+                        probe_buffer.as_ref(),
+                        &mut probe_requests,
+                    );
                     pass = self.continue_main_pass(&mut encoder, render_view);
                 }
                 match batch {
@@ -2136,18 +2219,18 @@ impl WgpuRenderer {
                     PrimitiveBatch::Surfaces(_surfaces) => {}
                 }
             }
-            for blur in pending_blurs {
+            for glass in pending_glass {
                 let Some(pass_count) =
-                    planned_backdrop_blur_pass_count(blur, &mut remaining_backdrop_passes)
+                    planned_backdrop_glass_pass_count(glass, &mut remaining_backdrop_passes)
                 else {
                     continue;
                 };
                 drop(pass);
-                self.draw_backdrop_blur(
+                self.draw_backdrop_glass(
                     &mut encoder,
                     &mut backdrop_pass_resources,
                     &mut params_buffers,
-                    blur,
+                    glass,
                     pass_count,
                     render_view,
                     &backdrop_textures
@@ -2159,6 +2242,12 @@ impl WgpuRenderer {
                         .context("backdrop textures unavailable")?
                         .2,
                 )?;
+                self.encode_probe_copy(
+                    &mut encoder,
+                    glass,
+                    probe_buffer.as_ref(),
+                    &mut probe_requests,
+                );
                 pass = self.continue_main_pass(&mut encoder, render_view);
             }
         }
@@ -2190,7 +2279,9 @@ impl WgpuRenderer {
                     ],
                     direction: [0.0; 2],
                     sigma: 1.0,
-                    pad: [0; 3],
+                    // The copy pass reads the texture and nothing else, so
+                    // the shape and the optics have nothing to say here.
+                    ..Zeroable::zeroed()
                 },
                 &self.resources().pipelines.backdrop_copy,
                 wgpu::LoadOp::Clear(clear_color),
@@ -2209,6 +2300,29 @@ impl WgpuRenderer {
             "WebGPU frame submission validation failed",
             Arc::clone(&self.last_error),
         );
+        if let Some(buffer) = probe_buffer
+            && !probe_requests.is_empty()
+        {
+            let bgra = matches!(
+                self.surface_config.format,
+                wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Bgra8UnormSrgb
+            );
+            let mapped = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let flag = std::sync::Arc::clone(&mapped);
+            buffer
+                .slice(..)
+                .map_async(wgpu::MapMode::Read, move |result| {
+                    if result.is_ok() {
+                        flag.store(true, std::sync::atomic::Ordering::Release);
+                    }
+                });
+            self.probe_inflight = Some(ProbeInflight {
+                buffer,
+                requests: probe_requests,
+                bgra,
+                mapped,
+            });
+        }
         Ok(())
     }
 
@@ -2235,12 +2349,12 @@ impl WgpuRenderer {
 
     // Rendering boundaries pass distinct layout, scene, window, and application state.
     #[allow(clippy::too_many_arguments)]
-    fn draw_backdrop_blur(
+    fn draw_backdrop_glass(
         &self,
         encoder: &mut wgpu::CommandEncoder,
         pass_resources: &mut Vec<BackdropPassResources>,
         params_buffers: &mut std::slice::Iter<'_, wgpu::Buffer>,
-        blur: &BackdropBlur,
+        glass: &BackdropGlass,
         pass_count: u32,
         scene: &wgpu::TextureView,
         horizontal: &wgpu::TextureView,
@@ -2250,9 +2364,30 @@ impl WgpuRenderer {
             self.surface_config.width as f32,
             self.surface_config.height as f32,
         ];
-        let bounds = blur.bounds;
-        let mask = blur.content_mask.bounds;
-        let sigma = blur.blur_radius.0.max(1.0);
+        let bounds = glass.bounds;
+        let mask = glass.content_mask.bounds;
+        let sigma = glass.blur_radius.0.max(1.0);
+        let material = glass.material;
+
+        let mut lobes = [BackdropLobe::default(); MAX_GLASS_LOBES];
+        let lobe_count = (glass.lobe_count as usize).min(MAX_GLASS_LOBES);
+        for (slot, lobe) in lobes.iter_mut().zip(&glass.lobes[..lobe_count]) {
+            *slot = BackdropLobe {
+                bounds: [
+                    lobe.bounds.origin.x.0,
+                    lobe.bounds.origin.y.0,
+                    lobe.bounds.size.width.0,
+                    lobe.bounds.size.height.0,
+                ],
+                radii: [
+                    lobe.corner_radii.top_left.0,
+                    lobe.corner_radii.top_right.0,
+                    lobe.corner_radii.bottom_right.0,
+                    lobe.corner_radii.bottom_left.0,
+                ],
+            };
+        }
+
         let base = BackdropParams {
             bounds: [
                 bounds.origin.x.0,
@@ -2267,15 +2402,24 @@ impl WgpuRenderer {
                 mask.size.height.0,
             ],
             radii: [
-                blur.corner_radii.top_left.0,
-                blur.corner_radii.top_right.0,
-                blur.corner_radii.bottom_right.0,
-                blur.corner_radii.bottom_left.0,
+                glass.corner_radii.top_left.0,
+                glass.corner_radii.top_right.0,
+                glass.corner_radii.bottom_right.0,
+                glass.corner_radii.bottom_left.0,
             ],
             viewport,
             direction: [1.0, 0.0],
             sigma: sigma / (pass_count as f32).sqrt(),
+            bevel: material.bevel.0,
+            refraction: material.refraction,
+            dispersion: material.dispersion,
+            specular: material.specular,
+            light_angle: material.light_angle,
+            specular_sharpness: material.specular_sharpness,
+            smoothing: material.smoothing.0,
+            lobe_count: lobe_count as u32,
             pad: [0; 3],
+            lobes,
         };
 
         let mut source = scene;
@@ -2316,6 +2460,113 @@ impl WgpuRenderer {
             wgpu::LoadOp::Load,
         )?;
         Ok(())
+    }
+
+    /// Copy this surface's luminance probe texels out of the blurred result,
+    /// when the surface asks for a slot that exists.
+    fn encode_probe_copy(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        glass: &BackdropGlass,
+        buffer: Option<&wgpu::Buffer>,
+        requests: &mut Vec<u32>,
+    ) {
+        let Some(buffer) = buffer else {
+            return;
+        };
+        let slot = glass.material.probe;
+        if slot == NO_LUMINANCE_PROBE || slot as usize >= MAX_LUMINANCE_PROBES {
+            return;
+        }
+        let Some(textures) = self.resources().backdrop_textures.as_ref() else {
+            return;
+        };
+        let points = glass.probe_sample_points(textures.width as f32, textures.height as f32);
+        for (index, [x, y]) in points.into_iter().enumerate() {
+            encoder.copy_texture_to_buffer(
+                wgpu::TexelCopyTextureInfo {
+                    texture: &textures.vertical,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d {
+                        x: x as u32,
+                        y: y as u32,
+                        z: 0,
+                    },
+                    aspect: wgpu::TextureAspect::All,
+                },
+                wgpu::TexelCopyBufferInfo {
+                    buffer,
+                    layout: wgpu::TexelCopyBufferLayout {
+                        offset: ((slot as usize * LUMINANCE_PROBE_SAMPLES + index)
+                            * PROBE_SAMPLE_STRIDE) as u64,
+                        bytes_per_row: None,
+                        rows_per_image: None,
+                    },
+                },
+                wgpu::Extent3d {
+                    width: 1,
+                    height: 1,
+                    depth_or_array_layers: 1,
+                },
+            );
+        }
+        requests.push(slot);
+    }
+
+    /// Fold the in-flight probe readback into the slot values.
+    ///
+    /// Waits for the map if the GPU is still on the frame that wrote it: the
+    /// copy is already submitted, so the wait is bounded by work the renderer
+    /// had to finish anyway, and on a slow adapter a reading that silently
+    /// stayed one more frame behind would make the flip land at a different
+    /// frame per machine.
+    fn collect_probes(&mut self) {
+        {
+            let Some(inflight) = &self.probe_inflight else {
+                return;
+            };
+            if !inflight.mapped.load(std::sync::atomic::Ordering::Acquire)
+                && let Some(resources) = &self.resources
+            {
+                let _ = resources.device.poll(wgpu::PollType::Wait {
+                    submission_index: None,
+                    timeout: None,
+                });
+            }
+            if !inflight.mapped.load(std::sync::atomic::Ordering::Acquire) {
+                return;
+            }
+        }
+        let inflight = self
+            .probe_inflight
+            .take()
+            .expect("required framework invariant must hold");
+        let data = inflight.buffer.slice(..).get_mapped_range();
+        for &slot in &inflight.requests {
+            let mut total = 0.0;
+            for index in 0..LUMINANCE_PROBE_SAMPLES {
+                let offset =
+                    (slot as usize * LUMINANCE_PROBE_SAMPLES + index) * PROBE_SAMPLE_STRIDE;
+                let texel = &data[offset..offset + 4];
+                let (red, green, blue) = if inflight.bgra {
+                    (texel[2], texel[1], texel[0])
+                } else {
+                    (texel[0], texel[1], texel[2])
+                };
+                total += probe_sample_luminance(
+                    red as f32 / 255.0,
+                    green as f32 / 255.0,
+                    blue as f32 / 255.0,
+                );
+            }
+            self.probe_values[slot as usize] = Some(total / LUMINANCE_PROBE_SAMPLES as f32);
+        }
+    }
+
+    /// The luminance the most recently completed frame read for this slot.
+    pub fn backdrop_luminance(&mut self, slot: u32) -> Option<f32> {
+        self.collect_probes();
+        *self.probe_values.get(slot as usize)?
     }
 
     // Rendering boundaries pass distinct layout, scene, window, and application state.
@@ -2983,29 +3234,16 @@ fn instance_range(range: Range<usize>) -> Range<u32> {
     range.start as u32..range.end as u32
 }
 
-fn backdrop_blur_pass_count(blur: &BackdropBlur) -> Option<u32> {
-    let radius = blur.blur_radius.0;
-    if !radius.is_finite() || radius < 0.0 {
-        return None;
-    }
-
-    let sigma = radius.max(1.0);
-    let pass_count = (sigma * sigma / MAX_BLUR_SIGMA_PER_PASS.powi(2))
-        .ceil()
-        .max(1.0) as u32;
-    (pass_count <= MAX_BACKDROP_BLUR_ITERATIONS_PER_REGION).then_some(pass_count)
-}
-
-fn backdrop_blur_render_pass_count(pass_count: u32) -> usize {
+fn backdrop_glass_render_pass_count(pass_count: u32) -> usize {
     pass_count as usize * 2 + 1
 }
 
-fn planned_backdrop_blur_pass_count(
-    blur: &BackdropBlur,
+fn planned_backdrop_glass_pass_count(
+    blur: &BackdropGlass,
     remaining_render_passes: &mut usize,
 ) -> Option<u32> {
-    let pass_count = backdrop_blur_pass_count(blur)?;
-    let render_pass_count = backdrop_blur_render_pass_count(pass_count);
+    let pass_count = blur.gaussian_pass_count()?;
+    let render_pass_count = backdrop_glass_render_pass_count(pass_count);
     if render_pass_count > *remaining_render_passes {
         return None;
     }
@@ -3061,6 +3299,10 @@ impl gpui::PlatformHeadlessRenderer for WgpuHeadlessRenderer {
 
     fn sprite_atlas(&self) -> Arc<dyn gpui::PlatformAtlas> {
         self.renderer.sprite_atlas().clone()
+    }
+
+    fn backdrop_luminance(&mut self, slot: u32) -> Option<f32> {
+        self.renderer.backdrop_luminance(slot)
     }
 }
 
@@ -3129,12 +3371,12 @@ impl RenderingParameters {
 mod tests {
     use super::*;
     use gpui::{
-        ContentMask, Corners, MonochromeSprite, PolychromeSprite, Quad, Shadow, SubpixelSprite,
-        Underline,
+        ContentMask, Corners, GlassLobe, GlassMaterial, MonochromeSprite, PolychromeSprite, Quad,
+        Shadow, SubpixelSprite, Underline,
     };
 
-    fn backdrop_blur_with_radius(radius: f32) -> BackdropBlur {
-        BackdropBlur {
+    fn backdrop_glass_with_radius(radius: f32) -> BackdropGlass {
+        BackdropGlass {
             order: 0,
             blur_radius: ScaledPixels(radius),
             bounds: Bounds::default(),
@@ -3142,18 +3384,43 @@ mod tests {
                 bounds: Bounds::default(),
             },
             corner_radii: Corners::default(),
+            material: GlassMaterial::frosted(),
+            lobes: [GlassLobe::default(); MAX_GLASS_LOBES],
+            lobe_count: 0,
         }
+    }
+
+    #[test]
+    fn the_uniform_block_matches_the_layout_the_shader_declares() {
+        use std::mem::size_of;
+
+        // The uniform address space rounds an array element's stride up to 16
+        // bytes. A lobe is exactly two of those, so the array the shader
+        // declares has no gap the Rust side does not also have.
+        assert_eq!(size_of::<BackdropLobe>(), 32);
+        assert_eq!(size_of::<BackdropLobe>() % 16, 0);
+        // Everything ahead of the array occupies 112 bytes, which is a
+        // multiple of 16. That is the whole reason the three explicit pads
+        // are there: without them the array would start at an offset the
+        // shader rounds up and the Rust side does not, and every lobe would
+        // be read from the wrong place.
+        const HEADER: usize = 112;
+        assert_eq!(HEADER % 16, 0, "the lobe array must start 16-byte aligned");
+        assert_eq!(
+            size_of::<BackdropParams>(),
+            HEADER + size_of::<BackdropLobe>() * MAX_GLASS_LOBES
+        );
     }
 
     #[test]
     fn backdrop_blur_rejects_invalid_and_unbounded_radii() {
         assert_eq!(
-            backdrop_blur_pass_count(&backdrop_blur_with_radius(24.0)),
+            backdrop_glass_with_radius(24.0).gaussian_pass_count(),
             Some(2)
         );
         for radius in [-1.0, f32::NAN, f32::INFINITY, f32::NEG_INFINITY, f32::MAX] {
             assert_eq!(
-                backdrop_blur_pass_count(&backdrop_blur_with_radius(radius)),
+                backdrop_glass_with_radius(radius).gaussian_pass_count(),
                 None,
                 "radius {radius:?} should fall back to an unblurred backdrop"
             );
@@ -3162,14 +3429,14 @@ mod tests {
 
     #[test]
     fn backdrop_blur_frame_work_has_a_hard_budget() {
-        let blur = backdrop_blur_with_radius(1.0);
-        let mut remaining = MAX_BACKDROP_BLUR_RENDER_PASSES_PER_FRAME;
+        let blur = backdrop_glass_with_radius(1.0);
+        let mut remaining = MAX_BACKDROP_GLASS_RENDER_PASSES_PER_FRAME;
         let mut accepted_render_passes = 0;
         let mut accepted_regions = 0;
 
         for _ in 0..1_000 {
-            if let Some(pass_count) = planned_backdrop_blur_pass_count(&blur, &mut remaining) {
-                accepted_render_passes += backdrop_blur_render_pass_count(pass_count);
+            if let Some(pass_count) = planned_backdrop_glass_pass_count(&blur, &mut remaining) {
+                accepted_render_passes += backdrop_glass_render_pass_count(pass_count);
                 accepted_regions += 1;
             }
         }
@@ -3177,7 +3444,7 @@ mod tests {
         assert_eq!(accepted_regions, 21);
         assert_eq!(accepted_render_passes, 63);
         assert_eq!(remaining, 1);
-        assert!(accepted_render_passes < MAX_BACKDROP_BLUR_PARAMETER_BUFFERS);
+        assert!(accepted_render_passes < MAX_BACKDROP_GLASS_PARAMETER_BUFFERS);
     }
 
     #[test]
@@ -3189,6 +3456,14 @@ mod tests {
     #[test]
     fn storage_buffer_shader_is_valid_wgsl() {
         validate_wgsl(STORAGE_BUFFER_SHADERS, naga::valid::Capabilities::empty());
+    }
+
+    #[test]
+    fn backdrop_glass_shader_is_valid_wgsl() {
+        // WebGL2 runs this shader too, so it may not reach for anything past
+        // the baseline capabilities.
+        validate_wgsl(BACKDROP_GLASS_SHADERS, naga::valid::Capabilities::empty());
+        assert!(!BACKDROP_GLASS_SHADERS.contains("var<storage"));
     }
 
     #[test]

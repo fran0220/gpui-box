@@ -1288,3 +1288,194 @@ float4 polychrome_sprite_fragment(PolychromeSpriteFragmentInput input): SV_Targe
     color.a *= sprite.opacity * saturate(0.5 - distance);
     return color;
 }
+
+/*
+**
+**              Backdrop glass
+**
+*/
+
+// The blur and the composite both draw one full-viewport triangle strip and
+// read `t_sprite`, which the renderer points at whichever scratch texture the
+// pass is reading. `b2` carries what changes between them.
+cbuffer BackdropGlassParams: register(b2) {
+    // The separable gaussian's axis for this pass, and its sigma.
+    float2 backdrop_direction;
+    float backdrop_sigma;
+    float backdrop_bevel;
+    // The surface's own rounded rect, used when `backdrop_lobe_count` is 0.
+    float4 backdrop_bounds;
+    float4 backdrop_radii;
+    float4 backdrop_mask;
+    float backdrop_refraction;
+    float backdrop_dispersion;
+    float backdrop_specular;
+    float backdrop_light_angle;
+    float backdrop_specular_sharpness;
+    float backdrop_smoothing;
+    uint backdrop_lobe_count;
+    uint backdrop_pad;
+    // Eight lobes, each a bounds and a radii. Written as an array of vectors
+    // rather than of structs so that the sixteen-byte constant buffer packing
+    // is the one the Rust side lays out.
+    float4 backdrop_lobes[16];
+};
+
+struct BackdropVertexOutput {
+    float4 position: SV_Position;
+    float2 uv: TEXCOORD0;
+};
+
+BackdropVertexOutput backdrop_blur_vertex(uint vertex_id: SV_VertexID) {
+    float2 unit_vertex = float2(float(vertex_id & 1u), 0.5 * float(vertex_id & 2u));
+    BackdropVertexOutput output;
+    output.position = float4(unit_vertex * float2(2.0, -2.0) + float2(-1.0, 1.0), 0.0, 1.0);
+    output.uv = unit_vertex;
+    return output;
+}
+
+// The composite draws the same strip. The entry pt is named separately
+// because the shader table pairs a vertex and a fragment by module name.
+BackdropVertexOutput backdrop_glass_vertex(uint vertex_id: SV_VertexID) {
+    return backdrop_blur_vertex(vertex_id);
+}
+
+float backdrop_gaussian(float x, float sigma) {
+    float sigma_squared = sigma * sigma;
+    return exp(-(x * x) / (2.0 * sigma_squared)) / sqrt(2.0 * M_PI_F * sigma_squared);
+}
+
+// One axis of the separable gaussian. Mirrors `fs_blur` in
+// backdrop_glass.wgsl, including its sixty-four tap budget, which is what
+// `MAX_GLASS_SIGMA_PER_PASS` in scene.rs is derived from.
+float4 backdrop_blur_fragment(BackdropVertexOutput input): SV_Target {
+    float sigma = max(backdrop_sigma, 1.0);
+    int radius = min(64, int(ceil(sigma * 3.0)));
+    float center_weight = backdrop_gaussian(0.0, sigma);
+    float4 color = t_sprite.Sample(s_sprite, input.uv) * center_weight;
+    float weight = center_weight;
+    for (int offset = 1; offset <= 64; offset++) {
+        if (offset <= radius) {
+            float sample_weight = backdrop_gaussian(float(offset), sigma);
+            float2 delta = backdrop_direction * float(offset) / global_viewport_size;
+            color += (t_sprite.Sample(s_sprite, input.uv + delta) +
+                      t_sprite.Sample(s_sprite, input.uv - delta)) * sample_weight;
+            weight += 2.0 * sample_weight;
+        }
+    }
+    return color / weight;
+}
+
+// Signed distance to one lobe. Mirrors `lobe_distance` in
+// backdrop_glass.wgsl and `glass_lobe_sdf` in scene.rs.
+float backdrop_lobe_distance(float2 pt, float4 bounds, float4 radii) {
+    float2 half_size = bounds.zw * 0.5;
+    float2 local = pt - (bounds.xy + half_size);
+    float radius = local.x >= 0.0
+        ? (local.y >= 0.0 ? radii.z : radii.y)
+        : (local.y >= 0.0 ? radii.w : radii.x);
+    float2 delta = abs(local) - half_size + radius;
+    return length(max(delta, float2(0.0, 0.0))) + min(max(delta.x, delta.y), 0.0) - radius;
+}
+
+// The polynomial smooth minimum. Mirrors `glass_smooth_min` in scene.rs.
+float backdrop_smooth_min(float a, float b, float smoothing) {
+    if (smoothing <= 0.0) {
+        return min(a, b);
+    }
+    float h = max(smoothing - abs(a - b), 0.0) / smoothing;
+    return min(a, b) - h * h * smoothing * 0.25;
+}
+
+// Distance to the surface's shape. Mirrors `glass_distance` in
+// backdrop_glass.wgsl and the union inside `glass_field` in scene.rs,
+// including the no-lobes case that is the surface's own rounded rect.
+float backdrop_glass_distance(float2 pt) {
+    if (backdrop_lobe_count == 0u) {
+        return backdrop_lobe_distance(pt, backdrop_bounds, backdrop_radii);
+    }
+    float distance = backdrop_lobe_distance(pt, backdrop_lobes[0], backdrop_lobes[1]);
+    for (uint index = 1u; index < 8u; index++) {
+        if (index < backdrop_lobe_count) {
+            distance = backdrop_smooth_min(
+                distance,
+                backdrop_lobe_distance(pt, backdrop_lobes[index * 2u],
+                                       backdrop_lobes[index * 2u + 1u]),
+                backdrop_smoothing);
+        }
+    }
+    return distance;
+}
+
+// The blurred snapshot painted back through the surface's shape and material.
+// Mirrors `fs_composite` in backdrop_glass.wgsl and
+// `backdrop_glass_fragment` in shaders.metal.
+float4 backdrop_glass_fragment(BackdropVertexOutput input): SV_Target {
+    float2 pt = input.position.xy;
+    float2 mask_end = backdrop_mask.xy + backdrop_mask.zw;
+    float distance = backdrop_glass_distance(pt);
+    if (pt.x < backdrop_mask.x || pt.y < backdrop_mask.y ||
+        pt.x >= mask_end.x || pt.y >= mask_end.y || distance > 0.0) {
+        discard;
+    }
+
+    float2 uv = pt / global_viewport_size;
+
+    // Without optics the blurred snapshot is the whole answer.
+    if ((backdrop_bevel <= 0.0 || backdrop_refraction == 0.0) && backdrop_specular <= 0.0) {
+        return t_sprite.Load(int3(int2(pt), 0));
+    }
+
+    // The gradient by central differences, on the same half-pixel stencil as
+    // `glass_field` in scene.rs. See that function for why the normal is
+    // differenced in all four implementations rather than derived in each.
+    const float epsilon = 0.5;
+    float2 gradient = float2(
+        backdrop_glass_distance(pt + float2(epsilon, 0.0)) -
+            backdrop_glass_distance(pt - float2(epsilon, 0.0)),
+        backdrop_glass_distance(pt + float2(0.0, epsilon)) -
+            backdrop_glass_distance(pt - float2(0.0, epsilon)));
+    float gradient_length = length(gradient);
+    if (gradient_length > 0.0) {
+        gradient = gradient / gradient_length;
+    }
+
+    // The bevel: 0 at the rim rising to 1 once the surface is `bevel` pixels
+    // deep. `slope` is how much of it is left to bend light with.
+    float height = backdrop_bevel > 0.0 ? saturate(-distance / backdrop_bevel) : 1.0;
+    float slope = 1.0 - height;
+    float smooth_slope = slope * slope * (3.0 - 2.0 * slope);
+    float3 normal = normalize(float3(gradient * smooth_slope, max(height, 0.001)));
+
+    float4 color;
+    if (backdrop_bevel > 0.0 && backdrop_refraction != 0.0) {
+        float2 offset = normal.xy * backdrop_refraction * backdrop_bevel * smooth_slope /
+            global_viewport_size;
+        if (backdrop_dispersion > 0.0) {
+            // Dispersion splits the channels along the same offset, which is
+            // what makes a rim read as glass rather than as a smear.
+            float4 red = t_sprite.Sample(s_sprite, uv + offset * (1.0 + backdrop_dispersion));
+            float4 green = t_sprite.Sample(s_sprite, uv + offset);
+            float4 blue = t_sprite.Sample(s_sprite, uv + offset * (1.0 - backdrop_dispersion));
+            color = float4(red.r, green.g, blue.b, green.a);
+        } else {
+            color = t_sprite.Sample(s_sprite, uv + offset);
+        }
+    } else {
+        color = t_sprite.Load(int3(int2(pt), 0));
+    }
+
+    if (backdrop_specular > 0.0) {
+        // The light sits on the unit sphere at `light_angle`, measured
+        // clockwise from straight up, tilted towards the viewer so a flat
+        // surface is lit rather than black.
+        float3 light = normalize(float3(sin(backdrop_light_angle),
+                                        -cos(backdrop_light_angle), 0.6));
+        float lobe_value = saturate(dot(normal, light));
+        float highlight = pow(lobe_value, backdrop_specular_sharpness) *
+                          backdrop_specular * smooth_slope;
+        color = float4(saturate(color.rgb + highlight), color.a);
+    }
+
+    return color;
+}

@@ -7,8 +7,9 @@ use cocoa::{
     quartzcore::AutoresizingMask,
 };
 use gpui::{
-    AtlasTextureId, BackdropBlur, Background, Bounds, ContentMask, DevicePixels, DrawOrder,
-    PaintSurface, Path, Point, PrimitiveBatch, ScaledPixels, Scene, Size, point, size,
+    AtlasTextureId, BackdropGlass, Background, Bounds, ContentMask, DevicePixels, DrawOrder,
+    LUMINANCE_PROBE_SAMPLES, MAX_LUMINANCE_PROBES, NO_LUMINANCE_PROBE, PaintSurface, Path, Point,
+    PrimitiveBatch, ScaledPixels, Scene, Size, point, probe_sample_luminance, size,
 };
 #[cfg(any(test, feature = "test-support"))]
 use image::RgbaImage;
@@ -128,13 +129,22 @@ pub(crate) struct MetalRenderer {
     paths_rasterization_pipeline_state: metal::RenderPipelineState,
     path_sprites_pipeline_state: metal::RenderPipelineState,
     shadows_pipeline_state: metal::RenderPipelineState,
-    backdrop_blur_pipeline_state: metal::RenderPipelineState,
+    backdrop_glass_pipeline_state: metal::RenderPipelineState,
     /// Framebuffer snapshot (blit dst / gaussian src) + the blurred result the
     /// draw samples from — recreated on drawable size/format changes.
     backdrop_scratch: Option<metal::Texture>,
-    backdrop_blurred: Option<metal::Texture>,
+    backdrop_blurred_snapshot: Option<metal::Texture>,
     /// Cached `MPSImageGaussianBlur` kernel, keyed by sigma.
     backdrop_kernel: Option<(f32, *mut objc::runtime::Object)>,
+    /// The shared buffer luminance probe texels are blitted into, one row of
+    /// [`LUMINANCE_PROBE_SAMPLES`] BGRA texels per slot.
+    probe_buffer: metal::Buffer,
+    /// The slots the frame currently being encoded blits probes for.
+    probe_requests: Vec<u32>,
+    /// The last committed frame that carried probes, held until it completes
+    /// so the readback never stalls the frame that took it.
+    probe_frame: Option<(metal::CommandBuffer, Vec<u32>)>,
+    probe_values: [Option<f32>; MAX_LUMINANCE_PROBES],
     quads_pipeline_state: metal::RenderPipelineState,
     underlines_pipeline_state: metal::RenderPipelineState,
     monochrome_sprites_pipeline_state: metal::RenderPipelineState,
@@ -325,12 +335,12 @@ impl MetalRenderer {
         );
         // Blending DISABLED: the blur REPLACES the region with the blurred
         // snapshot verbatim (fragments outside the rounded rect discard).
-        let backdrop_blur_pipeline_state = build_pipeline_state_no_blend(
+        let backdrop_glass_pipeline_state = build_pipeline_state_no_blend(
             &device,
             &library,
-            "backdrop_blur",
-            "backdrop_blur_vertex",
-            "backdrop_blur_fragment",
+            "backdrop_glass",
+            "backdrop_glass_vertex",
+            "backdrop_glass_fragment",
             MTLPixelFormat::BGRA8Unorm,
         );
         let quads_pipeline_state = build_pipeline_state(
@@ -379,6 +389,10 @@ impl MetalRenderer {
             .unwrap_or_else(|| Arc::new(MetalAtlas::new(device.clone(), is_apple_gpu)));
         let core_video_texture_cache = CVMetalTextureCache::new(None, device.clone(), None)
             .expect("required framework invariant must hold");
+        let probe_buffer = device.new_buffer(
+            (MAX_LUMINANCE_PROBES * LUMINANCE_PROBE_SAMPLES * 4) as u64,
+            MTLResourceOptions::StorageModeShared,
+        );
 
         Self {
             device,
@@ -391,10 +405,14 @@ impl MetalRenderer {
             paths_rasterization_pipeline_state,
             path_sprites_pipeline_state,
             shadows_pipeline_state,
-            backdrop_blur_pipeline_state,
+            backdrop_glass_pipeline_state,
             backdrop_scratch: None,
-            backdrop_blurred: None,
+            backdrop_blurred_snapshot: None,
             backdrop_kernel: None,
+            probe_buffer,
+            probe_requests: Vec::new(),
+            probe_frame: None,
+            probe_values: [None; MAX_LUMINANCE_PROBES],
             quads_pipeline_state,
             underlines_pipeline_state,
             monochrome_sprites_pipeline_state,
@@ -572,6 +590,12 @@ impl MetalRenderer {
             texture,
             viewport_size,
         )?;
+        // A frame that encoded no probe blits leaves the last carrying frame
+        // in place, so a still window keeps its reading instead of losing it.
+        let probes = mem::take(&mut self.probe_requests);
+        if !probes.is_empty() {
+            self.probe_frame = Some((command_buffer.to_owned(), probes));
+        }
 
         let instance_buffer_pool = self.instance_buffer_pool.clone();
         let instance_buffer = Cell::new(Some(writer.finish()));
@@ -722,16 +746,16 @@ impl MetalRenderer {
             Some(metal::MTLClearColor::new(0., 0., 0., alpha)),
         );
 
-        let mut pending_blurs = scene.backdrop_blurs.iter().peekable();
+        let mut pending_glass = scene.backdrop_glass.iter().peekable();
         for batch in scene.batches() {
-            // Backdrop blurs interleave by draw order OUTSIDE the batch
+            // Glass surfaces interleave by draw order OUTSIDE the batch
             // stream: break the pass here, snapshot the framebuffer, and
-            // paint the blurred region back before continuing.
-            while pending_blurs
+            // paint the surface back before continuing.
+            while pending_glass
                 .peek()
-                .is_some_and(|blur| blur.order <= batch_first_order(scene, &batch))
+                .is_some_and(|glass| glass.order <= batch_first_order(scene, &batch))
             {
-                let blur = *pending_blurs
+                let glass = *pending_glass
                     .next()
                     .expect("required framework invariant must hold");
                 command_encoder.end_encoding();
@@ -755,7 +779,7 @@ impl MetalRenderer {
                 blit.end_encoding();
                 {
                     use metal::foreign_types::ForeignType as _;
-                    let kernel = self.ensure_gaussian_kernel(blur.blur_radius.0.max(1.0));
+                    let kernel = self.ensure_gaussian_kernel(glass.blur_radius.0.max(1.0));
                     unsafe {
                         let _: () = msg_send![
                             kernel,
@@ -765,10 +789,11 @@ impl MetalRenderer {
                         ];
                     }
                 }
+                self.encode_probe_blit(&glass, &blurred, command_buffer);
                 command_encoder =
                     new_command_encoder_for_texture(command_buffer, texture, viewport_size, None);
-                if let Err(error) = self.draw_backdrop_blurs(
-                    &[blur],
+                if let Err(error) = self.draw_backdrop_glass(
+                    &[glass],
                     writer,
                     viewport_size,
                     &blurred,
@@ -842,6 +867,56 @@ impl MetalRenderer {
                     command_encoder,
                 ),
                 PrimitiveBatch::SubpixelSprites { .. } => unreachable!(),
+            }
+        }
+
+        // A surface ordered above everything painted has no batch after it
+        // to trigger on, and still has a backdrop — the same trailing pass
+        // the WGPU and DirectX renderers take.
+        for glass in pending_glass {
+            command_encoder.end_encoding();
+            let (scratch, blurred) = self.ensure_backdrop_scratch(texture);
+            let blit = command_buffer.new_blit_command_encoder();
+            blit.copy_from_texture(
+                texture,
+                0,
+                0,
+                metal::MTLOrigin { x: 0, y: 0, z: 0 },
+                metal::MTLSize {
+                    width: texture.width(),
+                    height: texture.height(),
+                    depth: 1,
+                },
+                &scratch,
+                0,
+                0,
+                metal::MTLOrigin { x: 0, y: 0, z: 0 },
+            );
+            blit.end_encoding();
+            {
+                use metal::foreign_types::ForeignType as _;
+                let kernel = self.ensure_gaussian_kernel(glass.blur_radius.0.max(1.0));
+                unsafe {
+                    let _: () = msg_send![
+                        kernel,
+                        encodeToCommandBuffer: command_buffer.as_ptr() as *mut objc::runtime::Object
+                        sourceTexture: scratch.as_ptr() as *mut objc::runtime::Object
+                        destinationTexture: blurred.as_ptr() as *mut objc::runtime::Object
+                    ];
+                }
+            }
+            self.encode_probe_blit(glass, &blurred, command_buffer);
+            command_encoder =
+                new_command_encoder_for_texture(command_buffer, texture, viewport_size, None);
+            if let Err(error) = self.draw_backdrop_glass(
+                &[*glass],
+                writer,
+                viewport_size,
+                &blurred,
+                command_encoder,
+            ) {
+                command_encoder.end_encoding();
+                return Err(error);
             }
         }
 
@@ -944,16 +1019,97 @@ impl MetalRenderer {
             descriptor.set_usage(
                 metal::MTLTextureUsage::ShaderRead | metal::MTLTextureUsage::ShaderWrite,
             );
-            self.backdrop_blurred = Some(self.device.new_texture(&descriptor));
+            self.backdrop_blurred_snapshot = Some(self.device.new_texture(&descriptor));
         }
         (
             self.backdrop_scratch
                 .clone()
                 .expect("required framework invariant must hold"),
-            self.backdrop_blurred
+            self.backdrop_blurred_snapshot
                 .clone()
                 .expect("required framework invariant must hold"),
         )
+    }
+
+    /// Blit this surface's luminance probe texels out of the blurred
+    /// snapshot, when the surface asks for a slot that exists.
+    fn encode_probe_blit(
+        &mut self,
+        glass: &BackdropGlass,
+        blurred: &metal::TextureRef,
+        command_buffer: &metal::CommandBufferRef,
+    ) {
+        let slot = glass.material.probe;
+        if slot == NO_LUMINANCE_PROBE || slot as usize >= MAX_LUMINANCE_PROBES {
+            return;
+        }
+        let points = glass.probe_sample_points(blurred.width() as f32, blurred.height() as f32);
+        let blit = command_buffer.new_blit_command_encoder();
+        for (index, [x, y]) in points.into_iter().enumerate() {
+            blit.copy_from_texture_to_buffer(
+                blurred,
+                0,
+                0,
+                metal::MTLOrigin {
+                    x: x as u64,
+                    y: y as u64,
+                    z: 0,
+                },
+                metal::MTLSize {
+                    width: 1,
+                    height: 1,
+                    depth: 1,
+                },
+                &self.probe_buffer,
+                ((slot as usize * LUMINANCE_PROBE_SAMPLES + index) * 4) as u64,
+                4,
+                4,
+                metal::MTLBlitOption::empty(),
+            );
+        }
+        blit.end_encoding();
+        self.probe_requests.push(slot);
+    }
+
+    /// Fold the last committed frame's probe texels into the slot values.
+    ///
+    /// Waits for that frame if the GPU is still on it: the frame is already
+    /// committed, so the wait is bounded by work the renderer had to finish
+    /// anyway, and a reading that silently stayed one more frame behind on a
+    /// slow device would make the flip land at a different frame per machine.
+    fn collect_probes(&mut self) {
+        let Some((frame, requests)) = &self.probe_frame else {
+            return;
+        };
+        if frame.status() != metal::MTLCommandBufferStatus::Completed {
+            frame.wait_until_completed();
+        }
+        let data = self.probe_buffer.contents() as *const u8;
+        for &slot in requests {
+            let mut total = 0.0;
+            for index in 0..LUMINANCE_PROBE_SAMPLES {
+                // The drawable and every scratch texture are BGRA8Unorm.
+                let texel = unsafe {
+                    slice::from_raw_parts(
+                        data.add((slot as usize * LUMINANCE_PROBE_SAMPLES + index) * 4),
+                        4,
+                    )
+                };
+                total += probe_sample_luminance(
+                    texel[2] as f32 / 255.0,
+                    texel[1] as f32 / 255.0,
+                    texel[0] as f32 / 255.0,
+                );
+            }
+            self.probe_values[slot as usize] = Some(total / LUMINANCE_PROBE_SAMPLES as f32);
+        }
+        self.probe_frame = None;
+    }
+
+    /// The luminance the most recently completed frame read for this slot.
+    pub fn backdrop_luminance(&mut self, slot: u32) -> Option<f32> {
+        self.collect_probes();
+        *self.probe_values.get(slot as usize)?
     }
 
     /// The cached `MPSImageGaussianBlur` for `sigma` (device px) — Apple's
@@ -984,47 +1140,47 @@ impl MetalRenderer {
         kernel
     }
 
-    fn draw_backdrop_blurs(
+    fn draw_backdrop_glass(
         &self,
-        blurs: &[BackdropBlur],
+        surfaces: &[BackdropGlass],
         writer: &mut InstanceBufferWriter,
         viewport_size: Size<DevicePixels>,
         source_texture: &metal::TextureRef,
         command_encoder: &metal::RenderCommandEncoderRef,
     ) -> Result<()> {
-        if blurs.is_empty() {
+        if surfaces.is_empty() {
             return Ok(());
         }
-        let instance_binding = writer.write(blurs)?;
+        let instance_binding = writer.write(surfaces)?;
 
-        command_encoder.set_render_pipeline_state(&self.backdrop_blur_pipeline_state);
+        command_encoder.set_render_pipeline_state(&self.backdrop_glass_pipeline_state);
         command_encoder.set_vertex_buffer(
-            BackdropBlurInputIndex::Vertices as u64,
+            BackdropGlassInputIndex::Vertices as u64,
             Some(&self.unit_vertices),
             0,
         );
         command_encoder.set_vertex_buffer(
-            BackdropBlurInputIndex::Blurs as u64,
+            BackdropGlassInputIndex::Surfaces as u64,
             Some(&instance_binding.buffer),
             instance_binding.offset as u64,
         );
         command_encoder.set_fragment_buffer(
-            BackdropBlurInputIndex::Blurs as u64,
+            BackdropGlassInputIndex::Surfaces as u64,
             Some(&instance_binding.buffer),
             instance_binding.offset as u64,
         );
         command_encoder.set_vertex_bytes(
-            BackdropBlurInputIndex::ViewportSize as u64,
+            BackdropGlassInputIndex::ViewportSize as u64,
             mem::size_of_val(&viewport_size) as u64,
             &viewport_size as *const Size<DevicePixels> as *const _,
         );
         command_encoder.set_fragment_bytes(
-            BackdropBlurInputIndex::ViewportSize as u64,
+            BackdropGlassInputIndex::ViewportSize as u64,
             mem::size_of_val(&viewport_size) as u64,
             &viewport_size as *const Size<DevicePixels> as *const _,
         );
         command_encoder.set_fragment_texture(
-            BackdropBlurInputIndex::SourceTexture as u64,
+            BackdropGlassInputIndex::SourceTexture as u64,
             Some(source_texture),
         );
 
@@ -1032,7 +1188,7 @@ impl MetalRenderer {
             metal::MTLPrimitiveType::Triangle,
             0,
             6,
-            blurs.len() as u64,
+            surfaces.len() as u64,
         );
         Ok(())
     }
@@ -1832,9 +1988,9 @@ enum ShadowInputIndex {
 }
 
 #[repr(C)]
-enum BackdropBlurInputIndex {
+enum BackdropGlassInputIndex {
     Vertices = 0,
-    Blurs = 1,
+    Surfaces = 1,
     ViewportSize = 2,
     SourceTexture = 3,
 }
@@ -1928,5 +2084,97 @@ impl gpui::PlatformHeadlessRenderer for MetalHeadlessRenderer {
 
     fn sprite_atlas(&self) -> Arc<dyn gpui::PlatformAtlas> {
         self.renderer.sprite_atlas().clone()
+    }
+
+    fn backdrop_luminance(&mut self, slot: u32) -> Option<f32> {
+        self.renderer.backdrop_luminance(slot)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gpui::{
+        Background, BorderStyle, ContentMask, Corners, Edges, GlassMaterial, Hsla, Quad, point,
+        size,
+    };
+
+    /// A scene that paints one full-viewport quad of `background` and lays a
+    /// probed glass surface over the middle of it.
+    fn probed_scene(background: Hsla, slot: u32) -> Scene {
+        let mut scene = Scene::default();
+        let viewport = Bounds {
+            origin: point(ScaledPixels(0.), ScaledPixels(0.)),
+            size: size(ScaledPixels(256.), ScaledPixels(256.)),
+        };
+        scene.insert_primitive(Quad {
+            order: 0,
+            border_style: BorderStyle::default(),
+            bounds: viewport,
+            content_mask: ContentMask { bounds: viewport },
+            background: Background::from(background),
+            border_color: Hsla::transparent_black(),
+            corner_radii: Corners::default(),
+            border_widths: Edges::default(),
+        });
+        scene.insert_backdrop_glass(gpui::BackdropGlass {
+            order: 0,
+            blur_radius: ScaledPixels(16.),
+            bounds: Bounds {
+                origin: point(ScaledPixels(64.), ScaledPixels(64.)),
+                size: size(ScaledPixels(128.), ScaledPixels(128.)),
+            },
+            content_mask: ContentMask { bounds: viewport },
+            corner_radii: Corners::default(),
+            material: GlassMaterial {
+                probe: slot,
+                ..GlassMaterial::frosted()
+            },
+            lobes: [gpui::GlassLobe::default(); gpui::MAX_GLASS_LOBES],
+            lobe_count: 0,
+        });
+        scene.finish();
+        scene
+    }
+
+    /// The probe reports what was behind the surface: near-white over a white
+    /// backdrop, near-black over a black one, and nothing at all before any
+    /// probed frame has completed. Runs against the real Metal device, which
+    /// every macOS validation machine has.
+    #[test]
+    fn a_probe_reads_the_backdrop_it_blurred() {
+        let pool = Arc::new(Mutex::new(InstanceBufferPool::default()));
+        let mut renderer = MetalRenderer::new_headless(pool);
+        let extent: Size<DevicePixels> = size(DevicePixels(256), DevicePixels(256));
+
+        assert_eq!(
+            renderer.backdrop_luminance(0),
+            None,
+            "no frame has filled the slot yet"
+        );
+
+        let white = probed_scene(Hsla::white(), 0);
+        renderer
+            .render_scene_to_image(&white, extent)
+            .expect("the headless Metal renderer draws");
+        let bright = renderer
+            .backdrop_luminance(0)
+            .expect("the completed frame filled the slot");
+        assert!(bright > 0.9, "a white backdrop reads bright, got {bright}");
+
+        let black = probed_scene(Hsla::black(), 0);
+        renderer
+            .render_scene_to_image(&black, extent)
+            .expect("the headless Metal renderer draws");
+        let dark = renderer
+            .backdrop_luminance(0)
+            .expect("the completed frame filled the slot");
+        assert!(dark < 0.1, "a black backdrop reads dark, got {dark}");
+
+        assert_eq!(
+            renderer.backdrop_luminance(1),
+            None,
+            "an unprobed slot stays empty"
+        );
     }
 }

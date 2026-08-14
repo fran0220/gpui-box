@@ -194,6 +194,10 @@ pub fn catalog() -> Vec<Scene> {
             build: frost,
         },
         Scene {
+            name: "glass",
+            build: glass,
+        },
+        Scene {
             name: "toolbar",
             build: toolbar,
         },
@@ -3425,6 +3429,217 @@ fn frost(_window: &mut Window, cx: &mut App) -> AnyElement {
                                 .radius(Radius::Dialog)
                                 .blur(32.0)
                                 .child(card("Rail", "The striped backdrop stays out of focus")),
+                        ),
+                ),
+        )
+        .into_any_element()
+}
+
+/// The optics, one at a time and then together, over a backdrop with enough
+/// structure in it that a bend is visible as a bend rather than as a smudge.
+///
+/// The presets sit side by side deliberately: `Frosted` is the control, and
+/// what separates it from `Lens` is exactly the refraction, so a reviewer
+/// looking at the pair is looking at the thing that changed.
+fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let label = |title: &'static str, body: &'static str| {
+        div()
+            .column()
+            .gap(px(theme.space(Space::Xs)))
+            .p(px(theme.space(Space::Md)))
+            .child(crate::foundation::text(
+                &theme,
+                TypeScale::Label,
+                SharedString::from(title),
+            ))
+            .child(caption(&theme, body))
+    };
+
+    // A checkerboard bends far more legibly than a flat fill: a straight edge
+    // running under the rim is what makes refraction readable in a still.
+    let checkerboard =
+        |width: f32, height: f32| {
+            let columns = (width / 48.0).ceil() as usize;
+            let rows = (height / 48.0).ceil() as usize;
+            div()
+                .absolute()
+                .top(px(0.0))
+                .left(px(0.0))
+                .w(px(width))
+                .h(px(height))
+                .column()
+                .overflow_hidden()
+                .children((0..rows).map(|row| {
+                    div()
+                        .flex()
+                        .flex_none()
+                        .h(px(48.0))
+                        .children((0..columns).map(move |column| {
+                            div().flex_none().w(px(48.0)).h(px(48.0)).bg(
+                                if (row + column) % 2 == 0 {
+                                    theme.colors.accent
+                                } else {
+                                    theme.colors.canvas
+                                },
+                            )
+                        }))
+                }))
+        };
+
+    let plate =
+        |ident: &'static str, preset: GlassPreset, title: &'static str, body: &'static str| {
+            div()
+                .relative()
+                .h(px(150.0))
+                .w(px(460.0))
+                .hairline(&theme)
+                .radius(&theme, Radius::Card)
+                .overflow_hidden()
+                .child(checkerboard(460.0, 150.0))
+                .child(
+                    div()
+                        .absolute()
+                        .top(px(28.0))
+                        .left(px(90.0))
+                        .w(px(280.0))
+                        .child(
+                            Glass::new(ident)
+                                .preset(preset)
+                                .radius(Radius::Dialog)
+                                .child(label(title, body)),
+                        ),
+                )
+        };
+
+    stack(&theme)
+        .w(px(900.0))
+        .child(caption(&theme, "Frosted: blurred, and nothing bent"))
+        .child(plate(
+            "scene.glass.frosted",
+            GlassPreset::Frosted,
+            "Frosted",
+            "The control the others are read against",
+        ))
+        .child(caption(&theme, "Lens: the edge bends the backdrop"))
+        .child(plate(
+            "scene.glass.lens",
+            GlassPreset::Lens,
+            "Lens",
+            "The squares bend at the rim and run straight inside",
+        ))
+        .child(caption(
+            &theme,
+            "Liquid: the bend, its colour, and the light",
+        ))
+        .child(plate(
+            "scene.glass.liquid",
+            GlassPreset::Liquid,
+            "Liquid",
+            "Dispersion at the rim and a highlight from the top right",
+        ))
+        // The last two demonstrations sit side by side so the whole scene
+        // stays inside the window a real display can give the gallery, which
+        // is where the DirectX renderer gets looked at.
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .gap(px(theme.space(Space::Md)))
+                .child(
+                    div()
+                        .column()
+                        .gap(px(theme.space(Space::Sm)))
+                        .child(caption(&theme, "Fused: two panes joined into one body"))
+                        .child(
+                            div()
+                                .relative()
+                                .h(px(150.0))
+                                .w(px(440.0))
+                                .hairline(&theme)
+                                .radius(&theme, Radius::Card)
+                                .overflow_hidden()
+                                .child(checkerboard(440.0, 150.0))
+                                .child(
+                                    div().absolute().top(px(40.0)).left(px(40.0)).child(
+                                        GlassGroup::new("scene.glass.fused")
+                                            .preset(GlassPreset::Liquid)
+                                            .radius(Radius::Dialog)
+                                            .gap(12.0)
+                                            .pane(
+                                                "scene.glass.fused.left",
+                                                label("Left", "One lobe of the body"),
+                                            )
+                                            .pane(
+                                                "scene.glass.fused.right",
+                                                label("Right", "Joined across the gap"),
+                                            ),
+                                    ),
+                                ),
+                        ),
+                )
+                .child(
+                    div()
+                        .column()
+                        .gap(px(theme.space(Space::Sm)))
+                        .child(caption(&theme, "Adaptive: the tint deepens when opposed"))
+                        .child(
+                            div()
+                                .relative()
+                                .h(px(150.0))
+                                .w(px(440.0))
+                                .hairline(&theme)
+                                .radius(&theme, Radius::Card)
+                                .overflow_hidden()
+                                .child(
+                                    div()
+                                        .absolute()
+                                        .top(px(0.0))
+                                        .left(px(0.0))
+                                        .w(px(220.0))
+                                        .h(px(150.0))
+                                        .bg(gpui::white()),
+                                )
+                                .child(
+                                    div()
+                                        .absolute()
+                                        .top(px(0.0))
+                                        .left(px(220.0))
+                                        .w(px(220.0))
+                                        .h(px(150.0))
+                                        .bg(gpui::black()),
+                                )
+                                .child(
+                                    div()
+                                        .absolute()
+                                        .top(px(28.0))
+                                        .left(px(15.0))
+                                        .w(px(190.0))
+                                        .child(
+                                            Glass::new("scene.glass.adaptive.bright")
+                                                .preset(GlassPreset::Liquid)
+                                                .radius(Radius::Dialog)
+                                                .adaptive(true)
+                                                .child(label(
+                                                    "Bright",
+                                                    "The reading lands next frame",
+                                                )),
+                                        ),
+                                )
+                                .child(
+                                    div()
+                                        .absolute()
+                                        .top(px(28.0))
+                                        .left(px(235.0))
+                                        .w(px(190.0))
+                                        .child(
+                                            Glass::new("scene.glass.adaptive.dark")
+                                                .preset(GlassPreset::Liquid)
+                                                .radius(Radius::Dialog)
+                                                .adaptive(true)
+                                                .child(label("Dark", "The same glass, other side")),
+                                        ),
+                                ),
                         ),
                 ),
         )

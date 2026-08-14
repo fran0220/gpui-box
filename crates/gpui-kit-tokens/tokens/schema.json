@@ -440,7 +440,18 @@
         "glowAlpha",
         "glowBlur",
         "glassAlpha",
-        "glassBlur"
+        "glassBlur",
+        "glassLiquidAlpha",
+        "glassBevel",
+        "glassRefraction",
+        "glassDispersion",
+        "glassSpecular",
+        "glassSpecularSharpness",
+        "glassLightAngle",
+        "glassMergeDistance",
+        "glassContrastFlipLow",
+        "glassContrastFlipHigh",
+        "glassPressDepth"
       ],
       "properties": {
         "edgeFadeBand": { "$ref": "#/$defs/positiveNumber" },
@@ -450,7 +461,18 @@
         "glowAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
         "glowBlur": { "$ref": "#/$defs/positiveNumber" },
         "glassAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
-        "glassBlur": { "$ref": "#/$defs/positiveNumber" }
+        "glassBlur": { "$ref": "#/$defs/positiveNumber" },
+        "glassLiquidAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "glassBevel": { "$ref": "#/$defs/positiveNumber" },
+        "glassRefraction": { "type": "number", "minimum": 0, "maximum": 2 },
+        "glassDispersion": { "type": "number", "minimum": 0, "maximum": 1 },
+        "glassSpecular": { "type": "number", "minimum": 0, "maximum": 1 },
+        "glassSpecularSharpness": { "type": "number", "minimum": 1 },
+        "glassLightAngle": { "type": "number", "minimum": 0, "maximum": 6.2831854 },
+        "glassMergeDistance": { "$ref": "#/$defs/positiveNumber" },
+        "glassContrastFlipLow": { "type": "number", "minimum": 0, "maximum": 1 },
+        "glassContrastFlipHigh": { "type": "number", "minimum": 0, "maximum": 1 },
+        "glassPressDepth": { "type": "number", "minimum": 1 }
       }
     }
   }

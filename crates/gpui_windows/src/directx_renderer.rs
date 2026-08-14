@@ -30,6 +30,12 @@ const RENDER_TARGET_FORMAT: DXGI_FORMAT = DXGI_FORMAT_B8G8R8A8_UNORM;
 // This configuration is used for MSAA rendering on paths only, and it's guaranteed to be supported by DirectX 11.
 const PATH_MULTISAMPLE_COUNT: u32 = 4;
 const MAX_INSTANCE_BUFFER_SIZE: usize = 256 * 1024 * 1024;
+/// How many full-viewport blur passes all the glass surfaces in one frame may
+/// spend between them. How many one radius needs is
+/// [`BackdropGlass::gaussian_pass_count`], which this renderer shares with
+/// WGPU; how many a frame may afford is this renderer's own, because it is a
+/// property of drawing them one at a time into the swap chain.
+const MAX_BACKDROP_GLASS_PASSES_PER_FRAME: usize = 64;
 
 pub(crate) struct FontInfo {
     pub gamma_ratios: [f32; 4],
@@ -57,6 +63,15 @@ pub(crate) struct DirectXRenderer {
     /// In that case we want to discard the first frame that we draw as we got reset in the middle of a frame
     /// meaning we lost all the allocated gpu textures and scene resources.
     skip_draws: bool,
+
+    /// The staging texture luminance probe texels are copied into, one row of
+    /// [`LUMINANCE_PROBE_SAMPLES`] texels per slot, mapped a frame later.
+    probe_staging: Option<ID3D11Texture2D>,
+    /// The slots the frame currently being drawn copies probes for.
+    probe_requests: Vec<u32>,
+    /// The slots the previous frame copied, awaiting a map that never waits.
+    probe_pending: Vec<u32>,
+    probe_values: [Option<f32>; MAX_LUMINANCE_PROBES],
 }
 
 /// Direct3D objects
@@ -82,6 +97,17 @@ struct DirectXResources {
     path_intermediate_msaa_texture: ID3D11Texture2D,
     path_intermediate_msaa_view: Option<ID3D11RenderTargetView>,
 
+    // Backdrop glass scratch. `snapshot` is the copy of the render target the
+    // blur reads, and the two scratch textures are ping-ponged through the
+    // separable gaussian's axes. All three are full viewport: a glass surface
+    // samples outside its own bounds, both because the blur's kernel reaches
+    // past the rim and because refraction displaces the sample further.
+    backdrop_snapshot: ID3D11Texture2D,
+    backdrop_snapshot_srv: Option<ID3D11ShaderResourceView>,
+    backdrop_scratch: [ID3D11Texture2D; 2],
+    backdrop_scratch_srv: [Option<ID3D11ShaderResourceView>; 2],
+    backdrop_scratch_view: [Option<ID3D11RenderTargetView>; 2],
+
     // Cached viewport
     viewport: D3D11_VIEWPORT,
 }
@@ -101,12 +127,68 @@ struct DirectXRenderPipelines {
     mono_sprites: PipelineState<MonochromeSprite>,
     subpixel_sprites: PipelineState<SubpixelSprite>,
     poly_sprites: PipelineState<PolychromeSprite>,
+    // The two backdrop passes carry no instance buffer: each draws one full
+    // viewport strip and reads everything it needs from `b2`, so they are a
+    // shader pair and a blend state rather than a `PipelineState`.
+    backdrop_blur: BackdropPipeline,
+    backdrop_glass: BackdropPipeline,
+}
+
+/// A shader pair that draws one full-viewport strip.
+struct BackdropPipeline {
+    vertex: ID3D11VertexShader,
+    fragment: ID3D11PixelShader,
+    blend_state: ID3D11BlendState,
+}
+
+impl BackdropPipeline {
+    fn new(
+        device: &ID3D11Device,
+        shader_module: ShaderModule,
+        blend_state: ID3D11BlendState,
+    ) -> Result<Self> {
+        let vertex = {
+            let raw_shader = RawShaderBytes::new(shader_module, ShaderTarget::Vertex)?;
+            create_vertex_shader(device, raw_shader.as_bytes())?
+        };
+        let fragment = {
+            let raw_shader = RawShaderBytes::new(shader_module, ShaderTarget::Fragment)?;
+            create_fragment_shader(device, raw_shader.as_bytes())?
+        };
+        Ok(Self {
+            vertex,
+            fragment,
+            blend_state,
+        })
+    }
+
+    fn draw(
+        &self,
+        device_context: &ID3D11DeviceContext,
+        source: &[Option<ID3D11ShaderResourceView>],
+        sampler: &[Option<ID3D11SamplerState>],
+    ) {
+        unsafe {
+            device_context.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+            device_context.VSSetShader(&self.vertex, None);
+            device_context.PSSetShader(&self.fragment, None);
+            device_context.OMSetBlendState(&self.blend_state, None, 0xFFFFFFFF);
+            device_context.PSSetSamplers(0, Some(sampler));
+            device_context.PSSetShaderResources(0, Some(source));
+            device_context.DrawInstanced(4, 1, 0, 0);
+        }
+    }
 }
 
 struct DirectXGlobalElements {
     global_params_buffer: Option<ID3D11Buffer>,
     batch_params_buffer: Option<ID3D11Buffer>,
+    backdrop_params_buffer: Option<ID3D11Buffer>,
     sampler: Option<ID3D11SamplerState>,
+    /// Clamping, so a blur tap or a refracted sample that reaches past the
+    /// edge of the viewport reads the edge rather than wrapping to the far
+    /// side, which the wrapping sprite sampler would do.
+    backdrop_sampler: Option<ID3D11SamplerState>,
 }
 
 struct Annotation<'a>(&'a ID3DUserDefinedAnnotation);
@@ -225,6 +307,10 @@ impl DirectXRenderer {
             width: 1,
             height: 1,
             skip_draws: false,
+            probe_staging: None,
+            probe_requests: Vec::new(),
+            probe_pending: Vec::new(),
+            probe_values: [None; MAX_LUMINANCE_PROBES],
         })
     }
 
@@ -408,6 +494,88 @@ impl DirectXRenderer {
         self.present()
     }
 
+    /// Draw the scene and read the result back, without presenting it.
+    ///
+    /// This is what makes the DirectX renderer testable: everything below it,
+    /// including the backdrop passes, runs exactly as it does for a real
+    /// frame, and the pixels come back rather than going to the display. The
+    /// frame is not presented, so the window keeps whatever it was showing.
+    #[cfg(any(test, feature = "test-support"))]
+    pub(crate) fn render_to_image(&mut self, scene: &Scene) -> Result<image::RgbaImage> {
+        anyhow::ensure!(
+            !self.skip_draws,
+            "the renderer is recovering from a lost device and has no textures to draw with"
+        );
+        let render_target_view = self
+            .resources
+            .as_ref()
+            .context("resources missing")?
+            .render_target_view
+            .clone();
+        self.pre_draw(&render_target_view, &[0.0f32; 4])?;
+        self.draw_scene(scene)?;
+
+        let devices = self.devices.as_ref().context("devices missing")?;
+        let resources = self.resources.as_ref().context("resources missing")?;
+        let render_target = resources
+            .render_target
+            .as_ref()
+            .context("missing render target")?;
+        let (width, height) = (self.width.max(1), self.height.max(1));
+
+        // The render target lives in device memory the CPU cannot map, so the
+        // readback goes through a staging texture, which is the only usage
+        // D3D11 will let both the GPU write to and the CPU read.
+        let staging = unsafe {
+            let desc = D3D11_TEXTURE2D_DESC {
+                Width: width,
+                Height: height,
+                MipLevels: 1,
+                ArraySize: 1,
+                Format: RENDER_TARGET_FORMAT,
+                SampleDesc: DXGI_SAMPLE_DESC {
+                    Count: 1,
+                    Quality: 0,
+                },
+                Usage: D3D11_USAGE_STAGING,
+                BindFlags: 0,
+                CPUAccessFlags: D3D11_CPU_ACCESS_READ.0 as u32,
+                MiscFlags: 0,
+            };
+            let mut output = None;
+            devices
+                .device
+                .CreateTexture2D(&desc, None, Some(&mut output))?;
+            output.context("failed to create the readback texture")?
+        };
+
+        let mut image = image::RgbaImage::new(width, height);
+        unsafe {
+            devices.device_context.CopyResource(&staging, render_target);
+            let mut mapped = std::mem::zeroed();
+            devices
+                .device_context
+                .Map(&staging, 0, D3D11_MAP_READ, 0, Some(&mut mapped))?;
+            let pitch = mapped.RowPitch as usize;
+            let source =
+                std::slice::from_raw_parts(mapped.pData as *const u8, pitch * height as usize);
+            for y in 0..height as usize {
+                let row = &source[y * pitch..y * pitch + width as usize * 4];
+                for x in 0..width as usize {
+                    let pixel = &row[x * 4..x * 4 + 4];
+                    // The render target is BGRA and the image is RGBA.
+                    image.put_pixel(
+                        x as u32,
+                        y as u32,
+                        image::Rgba([pixel[2], pixel[1], pixel[0], pixel[3]]),
+                    );
+                }
+            }
+            devices.device_context.Unmap(&staging, 0);
+        }
+        Ok(image)
+    }
+
     pub(crate) fn draw_layered(
         &mut self,
         scene: &Scene,
@@ -497,13 +665,29 @@ impl DirectXRenderer {
     }
 
     fn draw_scene(&mut self, scene: &Scene) -> Result<()> {
+        self.collect_probes();
         self.upload_scene_buffers(scene)?;
         let annotation = self
             .devices
             .as_ref()
             .and_then(|devices| devices.annotation.clone())
             .filter(|annotation| unsafe { annotation.GetStatus().as_bool() });
+        // A glass surface reads everything painted below its order, so it is
+        // drawn between the batches rather than as one of them, on the same
+        // schedule the WGPU renderer uses.
+        let mut pending_glass = scene.backdrop_glass.iter().peekable();
+        let mut remaining_backdrop_passes = MAX_BACKDROP_GLASS_PASSES_PER_FRAME;
         for batch in scene.batches() {
+            let batch_order = backdrop_batch_first_order(scene, &batch);
+            while pending_glass
+                .peek()
+                .is_some_and(|glass| glass.order <= batch_order)
+            {
+                let Some(glass) = pending_glass.next() else {
+                    break;
+                };
+                self.draw_backdrop_glass(glass, &mut remaining_backdrop_passes)?;
+            }
             let _annotation = annotation
                 .as_ref()
                 .map(|annotation| Annotation::new(annotation, HSTRING::from(batch.label())));
@@ -542,7 +726,244 @@ impl DirectXRenderer {
                 )
             })?;
         }
+        // A surface ordered above everything painted has no batch after it to
+        // trigger on, and still has a backdrop.
+        for glass in pending_glass {
+            self.draw_backdrop_glass(glass, &mut remaining_backdrop_passes)?;
+        }
+        if !self.probe_requests.is_empty() {
+            self.probe_pending = std::mem::take(&mut self.probe_requests);
+        }
         Ok(())
+    }
+
+    /// Snapshot what has been painted, blur it, and paint it back through the
+    /// surface's shape and material.
+    ///
+    /// A surface whose blur needs more passes than the frame has left keeps
+    /// its unblurred backdrop rather than being skipped, which is the same
+    /// refusal the other renderers make and the reason it is a fallback
+    /// rather than a hole: a legible surface beats a missing one.
+    fn draw_backdrop_glass(
+        &mut self,
+        glass: &BackdropGlass,
+        remaining_passes: &mut usize,
+    ) -> Result<()> {
+        let probe_slot = glass.material.probe;
+        let takes_probe =
+            probe_slot != NO_LUMINANCE_PROBE && (probe_slot as usize) < MAX_LUMINANCE_PROBES;
+        if takes_probe {
+            self.ensure_probe_staging()?;
+        }
+        let pass_count = glass.gaussian_pass_count().unwrap_or(0);
+        let requested = pass_count as usize * 2;
+        let pass_count = if pass_count > 0 && requested <= *remaining_passes {
+            *remaining_passes -= requested;
+            pass_count
+        } else {
+            0
+        };
+
+        let devices = self.devices.as_ref().context("devices missing")?;
+        let resources = self.resources.as_ref().context("resources missing")?;
+        let device_context = &devices.device_context;
+        let render_target = resources
+            .render_target
+            .as_ref()
+            .context("missing render target")?;
+        let backdrop_params_buffer = self
+            .globals
+            .backdrop_params_buffer
+            .as_ref()
+            .context("backdrop params buffer missing")?;
+        let sampler = slice::from_ref(&self.globals.backdrop_sampler);
+
+        let mut params = BackdropGlassParams::from_glass(glass);
+
+        unsafe {
+            // Take the backdrop out of the render target. Everything painted
+            // below this order is in it, and nothing above it has been drawn.
+            device_context.CopyResource(&resources.backdrop_snapshot, render_target);
+            device_context.RSSetViewports(Some(slice::from_ref(&resources.viewport)));
+            device_context.PSSetConstantBuffers(
+                2,
+                Some(slice::from_ref(&self.globals.backdrop_params_buffer)),
+            );
+        }
+
+        // The variances of several passes add, so a wide blur is several
+        // narrow ones. `read` names the texture the next pass samples, and
+        // `blurred` the texture behind it, which the luminance probe copies
+        // its sample texels out of.
+        let mut read = &resources.backdrop_snapshot_srv;
+        let mut blurred = &resources.backdrop_snapshot;
+        if pass_count > 0 {
+            params.sigma = glass.blur_radius.0.max(1.0) / (pass_count as f32).sqrt();
+            for _ in 0..pass_count {
+                for (index, direction) in [[1.0, 0.0], [0.0, 1.0]].into_iter().enumerate() {
+                    params.direction = direction;
+                    update_buffer(device_context, backdrop_params_buffer, &[params])?;
+                    unsafe {
+                        // The texture being drawn to cannot also be bound for
+                        // reading, and the previous pass left it bound.
+                        device_context.PSSetShaderResources(0, Some(&[None]));
+                        device_context.OMSetRenderTargets(
+                            Some(slice::from_ref(&resources.backdrop_scratch_view[index])),
+                            None,
+                        );
+                    }
+                    self.pipelines.backdrop_blur.draw(
+                        device_context,
+                        slice::from_ref(read),
+                        sampler,
+                    );
+                    read = &resources.backdrop_scratch_srv[index];
+                    blurred = &resources.backdrop_scratch[index];
+                }
+            }
+        }
+
+        if takes_probe && let Some(staging) = &self.probe_staging {
+            let points = glass.probe_sample_points(self.width as f32, self.height as f32);
+            for (index, [x, y]) in points.into_iter().enumerate() {
+                let source = D3D11_BOX {
+                    left: x as u32,
+                    top: y as u32,
+                    front: 0,
+                    right: x as u32 + 1,
+                    bottom: y as u32 + 1,
+                    back: 1,
+                };
+                unsafe {
+                    device_context.CopySubresourceRegion(
+                        staging,
+                        0,
+                        index as u32,
+                        probe_slot,
+                        0,
+                        blurred,
+                        0,
+                        Some(&source),
+                    );
+                }
+            }
+        }
+
+        // The composite reads the blurred backdrop and writes the surface
+        // back into the render target it was taken from.
+        params.direction = [0.0, 0.0];
+        update_buffer(device_context, backdrop_params_buffer, &[params])?;
+        unsafe {
+            device_context.PSSetShaderResources(0, Some(&[None]));
+            device_context
+                .OMSetRenderTargets(Some(slice::from_ref(&resources.render_target_view)), None);
+        }
+        self.pipelines
+            .backdrop_glass
+            .draw(device_context, slice::from_ref(read), sampler);
+
+        unsafe {
+            device_context.PSSetShaderResources(0, Some(&[None]));
+        }
+        if takes_probe {
+            self.probe_requests.push(probe_slot);
+        }
+        Ok(())
+    }
+
+    /// The staging texture the probe texels land in, created on first use and
+    /// kept: its size depends only on the probe capacity, never the window's.
+    fn ensure_probe_staging(&mut self) -> Result<()> {
+        if self.probe_staging.is_some() {
+            return Ok(());
+        }
+        let devices = self.devices.as_ref().context("devices missing")?;
+        let staging = unsafe {
+            let desc = D3D11_TEXTURE2D_DESC {
+                Width: LUMINANCE_PROBE_SAMPLES as u32,
+                Height: MAX_LUMINANCE_PROBES as u32,
+                MipLevels: 1,
+                ArraySize: 1,
+                Format: RENDER_TARGET_FORMAT,
+                SampleDesc: DXGI_SAMPLE_DESC {
+                    Count: 1,
+                    Quality: 0,
+                },
+                Usage: D3D11_USAGE_STAGING,
+                BindFlags: 0,
+                CPUAccessFlags: D3D11_CPU_ACCESS_READ.0 as u32,
+                MiscFlags: 0,
+            };
+            let mut output = None;
+            devices
+                .device
+                .CreateTexture2D(&desc, None, Some(&mut output))?;
+            output.context("failed to create the probe staging texture")?
+        };
+        self.probe_staging = Some(staging);
+        Ok(())
+    }
+
+    /// Fold the previous frame's probe texels into the slot values.
+    ///
+    /// The map waits for the frame that wrote the staging texture if the GPU
+    /// is still on it: the copy is already submitted, so the wait is bounded
+    /// by work the renderer had to finish anyway, and on a slow adapter a
+    /// reading that silently stayed one more frame behind would make the
+    /// flip land at a different frame per machine.
+    fn collect_probes(&mut self) {
+        if self.probe_pending.is_empty() {
+            return;
+        }
+        let Some(devices) = self.devices.as_ref() else {
+            return;
+        };
+        let Some(staging) = self.probe_staging.as_ref() else {
+            return;
+        };
+        let mut values = self.probe_values;
+        let read = unsafe {
+            let mut mapped = std::mem::zeroed();
+            if devices
+                .device_context
+                .Map(staging, 0, D3D11_MAP_READ, 0, Some(&mut mapped))
+                .is_err()
+            {
+                false
+            } else {
+                let pitch = mapped.RowPitch as usize;
+                let data = std::slice::from_raw_parts(
+                    mapped.pData as *const u8,
+                    pitch * MAX_LUMINANCE_PROBES,
+                );
+                for &slot in &self.probe_pending {
+                    let row = &data[slot as usize * pitch..];
+                    let mut total = 0.0;
+                    for index in 0..LUMINANCE_PROBE_SAMPLES {
+                        // The render target, and so every texel here, is BGRA.
+                        let texel = &row[index * 4..index * 4 + 4];
+                        total += probe_sample_luminance(
+                            texel[2] as f32 / 255.0,
+                            texel[1] as f32 / 255.0,
+                            texel[0] as f32 / 255.0,
+                        );
+                    }
+                    values[slot as usize] = Some(total / LUMINANCE_PROBE_SAMPLES as f32);
+                }
+                devices.device_context.Unmap(staging, 0);
+                true
+            }
+        };
+        if read {
+            self.probe_values = values;
+            self.probe_pending.clear();
+        }
+    }
+
+    /// The luminance the most recently completed frame read for this slot.
+    pub(crate) fn backdrop_luminance(&mut self, slot: u32) -> Option<f32> {
+        self.collect_probes();
+        *self.probe_values.get(slot as usize)?
     }
 
     pub(crate) fn resize(&mut self, new_size: Size<DevicePixels>) -> Result<()> {
@@ -962,26 +1383,23 @@ impl DirectXResources {
             )?
         };
 
-        let (
-            render_target,
-            render_target_view,
-            path_intermediate_texture,
-            path_intermediate_srv,
-            path_intermediate_msaa_texture,
-            path_intermediate_msaa_view,
-            viewport,
-        ) = create_resources(devices, &swap_chain, width, height)?;
+        let created = create_resources(devices, &swap_chain, width, height)?;
         set_rasterizer_state(&devices.device, &devices.device_context)?;
 
         Ok(Self {
             swap_chain,
-            render_target: Some(render_target),
-            render_target_view,
-            path_intermediate_texture,
-            path_intermediate_msaa_texture,
-            path_intermediate_msaa_view,
-            path_intermediate_srv,
-            viewport,
+            render_target: Some(created.render_target),
+            render_target_view: created.render_target_view,
+            path_intermediate_texture: created.path_intermediate_texture,
+            path_intermediate_msaa_texture: created.path_intermediate_msaa_texture,
+            path_intermediate_msaa_view: created.path_intermediate_msaa_view,
+            path_intermediate_srv: created.path_intermediate_srv,
+            backdrop_snapshot: created.backdrop_snapshot,
+            backdrop_snapshot_srv: created.backdrop_snapshot_srv,
+            backdrop_scratch: created.backdrop_scratch,
+            backdrop_scratch_srv: created.backdrop_scratch_srv,
+            backdrop_scratch_view: created.backdrop_scratch_view,
+            viewport: created.viewport,
         })
     }
 
@@ -992,22 +1410,19 @@ impl DirectXResources {
         width: u32,
         height: u32,
     ) -> Result<()> {
-        let (
-            render_target,
-            render_target_view,
-            path_intermediate_texture,
-            path_intermediate_srv,
-            path_intermediate_msaa_texture,
-            path_intermediate_msaa_view,
-            viewport,
-        ) = create_resources(devices, &self.swap_chain, width, height)?;
-        self.render_target = Some(render_target);
-        self.render_target_view = render_target_view;
-        self.path_intermediate_texture = path_intermediate_texture;
-        self.path_intermediate_msaa_texture = path_intermediate_msaa_texture;
-        self.path_intermediate_msaa_view = path_intermediate_msaa_view;
-        self.path_intermediate_srv = path_intermediate_srv;
-        self.viewport = viewport;
+        let created = create_resources(devices, &self.swap_chain, width, height)?;
+        self.render_target = Some(created.render_target);
+        self.render_target_view = created.render_target_view;
+        self.path_intermediate_texture = created.path_intermediate_texture;
+        self.path_intermediate_msaa_texture = created.path_intermediate_msaa_texture;
+        self.path_intermediate_msaa_view = created.path_intermediate_msaa_view;
+        self.path_intermediate_srv = created.path_intermediate_srv;
+        self.backdrop_snapshot = created.backdrop_snapshot;
+        self.backdrop_snapshot_srv = created.backdrop_snapshot_srv;
+        self.backdrop_scratch = created.backdrop_scratch;
+        self.backdrop_scratch_srv = created.backdrop_scratch_srv;
+        self.backdrop_scratch_view = created.backdrop_scratch_view;
+        self.viewport = created.viewport;
         Ok(())
     }
 }
@@ -1063,6 +1478,16 @@ impl DirectXRenderPipelines {
             512,
             create_blend_state_for_subpixel_rendering(device)?,
         )?;
+        let backdrop_blur = BackdropPipeline::new(
+            device,
+            ShaderModule::BackdropBlur,
+            create_blend_state_for_backdrop(device)?,
+        )?;
+        let backdrop_glass = BackdropPipeline::new(
+            device,
+            ShaderModule::BackdropGlass,
+            create_blend_state_for_backdrop(device)?,
+        )?;
         let poly_sprites = PipelineState::new(
             device,
             "polychrome_sprite_pipeline",
@@ -1080,6 +1505,8 @@ impl DirectXRenderPipelines {
             mono_sprites,
             subpixel_sprites,
             poly_sprites,
+            backdrop_blur,
+            backdrop_glass,
         })
     }
 }
@@ -1237,6 +1664,7 @@ impl DirectXGlobalElements {
     pub fn new(device: &ID3D11Device) -> Result<Self> {
         let global_params_buffer = create_constant_buffer::<GlobalParams>(device)?;
         let batch_params_buffer = create_constant_buffer::<BatchParams>(device)?;
+        let backdrop_params_buffer = create_constant_buffer::<BackdropGlassParams>(device)?;
 
         let sampler = unsafe {
             let desc = D3D11_SAMPLER_DESC {
@@ -1256,11 +1684,113 @@ impl DirectXGlobalElements {
             output
         };
 
+        let backdrop_sampler = unsafe {
+            let desc = D3D11_SAMPLER_DESC {
+                Filter: D3D11_FILTER_MIN_MAG_MIP_LINEAR,
+                AddressU: D3D11_TEXTURE_ADDRESS_CLAMP,
+                AddressV: D3D11_TEXTURE_ADDRESS_CLAMP,
+                AddressW: D3D11_TEXTURE_ADDRESS_CLAMP,
+                MipLODBias: 0.0,
+                MaxAnisotropy: 1,
+                ComparisonFunc: D3D11_COMPARISON_ALWAYS,
+                BorderColor: [0.0; 4],
+                MinLOD: 0.0,
+                MaxLOD: D3D11_FLOAT32_MAX,
+            };
+            let mut output = None;
+            device.CreateSamplerState(&desc, Some(&mut output))?;
+            output
+        };
+
         Ok(Self {
             global_params_buffer,
             batch_params_buffer,
+            backdrop_params_buffer,
             sampler,
+            backdrop_sampler,
         })
+    }
+}
+
+/// What one backdrop pass reads, matching `BackdropGlassParams` in
+/// `shaders.hlsl`.
+///
+/// The lobes are flattened into vectors rather than kept as a struct array
+/// because a constant buffer packs an array element to sixteen bytes, and a
+/// lobe is two of them: writing the pairing out here is what keeps the Rust
+/// layout and the HLSL layout the same thing rather than two things that
+/// happen to agree today.
+#[derive(Clone, Copy, Debug, Default)]
+#[repr(C, align(16))]
+struct BackdropGlassParams {
+    direction: [f32; 2],
+    sigma: f32,
+    bevel: f32,
+    bounds: [f32; 4],
+    radii: [f32; 4],
+    mask: [f32; 4],
+    refraction: f32,
+    dispersion: f32,
+    specular: f32,
+    light_angle: f32,
+    specular_sharpness: f32,
+    smoothing: f32,
+    lobe_count: u32,
+    _pad: u32,
+    lobes: [[f32; 4]; MAX_GLASS_LOBES * 2],
+}
+
+// Six sixteen-byte registers of header, then two per lobe. HLSL packs a
+// constant buffer into sixteen-byte registers that a member may not straddle,
+// which is what the groupings above are chosen to respect.
+const _: () = assert!(
+    std::mem::size_of::<BackdropGlassParams>() == 96 + MAX_GLASS_LOBES * 32,
+    "the backdrop parameter buffer must match the cbuffer in shaders.hlsl"
+);
+
+impl BackdropGlassParams {
+    fn from_glass(glass: &BackdropGlass) -> Self {
+        let bounds = |bounds: Bounds<ScaledPixels>| {
+            [
+                bounds.origin.x.0,
+                bounds.origin.y.0,
+                bounds.size.width.0,
+                bounds.size.height.0,
+            ]
+        };
+        let radii = |radii: Corners<ScaledPixels>| {
+            [
+                radii.top_left.0,
+                radii.top_right.0,
+                radii.bottom_right.0,
+                radii.bottom_left.0,
+            ]
+        };
+
+        let mut lobes = [[0.0; 4]; MAX_GLASS_LOBES * 2];
+        let lobe_count = (glass.lobe_count as usize).min(MAX_GLASS_LOBES);
+        for (index, lobe) in glass.lobes[..lobe_count].iter().enumerate() {
+            lobes[index * 2] = bounds(lobe.bounds);
+            lobes[index * 2 + 1] = radii(lobe.corner_radii);
+        }
+
+        Self {
+            direction: [0.0, 0.0],
+            sigma: 1.0,
+            bevel: glass.material.bevel.0,
+            bounds: bounds(glass.bounds),
+            radii: radii(glass.corner_radii),
+            mask: bounds(glass.content_mask.bounds),
+            refraction: glass.material.refraction,
+            dispersion: glass.material.dispersion,
+            specular: glass.material.specular,
+            light_angle: glass.material.light_angle,
+            specular_sharpness: glass.material.specular_sharpness,
+            smoothing: glass.material.smoothing.0,
+            lobe_count: lobe_count as u32,
+            _pad: 0,
+            lobes,
+        }
     }
 }
 
@@ -1551,15 +2081,20 @@ fn create_swap_chain(
     Ok(swap_chain)
 }
 
-type CreatedResources = (
-    ID3D11Texture2D,
-    Option<ID3D11RenderTargetView>,
-    ID3D11Texture2D,
-    Option<ID3D11ShaderResourceView>,
-    ID3D11Texture2D,
-    Option<ID3D11RenderTargetView>,
-    D3D11_VIEWPORT,
-);
+struct CreatedResources {
+    render_target: ID3D11Texture2D,
+    render_target_view: Option<ID3D11RenderTargetView>,
+    path_intermediate_texture: ID3D11Texture2D,
+    path_intermediate_srv: Option<ID3D11ShaderResourceView>,
+    path_intermediate_msaa_texture: ID3D11Texture2D,
+    path_intermediate_msaa_view: Option<ID3D11RenderTargetView>,
+    backdrop_snapshot: ID3D11Texture2D,
+    backdrop_snapshot_srv: Option<ID3D11ShaderResourceView>,
+    backdrop_scratch: [ID3D11Texture2D; 2],
+    backdrop_scratch_srv: [Option<ID3D11ShaderResourceView>; 2],
+    backdrop_scratch_view: [Option<ID3D11RenderTargetView>; 2],
+    viewport: D3D11_VIEWPORT,
+}
 
 #[inline]
 fn create_resources(
@@ -1574,6 +2109,12 @@ fn create_resources(
         create_path_intermediate_texture(&devices.device, width, height)?;
     let (path_intermediate_msaa_texture, path_intermediate_msaa_view) =
         create_path_intermediate_msaa_texture_and_view(&devices.device, width, height)?;
+    let (backdrop_snapshot, backdrop_snapshot_srv) =
+        create_backdrop_texture(&devices.device, width, height, false)?;
+    let (first_scratch, first_srv, first_view) =
+        create_backdrop_scratch(&devices.device, width, height)?;
+    let (second_scratch, second_srv, second_view) =
+        create_backdrop_scratch(&devices.device, width, height)?;
     let viewport = D3D11_VIEWPORT {
         TopLeftX: 0.0,
         TopLeftY: 0.0,
@@ -1582,15 +2123,79 @@ fn create_resources(
         MinDepth: 0.0,
         MaxDepth: 1.0,
     };
-    Ok((
+    Ok(CreatedResources {
         render_target,
         render_target_view,
         path_intermediate_texture,
         path_intermediate_srv,
         path_intermediate_msaa_texture,
         path_intermediate_msaa_view,
+        backdrop_snapshot,
+        backdrop_snapshot_srv,
+        backdrop_scratch: [first_scratch, second_scratch],
+        backdrop_scratch_srv: [first_srv, second_srv],
+        backdrop_scratch_view: [first_view, second_view],
         viewport,
-    ))
+    })
+}
+
+/// A full-viewport texture the backdrop passes read, and optionally draw to.
+///
+/// The snapshot only needs to be readable, because it is filled by copying
+/// the render target rather than by drawing; the two scratch textures are
+/// both, because the separable gaussian writes one axis while reading the
+/// other.
+#[inline]
+fn create_backdrop_texture(
+    device: &ID3D11Device,
+    width: u32,
+    height: u32,
+    renderable: bool,
+) -> Result<(ID3D11Texture2D, Option<ID3D11ShaderResourceView>)> {
+    let bind_flags = if renderable {
+        (D3D11_BIND_RENDER_TARGET.0 | D3D11_BIND_SHADER_RESOURCE.0) as u32
+    } else {
+        D3D11_BIND_SHADER_RESOURCE.0 as u32
+    };
+    let texture = unsafe {
+        let mut output = None;
+        let desc = D3D11_TEXTURE2D_DESC {
+            Width: width.max(1),
+            Height: height.max(1),
+            MipLevels: 1,
+            ArraySize: 1,
+            Format: RENDER_TARGET_FORMAT,
+            SampleDesc: DXGI_SAMPLE_DESC {
+                Count: 1,
+                Quality: 0,
+            },
+            Usage: D3D11_USAGE_DEFAULT,
+            BindFlags: bind_flags,
+            CPUAccessFlags: 0,
+            MiscFlags: 0,
+        };
+        device.CreateTexture2D(&desc, None, Some(&mut output))?;
+        output.expect("required framework invariant must hold")
+    };
+    let mut view = None;
+    unsafe { device.CreateShaderResourceView(&texture, None, Some(&mut view))? };
+    Ok((texture, view))
+}
+
+#[inline]
+fn create_backdrop_scratch(
+    device: &ID3D11Device,
+    width: u32,
+    height: u32,
+) -> Result<(
+    ID3D11Texture2D,
+    Option<ID3D11ShaderResourceView>,
+    Option<ID3D11RenderTargetView>,
+)> {
+    let (texture, srv) = create_backdrop_texture(device, width, height, true)?;
+    let mut view = None;
+    unsafe { device.CreateRenderTargetView(&texture, None, Some(&mut view))? };
+    Ok((texture, srv, view))
 }
 
 #[inline]
@@ -1708,6 +2313,23 @@ fn create_blend_state(device: &ID3D11Device) -> Result<ID3D11BlendState> {
     desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
     desc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
     desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
+    desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL.0 as u8;
+    unsafe {
+        let mut state = None;
+        device.CreateBlendState(&desc, Some(&mut state))?;
+        Ok(state.expect("required framework invariant must hold"))
+    }
+}
+
+/// The backdrop passes replace what they cover rather than compositing over
+/// it: the blur's output is the whole of the scratch texture, and the glass
+/// surface is the backdrop it just blurred, painted back where it was. A
+/// fragment outside the shape discards instead of writing a transparent
+/// pixel, which is why blending is off rather than set to source-over.
+#[inline]
+fn create_blend_state_for_backdrop(device: &ID3D11Device) -> Result<ID3D11BlendState> {
+    let mut desc = D3D11_BLEND_DESC::default();
+    desc.RenderTarget[0].BlendEnable = false.into();
     desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL.0 as u8;
     unsafe {
         let mut state = None;
@@ -1890,6 +2512,25 @@ fn set_pipeline_state(
     }
 }
 
+/// The order of the first primitive in a batch, which is what decides whether
+/// a pending glass surface belongs before it.
+fn backdrop_batch_first_order(scene: &Scene, batch: &PrimitiveBatch) -> DrawOrder {
+    match batch {
+        PrimitiveBatch::Shadows(range) => scene.shadows[range.start].order,
+        PrimitiveBatch::Quads(range) => scene.quads[range.start].order,
+        PrimitiveBatch::Paths(range) => scene.paths[range.start].order,
+        PrimitiveBatch::Underlines(range) => scene.underlines[range.start].order,
+        PrimitiveBatch::MonochromeSprites { range, .. } => {
+            scene.monochrome_sprites[range.start].order
+        }
+        PrimitiveBatch::SubpixelSprites { range, .. } => scene.subpixel_sprites[range.start].order,
+        PrimitiveBatch::PolychromeSprites { range, .. } => {
+            scene.polychrome_sprites[range.start].order
+        }
+        PrimitiveBatch::Surfaces(range) => scene.surfaces[range.start].order,
+    }
+}
+
 #[cfg(debug_assertions)]
 fn report_live_objects(device: &ID3D11Device) -> Result<()> {
     let debug_device: ID3D11Debug = device.cast()?;
@@ -1924,6 +2565,8 @@ pub(crate) mod shader_resources {
         SubpixelSprite,
         PolychromeSprite,
         EmojiRasterization,
+        BackdropBlur,
+        BackdropGlass,
     }
 
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -2000,6 +2643,14 @@ pub(crate) mod shader_resources {
                 ShaderModule::EmojiRasterization => match target {
                     ShaderTarget::Vertex => EMOJI_RASTERIZATION_VERTEX_BYTES,
                     ShaderTarget::Fragment => EMOJI_RASTERIZATION_FRAGMENT_BYTES,
+                },
+                ShaderModule::BackdropBlur => match target {
+                    ShaderTarget::Vertex => BACKDROP_BLUR_VERTEX_BYTES,
+                    ShaderTarget::Fragment => BACKDROP_BLUR_FRAGMENT_BYTES,
+                },
+                ShaderModule::BackdropGlass => match target {
+                    ShaderTarget::Vertex => BACKDROP_GLASS_VERTEX_BYTES,
+                    ShaderTarget::Fragment => BACKDROP_GLASS_FRAGMENT_BYTES,
                 },
             };
             Self { inner: bytes }
@@ -2092,6 +2743,10 @@ pub(crate) mod shader_resources {
                 ShaderModule::SubpixelSprite => "subpixel_sprite",
                 ShaderModule::PolychromeSprite => "polychrome_sprite",
                 ShaderModule::EmojiRasterization => "emoji_rasterization",
+                // Both backdrop passes share one vertex shader, which draws
+                // the same full-viewport strip: only the fragment differs.
+                ShaderModule::BackdropBlur => "backdrop_blur",
+                ShaderModule::BackdropGlass => "backdrop_glass",
             }
         }
     }

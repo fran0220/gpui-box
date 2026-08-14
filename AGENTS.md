@@ -129,7 +129,8 @@ software adapters on Linux and Windows —
 with reduced motion and simulated time, so no window, display, dock, or
 compositor takes part and the same scene produces the same bytes on any
 machine with that renderer. Active baselines live in
-`snapshots/headless/{macos,linux,windows}/scenes`, one set per renderer.
+`snapshots/headless/{macos,windows}/scenes`, one set per renderer; the Linux
+set is retired and no CI job compares it.
 
 Never hold a baseline from a real window. A window negotiates its size with
 the display it opens on, which is how `snapshots/macos` came to hold two

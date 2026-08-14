@@ -122,10 +122,11 @@ cargo run -p xtask -- headless capture        # accept
 `tools/headless-visual` renders each scene into an offscreen texture at a size
 it names and reads the pixels straight back. No window, display, menu bar,
 dock, or compositor takes part, so any machine with the same renderer produces
-the same bytes. Baselines live in `snapshots/headless/{macos,linux,windows}/scenes`,
-one set per renderer, because Metal, llvmpipe, and WARP land antialiased edges
-differently. All three sets are active platform-specific gates and must be
-captured on the renderer they represent.
+the same bytes. Baselines live in `snapshots/headless/{macos,windows}/scenes`,
+one set per renderer, because Metal and WARP land antialiased edges
+differently. Both sets are active platform-specific gates and must be
+captured on the renderer they represent. A retired llvmpipe set remains under
+`snapshots/headless/linux` from when CI compared it; no job runs it today.
 
 Text is shaped by cosmic-text from the bundled fonts only. Loading the
 machine's own fonts would shape text differently from one machine to the next,
@@ -248,8 +249,8 @@ cargo run -p xtask -- headless check     # compare against the baseline
 cargo run -p xtask -- headless capture   # accept what check reported
 ```
 
-The active baselines live in `snapshots/headless/{macos,linux,windows}/scenes`.
-Metal, llvmpipe, and WARP land antialiased edges differently, so each supported
+The active baselines live in `snapshots/headless/{macos,windows}/scenes`.
+Metal and WARP land antialiased edges differently, so each supported
 renderer verifies its own baseline.
 
 The harness is its own Cargo workspace because its renderer dependencies and
