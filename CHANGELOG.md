@@ -8,6 +8,30 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ## [Unreleased]
 
+### Added
+
+**Application paint the role vocabulary does not model.** `Theme` now carries
+the active document's palette and reads an entry by `"group.step"` through
+`Theme::palette_color`. An application whose product has colour the shared
+roles have no slot for — a colour per person, a syntax class, a diff sign —
+keeps it in the same token document, validated by the same parse and retinted
+by the same registry, instead of as literals in views. Components never reach
+past the typed roles themselves. An entry the active document does not declare
+resolves to `None` rather than a guessed colour: a theme that has not named a
+scale has not agreed to paint it.
+
+**Identity colour on the mark surfaces.** `Avatar`, `Badge`, `StatusDot` and
+`StatusLine` accept a caller-owned `tint`. A tint answers whose the mark is
+while the tone still answers how it is going, and painting cannot edit the
+claim: `Badge` and `StatusLine` now publish the tone by name, so a mark wearing
+a colour no tone maps to can still be asked what severity it reported. A tinted
+mark keeps the tone language's own treatment — a carried wash, not a filled
+shape — so a colour cannot turn one mark into a second mark shape. `StatusLine`
+additionally reaches `StatusDot`'s breathing state, so a running row does not
+have to be rebuilt out of parts to move. Tints are never derived from a name;
+an application that wants a stable colour per identity derives it and passes
+it, because the library cannot know which colours that application has spent.
+
 ## [0.1.2] - 2026-08-13
 
 ### Added

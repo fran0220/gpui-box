@@ -575,7 +575,30 @@ fn badge(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .child(Badge::new("Danger").danger().id("scene.badge.danger"))
                 .child(Badge::new("Info").info().id("scene.badge.info")),
         )
+        // A tint says whose the badge is. The colours come from the theme's
+        // own palette rather than from literals, so a retinted document
+        // retints these too, and the tone underneath still reports itself.
+        .child(
+            row(&theme)
+                .child(
+                    Badge::new("Ada")
+                        .tint(identity_tint(&theme, "loader.pink"))
+                        .id("scene.badge.tinted-neutral"),
+                )
+                .child(
+                    Badge::new("Grace")
+                        .tint(identity_tint(&theme, "loader.orange"))
+                        .warning()
+                        .id("scene.badge.tinted-warning"),
+                ),
+        )
         .into_any_element()
+}
+
+/// A palette entry as an identity colour, falling back to the accent when a
+/// theme has not named that scale.
+fn identity_tint(theme: &Theme, path: &str) -> gpui::Hsla {
+    theme.palette_color(path).unwrap_or(theme.colors.accent)
 }
 
 fn card(_window: &mut Window, cx: &mut App) -> AnyElement {
@@ -929,10 +952,20 @@ fn status(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .child(StatusDot::new(Tone::Success))
                 .child(StatusDot::new(Tone::Warning))
                 .child(StatusDot::new(Tone::Danger))
-                .child(StatusDot::new(Tone::Neutral)),
+                .child(StatusDot::new(Tone::Neutral))
+                // The same dot wearing an identity colour: a state the six
+                // severities cannot name, still reporting the severity it
+                // claims through the surface around it.
+                .child(StatusDot::new(Tone::Neutral).tint(identity_tint(&theme, "loader.pink"))),
         )
         .child(
             StatusLine::new("Connected", Tone::Success).id("scene.status.line"),
+        )
+        .child(
+            StatusLine::new("Ada · reviewing", Tone::Neutral)
+                .tint(identity_tint(&theme, "loader.pink"))
+                .busy("scene.status.tinted")
+                .id("scene.status.tinted"),
         )
         .child(
             Callout::new(
@@ -3041,7 +3074,12 @@ fn content(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .items_center()
                 .gap(px(theme.space(Space::Sm)))
                 .child(Avatar::new("Ada Lovelace").id("scene.content.avatar"))
-                .child(Avatar::new("").size(24.0)),
+                .child(Avatar::new("").size(24.0))
+                .child(
+                    Avatar::new("Grace Hopper")
+                        .tint(identity_tint(&theme, "loader.orange"))
+                        .id("scene.content.avatar.tinted"),
+                ),
         )
         .child(
             EmptyState::new("scene.content.empty", "No runs yet")

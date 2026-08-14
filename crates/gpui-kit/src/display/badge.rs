@@ -10,6 +10,13 @@ use crate::foundation::{Ident, StyledExt};
 ///
 /// A tone is a statement about the state, not a decoration: Success on an idle
 /// thing says the thing succeeded, which is a different and untrue sentence.
+///
+/// The mark surfaces built on a tone — [`Badge`], [`crate::prelude::StatusDot`]
+/// and [`crate::prelude::StatusLine`] — additionally take a caller-owned
+/// `tint`. A tint answers *whose* the mark is, the tone still answers *how it
+/// is going*, and the two are independent: tinting never edits the reported
+/// severity, which is why those surfaces publish the tone by name once they
+/// can be painted a colour that is not derived from it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Tone {
     #[default]
@@ -45,6 +52,12 @@ impl Tone {
             Self::Info => theme.colors.info,
         }
     }
+
+    /// The paint a mark uses: the caller's tint when it gave one, the tone's
+    /// own colour otherwise.
+    pub(crate) fn mark_color(self, tint: Option<Hsla>, theme: &Theme) -> Hsla {
+        tint.unwrap_or_else(|| self.color(theme))
+    }
 }
 
 /// A compact status label.
@@ -56,6 +69,7 @@ pub struct Badge {
     ident: Option<Ident>,
     label: SharedString,
     tone: Tone,
+    tint: Option<Hsla>,
 }
 
 impl Badge {
@@ -64,6 +78,7 @@ impl Badge {
             ident: None,
             label: label.into(),
             tone: Tone::default(),
+            tint: None,
         }
     }
 
@@ -100,6 +115,18 @@ impl Badge {
     pub fn info(self) -> Self {
         self.tone(Tone::Info)
     }
+
+    /// Paints the badge in a caller-owned colour, leaving the severity it
+    /// reports alone.
+    ///
+    /// For a badge that belongs to a colour-identified thing — a person, a
+    /// branch, a label. The tinted badge keeps the tone language's own
+    /// treatment, so a colour cannot turn one badge into a second badge
+    /// shape, and [`Tone::name`] is still what the node publishes.
+    pub fn tint(mut self, tint: Hsla) -> Self {
+        self.tint = Some(tint);
+        self
+    }
 }
 
 impl RenderOnce for Badge {
@@ -110,9 +137,14 @@ impl RenderOnce for Badge {
         // which is what lets the outline go: an outline around a shape that
         // is already a colour was only ever compensating for a tint too weak
         // to see.
-        let (foreground, background) = match self.tone {
-            Tone::Neutral => (theme.colors.text_muted, theme.colors.raised),
-            tone => {
+        let (foreground, background) = match (self.tint, self.tone) {
+            // A tint is a colour the caller chose on purpose, so it takes the
+            // coloured treatment even at Neutral: the tone says nothing about
+            // severity there, which is exactly the case an identity colour is
+            // for.
+            (Some(tint), _) => (tint, tint.opacity(0.18)),
+            (None, Tone::Neutral) => (theme.colors.text_muted, theme.colors.raised),
+            (None, tone) => {
                 let color = tone.color(&theme);
                 (color, color.opacity(0.18))
             }
@@ -131,7 +163,12 @@ impl RenderOnce for Badge {
             Some(ident) => element
                 .semantic_in(
                     cx,
-                    NodeSpec::new(ident.semantic_id(), Role::Status).text(self.label.clone()),
+                    NodeSpec::new(ident.semantic_id(), Role::Status)
+                        .text(self.label.clone())
+                        // The severity by name, because a tint can paint this
+                        // badge a colour no tone maps to and a reader would
+                        // then have no way to ask what it claimed.
+                        .value(self.tone.name()),
                 )
                 .into_any_element(),
             None => element.into_any_element(),

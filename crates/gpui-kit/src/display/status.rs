@@ -1,4 +1,6 @@
-use gpui::{App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div, px};
+use gpui::{
+    App, Hsla, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div, px,
+};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
 
@@ -10,6 +12,7 @@ use crate::motion;
 #[derive(Debug, IntoElement)]
 pub struct StatusDot {
     tone: Tone,
+    tint: Option<Hsla>,
     /// The identity a breathing dot animates under, when it is reporting
     /// work that is still going.
     busy: Option<Ident>,
@@ -17,7 +20,22 @@ pub struct StatusDot {
 
 impl StatusDot {
     pub fn new(tone: Tone) -> Self {
-        Self { tone, busy: None }
+        Self {
+            tone,
+            tint: None,
+            busy: None,
+        }
+    }
+
+    /// Paints the dot in a caller-owned colour without changing the severity
+    /// the surface around it reports.
+    ///
+    /// A dot is the smallest identity mark the library has, and an
+    /// application that colours people or workspaces needs one that is not
+    /// limited to the six severities. See [`Tone`] for what stays true.
+    pub fn tint(mut self, tint: Hsla) -> Self {
+        self.tint = Some(tint);
+        self
     }
 
     /// Breathes the dot, for a state that is still running.
@@ -38,7 +56,7 @@ impl RenderOnce for StatusDot {
             .flex_none()
             .size(px(7.0))
             .rounded_full()
-            .bg(self.tone.color(&theme));
+            .bg(self.tone.mark_color(self.tint, &theme));
         match self.busy {
             Some(ident) => motion::breathe(dot, ident.element_id(), &theme, cx),
             None => dot.into_any_element(),
@@ -52,6 +70,8 @@ pub struct StatusLine {
     ident: Option<Ident>,
     label: SharedString,
     tone: Tone,
+    tint: Option<Hsla>,
+    busy: Option<Ident>,
 }
 
 impl StatusLine {
@@ -60,6 +80,8 @@ impl StatusLine {
             ident: None,
             label: label.into(),
             tone,
+            tint: None,
+            busy: None,
         }
     }
 
@@ -67,23 +89,53 @@ impl StatusLine {
         self.ident = Some(ident.into());
         self
     }
+
+    /// Paints the dot in a caller-owned colour, leaving the reported severity
+    /// alone. See [`Tone`].
+    pub fn tint(mut self, tint: Hsla) -> Self {
+        self.tint = Some(tint);
+        self
+    }
+
+    /// Breathes the dot, for state that is still running.
+    ///
+    /// The same claim [`StatusDot::busy`] makes, reachable from the labelled
+    /// form, so a running row does not have to be rebuilt out of parts to
+    /// move.
+    pub fn busy(mut self, ident: impl Into<Ident>) -> Self {
+        self.busy = Some(ident.into());
+        self
+    }
 }
 
 impl RenderOnce for StatusLine {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
+        let mut dot = StatusDot::new(self.tone);
+        if let Some(tint) = self.tint {
+            dot = dot.tint(tint);
+        }
+        if let Some(busy) = self.busy.clone() {
+            dot = dot.busy(busy);
+        }
         let element = div()
             .row()
             .gap_token(&theme, Space::Sm)
             .type_scale(&theme, TypeScale::Label)
             .text_color(theme.colors.text_muted)
-            .child(StatusDot::new(self.tone))
+            .child(dot)
             .child(self.label.clone());
         match self.ident {
             Some(ident) => element
                 .semantic_in(
                     cx,
-                    NodeSpec::new(ident.semantic_id(), Role::Status).text(self.label.clone()),
+                    NodeSpec::new(ident.semantic_id(), Role::Status)
+                        .text(self.label.clone())
+                        // The severity by name: a tinted dot no longer says
+                        // it in paint, and a running line is busy whatever
+                        // colour it wears.
+                        .value(self.tone.name())
+                        .busy(self.busy.is_some()),
                 )
                 .into_any_element(),
             None => element.into_any_element(),

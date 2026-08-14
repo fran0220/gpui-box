@@ -9,8 +9,8 @@ use gpui_kit_tokens::{
 };
 
 pub use gpui_kit_tokens::{
-    Appearance, ControlSize, Density, Elevation, Layer, MotionDuration, MotionEasing, Radius,
-    SemanticColor, Space, SpringPreset, SpringTokens, Surface, TextTone, TypeScale,
+    Appearance, ControlSize, Density, Elevation, Layer, MotionDuration, MotionEasing, Palette,
+    Radius, SemanticColor, Space, SpringPreset, SpringTokens, Surface, TextTone, TypeScale,
 };
 
 /// Reads the active theme from any context that dereferences to [`App`].
@@ -44,6 +44,13 @@ pub struct Theme {
     pub elevation: Elevations,
     pub z_index: ZIndices,
     pub effects: Effects,
+    /// The active document's palette, carried so that paint the shared role
+    /// vocabulary has no slot for still travels with the theme rather than
+    /// being read from a second document the registry does not know about.
+    ///
+    /// Read it through [`Theme::palette_color`]. Shared behind an `Arc`
+    /// because a theme is cloned on every render that reads it.
+    pub palette: Arc<Palette>,
 }
 
 #[derive(Debug, Clone)]
@@ -447,7 +454,26 @@ impl Theme {
                 glass_contrast_flip_high: tokens.effect.glass_contrast_flip_high,
                 glass_press_depth: tokens.effect.glass_press_depth,
             },
+            palette: Arc::new(tokens.color.palette.clone()),
         }
+    }
+
+    /// A palette entry, addressed as `"group.step"`.
+    ///
+    /// The typed roles are the vocabulary components paint from, and a
+    /// component never reaches past them. This is for the application that
+    /// has paint the shared vocabulary does not model — a colour per person,
+    /// a syntax class, a diff sign — and wants it to live in the same token
+    /// document, validated by the same parse and retinted by the same
+    /// registry, instead of as literals in views.
+    ///
+    /// An entry the active document does not declare is `None`, never a
+    /// guessed colour: a theme that has not named a scale has not agreed to
+    /// paint it.
+    pub fn palette_color(&self, path: &str) -> Option<Hsla> {
+        let (group, step) = path.split_once('.')?;
+        let value = self.palette.get(group)?.get(step)?;
+        Color::resolve(path, value, &self.palette).ok().map(color)
     }
 
     pub fn surface(&self, surface: Surface) -> Hsla {
@@ -916,5 +942,59 @@ mod tests {
         assert_eq!(ring.len(), 1);
         assert!(ring[0].inset);
         assert_eq!(ring[0].spread_radius, px(1.0));
+    }
+
+    #[test]
+    fn a_palette_entry_resolves_to_the_same_paint_a_role_would_have() {
+        let theme = Theme::studio_dark();
+        // `indigo.400` is what `color.semantic.accent` references, so reading
+        // the scale directly must land on the paint the role produced rather
+        // than on a second interpretation of the same hex.
+        assert_eq!(theme.palette_color("indigo.400"), Some(theme.colors.accent));
+        assert_eq!(
+            theme.palette_color("indigo.600"),
+            Some(theme.colors.accent_strong)
+        );
+        // A scale no role happens to reference is readable all the same; that
+        // is the point of reaching the palette rather than the roles.
+        assert_eq!(
+            theme.palette_color("loader.blue"),
+            Some(color(Color::parse("test", "#b6d3ef").expect("literal")))
+        );
+    }
+
+    #[test]
+    fn an_undeclared_palette_entry_is_none_rather_than_a_guess() {
+        let theme = Theme::studio_dark();
+        assert_eq!(theme.palette_color("indigo.999"), None);
+        assert_eq!(theme.palette_color("nosuchgroup.400"), None);
+        // A path with no step names a group, not a colour.
+        assert_eq!(theme.palette_color("indigo"), None);
+    }
+
+    #[test]
+    fn the_palette_travels_with_the_document_the_registry_activated() {
+        let mut registry = ThemeRegistry::new();
+        let retinted = serde_json::to_string(&{
+            let mut document: serde_json::Value = serde_json::from_str(include_str!(
+                "../../gpui-kit-tokens/tokens/studio-dark.json"
+            ))
+            .expect("bundled dark document");
+            document["meta"]["id"] = serde_json::Value::String("palette-probe".into());
+            document["color"]["palette"]["identity"] = serde_json::json!({ "violet": "#8b5cf6" });
+            document
+        })
+        .expect("retinted document");
+
+        // Before registration the scale does not exist, and afterwards the
+        // active theme paints it — which is the whole claim: an application
+        // scale follows the registry instead of a document held on the side.
+        assert_eq!(registry.active().palette_color("identity.violet"), None);
+        registry.register_json(&retinted).expect("register");
+        assert!(registry.activate("palette-probe"));
+        assert_eq!(
+            registry.active().palette_color("identity.violet"),
+            Some(color(Color::parse("test", "#8b5cf6").expect("literal")))
+        );
     }
 }

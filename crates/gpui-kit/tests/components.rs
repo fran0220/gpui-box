@@ -187,6 +187,39 @@ fn decorative_badges_stay_out_of_the_semantic_tree(cx: &mut TestAppContext) {
     text(&snapshot, "row.state", "Stale").expect("identified badges publish their label");
 }
 
+/// A tint answers whose the mark is; the tone still answers how it is going.
+/// Painting cannot edit the claim, which is the only thing that makes a
+/// caller-owned colour safe on a status surface.
+#[gpui::test]
+fn a_tinted_mark_still_reports_the_severity_it_claims(cx: &mut TestAppContext) {
+    let mut harness = harness(cx, |_, cx| {
+        let tint = cx.theme().colors.info;
+        div()
+            .child(Badge::new("Ada").tint(tint).id("roster.ada.badge"))
+            .child(
+                StatusLine::new("Reviewing", Tone::Warning)
+                    .tint(tint)
+                    .busy("roster.ada.state")
+                    .id("roster.ada.state"),
+            )
+            .into_any_element()
+    });
+
+    let snapshot = harness.snapshot();
+    // An untoned badge that got a colour is still making no severity claim.
+    assert_eq!(
+        visible(&snapshot, "roster.ada.badge")
+            .expect("badge is visible")
+            .value
+            .as_deref(),
+        Some("neutral")
+    );
+    let line = visible(&snapshot, "roster.ada.state").expect("status line is visible");
+    assert_eq!(line.value.as_deref(), Some("warning"));
+    assert!(line.busy, "a running line reports busy whatever it wears");
+    text(&snapshot, "roster.ada.state", "Reviewing").expect("the label is the accessible name");
+}
+
 #[gpui::test]
 fn credentials_never_reach_a_snapshot(cx: &mut TestAppContext) {
     let mut harness = harness(cx, |_, _| {

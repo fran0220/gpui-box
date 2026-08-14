@@ -165,7 +165,8 @@
       "options": [
         "id(ident: impl Into<Ident>) -> Self",
         "image(image: impl Into<SharedString>) -> Self",
-        "size(size: f32) -> Self"
+        "size(size: f32) -> Self",
+        "tint(tint: Hsla) -> Self"
       ],
       "commands": [],
       "queries": [],
@@ -205,7 +206,8 @@
         "success() -> Self",
         "warning() -> Self",
         "danger() -> Self",
-        "info() -> Self"
+        "info() -> Self",
+        "tint(tint: Hsla) -> Self"
       ],
       "commands": [],
       "queries": [],
@@ -2978,6 +2980,7 @@
         "new(tone: Tone) -> Self"
       ],
       "options": [
+        "tint(tint: Hsla) -> Self",
         "busy(ident: impl Into<Ident>) -> Self"
       ],
       "commands": [],
@@ -2998,7 +3001,9 @@
         "new(label: impl Into<SharedString>, tone: Tone) -> Self"
       ],
       "options": [
-        "id(ident: impl Into<Ident>) -> Self"
+        "id(ident: impl Into<Ident>) -> Self",
+        "tint(tint: Hsla) -> Self",
+        "busy(ident: impl Into<Ident>) -> Self"
       ],
       "commands": [],
       "queries": [],
@@ -8474,7 +8479,7 @@
       "uses": [
         "Badge"
       ],
-      "example": "fn badge(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(\n            row(&theme)\n                .child(Badge::new(\"Neutral\").neutral().id(\"scene.badge.neutral\"))\n                .child(Badge::new(\"Accent\").accent().id(\"scene.badge.accent\"))\n                .child(Badge::new(\"Success\").success().id(\"scene.badge.success\"))\n                .child(Badge::new(\"Warning\").warning().id(\"scene.badge.warning\"))\n                .child(Badge::new(\"Danger\").danger().id(\"scene.badge.danger\"))\n                .child(Badge::new(\"Info\").info().id(\"scene.badge.info\")),\n        )\n        .into_any_element()\n}"
+      "example": "fn badge(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(\n            row(&theme)\n                .child(Badge::new(\"Neutral\").neutral().id(\"scene.badge.neutral\"))\n                .child(Badge::new(\"Accent\").accent().id(\"scene.badge.accent\"))\n                .child(Badge::new(\"Success\").success().id(\"scene.badge.success\"))\n                .child(Badge::new(\"Warning\").warning().id(\"scene.badge.warning\"))\n                .child(Badge::new(\"Danger\").danger().id(\"scene.badge.danger\"))\n                .child(Badge::new(\"Info\").info().id(\"scene.badge.info\")),\n        )\n        // A tint says whose the badge is. The colours come from the theme's\n        // own palette rather than from literals, so a retinted document\n        // retints these too, and the tone underneath still reports itself.\n        .child(\n            row(&theme)\n                .child(\n                    Badge::new(\"Ada\")\n                        .tint(identity_tint(&theme, \"loader.pink\"))\n                        .id(\"scene.badge.tinted-neutral\"),\n                )\n                .child(\n                    Badge::new(\"Grace\")\n                        .tint(identity_tint(&theme, \"loader.orange\"))\n                        .warning()\n                        .id(\"scene.badge.tinted-warning\"),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "card",
@@ -8494,7 +8499,7 @@
         "StatusDot",
         "StatusLine"
       ],
-      "example": "fn status(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(\n            row(&theme)\n                .child(StatusDot::new(Tone::Success))\n                .child(StatusDot::new(Tone::Warning))\n                .child(StatusDot::new(Tone::Danger))\n                .child(StatusDot::new(Tone::Neutral)),\n        )\n        .child(\n            StatusLine::new(\"Connected\", Tone::Success).id(\"scene.status.line\"),\n        )\n        .child(\n            Callout::new(\n                \"The host refused this action. The refusal is shown, not converted to an empty state.\",\n                Tone::Danger,\n            )\n            .id(\"scene.status.refusal\"),\n        )\n        .child(\n            Callout::new(\"Refreshing failed. The last verified value remains visible.\", Tone::Warning)\n                .id(\"scene.status.stale\"),\n        )\n        .into_any_element()\n}"
+      "example": "fn status(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(\n            row(&theme)\n                .child(StatusDot::new(Tone::Success))\n                .child(StatusDot::new(Tone::Warning))\n                .child(StatusDot::new(Tone::Danger))\n                .child(StatusDot::new(Tone::Neutral))\n                // The same dot wearing an identity colour: a state the six\n                // severities cannot name, still reporting the severity it\n                // claims through the surface around it.\n                .child(StatusDot::new(Tone::Neutral).tint(identity_tint(&theme, \"loader.pink\"))),\n        )\n        .child(\n            StatusLine::new(\"Connected\", Tone::Success).id(\"scene.status.line\"),\n        )\n        .child(\n            StatusLine::new(\"Ada · reviewing\", Tone::Neutral)\n                .tint(identity_tint(&theme, \"loader.pink\"))\n                .busy(\"scene.status.tinted\")\n                .id(\"scene.status.tinted\"),\n        )\n        .child(\n            Callout::new(\n                \"The host refused this action. The refusal is shown, not converted to an empty state.\",\n                Tone::Danger,\n            )\n            .id(\"scene.status.refusal\"),\n        )\n        .child(\n            Callout::new(\"Refreshing failed. The last verified value remains visible.\", Tone::Warning)\n                .id(\"scene.status.stale\"),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "loading",
@@ -8617,7 +8622,7 @@
         "Tag",
         "Timeline"
       ],
-      "example": "fn content(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    div()\n        .flex()\n        .flex_col()\n        .gap(px(theme.space(Space::Lg)))\n        .p(px(theme.space(Space::Lg)))\n        .w(px(420.0))\n        .child(\n            ProgressBar::new(\"scene.content.upload\")\n                .label(\"Indexing workspace\")\n                .count(3, 12),\n        )\n        .child(ProgressBar::new(\"scene.content.unknown\").label(\"Contacting host\"))\n        .child(Divider::new().id(\"scene.content.rule\").label(\"Filters\"))\n        .child(\n            div()\n                .flex()\n                .flex_row()\n                .flex_wrap()\n                .gap(px(theme.space(Space::Xs)))\n                .child(Tag::new(\"scene.content.tag.rust\", \"rust\").on_remove(|_, _| {}))\n                .child(\n                    Tag::new(\"scene.content.tag.failing\", \"failing\")\n                        .tone(Tone::Danger)\n                        .on_remove(|_, _| {}),\n                )\n                .child(Tag::new(\"scene.content.tag.pinned\", \"pinned\").disabled(true)),\n        )\n        .child(\n            div()\n                .flex()\n                .flex_row()\n                .items_center()\n                .gap(px(theme.space(Space::Sm)))\n                .child(Avatar::new(\"Ada Lovelace\").id(\"scene.content.avatar\"))\n                .child(Avatar::new(\"\").size(24.0)),\n        )\n        .child(\n            EmptyState::new(\"scene.content.empty\", \"No runs yet\")\n                .kind(EmptyKind::Unstarted)\n                .detail(\"A run appears here once one has been started.\"),\n        )\n        .child(\n            EmptyState::new(\"scene.content.refused\", \"The host refused the request\")\n                .kind(EmptyKind::Unavailable)\n                .detail(\"Approval is required for this workspace.\")\n                .action(\n                    Button::new(\"scene.content.retry\")\n                        .label(\"Try again\")\n                        .secondary()\n                        .on_click(|_, _| {}),\n                ),\n        )\n        .into_any_element()\n}"
+      "example": "fn content(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    div()\n        .flex()\n        .flex_col()\n        .gap(px(theme.space(Space::Lg)))\n        .p(px(theme.space(Space::Lg)))\n        .w(px(420.0))\n        .child(\n            ProgressBar::new(\"scene.content.upload\")\n                .label(\"Indexing workspace\")\n                .count(3, 12),\n        )\n        .child(ProgressBar::new(\"scene.content.unknown\").label(\"Contacting host\"))\n        .child(Divider::new().id(\"scene.content.rule\").label(\"Filters\"))\n        .child(\n            div()\n                .flex()\n                .flex_row()\n                .flex_wrap()\n                .gap(px(theme.space(Space::Xs)))\n                .child(Tag::new(\"scene.content.tag.rust\", \"rust\").on_remove(|_, _| {}))\n                .child(\n                    Tag::new(\"scene.content.tag.failing\", \"failing\")\n                        .tone(Tone::Danger)\n                        .on_remove(|_, _| {}),\n                )\n                .child(Tag::new(\"scene.content.tag.pinned\", \"pinned\").disabled(true)),\n        )\n        .child(\n            div()\n                .flex()\n                .flex_row()\n                .items_center()\n                .gap(px(theme.space(Space::Sm)))\n                .child(Avatar::new(\"Ada Lovelace\").id(\"scene.content.avatar\"))\n                .child(Avatar::new(\"\").size(24.0))\n                .child(\n                    Avatar::new(\"Grace Hopper\")\n                        .tint(identity_tint(&theme, \"loader.orange\"))\n                        .id(\"scene.content.avatar.tinted\"),\n                ),\n        )\n        .child(\n            EmptyState::new(\"scene.content.empty\", \"No runs yet\")\n                .kind(EmptyKind::Unstarted)\n                .detail(\"A run appears here once one has been started.\"),\n        )\n        .child(\n            EmptyState::new(\"scene.content.refused\", \"The host refused the request\")\n                .kind(EmptyKind::Unavailable)\n                .detail(\"Approval is required for this workspace.\")\n                .action(\n                    Button::new(\"scene.content.retry\")\n                        .label(\"Try again\")\n                        .secondary()\n                        .on_click(|_, _| {}),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "kbd",
