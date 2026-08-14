@@ -35,7 +35,11 @@ const MAX_INSTANCE_BUFFER_SIZE: usize = 256 * 1024 * 1024;
 /// [`BackdropGlass::gaussian_pass_count`], which this renderer shares with
 /// WGPU; how many a frame may afford is this renderer's own, because it is a
 /// property of drawing them one at a time into the swap chain.
-const MAX_BACKDROP_GLASS_PASSES_PER_FRAME: usize = 64;
+/// Sized so a scene holding [`MAX_LUMINANCE_PROBES`] surfaces at the themes'
+/// standard blur — twelve blur passes each at 2x scale — still fits with room
+/// to spare; a surface past the budget keeps its optics and its probe but
+/// loses the blur.
+const MAX_BACKDROP_GLASS_PASSES_PER_FRAME: usize = 256;
 
 pub(crate) struct FontInfo {
     pub gamma_ratios: [f32; 4],

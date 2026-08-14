@@ -23,7 +23,11 @@ const MAX_INSTANCE_BUFFER_SIZE: u64 = 256 * 1024 * 1024;
 // shares with DirectX; how much of a frame all of them together may spend is
 // this renderer's own budget, because it is a property of its pass encoding.
 // Unsupported regions fall back to their unblurred backdrop.
-const MAX_BACKDROP_GLASS_RENDER_PASSES_PER_FRAME: usize = 64;
+// Sized so a scene holding [`gpui::MAX_LUMINANCE_PROBES`] surfaces at the
+// themes' standard blur — thirteen render passes each at 2x scale — still
+// fits with room to spare, because a surface the budget rejects loses its
+// optics and its probe entirely rather than degrading.
+const MAX_BACKDROP_GLASS_RENDER_PASSES_PER_FRAME: usize = 256;
 const MAX_BACKDROP_GLASS_PARAMETER_BUFFERS: usize = MAX_BACKDROP_GLASS_RENDER_PASSES_PER_FRAME + 1;
 
 const INSTANCE_TEXTURE_TEXEL_SIZE: u64 = 16;
@@ -3441,10 +3445,27 @@ mod tests {
             }
         }
 
-        assert_eq!(accepted_regions, 21);
-        assert_eq!(accepted_render_passes, 63);
+        assert_eq!(accepted_regions, 85);
+        assert_eq!(accepted_render_passes, 255);
         assert_eq!(remaining, 1);
         assert!(accepted_render_passes < MAX_BACKDROP_GLASS_PARAMETER_BUFFERS);
+    }
+
+    #[test]
+    fn a_catalog_of_probed_surfaces_fits_the_budget() {
+        // Sixteen surfaces at the themes' standard blur — 24 logical pixels
+        // at 2x scale — all fit, because a surface the budget rejects loses
+        // its probe with its optics. This is the frame that regressed when
+        // the budget was 64: the fifth surface fell out and its probe
+        // silently stopped reading.
+        let blur = backdrop_glass_with_radius(48.0);
+        let mut remaining = MAX_BACKDROP_GLASS_RENDER_PASSES_PER_FRAME;
+        for surface in 0..16 {
+            assert!(
+                planned_backdrop_glass_pass_count(&blur, &mut remaining).is_some(),
+                "surface {surface} of a full probe complement must still draw"
+            );
+        }
     }
 
     #[test]
@@ -3456,6 +3477,94 @@ mod tests {
     #[test]
     fn storage_buffer_shader_is_valid_wgsl() {
         validate_wgsl(STORAGE_BUFFER_SHADERS, naga::valid::Capabilities::empty());
+    }
+
+    /// A scene that paints one full-viewport quad of `background` and lays a
+    /// probed glass surface over the middle of it.
+    fn probed_scene(background: gpui::Hsla, slot: u32) -> Scene {
+        use gpui::{Background, BorderStyle, Edges, Hsla, point, size};
+        let mut scene = Scene::default();
+        let viewport = Bounds {
+            origin: point(ScaledPixels(0.), ScaledPixels(0.)),
+            size: size(ScaledPixels(256.), ScaledPixels(256.)),
+        };
+        scene.insert_primitive(Quad {
+            order: 0,
+            border_style: BorderStyle::default(),
+            bounds: viewport,
+            content_mask: ContentMask { bounds: viewport },
+            background: Background::from(background),
+            border_color: Hsla::transparent_black(),
+            corner_radii: Corners::default(),
+            border_widths: Edges::default(),
+        });
+        scene.insert_backdrop_glass(BackdropGlass {
+            order: 0,
+            blur_radius: ScaledPixels(16.),
+            bounds: Bounds {
+                origin: point(ScaledPixels(64.), ScaledPixels(64.)),
+                size: size(ScaledPixels(128.), ScaledPixels(128.)),
+            },
+            content_mask: ContentMask { bounds: viewport },
+            corner_radii: Corners::default(),
+            material: GlassMaterial {
+                probe: slot,
+                ..GlassMaterial::frosted()
+            },
+            lobes: [GlassLobe::default(); MAX_GLASS_LOBES],
+            lobe_count: 0,
+        });
+        scene.finish();
+        scene
+    }
+
+    /// The probe reports what was behind the surface: near-white over a white
+    /// backdrop, near-black over a black one, and nothing at all before any
+    /// probed frame has completed. Runs against whatever adapter wgpu finds
+    /// on the validation machine, the same code path the Windows headless
+    /// gate exercises on WARP.
+    #[test]
+    fn a_probe_reads_the_backdrop_it_blurred() {
+        use gpui::{DevicePixels, Hsla, size};
+        let mut headless = match WgpuHeadlessRenderer::new() {
+            Ok(headless) => headless,
+            Err(error) => {
+                // The headless context insists on a software adapter for
+                // determinism, and a machine without one (macOS) validates
+                // this path through its own renderer's twin of this test.
+                eprintln!("skipping: {error}");
+                return;
+            }
+        };
+        let extent: Size<DevicePixels> = size(DevicePixels(256), DevicePixels(256));
+
+        assert_eq!(
+            gpui::PlatformHeadlessRenderer::backdrop_luminance(&mut headless, 0),
+            None,
+            "no frame has filled the slot yet"
+        );
+
+        // Through the same image path the headless harness captures with,
+        // not just the bare offscreen draw.
+        let white = probed_scene(Hsla::white(), 0);
+        gpui::PlatformHeadlessRenderer::render_scene_to_image(&mut headless, &white, extent)
+            .expect("the headless wgpu renderer draws");
+        let bright = gpui::PlatformHeadlessRenderer::backdrop_luminance(&mut headless, 0)
+            .expect("the completed frame filled the slot");
+        assert!(bright > 0.9, "a white backdrop reads bright, got {bright}");
+
+        let black = probed_scene(Hsla::black(), 0);
+        gpui::PlatformHeadlessRenderer::render_scene_to_image(&mut headless, &black, extent)
+            .expect("the headless wgpu renderer draws");
+        let dark = gpui::PlatformHeadlessRenderer::backdrop_luminance(&mut headless, 0)
+            .expect("the completed frame filled the slot");
+        assert!(dark < 0.1, "a black backdrop reads dark, got {dark}");
+
+        assert_eq!(
+            gpui::PlatformHeadlessRenderer::backdrop_luminance(&mut headless, 1),
+            None,
+            "an unprobed slot stays empty"
+        );
     }
 
     #[test]
