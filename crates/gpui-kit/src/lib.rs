@@ -92,6 +92,12 @@ pub mod prelude {
     pub use crate::agent::cost::{
         Basis, ContextGauge, CostLine, CostMeter, LastVerified, Limit, Quantity, Reading,
     };
+    pub use crate::agent::model::{
+        AgentActivity, AgentDescriptor, AgentExecutionState, AgentId, AgentModelIssue,
+        AgentOutcome, AgentPresence, AgentRunSnapshot, AgentSnapshot, AgentTaskSnapshot,
+        AgentUiAction, AggregationSnapshot, InvocationId, RunId, RunLink, RunLinkId, RunLinkKind,
+        RunSubjectId, TaskId, VisualEventId, WaitReason,
+    };
     pub use crate::agent::offering_catalog::{
         OfferingCatalog, OfferingIdentity, OfferingSource, OfferingSourceState, SearchableOffering,
     };

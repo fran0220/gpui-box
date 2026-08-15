@@ -3878,6 +3878,217 @@
       "queries": []
     },
     {
+      "name": "AgentActivity",
+      "path": "gpui_kit::agent::AgentActivity",
+      "summary": "What useful work an active agent is visibly doing.",
+      "variants": [
+        "Idle",
+        "Planning",
+        "Thinking",
+        "UsingTool",
+        "Speaking",
+        "Aggregating",
+        "Custom"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "as_str() -> &'static str"
+      ]
+    },
+    {
+      "name": "AgentDescriptor",
+      "path": "gpui_kit::agent::AgentDescriptor",
+      "summary": "Identity and caller-owned description of one agent.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<AgentId>, name: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "role(role: impl Into<SharedString>) -> Self",
+        "capabilities(capabilities: impl IntoIterator<Item = impl Into<SharedString>>) -> Self"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "AgentExecutionState",
+      "path": "gpui_kit::agent::AgentExecutionState",
+      "summary": "Mutually exclusive execution state for an agent, task, or run.",
+      "variants": [
+        "Idle",
+        "Queued",
+        "Starting",
+        "Active",
+        "Waiting",
+        "Blocked",
+        "Cancelling",
+        "Completed",
+        "Unavailable"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "as_str() -> &'static str",
+        "busy() -> bool",
+        "terminal() -> bool"
+      ]
+    },
+    {
+      "name": "AgentId",
+      "path": "gpui_kit::agent::AgentId",
+      "summary": "The stable identity of an agent, independent of its role or display name.",
+      "variants": [],
+      "construct": [
+        "new(value: impl Into<SharedString>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "as_str() -> &str"
+      ]
+    },
+    {
+      "name": "AgentModelIssue",
+      "path": "gpui_kit::agent::AgentModelIssue",
+      "summary": "A structural problem found in an AgentRunSnapshot.",
+      "variants": [
+        "MissingRoot",
+        "DuplicateAgent",
+        "DuplicateTask",
+        "DuplicateLink",
+        "MissingTaskOwner",
+        "MissingLinkEndpoint",
+        "SelfLink"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "AgentOutcome",
+      "path": "gpui_kit::agent::AgentOutcome",
+      "summary": "The terminal result of an agent, task, or run.",
+      "variants": [
+        "Succeeded",
+        "Partial",
+        "Failed",
+        "Refused",
+        "Cancelled",
+        "TimedOut"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "as_str() -> &'static str"
+      ]
+    },
+    {
+      "name": "AgentPresence",
+      "path": "gpui_kit::agent::AgentPresence",
+      "summary": "Whether the host can presently reach an agent.",
+      "variants": [
+        "Unknown",
+        "Online",
+        "Away",
+        "Offline",
+        "Unavailable"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "as_str() -> &'static str"
+      ]
+    },
+    {
+      "name": "AgentRunSnapshot",
+      "path": "gpui_kit::agent::AgentRunSnapshot",
+      "summary": "A complete observed run. The caller replaces or updates it as facts change.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<RunId>, root: impl Into<AgentId>) -> Self"
+      ],
+      "options": [
+        "execution(execution: AgentExecutionState) -> Self",
+        "agents(agents: impl IntoIterator<Item = AgentSnapshot>) -> Self",
+        "tasks(tasks: impl IntoIterator<Item = AgentTaskSnapshot>) -> Self",
+        "links(links: impl IntoIterator<Item = RunLink>) -> Self",
+        "aggregation(aggregation: AggregationSnapshot) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "issues() -> Vec<AgentModelIssue>"
+      ]
+    },
+    {
+      "name": "AgentSnapshot",
+      "path": "gpui_kit::agent::AgentSnapshot",
+      "summary": "One agent at one observed point in a run.",
+      "variants": [],
+      "construct": [
+        "new(descriptor: AgentDescriptor) -> Self"
+      ],
+      "options": [
+        "presence(presence: AgentPresence) -> Self",
+        "execution(execution: AgentExecutionState) -> Self",
+        "current_task(task: impl Into<TaskId>) -> Self",
+        "progress(progress: f32) -> Self"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "AgentTaskSnapshot",
+      "path": "gpui_kit::agent::AgentTaskSnapshot",
+      "summary": "One caller-owned task in a run.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<TaskId>, label: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "owner(owner: impl Into<AgentId>) -> Self",
+        "execution(execution: AgentExecutionState) -> Self"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "AgentUiAction",
+      "path": "gpui_kit::agent::AgentUiAction",
+      "summary": "An action a multi-agent surface asks the host to consider.",
+      "variants": [
+        "SelectAgent",
+        "OpenTask",
+        "RequestCancel",
+        "RequestRetry",
+        "FocusResult"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "AggregationSnapshot",
+      "path": "gpui_kit::agent::AggregationSnapshot",
+      "summary": "A caller-owned count of the results being combined.",
+      "variants": [],
+      "construct": [
+        "new(expected: usize, received: usize) -> Self"
+      ],
+      "options": [
+        "conflicts(conflicts: usize) -> Self",
+        "outcome(outcome: AgentOutcome) -> Self"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "Align",
       "path": "gpui_kit::data::Align",
       "summary": "Where a cell's content sits inside its column.",
@@ -5748,6 +5959,20 @@
       "queries": []
     },
     {
+      "name": "InvocationId",
+      "path": "gpui_kit::agent::InvocationId",
+      "summary": "The stable identity of one tool or capability invocation.",
+      "variants": [],
+      "construct": [
+        "new(value: impl Into<SharedString>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "as_str() -> &str"
+      ]
+    },
+    {
       "name": "JsonValue",
       "path": "gpui_kit::structured::JsonValue",
       "summary": "A JSON value, plus the one thing JSON cannot say: that a subtree is being withheld on purpose.",
@@ -7225,6 +7450,20 @@
       "queries": []
     },
     {
+      "name": "RunId",
+      "path": "gpui_kit::agent::RunId",
+      "summary": "The stable identity of one run.",
+      "variants": [],
+      "construct": [
+        "new(value: impl Into<SharedString>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "as_str() -> &str"
+      ]
+    },
+    {
       "name": "RunLength",
       "path": "gpui_kit::agent::RunLength",
       "summary": "Whether the caller has counted the run.",
@@ -7238,6 +7477,70 @@
       ],
       "commands": [],
       "queries": []
+    },
+    {
+      "name": "RunLink",
+      "path": "gpui_kit::agent::RunLink",
+      "summary": "One typed relationship between two run subjects.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<RunLinkId>, from: RunSubjectId, to: RunSubjectId, kind: RunLinkKind) -> Self"
+      ],
+      "options": [
+        "label(label: impl Into<SharedString>) -> Self"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "RunLinkId",
+      "path": "gpui_kit::agent::RunLinkId",
+      "summary": "The stable identity of a topology relationship.",
+      "variants": [],
+      "construct": [
+        "new(value: impl Into<SharedString>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "as_str() -> &str"
+      ]
+    },
+    {
+      "name": "RunLinkKind",
+      "path": "gpui_kit::agent::RunLinkKind",
+      "summary": "The meaning of a topology relationship.",
+      "variants": [
+        "Spawn",
+        "Delegation",
+        "Dependency",
+        "Handoff",
+        "Report",
+        "Aggregation",
+        "Retry"
+      ],
+      "construct": [],
+      "options": [
+        "as_str() -> &'static str"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "RunSubjectId",
+      "path": "gpui_kit::agent::RunSubjectId",
+      "summary": "What kind of thing one topology endpoint identifies.",
+      "variants": [
+        "Agent",
+        "Task",
+        "Invocation"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "as_str() -> &str"
+      ]
     },
     {
       "name": "SaveState",
@@ -8051,6 +8354,20 @@
       "queries": []
     },
     {
+      "name": "TaskId",
+      "path": "gpui_kit::agent::TaskId",
+      "summary": "The stable identity of one task in a run.",
+      "variants": [],
+      "construct": [
+        "new(value: impl Into<SharedString>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "as_str() -> &str"
+      ]
+    },
+    {
       "name": "TextAreaElement",
       "path": "gpui_kit::controls::TextAreaElement",
       "summary": "",
@@ -8592,6 +8909,39 @@
       "options": [],
       "commands": [],
       "queries": []
+    },
+    {
+      "name": "VisualEventId",
+      "path": "gpui_kit::agent::VisualEventId",
+      "summary": "The stable identity of a transient visual event.",
+      "variants": [],
+      "construct": [
+        "new(value: impl Into<SharedString>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "as_str() -> &str"
+      ]
+    },
+    {
+      "name": "WaitReason",
+      "path": "gpui_kit::agent::WaitReason",
+      "summary": "Why an agent or task is waiting rather than making progress.",
+      "variants": [
+        "UserInput",
+        "Approval",
+        "Dependency",
+        "RemoteAgent",
+        "RateLimit",
+        "Custom"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "as_str() -> &'static str"
+      ]
     },
     {
       "name": "WizardIntent",
