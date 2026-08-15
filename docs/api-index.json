@@ -4413,6 +4413,43 @@
       "queries": []
     },
     {
+      "name": "AgentVisualEvent",
+      "path": "gpui_kit::agent::AgentVisualEvent",
+      "summary": "A semantic event ready for the shared effects policy.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<VisualEventId>, surface: impl Into<SharedString>, kind: AgentVisualEventKind, target: RunSubjectId) -> Self"
+      ],
+      "options": [
+        "origin(origin: RunSubjectId) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "effect_event() -> EffectEvent"
+      ]
+    },
+    {
+      "name": "AgentVisualEventKind",
+      "path": "gpui_kit::agent::AgentVisualEventKind",
+      "summary": "The agent-domain meaning of one transient visual event.",
+      "variants": [
+        "AgentSpawned",
+        "DelegationStarted",
+        "HandoffCommitted",
+        "ResultAggregated",
+        "AgentSucceeded",
+        "AgentRefused",
+        "AgentFailed",
+        "RewardGranted"
+      ],
+      "construct": [],
+      "options": [
+        "cue() -> VisualCue"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "AggregationSnapshot",
       "path": "gpui_kit::agent::AggregationSnapshot",
       "summary": "A caller-owned count of the results being combined.",
@@ -5635,6 +5672,164 @@
       "construct": [
         "new(row: impl Into<SharedString>, column: impl Into<SharedString>, value: impl Into<SharedString>) -> Self"
       ],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EffectCost",
+      "path": "gpui_kit::effects::EffectCost",
+      "summary": "Estimated renderer work consumed by one animated recipe.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EffectEvent",
+      "path": "gpui_kit::effects::EffectEvent",
+      "summary": "One normalized event submitted to the effects policy.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, surface: impl Into<SharedString>, target: impl Into<SharedString>, cue: VisualCue) -> Self"
+      ],
+      "options": [
+        "origin(origin: impl Into<SharedString>) -> Self"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EffectFallback",
+      "path": "gpui_kit::effects::EffectFallback",
+      "summary": "Why the full animated recipe resolved to its static counterpart.",
+      "variants": [
+        "Quality",
+        "ReducedMotion",
+        "Budget"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EffectImportance",
+      "path": "gpui_kit::effects::EffectImportance",
+      "summary": "Why a cue matters when the active quality tier decides how to present it.",
+      "variants": [
+        "Essential",
+        "Expressive",
+        "Decorative"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EffectPlan",
+      "path": "gpui_kit::effects::EffectPlan",
+      "summary": "The complete deterministic answer for one semantic event.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "animated() -> bool",
+        "visible() -> bool"
+      ]
+    },
+    {
+      "name": "EffectPlanner",
+      "path": "gpui_kit::effects::EffectPlanner",
+      "summary": "Stateful resolver used by the installed global and available for isolated runtimes or deterministic tests.",
+      "variants": [],
+      "construct": [
+        "new(policy: EffectPolicy) -> Self"
+      ],
+      "options": [],
+      "commands": [
+        "set_policy(policy: EffectPolicy)",
+        "plan(event: EffectEvent, frame: u64, reduce_motion: bool) -> EffectPlan"
+      ],
+      "queries": [
+        "policy() -> &EffectPolicy"
+      ]
+    },
+    {
+      "name": "EffectPolicy",
+      "path": "gpui_kit::effects::EffectPolicy",
+      "summary": "Quality, replay, and frame/surface budget policy installed by the host.",
+      "variants": [],
+      "construct": [
+        "new(quality: EffectQuality) -> Self"
+      ],
+      "options": [
+        "budgets(global: EffectBudget, per_surface: EffectBudget) -> Self",
+        "replay_capacity(capacity: usize) -> Self"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EffectPresentation",
+      "path": "gpui_kit::effects::EffectPresentation",
+      "summary": "How the chosen recipe is allowed to appear.",
+      "variants": [
+        "Suppressed",
+        "Static",
+        "Animated"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EffectQuality",
+      "path": "gpui_kit::effects::EffectQuality",
+      "summary": "How much optional visual richness the host permits.",
+      "variants": [
+        "Off",
+        "Essential",
+        "Balanced",
+        "Cinematic"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EffectRecipe",
+      "path": "gpui_kit::effects::EffectRecipe",
+      "summary": "Renderer-facing recipe selected from a semantic cue.",
+      "variants": [
+        "ArrivalHalo",
+        "DelegationTrace",
+        "HandoffTrace",
+        "AggregationPulse",
+        "SuccessBurst",
+        "RewardCelebration",
+        "AttentionPulse",
+        "RefusalMark",
+        "FailurePulse"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EffectSuppression",
+      "path": "gpui_kit::effects::EffectSuppression",
+      "summary": "Why no visual presentation should be emitted at all.",
+      "variants": [
+        "Replay"
+      ],
+      "construct": [],
       "options": [],
       "commands": [],
       "queries": []
@@ -9270,6 +9465,28 @@
       ],
       "construct": [],
       "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "VisualCue",
+      "path": "gpui_kit::effects::VisualCue",
+      "summary": "A product-neutral statement of what changed visually.",
+      "variants": [
+        "Arrival",
+        "Delegation",
+        "Handoff",
+        "Aggregation",
+        "Success",
+        "Reward",
+        "Attention",
+        "Refusal",
+        "Failure"
+      ],
+      "construct": [],
+      "options": [
+        "importance() -> EffectImportance"
+      ],
       "commands": [],
       "queries": []
     },

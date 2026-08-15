@@ -111,6 +111,30 @@ and reports caller-owned actions. `AgentRunSnapshot::issues()` remains the
 source of structural validation: components never repair duplicate identities
 or dangling topology into a different run.
 
+### Semantic visual effects
+
+`AgentVisualEvent` reports facts such as `AgentSpawned`,
+`DelegationStarted`, `HandoffCommitted`, `ResultAggregated`,
+`AgentSucceeded`, `AgentRefused`, `AgentFailed`, and `RewardGranted`. It carries
+stable event, surface, target, and optional origin identities; it cannot name a
+particle system, colour, shader, duration, or animation recipe.
+
+`EffectPlanner` normalizes those events together with generic `EffectEvent`s.
+It chooses a semantic `EffectRecipe` and one of `Static`, `Animated`, or
+replay-suppressed presentation. The installed `EffectPolicy` has four complete
+quality tiers — `Off`, `Essential`, `Balanced`, and `Cinematic` — plus global
+and per-surface frame budgets for events, emitters, particles, and animated
+area. Reduced motion and exhausted budgets choose the static recipe; they do
+not erase feedback. Stable event identity seeds deterministic rendering and a
+bounded, per-surface replay history prevents reconnects or rebuilt trees from
+replaying a celebration.
+
+The planner is the policy boundary, not a particle renderer. Components and
+agent runtimes provide semantic events; shared stroke, compositing, sprite, and
+batched particle primitives consume the resulting plan. This keeps graceful
+degradation and performance policy out of every downstream chatbot, persona,
+or game surface.
+
 ## Navigation
 
 | Component | Kind | Reports | Notes |

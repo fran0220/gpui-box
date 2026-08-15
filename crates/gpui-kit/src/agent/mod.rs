@@ -21,8 +21,8 @@ pub use cost::{Basis, ContextGauge, CostLine, CostMeter, LastVerified, Limit, Qu
 pub use model::{
     AgentActivity, AgentDescriptor, AgentExecutionState, AgentId, AgentModelIssue, AgentOutcome,
     AgentPresence, AgentRunSnapshot, AgentSnapshot, AgentTaskSnapshot, AgentUiAction,
-    AggregationSnapshot, InvocationId, RunId, RunLink, RunLinkId, RunLinkKind, RunSubjectId,
-    TaskId, VisualEventId, WaitReason,
+    AgentVisualEvent, AgentVisualEventKind, AggregationSnapshot, InvocationId, RunId, RunLink,
+    RunLinkId, RunLinkKind, RunSubjectId, TaskId, VisualEventId, WaitReason,
 };
 pub use offering_catalog::{
     OfferingCatalog, OfferingIdentity, OfferingSource, OfferingSourceState, SearchableOffering,

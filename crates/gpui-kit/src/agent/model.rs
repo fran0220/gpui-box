@@ -17,6 +17,8 @@ use std::collections::HashSet;
 use gpui::SharedString;
 use serde::{Deserialize, Serialize};
 
+use crate::effects::{EffectEvent, VisualCue};
+
 /// The stable identity of an agent, independent of its role or display name.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -235,6 +237,99 @@ impl RunSubjectId {
             Self::Invocation(id) => id.as_str(),
         }
     }
+}
+
+/// The agent-domain meaning of one transient visual event.
+///
+/// Hosts report these facts instead of selecting an animation recipe. The
+/// effects policy maps them onto product-neutral [`VisualCue`]s, quality,
+/// accessibility, replay, and budget decisions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum AgentVisualEventKind {
+    AgentSpawned,
+    DelegationStarted,
+    HandoffCommitted,
+    ResultAggregated,
+    AgentSucceeded,
+    AgentRefused,
+    AgentFailed,
+    RewardGranted,
+}
+
+impl AgentVisualEventKind {
+    pub fn cue(self) -> VisualCue {
+        match self {
+            Self::AgentSpawned => VisualCue::Arrival,
+            Self::DelegationStarted => VisualCue::Delegation,
+            Self::HandoffCommitted => VisualCue::Handoff,
+            Self::ResultAggregated => VisualCue::Aggregation,
+            Self::AgentSucceeded => VisualCue::Success,
+            Self::AgentRefused => VisualCue::Refusal,
+            Self::AgentFailed => VisualCue::Failure,
+            Self::RewardGranted => VisualCue::Reward,
+        }
+    }
+}
+
+/// A semantic event ready for the shared effects policy.
+///
+/// `target` is the subject the event lands on. `origin`, when supplied, is the
+/// parent, delegator, or handoff source. `surface` scopes the automatic budget;
+/// all three identities remain host-owned facts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AgentVisualEvent {
+    pub id: VisualEventId,
+    pub surface: SharedString,
+    pub kind: AgentVisualEventKind,
+    pub target: RunSubjectId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<RunSubjectId>,
+}
+
+impl AgentVisualEvent {
+    pub fn new(
+        id: impl Into<VisualEventId>,
+        surface: impl Into<SharedString>,
+        kind: AgentVisualEventKind,
+        target: RunSubjectId,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            surface: surface.into(),
+            kind,
+            target,
+            origin: None,
+        }
+    }
+
+    pub fn origin(mut self, origin: RunSubjectId) -> Self {
+        self.origin = Some(origin);
+        self
+    }
+
+    /// Normalizes agent identities and meaning without choosing an effect.
+    pub fn effect_event(&self) -> EffectEvent {
+        let mut event = EffectEvent::new(
+            self.id.as_str().to_owned(),
+            self.surface.clone(),
+            visual_subject_id(&self.target),
+            self.kind.cue(),
+        );
+        if let Some(origin) = &self.origin {
+            event = event.origin(visual_subject_id(origin));
+        }
+        event
+    }
+}
+
+fn visual_subject_id(subject: &RunSubjectId) -> SharedString {
+    let kind = match subject {
+        RunSubjectId::Agent(_) => "agent",
+        RunSubjectId::Task(_) => "task",
+        RunSubjectId::Invocation(_) => "invocation",
+    };
+    format!("{}:{}:{}", kind.len(), kind, subject.as_str()).into()
 }
 
 /// Identity and caller-owned description of one agent.

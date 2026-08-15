@@ -30,6 +30,7 @@
 //! - [`interaction`] — drag and drop, the one gesture that starts in one
 //!   component and finishes in another.
 //! - [`motion`] — token-driven animation.
+//! - [`effects`] — semantic visual events, quality policy, replay, and budgets.
 //! - [`state`] — the explicit async states a truthful surface distinguishes.
 //! - [`strings`] — every word this library shows, and the host's right to
 //!   replace any of them without losing the English behind the rest.
@@ -65,6 +66,7 @@ pub mod controls;
 pub mod data;
 pub mod datetime;
 pub mod display;
+pub mod effects;
 pub mod foundation;
 pub mod interaction;
 pub mod layout;
@@ -96,8 +98,8 @@ pub mod prelude {
     pub use crate::agent::model::{
         AgentActivity, AgentDescriptor, AgentExecutionState, AgentId, AgentModelIssue,
         AgentOutcome, AgentPresence, AgentRunSnapshot, AgentSnapshot, AgentTaskSnapshot,
-        AgentUiAction, AggregationSnapshot, InvocationId, RunId, RunLink, RunLinkId, RunLinkKind,
-        RunSubjectId, TaskId, VisualEventId, WaitReason,
+        AgentUiAction, AgentVisualEvent, AgentVisualEventKind, AggregationSnapshot, InvocationId,
+        RunId, RunLink, RunLinkId, RunLinkKind, RunSubjectId, TaskId, VisualEventId, WaitReason,
     };
     pub use crate::agent::offering_catalog::{
         OfferingCatalog, OfferingIdentity, OfferingSource, OfferingSourceState, SearchableOffering,
@@ -199,6 +201,11 @@ pub mod prelude {
     pub use crate::display::status::{Callout, StatusDot, StatusLine};
     pub use crate::display::tag::Tag;
     pub use crate::display::timeline::{EntryTime, Timeline, TimelineEntry, TimelineGroup};
+    pub use crate::effects::{
+        EffectBudget, EffectCost, EffectEvent, EffectFallback, EffectImportance, EffectPlan,
+        EffectPlanner, EffectPolicy, EffectPresentation, EffectQuality, EffectRecipe,
+        EffectSuppression, VisualCue, effect_policy, plan_effect, set_effect_policy,
+    };
     pub use crate::foundation::direction::{
         ActiveDirection, DirectionalExt, LayoutDirection, LogicalSide, PhysicalSide,
         set_layout_direction,
@@ -258,6 +265,7 @@ pub fn install(cx: &mut App) {
     gpui_kit_theme::Theme::install(cx);
     gpui_kit_semantics::install(cx);
     strings::install(cx);
+    effects::install(cx);
     foundation::direction::install(cx);
     interaction::install(cx);
     controls::input::install(cx);
