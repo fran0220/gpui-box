@@ -72,7 +72,9 @@ aggregation, and locale policy remain host-owned.
 **Schema date fields.** `SchemaKind::Date`, `Time`, and `DateRange` now
 construct the existing date controls when the host has installed a
 `DateAdapter` through `set_date_adapter`. Without one they stay
-unrenderable. `Files` and repeating `List` still wait on a host policy.
+unrenderable. `Files` uses the installed `SchemaFilePolicy` for admissibility
+and display names while the host still owns the OS picker; repeating `List`
+owns add/remove UI and stable item identity without requiring another policy.
 
 ## [0.1.2] - 2026-08-13
 

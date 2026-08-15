@@ -799,7 +799,7 @@ turns a number into text.
 | Component | Kind | Reports | Notes |
 |---|---|---|---|
 | `JsonView` | builder | a path and the disclosure state it should take, and the row that was picked | A structured value over a caller-supplied `JsonValue`. Virtualized, so only the rows the viewport holds are laid out or published. `null`, an empty container, and a key the document does not hold are three presentations, and a withheld subtree reads as withheld |
-| `SchemaForm` | view | a field that changed, and a submit | A form built from a caller-supplied `Schema` over the existing controls. A field it cannot draw states so where the control would have been and is still reported by `values` |
+| `SchemaForm` | view | a field that changed, a file field whose picker was requested, and a submit | A form built from a caller-supplied `Schema` over the existing controls. Date shapes use the host's `DateAdapter`; `Files` uses a host `SchemaFilePolicy` without owning an OS picker; repeating `List` owns stable add/remove UI and nested values. A field it cannot draw states so where the control would have been and is still reported by `values` |
 | `ServerList` | builder | a server that was picked, a failed one that should be tried again, and a server whose offerings should be shown | What is connected and what each connection offers. Five states, none of them a shade of another, and an empty answer that is not an unasked question |
 | `OfferingCatalog` | builder | activation carrying `{server_id, offering_id}` | Searchable Tool, Skill, and Resource results aggregated across caller-owned servers. Search text and kind filters are caller supplied; duplicate names remain attributed, stale data remains visible, and the component performs no install, invocation, trust, permission, or network policy |
 
@@ -852,6 +852,14 @@ Errors come from two places and stay apart. `validate` marks required fields
 nobody filled in, which is all the form can judge on its own; `set_error` shows
 what the host returned, in the host's words, and outranks the form's own on the
 same field. Both are drawn by `FormField`, next to the control they are about.
+
+Files keep the same boundary. The form owns its drop target, selected rows,
+maximum count, removal, and `FilesRequested` event. The installed
+`SchemaFilePolicy` decides whether a complete candidate selection is admissible
+and supplies display names; the host opens the platform picker and returns paths
+through `set_files`. A repeating `List` needs no host policy: it creates nested
+forms with monotonic visual identity, reports indexed values and errors, and
+applies the same date/file adapter requirements recursively.
 
 ### Five connection states, and an answer that was empty
 
