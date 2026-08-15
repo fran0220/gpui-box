@@ -18,6 +18,11 @@
   authority; historical repository URLs and vendor refs are immutable evidence,
   while all project-owned framework, platform, media, Kit, and tooling code is
   developed in this repository over public registry dependencies.
+- GPUI Box is the application substrate, not the older Kit-era component
+  subset. A surface a downstream desktop app needs is in scope unless it
+  invents a host fact, a locale, a transport, or OS chrome. Do not keep
+  refusing charts, form shapes, or other application primitives because an
+  earlier Kit coverage note called them another library.
 
 ## 2026-08-12: CI cache cleanup must also invalidate polluted restore keys
 

@@ -1,6 +1,8 @@
-//! A deliberately narrow trend reading, not a charting framework.
+//! A deliberately narrow trend reading.
 //!
 //! A sparkline has no axes, ticks, legend, tooltip, locale or scale policy.
+//! Broader cartesian surfaces belong in this library as later primitives;
+//! they are not this component.
 //! The caller supplies points already normalized into the inclusive `0..=1`
 //! square, plus the exact label and current, minimum and maximum text a reader
 //! should receive. `x = 0` is the leading edge, `x = 1` the trailing edge,

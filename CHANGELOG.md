@@ -45,6 +45,12 @@ node still publishes its fraction and its busy flag. Under reduced motion an
 unknown-extent bar parks a still band at the leading edge rather than
 filling the track.
 
+**Box substrate, not a Kit-era subset.** Coverage now treats charts and the
+remaining form shapes as missing application primitives rather than another
+library's job. Box still refuses to invent calendar arithmetic, locale
+wording, transports, and OS window chrome; it no longer refuses the
+surfaces a downstream desktop app has to put on screen.
+
 ## [0.1.2] - 2026-08-13
 
 ### Added
@@ -576,9 +582,10 @@ threading limits.
 
 ### Not provided
 
-`docs/coverage.md` states what this library refuses to build and why — the
-calendar, time formatting, rich-text and code editing, charts, platform pickers,
-window chrome — and, separately, what is missing but intended. Read it before
+`docs/coverage.md` states what this library refuses to invent — calendar
+arithmetic, time wording, grammars, transports, platform window chrome —
+and, separately, the application surfaces that are still missing. Charts
+and the remaining form shapes are gaps, not refusals. Read it before
 planning around a component that is not here.
 
 [Unreleased]: https://github.com/fran0220/gpui-box/compare/v0.1.2...HEAD

@@ -1,9 +1,12 @@
 # Coverage
 
 What a general-purpose desktop UI library is expected to provide, what this
-one provides, and what is deliberately out of scope. `docs/components.md`
-describes the components themselves; this file exists so a gap is a recorded
-decision rather than an oversight.
+one provides, and what is deliberately out of scope. GPUI Box is the
+application substrate: if a downstream desktop or browser-hosted product
+needs a surface to exist, the surface belongs here unless it is a host
+fact, a locale fact, a transport, or a platform chrome the OS already
+owns. `docs/components.md` describes the components themselves; this file
+exists so a gap is a recorded decision rather than an oversight.
 
 A component counts as covered only when it has all four of: a public builder or
 view, a scene in `gpui_kit::scenes`, behaviour tests driven through simulated
@@ -172,12 +175,17 @@ own; both are exercised through every control and overlay that uses them.
   a scene-graph dependency, a material system, or a texture pipeline. Other
   formats, materials, animation and skinning are not gaps to be filled here:
   a document that needs them is one an application converts before it arrives.
-- **Charts.** A chart is a data-visualisation library with its own scales,
-  axes and accessibility model. `Sparkline` is the deliberate narrow exception:
-  an accessible reading over caller-normalized points, with no scale, axes,
-  locale, interaction or chart model of its own.
-- **Colour picker, file picker, print dialog.** Platform surfaces; a host
-  should reach the operating system rather than a reimplementation.
+- **Inventing a scale, a locale, or a series policy.** A chart still does not
+  own data. Axes, ticks, domains, stacking, aggregation, and "2 minutes ago"
+  are facts the host already has or can compute; Box paints them. The old
+  Kit-era refusal of charts themselves is lifted: line, bar, area, and
+  distribution surfaces are in scope as application primitives. A
+  business-intelligence toolkit — live query, crossfilter, annotation
+  layers, financial overlays — is still a product, not a substrate.
+- **Owning a platform picker.** Colour, file, and print dialogs that replace
+  the operating system stay out. In-window colour wells, dropzones, and
+  print-preview chrome that report a choice are in scope; they do not
+  become the system dialog.
 - **Menu bar and window chrome.** Owned by the platform window, not by a
   component tree.
 - **Carousel, rating, and other marketing patterns.** Not desktop-application
@@ -352,6 +360,13 @@ Then: mentions in a text field and search within settings. `UndoHistory` now
 covers the caller-owned revision list and reports restore intents without
 keeping or mutating an undo stack.
 
+Application forms still need the schema shapes a settings page and a tool
+card actually use: date, time, range, files, repeating sections, and
+host-declared visibility. `SchemaForm` already keeps unrenderable fields
+visible; it does not yet express those shapes. Charts are the same kind of
+gap: `Sparkline`, `ContextGauge`, and `CostMeter` are readings, not the
+cartesian surfaces an application dashboard needs.
+
 Agent applications need a family this library is still filling in. A
 conversation is not the unit; a run made of steps is, and `ToolCallCard`,
 `StepList` and `ThinkingBlock` are covered above. Still wanted:
@@ -378,6 +393,7 @@ precisely because it is separable from the drawing.
 | Number, date, and quantity formatting | Every word is now host-replaceable, but every *number* beside one is still formatted by Rust. See "Numbers a catalogue cannot fix" below. |
 | Assistive technology gaps | Basic semantics, grapheme-based editable text runs and selection actions, and explicit live-region properties now reach GPUI's AccessKit platform tree. Character geometry/native caret tracking, verified screen-reader announcement timing, native-child handoff, and native Windows session verification remain absent. Linux compatibility, including native AT-SPI validation, is deferred; see `docs/accessibility.md`. |
 | Validation vocabulary | `FormField` shows an error it is handed. When to validate, field against form, and validation still in flight have no shared shape. |
+| Cartesian readings | `Sparkline` is a normalized trend. Line, bar, area, and share surfaces with host-supplied domains and labels are not built yet. |
 | Composition | There is no `Slot`: a caller cannot replace a node inside a component, only configure it. |
 | Size response | No breakpoint or container query. `Toolbar` overflow is declared rather than measured, which is the same gap seen from one component. |
 | Style escape hatch | Beyond tokens there is no supported way to override one instance. |
