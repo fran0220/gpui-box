@@ -135,12 +135,16 @@ struct Background {
     // 1u is LinearGradient
     // 2u is PatternSlash
     // 3u is Checkerboard
+    // 4u is RadialGradient
+    // 5u is ConicGradient
     tag: u32,
     // 0u is sRGB linear color
     // 1u is Oklab color
     color_space: u32,
     solid: Hsla,
     gradient_angle_or_pattern_height: f32,
+    gradient_center: vec2<f32>,
+    gradient_radius: vec2<f32>,
     colors: array<LinearColorStop, 8>,
     color_stop_count: u32,
 }
@@ -421,7 +425,7 @@ fn prepare_gradient_color(tag: u32, color_space: u32,
     var result = GradientColor();
     if (tag == 0u || tag == 2u || tag == 3u) {
         result.solid = hsla_to_rgba(solid);
-    } else if (tag == 1u) {
+    } else if (tag == 1u || tag == 4u || tag == 5u) {
         result = prepare_gradient_pair(color_space, colors[0].color, colors[1].color);
     }
 
@@ -461,29 +465,48 @@ fn gradient_color(background: Background, position: vec2<f32>, bounds: Bounds,
         default: {
             return solid_color;
         }
-        case 1u: {
-            // Linear gradient background.
-            // -90 degrees to match the CSS gradient angle.
-            let angle = background.gradient_angle_or_pattern_height;
-            let radians = (angle % 360.0 - 90.0) * M_PI_F / 180.0;
-            var direction = vec2<f32>(cos(radians), sin(radians));
-            // Expand the short side to be the same as the long side
-            if (bounds.size.x > bounds.size.y) {
-                direction.y *= bounds.size.y / bounds.size.x;
-            } else {
-                direction.x *= bounds.size.x / bounds.size.y;
-            }
+        case 1u, 4u, 5u: {
+            var t = 0.0;
+            switch (background.tag) {
+                case 1u: {
+                    // -90 degrees to match the CSS gradient angle.
+                    let angle = background.gradient_angle_or_pattern_height;
+                    let radians = (angle % 360.0 - 90.0) * M_PI_F / 180.0;
+                    var direction = vec2<f32>(cos(radians), sin(radians));
+                    // Expand the short side to be the same as the long side.
+                    if (bounds.size.x > bounds.size.y) {
+                        direction.y *= bounds.size.y / bounds.size.x;
+                    } else {
+                        direction.x *= bounds.size.x / bounds.size.y;
+                    }
 
-            // Get the t value for the linear gradient with the color stop percentages.
-            let half_size = bounds.size / 2.0;
-            let center = bounds.origin + half_size;
-            let center_to_point = position - center;
-            var t = dot(center_to_point, direction) / length(direction);
-            // Check the direct to determine the use x or y
-            if (abs(direction.x) > abs(direction.y)) {
-                t = (t + half_size.x) / bounds.size.x;
-            } else {
-                t = (t + half_size.y) / bounds.size.y;
+                    let half_size = bounds.size / 2.0;
+                    let center = bounds.origin + half_size;
+                    let center_to_point = position - center;
+                    t = dot(center_to_point, direction) / length(direction);
+                    if (abs(direction.x) > abs(direction.y)) {
+                        t = (t + half_size.x) / bounds.size.x;
+                    } else {
+                        t = (t + half_size.y) / bounds.size.y;
+                    }
+                }
+                case 4u: {
+                    let center = bounds.origin + bounds.size * background.gradient_center;
+                    let radius = max(
+                        abs(bounds.size * background.gradient_radius),
+                        vec2<f32>(0.0001),
+                    );
+                    t = length((position - center) / radius);
+                }
+                default: {
+                    let center = bounds.origin + bounds.size * background.gradient_center;
+                    let center_to_point = position - center;
+                    if (dot(center_to_point, center_to_point) > 0.00000001) {
+                        let clockwise_from_top = atan2(center_to_point.x, -center_to_point.y);
+                        let start = background.gradient_angle_or_pattern_height * M_PI_F / 180.0;
+                        t = fract((clockwise_from_top - start) / (2.0 * M_PI_F));
+                    }
+                }
             }
 
             // Select the two stops surrounding this pixel. The stop count and

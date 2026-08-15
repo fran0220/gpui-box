@@ -240,7 +240,7 @@ impl Scene {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{BackgroundTag, ColorSpace, LinearColorStop, MAX_LINEAR_GRADIENT_STOPS};
+    use crate::{BackgroundTag, ColorSpace, LinearColorStop, MAX_GRADIENT_STOPS};
 
     #[test]
     fn empty_layers_do_not_make_a_scene_drawable() {
@@ -619,7 +619,8 @@ mod tests {
                 + size_of::<ColorSpace>()
                 + size_of::<Hsla>()
                 + size_of::<f32>()
-                + MAX_LINEAR_GRADIENT_STOPS * size_of::<LinearColorStop>()
+                + 2 * size_of::<Point<f32>>()
+                + MAX_GRADIENT_STOPS * size_of::<LinearColorStop>()
                 + size_of::<u32>()
         );
         assert_eq!(size_of::<GlassLobe>(), 8 * size_of::<f32>());

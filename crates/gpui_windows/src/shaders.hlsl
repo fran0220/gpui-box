@@ -57,12 +57,17 @@ struct Background {
     // 0u is Solid
     // 1u is LinearGradient
     // 2u is PatternSlash
+    // 3u is Checkerboard
+    // 4u is RadialGradient
+    // 5u is ConicGradient
     uint tag;
     // 0u is sRGB linear color
     // 1u is Oklab color
     uint color_space;
     Hsla solid;
     float gradient_angle_or_pattern_height;
+    float2 gradient_center;
+    float2 gradient_radius;
     LinearColorStop colors[8];
     uint color_stop_count;
 };
@@ -330,7 +335,7 @@ GradientColor prepare_gradient_color(uint tag, uint color_space, Hsla solid, Lin
     GradientColor output;
     if (tag == 0 || tag == 2 || tag == 3) {
         output.solid = hsla_to_rgba(solid);
-    } else if (tag == 1) {
+    } else if (tag == 1 || tag == 4 || tag == 5) {
         output = prepare_gradient_pair(color_space, colors[0].color, colors[1].color);
     }
     return output;
@@ -375,29 +380,47 @@ float4 gradient_color(Background background,
         case 0:
             color = solid_color;
             break;
-        case 1: {
-            // -90 degrees to match the CSS gradient angle.
-            float gradient_angle = background.gradient_angle_or_pattern_height;
-            float radians = (fmod(gradient_angle, 360.0) - 90.0) * (M_PI_F / 180.0);
-            float2 direction = float2(cos(radians), sin(radians));
+        case 1:
+        case 4:
+        case 5: {
+            float t = 0.0;
+            if (background.tag == 1) {
+                // -90 degrees to match the CSS gradient angle.
+                float gradient_angle = background.gradient_angle_or_pattern_height;
+                float radians = (fmod(gradient_angle, 360.0) - 90.0) * (M_PI_F / 180.0);
+                float2 direction = float2(cos(radians), sin(radians));
 
-            // Expand the short side to be the same as the long side
-            if (bounds.size.x > bounds.size.y) {
-                direction.y *= bounds.size.y / bounds.size.x;
-            } else {
-                direction.x *=  bounds.size.x / bounds.size.y;
-            }
+                // Expand the short side to be the same as the long side.
+                if (bounds.size.x > bounds.size.y) {
+                    direction.y *= bounds.size.y / bounds.size.x;
+                } else {
+                    direction.x *=  bounds.size.x / bounds.size.y;
+                }
 
-            // Get the t value for the linear gradient with the color stop percentages.
-            float2 half_size = bounds.size * 0.5;
-            float2 center = bounds.origin + half_size;
-            float2 center_to_point = position - center;
-            float t = dot(center_to_point, direction) / length(direction);
-            // Check the direct to determine the use x or y
-            if (abs(direction.x) > abs(direction.y)) {
-                t = (t + half_size.x) / bounds.size.x;
+                float2 half_size = bounds.size * 0.5;
+                float2 center = bounds.origin + half_size;
+                float2 center_to_point = position - center;
+                t = dot(center_to_point, direction) / length(direction);
+                if (abs(direction.x) > abs(direction.y)) {
+                    t = (t + half_size.x) / bounds.size.x;
+                } else {
+                    t = (t + half_size.y) / bounds.size.y;
+                }
+            } else if (background.tag == 4) {
+                float2 center = bounds.origin + bounds.size * background.gradient_center;
+                float2 radius = max(
+                    abs(bounds.size * background.gradient_radius),
+                    float2(0.0001, 0.0001)
+                );
+                t = length((position - center) / radius);
             } else {
-                t = (t + half_size.y) / bounds.size.y;
+                float2 center = bounds.origin + bounds.size * background.gradient_center;
+                float2 center_to_point = position - center;
+                if (dot(center_to_point, center_to_point) > 0.00000001) {
+                    float clockwise_from_top = atan2(center_to_point.x, -center_to_point.y);
+                    float start = background.gradient_angle_or_pattern_height * M_PI_F / 180.0;
+                    t = frac((clockwise_from_top - start) / (2.0 * M_PI_F));
+                }
             }
 
             // Select the two stops surrounding this pixel. The stop count and

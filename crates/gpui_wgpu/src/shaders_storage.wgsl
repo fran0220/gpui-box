@@ -71,6 +71,8 @@ fn read_background(cursor: ptr<function, InstanceCursor>) -> Background {
         read_word(cursor),
         read_hsla(cursor),
         read_f32(cursor),
+        read_vec2_f32(cursor),
+        read_vec2_f32(cursor),
         array<LinearColorStop, 8>(
             read_color_stop(cursor),
             read_color_stop(cursor),
@@ -111,7 +113,7 @@ fn read_transformation(cursor: ptr<function, InstanceCursor>) -> TransformationM
 }
 
 fn load_quad(instance_id: u32) -> Quad {
-    var cursor = instance_cursor(instance_id * 70u);
+    var cursor = instance_cursor(instance_id * 74u);
     return Quad(
         read_word(&cursor),
         read_word(&cursor),
@@ -141,7 +143,7 @@ fn load_shadow(instance_id: u32) -> Shadow {
 }
 
 fn load_path_vertex(vertex_id: u32) -> PathRasterizationVertex {
-    var cursor = instance_cursor(vertex_id * 56u);
+    var cursor = instance_cursor(vertex_id * 60u);
     return PathRasterizationVertex(
         read_vec2_f32(&cursor),
         read_vec2_f32(&cursor),

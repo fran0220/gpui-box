@@ -10,6 +10,14 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ### Added
 
+**Renderer-backed radial and conic gradients.** `Background` now carries
+linear, elliptical radial, and clockwise conic geometry through the same
+bounded two-to-eight-stop scene ABI. Quads and filled paths share sRGB/Oklab
+interpolation, deterministic screen-pixel dithering, clipping, and opacity on
+Metal, Direct3D, WGPU, and browser WebGL. Callers choose normalized geometry
+and semantic colors; they no longer approximate glows, wheels, or area washes
+with rings of adjacent elements.
+
 **Application paint the role vocabulary does not model.** `Theme` now carries
 the active document's palette and reads an entry by `"group.step"` through
 `Theme::palette_color`. An application whose product has colour the shared

@@ -34,15 +34,17 @@ the final column. Accessibility capability details remain in
 [`accessibility.md`](accessibility.md), and visual mechanics in
 [`screenshot-testing.md`](screenshot-testing.md).
 
-Renderer-backed linear gradients accept two through eight ordered color stops
-for both quads and filled paths. Metal, Direct3D, WGPU, and browser WebGL select
-the same adjacent stop interval before applying sRGB or Oklab interpolation.
-Their dithering also follows one contract: a screen-pixel-anchored unsigned
-integer hash produces the two triangular samples, so GPU families and shader
-compilers cannot choose different transcendental approximations for the noise.
-Color conversion and edge rasterization remain renderer-specific, which is why
-each renderer retains its own baseline rather than claiming identical bytes
-across platforms.
+Renderer-backed linear, elliptical radial, and conic gradients accept two
+through eight ordered color stops for both quads and filled paths. Radial
+centres and radii are normalized to the painted bounds; conic gradients start
+at the caller's CSS-oriented angle and proceed clockwise. Metal, Direct3D,
+WGPU, and browser WebGL derive the same geometry and select the same adjacent
+stop interval before applying sRGB or Oklab interpolation. Their dithering also
+follows one contract: a screen-pixel-anchored unsigned integer hash produces
+the two triangular samples, so GPU families and shader compilers cannot choose
+different transcendental approximations for the noise. Color conversion and
+edge rasterization remain renderer-specific, which is why each renderer
+retains its own baseline rather than claiming identical bytes across platforms.
 
 Read-only `StyledText` selection is a framework primitive rather than a Kit
 gesture. Its stable element id retains transient anchor/focus state; pointer

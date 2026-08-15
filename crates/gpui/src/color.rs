@@ -10,6 +10,8 @@ use std::{
     hash::{Hash, Hasher},
 };
 
+use crate::{Point, point};
+
 /// Convert an RGB hex color code number to a color type
 pub fn rgb(hex: u32) -> Rgba {
     let [_, r, g, b] = hex.to_be_bytes().map(|b| (b as f32) / 255.0);
@@ -747,6 +749,8 @@ pub(crate) enum BackgroundTag {
     LinearGradient = 1,
     PatternSlash = 2,
     Checkerboard = 3,
+    RadialGradient = 4,
+    ConicGradient = 5,
 }
 
 /// A color space for color interpolation.
@@ -773,7 +777,7 @@ impl Display for ColorSpace {
     }
 }
 
-/// A background color, which can be either a solid color or a linear gradient.
+/// A renderer-backed solid, gradient, or pattern background.
 #[derive(Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[repr(C)]
 pub struct Background {
@@ -781,17 +785,22 @@ pub struct Background {
     pub(crate) color_space: ColorSpace,
     pub(crate) solid: Hsla,
     pub(crate) gradient_angle_or_pattern_height: f32,
-    pub(crate) colors: [LinearColorStop; MAX_LINEAR_GRADIENT_STOPS],
+    pub(crate) gradient_center: Point<f32>,
+    pub(crate) gradient_radius: Point<f32>,
+    pub(crate) colors: [LinearColorStop; MAX_GRADIENT_STOPS],
     pub(crate) color_stop_count: u32,
 }
 
-/// The number of stops one renderer-backed linear gradient can carry.
+/// The number of stops one renderer-backed gradient can carry.
 ///
 /// Stops are stored inline with scene primitives so quads and paths use the
 /// same representation on Metal, Direct3D, and WGPU. Eight covers ordinary
 /// UI washes, charts, heat scales, and shimmer signatures without introducing
 /// a renderer-specific side buffer.
-pub const MAX_LINEAR_GRADIENT_STOPS: usize = 8;
+pub const MAX_GRADIENT_STOPS: usize = 8;
+
+/// Compatibility name for the renderer-backed gradient stop capacity.
+pub const MAX_LINEAR_GRADIENT_STOPS: usize = MAX_GRADIENT_STOPS;
 
 impl std::fmt::Debug for Background {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -801,6 +810,20 @@ impl std::fmt::Debug for Background {
                 f,
                 "LinearGradient({}, {:?})",
                 self.gradient_angle_or_pattern_height,
+                &self.colors[..self.color_stop_count as usize]
+            ),
+            BackgroundTag::RadialGradient => write!(
+                f,
+                "RadialGradient({:?}, {:?}, {:?})",
+                self.gradient_center,
+                self.gradient_radius,
+                &self.colors[..self.color_stop_count as usize]
+            ),
+            BackgroundTag::ConicGradient => write!(
+                f,
+                "ConicGradient({}, {:?}, {:?})",
+                self.gradient_angle_or_pattern_height,
+                self.gradient_center,
                 &self.colors[..self.color_stop_count as usize]
             ),
             BackgroundTag::PatternSlash => write!(
@@ -825,7 +848,9 @@ impl Default for Background {
             solid: Hsla::default(),
             color_space: ColorSpace::default(),
             gradient_angle_or_pattern_height: 0.0,
-            colors: [LinearColorStop::default(); MAX_LINEAR_GRADIENT_STOPS],
+            gradient_center: point(0.5, 0.5),
+            gradient_radius: point(0.5, 0.5),
+            colors: [LinearColorStop::default(); MAX_GRADIENT_STOPS],
             color_stop_count: 0,
         }
     }
@@ -889,22 +914,124 @@ where
     S: Into<LinearColorStop>,
 {
     assert!(angle.is_finite(), "a linear gradient angle must be finite");
-    let mut colors = [LinearColorStop::default(); MAX_LINEAR_GRADIENT_STOPS];
+    let (colors, color_stop_count) = collect_gradient_stops("linear", stops);
+    Background {
+        tag: BackgroundTag::LinearGradient,
+        gradient_angle_or_pattern_height: angle,
+        colors,
+        color_stop_count,
+        ..Default::default()
+    }
+}
+
+/// Creates an elliptical radial gradient between two color stops.
+///
+/// `center` and `radius` are fractions of the painted bounds. A center of
+/// `(0.5, 0.5)` and radius of `(0.5, 0.5)` reaches the midpoint of every side;
+/// unequal radii produce an ellipse. Centers may lie outside the bounds, while
+/// both radii must be finite and greater than zero.
+pub fn radial_gradient(
+    center: Point<f32>,
+    radius: Point<f32>,
+    from: impl Into<LinearColorStop>,
+    to: impl Into<LinearColorStop>,
+) -> Background {
+    radial_gradient_stops(center, radius, [from.into(), to.into()])
+}
+
+/// Creates an elliptical radial gradient from two through eight color stops.
+pub fn radial_gradient_stops<S>(
+    center: Point<f32>,
+    radius: Point<f32>,
+    stops: impl IntoIterator<Item = S>,
+) -> Background
+where
+    S: Into<LinearColorStop>,
+{
+    assert!(
+        center.x.is_finite() && center.y.is_finite(),
+        "a radial gradient center must be finite"
+    );
+    assert!(
+        radius.x.is_finite() && radius.x > 0.0 && radius.y.is_finite() && radius.y > 0.0,
+        "a radial gradient radius must be finite and greater than zero"
+    );
+    let (colors, color_stop_count) = collect_gradient_stops("radial", stops);
+    Background {
+        tag: BackgroundTag::RadialGradient,
+        gradient_center: center,
+        gradient_radius: radius,
+        colors,
+        color_stop_count,
+        ..Default::default()
+    }
+}
+
+/// Creates a conic gradient between two color stops.
+///
+/// `start_angle` uses CSS gradient geometry: zero degrees starts at the top and
+/// increasing values rotate clockwise. `center` is expressed as fractions of
+/// the painted bounds and may lie outside them.
+pub fn conic_gradient(
+    start_angle: f32,
+    center: Point<f32>,
+    from: impl Into<LinearColorStop>,
+    to: impl Into<LinearColorStop>,
+) -> Background {
+    conic_gradient_stops(start_angle, center, [from.into(), to.into()])
+}
+
+/// Creates a conic gradient from two through eight color stops.
+pub fn conic_gradient_stops<S>(
+    start_angle: f32,
+    center: Point<f32>,
+    stops: impl IntoIterator<Item = S>,
+) -> Background
+where
+    S: Into<LinearColorStop>,
+{
+    assert!(
+        start_angle.is_finite(),
+        "a conic gradient angle must be finite"
+    );
+    assert!(
+        center.x.is_finite() && center.y.is_finite(),
+        "a conic gradient center must be finite"
+    );
+    let (colors, color_stop_count) = collect_gradient_stops("conic", stops);
+    Background {
+        tag: BackgroundTag::ConicGradient,
+        gradient_angle_or_pattern_height: start_angle,
+        gradient_center: center,
+        colors,
+        color_stop_count,
+        ..Default::default()
+    }
+}
+
+fn collect_gradient_stops<S>(
+    kind: &str,
+    stops: impl IntoIterator<Item = S>,
+) -> ([LinearColorStop; MAX_GRADIENT_STOPS], u32)
+where
+    S: Into<LinearColorStop>,
+{
+    let mut colors = [LinearColorStop::default(); MAX_GRADIENT_STOPS];
     let mut color_stop_count = 0;
     for stop in stops {
         assert!(
-            color_stop_count < MAX_LINEAR_GRADIENT_STOPS,
-            "a linear gradient accepts at most {MAX_LINEAR_GRADIENT_STOPS} color stops"
+            color_stop_count < MAX_GRADIENT_STOPS,
+            "a {kind} gradient accepts at most {MAX_GRADIENT_STOPS} color stops"
         );
         let stop = stop.into();
         assert!(
             stop.percentage.is_finite() && (0.0..=1.0).contains(&stop.percentage),
-            "linear gradient stop {color_stop_count} must have a finite percentage in 0.0..=1.0"
+            "{kind} gradient stop {color_stop_count} must have a finite percentage in 0.0..=1.0"
         );
         if color_stop_count > 0 {
             assert!(
                 colors[color_stop_count - 1].percentage <= stop.percentage,
-                "linear gradient stops must be ordered by percentage"
+                "{kind} gradient stops must be ordered by percentage"
             );
         }
         colors[color_stop_count] = stop;
@@ -912,15 +1039,9 @@ where
     }
     assert!(
         color_stop_count >= 2,
-        "a linear gradient requires at least 2 color stops"
+        "a {kind} gradient requires at least 2 color stops"
     );
-    Background {
-        tag: BackgroundTag::LinearGradient,
-        gradient_angle_or_pattern_height: angle,
-        colors,
-        color_stop_count: color_stop_count as u32,
-        ..Default::default()
-    }
+    (colors, color_stop_count as u32)
 }
 
 /// A color stop in a linear gradient.
@@ -987,7 +1108,9 @@ impl Background {
     pub fn is_transparent(&self) -> bool {
         match self.tag {
             BackgroundTag::Solid => self.solid.is_transparent(),
-            BackgroundTag::LinearGradient => self.colors[..self.color_stop_count as usize]
+            BackgroundTag::LinearGradient
+            | BackgroundTag::RadialGradient
+            | BackgroundTag::ConicGradient => self.colors[..self.color_stop_count as usize]
                 .iter()
                 .all(|c| c.color.is_transparent()),
             BackgroundTag::PatternSlash => self.solid.is_transparent(),
@@ -1112,6 +1235,46 @@ mod tests {
         assert_eq!(
             &background.opacity(0.5).colors[..3],
             &stops.map(|stop| stop.opacity(0.5))
+        );
+    }
+
+    #[test]
+    fn radial_gradient_carries_normalized_ellipse_geometry() {
+        let stops = [
+            linear_color_stop(rgba(0xff0000ff), 0.0),
+            linear_color_stop(rgba(0x00ff00ff), 0.4),
+            linear_color_stop(rgba(0x0000ffff), 1.0),
+        ];
+        let background = radial_gradient_stops(point(0.25, 0.75), point(0.5, 0.3), stops);
+        assert_eq!(background.tag, BackgroundTag::RadialGradient);
+        assert_eq!(background.gradient_center, point(0.25, 0.75));
+        assert_eq!(background.gradient_radius, point(0.5, 0.3));
+        assert_eq!(&background.colors[..3], &stops);
+        assert_eq!(background.color_stop_count, 3);
+        assert!(!background.is_transparent());
+        assert!(background.opacity(0.0).is_transparent());
+    }
+
+    #[test]
+    fn conic_gradient_carries_css_angle_and_center_geometry() {
+        let from = linear_color_stop(rgba(0xff0000ff), 0.0);
+        let to = linear_color_stop(rgba(0x0000ffff), 1.0);
+        let background = conic_gradient(45.0, point(0.4, 0.6), from, to);
+        assert_eq!(background.tag, BackgroundTag::ConicGradient);
+        assert_eq!(background.gradient_angle_or_pattern_height, 45.0);
+        assert_eq!(background.gradient_center, point(0.4, 0.6));
+        assert_eq!(background.color_stop_count, 2);
+        assert_eq!(&background.colors[..2], &[from, to]);
+    }
+
+    #[test]
+    #[should_panic(expected = "radial gradient radius must be finite and greater than zero")]
+    fn radial_gradient_refuses_a_zero_radius() {
+        let _ = radial_gradient(
+            point(0.5, 0.5),
+            point(0.0, 0.5),
+            linear_color_stop(rgba(0xff0000ff), 0.0),
+            linear_color_stop(rgba(0x0000ffff), 1.0),
         );
     }
 

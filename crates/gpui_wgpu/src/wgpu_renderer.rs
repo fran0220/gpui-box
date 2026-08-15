@@ -3614,9 +3614,9 @@ mod tests {
 
     #[test]
     fn record_sizes_match_shader_word_strides() {
-        assert_eq!(std::mem::size_of::<Quad>(), 70 * 4);
+        assert_eq!(std::mem::size_of::<Quad>(), 74 * 4);
         assert_eq!(std::mem::size_of::<Shadow>(), 28 * 4);
-        assert_eq!(std::mem::size_of::<PathRasterizationVertex>(), 56 * 4);
+        assert_eq!(std::mem::size_of::<PathRasterizationVertex>(), 60 * 4);
         assert_eq!(std::mem::size_of::<PathSprite>(), 4 * 4);
         assert_eq!(std::mem::size_of::<Underline>(), 16 * 4);
         assert_eq!(std::mem::size_of::<MonochromeSprite>(), 28 * 4);

@@ -60,10 +60,11 @@ Box work, not part of either imported lane. It changes no native hosting or
 renderer behavior; it retains caller-owned native controller state until the
 existing host has detached and released its final handle clone.
 
-The renderer-backed linear-gradient primitive with up to eight ordered color
-stops is also subsequent GPUI Box work. Its shared inline scene representation
-and Metal, Direct3D, WGPU, and WebGL shader implementations were authored here;
-they import no additional framework or shader source.
+The renderer-backed linear, elliptical radial, and conic gradient primitives
+with up to eight ordered color stops are also subsequent GPUI Box work. Their
+shared inline scene representation and Metal, Direct3D, WGPU, and WebGL shader
+implementations were authored here; they import no additional framework or
+shader source.
 
 The read-only selectable-text primitive, wrapped and bidirectional range
 geometry, pointer-capture interaction, clipboard behavior, and AccessKit text

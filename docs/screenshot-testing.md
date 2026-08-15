@@ -137,14 +137,14 @@ Sans Hebrew are bundled and named in every Kit type style for the same reason;
 the `reading-direction` scene exercises mixed RTL scripts, Latin, punctuation,
 paths, and numbers without consulting machine fonts.
 
-Gradient noise is deterministic for the same reason. Metal, Direct3D, and WGPU
-derive their triangular dither from the integer identity of the screen pixel.
-The former float `sin` hash was not a reproducible contract: different Metal
-GPU families produced different random fields even though the gradients and
-geometry were identical. The integer hash fixes the field without raising the
-comparison tolerance or weakening the component gate. It does not make color
-conversion identical across renderers, so the three baseline sets remain
-separate.
+Gradient noise is deterministic for the same reason. Linear, radial, and conic
+gradients on Metal, Direct3D, and WGPU derive their triangular dither from the
+integer identity of the screen pixel. The former float `sin` hash was not a
+reproducible contract: different Metal GPU families produced different random
+fields even though the gradients and geometry were identical. The integer hash
+fixes the field without raising the comparison tolerance or weakening the
+component gate. It does not make color conversion identical across renderers,
+so the three baseline sets remain separate.
 
 A comparison allows one step per channel. Exactness was tried and does not
 hold: capturing `frost` alone and capturing it as the ninetieth scene of a full

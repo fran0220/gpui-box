@@ -5,8 +5,8 @@
 //! visually in one arrangement and tested in another.
 
 use gpui::{
-    AnyElement, App, Entity, Focusable, Global, IntoElement, SharedString, Window, div, prelude::*,
-    px,
+    AnyElement, App, Entity, Focusable, Global, IntoElement, SharedString, Window, canvas,
+    conic_gradient_stops, div, linear_color_stop, point, prelude::*, px, radial_gradient_stops,
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -68,6 +68,10 @@ pub fn catalog() -> Vec<Scene> {
         Scene {
             name: "loading",
             build: loading,
+        },
+        Scene {
+            name: "visual-effects",
+            build: visual_effects,
         },
         Scene {
             name: "choice",
@@ -1046,6 +1050,128 @@ fn loading(_window: &mut Window, cx: &mut App) -> AnyElement {
                     Skeleton::new("scene.loading.skeleton")
                         .rows(3)
                         .label("Loading list"),
+                ),
+        )
+        .into_any_element()
+}
+
+fn visual_effects(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let radial = radial_gradient_stops(
+        point(0.32, 0.36),
+        point(0.68, 0.72),
+        [
+            linear_color_stop(theme.colors.accent_strong, 0.0),
+            linear_color_stop(theme.colors.info.opacity(0.86), 0.34),
+            linear_color_stop(theme.colors.accent.opacity(0.38), 0.7),
+            linear_color_stop(theme.colors.canvas.opacity(0.0), 1.0),
+        ],
+    )
+    .color_space(gpui::ColorSpace::Oklab);
+    let conic = conic_gradient_stops(
+        -24.0,
+        point(0.5, 0.5),
+        [
+            linear_color_stop(theme.colors.accent_strong, 0.0),
+            linear_color_stop(theme.colors.info, 0.22),
+            linear_color_stop(theme.colors.success, 0.48),
+            linear_color_stop(theme.colors.warning, 0.72),
+            linear_color_stop(theme.colors.danger, 1.0),
+        ],
+    )
+    .color_space(gpui::ColorSpace::Oklab);
+    let path_fill = conic;
+    let label = |text: &'static str| {
+        div()
+            .absolute()
+            .bottom(px(theme.spacing.sm))
+            .left(px(theme.spacing.sm))
+            .px_token(&theme, Space::Sm)
+            .py_token(&theme, Space::Xs)
+            .radius(&theme, Radius::Pill)
+            .bg(theme.colors.panel.opacity(0.9))
+            .border_1()
+            .border_color(theme.colors.hairline_strong)
+            .child(crate::foundation::text(&theme, TypeScale::Caption, text))
+    };
+
+    stack(&theme)
+        .child(crate::foundation::text(
+            &theme,
+            TypeScale::Subtitle,
+            "Renderer-backed gradients",
+        ))
+        .child(
+            row(&theme)
+                .gap_token(&theme, Space::Md)
+                .child(
+                    div()
+                        .relative()
+                        .w(px(248.0))
+                        .h(px(164.0))
+                        .radius(&theme, Radius::Card)
+                        .overflow_hidden()
+                        .bg(radial)
+                        .semantic_in(
+                            cx,
+                            NodeSpec::new("scene.effects.radial", Role::Image)
+                                .text("Elliptical radial gradient")
+                                .description("Four ordered Oklab color stops"),
+                        )
+                        .child(label("Radial · 4 stops")),
+                )
+                .child(
+                    div()
+                        .relative()
+                        .w(px(248.0))
+                        .h(px(164.0))
+                        .radius(&theme, Radius::Card)
+                        .overflow_hidden()
+                        .bg(conic)
+                        .semantic_in(
+                            cx,
+                            NodeSpec::new("scene.effects.conic", Role::Image)
+                                .text("Clockwise conic gradient")
+                                .description("Five ordered Oklab color stops"),
+                        )
+                        .child(label("Conic · 5 stops")),
+                )
+                .child(
+                    div()
+                        .relative()
+                        .w(px(248.0))
+                        .h(px(164.0))
+                        .radius(&theme, Radius::Card)
+                        .overflow_hidden()
+                        .bg(theme.colors.sunken)
+                        .semantic_in(
+                            cx,
+                            NodeSpec::new("scene.effects.path-gradient", Role::Image)
+                                .text("Conic gradient path fill")
+                                .description("The same renderer primitive clipped by a GPUI path"),
+                        )
+                        .child(
+                            div().absolute().inset_0().child(
+                                canvas(
+                                    |_, _, _| {},
+                                    move |bounds, _, window, _| {
+                                        let inset = px(22.0);
+                                        let center = bounds.center();
+                                        let mut builder = gpui::PathBuilder::fill();
+                                        builder.move_to(point(center.x, bounds.top() + inset));
+                                        builder.line_to(point(bounds.right() - inset, center.y));
+                                        builder.line_to(point(center.x, bounds.bottom() - inset));
+                                        builder.line_to(point(bounds.left() + inset, center.y));
+                                        builder.close();
+                                        if let Ok(path) = builder.build() {
+                                            window.paint_path(path, path_fill);
+                                        }
+                                    },
+                                )
+                                .size_full(),
+                            ),
+                        )
+                        .child(label("Path fill · conic")),
                 ),
         )
         .into_any_element()

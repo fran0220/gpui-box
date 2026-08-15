@@ -1155,7 +1155,7 @@ GradientColor prepare_fill_color(uint tag, uint color_space, Hsla solid,
   GradientColor out;
   if (tag == 0 || tag == 2 || tag == 3) {
     out.solid = hsla_to_rgba(solid);
-  } else if (tag == 1) {
+  } else if (tag == 1 || tag == 4 || tag == 5) {
     out.color0 = hsla_to_rgba(color0);
     out.color1 = hsla_to_rgba(color1);
 
@@ -1210,29 +1210,54 @@ float4 fill_color(Background background,
     case 0:
       color = solid_color;
       break;
-    case 1: {
-      // -90 degrees to match the CSS gradient angle.
-      float gradient_angle = background.gradient_angle_or_pattern_height;
-      float radians = (fmod(gradient_angle, 360.0) - 90.0) * (M_PI_F / 180.0);
-      float2 direction = float2(cos(radians), sin(radians));
+    case 1:
+    case 4:
+    case 5: {
+      float t = 0.0;
+      if (background.tag == 1) {
+        // -90 degrees to match the CSS gradient angle.
+        float gradient_angle = background.gradient_angle_or_pattern_height;
+        float radians = (fmod(gradient_angle, 360.0) - 90.0) * (M_PI_F / 180.0);
+        float2 direction = float2(cos(radians), sin(radians));
 
-      // Expand the short side to be the same as the long side
-      if (bounds.size.width > bounds.size.height) {
-          direction.y *= bounds.size.height / bounds.size.width;
-      } else {
-          direction.x *=  bounds.size.width / bounds.size.height;
-      }
+        // Expand the short side to be the same as the long side.
+        if (bounds.size.width > bounds.size.height) {
+            direction.y *= bounds.size.height / bounds.size.width;
+        } else {
+            direction.x *=  bounds.size.width / bounds.size.height;
+        }
 
-      // Get the t value for the linear gradient with the color stop percentages.
-      float2 half_size = float2(bounds.size.width, bounds.size.height) / 2.;
-      float2 center = float2(bounds.origin.x, bounds.origin.y) + half_size;
-      float2 center_to_point = position - center;
-      float t = dot(center_to_point, direction) / length(direction);
-      // Check the direction to determine whether to use x or y
-      if (abs(direction.x) > abs(direction.y)) {
-          t = (t + half_size.x) / bounds.size.width;
+        float2 half_size = float2(bounds.size.width, bounds.size.height) / 2.;
+        float2 center = float2(bounds.origin.x, bounds.origin.y) + half_size;
+        float2 center_to_point = position - center;
+        t = dot(center_to_point, direction) / length(direction);
+        if (abs(direction.x) > abs(direction.y)) {
+            t = (t + half_size.x) / bounds.size.width;
+        } else {
+            t = (t + half_size.y) / bounds.size.height;
+        }
+      } else if (background.tag == 4) {
+        float2 bounds_size = float2(bounds.size.width, bounds.size.height);
+        float2 center = float2(bounds.origin.x, bounds.origin.y) +
+                        bounds_size * float2(background.gradient_center.x,
+                                             background.gradient_center.y);
+        float2 radius = max(
+          abs(bounds_size * float2(background.gradient_radius.x,
+                                   background.gradient_radius.y)),
+          float2(0.0001)
+        );
+        t = length((position - center) / radius);
       } else {
-          t = (t + half_size.y) / bounds.size.height;
+        float2 bounds_size = float2(bounds.size.width, bounds.size.height);
+        float2 center = float2(bounds.origin.x, bounds.origin.y) +
+                        bounds_size * float2(background.gradient_center.x,
+                                             background.gradient_center.y);
+        float2 center_to_point = position - center;
+        if (dot(center_to_point, center_to_point) > 0.00000001) {
+          float clockwise_from_top = atan2(center_to_point.x, -center_to_point.y);
+          float start = background.gradient_angle_or_pattern_height * M_PI_F / 180.0;
+          t = fract((clockwise_from_top - start) / (2.0 * M_PI_F));
+        }
       }
 
       // Select the two stops surrounding this pixel. The stop count and
