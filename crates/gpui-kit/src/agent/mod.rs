@@ -4,6 +4,7 @@
 //! costs. Runtime transports stay outside this module: [`model`] is the
 //! caller-owned snapshot components read, not a second agent runtime.
 pub mod approval;
+pub mod canvas;
 pub mod cost;
 pub mod model;
 pub mod offering_catalog;
@@ -15,6 +16,7 @@ pub mod thinking;
 pub mod tool_call;
 
 pub use approval::{AlwaysScope, ApprovalDecision, ApprovalEvent, ApprovalPrompt, ApprovalStatus};
+pub use canvas::{AgentRunCanvas, AgentRunCanvasEvent, AgentRunLayout};
 pub use cost::{Basis, ContextGauge, CostLine, CostMeter, LastVerified, Limit, Quantity, Reading};
 pub use model::{
     AgentActivity, AgentDescriptor, AgentExecutionState, AgentId, AgentModelIssue, AgentOutcome,

@@ -103,6 +103,7 @@ actions. They define no account, provider, network, or credential policy.
 | `AgentRoster` | builder | selected agent | A virtualized roster consuming `AgentSnapshot` and `AgentTaskSnapshot` directly. Selection remains caller-owned and row IDs are agent business identities |
 | `SubagentTree` | builder | selected agent and requested disclosure state | Derives only parent-child structure from typed `Spawn` links. Expanded branches and selection remain caller-owned; non-spawn delegation, report, handoff, and dependency links do not silently reparent agents |
 | `AgentRunIssues` | builder | — | Renders `AgentRunSnapshot::issues()` as one stable failure notice. Identity-indexed components use it instead of collapsing duplicate or dangling facts into a different roster or topology |
+| `AgentRunCanvas`, `AgentRunLayout` | builder, policy | typed subject selection, viewport, and optional arranged subject positions | Projects one valid `AgentRunSnapshot` directly onto `NodeGraph`: agents, tasks, invocation placeholders, every execution state, and all seven relationship kinds keep their typed identity and localized wording. The built-in layered layout is deterministic and RTL-aware. Inspection never installs topology edits; malformed topology renders `AgentRunIssues` before any identity-indexed projection |
 
 The presentation layer is not an agent runtime. It consumes an observed
 `AgentRunSnapshot`, displays waiting/refused/failed/cancelled as distinct facts,

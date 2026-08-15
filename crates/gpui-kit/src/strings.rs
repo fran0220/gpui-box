@@ -475,6 +475,22 @@ string_keys! {
     AgentIssueMissingTaskOwner => "agent.issue.missing-task-owner", "Task {0} references missing owner {1}";
     AgentIssueMissingLinkEndpoint => "agent.issue.missing-link-endpoint", "Run link {0} references missing endpoint {1}";
     AgentIssueSelfLink => "agent.issue.self-link", "Run link {0} references itself";
+    AgentRunCanvasKind => "agent.run-canvas.kind", "Kind";
+    AgentRunCanvasAgent => "agent.run-canvas.agent", "Agent";
+    AgentRunCanvasTask => "agent.run-canvas.task", "Task";
+    AgentRunCanvasInvocationKind => "agent.run-canvas.invocation-kind", "Invocation";
+    AgentRunCanvasInvocation => "agent.run-canvas.invocation", "Invocation {0}";
+    AgentRunCanvasInvocationPending => "agent.run-canvas.invocation-pending", "Invocation details not supplied";
+    AgentRunCanvasResults => "agent.run-canvas.results", "Results";
+    AgentRunCanvasConflicts => "agent.run-canvas.conflicts", "Conflicts";
+    AgentRunCanvasSpawn => "agent.run-canvas.spawn", "Spawn";
+    AgentRunCanvasDelegation => "agent.run-canvas.delegation", "Delegation";
+    AgentRunCanvasDependency => "agent.run-canvas.dependency", "Dependency";
+    AgentRunCanvasHandoff => "agent.run-canvas.handoff", "Handoff";
+    AgentRunCanvasReport => "agent.run-canvas.report", "Report";
+    AgentRunCanvasAggregation => "agent.run-canvas.aggregation", "Aggregation";
+    AgentRunCanvasRetry => "agent.run-canvas.retry", "Retry";
+    AgentRunCanvasRelationLabel => "agent.run-canvas.relation-label", "{0}: {1}";
 
     // Document tabs. A clean tab carries no wording at all, which is why
     // there is no key here for one: silence is the whole message.

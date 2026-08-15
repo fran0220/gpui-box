@@ -162,6 +162,34 @@
       ]
     },
     {
+      "name": "AgentRunCanvas",
+      "kind": "builder",
+      "path": "gpui_kit::agent::AgentRunCanvas",
+      "source": "crates/gpui-kit/src/agent/canvas.rs",
+      "summary": "A typed, read-mostly view of an AgentRunSnapshot on a node canvas.",
+      "construct": [
+        "new(ident: impl Into<Ident>, run: AgentRunSnapshot) -> Self"
+      ],
+      "options": [
+        "layout(layout: AgentRunLayout) -> Self",
+        "position(subject: RunSubjectId, x: f32, y: f32) -> Self",
+        "selected(selected: impl IntoIterator<Item = RunSubjectId>) -> Self",
+        "viewport(viewport: GraphViewport) -> Self",
+        "arrangeable(arrangeable: bool) -> Self",
+        "on_event(handler: impl Fn(&AgentRunCanvasEvent, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [
+        "SelectionChanged",
+        "ViewportChanged",
+        "PositionChanged"
+      ],
+      "scenes": [
+        "agent-run-canvas"
+      ]
+    },
+    {
       "name": "AgentRunIssues",
       "kind": "builder",
       "path": "gpui_kit::agent::AgentRunIssues",
@@ -4288,6 +4316,33 @@
       "queries": [
         "as_str() -> &'static str"
       ]
+    },
+    {
+      "name": "AgentRunCanvasEvent",
+      "path": "gpui_kit::agent::AgentRunCanvasEvent",
+      "summary": "A controlled change proposed by AgentRunCanvas.",
+      "variants": [
+        "SelectionChanged",
+        "ViewportChanged",
+        "PositionChanged"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "AgentRunLayout",
+      "path": "gpui_kit::agent::AgentRunLayout",
+      "summary": "The reading axis used by the built-in deterministic run layout.",
+      "variants": [
+        "LayeredHorizontal",
+        "LayeredVertical"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "AgentRunSnapshot",
@@ -10021,6 +10076,14 @@
         "Tree"
       ],
       "example": "fn agent_roster(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let direction = cx.layout_direction();\n    let run = scene_agent_run();\n    let root = run\n        .agents\n        .first()\n        .cloned()\n        .expect(\"the canonical multi-agent scene has a root agent\");\n\n    stack(&theme)\n        .w(px(720.0))\n        .child(\n            div()\n                .row_reading(direction)\n                .items_center()\n                .justify_between()\n                .child(\n                    div()\n                        .column()\n                        .gap_token(&theme, Space::Xs)\n                        .child(\n                            div()\n                                .type_scale(&theme, TypeScale::Title)\n                                .text_tone(&theme, TextTone::Primary)\n                                .child(\"Release review\"),\n                        )\n                        .child(AgentActivityLine::new(\n                            \"scene.agent-roster.run-state\",\n                            run.execution.clone(),\n                        )),\n                )\n                .child(\n                    AgentGroup::new(\"scene.agent-roster.group\", run.agents.clone()).max_visible(3),\n                ),\n        )\n        .child(\n            AgentCard::new(\"scene.agent-roster.root\", root)\n                .task_label(\"Synthesis\")\n                .selected(true)\n                .on_action(|_, _, _| {}),\n        )\n        .child(\n            div()\n                .row_reading(direction)\n                .items_start()\n                .gap_token(&theme, Space::Lg)\n                .child(\n                    div().w(px(420.0)).child(\n                        AgentRoster::from_run(\"scene.agent-roster.list\", &run)\n                            .selected(\"researcher\")\n                            .visible_rows(4)\n                            .on_action(|_, _, _| {}),\n                    ),\n                )\n                .child(\n                    div().w(px(270.0)).child(\n                        SubagentTree::new(\"scene.agent-roster.tree\", run)\n                            .expanded([\"orchestrator\".into(), \"researcher\".into()])\n                            .selected(\"researcher\")\n                            .visible_rows(4)\n                            .on_toggle(|_, _, _, _| {})\n                            .on_action(|_, _, _| {}),\n                    ),\n                ),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "agent-run-canvas",
+      "capture": "cargo run -p xtask -- headless capture agent-run-canvas",
+      "uses": [
+        "AgentRunCanvas"
+      ],
+      "example": "fn agent_run_canvas(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let run = AgentRunSnapshot::new(\"release-topology\", \"orchestrator\")\n        .execution(AgentExecutionState::Active(AgentActivity::Aggregating))\n        .agents([\n            AgentSnapshot::new(\n                AgentDescriptor::new(\"orchestrator\", \"Atlas\").role(\"Run coordinator\"),\n            )\n            .execution(AgentExecutionState::Active(AgentActivity::Aggregating)),\n            AgentSnapshot::new(\n                AgentDescriptor::new(\"researcher\", \"Nova\").role(\"Repository research\"),\n            )\n            .execution(AgentExecutionState::Active(AgentActivity::UsingTool(\n                \"repository search\".into(),\n            ))),\n            AgentSnapshot::new(AgentDescriptor::new(\"reviewer\", \"Sage\").role(\"Independent review\"))\n                .execution(AgentExecutionState::Waiting(WaitReason::Approval)),\n        ])\n        .tasks([\n            AgentTaskSnapshot::new(\"evidence\", \"Evidence bundle\")\n                .execution(AgentExecutionState::Completed(AgentOutcome::Succeeded)),\n            AgentTaskSnapshot::new(\"synthesis\", \"Release synthesis\").execution(\n                AgentExecutionState::Completed(AgentOutcome::Partial(\"awaiting approval\".into())),\n            ),\n        ])\n        .links([\n            RunLink::new(\n                \"spawn-researcher\",\n                RunSubjectId::Agent(\"orchestrator\".into()),\n                RunSubjectId::Agent(\"researcher\".into()),\n                RunLinkKind::Spawn,\n            ),\n            RunLink::new(\n                \"delegate-evidence\",\n                RunSubjectId::Agent(\"orchestrator\".into()),\n                RunSubjectId::Task(\"evidence\".into()),\n                RunLinkKind::Delegation,\n            ),\n            RunLink::new(\n                \"evidence-before-synthesis\",\n                RunSubjectId::Task(\"evidence\".into()),\n                RunSubjectId::Task(\"synthesis\".into()),\n                RunLinkKind::Dependency,\n            ),\n            RunLink::new(\n                \"handoff-review\",\n                RunSubjectId::Agent(\"researcher\".into()),\n                RunSubjectId::Agent(\"reviewer\".into()),\n                RunLinkKind::Handoff,\n            ),\n            RunLink::new(\n                \"search-report\",\n                RunSubjectId::Invocation(\"search-42\".into()),\n                RunSubjectId::Agent(\"researcher\".into()),\n                RunLinkKind::Report,\n            ),\n            RunLink::new(\n                \"aggregate-review\",\n                RunSubjectId::Agent(\"reviewer\".into()),\n                RunSubjectId::Task(\"synthesis\".into()),\n                RunLinkKind::Aggregation,\n            ),\n            RunLink::new(\n                \"retry-search\",\n                RunSubjectId::Agent(\"reviewer\".into()),\n                RunSubjectId::Agent(\"researcher\".into()),\n                RunLinkKind::Retry,\n            )\n            .label(\"bounded attempt 2\"),\n        ])\n        .aggregation(AggregationSnapshot::new(3, 2).conflicts(1));\n\n    stack(&theme)\n        .w(px(860.0))\n        .child(\n            div()\n                .w_full()\n                .h(px(500.0))\n                .hairline(&theme)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(\n                    AgentRunCanvas::new(\"scene.agent-run-canvas\", run)\n                        .selected([RunSubjectId::Agent(\"researcher\".into())])\n                        .viewport(GraphViewport::new(gpui::point(0.0, 0.0), 0.56))\n                        .on_event(|_, _, _| {}),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "conversation",

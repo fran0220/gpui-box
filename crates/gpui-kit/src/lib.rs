@@ -89,6 +89,7 @@ pub mod prelude {
     pub use crate::agent::approval::{
         AlwaysScope, ApprovalDecision, ApprovalEvent, ApprovalPrompt, ApprovalStatus,
     };
+    pub use crate::agent::canvas::{AgentRunCanvas, AgentRunCanvasEvent, AgentRunLayout};
     pub use crate::agent::cost::{
         Basis, ContextGauge, CostLine, CostMeter, LastVerified, Limit, Quantity, Reading,
     };

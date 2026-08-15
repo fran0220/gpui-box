@@ -294,6 +294,10 @@ pub fn catalog() -> Vec<Scene> {
             build: agent_roster,
         },
         Scene {
+            name: "agent-run-canvas",
+            build: agent_run_canvas,
+        },
+        Scene {
             name: "conversation",
             build: conversation,
         },
@@ -5532,6 +5536,97 @@ fn agent_roster(_window: &mut Window, cx: &mut App) -> AnyElement {
                             .on_toggle(|_, _, _, _| {})
                             .on_action(|_, _, _| {}),
                     ),
+                ),
+        )
+        .into_any_element()
+}
+
+fn agent_run_canvas(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let run = AgentRunSnapshot::new("release-topology", "orchestrator")
+        .execution(AgentExecutionState::Active(AgentActivity::Aggregating))
+        .agents([
+            AgentSnapshot::new(
+                AgentDescriptor::new("orchestrator", "Atlas").role("Run coordinator"),
+            )
+            .execution(AgentExecutionState::Active(AgentActivity::Aggregating)),
+            AgentSnapshot::new(
+                AgentDescriptor::new("researcher", "Nova").role("Repository research"),
+            )
+            .execution(AgentExecutionState::Active(AgentActivity::UsingTool(
+                "repository search".into(),
+            ))),
+            AgentSnapshot::new(AgentDescriptor::new("reviewer", "Sage").role("Independent review"))
+                .execution(AgentExecutionState::Waiting(WaitReason::Approval)),
+        ])
+        .tasks([
+            AgentTaskSnapshot::new("evidence", "Evidence bundle")
+                .execution(AgentExecutionState::Completed(AgentOutcome::Succeeded)),
+            AgentTaskSnapshot::new("synthesis", "Release synthesis").execution(
+                AgentExecutionState::Completed(AgentOutcome::Partial("awaiting approval".into())),
+            ),
+        ])
+        .links([
+            RunLink::new(
+                "spawn-researcher",
+                RunSubjectId::Agent("orchestrator".into()),
+                RunSubjectId::Agent("researcher".into()),
+                RunLinkKind::Spawn,
+            ),
+            RunLink::new(
+                "delegate-evidence",
+                RunSubjectId::Agent("orchestrator".into()),
+                RunSubjectId::Task("evidence".into()),
+                RunLinkKind::Delegation,
+            ),
+            RunLink::new(
+                "evidence-before-synthesis",
+                RunSubjectId::Task("evidence".into()),
+                RunSubjectId::Task("synthesis".into()),
+                RunLinkKind::Dependency,
+            ),
+            RunLink::new(
+                "handoff-review",
+                RunSubjectId::Agent("researcher".into()),
+                RunSubjectId::Agent("reviewer".into()),
+                RunLinkKind::Handoff,
+            ),
+            RunLink::new(
+                "search-report",
+                RunSubjectId::Invocation("search-42".into()),
+                RunSubjectId::Agent("researcher".into()),
+                RunLinkKind::Report,
+            ),
+            RunLink::new(
+                "aggregate-review",
+                RunSubjectId::Agent("reviewer".into()),
+                RunSubjectId::Task("synthesis".into()),
+                RunLinkKind::Aggregation,
+            ),
+            RunLink::new(
+                "retry-search",
+                RunSubjectId::Agent("reviewer".into()),
+                RunSubjectId::Agent("researcher".into()),
+                RunLinkKind::Retry,
+            )
+            .label("bounded attempt 2"),
+        ])
+        .aggregation(AggregationSnapshot::new(3, 2).conflicts(1));
+
+    stack(&theme)
+        .w(px(860.0))
+        .child(
+            div()
+                .w_full()
+                .h(px(500.0))
+                .hairline(&theme)
+                .radius(&theme, Radius::Card)
+                .overflow_hidden()
+                .child(
+                    AgentRunCanvas::new("scene.agent-run-canvas", run)
+                        .selected([RunSubjectId::Agent("researcher".into())])
+                        .viewport(GraphViewport::new(gpui::point(0.0, 0.0), 0.56))
+                        .on_event(|_, _, _| {}),
                 ),
         )
         .into_any_element()

@@ -950,7 +950,7 @@ fn execution_glyph(execution: &AgentExecutionState) -> Option<Glyph> {
     }
 }
 
-fn execution_label(execution: &AgentExecutionState, strings: &Strings) -> SharedString {
+pub(crate) fn execution_label(execution: &AgentExecutionState, strings: &Strings) -> SharedString {
     match execution {
         AgentExecutionState::Idle => strings.text(StringKey::AgentIdle),
         AgentExecutionState::Queued => strings.text(StringKey::AgentQueued),
