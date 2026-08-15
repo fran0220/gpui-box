@@ -16,6 +16,8 @@ pub mod schema_form;
 
 pub use json_view::{JsonValue, JsonView, ValueKind};
 pub use schema_form::{
-    FieldValue, NumberBounds, Schema, SchemaChoice, SchemaField, SchemaForm, SchemaFormEvent,
-    SchemaKind, UnrenderableField,
+    DefaultSchemaFilePolicy, FieldValue, NumberBounds, Schema, SchemaChoice, SchemaField,
+    SchemaFilePolicy, SchemaFileRequest, SchemaForm, SchemaFormEvent, SchemaKind,
+    SharedSchemaFilePolicy, UnrenderableField, installed_schema_file_policy,
+    reset_schema_file_policy, set_schema_file_policy,
 };

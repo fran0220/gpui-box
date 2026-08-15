@@ -6101,17 +6101,34 @@ fn scene_schema() -> Schema {
             .required(true),
         )
         .field(
-            SchemaField::new(
-                "profile",
-                SchemaKind::OpenEnum(vec![
-                    SchemaChoice::new("fast", "Fast"),
-                    SchemaChoice::new("thorough", "Thorough"),
-                ]),
-            )
-            .label("Profile")
-            .description("One of these, or whatever you type"),
+            SchemaField::new("attachments", SchemaKind::Files { max: Some(2) })
+                .label("Attachments")
+                .description("Paths are acquired and accepted by the host"),
         )
-        .field(SchemaField::new("tags", SchemaKind::TextList { max: Some(4) }).label("Tags"))
+        .field(
+            SchemaField::new(
+                "headers",
+                SchemaKind::List {
+                    item: Box::new(SchemaField::new(
+                        "header",
+                        SchemaKind::Object(vec![
+                            SchemaField::new(
+                                "name",
+                                SchemaKind::Text {
+                                    placeholder: Some("Header name".into()),
+                                    secret: false,
+                                },
+                            )
+                            .label("Name")
+                            .required(true),
+                            SchemaField::new("enabled", SchemaKind::Boolean).label("Enabled"),
+                        ]),
+                    )),
+                    max: Some(3),
+                },
+            )
+            .label("Headers"),
+        )
         .field(
             SchemaField::new(
                 "limits",
@@ -6138,11 +6155,15 @@ fn scene_schema() -> Schema {
 
 fn schema_form(window: &mut Window, cx: &mut App) -> AnyElement {
     if !cx.has_global::<SceneSchemaForm>() {
+        set_schema_file_policy(DefaultSchemaFilePolicy, cx);
         let form = cx.new(|cx| SchemaForm::new("scene.schema", scene_schema(), window, cx));
         form.update(cx, |form, cx| {
             // An error the host returned rather than one the form derived:
             // only the host knows this path is outside the workspace.
             form.set_error("path", "That path is outside the workspace.", cx);
+            form.set_files("attachments", vec!["/workspace/brief.md".into()], cx)
+                .expect("the scene's permissive file policy accepts its fixture");
+            form.add_list_item("headers", window, cx);
         });
         cx.set_global(SceneSchemaForm { form });
     }

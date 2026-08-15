@@ -2559,6 +2559,10 @@
       ],
       "options": [],
       "commands": [
+        "set_files(path: impl Into<SharedString>, files: Vec<PathBuf>, cx: &mut Context<Self>) -> Result<bool, SharedString>",
+        "add_list_item(path: impl Into<SharedString>, window: &mut Window, cx: &mut Context<Self>) -> bool",
+        "remove_list_item(path: impl Into<SharedString>, index: usize, cx: &mut Context<Self>) -> bool",
+        "move_list_item(path: impl Into<SharedString>, from: usize, to: usize, cx: &mut Context<Self>) -> bool",
         "set_error(path: impl Into<SharedString>, message: impl Into<SharedString>, cx: &mut Context<Self>)",
         "clear_host_errors(cx: &mut Context<Self>)",
         "validate(cx: &mut Context<Self>) -> bool",
@@ -2571,6 +2575,7 @@
       ],
       "reports": [
         "Changed",
+        "FilesRequested",
         "Submitted"
       ],
       "scenes": [
@@ -4547,6 +4552,16 @@
       "queries": []
     },
     {
+      "name": "DefaultSchemaFilePolicy",
+      "path": "gpui_kit::structured::DefaultSchemaFilePolicy",
+      "summary": "Opt-in policy for ordinary files with no host-specific restrictions.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "DeliveryState",
       "path": "gpui_kit::content::DeliveryState",
       "summary": "What a host said about a message's journey.",
@@ -5163,6 +5178,8 @@
         "Boolean",
         "Choice",
         "List",
+        "Files",
+        "ItemCount",
         "Day",
         "Time",
         "Range",
@@ -7259,11 +7276,22 @@
       ]
     },
     {
+      "name": "SchemaFileRequest",
+      "path": "gpui_kit::structured::SchemaFileRequest",
+      "summary": "The file field the form is asking the host to acquire paths for.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "SchemaFormEvent",
       "path": "gpui_kit::structured::SchemaFormEvent",
       "summary": "What the form reports.",
       "variants": [
         "Changed",
+        "FilesRequested",
         "Submitted"
       ],
       "construct": [],
@@ -9458,7 +9486,7 @@
         "TagInput",
         "TextInput"
       ],
-      "example": "fn schema_form(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneSchemaForm>() {\n        let form = cx.new(|cx| SchemaForm::new(\"scene.schema\", scene_schema(), window, cx));\n        form.update(cx, |form, cx| {\n            // An error the host returned rather than one the form derived:\n            // only the host knows this path is outside the workspace.\n            form.set_error(\"path\", \"That path is outside the workspace.\", cx);\n        });\n        cx.set_global(SceneSchemaForm { form });\n    }\n    let form = cx.global::<SceneSchemaForm>().form.clone();\n    let theme = cx.theme().clone();\n    stack(&theme).w(px(520.0)).child(form).into_any_element()\n}"
+      "example": "fn schema_form(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneSchemaForm>() {\n        set_schema_file_policy(DefaultSchemaFilePolicy, cx);\n        let form = cx.new(|cx| SchemaForm::new(\"scene.schema\", scene_schema(), window, cx));\n        form.update(cx, |form, cx| {\n            // An error the host returned rather than one the form derived:\n            // only the host knows this path is outside the workspace.\n            form.set_error(\"path\", \"That path is outside the workspace.\", cx);\n            form.set_files(\"attachments\", vec![\"/workspace/brief.md\".into()], cx)\n                .expect(\"the scene's permissive file policy accepts its fixture\");\n            form.add_list_item(\"headers\", window, cx);\n        });\n        cx.set_global(SceneSchemaForm { form });\n    }\n    let form = cx.global::<SceneSchemaForm>().form.clone();\n    let theme = cx.theme().clone();\n    stack(&theme).w(px(520.0)).child(form).into_any_element()\n}"
     },
     {
       "name": "server-list",

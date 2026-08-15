@@ -246,6 +246,18 @@ string_keys! {
     // Drop zone.
     DropzoneRefusal => "dropzone.refusal", "This zone does not take that.";
 
+    // Schema file and repeated fields.
+    SchemaFilesChoose => "schema.files.choose", "Choose files";
+    SchemaFilesDrop => "schema.files.drop", "Drop files here";
+    SchemaFilesDropHint => "schema.files.drop-hint", "or choose them with the file picker";
+    SchemaFilesMaximum => "schema.files.maximum", "This field holds at most {0} files.";
+    SchemaFilesRemove => "schema.files.remove", "Remove selected file";
+    SchemaListAdd => "schema.list.add", "Add item";
+    SchemaListItem => "schema.list.item", "Item {0}";
+    SchemaListMoveUp => "schema.list.move-up", "Move item up";
+    SchemaListMoveDown => "schema.list.move-down", "Move item down";
+    SchemaListRemove => "schema.list.remove", "Remove item";
+
     // Filter bar.
     FilterBarLabel => "filter-bar.label", "Filters";
     FilterBarAdd => "filter-bar.add", "Add filter";

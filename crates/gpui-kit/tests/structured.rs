@@ -1,9 +1,12 @@
 //! What a structured surface is allowed to claim: `JsonView` and `SchemaForm`.
 
 use std::cell::RefCell;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
-use gpui::{AppContext, IntoElement, SharedString, TestAppContext};
+use gpui::{
+    AppContext, Context, IntoElement, Render, SharedString, Subscription, TestAppContext, Window,
+};
 use gpui_kit::prelude::*;
 use gpui_kit_semantics::{Node, Role, Snapshot};
 use gpui_kit_testkit::harness::Harness;
@@ -493,6 +496,401 @@ fn an_untouched_field_holds_nothing_rather_than_an_empty_string(cx: &mut TestApp
             follow,
             Some(FieldValue::Boolean(false)),
             "a switch always holds one of two answers"
+        );
+    });
+}
+
+#[gpui::test]
+fn files_without_a_host_policy_stay_visible_and_unrenderable(cx: &mut TestAppContext) {
+    let schema = Schema::new().field(
+        SchemaField::new("attachments", SchemaKind::Files { max: Some(2) })
+            .label("Attachments")
+            .required(true),
+    );
+    let (mut harness, form) = form_harness(cx, schema);
+
+    let refusal = harness
+        .node("form.attachments.unrenderable")
+        .expect("file field keeps its place");
+    assert_eq!(
+        refusal.text.as_deref(),
+        Some("This field needs a host policy before it can be filled in.")
+    );
+    harness.update(|_, cx| {
+        let form = form.read(cx);
+        assert_eq!(
+            form.values(cx),
+            vec![("attachments".into(), FieldValue::Unrenderable)]
+        );
+        assert_eq!(form.unrenderable()[0].path.as_ref(), "attachments");
+    });
+}
+
+#[derive(Clone, Copy)]
+struct WorkspaceFiles;
+
+impl SchemaFilePolicy for WorkspaceFiles {
+    fn accept(&self, _request: &SchemaFileRequest, paths: &[PathBuf]) -> Result<(), SharedString> {
+        if paths.iter().all(|path| path.starts_with("/workspace")) {
+            Ok(())
+        } else {
+            Err("Only workspace files are accepted.".into())
+        }
+    }
+
+    fn display_name(&self, path: &Path) -> SharedString {
+        format!(
+            "Attachment {}",
+            path.file_name()
+                .expect("test path has a file name")
+                .to_string_lossy()
+        )
+        .into()
+    }
+}
+
+struct FileHost {
+    form: gpui::Entity<SchemaForm>,
+    _subscription: Subscription,
+}
+
+impl FileHost {
+    fn new(
+        schema: Schema,
+        requests: Rc<RefCell<Vec<SchemaFileRequest>>>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        let form = cx.new(|cx| SchemaForm::new("form", schema, window, cx));
+        let subscription = cx.subscribe(&form, move |_, _, event: &SchemaFormEvent, _| {
+            if let SchemaFormEvent::FilesRequested(request) = event {
+                requests.borrow_mut().push(request.clone());
+            }
+        });
+        Self {
+            form,
+            _subscription: subscription,
+        }
+    }
+}
+
+impl Render for FileHost {
+    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+        self.form.clone()
+    }
+}
+
+fn file_form_harness(
+    cx: &mut TestAppContext,
+) -> (
+    Harness,
+    gpui::Entity<SchemaForm>,
+    Rc<RefCell<Vec<SchemaFileRequest>>>,
+) {
+    let schema = Schema::new()
+        .field(
+            SchemaField::new("attachments", SchemaKind::Files { max: Some(2) })
+                .label("Attachments")
+                .required(true),
+        )
+        .field(
+            SchemaField::new(
+                "groups",
+                SchemaKind::List {
+                    item: Box::new(SchemaField::new(
+                        "group",
+                        SchemaKind::Object(vec![
+                            SchemaField::new("attachment", SchemaKind::Files { max: Some(1) })
+                                .label("Attachment"),
+                        ]),
+                    )),
+                    max: Some(2),
+                },
+            )
+            .label("Groups"),
+        );
+    let held: Rc<RefCell<Option<gpui::Entity<FileHost>>>> = Rc::new(RefCell::new(None));
+    let sink = Rc::clone(&held);
+    let requests = Rc::new(RefCell::new(Vec::new()));
+    let request_sink = Rc::clone(&requests);
+    let mut harness = Harness::new(
+        cx,
+        |cx| {
+            gpui_kit::install(cx);
+            set_schema_file_policy(WorkspaceFiles, cx);
+        },
+        move |window, cx| {
+            let mut slot = sink.borrow_mut();
+            let host = slot
+                .get_or_insert_with(|| {
+                    let requests = Rc::clone(&request_sink);
+                    cx.new(|cx| FileHost::new(schema.clone(), requests, window, cx))
+                })
+                .clone();
+            host.into_any_element()
+        },
+    );
+    let host = held.borrow().clone().expect("built");
+    let form = harness.context().update(|_, cx| host.read(cx).form.clone());
+    (harness, form, requests)
+}
+
+#[gpui::test]
+fn file_host_request_policy_maximum_removal_and_values_share_one_contract(cx: &mut TestAppContext) {
+    let (mut harness, form, requests) = file_form_harness(cx);
+
+    harness.click("form.attachments.control.choose");
+    assert!(
+        !harness.context().did_prompt_for_paths(),
+        "the form never opens an OS picker itself"
+    );
+    assert_eq!(
+        requests.borrow().as_slice(),
+        [SchemaFileRequest {
+            path: "attachments".into(),
+            label: "Attachments".into(),
+            max: Some(2),
+        }],
+        "the host receives enough context to acquire its own paths"
+    );
+
+    harness.update(|_, cx| {
+        form.update(cx, |form, cx| {
+            form.set_files(
+                "attachments",
+                vec![PathBuf::from("/workspace/brief.txt")],
+                cx,
+            )
+            .expect("host-selected path is accepted");
+        });
+        assert_eq!(
+            form.read(cx).values(cx),
+            vec![
+                (
+                    "attachments".into(),
+                    FieldValue::Files(vec![PathBuf::from("/workspace/brief.txt")])
+                ),
+                ("groups".into(), FieldValue::ItemCount(0)),
+            ]
+        );
+        let refused = form.update(cx, |form, cx| {
+            form.set_files(
+                "attachments",
+                vec![
+                    PathBuf::from("/workspace/one.txt"),
+                    PathBuf::from("/workspace/two.txt"),
+                    PathBuf::from("/workspace/three.txt"),
+                ],
+                cx,
+            )
+        });
+        assert_eq!(
+            refused,
+            Err("This field holds at most 2 files.".into()),
+            "the maximum is enforced after host acquisition too"
+        );
+        let outside = form.update(cx, |form, cx| {
+            form.set_files(
+                "attachments",
+                vec![PathBuf::from("/private/secret.txt")],
+                cx,
+            )
+        });
+        assert_eq!(outside, Err("Only workspace files are accepted.".into()));
+        assert_eq!(
+            form.read(cx).values(cx)[0].1,
+            FieldValue::Files(vec![PathBuf::from("/workspace/brief.txt")]),
+            "a refusal preserves the last accepted paths"
+        );
+    });
+    harness.frame();
+
+    let snapshot = harness.snapshot();
+    assert!(snapshot.nodes.iter().all(|node| {
+        [&node.text, &node.value, &node.description]
+            .into_iter()
+            .flatten()
+            .all(|text| !text.contains("/workspace/brief.txt"))
+    }));
+
+    harness.click("form.attachments.control.file.0.remove");
+    harness.update(|_, cx| {
+        assert_eq!(form.read(cx).values(cx)[0].1, FieldValue::Files(Vec::new()));
+    });
+}
+
+#[gpui::test]
+fn nested_file_requests_and_values_follow_repeated_position(cx: &mut TestAppContext) {
+    let (mut harness, form, requests) = file_form_harness(cx);
+
+    harness.click("form.groups.control.add");
+    harness.click("form.groups.control.add");
+    harness.click("form.groups.control.item-0.attachment.control.choose");
+    assert_eq!(requests.borrow()[0].path, "groups[0].attachment");
+
+    harness.click("form.groups.control.item-0.move-down");
+    harness.click("form.groups.control.item-0.attachment.control.choose");
+    assert_eq!(
+        requests.borrow()[1].path,
+        "groups[1].attachment",
+        "the stable item identity reports its new positional answer path"
+    );
+
+    harness.update(|_, cx| {
+        form.update(cx, |form, cx| {
+            form.set_files(
+                "groups[1].attachment",
+                vec![PathBuf::from("/workspace/nested.txt")],
+                cx,
+            )
+            .expect("the parent routes a positional path to the nested file field");
+        });
+        assert!(form.read(cx).values(cx).contains(&(
+            "groups[1].attachment".into(),
+            FieldValue::Files(vec![PathBuf::from("/workspace/nested.txt")])
+        )));
+    });
+}
+
+fn repeated_schema() -> Schema {
+    Schema::new().field(
+        SchemaField::new(
+            "items",
+            SchemaKind::List {
+                item: Box::new(SchemaField::new(
+                    "item",
+                    SchemaKind::Object(vec![
+                        SchemaField::new(
+                            "name",
+                            SchemaKind::Text {
+                                placeholder: None,
+                                secret: false,
+                            },
+                        )
+                        .label("Name")
+                        .required(true),
+                        SchemaField::new(
+                            "host_value",
+                            SchemaKind::Unrenderable("The host supplies this value.".into()),
+                        )
+                        .label("Host value"),
+                    ]),
+                )),
+                max: Some(2),
+            },
+        )
+        .label("Items")
+        .required(true),
+    )
+}
+
+#[gpui::test]
+fn repeated_items_keep_identity_while_exported_paths_follow_position(cx: &mut TestAppContext) {
+    let (mut harness, form) = form_harness(cx, repeated_schema());
+
+    harness.click("form.items.control.add");
+    harness.click("form.items.control.item-0.name.control");
+    harness.context().simulate_input("Alpha");
+    harness.click("form.items.control.add");
+    harness.click("form.items.control.item-1.name.control");
+    harness.context().simulate_input("Beta");
+    harness.frame();
+
+    harness.update(|_, cx| {
+        let values = form.read(cx).values(cx);
+        assert!(values.contains(&("items[0].name".into(), FieldValue::Text("Alpha".into()))));
+        assert!(values.contains(&("items[1].name".into(), FieldValue::Text("Beta".into()))));
+        assert_eq!(form.read(cx).unrenderable()[0].path, "items[0].host_value");
+        assert_eq!(form.read(cx).unrenderable()[1].path, "items[1].host_value");
+    });
+
+    harness.click("form.items.control.item-0.move-down");
+    assert!(
+        harness
+            .node("form.items.control.item-0.name.control")
+            .is_some(),
+        "the first item's internal semantic identity survives the reorder"
+    );
+    harness.update(|_, cx| {
+        let values = form.read(cx).values(cx);
+        assert!(values.contains(&("items[0].name".into(), FieldValue::Text("Beta".into()))));
+        assert!(values.contains(&("items[1].name".into(), FieldValue::Text("Alpha".into()))));
+        assert_eq!(form.read(cx).unrenderable()[0].path, "items[0].host_value");
+        assert_eq!(form.read(cx).unrenderable()[1].path, "items[1].host_value");
+    });
+
+    assert!(
+        harness
+            .node("form.items.control.add")
+            .expect("published")
+            .disabled,
+        "the schema maximum disables the add action"
+    );
+    harness.click("form.items.control.item-1.remove");
+    harness.update(|_, cx| {
+        let values = form.read(cx).values(cx);
+        assert!(values.contains(&("items".into(), FieldValue::ItemCount(1))));
+        assert!(values.iter().all(|(path, _)| !path.starts_with("items[1]")));
+        assert_eq!(form.read(cx).unrenderable().len(), 1);
+    });
+}
+
+#[gpui::test]
+fn repeated_required_fields_validate_and_disabled_lists_install_no_actions(
+    cx: &mut TestAppContext,
+) {
+    let (mut harness, form) = form_harness(cx, repeated_schema());
+
+    harness.update(|window, cx| {
+        form.update(cx, |form, cx| {
+            assert!(!form.validate(cx), "a required repeated field starts empty");
+            form.add_list_item("items", window, cx);
+            assert!(
+                !form.validate(cx),
+                "the required nested name is still empty"
+            );
+            form.set_error("items[0].name", "The host refused this name.", cx);
+        });
+    });
+    harness.frame();
+    assert_eq!(
+        harness
+            .node("form.items.control.item-0.name.error")
+            .expect("the indexed host error is routed to its child")
+            .text
+            .as_deref(),
+        Some("The host refused this name.")
+    );
+
+    harness.update(|_, cx| {
+        form.update(cx, |form, cx| {
+            form.clear_host_errors(cx);
+            assert!(!form.validate(cx));
+            form.set_disabled(true, cx);
+        });
+    });
+    harness.frame();
+    assert_eq!(
+        harness
+            .node("form.items.control.item-0.name.error")
+            .expect("nested validation is drawn")
+            .text
+            .as_deref(),
+        Some("This field is required.")
+    );
+    assert!(
+        harness
+            .node("form.items.control.add")
+            .expect("published")
+            .disabled,
+        "disabled repeated forms disable their add action"
+    );
+    harness.click("form.items.control.add");
+    harness.update(|_, cx| {
+        assert_eq!(
+            form.read(cx).values(cx)[0].1,
+            FieldValue::ItemCount(1),
+            "a disabled add button has no action handler"
         );
     });
 }

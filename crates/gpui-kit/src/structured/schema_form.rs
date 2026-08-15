@@ -32,16 +32,21 @@
 //! the host knows something the form does not.
 
 use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 use gpui::{
     AnyElement, App, AppContext, Context, Entity, EventEmitter, InteractiveElement, IntoElement,
     ParentElement, Render, SharedString, Styled, Subscription, Window, div, prelude::FluentBuilder,
     px,
 };
+use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TextTone, TypeScale};
 
+use crate::controls::button::{Button, IconButton};
 use crate::controls::combobox::{Combobox, ComboboxEvent};
+use crate::controls::dropzone::Dropzone;
 use crate::controls::form_field::FormField;
 use crate::controls::input::{TextInput, TextInputEvent};
 use crate::controls::number_input::{NumberInput, NumberInputEvent};
@@ -55,7 +60,78 @@ use crate::datetime::{
 use crate::display::badge::Tone;
 use crate::display::status::Callout;
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
+
+/// The file field the form is asking the host to acquire paths for.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SchemaFileRequest {
+    pub path: SharedString,
+    pub label: SharedString,
+    pub max: Option<usize>,
+}
+
+/// Host policy for schema file fields.
+///
+/// The form owns the drop target, selected-path rows, and schema maximum. The
+/// host owns which paths may become answers and how one is named on screen. A
+/// browse action emits [`SchemaFormEvent::FilesRequested`]; the host opens its
+/// picker and returns paths with [`SchemaForm::set_files`].
+pub trait SchemaFilePolicy {
+    /// Accepts or refuses one complete candidate selection. A refusal is
+    /// shown verbatim and changes none of the paths the form already holds.
+    fn accept(&self, _request: &SchemaFileRequest, _paths: &[PathBuf]) -> Result<(), SharedString> {
+        Ok(())
+    }
+
+    /// Names a selected path on screen. The name is deliberately omitted from
+    /// semantic snapshots because a pathname is user-generated content.
+    fn display_name(&self, path: &Path) -> SharedString;
+}
+
+pub type SharedSchemaFilePolicy = Rc<dyn SchemaFilePolicy>;
+
+/// Opt-in policy for ordinary files with no host-specific restrictions.
+///
+/// Installing this is an explicit statement that any file path the platform
+/// returns is acceptable. Applications with workspace, extension, or access
+/// policy install their own implementation instead.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct DefaultSchemaFilePolicy;
+
+impl SchemaFilePolicy for DefaultSchemaFilePolicy {
+    fn display_name(&self, path: &Path) -> SharedString {
+        path.file_name()
+            .unwrap_or(path.as_os_str())
+            .to_string_lossy()
+            .into_owned()
+            .into()
+    }
+}
+
+struct InstalledSchemaFiles(SharedSchemaFilePolicy);
+
+impl gpui::Global for InstalledSchemaFiles {}
+
+/// Reads the file policy a host installed, if any.
+pub fn installed_schema_file_policy(cx: &App) -> Option<SharedSchemaFilePolicy> {
+    cx.try_global::<InstalledSchemaFiles>()
+        .map(|installed| Rc::clone(&installed.0))
+}
+
+/// Installs the policy schema file fields use. Replaces any previous policy.
+pub fn set_schema_file_policy(policy: impl SchemaFilePolicy + 'static, cx: &mut App) {
+    cx.set_global(InstalledSchemaFiles(Rc::new(policy)));
+    cx.refresh_windows();
+}
+
+/// Removes the installed policy so schema file fields remain visibly
+/// unrenderable rather than silently accepting paths.
+pub fn reset_schema_file_policy(cx: &mut App) {
+    if cx.has_global::<InstalledSchemaFiles>() {
+        cx.remove_global::<InstalledSchemaFiles>();
+        cx.refresh_windows();
+    }
+}
 
 /// One option a closed or open choice offers.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -269,6 +345,12 @@ pub enum FieldValue {
     Boolean(bool),
     Choice(SharedString),
     List(Vec<SharedString>),
+    /// Paths the installed host policy accepted. Paths are returned to the
+    /// caller but never copied into semantic snapshots.
+    Files(Vec<PathBuf>),
+    /// How many repeated sections the list currently holds. Their individual
+    /// answers follow under paths such as `parent[0].child`.
+    ItemCount(usize),
     /// A calendar day the host adapter already accepted.
     Day(i64),
     /// A time of day, as hour / minute / optional second.
@@ -296,11 +378,42 @@ pub enum SchemaFormEvent {
     /// The field at this path changed. The value is read from
     /// [`SchemaForm::values`], because a form has more than one of them.
     Changed(SharedString),
+    /// The person asked to browse for this file field. The form deliberately
+    /// opens no OS picker; the host acquires paths and returns them through
+    /// [`SchemaForm::set_files`].
+    FilesRequested(SchemaFileRequest),
     /// The primary key was pressed in a field. The form submits nothing.
     Submitted,
 }
 
 impl EventEmitter<SchemaFormEvent> for SchemaForm {}
+
+struct SelectedFile {
+    id: u64,
+    path: PathBuf,
+    label: SharedString,
+}
+
+struct FilesControl {
+    request: SchemaFileRequest,
+    policy: SharedSchemaFilePolicy,
+    selected: Vec<SelectedFile>,
+    next_id: u64,
+    refusal: Option<SharedString>,
+}
+
+struct RepeatedItem {
+    id: u64,
+    form: Entity<SchemaForm>,
+    _subscription: Subscription,
+}
+
+struct RepeatedControl {
+    item: SchemaField,
+    max: Option<usize>,
+    items: Vec<RepeatedItem>,
+    next_id: u64,
+}
 
 /// The control that edits one field, and where the value lives.
 enum Control {
@@ -314,6 +427,8 @@ enum Control {
     Date(Entity<DateInput>),
     Time(Entity<TimeInput>),
     DateRange(Entity<RangePicker>),
+    Files(FilesControl),
+    Repeated(RepeatedControl),
     /// A heading over the fields beneath it. It holds nothing.
     Group,
     Unrenderable(SharedString),
@@ -336,6 +451,9 @@ struct Field {
 /// each own a caret, an open menu, or a selection that has to survive a frame.
 pub struct SchemaForm {
     ident: Ident,
+    /// Positional answer prefix when this form is one stable repeated item.
+    /// Reordering changes the prefix without changing any control identity.
+    export_prefix: SharedString,
     fields: Vec<Field>,
     /// What the host said is wrong, by path.
     host_errors: BTreeMap<SharedString, SharedString>,
@@ -343,6 +461,7 @@ pub struct SchemaForm {
     /// that field, so an answered complaint does not stay on screen.
     derived_errors: BTreeMap<SharedString, SharedString>,
     unrenderable: Vec<UnrenderableField>,
+    base_unrenderable: usize,
     size: ControlSize,
     disabled: bool,
     _subscriptions: Vec<Subscription>,
@@ -370,16 +489,19 @@ impl SchemaForm {
         let ident = ident.into();
         let mut form = Self {
             ident,
+            export_prefix: SharedString::default(),
             fields: Vec::new(),
             host_errors: BTreeMap::new(),
             derived_errors: BTreeMap::new(),
             unrenderable: Vec::new(),
+            base_unrenderable: 0,
             size: ControlSize::Md,
             disabled: false,
             _subscriptions: Vec::new(),
         };
         let ident = form.ident.clone();
         form.build(&schema.fields, "", 1, &ident, window, cx);
+        form.base_unrenderable = form.unrenderable.len();
         form
     }
 
@@ -400,7 +522,7 @@ impl SchemaForm {
             };
             let field_ident = ident.child(path.as_ref());
             let label = field.shown_label();
-            let control = self.control_for(field, &field_ident, window, cx);
+            let control = self.control_for(field, &path, &field_ident, window, cx);
 
             if let Control::Unrenderable(reason) = &control {
                 self.unrenderable.push(UnrenderableField {
@@ -434,11 +556,11 @@ impl SchemaForm {
     fn control_for(
         &mut self,
         field: &SchemaField,
+        path: &SharedString,
         ident: &Ident,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Control {
-        let path = SharedString::from(ident.as_str().to_string());
         let control_ident = ident.child("control");
         match &field.kind {
             SchemaKind::Unrenderable(reason) => Control::Unrenderable(reason.clone()),
@@ -464,7 +586,7 @@ impl SchemaForm {
                     }
                     input
                 });
-                self.watch_text(&path, &input, cx);
+                self.watch_text(path, &input, cx);
                 Control::Text(input)
             }
             SchemaKind::Number(bounds) | SchemaKind::Integer(bounds) => {
@@ -488,7 +610,7 @@ impl SchemaForm {
                     }
                     number
                 });
-                self.watch_number(&path, &number, cx);
+                self.watch_number(path, &number, cx);
                 Control::Number(number)
             }
             SchemaKind::Boolean => Control::Boolean(false),
@@ -500,7 +622,7 @@ impl SchemaForm {
                         .name(name)
                         .options(options)
                 });
-                self.watch_select(&path, &select, cx);
+                self.watch_select(path, &select, cx);
                 Control::Choice(select)
             }
             SchemaKind::OpenEnum(choices) => {
@@ -512,7 +634,7 @@ impl SchemaForm {
                         .options(options)
                         .allow_custom(true)
                 });
-                self.watch_combobox(&path, &combobox, cx);
+                self.watch_combobox(path, &combobox, cx);
                 Control::OpenChoice(combobox)
             }
             SchemaKind::TextList { max } => {
@@ -524,7 +646,7 @@ impl SchemaForm {
                         None => field,
                     }
                 });
-                self.watch_tags(&path, &tags, cx);
+                self.watch_tags(path, &tags, cx);
                 Control::List(tags)
             }
             // These shapes are named so a host can describe a settings page
@@ -534,7 +656,7 @@ impl SchemaForm {
             SchemaKind::Date => match installed_adapter(cx) {
                 Some(adapter) => {
                     let input = cx.new(|cx| DateInput::new(control_ident, adapter, window, cx));
-                    self.watch_date(&path, &input, cx);
+                    self.watch_date(path, &input, cx);
                     Control::Date(input)
                 }
                 None => Control::Unrenderable(cx.strings().text(StringKey::SchemaNeedsAdapter)),
@@ -542,7 +664,7 @@ impl SchemaForm {
             SchemaKind::Time => match installed_adapter(cx) {
                 Some(adapter) => {
                     let input = cx.new(|cx| TimeInput::new(control_ident, adapter, window, cx));
-                    self.watch_time(&path, &input, cx);
+                    self.watch_time(path, &input, cx);
                     Control::Time(input)
                 }
                 None => Control::Unrenderable(cx.strings().text(StringKey::SchemaNeedsAdapter)),
@@ -550,14 +672,31 @@ impl SchemaForm {
             SchemaKind::DateRange => match installed_adapter(cx) {
                 Some(adapter) => {
                     let picker = cx.new(|cx| RangePicker::new(control_ident, adapter, window, cx));
-                    self.watch_range(&path, &picker, cx);
+                    self.watch_range(path, &picker, cx);
                     Control::DateRange(picker)
                 }
                 None => Control::Unrenderable(cx.strings().text(StringKey::SchemaNeedsAdapter)),
             },
-            SchemaKind::Files { .. } | SchemaKind::List { .. } => {
-                Control::Unrenderable(cx.strings().text(StringKey::SchemaNeedsHost))
-            }
+            SchemaKind::Files { max } => match installed_schema_file_policy(cx) {
+                Some(policy) => Control::Files(FilesControl {
+                    request: SchemaFileRequest {
+                        path: path.clone(),
+                        label: field.shown_label(),
+                        max: *max,
+                    },
+                    policy,
+                    selected: Vec::new(),
+                    next_id: 0,
+                    refusal: None,
+                }),
+                None => Control::Unrenderable(cx.strings().text(StringKey::SchemaNeedsHost)),
+            },
+            SchemaKind::List { item, max } => Control::Repeated(RepeatedControl {
+                item: item.as_ref().clone(),
+                max: *max,
+                items: Vec::new(),
+                next_id: 0,
+            }),
         }
     }
 
@@ -671,7 +810,12 @@ impl SchemaForm {
         ));
     }
 
-    fn watch_date(&mut self, path: &SharedString, input: &Entity<DateInput>, cx: &mut Context<Self>) {
+    fn watch_date(
+        &mut self,
+        path: &SharedString,
+        input: &Entity<DateInput>,
+        cx: &mut Context<Self>,
+    ) {
         let path = path.clone();
         self._subscriptions.push(cx.subscribe(
             input,
@@ -685,7 +829,12 @@ impl SchemaForm {
         ));
     }
 
-    fn watch_time(&mut self, path: &SharedString, input: &Entity<TimeInput>, cx: &mut Context<Self>) {
+    fn watch_time(
+        &mut self,
+        path: &SharedString,
+        input: &Entity<TimeInput>,
+        cx: &mut Context<Self>,
+    ) {
         let path = path.clone();
         self._subscriptions.push(cx.subscribe(
             input,
@@ -720,6 +869,403 @@ impl SchemaForm {
         cx.notify();
     }
 
+    fn apply_files(
+        &mut self,
+        path: &SharedString,
+        paths: Vec<PathBuf>,
+        append: bool,
+        cx: &mut Context<Self>,
+    ) -> Result<bool, SharedString> {
+        let Some(field) = self.fields.iter().find(|field| field.path == *path) else {
+            return Ok(false);
+        };
+        let Control::Files(files) = &field.control else {
+            return Ok(false);
+        };
+
+        let mut candidates = if append {
+            files
+                .selected
+                .iter()
+                .map(|file| file.path.clone())
+                .collect::<Vec<_>>()
+        } else {
+            Vec::new()
+        };
+        for candidate in paths {
+            if !candidates.contains(&candidate) {
+                candidates.push(candidate);
+            }
+        }
+
+        if files
+            .request
+            .max
+            .is_some_and(|maximum| candidates.len() > maximum)
+        {
+            let maximum = files.request.max.expect("checked above");
+            let refusal = cx
+                .strings()
+                .format(StringKey::SchemaFilesMaximum, &[&maximum.to_string()]);
+            if let Some(field) = self.fields.iter_mut().find(|field| field.path == *path)
+                && let Control::Files(files) = &mut field.control
+            {
+                files.refusal = Some(refusal.clone());
+            }
+            cx.notify();
+            return Err(refusal);
+        }
+
+        if let Err(refusal) = files.policy.accept(&files.request, &candidates) {
+            if let Some(field) = self.fields.iter_mut().find(|field| field.path == *path)
+                && let Control::Files(files) = &mut field.control
+            {
+                files.refusal = Some(refusal.clone());
+            }
+            cx.notify();
+            return Err(refusal);
+        }
+
+        let policy = Rc::clone(&files.policy);
+        let previous = files
+            .selected
+            .iter()
+            .map(|file| (file.path.clone(), file.id, file.label.clone()))
+            .collect::<Vec<_>>();
+        let mut next_id = files.next_id;
+        let selected = candidates
+            .into_iter()
+            .map(|candidate| {
+                if let Some((_, id, label)) =
+                    previous.iter().find(|(path, _, _)| path == &candidate)
+                {
+                    SelectedFile {
+                        id: *id,
+                        path: candidate,
+                        label: label.clone(),
+                    }
+                } else {
+                    let id = next_id;
+                    next_id += 1;
+                    let label = policy.display_name(&candidate);
+                    SelectedFile {
+                        id,
+                        path: candidate,
+                        label,
+                    }
+                }
+            })
+            .collect::<Vec<_>>();
+        let changed = previous.len() != selected.len()
+            || previous
+                .iter()
+                .zip(&selected)
+                .any(|((path, _, _), selected)| path != &selected.path);
+
+        if let Some(field) = self.fields.iter_mut().find(|field| field.path == *path)
+            && let Control::Files(files) = &mut field.control
+        {
+            files.selected = selected;
+            files.next_id = next_id;
+            files.refusal = None;
+        }
+        if changed {
+            self.changed(path.clone(), cx);
+        } else {
+            cx.notify();
+        }
+        Ok(changed)
+    }
+
+    /// Replaces the paths in one file field after applying its installed host
+    /// policy and schema maximum. Returns `Ok(false)` when the path does not
+    /// name a file field.
+    pub fn set_files(
+        &mut self,
+        path: impl Into<SharedString>,
+        files: Vec<PathBuf>,
+        cx: &mut Context<Self>,
+    ) -> Result<bool, SharedString> {
+        let path = path.into();
+        if let Some((form, child_path)) = self.repeated_child(path.as_ref()) {
+            return form.update(cx, |form, cx| form.set_files(child_path, files, cx));
+        }
+        self.apply_files(&path, files, false, cx)
+    }
+
+    fn remove_file(&mut self, path: &SharedString, id: u64, cx: &mut Context<Self>) {
+        let mut changed = false;
+        if let Some(field) = self.fields.iter_mut().find(|field| field.path == *path)
+            && let Control::Files(files) = &mut field.control
+        {
+            let before = files.selected.len();
+            files.selected.retain(|file| file.id != id);
+            files.refusal = None;
+            changed = before != files.selected.len();
+        }
+        if changed {
+            self.changed(path.clone(), cx);
+        }
+    }
+
+    fn repeated_schema(item: &SchemaField) -> Schema {
+        match &item.kind {
+            SchemaKind::Object(children) => Schema::new().fields(children.clone()),
+            _ => Schema::new().field(item.clone()),
+        }
+    }
+
+    /// Adds one repeated section. The section keeps its semantic identity
+    /// across later reorders; only its caller-facing `parent[i].child` paths
+    /// change with its position.
+    pub fn add_list_item(
+        &mut self,
+        path: impl Into<SharedString>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let path = path.into();
+        if let Some((form, child_path)) = self.repeated_child(path.as_ref()) {
+            return form.update(cx, |form, cx| form.add_list_item(child_path, window, cx));
+        }
+        let Some((item, id, index)) = self
+            .fields
+            .iter_mut()
+            .find(|field| field.path == path)
+            .and_then(|field| match &mut field.control {
+                Control::Repeated(repeated)
+                    if repeated
+                        .max
+                        .is_none_or(|maximum| repeated.items.len() < maximum) =>
+                {
+                    let id = repeated.next_id;
+                    repeated.next_id += 1;
+                    Some((repeated.item.clone(), id, repeated.items.len()))
+                }
+                _ => None,
+            })
+        else {
+            return false;
+        };
+
+        let item_ident = self
+            .ident
+            .child(path.as_ref())
+            .child("control")
+            .child(format!("item-{id}"));
+        let schema = Self::repeated_schema(&item);
+        let form = cx.new(|cx| SchemaForm::new(item_ident, schema, window, cx));
+        let export_prefix = Self::exported_path(
+            self.export_prefix.as_ref(),
+            format!("{path}[{index}]").as_ref(),
+        );
+        form.update(cx, |form, cx| form.set_export_prefix(export_prefix, cx));
+        if self.disabled {
+            form.update(cx, |form, cx| form.set_disabled(true, cx));
+        }
+        let parent_path = path.clone();
+        let subscription =
+            cx.subscribe(
+                &form,
+                move |parent, _, event: &SchemaFormEvent, cx| match event {
+                    SchemaFormEvent::Changed(child) => {
+                        parent.repeated_child_changed(&parent_path, id, child, cx)
+                    }
+                    SchemaFormEvent::FilesRequested(request) => {
+                        cx.emit(SchemaFormEvent::FilesRequested(request.clone()))
+                    }
+                    SchemaFormEvent::Submitted => cx.emit(SchemaFormEvent::Submitted),
+                },
+            );
+        if let Some(field) = self.fields.iter_mut().find(|field| field.path == path)
+            && let Control::Repeated(repeated) = &mut field.control
+        {
+            repeated.items.push(RepeatedItem {
+                id,
+                form,
+                _subscription: subscription,
+            });
+        }
+        self.refresh_repeated_unrenderable(cx);
+        self.changed(path, cx);
+        true
+    }
+
+    /// Removes one repeated section by its current index.
+    pub fn remove_list_item(
+        &mut self,
+        path: impl Into<SharedString>,
+        index: usize,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let path = path.into();
+        if let Some((form, child_path)) = self.repeated_child(path.as_ref()) {
+            return form.update(cx, |form, cx| form.remove_list_item(child_path, index, cx));
+        }
+        let removed = self
+            .fields
+            .iter_mut()
+            .find(|field| field.path == path)
+            .is_some_and(|field| match &mut field.control {
+                Control::Repeated(repeated) if index < repeated.items.len() => {
+                    repeated.items.remove(index);
+                    true
+                }
+                _ => false,
+            });
+        if removed {
+            self.sync_repeated_export_paths(cx);
+            self.refresh_repeated_unrenderable(cx);
+            self.changed(path, cx);
+        }
+        removed
+    }
+
+    /// Moves one repeated section to another current index.
+    pub fn move_list_item(
+        &mut self,
+        path: impl Into<SharedString>,
+        from: usize,
+        to: usize,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let path = path.into();
+        if let Some((form, child_path)) = self.repeated_child(path.as_ref()) {
+            return form.update(cx, |form, cx| form.move_list_item(child_path, from, to, cx));
+        }
+        let moved = self
+            .fields
+            .iter_mut()
+            .find(|field| field.path == path)
+            .is_some_and(|field| match &mut field.control {
+                Control::Repeated(repeated)
+                    if from < repeated.items.len() && to < repeated.items.len() && from != to =>
+                {
+                    let item = repeated.items.remove(from);
+                    repeated.items.insert(to, item);
+                    true
+                }
+                _ => false,
+            });
+        if moved {
+            self.sync_repeated_export_paths(cx);
+            self.refresh_repeated_unrenderable(cx);
+            self.changed(path, cx);
+        }
+        moved
+    }
+
+    fn repeated_child_changed(
+        &mut self,
+        parent_path: &SharedString,
+        id: u64,
+        child_path: &SharedString,
+        cx: &mut Context<Self>,
+    ) {
+        let index = self.repeated_index(parent_path, id);
+        if let Some(index) = index {
+            self.refresh_repeated_unrenderable(cx);
+            self.changed(format!("{parent_path}[{index}].{child_path}").into(), cx);
+        }
+    }
+
+    fn repeated_index(&self, parent_path: &SharedString, id: u64) -> Option<usize> {
+        self.fields
+            .iter()
+            .find(|field| field.path == *parent_path)
+            .and_then(|field| match &field.control {
+                Control::Repeated(repeated) => repeated.items.iter().position(|item| item.id == id),
+                _ => None,
+            })
+    }
+
+    fn exported_path(prefix: &str, local: &str) -> SharedString {
+        if prefix.is_empty() {
+            local.to_owned().into()
+        } else {
+            format!("{prefix}.{local}").into()
+        }
+    }
+
+    fn set_export_prefix(&mut self, prefix: SharedString, cx: &mut Context<Self>) {
+        self.export_prefix = prefix;
+        for field in &mut self.fields {
+            if let Control::Files(files) = &mut field.control {
+                files.request.path =
+                    Self::exported_path(self.export_prefix.as_ref(), field.path.as_ref());
+            }
+        }
+        self.sync_repeated_export_paths(cx);
+    }
+
+    fn sync_repeated_export_paths(&self, cx: &mut Context<Self>) {
+        let children = self
+            .fields
+            .iter()
+            .filter_map(|field| match &field.control {
+                Control::Repeated(repeated) => Some(
+                    repeated
+                        .items
+                        .iter()
+                        .enumerate()
+                        .map(|(index, item)| {
+                            (
+                                item.form.clone(),
+                                Self::exported_path(
+                                    self.export_prefix.as_ref(),
+                                    format!("{}[{index}]", field.path).as_ref(),
+                                ),
+                            )
+                        })
+                        .collect::<Vec<_>>(),
+                ),
+                _ => None,
+            })
+            .flatten()
+            .collect::<Vec<_>>();
+        for (form, prefix) in children {
+            form.update(cx, |form, cx| form.set_export_prefix(prefix, cx));
+        }
+    }
+
+    fn repeated_child(&self, path: &str) -> Option<(Entity<SchemaForm>, SharedString)> {
+        self.fields.iter().find_map(|field| {
+            let Control::Repeated(repeated) = &field.control else {
+                return None;
+            };
+            let rest = path.strip_prefix(field.path.as_ref())?.strip_prefix('[')?;
+            let (index, child_path) = rest.split_once("].")?;
+            let index = index.parse::<usize>().ok()?;
+            let item = repeated.items.get(index)?;
+            Some((item.form.clone(), child_path.to_owned().into()))
+        })
+    }
+
+    fn refresh_repeated_unrenderable(&mut self, cx: &App) {
+        self.unrenderable.truncate(self.base_unrenderable);
+        for field in &self.fields {
+            let Control::Repeated(repeated) = &field.control else {
+                continue;
+            };
+            for (index, item) in repeated.items.iter().enumerate() {
+                self.unrenderable
+                    .extend(
+                        item.form
+                            .read(cx)
+                            .unrenderable()
+                            .iter()
+                            .map(|unrenderable| UnrenderableField {
+                                path: format!("{}[{index}].{}", field.path, unrenderable.path)
+                                    .into(),
+                                label: unrenderable.label.clone(),
+                                required: unrenderable.required,
+                                reason: unrenderable.reason.clone(),
+                            }),
+                    );
+            }
+        }
+    }
+
     /// Shows an error the host returned, next to the field it is about.
     pub fn set_error(
         &mut self,
@@ -727,7 +1273,13 @@ impl SchemaForm {
         message: impl Into<SharedString>,
         cx: &mut Context<Self>,
     ) {
-        self.host_errors.insert(path.into(), message.into());
+        let path = path.into();
+        let message = message.into();
+        if let Some((form, child_path)) = self.repeated_child(path.as_ref()) {
+            form.update(cx, |form, cx| form.set_error(child_path, message, cx));
+            return;
+        }
+        self.host_errors.insert(path, message);
         cx.notify();
     }
 
@@ -735,6 +1287,17 @@ impl SchemaForm {
     /// itself is untouched, because the host did not put it there.
     pub fn clear_host_errors(&mut self, cx: &mut Context<Self>) {
         self.host_errors.clear();
+        for item in self
+            .fields
+            .iter()
+            .filter_map(|field| match &field.control {
+                Control::Repeated(repeated) => Some(&repeated.items),
+                _ => None,
+            })
+            .flatten()
+        {
+            item.form.update(cx, |form, cx| form.clear_host_errors(cx));
+        }
         cx.notify();
     }
 
@@ -752,7 +1315,13 @@ impl SchemaForm {
             .fields
             .iter()
             .filter(|field| {
-                field.required && matches!(self.value_of(field, cx), FieldValue::Absent)
+                field.required
+                    && match self.value_of(field, cx) {
+                        FieldValue::Absent => true,
+                        FieldValue::Files(paths) => paths.is_empty(),
+                        FieldValue::ItemCount(count) => count == 0,
+                        _ => false,
+                    }
             })
             .map(|field| field.path.clone())
             .collect();
@@ -774,19 +1343,49 @@ impl SchemaForm {
         for (path, reason) in rejected {
             self.derived_errors.entry(path).or_insert(reason);
         }
+        let mut repeated_answerable = true;
+        for item in self
+            .fields
+            .iter()
+            .filter_map(|field| match &field.control {
+                Control::Repeated(repeated) => Some(&repeated.items),
+                _ => None,
+            })
+            .flatten()
+        {
+            repeated_answerable &= item.form.update(cx, |form, cx| form.validate(cx));
+        }
+        self.refresh_repeated_unrenderable(cx);
         cx.notify();
-        self.derived_errors.is_empty() && !self.unrenderable.iter().any(|field| field.required)
+        repeated_answerable
+            && self.derived_errors.is_empty()
+            && !self.unrenderable.iter().any(|field| field.required)
     }
 
     /// Every field and what it holds, including the ones the form could not
     /// draw. A caller that builds a call from this cannot lose a field without
     /// seeing it.
     pub fn values(&self, cx: &App) -> Vec<(SharedString, FieldValue)> {
-        self.fields
-            .iter()
-            .filter(|field| !matches!(field.control, Control::Group))
-            .map(|field| (field.path.clone(), self.value_of(field, cx)))
-            .collect()
+        let mut values = Vec::new();
+        for field in &self.fields {
+            if matches!(field.control, Control::Group) {
+                continue;
+            }
+            values.push((field.path.clone(), self.value_of(field, cx)));
+            if let Control::Repeated(repeated) = &field.control {
+                for (index, item) in repeated.items.iter().enumerate() {
+                    values.extend(item.form.read(cx).values(cx).into_iter().map(
+                        |(child_path, value)| {
+                            (
+                                format!("{}[{index}].{child_path}", field.path).into(),
+                                value,
+                            )
+                        },
+                    ));
+                }
+            }
+        }
+        values
     }
 
     /// The fields that have to be filled in somewhere else.
@@ -825,7 +1424,16 @@ impl SchemaForm {
                 Control::DateRange(picker) => {
                     picker.update(cx, |picker, cx| picker.set_disabled(disabled, cx))
                 }
-                Control::Boolean(_) | Control::Group | Control::Unrenderable(_) => {}
+                Control::Repeated(repeated) => {
+                    for item in &repeated.items {
+                        item.form
+                            .update(cx, |form, cx| form.set_disabled(disabled, cx));
+                    }
+                }
+                Control::Boolean(_)
+                | Control::Files(_)
+                | Control::Group
+                | Control::Unrenderable(_) => {}
             }
         }
         cx.notify();
@@ -884,6 +1492,14 @@ impl SchemaForm {
                     end: Some(end.0),
                 },
             },
+            Control::Files(files) => FieldValue::Files(
+                files
+                    .selected
+                    .iter()
+                    .map(|file| file.path.clone())
+                    .collect(),
+            ),
+            Control::Repeated(repeated) => FieldValue::ItemCount(repeated.items.len()),
             Control::Unrenderable(_) => FieldValue::Unrenderable,
             Control::Group => FieldValue::Absent,
         }
@@ -1040,6 +1656,206 @@ impl SchemaForm {
             Control::Date(input) => input.clone().into_any_element(),
             Control::Time(input) => input.clone().into_any_element(),
             Control::DateRange(picker) => picker.clone().into_any_element(),
+            Control::Files(files) => {
+                let form = cx.entity().downgrade();
+                let drop_path = field.path.clone();
+                let dropzone = Dropzone::new(
+                    control_ident.child("dropzone"),
+                    cx.strings().text(StringKey::SchemaFilesDrop),
+                )
+                .hint(cx.strings().text(StringKey::SchemaFilesDropHint))
+                .disabled(self.disabled)
+                .when(!self.disabled, |dropzone| {
+                    dropzone.on_files(move |external, _, cx| {
+                        let paths = external.paths().to_vec();
+                        let path = drop_path.clone();
+                        form.update(cx, |form, cx| {
+                            let _ = form.apply_files(&path, paths, true, cx);
+                        })
+                        .ok();
+                    })
+                });
+
+                let form = cx.entity().downgrade();
+                let request = files.request.clone();
+                let choose = Button::new(control_ident.child("choose"))
+                    .label(cx.strings().text(StringKey::SchemaFilesChoose))
+                    .secondary()
+                    .disabled(self.disabled)
+                    .when(!self.disabled, |button| {
+                        button.on_click(move |_, cx| {
+                            let request = request.clone();
+                            form.update(cx, |_, cx| {
+                                cx.emit(SchemaFormEvent::FilesRequested(request));
+                            })
+                            .ok();
+                        })
+                    });
+
+                let selected = files.selected.iter().map(|selected| {
+                    let form = cx.entity().downgrade();
+                    let path = field.path.clone();
+                    let id = selected.id;
+                    div()
+                        .id(control_ident
+                            .child("file")
+                            .child(id.to_string())
+                            .element_id())
+                        .row()
+                        .items_center()
+                        .justify_between()
+                        .gap_token(&theme, Space::Sm)
+                        .child(
+                            text(&theme, TypeScale::Body, selected.label.clone())
+                                .overflow_hidden()
+                                .text_ellipsis(),
+                        )
+                        .child(
+                            IconButton::new(
+                                control_ident
+                                    .child("file")
+                                    .child(id.to_string())
+                                    .child("remove"),
+                                Icon::Trash,
+                                cx.strings().text(StringKey::SchemaFilesRemove),
+                            )
+                            .small()
+                            .disabled(self.disabled)
+                            .when(!self.disabled, |button| {
+                                button.on_click(move |_, cx| {
+                                    form.update(cx, |form, cx| form.remove_file(&path, id, cx))
+                                        .ok();
+                                })
+                            }),
+                        )
+                });
+
+                div()
+                    .column()
+                    .gap_token(&theme, Space::Sm)
+                    .child(dropzone)
+                    .child(choose)
+                    .children(selected)
+                    .children(files.refusal.clone().map(|refusal| {
+                        Callout::new(refusal, Tone::Danger).id(control_ident.child("refusal"))
+                    }))
+                    .into_any_element()
+            }
+            Control::Repeated(repeated) => {
+                let item_count = repeated.items.len();
+                let items = repeated.items.iter().enumerate().map(|(index, item)| {
+                    let item_ident = control_ident.child(format!("item-{}", item.id));
+
+                    let form = cx.entity().downgrade();
+                    let path = field.path.clone();
+                    let move_up = IconButton::new(
+                        item_ident.child("move-up"),
+                        Icon::ArrowUp,
+                        cx.strings().text(StringKey::SchemaListMoveUp),
+                    )
+                    .small()
+                    .disabled(self.disabled || index == 0)
+                    .when(!self.disabled && index > 0, |button| {
+                        button.on_click(move |_, cx| {
+                            form.update(cx, |form, cx| {
+                                form.move_list_item(path.clone(), index, index - 1, cx);
+                            })
+                            .ok();
+                        })
+                    });
+
+                    let form = cx.entity().downgrade();
+                    let path = field.path.clone();
+                    let move_down = IconButton::new(
+                        item_ident.child("move-down"),
+                        Icon::ArrowDown,
+                        cx.strings().text(StringKey::SchemaListMoveDown),
+                    )
+                    .small()
+                    .disabled(self.disabled || index + 1 == item_count)
+                    .when(!self.disabled && index + 1 < item_count, |button| {
+                        button.on_click(move |_, cx| {
+                            form.update(cx, |form, cx| {
+                                form.move_list_item(path.clone(), index, index + 1, cx);
+                            })
+                            .ok();
+                        })
+                    });
+
+                    let form = cx.entity().downgrade();
+                    let path = field.path.clone();
+                    let remove = IconButton::new(
+                        item_ident.child("remove"),
+                        Icon::Trash,
+                        cx.strings().text(StringKey::SchemaListRemove),
+                    )
+                    .small()
+                    .disabled(self.disabled)
+                    .when(!self.disabled, |button| {
+                        button.on_click(move |_, cx| {
+                            form.update(cx, |form, cx| {
+                                form.remove_list_item(path.clone(), index, cx);
+                            })
+                            .ok();
+                        })
+                    });
+
+                    let number = cx.numbers().count(index + 1);
+                    let label = cx
+                        .strings()
+                        .format(StringKey::SchemaListItem, &[number.as_ref()]);
+                    div()
+                        .id(item_ident.element_id())
+                        .column()
+                        .gap_token(&theme, Space::Sm)
+                        .p_token(&theme, Space::Sm)
+                        .border(px(theme.borders.hairline))
+                        .border_color(theme.colors.hairline)
+                        .radius(&theme, gpui_kit_theme::Radius::Card)
+                        .child(
+                            div()
+                                .row()
+                                .items_center()
+                                .justify_between()
+                                .child(text(&theme, TypeScale::Label, label))
+                                .child(
+                                    div()
+                                        .row()
+                                        .items_center()
+                                        .child(move_up)
+                                        .child(move_down)
+                                        .child(remove),
+                                ),
+                        )
+                        .child(item.form.clone())
+                });
+
+                let form = cx.entity().downgrade();
+                let path = field.path.clone();
+                let at_maximum = repeated
+                    .max
+                    .is_some_and(|maximum| repeated.items.len() >= maximum);
+                div()
+                    .column()
+                    .gap_token(&theme, Space::Sm)
+                    .children(items)
+                    .child(
+                        Button::new(control_ident.child("add"))
+                            .label(cx.strings().text(StringKey::SchemaListAdd))
+                            .icon(Icon::Plus)
+                            .secondary()
+                            .disabled(self.disabled || at_maximum)
+                            .when(!self.disabled && !at_maximum, |button| {
+                                button.on_click(move |window, cx| {
+                                    form.update(cx, |form, cx| {
+                                        form.add_list_item(path.clone(), window, cx);
+                                    })
+                                    .ok();
+                                })
+                            }),
+                    )
+                    .into_any_element()
+            }
             Control::Boolean(on) => {
                 let on = *on;
                 let path = field.path.clone();
