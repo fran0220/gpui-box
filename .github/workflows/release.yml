@@ -49,7 +49,7 @@ jobs:
         run: |
           test "$GITHUB_REF" = refs/heads/main
           test "$EXECUTE" != "$BOOTSTRAP_TRUSTPUB"
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with: { ref: "v${{ inputs.version }}", fetch-depth: 0 }
       - name: Verify immutable tag and authority version
         id: tag
@@ -119,7 +119,7 @@ jobs:
         os: [macos-15, windows-2025]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0 }
       - name: Install Linux GPUI libraries
         if: runner.os == 'Linux'
@@ -146,7 +146,7 @@ jobs:
         os: [macos-15, ubuntu-24.04]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0 }
       - name: Install Linux GPUI libraries
         if: runner.os == 'Linux'
@@ -169,7 +169,7 @@ jobs:
     needs: preflight
     runs-on: windows-2025
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0 }
       - uses: dtolnay/rust-toolchain@master
         with: { toolchain: 1.97.1 }
@@ -192,7 +192,7 @@ jobs:
         shard: [0, 1, 2, 3, 4, 5, 6, 7]
     runs-on: windows-2025
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0 }
       - uses: actions/download-artifact@v7
         with:
@@ -220,7 +220,7 @@ jobs:
     needs: preflight
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0 }
       - uses: dtolnay/rust-toolchain@master
         with: { toolchain: 1.97.1, targets: wasm32-unknown-unknown }
@@ -237,7 +237,7 @@ jobs:
         os: [macos-15, ubuntu-24.04, windows-2025]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0 }
       - name: Install Linux GPUI libraries
         if: ${{ inputs.version != '0.1.0' && runner.os == 'Linux' }}
@@ -260,9 +260,9 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with: { ref: "${{ github.sha }}", fetch-depth: 0, path: publisher }
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0, path: release }
       - name: Verify publisher and immutable release checkouts
         run: |
@@ -294,9 +294,9 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with: { ref: "${{ github.sha }}", fetch-depth: 0, path: publisher }
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0, path: release }
       - name: Verify publisher and immutable release checkouts
         run: |
@@ -326,7 +326,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with: { ref: "${{ github.sha }}", fetch-depth: 0 }
       - name: Test trusted-publishing reconciliation
         run: python3 -m unittest discover -s scripts/release/tests -v
