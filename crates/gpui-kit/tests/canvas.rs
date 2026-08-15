@@ -200,10 +200,11 @@ fn ports_publish_business_identity_direction_and_label(cx: &mut TestAppContext) 
 fn inspect_mode_navigates_and_selects_without_editing_topology(cx: &mut TestAppContext) {
     let (mut harness, calls) = inspector(cx);
 
-    assert!(
-        harness.node(&edge_id("inspect.edge")).is_none(),
-        "an inspected edge has no disconnect action"
-    );
+    let edge = harness
+        .node(&edge_id("inspect.edge"))
+        .expect("an inspected edge remains semantically visible");
+    assert_eq!(edge.role, gpui_kit::semantics::Role::Group);
+    assert_eq!(edge.text.as_deref(), Some("Connection"));
     assert_eq!(
         harness
             .node(&port_id("inspect.source", "result"))

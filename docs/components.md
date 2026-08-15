@@ -687,7 +687,10 @@ plainer component would have to collapse two facts into one.
 `Failed`, `Refused`, `Cancelling`, `Cancelled`, `TimedOut`, and `Unavailable`
 remain distinct semantic values. Related states may share a theme tone, but
 wording, a static glyph, busy state, and invalid state preserve the distinction
-when colour or motion is unavailable.
+when colour or motion is unavailable. Every routed edge remains a named
+semantic group in Inspect and Arrange modes; Edit changes that same stable
+target into the disconnect action rather than making topology disappear from
+non-editable semantic trees.
 
 ### A refusal is not an absence and not an error
 

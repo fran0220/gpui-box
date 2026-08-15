@@ -955,81 +955,101 @@ impl RenderOnce for NodeGraph {
             })
             .collect();
 
-        let edge_actions: Vec<AnyElement> = self
-            .on_event
-            .as_ref()
-            .filter(|_| self.interaction.edits_topology())
-            .map(|report| {
-                routes
-                    .iter()
-                    .map(|routed| {
-                        let id = routed.edge.edge_id();
-                        let semantic_id = composite_id("graph-edge", &[id.as_ref()]);
-                        let at = world_to_screen(routed.route.midpoint(), viewport);
-                        let size = 18.0 * viewport.zoom;
-                        let report_pointer = Rc::clone(report);
-                        let pointer_id = id.clone();
-                        let report_key = Rc::clone(report);
-                        let key_id = id.clone();
-                        div()
-                            .id(semantic_id.clone())
-                            .absolute()
-                            .left(px(at.x - size * 0.5))
-                            .top(px(at.y - size * 0.5))
-                            .w(px(size))
-                            .h(px(size))
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .rounded_full()
-                            .border_1()
-                            .border_color(theme.colors.hairline_strong)
-                            .bg(theme.colors.canvas)
-                            .cursor_pointer()
-                            .tab_index(0)
-                            .focus_ring(&theme)
-                            .pressable(cx)
-                            .hover(|style| style.bg(theme.colors.hover))
-                            .child(
-                                icon(Icon::Close)
-                                    .size(px(9.0 * viewport.zoom))
-                                    .text_color(theme.colors.text_muted),
-                            )
-                            .on_mouse_down_with_pointer_capture(MouseButton::Left, |_, _, cx| {
-                                cx.stop_propagation()
-                            })
-                            .on_mouse_up(MouseButton::Left, move |_, window, cx| {
-                                report_pointer(
-                                    &NodeGraphEvent::DisconnectRequested {
-                                        id: pointer_id.clone(),
-                                    },
+        let edge_nodes: Vec<AnyElement> = routes
+            .iter()
+            .map(|routed| {
+                let id = routed.edge.edge_id();
+                let semantic_id = composite_id("graph-edge", &[id.as_ref()]);
+                let at = world_to_screen(routed.route.midpoint(), viewport);
+                let size = 18.0 * viewport.zoom;
+                let relation = routed
+                    .edge
+                    .edge_label()
+                    .cloned()
+                    .unwrap_or_else(|| cx.strings().text(StringKey::CanvasConnection));
+                if let Some(report) = self
+                    .on_event
+                    .as_ref()
+                    .filter(|_| self.interaction.edits_topology())
+                {
+                    let report_pointer = Rc::clone(report);
+                    let pointer_id = id.clone();
+                    let report_key = Rc::clone(report);
+                    let key_id = id.clone();
+                    div()
+                        .id(semantic_id.clone())
+                        .absolute()
+                        .left(px(at.x - size * 0.5))
+                        .top(px(at.y - size * 0.5))
+                        .w(px(size))
+                        .h(px(size))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .rounded_full()
+                        .border_1()
+                        .border_color(theme.colors.hairline_strong)
+                        .bg(theme.colors.canvas)
+                        .cursor_pointer()
+                        .tab_index(0)
+                        .focus_ring(&theme)
+                        .pressable(cx)
+                        .hover(|style| style.bg(theme.colors.hover))
+                        .child(
+                            icon(Icon::Close)
+                                .size(px(9.0 * viewport.zoom))
+                                .text_color(theme.colors.text_muted),
+                        )
+                        .on_mouse_down_with_pointer_capture(MouseButton::Left, |_, _, cx| {
+                            cx.stop_propagation()
+                        })
+                        .on_mouse_up(MouseButton::Left, move |_, window, cx| {
+                            report_pointer(
+                                &NodeGraphEvent::DisconnectRequested {
+                                    id: pointer_id.clone(),
+                                },
+                                window,
+                                cx,
+                            );
+                            cx.stop_propagation();
+                        })
+                        .on_key_down(move |event, window, cx| {
+                            if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                                report_key(
+                                    &NodeGraphEvent::DisconnectRequested { id: key_id.clone() },
                                     window,
                                     cx,
                                 );
                                 cx.stop_propagation();
-                            })
-                            .on_key_down(move |event, window, cx| {
-                                if matches!(event.keystroke.key.as_str(), "enter" | "space") {
-                                    report_key(
-                                        &NodeGraphEvent::DisconnectRequested { id: key_id.clone() },
-                                        window,
-                                        cx,
-                                    );
-                                    cx.stop_propagation();
-                                }
-                            })
-                            .semantic_in(
-                                cx,
-                                NodeSpec::new(semantic_id, Role::Button)
-                                    .parent(self.ident.semantic_id())
-                                    .text(cx.strings().text(StringKey::CanvasDisconnect))
-                                    .value(id),
-                            )
-                            .into_any_element()
-                    })
-                    .collect()
+                            }
+                        })
+                        .semantic_in(
+                            cx,
+                            NodeSpec::new(semantic_id, Role::Button)
+                                .parent(self.ident.semantic_id())
+                                .text(cx.strings().text(StringKey::CanvasDisconnect))
+                                .description(relation)
+                                .value(id),
+                        )
+                        .into_any_element()
+                } else {
+                    div()
+                        .absolute()
+                        .left(px(at.x - size * 0.5))
+                        .top(px(at.y - size * 0.5))
+                        .w(px(size))
+                        .h(px(size))
+                        .semantic_in(
+                            cx,
+                            NodeSpec::new(semantic_id, Role::Group)
+                                .parent(self.ident.semantic_id())
+                                .text(relation)
+                                .value(id),
+                        )
+                        .into_any_element()
+                }
             })
-            .unwrap_or_default();
+            .collect();
 
         let mut ports = Vec::new();
         for node in &geometry {
@@ -1402,7 +1422,7 @@ impl RenderOnce for NodeGraph {
             .children(edge_labels)
             .children(cards)
             .children(ports)
-            .children(edge_actions)
+            .children(edge_nodes)
             .semantic_in(cx, spec.value(viewport_value("ready", viewport)))
             .into_any_element()
     }
