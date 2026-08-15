@@ -418,6 +418,10 @@ pub fn catalog() -> Vec<Scene> {
             build: sparkline,
         },
         Scene {
+            name: "chart",
+            build: chart,
+        },
+        Scene {
             name: "code-view",
             build: code_view,
         },
@@ -1800,6 +1804,55 @@ fn diff_view(_window: &mut Window, cx: &mut App) -> AnyElement {
                     ),
                 ),
         )
+        .into_any_element()
+}
+
+fn chart(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let cpu = [
+        SparklinePoint::new(0.0, 0.20),
+        SparklinePoint::new(0.25, 0.45),
+        SparklinePoint::new(0.5, 0.38),
+        SparklinePoint::new(0.75, 0.70),
+        SparklinePoint::new(1.0, 0.62),
+    ];
+    let memory = [
+        SparklinePoint::new(0.0, 0.40),
+        SparklinePoint::new(0.25, 0.42),
+        SparklinePoint::new(0.5, 0.55),
+        SparklinePoint::new(0.75, 0.58),
+        SparklinePoint::new(1.0, 0.61),
+    ];
+    stack(&theme)
+        .w(px(520.0))
+        .child(caption(
+            &theme,
+            "host-owned series, host-owned axis wording, no invented scale",
+        ))
+        .child(
+            LineChart::new(
+                "scene.chart.ready",
+                "Fixture load",
+                ChartState::Ready(vec![
+                    ChartSeries::new("cpu", "CPU")
+                        .points(cpu)
+                        .tint(identity_tint(&theme, "loader.blue")),
+                    ChartSeries::new("memory", "Memory")
+                        .points(memory)
+                        .tint(identity_tint(&theme, "loader.orange")),
+                ]),
+            )
+            .axes(
+                ChartAxes::default()
+                    .x_ends("00:00", "01:00")
+                    .y_ends("0%", "100%"),
+            ),
+        )
+        .child(LineChart::new(
+            "scene.chart.empty",
+            "Fixture load",
+            ChartState::Empty,
+        ))
         .into_any_element()
 }
 

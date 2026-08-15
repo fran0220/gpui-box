@@ -4,6 +4,7 @@ pub mod animated_number;
 pub mod avatar;
 pub mod badge;
 pub mod card;
+pub mod chart;
 pub mod description_list;
 pub mod empty;
 pub mod failure_panel;

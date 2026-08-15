@@ -30,12 +30,13 @@
 //!
 //! # What is not here
 //!
-//! Numbers, dates, and quantities are not translated. A count is still
-//! rendered with Rust's own digits and a plural is still chosen by an
-//! `if count == 1` at the call site, which is correct for English and for
-//! nothing else. `docs/coverage.md` records that as a named gap.
+//! Numbers, dates, and quantities are not translated here. Counts go through
+//! [`crate::strings::NumberAdapter`] the same way dates go through
+//! [`crate::datetime::DateAdapter`]: the component asks, it never formats. The
+//! English adapter compiled in is a fallback, not a locale.
 
 use std::collections::BTreeMap;
+use std::rc::Rc;
 use std::sync::OnceLock;
 
 use gpui::{App, BorrowAppContext, Global, SharedString};
@@ -385,6 +386,9 @@ string_keys! {
     SchemaUnrenderable => "schema.unrenderable", "This field cannot be shown here, so it has to be filled in some other way.";
     SchemaUnrenderableRequired => "schema.unrenderable-required", "This field is required and cannot be shown here, so this form cannot complete the call.";
     SchemaNoChoices => "schema.no-choices", "No choices were offered, so there is nothing to pick.";
+    SchemaNeedsAdapter => "schema.needs-adapter", "This field needs a date adapter from the host.";
+    SchemaNeedsHost => "schema.needs-host", "This field needs a host policy before it can be filled in.";
+    ChartEmpty => "chart.empty", "No series to plot";
     SchemaRequiredMissing => "schema.required-missing", "This field is required.";
     SchemaUnrenderableOne => "schema.unrenderable-one", "1 field cannot be shown here.";
     SchemaUnrenderableMany => "schema.unrenderable-many", "{0} fields cannot be shown here.";
@@ -650,6 +654,98 @@ impl ActiveStrings for App {
     }
 }
 
+/// Which plural form a count takes in the host's language.
+///
+/// English only distinguishes one and other. A host with dual or few forms
+/// maps those onto [`Plural::Few`] and [`Plural::Many`]; components never
+/// branch on `count == 1` themselves.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Plural {
+    Zero,
+    One,
+    Two,
+    Few,
+    Many,
+    Other,
+}
+
+/// Everything the components are not allowed to decide about a number.
+pub trait NumberAdapter {
+    /// The digits for a count, already grouped the way the host writes them.
+    fn count(&self, value: usize) -> SharedString;
+
+    /// Which plural form `value` takes.
+    fn plural(&self, value: usize) -> Plural;
+
+    /// A finished quantity such as `3 of 12`. The component supplies the two
+    /// counts; the adapter supplies the wording, the digits, and the order.
+    fn count_of_total(&self, done: usize, total: usize) -> SharedString;
+
+    /// A percentage the host has already decided how to mark.
+    fn percent(&self, value: f32) -> SharedString;
+}
+
+/// The adapter as the components hold it.
+pub type SharedNumberAdapter = Rc<dyn NumberAdapter>;
+
+/// English digits and English plurals. Installed when a host supplies none.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct EnglishNumbers;
+
+impl NumberAdapter for EnglishNumbers {
+    fn count(&self, value: usize) -> SharedString {
+        SharedString::from(value.to_string())
+    }
+
+    fn plural(&self, value: usize) -> Plural {
+        if value == 1 {
+            Plural::One
+        } else {
+            Plural::Other
+        }
+    }
+
+    fn count_of_total(&self, done: usize, total: usize) -> SharedString {
+        SharedString::from(format!("{done} of {total}"))
+    }
+
+    fn percent(&self, value: f32) -> SharedString {
+        let rounded = (value * 100.0).round() as i32;
+        SharedString::from(format!("{rounded}%"))
+    }
+}
+
+struct InstalledNumbers(SharedNumberAdapter);
+
+impl Global for InstalledNumbers {}
+
+/// Reads the installed number adapter, falling back to English.
+pub trait ActiveNumbers {
+    fn numbers(&self) -> SharedNumberAdapter;
+}
+
+impl ActiveNumbers for App {
+    fn numbers(&self) -> SharedNumberAdapter {
+        self.try_global::<InstalledNumbers>()
+            .map(|installed| Rc::clone(&installed.0))
+            .unwrap_or_else(|| Rc::new(EnglishNumbers))
+    }
+}
+
+/// Installs a host number adapter. Replaces any previous one and repaints.
+pub fn set_numbers(adapter: impl NumberAdapter + 'static, cx: &mut App) {
+    cx.set_global(InstalledNumbers(Rc::new(adapter)));
+    cx.refresh_windows();
+}
+
+/// Restores the English fallback and repaints.
+pub fn reset_numbers(cx: &mut App) {
+    if cx.has_global::<InstalledNumbers>() {
+        cx.remove_global::<InstalledNumbers>();
+        cx.refresh_windows();
+    }
+}
+
 /// Installs the catalogue global. Idempotent, and never discards a catalogue a
 /// host already installed.
 pub fn install(cx: &mut App) {
@@ -680,6 +776,17 @@ pub fn reset_strings(cx: &mut App) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn english_treats_one_as_one_and_everything_else_as_other() {
+        let numbers = EnglishNumbers;
+        assert_eq!(numbers.plural(0), Plural::Other);
+        assert_eq!(numbers.plural(1), Plural::One);
+        assert_eq!(numbers.plural(2), Plural::Other);
+        assert_eq!(numbers.count(12).as_ref(), "12");
+        assert_eq!(numbers.count_of_total(3, 12).as_ref(), "3 of 12");
+        assert_eq!(numbers.percent(0.25).as_ref(), "25%");
+    }
 
     #[test]
     fn every_key_has_a_unique_name_and_english() {

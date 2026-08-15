@@ -10,7 +10,7 @@ use gpui_kit_theme::{ActiveTheme, Space};
 use crate::display::signature;
 use crate::foundation::Ident;
 use crate::motion;
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::ActiveNumbers;
 
 /// What a progress surface knows about the work, and how it says so.
 ///
@@ -52,12 +52,8 @@ impl ProgressValue {
     /// then a counted position worded by the catalogue.
     pub(crate) fn shown(&self, cx: &App) -> Option<SharedString> {
         self.display.clone().or_else(|| {
-            self.count.map(|(done, total)| {
-                cx.strings().format(
-                    StringKey::CountOfTotal,
-                    &[&done.to_string(), &total.to_string()],
-                )
-            })
+            self.count
+                .map(|(done, total)| cx.numbers().count_of_total(done, total))
         })
     }
 

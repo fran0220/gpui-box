@@ -139,6 +139,25 @@ pub enum SchemaKind {
     },
     /// Fields under a name of their own.
     Object(Vec<SchemaField>),
+    /// A calendar day, edited with [`crate::datetime::DateInput`] when the
+    /// host has installed a date adapter. Without one the field stays
+    /// unrenderable rather than inventing a calendar.
+    Date,
+    /// A time of day, edited with [`crate::datetime::TimeInput`] when a date
+    /// adapter is present.
+    Time,
+    /// Two days, edited with [`crate::datetime::RangePicker`] when a date
+    /// adapter is present.
+    DateRange,
+    /// Paths the host already holds, collected through [`crate::controls::Dropzone`].
+    Files {
+        max: Option<usize>,
+    },
+    /// Repeating child objects. Each item is addressed as `parent[i].child`.
+    List {
+        item: Box<SchemaField>,
+        max: Option<usize>,
+    },
     /// The host could not express this field, and said so rather than
     /// dropping it. The text is the host's reason and is shown verbatim.
     Unrenderable(SharedString),
@@ -487,6 +506,16 @@ impl SchemaForm {
                 });
                 self.watch_tags(&path, &tags, cx);
                 Control::List(tags)
+            }
+            // These shapes are named so a host can describe a settings page
+            // without dropping fields. Wiring them to DateInput / Dropzone
+            // still needs a host adapter or a file policy; until that is
+            // supplied the field stays visible as unrenderable.
+            SchemaKind::Date | SchemaKind::Time | SchemaKind::DateRange => {
+                Control::Unrenderable(cx.strings().text(StringKey::SchemaNeedsAdapter))
+            }
+            SchemaKind::Files { .. } | SchemaKind::List { .. } => {
+                Control::Unrenderable(cx.strings().text(StringKey::SchemaNeedsHost))
             }
         }
     }

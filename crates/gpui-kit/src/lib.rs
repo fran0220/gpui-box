@@ -167,6 +167,7 @@ pub mod prelude {
     pub use crate::display::avatar::Avatar;
     pub use crate::display::badge::{Badge, Tone};
     pub use crate::display::card::{Card, ListRow};
+    pub use crate::display::chart::{ChartAxes, ChartSeries, ChartState, LineChart};
     pub use crate::display::description_list::{
         DescriptionItem, DescriptionList, DescriptionValue,
     };
@@ -224,7 +225,10 @@ pub mod prelude {
         Popover, PopoverEvent, Toast, ToastCorner, ToastLayer, Tooltip, Tooltipped, UnreadCount,
     };
     pub use crate::state::{AsyncStatus, AsyncValue, Loadable};
-    pub use crate::strings::{ActiveStrings, StringKey, Strings, reset_strings, set_strings};
+    pub use crate::strings::{
+        ActiveNumbers, ActiveStrings, EnglishNumbers, NumberAdapter, Plural, SharedNumberAdapter,
+        StringKey, Strings, reset_numbers, reset_strings, set_numbers, set_strings,
+    };
     pub use crate::structured::{
         FieldValue, JsonValue, JsonView, NumberBounds, Schema, SchemaChoice, SchemaField,
         SchemaForm, SchemaFormEvent, SchemaKind, UnrenderableField, ValueKind,
