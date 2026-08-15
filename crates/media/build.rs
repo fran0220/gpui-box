@@ -1,7 +1,13 @@
 #![allow(clippy::disallowed_methods, reason = "build scripts are exempt")]
+
 fn main() {
+    // Feature cfg is evaluated for the build script itself. Target OS must
+    // come from Cargo's crate-target cfg, or a macOS host compiling wasm
+    // would still compile macos.m against AppKit.
     #[cfg(all(feature = "native-playback", target_os = "macos"))]
-    build_macos();
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
+        build_macos();
+    }
 }
 
 #[cfg(all(feature = "native-playback", target_os = "macos"))]
