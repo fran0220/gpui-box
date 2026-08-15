@@ -401,11 +401,11 @@ impl GraphNode {
     /// click-versus-drag arbitration on the graph's outer card.
     pub(crate) fn graph_handlers(
         mut self,
-        on_activate: ClickHandler,
-        on_delete: ClickHandler,
+        on_activate: Option<ClickHandler>,
+        on_delete: Option<ClickHandler>,
     ) -> Self {
-        self.on_click = Some(on_activate);
-        self.on_delete = Some(on_delete);
+        self.on_click = on_activate;
+        self.on_delete = on_delete;
         self
     }
 

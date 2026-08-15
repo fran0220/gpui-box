@@ -82,6 +82,30 @@ pub enum NodeGraphEvent {
 
 type EventHandler = Rc<dyn Fn(&NodeGraphEvent, &mut Window, &mut App)>;
 
+/// Which controlled changes an interactive graph may propose.
+///
+/// Omitting [`NodeGraph::on_event`] still makes any mode static. With a
+/// handler installed, `Inspect` permits navigation and selection, `Arrange`
+/// additionally permits moving nodes, and `Edit` retains the complete graph
+/// editor including connection and deletion proposals.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum GraphInteraction {
+    Inspect,
+    Arrange,
+    #[default]
+    Edit,
+}
+
+impl GraphInteraction {
+    fn moves_nodes(self) -> bool {
+        matches!(self, Self::Arrange | Self::Edit)
+    }
+
+    fn edits_topology(self) -> bool {
+        self == Self::Edit
+    }
+}
+
 #[derive(Debug, Clone)]
 enum Gesture {
     Pan {
@@ -268,6 +292,7 @@ pub struct NodeGraph {
     grid: bool,
     viewport: GraphViewport,
     zoom_range: (f32, f32),
+    interaction: GraphInteraction,
     on_event: Option<EventHandler>,
 }
 
@@ -294,6 +319,7 @@ impl NodeGraph {
             grid: true,
             viewport: GraphViewport::default(),
             zoom_range: (0.5, 2.0),
+            interaction: GraphInteraction::default(),
             on_event: None,
         }
     }
@@ -368,6 +394,12 @@ impl NodeGraph {
         }
         self
     }
+
+    pub fn interaction(mut self, interaction: GraphInteraction) -> Self {
+        self.interaction = interaction;
+        self
+    }
+
     pub fn on_event(
         mut self,
         handler: impl Fn(&NodeGraphEvent, &mut Window, &mut App) + 'static,
@@ -926,6 +958,7 @@ impl RenderOnce for NodeGraph {
         let edge_actions: Vec<AnyElement> = self
             .on_event
             .as_ref()
+            .filter(|_| self.interaction.edits_topology())
             .map(|report| {
                 routes
                     .iter()
@@ -1020,9 +1053,13 @@ impl RenderOnce for NodeGraph {
                 let endpoint = GraphEndpoint::new(node.id.clone(), port.id().clone());
                 let semantic_id =
                     composite_id("graph-port", &[node.id.as_ref(), port.id().as_ref()]);
-                let spec = NodeSpec::new(semantic_id.clone(), Role::Button)
-                    .text(port.label().clone())
-                    .value(port.direction().name());
+                let editable = self.interaction.edits_topology();
+                let spec = NodeSpec::new(
+                    semantic_id.clone(),
+                    if editable { Role::Button } else { Role::Group },
+                )
+                .text(port.label().clone())
+                .value(port.direction().name());
                 let diameter = 12.0 * viewport.zoom;
                 let label_gap = 4.0 * viewport.zoom;
                 let target = preview
@@ -1076,9 +1113,11 @@ impl RenderOnce for NodeGraph {
                     .border_1()
                     .border_color(theme.colors.canvas)
                     .bg(color)
-                    .cursor_pointer()
                     .child(label);
-                if port.direction() == PortDirection::Output {
+                if editable {
+                    view = view.cursor_pointer();
+                }
+                if editable && port.direction() == PortDirection::Output {
                     let down = Rc::clone(&gesture);
                     let from = endpoint.clone();
                     view = view.on_mouse_down_with_pointer_capture(
@@ -1191,6 +1230,7 @@ impl RenderOnce for NodeGraph {
         }
 
         let report = self.on_event.clone();
+        let interaction = self.interaction;
         let selected: Vec<SharedString> = self
             .nodes
             .iter()
@@ -1217,22 +1257,22 @@ impl RenderOnce for NodeGraph {
                     let activate_id = id.clone();
                     let activate_selected = selected.clone();
                     let activate_click = click.clone();
-                    let delete_report = Rc::clone(report);
-                    let delete_id = id.clone();
-                    placed.node.graph_handlers(
-                        Rc::new(move |window, cx| {
-                            activate_report(
-                                &NodeGraphEvent::SelectionChanged {
-                                    ids: selection_after(&activate_selected, &activate_id, false),
-                                },
-                                window,
-                                cx,
-                            );
-                            if let Some(click) = &activate_click {
-                                click(window, cx);
-                            }
-                        }),
-                        Rc::new(move |window, cx| {
+                    let activate = Rc::new(move |window: &mut Window, cx: &mut App| {
+                        activate_report(
+                            &NodeGraphEvent::SelectionChanged {
+                                ids: selection_after(&activate_selected, &activate_id, false),
+                            },
+                            window,
+                            cx,
+                        );
+                        if let Some(click) = &activate_click {
+                            click(window, cx);
+                        }
+                    });
+                    let delete = interaction.edits_topology().then(|| {
+                        let delete_report = Rc::clone(report);
+                        let delete_id = id.clone();
+                        Rc::new(move |window: &mut Window, cx: &mut App| {
                             delete_report(
                                 &NodeGraphEvent::NodeDeleted {
                                     id: delete_id.clone(),
@@ -1240,8 +1280,9 @@ impl RenderOnce for NodeGraph {
                                 window,
                                 cx,
                             );
-                        }),
-                    )
+                        }) as super::node::ClickHandler
+                    });
+                    placed.node.graph_handlers(Some(activate), delete)
                 } else {
                     placed.node
                 };
@@ -1290,6 +1331,7 @@ impl RenderOnce for NodeGraph {
                     );
                     let moving = Rc::clone(&gesture);
                     let move_report = Rc::clone(&report);
+                    let moves_nodes = interaction.moves_nodes();
                     card = card.on_mouse_move(move |event, window, cx| {
                         let mut state = moving.borrow_mut();
                         if event.pressed_button != Some(MouseButton::Left) {
@@ -1320,7 +1362,9 @@ impl RenderOnce for NodeGraph {
                             _ => return,
                         };
                         drop(state);
-                        move_report(&NodeGraphEvent::NodeMoved { id, position }, window, cx);
+                        if moves_nodes {
+                            move_report(&NodeGraphEvent::NodeMoved { id, position }, window, cx);
+                        }
                         cx.stop_propagation();
                     });
                     let up = Rc::clone(&gesture);

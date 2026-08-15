@@ -2248,6 +2248,7 @@
         "viewport(viewport: GraphViewport) -> Self",
         "zoom(zoom: f32) -> Self",
         "zoom_range(min: f32, max: f32) -> Self",
+        "interaction(interaction: GraphInteraction) -> Self",
         "on_event(handler: impl Fn(&NodeGraphEvent, &mut Window, &mut App) + 'static) -> Self"
       ],
       "commands": [],
@@ -5933,6 +5934,20 @@
       "construct": [
         "new(node: impl Into<SharedString>, port: impl Into<SharedString>) -> Self"
       ],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "GraphInteraction",
+      "path": "gpui_kit::canvas::GraphInteraction",
+      "summary": "Which controlled changes an interactive graph may propose.",
+      "variants": [
+        "Inspect",
+        "Arrange",
+        "Edit"
+      ],
+      "construct": [],
       "options": [],
       "commands": [],
       "queries": []

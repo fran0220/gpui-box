@@ -105,6 +105,42 @@ fn controlled_editor(cx: &mut TestAppContext) -> (Harness, Calls, Rc<Cell<usize>
     (harness, calls, clicks)
 }
 
+fn inspector(cx: &mut TestAppContext) -> (Harness, Calls) {
+    let calls = Calls::default();
+    let sink = Rc::clone(&calls);
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let sink = Rc::clone(&sink);
+        div()
+            .w(px(560.0))
+            .h(px(280.0))
+            .child(
+                NodeGraph::new("inspect")
+                    .interaction(GraphInteraction::Inspect)
+                    .node(
+                        GraphNode::new("inspect.source", "Source")
+                            .port(GraphPort::output("result", "Result")),
+                        40.0,
+                        60.0,
+                    )
+                    .node(
+                        GraphNode::new("inspect.target", "Target")
+                            .port(GraphPort::input("result", "Result")),
+                        320.0,
+                        60.0,
+                    )
+                    .edge(
+                        GraphEdge::new("inspect.source", "inspect.target")
+                            .id("inspect.edge")
+                            .ports("result", "result"),
+                    )
+                    .on_event(move |event, _, _| sink.borrow_mut().push(event.clone())),
+            )
+            .into_any_element()
+    });
+    harness.frame();
+    (harness, calls)
+}
+
 #[gpui::test]
 fn ports_publish_business_identity_direction_and_label(cx: &mut TestAppContext) {
     let (mut harness, _) = editor(cx);
@@ -120,6 +156,59 @@ fn ports_publish_business_identity_direction_and_label(cx: &mut TestAppContext) 
         .expect("output port is published");
     assert_eq!(output.value.as_deref(), Some("output"));
     assert_eq!(output.text.as_deref(), Some("Records"));
+}
+
+#[gpui::test]
+fn inspect_mode_navigates_and_selects_without_editing_topology(cx: &mut TestAppContext) {
+    let (mut harness, calls) = inspector(cx);
+
+    assert!(
+        harness.node(&edge_id("inspect.edge")).is_none(),
+        "an inspected edge has no disconnect action"
+    );
+    assert_eq!(
+        harness
+            .node(&port_id("inspect.source", "result"))
+            .expect("port remains visible")
+            .role,
+        gpui_kit::semantics::Role::Group,
+        "an inspected port is information, not a connection handle"
+    );
+
+    harness.click("inspect.source");
+    assert!(calls.borrow().iter().any(|event| matches!(
+        event,
+        NodeGraphEvent::SelectionChanged { ids } if ids == &["inspect.source"]
+    )));
+
+    calls.borrow_mut().clear();
+    harness.keystrokes("delete");
+    assert!(
+        calls
+            .borrow()
+            .iter()
+            .all(|event| !matches!(event, NodeGraphEvent::NodeDeleted { .. })),
+        "inspection does not install the delete action"
+    );
+
+    let start = harness.point_in("inspect.source");
+    let end = start + point(px(90.0), px(50.0));
+    harness
+        .context()
+        .simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+    harness
+        .context()
+        .simulate_mouse_move(end, MouseButton::Left, Modifiers::none());
+    harness
+        .context()
+        .simulate_mouse_up(end, MouseButton::Left, Modifiers::none());
+    assert!(
+        calls
+            .borrow()
+            .iter()
+            .all(|event| !matches!(event, NodeGraphEvent::NodeMoved { .. })),
+        "inspection does not propose a new layout"
+    );
 }
 
 #[gpui::test]

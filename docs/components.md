@@ -680,7 +680,7 @@ plainer component would have to collapse two facts into one.
 | `ToolCallCard` | builder | a failed call that should be tried again | One invocation of one tool: what it was called with, which of its five states holds, its result or its error, and how long it took. Arguments and results publish their shape and never their text |
 | `StepList` | builder | — | An ordered run of steps, each with its own state, each able to hold a `ToolCallCard`. A run whose length nobody knows gets an indeterminate summary rather than an invented fraction |
 | `ThinkingBlock` | builder | the state the disclosure should take | Model reasoning, collapsed by default. Withheld, absent, and collapsed are three states and three presentations |
-| `NodeGraph` | builder | viewport, selection, node move/delete, and connection/disconnection proposals | A controlled run canvas over caller-positioned `GraphNode`s and caller-owned `GraphEdge`s. A node thumbnail is a caller-rendered element slot; the graph fetches and decodes nothing |
+| `NodeGraph`, `GraphInteraction` | builder, policy | viewport and selection; Arrange adds node moves; Edit adds node deletion and connection/disconnection proposals | A controlled run canvas over caller-positioned `GraphNode`s and caller-owned `GraphEdge`s. `Inspect` never installs topology-edit actions, while the default `Edit` preserves the complete editor. A node thumbnail is a caller-rendered element slot; the graph fetches and decodes nothing |
 
 ### A refusal is not an absence and not an error
 
