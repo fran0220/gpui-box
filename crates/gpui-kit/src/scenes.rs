@@ -3065,6 +3065,11 @@ fn content(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .tone(Tone::Danger)
                         .on_remove(|_, _| {}),
                 )
+                .child(
+                    Tag::new("scene.content.tag.ada", "Ada")
+                        .tint(identity_tint(&theme, "loader.pink"))
+                        .on_remove(|_, _| {}),
+                )
                 .child(Tag::new("scene.content.tag.pinned", "pinned").disabled(true)),
         )
         .child(

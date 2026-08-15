@@ -2,13 +2,14 @@
 
 use gpui::{
     App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div,
-    prelude::FluentBuilder, px, relative,
+    prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Space};
 
+use crate::display::signature;
 use crate::foundation::Ident;
-use crate::motion::{self, AnimationExt as _, MotionSpec};
+use crate::motion;
 use crate::strings::{ActiveStrings, StringKey};
 
 /// What a progress surface knows about the work, and how it says so.
@@ -168,42 +169,18 @@ impl RenderOnce for ProgressBar {
                     .overflow_hidden()
                     .bg(theme.colors.hairline_strong)
                     .when_some(drawn, |element, fraction| {
-                        element.child(
-                            div()
-                                .absolute()
-                                .left_0()
-                                .top_0()
-                                .bottom_0()
-                                .rounded_full()
-                                .bg(theme.colors.accent)
-                                .w(relative(fraction)),
-                        )
+                        element.child(signature::determined(&theme, fraction))
                     })
-                    // An unknown extent sweeps a segment across the track and
-                    // tints nothing behind it. A partly filled bar would be
-                    // read as a position and there is none, and a filled one
-                    // reads as the position at the end: the still frame of a
-                    // held animation showed exactly that, a bar that looked
-                    // finished beside a run that had not started.
+                    // An unknown extent sweeps the working signature across
+                    // the track and tints nothing behind it. A partly filled
+                    // bar would be read as a position and there is none, and
+                    // a filled one reads as the position at the end.
                     .when(indeterminate, |element| {
-                        let period = MotionSpec::new(
-                            theme.motion.pulse_ms * 2,
-                            motion::CubicBezier::new(0.4, 0.0, 0.6, 1.0),
-                        );
-                        element.child(
-                            div()
-                                .absolute()
-                                .top_0()
-                                .bottom_0()
-                                .w(relative(0.3))
-                                .rounded_full()
-                                .bg(theme.colors.accent)
-                                .with_animation(
-                                    self.ident.child("sweep").element_id(),
-                                    period.repeating(),
-                                    |element, delta| element.left(relative(delta * 1.3 - 0.3)),
-                                ),
-                        )
+                        element.child(signature::unknown(
+                            self.ident.child("sweep").element_id(),
+                            &theme,
+                            cx,
+                        ))
                     }),
             )
             .semantic_in(cx, spec)

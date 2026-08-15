@@ -92,6 +92,30 @@ fn a_tag_that_cannot_be_removed_offers_no_way_to(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn a_tinted_tag_still_publishes_its_tone(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, cx| {
+        let tint = cx
+            .theme()
+            .palette_color("loader.pink")
+            .expect("bundled loader stop");
+        Tag::new("filter.ada", "Ada")
+            .tone(Tone::Neutral)
+            .tint(tint)
+            .into_any_element()
+    });
+
+    assert_eq!(
+        harness
+            .node("filter.ada")
+            .expect("published")
+            .value
+            .as_deref(),
+        Some("neutral"),
+        "a tint must not replace the severity the tag reports"
+    );
+}
+
+#[gpui::test]
 fn an_empty_surface_says_which_fact_it_is_reporting(cx: &mut TestAppContext) {
     let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
         div()

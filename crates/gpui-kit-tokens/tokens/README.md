@@ -11,6 +11,8 @@ Rules:
 - surfaces establish hierarchy before borders;
 - accent remains a compact action/focus color;
 - semantic colors only communicate status;
+- `color.loader.gradient` is the working signature, not an accent: it
+  appears only while work is in flight and stays off idle chrome;
 - typography steps keep size, line-height, and weight together;
 - repeated semantic geometry is tokenized;
 - one-off component geometry may remain local;

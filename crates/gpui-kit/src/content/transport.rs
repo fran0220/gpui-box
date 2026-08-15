@@ -41,6 +41,7 @@ use crate::controls::button::{Button, IconButton};
 use crate::controls::segmented::{Segment, SegmentedControl};
 use crate::controls::slider::Slider;
 use crate::display::badge::Tone;
+use crate::display::signature;
 use crate::display::status::StatusLine;
 use crate::foundation::{Disableable, FocusRing, Ident, Selectable, Sizable, StyledExt};
 use crate::layout::measure;
@@ -471,16 +472,20 @@ impl RenderOnce for TransportBar {
         }
 
         if let Some(drawn) = drawn {
+            let played = if self.state.is_playing() {
+                signature::determined(&theme, drawn).h(px(TRACK_HEIGHT)).into_any_element()
+            } else {
+                div()
+                    .absolute()
+                    .left_0()
+                    .w(relative(drawn))
+                    .h(px(TRACK_HEIGHT))
+                    .rounded_full()
+                    .bg(theme.colors.accent)
+                    .into_any_element()
+            };
             track = track
-                .child(
-                    div()
-                        .absolute()
-                        .left_0()
-                        .w(relative(drawn))
-                        .h(px(TRACK_HEIGHT))
-                        .rounded_full()
-                        .bg(theme.colors.accent),
-                )
+                .child(played)
                 .child(
                     div()
                         .absolute()

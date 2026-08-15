@@ -75,14 +75,14 @@ actions. They define no account, provider, network, or credential policy.
 |---|---|---|
 | `Badge`, `StatusDot`, `StatusLine`, `Callout` | builder | Status vocabulary |
 | `Card`, `ListRow` | builder | Grouping |
-| `ProgressBar` | builder | Reports a position only when the extent is known |
+| `ProgressBar` | builder | Reports a position only when the extent is known. In-flight fill is the working signature from `color.loader.gradient`, not accent |
 | `AnimatedNumber` | builder | Counts to a new value, and publishes the target from the frame it changes: a number in flight is not a fact. A caller-supplied format function decides the text |
-| `Tag` | builder | Removal exists only when removal is allowed |
+| `Tag` | builder | Removal exists only when removal is allowed. Accepts a caller-owned `tint` the way `Badge` does; the published tone name is unchanged |
 | `Avatar` | builder | Initials fallback, blank when there is no name |
 | `Divider` | builder | Optional caption |
 | `EmptyState` | builder | Names which of empty, unstarted, unavailable, or failed holds |
-| `PulseLoader`, `GradientSpinner`, `Skeleton` | builder | Publish a busy indeterminate node |
-| `ProgressCircle` | builder | The ring form of `ProgressBar`, over the same state. A position only when the extent is known; an unknown extent tints the whole ring rather than part of it |
+| `PulseLoader`, `GradientSpinner`, `Skeleton` | builder | Publish a busy indeterminate node. All three paint the working signature |
+| `ProgressCircle` | builder | The ring form of `ProgressBar`, over the same state and the same working signature. A position only when the extent is known; an unknown extent travels a short arc rather than tinting part of the ring |
 | `DescriptionList` | builder | Term and value pairs for a detail page. Unknown, not applicable, and redacted are three different facts, and a redacted value carries only its shape |
 | `Timeline` | builder | A chronological feed. Every time and every day heading is a string the caller already formatted, and an entry whose time nobody knows says so |
 | `HighlightedText` | builder | Marks caller-given byte ranges in caller-given text. It searches nothing: the ranges are the caller's, the current one is drawn differently from the others rather than more strongly, and a range naming no real slice costs its mark and not the line |

@@ -75,7 +75,7 @@
       "info": "{cyan.400}"
     },
     "loader": {
-      "gradient": ["{indigo.400}", "{indigo.600}", "{indigo.400}"]
+      "gradient": ["{loader.blue}", "{loader.orange}", "{loader.pink}"]
     }
   },
   "space": {

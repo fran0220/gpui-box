@@ -146,7 +146,10 @@ impl RenderOnce for StatusLine {
 /// A bordered message block.
 ///
 /// Callouts carry host refusals and stale-data warnings verbatim; they never
-/// summarize an error into a friendlier but less true sentence.
+/// summarize an error into a friendlier but less true sentence. They take a
+/// [`Tone`] and no tint: a refusal is a severity, not an identity, and
+/// painting one in a person's colour would make the report look like it
+/// belonged to them.
 #[derive(Debug, IntoElement)]
 pub struct Callout {
     ident: Option<Ident>,

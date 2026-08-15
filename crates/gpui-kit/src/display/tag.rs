@@ -3,8 +3,8 @@
 use std::rc::Rc;
 
 use gpui::{
-    App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window,
-    div, prelude::FluentBuilder, px,
+    App, Hsla, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString, Styled,
+    Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -25,6 +25,7 @@ pub struct Tag {
     ident: Ident,
     label: SharedString,
     tone: Tone,
+    tint: Option<Hsla>,
     disabled: bool,
     selected: bool,
     on_remove: Option<RemoveHandler>,
@@ -37,6 +38,7 @@ impl std::fmt::Debug for Tag {
             .field("ident", &self.ident)
             .field("label", &self.label)
             .field("tone", &self.tone)
+            .field("tinted", &self.tint.is_some())
             .field("removable", &self.on_remove.is_some())
             .finish()
     }
@@ -48,6 +50,7 @@ impl Tag {
             ident: ident.into(),
             label: label.into(),
             tone: Tone::Neutral,
+            tint: None,
             disabled: false,
             selected: false,
             on_remove: None,
@@ -56,6 +59,13 @@ impl Tag {
 
     pub fn tone(mut self, tone: Tone) -> Self {
         self.tone = tone;
+        self
+    }
+
+    /// Paints the tag in a caller-owned colour, leaving the severity it
+    /// reports alone. See [`Tone`].
+    pub fn tint(mut self, tint: Hsla) -> Self {
+        self.tint = Some(tint);
         self
     }
 
@@ -84,7 +94,7 @@ impl Selectable for Tag {
 impl RenderOnce for Tag {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let color = self.tone.color(&theme);
+        let color = self.tone.mark_color(self.tint, &theme);
         let removable = !self.disabled && self.on_remove.is_some();
         let remove_ident = self.ident.child("remove");
 
@@ -147,7 +157,8 @@ impl RenderOnce for Tag {
                 NodeSpec::new(self.ident.semantic_id(), Role::Text)
                     .disabled(self.disabled)
                     .selected(self.selected)
-                    .text(self.label.clone()),
+                    .text(self.label.clone())
+                    .value(self.tone.name()),
             )
     }
 }

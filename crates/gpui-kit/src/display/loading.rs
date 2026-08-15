@@ -4,12 +4,12 @@
 //! single static frame when the platform asks for reduced motion.
 
 use gpui::{
-    App, IntoElement, ParentElement, RenderOnce, Styled, Window, div, linear_color_stop,
-    linear_gradient, px, relative,
+    App, IntoElement, ParentElement, RenderOnce, Styled, Window, div, px, relative,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::ActiveTheme;
 
+use crate::display::signature;
 use crate::foundation::Ident;
 use crate::motion::{self, AnimationExt as _, MotionSpec};
 
@@ -52,7 +52,7 @@ impl PulseLoader {
 impl RenderOnce for PulseLoader {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme();
-        let color = theme.colors.accent;
+        let colors = signature::stops(theme);
         let cell_size = self.cell_size;
         let period = MotionSpec::new(
             theme.motion.pulse_ms,
@@ -67,6 +67,7 @@ impl RenderOnce for PulseLoader {
             .gap(px(cell_size / 2.0))
             .semantic_in(cx, spec)
             .children((0..PULSE_CELLS).map(move |index| {
+                let color = colors[index % colors.len()];
                 div()
                     .size(px(cell_size))
                     .flex()
@@ -200,7 +201,6 @@ impl RenderOnce for Skeleton {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme();
         let color = theme.colors.hover.opacity(0.28);
-        let highlight = theme.colors.hover.opacity(0.5);
         let radius = theme.radii.control;
         let row_height = self.row_height;
         let period = MotionSpec::new(
@@ -221,43 +221,25 @@ impl RenderOnce for Skeleton {
                     .bg(color)
                     .relative()
                     .overflow_hidden()
-                    // A band sweeping across the row, rather than the whole
-                    // row breathing: a sweep reads as work moving through the
-                    // list, where a pulse reads as the list itself blinking.
-                    // Under reduced motion the repeating animation holds delta
-                    // zero, which parks the band off the leading edge and
-                    // leaves a plain placeholder behind.
+                    // A band of the working signature sweeping the row,
+                    // rather than the whole row breathing: a sweep reads as
+                    // work moving through the list. Under reduced motion the
+                    // repeating animation holds delta zero, which parks the
+                    // band off the leading edge and leaves a plain
+                    // placeholder behind.
                     .child(
-                        div()
-                            .absolute()
-                            .top_0()
-                            .bottom_0()
-                            .flex()
-                            .flex_row()
-                            .w(relative(SHIMMER_BAND))
-                            // Two halves rather than one block, because the
-                            // pinned GPUI takes two colour stops per gradient
-                            // and a band needs three: up, held, and back down.
-                            .child(div().h_full().w(relative(0.5)).bg(linear_gradient(
-                                90.0,
-                                linear_color_stop(highlight.opacity(0.0), 0.0),
-                                linear_color_stop(highlight, 1.0),
-                            )))
-                            .child(div().h_full().w(relative(0.5)).bg(linear_gradient(
-                                90.0,
-                                linear_color_stop(highlight, 0.0),
-                                linear_color_stop(highlight.opacity(0.0), 1.0),
-                            )))
-                            .with_animation(
-                                ident.indexed_element_id(index),
-                                period.repeating(),
-                                move |element, delta| {
-                                    let phase =
-                                        motion::staggered_phase(delta, index, SHIMMER_ROW_OFFSET);
-                                    element
-                                        .left(relative(motion::shimmer_offset(phase, SHIMMER_BAND)))
-                                },
-                            ),
+                        signature::shimmer_band(theme).with_animation(
+                            ident.indexed_element_id(index),
+                            period.repeating(),
+                            move |element, delta| {
+                                let phase =
+                                    motion::staggered_phase(delta, index, SHIMMER_ROW_OFFSET);
+                                element.left(relative(motion::shimmer_offset(
+                                    phase,
+                                    SHIMMER_BAND,
+                                )))
+                            },
+                        ),
                     )
             }))
     }

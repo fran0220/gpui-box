@@ -255,7 +255,7 @@ that rubric, not that every possible interaction was exercised.
 | `keybinding` | Medium: unbound/help/error text is faint and keycap/icon/row baselines vary. |
 | `keymap-editor` | High: `Defaults` and host-managed copy use GPUI's large default; chips, conflict/source text, and actions do not share a row grid. |
 | `list` | Light is clean; low in dark for title/list clearance and missing continuation affordance. |
-| `loading` | High: skeletons lack hierarchy/max-width and contrast; loaders crowd the top-left and use conflicting palettes. |
+| `loading` | High: skeletons lack hierarchy/max-width and contrast; loaders crowd the top-left. The three indicators now share `color.loader.gradient` rather than mixing accent with a second palette. |
 | `log-stream` | Medium: level/inline chips sit off baseline and small status copy is faint. |
 | `markdown` | Medium: the dark unfetched state disappears; truncated repetition and embedded-block widths are unclear. |
 | `menu` | Low: shortcut gaps/insets vary and the dark section label is weak. |

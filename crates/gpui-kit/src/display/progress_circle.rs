@@ -14,6 +14,7 @@ use gpui_kit_semantics::Semantic;
 use gpui_kit_theme::{ActiveTheme, ControlSize, TypeScale};
 
 use crate::display::progress::ProgressValue;
+use crate::display::signature;
 use crate::foundation::{Ident, Sizable, StyledExt};
 use crate::motion::{self, MotionSpec};
 
@@ -90,7 +91,8 @@ impl RenderOnce for ProgressCircle {
         let stroke = theme.borders.thick;
         let radius = (diameter - stroke) / 2.0;
         let track = theme.colors.hairline_strong;
-        let accent = theme.colors.accent;
+        let signature = signature::stops(&theme);
+        let muted = signature[1].opacity(theme.opacity.muted);
 
         // The published position is the caller's number from the frame it
         // changes; only the arc takes its time getting there.
@@ -104,7 +106,6 @@ impl RenderOnce for ProgressCircle {
             )
         });
 
-        let muted = accent.opacity(theme.opacity.muted);
         // An unknown extent turns a short arc around the ring. A *still* part
         // of a ring would be read as a position, and there is none to read —
         // but a part that travels at a constant rate is the one shape nobody
@@ -128,7 +129,7 @@ impl RenderOnce for ProgressCircle {
                             radius,
                             stroke,
                             track,
-                            accent,
+                            signature,
                             muted,
                             None,
                             Some(phase),
@@ -137,8 +138,17 @@ impl RenderOnce for ProgressCircle {
                 )
                 .into_any_element()
         } else {
-            ring_canvas(diameter, radius, stroke, track, accent, muted, drawn, None)
-                .into_any_element()
+            ring_canvas(
+                diameter,
+                radius,
+                stroke,
+                track,
+                signature,
+                muted,
+                drawn,
+                None,
+            )
+            .into_any_element()
         };
 
         let centre = self.centre.clone().map(|reading| {
@@ -182,7 +192,7 @@ fn ring_canvas(
     radius: f32,
     stroke: f32,
     track: Hsla,
-    accent: Hsla,
+    signature: [Hsla; 3],
     muted: Hsla,
     drawn: Option<f32>,
     // Where the travelling arc has got to, or `None` for the still ring that
@@ -196,23 +206,68 @@ fn ring_canvas(
             arc(window, centre, radius, stroke, 0.0, 1.0, track);
             match (drawn, phase) {
                 (Some(fraction), _) if fraction > 0.0 => {
-                    arc(window, centre, radius, stroke, 0.0, fraction, accent)
+                    signature_arc(window, centre, radius, stroke, 0.0, fraction, signature)
                 }
                 (Some(_), _) => {}
-                (None, Some(phase)) => arc(
+                (None, Some(phase)) => signature_arc(
                     window,
                     centre,
                     radius,
                     stroke,
                     phase,
                     phase + TRAVELLING_ARC,
-                    accent,
+                    signature,
                 ),
                 (None, None) => arc(window, centre, radius, stroke, 0.0, 1.0, muted),
             }
         },
     )
     .size(px(diameter))
+}
+
+/// Strokes a working arc in the three signature colours, so a ring and a bar
+/// name the same work.
+fn signature_arc(
+    window: &mut Window,
+    centre: Point<Pixels>,
+    radius: f32,
+    width: f32,
+    from: f32,
+    to: f32,
+    signature: [Hsla; 3],
+) {
+    if to <= from {
+        return;
+    }
+    let span = to - from;
+    // Three segments keep the ring on the same three stops the bar uses.
+    arc(
+        window,
+        centre,
+        radius,
+        width,
+        from,
+        from + span / 3.0,
+        signature[0],
+    );
+    arc(
+        window,
+        centre,
+        radius,
+        width,
+        from + span / 3.0,
+        from + span * 2.0 / 3.0,
+        signature[1],
+    );
+    arc(
+        window,
+        centre,
+        radius,
+        width,
+        from + span * 2.0 / 3.0,
+        to,
+        signature[2],
+    );
 }
 
 /// Strokes the part of a circle between two turns, clockwise from the top.

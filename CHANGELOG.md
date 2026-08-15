@@ -20,17 +20,30 @@ past the typed roles themselves. An entry the active document does not declare
 resolves to `None` rather than a guessed colour: a theme that has not named a
 scale has not agreed to paint it.
 
-**Identity colour on the mark surfaces.** `Avatar`, `Badge`, `StatusDot` and
-`StatusLine` accept a caller-owned `tint`. A tint answers whose the mark is
-while the tone still answers how it is going, and painting cannot edit the
-claim: `Badge` and `StatusLine` now publish the tone by name, so a mark wearing
-a colour no tone maps to can still be asked what severity it reported. A tinted
-mark keeps the tone language's own treatment — a carried wash, not a filled
-shape — so a colour cannot turn one mark into a second mark shape. `StatusLine`
-additionally reaches `StatusDot`'s breathing state, so a running row does not
-have to be rebuilt out of parts to move. Tints are never derived from a name;
-an application that wants a stable colour per identity derives it and passes
-it, because the library cannot know which colours that application has spent.
+**Identity colour on the mark surfaces.** `Avatar`, `Badge`, `StatusDot`,
+`StatusLine` and `Tag` accept a caller-owned `tint`. A tint answers whose the
+mark is while the tone still answers how it is going, and painting cannot edit
+the claim: `Badge`, `StatusLine` and `Tag` now publish the tone by name, so a
+mark wearing a colour no tone maps to can still be asked what severity it
+reported. A tinted mark keeps the tone language's own treatment — a carried
+wash, not a filled shape — so a colour cannot turn one mark into a second mark
+shape. `StatusLine` additionally reaches `StatusDot`'s breathing state, so a
+running row does not have to be rebuilt out of parts to move. Tints are never
+derived from a name; an application that wants a stable colour per identity
+derives it and passes it, because the library cannot know which colours that
+application has spent. `Callout` refuses a tint: a refusal is a severity, not
+an identity.
+
+**Working signature on in-flight tracks.** `color.loader.gradient` now
+resolves to the three `palette.loader` stops rather than a pair of indigo
+accents, and the same wash paints every surface that means "work is
+happening": `ProgressBar`, `ProgressCircle`, a playing `TransportBar`
+scrubber, `PulseLoader`, `GradientSpinner`, and the `Skeleton` shimmer.
+Idle chrome — a paused transport, a slider, a tab indicator, a focus ring —
+stays on accent. The signature never enters the semantic tree: a progress
+node still publishes its fraction and its busy flag. Under reduced motion an
+unknown-extent bar parks a still band at the leading edge rather than
+filling the track.
 
 ## [0.1.2] - 2026-08-13
 

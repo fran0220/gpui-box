@@ -60,9 +60,9 @@ Appearance: `Dark`.
 | `color.semantic.warning` | `{amber.500}` | `#ffb900` |
 | `color.semantic.success` | `{green.500}` | `#57c47f` |
 | `color.semantic.info` | `{cyan.400}` | `#7fb3cf` |
-| `color.loader.gradient.0` | `{indigo.400}` | `#7c86ff` |
-| `color.loader.gradient.1` | `{indigo.600}` | `#5865f2` |
-| `color.loader.gradient.2` | `{indigo.400}` | `#7c86ff` |
+| `color.loader.gradient.0` | `{loader.blue}` | `#b6d3ef` |
+| `color.loader.gradient.1` | `{loader.orange}` | `#edb185` |
+| `color.loader.gradient.2` | `{loader.pink}` | `#f888a0` |
 
 ### Spacing
 
@@ -269,9 +269,9 @@ Appearance: `Light`.
 | `color.semantic.warning` | `{amber.500}` | `#a76a00` |
 | `color.semantic.success` | `{green.500}` | `#237a48` |
 | `color.semantic.info` | `{cyan.400}` | `#2a6f8f` |
-| `color.loader.gradient.0` | `{indigo.400}` | `#4f5bd5` |
-| `color.loader.gradient.1` | `{indigo.600}` | `#3b46b8` |
-| `color.loader.gradient.2` | `{indigo.400}` | `#4f5bd5` |
+| `color.loader.gradient.0` | `{loader.blue}` | `#6ba7e0` |
+| `color.loader.gradient.1` | `{loader.orange}` | `#d98442` |
+| `color.loader.gradient.2` | `{loader.pink}` | `#e2557a` |
 
 ### Spacing
 
