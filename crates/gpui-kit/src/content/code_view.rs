@@ -47,14 +47,14 @@
 //!
 //! # Copying
 //!
-//! GPUI offers no text-selection primitive, which `docs/coverage.md` records
-//! as a library-wide gap; nothing rendered here can be selected with a
-//! pointer. So the view carries a control that copies the whole text, the way
-//! a `Markdown` code block does, and does not pretend a caret exists.
+//! Each shaped line uses GPUI's read-only selection primitive, including
+//! syntax-coloured spans, RTL hit testing, pointer capture, and keyboard copy.
+//! The optional copy control remains the document-wide operation, including
+//! virtualized lines that are not currently mounted.
 
 use gpui::{
-    AnyElement, App, ClipboardItem, InteractiveElement, IntoElement, ParentElement, RenderOnce,
-    SharedString, Styled, Window, div, prelude::FluentBuilder, px,
+    AnyElement, App, ClipboardItem, HighlightStyle, InteractiveElement, IntoElement, ParentElement,
+    RenderOnce, SharedString, Styled, StyledText, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{
@@ -316,18 +316,19 @@ fn line_element(
                 .when(line.mark.is_some(), |element| element.bg(rail)),
         )
         .child(
-            // The runs sit in a row. Without one they are laid out as blocks
-            // and every run paints from the same left edge, one word over the
-            // next, which is what a line with more than one span looked like.
             div()
-                .row()
-                .items_baseline()
                 .flex_1()
                 .min_w_0()
                 .whitespace_nowrap()
                 .pl(px(GUTTER_GAP / 2.0))
                 .when(struck, |element| element.line_through())
-                .children(code_runs(theme, line.text.as_ref(), &line.spans)),
+                .child(
+                    styled_code(theme, line.text.clone(), &line.spans).selectable(
+                        ident
+                            .child(format!("line-{}-text", line.number))
+                            .element_id(),
+                    ),
+                ),
         );
 
     match line.mark {
@@ -359,54 +360,43 @@ fn line_id(ident: &Ident, number: usize) -> SharedString {
     ident.child(format!("line-{number}")).semantic_id()
 }
 
-/// The coloured runs of one line, skipping any span that does not name a slice
-/// this line actually holds.
+/// One shaped code value with caller-supplied tone ranges.
 ///
-/// Each run holds its own width. Inside a row that lays its children out in
-/// one direction, a run that is allowed to shrink is shrunk to nothing, and
-/// every run then paints from the same left edge with one word on top of the
-/// next.
-pub(crate) fn code_runs(theme: &Theme, text: &str, spans: &[CodeSpan]) -> Vec<AnyElement> {
-    let mut out: Vec<AnyElement> = Vec::new();
-    let mut cut = 0usize;
-    for span in spans {
-        if span.range.start < cut || span.range.start >= span.range.end {
-            continue;
-        }
-        let (Some(before), Some(inside)) = (
-            text.get(cut..span.range.start),
-            text.get(span.range.start..span.range.end),
-        ) else {
-            continue;
-        };
-        if !before.is_empty() {
-            out.push(
-                div()
-                    .flex_none()
-                    .child(SharedString::from(before.to_string()))
-                    .into_any_element(),
-            );
-        }
-        out.push(
-            div()
-                .flex_none()
-                .text_color(span.tone.color(theme))
-                .child(SharedString::from(inside.to_string()))
-                .into_any_element(),
-        );
-        cut = span.range.end;
-    }
-    if let Some(rest) = text.get(cut..)
-        && !rest.is_empty()
-    {
-        out.push(
-            div()
-                .flex_none()
-                .child(SharedString::from(rest.to_string()))
-                .into_any_element(),
-        );
-    }
-    out
+/// Keeping the line as one text layout makes selection, bidirectional hit
+/// testing, and copying work across syntax-coloured boundaries.
+pub(crate) fn styled_code(
+    theme: &Theme,
+    text: impl Into<SharedString>,
+    spans: &[CodeSpan],
+) -> StyledText {
+    let text = text.into();
+    let highlights = code_highlights(theme, &text, spans);
+    StyledText::new(text).with_highlights(highlights)
+}
+
+fn code_highlights(
+    theme: &Theme,
+    text: &str,
+    spans: &[CodeSpan],
+) -> Vec<(std::ops::Range<usize>, HighlightStyle)> {
+    let mut end = 0;
+    spans
+        .iter()
+        .filter_map(|span| {
+            let valid = span.range.start >= end
+                && span.range.start < span.range.end
+                && span.range.end <= text.len()
+                && text.is_char_boundary(span.range.start)
+                && text.is_char_boundary(span.range.end);
+            valid.then(|| {
+                end = span.range.end;
+                (
+                    span.range.clone(),
+                    HighlightStyle::color(span.tone.color(theme)),
+                )
+            })
+        })
+        .collect()
 }
 
 /// Splits an optional pair into two values with defaults, so a marked and an
@@ -577,8 +567,7 @@ mod tests {
             range: 40..50,
             tone: Tone::Accent,
         }]);
-        // One run, the whole line, because the span named nothing real.
-        assert_eq!(code_runs(&theme, line.text.as_ref(), &line.spans).len(), 1);
+        assert!(code_highlights(&theme, line.text.as_ref(), &line.spans).is_empty());
     }
 
     #[test]

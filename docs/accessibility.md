@@ -115,13 +115,15 @@ so a request from a stale tree cannot be applied to changed text. Disabled field
 focus and composition/drag transients, install no input handler, and advertise
 no native focus, mutation, or selection actions; read-only fields remain
 focusable/selectable but non-mutating. Password fields use the native password
-role but publish neither plaintext nor text runs. Live regions are explicit
+role but publish neither plaintext nor text runs. Read-only selectable
+`StyledText` uses the same grapheme and bidi run contract and additionally
+publishes word starts plus shaped per-grapheme positions, widths, and run
+bounds; `SetTextSelection` is accepted only against the exact published text
+and layout revision. Live regions are explicit
 opt-in: static Status nodes are not live, ordinary toasts are polite, and danger
 toasts are assertive, with the whole toast marked atomic. Announcement speech
-and timing, shaped per-grapheme positions/widths and native caret geometry, and
-native child nodes remain separate platform work. AccessKit defines character
-geometry as optional; gpui-kit omits it rather than inventing measurements that
-are not yet available to the accessibility subtree callback.
+and timing, editable per-grapheme geometry and native caret geometry, and native
+child nodes remain separate platform work.
 
 Open dialogs publish a modal native Dialog node, and open menus and visible
 tooltips publish separate native Menu and Tooltip nodes; each role-bearing node

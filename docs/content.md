@@ -65,10 +65,13 @@ ranges tagged with the library's existing `Tone` vocabulary. There are no
 syntax categories in this crate, because deciding a word is a keyword is a
 grammar's judgement and this crate has no grammar.
 
-Selecting text is not something GPUI offers, so "selectable" is delivered as
-the capability underneath it: every block carries a copy action that puts its
-exact bytes on the clipboard and reports `MarkdownEvent::CodeCopied`. Nothing
-is reflowed, retyped, or re-indented on the way.
+Code blocks and prose runs use GPUI's read-only selection primitive. Pointer
+dragging, reverse selection, Copy, Select All, wrapped and bidirectional hit
+testing, and AccessKit selection all operate on grapheme boundaries. Every
+code block still carries a whole-value copy action that puts its exact bytes on
+the clipboard and reports `MarkdownEvent::CodeCopied`; that operation also
+includes text outside a mounted or visible range. Nothing is reflowed,
+retyped, or re-indented on the way.
 
 ### Truncation says how much it cut
 

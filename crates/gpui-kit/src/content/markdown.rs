@@ -30,12 +30,13 @@ use std::rc::Rc;
 
 use gpui::{
     AnyElement, App, ClipboardItem, FontWeight, InteractiveElement, IntoElement, ParentElement,
-    RenderOnce, SharedString, StatefulInteractiveElement, Styled, Window, div,
+    RenderOnce, SharedString, StatefulInteractiveElement, Styled, StyledText, Window, div,
     prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, Theme, TypeScale};
 
+use crate::content::code_view::styled_code;
 use crate::controls::button::Button;
 use crate::display::badge::Tone;
 use crate::foundation::{Ident, Sizable, StyledExt};
@@ -412,17 +413,23 @@ impl Painter {
         let mut elements = Vec::new();
         for inline in inlines {
             match inline {
-                Inline::Text(text) => elements.push(run(&theme, text.clone(), style)),
-                Inline::Code(text) => elements.push(
-                    div()
-                        .px(px(theme.space(Space::Xs)))
-                        .radius(&theme, Radius::Small)
-                        .bg(theme.colors.raised)
-                        .font_family(theme.typography.mono.clone())
-                        .text_size(px(theme.typography.code.size))
-                        .child(text.clone())
-                        .into_any_element(),
-                ),
+                Inline::Text(text) => {
+                    let ident = self.ident_for("text", text.as_ref());
+                    elements.push(run(&theme, ident.element_id(), text.clone(), style));
+                }
+                Inline::Code(text) => {
+                    let ident = self.ident_for("code", text.as_ref());
+                    elements.push(
+                        div()
+                            .px(px(theme.space(Space::Xs)))
+                            .radius(&theme, Radius::Small)
+                            .bg(theme.colors.raised)
+                            .font_family(theme.typography.mono.clone())
+                            .text_size(px(theme.typography.code.size))
+                            .child(StyledText::new(text.clone()).selectable(ident.element_id()))
+                            .into_any_element(),
+                    );
+                }
                 Inline::Emphasis(inner) => elements.extend(self.inlines(
                     inner,
                     RunStyle {
@@ -459,7 +466,10 @@ impl Painter {
                     elements.push(self.image(src, alt, title.as_ref(), window, cx))
                 }
                 Inline::Html(html) => elements.push(self.html_inline(html.clone(), cx)),
-                Inline::SoftBreak => elements.push(run(&theme, " ".into(), style)),
+                Inline::SoftBreak => {
+                    let ident = self.ident_for("text", "soft break");
+                    elements.push(run(&theme, ident.element_id(), " ".into(), style));
+                }
                 Inline::HardBreak => {
                     elements.push(div().w_full().h(px(0.0)).flex_none().into_any_element())
                 }
@@ -506,7 +516,12 @@ impl Painter {
             .underline()
             .tip(ident.clone(), help)
             .children(if runs.is_empty() {
-                vec![run(&theme, label.clone(), style)]
+                vec![run(
+                    &theme,
+                    ident.child("text").element_id(),
+                    label.clone(),
+                    style,
+                )]
             } else {
                 runs
             })
@@ -632,11 +647,15 @@ impl Painter {
         let body = div()
             .column()
             .w_full()
+            .min_h(px(theme.typography.code.line_height))
             .font_family(theme.typography.mono.clone())
             .text_size(px(theme.typography.code.size))
             .line_height(px(theme.typography.code.line_height))
             .text_color(theme.colors.text)
-            .children(code_lines(&theme, text.as_ref(), &spans));
+            .child(
+                styled_code(&theme, text.clone(), &spans)
+                    .selectable(ident.child("text").element_id()),
+            );
 
         div()
             .column()
@@ -983,7 +1002,7 @@ const UNRENDERED: SharedString = SharedString::new_static("unrendered html");
 const PLAIN_TEXT_ID: &str = "plain text";
 const TASK_ID: &str = "task";
 
-fn run(theme: &Theme, text: SharedString, style: RunStyle) -> AnyElement {
+fn run(theme: &Theme, id: gpui::ElementId, text: SharedString, style: RunStyle) -> AnyElement {
     div()
         .when(style.strong, |element| {
             element.font_weight(FontWeight::BOLD)
@@ -992,7 +1011,7 @@ fn run(theme: &Theme, text: SharedString, style: RunStyle) -> AnyElement {
         .when(style.struck, |element| {
             element.line_through().text_color(theme.colors.text_muted)
         })
-        .child(text)
+        .child(StyledText::new(text).selectable(id))
         .into_any_element()
 }
 
@@ -1008,55 +1027,6 @@ fn cell_frame(theme: &Theme, align: CellAlign) -> gpui::Div {
 
 fn aligned(alignment: &[CellAlign], column: usize) -> CellAlign {
     alignment.get(column).copied().unwrap_or_default()
-}
-
-/// One element per line of a code block, coloured only where the host said so.
-fn code_lines(theme: &Theme, text: &str, spans: &[CodeSpan]) -> Vec<AnyElement> {
-    let mut elements = Vec::new();
-    let mut offset = 0;
-    for line in text.lines() {
-        let range = offset..offset + line.len();
-        offset = range.end + 1;
-        let mut row = div().flex().flex_row().flex_wrap().w_full();
-        let mut cut = range.start;
-        for span in spans
-            .iter()
-            .filter(|span| span.range.start < range.end && span.range.end > range.start)
-        {
-            let start = span.range.start.max(range.start);
-            let end = span.range.end.min(range.end);
-            if start > cut
-                && let Some(before) = text.get(cut..start)
-            {
-                row = row.child(div().child(SharedString::from(before.to_string())));
-            }
-            if let Some(inside) = text.get(start..end) {
-                row = row.child(
-                    div()
-                        .text_color(span.tone.color(theme))
-                        .child(SharedString::from(inside.to_string())),
-                );
-            }
-            cut = end;
-        }
-        if let Some(tail) = text.get(cut..range.end) {
-            row = row.child(div().child(SharedString::from(tail.to_string())));
-        }
-        // A blank line still occupies one, so a fence keeps its shape.
-        elements.push(
-            row.min_h(px(theme.typography.code.line_height))
-                .into_any_element(),
-        );
-    }
-    if elements.is_empty() {
-        elements.push(
-            div()
-                .w_full()
-                .min_h(px(theme.typography.code.line_height))
-                .into_any_element(),
-        );
-    }
-    elements
 }
 
 /// The text a run of inlines reads as, for a name and for an id stem.

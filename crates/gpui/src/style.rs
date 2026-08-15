@@ -568,6 +568,7 @@ impl TextStyle {
             },
             color: self.color,
             background_color: self.background_color,
+            background_radius: None,
             underline: self.underline,
             strikethrough: self.strikethrough,
         }
@@ -590,6 +591,9 @@ pub struct HighlightStyle {
     /// The background color of the text
     pub background_color: Option<Hsla>,
 
+    /// A uniform corner radius for each painted fragment of the background.
+    pub background_radius: Option<Pixels>,
+
     /// The underline style of the text
     pub underline: Option<UnderlineStyle>,
 
@@ -608,6 +612,7 @@ impl Hash for HighlightStyle {
         self.font_weight.hash(state);
         self.font_style.hash(state);
         self.background_color.hash(state);
+        self.background_radius.hash(state);
         self.underline.hash(state);
         self.strikethrough.hash(state);
         state.write_u32(u32::from_be_bytes(
@@ -903,6 +908,7 @@ impl From<&TextStyle> for HighlightStyle {
             font_weight: Some(other.font_weight),
             font_style: Some(other.font_style),
             background_color: other.background_color,
+            background_radius: None,
             underline: other.underline,
             strikethrough: other.strikethrough,
             fade_out: None,
@@ -936,6 +942,7 @@ impl HighlightStyle {
             font_weight: other.font_weight.or(self.font_weight),
             font_style: other.font_style.or(self.font_style),
             background_color: other.background_color.or(self.background_color),
+            background_radius: other.background_radius.or(self.background_radius),
             underline: other.underline.or(self.underline),
             strikethrough: other.strikethrough.or(self.strikethrough),
             fade_out: other
@@ -1357,6 +1364,7 @@ mod tests {
             font_style: Some(FontStyle::Italic),
             font_weight: Some(FontWeight(300.)),
             background_color: Some(yellow()),
+            background_radius: Some(px(2.)),
             underline: Some(UnderlineStyle {
                 thickness: px(2.),
                 color: Some(red()),
@@ -1389,6 +1397,7 @@ mod tests {
             font_style: Some(FontStyle::Oblique),
             font_weight: Some(FontWeight(800.)),
             background_color: Some(green()),
+            background_radius: Some(px(4.)),
             underline: Some(UnderlineStyle {
                 thickness: px(4.),
                 color: None,
@@ -1407,6 +1416,7 @@ mod tests {
             font_style: Some(FontStyle::Oblique),
             font_weight: Some(FontWeight(800.)),
             background_color: Some(green()),
+            background_radius: Some(px(4.)),
             underline: Some(UnderlineStyle {
                 thickness: px(4.),
                 color: None,

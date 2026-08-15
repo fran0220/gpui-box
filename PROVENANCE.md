@@ -65,6 +65,14 @@ stops is also subsequent GPUI Box work. Its shared inline scene representation
 and Metal, Direct3D, WGPU, and WebGL shader implementations were authored here;
 they import no additional framework or shader source.
 
+The read-only selectable-text primitive, wrapped and bidirectional range
+geometry, pointer-capture interaction, clipboard behavior, and AccessKit text
+run publication are subsequent GPUI Box work. Rounded backgrounds for shaped
+text fragments were added at the same framework boundary so selection does not
+force Kit highlights to recompose text into separate layout elements. They use
+the workspace's existing Unicode segmentation and bidirectional libraries and
+import no editor or product source.
+
 The full-frame platform-view clipping and macOS restacking implementation is
 also subsequent GPUI Box work. It extends the product-neutral host contract on
 both native platforms and imports no platform-view source from Zed or another

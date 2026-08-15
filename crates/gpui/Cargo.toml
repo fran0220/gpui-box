@@ -108,6 +108,8 @@ url.workspace = true
 uuid.workspace = true
 web-time.workspace = true
 heapless.workspace = true
+unicode-bidi.workspace = true
+unicode-segmentation.workspace = true
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 getrandom = { version = "0.3.4", features = ["wasm_js"] }
@@ -159,7 +161,6 @@ gpui_util = { package = "gpui-box-util", path = "../gpui_util" }
 lyon = { version = "1.0", features = ["extra"] }
 rand.workspace = true
 scheduler = { package = "gpui-box-scheduler", path = "../scheduler", features = ["test-support"] }
-unicode-segmentation = { workspace = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 http_client = { package = "gpui-box-http-client", path = "../http_client", features = ["test-support"] }

@@ -744,8 +744,9 @@ invariants; source text assertions are not evidence.
 
 The next gaps are a single agent-run/timeline-card aggregate, host-resolved
 image/attachment/file capabilities, and a portable date capability over
-`DateAdapter`. `DataGrid` also deliberately lacks horizontal scrolling, and
-`CodeView` records the GPUI-wide absence of pointer text selection. Those are
+`DateAdapter`. `DataGrid` also deliberately lacks horizontal scrolling. GPUI's
+read-only text primitive now covers one shaped value, while a drag spanning
+separately mounted or virtualized document rows remains unsupported. Those are
 real component limitations, but they need not block a first vocabulary if its
 published capabilities say so.
 

@@ -18,8 +18,10 @@
 //! Following the newest entry, and pausing that follow, change only where the
 //! viewport is looking. They are transient visual state keyed by the stream's
 //! identity. Selecting an entry and asking to copy one are caller-owned intents
-//! and are only offered when the matching callbacks exist. GPUI has no pointer
-//! text-selection primitive, so this component does not claim one.
+//! and are only offered when the matching callbacks exist. Message text uses
+//! GPUI's read-only selection primitive without adding caller content to the
+//! Kit semantic snapshot; the explicit copy intent remains the whole-entry
+//! operation.
 
 use std::ops::Range;
 use std::rc::Rc;
@@ -427,6 +429,7 @@ fn entry_row(
 ) -> AnyElement {
     let entry_ident = parent.child(entry.id.as_ref());
     let mut message = HighlightedText::new(entry.message.clone())
+        .selectable(entry_ident.child("message"))
         .hits(entry.search_hits.clone())
         .monospace(true);
     if let Some(current) = entry.current_hit {

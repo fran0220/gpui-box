@@ -44,6 +44,18 @@ Color conversion and edge rasterization remain renderer-specific, which is why
 each renderer retains its own baseline rather than claiming identical bytes
 across platforms.
 
+Read-only `StyledText` selection is a framework primitive rather than a Kit
+gesture. Its stable element id retains transient anchor/focus state; pointer
+capture continues reverse drags outside the element; grapheme-safe Copy and
+Select All share the focused dispatch path; and AccessKit receives bidi-split
+text runs, word starts, per-grapheme bounds, and stale-revision-safe selection
+actions. Selection is scoped to one shaped value. A host that needs one drag to
+span independently mounted or virtualized values still needs a future
+document-selection coordinator rather than inferring bytes from row indexes.
+`HighlightStyle::background_radius` paints each line or wrap fragment as its
+own rounded quad, preserving range-highlight geometry without changing shaping,
+wrapping, hit testing, or accessibility bounds.
+
 Browser checks are:
 
 ```bash

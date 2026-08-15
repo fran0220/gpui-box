@@ -467,6 +467,7 @@ impl Element for TextElement {
             font: style.font(),
             color: text_color,
             background_color: None,
+            background_radius: None,
             underline: None,
             strikethrough: None,
         };

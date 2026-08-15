@@ -1477,6 +1477,7 @@
       ],
       "options": [
         "id(ident: impl Into<Ident>) -> Self",
+        "selectable(ident: impl Into<Ident>) -> Self",
         "hits(hits: impl IntoIterator<Item = Range<usize>>) -> Self",
         "current(index: usize) -> Self",
         "monospace(monospace: bool) -> Self"

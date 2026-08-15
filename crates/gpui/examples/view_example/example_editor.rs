@@ -415,6 +415,7 @@ impl Element for EditorText {
                 font: style.font(),
                 color: hsla(0., 0., 0.5, 0.5),
                 background_color: None,
+                background_radius: None,
                 underline: None,
                 strikethrough: None,
             };
@@ -433,6 +434,7 @@ impl Element for EditorText {
                         font: style.font(),
                         color: text_color,
                         background_color: None,
+                        background_radius: None,
                         underline: None,
                         strikethrough: None,
                     };

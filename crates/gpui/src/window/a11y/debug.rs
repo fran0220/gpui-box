@@ -261,6 +261,16 @@ fn node_to_json(
     if !lengths.is_empty() {
         aria.insert("character_lengths".into(), json!(lengths));
     }
+    let word_starts = node.word_starts();
+    if !word_starts.is_empty() {
+        aria.insert("word_starts".into(), json!(word_starts));
+    }
+    if let Some(positions) = node.character_positions() {
+        aria.insert("character_positions".into(), json!(positions));
+    }
+    if let Some(widths) = node.character_widths() {
+        aria.insert("character_widths".into(), json!(widths));
+    }
     if let Some(direction) = node.text_direction() {
         aria.insert("text_direction".into(), json!(format!("{direction:?}")));
     }

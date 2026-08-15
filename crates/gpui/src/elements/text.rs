@@ -1,9 +1,11 @@
+use crate::colors::Colors;
 use crate::{
-    ActiveTooltip, AnyView, App, Bounds, DispatchPhase, Element, ElementId, GlobalElementId,
-    HighlightStyle, Hitbox, HitboxBehavior, InspectorElementId, IntoElement, LayoutId,
-    MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, Point, SharedString, Size, TextOverflow,
-    TextRun, TextStyle, TooltipId, TruncateFrom, WhiteSpace, Window, WrappedLine,
-    WrappedLineLayout, register_tooltip_mouse_handlers, set_tooltip_on_window,
+    ActiveTooltip, AnyView, App, Bounds, ClipboardItem, CursorStyle, DispatchPhase, Element,
+    ElementId, FocusHandle, GlobalElementId, HighlightStyle, Hitbox, HitboxBehavior,
+    InspectorElementId, IntoElement, KeyDownEvent, LayoutId, MouseButton, MouseDownEvent,
+    MouseMoveEvent, MouseUpEvent, PaintQuad, Pixels, Point, SharedString, Size, TextAlign,
+    TextOverflow, TextRun, TextStyle, TooltipId, TruncateFrom, WhiteSpace, Window, WrappedLine,
+    WrappedLineLayout, accesskit, fill, register_tooltip_mouse_handlers, set_tooltip_on_window,
 };
 use anyhow::Context as _;
 use gpui_util::ResultExt;
@@ -16,6 +18,12 @@ use std::{
     ops::{Deref, DerefMut, Range},
     rc::Rc,
     sync::Arc,
+};
+use unicode_segmentation::UnicodeSegmentation;
+
+use super::selectable_text::{
+    PublishedAccessibleText, accessible_text_is_representable, byte_offset_for_published_position,
+    publish_accessible_text_with_geometry,
 };
 
 /// An [`Element`] that renders text.
@@ -415,6 +423,14 @@ impl StyledText {
         &self.layout
     }
 
+    /// Make this styled text selectable with standard pointer, keyboard,
+    /// clipboard, and accessibility behavior.
+    ///
+    /// The id retains the transient selection and focus state across frames.
+    pub fn selectable(self, id: impl Into<ElementId>) -> InteractiveText {
+        InteractiveText::new(id, self).selectable()
+    }
+
     /// Set the styling attributes for the given text, as well as
     /// as any ranges of text that have had their style customized.
     pub fn with_default_highlights(
@@ -465,12 +481,12 @@ impl StyledText {
                 runs.push(default_style.clone().to_run(range.start - ix));
             }
             debug_assert!(text.is_char_boundary(range.end));
-            runs.push(
-                default_style
-                    .clone()
-                    .highlight(highlight)
-                    .to_run(range.len()),
-            );
+            let mut run = default_style
+                .clone()
+                .highlight(highlight)
+                .to_run(range.len());
+            run.background_radius = highlight.background_radius;
+            runs.push(run);
             ix = range.end;
         }
         if ix < text.len() {
@@ -616,6 +632,7 @@ impl IntoElement for StyledText {
 pub struct TextLayout(Rc<RefCell<Option<TextLayoutInner>>>);
 
 struct TextLayoutInner {
+    source: SharedString,
     len: usize,
     lines: SmallVec<[WrappedLine; 1]>,
     line_height: Pixels,
@@ -736,6 +753,7 @@ impl TextLayout {
                     (text.clone(), Cow::Borrowed(&*runs))
                 };
                 let len = text.len();
+                let shaped_source = text.clone();
 
                 let Some(lines) = window
                     .text_system()
@@ -749,6 +767,7 @@ impl TextLayout {
                     .log_err()
                 else {
                     element_state.0.borrow_mut().replace(TextLayoutInner {
+                        source: SharedString::default(),
                         lines: Default::default(),
                         len: 0,
                         line_height,
@@ -768,6 +787,7 @@ impl TextLayout {
                 }
 
                 element_state.0.borrow_mut().replace(TextLayoutInner {
+                    source: shaped_source,
                     lines,
                     len,
                     line_height,
@@ -791,7 +811,26 @@ impl TextLayout {
         element_state.bounds = Some(bounds);
     }
 
+    fn source(&self) -> SharedString {
+        self.0
+            .borrow()
+            .as_ref()
+            .expect("measurement has not been performed")
+            .source
+            .clone()
+    }
+
     fn paint(&self, text: &str, window: &mut Window, cx: &mut App) {
+        self.paint_with_overlays(text, std::iter::empty(), window, cx)
+    }
+
+    fn paint_with_overlays(
+        &self,
+        text: &str,
+        overlays: impl IntoIterator<Item = PaintQuad>,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
         let element_state = self.0.borrow();
         let element_state = element_state
             .as_ref()
@@ -815,6 +854,13 @@ impl TextLayout {
                 cx,
             )
             .log_err();
+            line_origin.y += line.size(line_height).height;
+        }
+        for overlay in overlays {
+            window.paint_quad(overlay);
+        }
+        line_origin = bounds.origin;
+        for line in &element_state.lines {
             line.paint(
                 line_origin,
                 line_height,
@@ -860,6 +906,41 @@ impl TextLayout {
         }
 
         Err(line_start_ix.saturating_sub(1))
+    }
+
+    /// Returns the selectable byte boundary closest to a window position.
+    ///
+    /// Positions above or below the element clamp to the start or end. A
+    /// position outside a visual row clamps to that row's nearest edge, which
+    /// keeps pointer selection stable while dragging beyond the text bounds.
+    pub fn closest_index_for_position(&self, position: Point<Pixels>) -> usize {
+        let element_state = self.0.borrow();
+        let element_state = element_state
+            .as_ref()
+            .expect("measurement has not been performed");
+        let bounds = element_state
+            .bounds
+            .expect("prepaint has not been performed");
+        if position.y < bounds.top() {
+            return 0;
+        }
+
+        let line_height = element_state.line_height;
+        let mut line_origin = bounds.origin;
+        let mut line_start = 0;
+        for line in &element_state.lines {
+            let line_bottom = line_origin.y + line.size(line_height).height;
+            if position.y > line_bottom {
+                line_origin.y = line_bottom;
+                line_start += line.len() + 1;
+                continue;
+            }
+            let local = line
+                .closest_index_for_position(position - line_origin, line_height)
+                .unwrap_or_else(|edge| edge);
+            return (line_start + local).min(element_state.len);
+        }
+        element_state.len
     }
 
     /// Get the pixel position for the given byte index.
@@ -926,6 +1007,72 @@ impl TextLayout {
             .iter()
             .map(|line| line.layout.clone())
             .collect()
+    }
+
+    /// Returns source byte ranges for all shaped visual rows.
+    ///
+    /// A hard line break belongs to the visual row before it. Soft wrapping
+    /// introduces a new row without introducing a source byte.
+    pub fn visual_rows(&self) -> Vec<Range<usize>> {
+        let element_state = self.0.borrow();
+        let element_state = element_state
+            .as_ref()
+            .expect("measurement has not been performed");
+        let mut rows = Vec::new();
+        let mut line_start = 0;
+        for line in &element_state.lines {
+            let mut row_start = 0;
+            for boundary in &line.layout.wrap_boundaries {
+                let row_end = line.layout.unwrapped_layout.runs[boundary.run_ix].glyphs
+                    [boundary.glyph_ix]
+                    .index;
+                rows.push(line_start + row_start..line_start + row_end);
+                row_start = row_end;
+            }
+            let line_end = line_start + line.len();
+            let hard_break = usize::from(line_end < element_state.len);
+            rows.push(line_start + row_start..line_end + hard_break);
+            line_start = line_end + hard_break;
+        }
+        if rows.is_empty() {
+            rows.push(0..0);
+        }
+        rows
+    }
+
+    /// Returns the visual rectangles occupied by a source byte range.
+    ///
+    /// The result may contain multiple rectangles for wrapped or
+    /// bidirectional text. The caller supplies the same alignment used to
+    /// paint the text.
+    pub fn bounds_for_range(&self, range: Range<usize>, align: TextAlign) -> Vec<Bounds<Pixels>> {
+        let element_state = self.0.borrow();
+        let element_state = element_state
+            .as_ref()
+            .expect("measurement has not been performed");
+        let bounds = element_state
+            .bounds
+            .expect("prepaint has not been performed");
+        let mut result = Vec::new();
+        let mut line_origin = bounds.origin;
+        let mut line_start = 0;
+        for line in &element_state.lines {
+            let line_end = line_start + line.len();
+            let local_start = range.start.max(line_start).min(line_end) - line_start;
+            let local_end = range.end.max(line_start).min(line_end) - line_start;
+            if local_start < local_end {
+                result.extend(line.layout.bounds_for_range(
+                    local_start..local_end,
+                    line_origin,
+                    element_state.line_height,
+                    align,
+                    bounds.size.width,
+                ));
+            }
+            line_origin.y += line.size(element_state.line_height).height;
+            line_start = line_end + usize::from(line_end < element_state.len);
+        }
+        result
     }
 
     /// The bounds of this layout.
@@ -1014,6 +1161,7 @@ pub struct InteractiveText {
     tooltip_builder: Option<Rc<dyn Fn(usize, &mut Window, &mut App) -> Option<AnyView>>>,
     tooltip_id: Option<TooltipId>,
     clickable_ranges: Vec<Range<usize>>,
+    selectable: bool,
 }
 
 struct InteractiveTextClickEvent {
@@ -1027,6 +1175,49 @@ pub struct InteractiveTextState {
     mouse_down_index: Rc<Cell<Option<usize>>>,
     hovered_index: Rc<Cell<Option<usize>>>,
     active_tooltip: Rc<RefCell<Option<ActiveTooltip>>>,
+    selection: Rc<RefCell<TextSelectionState>>,
+    focus_handle: Option<FocusHandle>,
+}
+
+#[derive(Default)]
+struct TextSelectionState {
+    anchor: usize,
+    focus: usize,
+    dragging: bool,
+    drag_unit: Option<Range<usize>>,
+    source: SharedString,
+    visual_rows: Vec<Range<usize>>,
+    revision: u64,
+    published: Option<PublishedAccessibleText>,
+}
+
+impl TextSelectionState {
+    fn range(&self) -> Range<usize> {
+        self.anchor.min(self.focus)..self.anchor.max(self.focus)
+    }
+
+    fn update_source(&mut self, source: &SharedString, visual_rows: Vec<Range<usize>>) {
+        if self.source != *source || self.visual_rows != visual_rows {
+            self.source = source.clone();
+            self.visual_rows = visual_rows;
+            self.revision = self.revision.wrapping_add(1);
+            self.published = None;
+            self.dragging = false;
+            self.drag_unit = None;
+        }
+        self.anchor = previous_grapheme_boundary(source, self.anchor.min(source.len()));
+        self.focus = previous_grapheme_boundary(source, self.focus.min(source.len()));
+    }
+}
+
+#[doc(hidden)]
+pub struct InteractiveTextPrepaintState {
+    hitbox: Hitbox,
+    selection_quads: Vec<PaintQuad>,
+    selection: Rc<RefCell<TextSelectionState>>,
+    fallback_direction: accesskit::TextDirection,
+    text_align: TextAlign,
+    scale_factor: f32,
 }
 
 /// InteractiveTest is a wrapper around StyledText that adds mouse interactions.
@@ -1041,7 +1232,19 @@ impl InteractiveText {
             tooltip_builder: None,
             tooltip_id: None,
             clickable_ranges: Vec::new(),
+            selectable: false,
         }
+    }
+
+    /// Enable native read-only text selection.
+    ///
+    /// Selection is grapheme-safe, continues beyond the element while the
+    /// pointer is captured, supports Copy and Select All, and is exposed as
+    /// AccessKit text runs. Existing clickable ranges still activate on a
+    /// click, but not when the same gesture selected text.
+    pub fn selectable(mut self) -> Self {
+        self.selectable = true;
+        self
     }
 
     /// on_click is called when the user clicks on one of the given ranges, passing the index of
@@ -1083,9 +1286,70 @@ impl InteractiveText {
     }
 }
 
+fn previous_grapheme_boundary(text: &str, index: usize) -> usize {
+    if index >= text.len() {
+        return text.len();
+    }
+    text.grapheme_indices(true)
+        .map(|(offset, _)| offset)
+        .take_while(|offset| *offset <= index)
+        .last()
+        .unwrap_or(0)
+}
+
+fn next_grapheme_boundary(text: &str, index: usize) -> usize {
+    text.grapheme_indices(true)
+        .map(|(offset, _)| offset)
+        .find(|offset| *offset > index)
+        .unwrap_or(text.len())
+}
+
+fn selectable_index_at(text: &str, layout: &TextLayout, position: Point<Pixels>) -> usize {
+    let index = layout.closest_index_for_position(position).min(text.len());
+    if index == text.len() {
+        index
+    } else {
+        previous_grapheme_boundary(text, index)
+    }
+}
+
+fn word_range_at(text: &str, index: usize) -> Range<usize> {
+    text.split_word_bound_indices()
+        .find_map(|(start, word)| {
+            let end = start + word.len();
+            (start <= index && index < end).then_some(start..end)
+        })
+        .unwrap_or(index..index)
+}
+
+fn visual_row_at(rows: &[Range<usize>], index: usize) -> Range<usize> {
+    rows.iter()
+        .find(|row| row.start <= index && index < row.end)
+        .or_else(|| rows.last())
+        .cloned()
+        .unwrap_or(index..index)
+}
+
+fn extend_pointer_selection(selection: &mut TextSelectionState, index: usize) {
+    if let Some(unit) = selection.drag_unit.clone() {
+        if index < unit.start {
+            selection.anchor = unit.end;
+            selection.focus = index;
+        } else if index > unit.end {
+            selection.anchor = unit.start;
+            selection.focus = index;
+        } else {
+            selection.anchor = unit.start;
+            selection.focus = unit.end;
+        }
+    } else {
+        selection.focus = index;
+    }
+}
+
 impl Element for InteractiveText {
     type RequestLayoutState = ();
-    type PrepaintState = Hitbox;
+    type PrepaintState = InteractiveTextPrepaintState;
 
     fn id(&self) -> Option<ElementId> {
         Some(self.element_id.clone())
@@ -1100,7 +1364,39 @@ impl Element for InteractiveText {
     }
 
     fn write_a11y_info(&self, node: &mut accesskit::Node) {
-        node.set_value(self.text.text.to_string());
+        let source = self.text.layout().source();
+        node.set_value(source.to_string());
+        if self.selectable && accessible_text_is_representable(&source) {
+            node.add_action(accesskit::Action::Focus);
+            node.add_action(accesskit::Action::SetTextSelection);
+        }
+    }
+
+    fn a11y_synthetic_children(
+        &mut self,
+        prepaint: &mut Self::PrepaintState,
+        builder: &mut crate::A11ySubtreeBuilder,
+    ) {
+        let source = self.text.layout().source();
+        if !self.selectable || !accessible_text_is_representable(&source) {
+            return;
+        }
+        let mut selection = prepaint.selection.borrow_mut();
+        selection.published = publish_accessible_text_with_geometry(
+            builder,
+            &source,
+            selection.anchor,
+            selection.focus,
+            prepaint.fallback_direction,
+            &selection.visual_rows,
+            selection.revision,
+            prepaint.scale_factor,
+            |range| {
+                self.text
+                    .layout()
+                    .bounds_for_range(range, prepaint.text_align)
+            },
+        );
     }
 
     fn request_layout(
@@ -1121,7 +1417,7 @@ impl Element for InteractiveText {
         state: &mut Self::RequestLayoutState,
         window: &mut Window,
         cx: &mut App,
-    ) -> Hitbox {
+    ) -> InteractiveTextPrepaintState {
         window.with_optional_element_state::<InteractiveTextState, _>(
             global_id,
             |interactive_state, window| {
@@ -1141,7 +1437,51 @@ impl Element for InteractiveText {
                 self.text
                     .prepaint(None, inspector_id, bounds, state, window, cx);
                 let hitbox = window.insert_hitbox(bounds, HitboxBehavior::Normal);
-                (hitbox, interactive_state)
+                let mut selection_quads = Vec::new();
+                let mut selection = interactive_state
+                    .as_ref()
+                    .map(|state| state.selection.clone())
+                    .unwrap_or_default();
+                let text_align = window.text_style().text_align;
+                if self.selectable {
+                    let source = self.text.layout().source();
+                    let visual_rows = self.text.layout().visual_rows();
+                    selection.borrow_mut().update_source(&source, visual_rows);
+                    let range = selection.borrow().range();
+                    let color = Colors::for_appearance(window).selected.opacity(0.4);
+                    selection_quads.extend(
+                        self.text
+                            .layout()
+                            .bounds_for_range(range, text_align)
+                            .into_iter()
+                            .map(|bounds| fill(bounds, color)),
+                    );
+                    if let Some(state) = interactive_state.as_mut() {
+                        let focus_handle = state
+                            .focus_handle
+                            .get_or_insert_with(|| cx.focus_handle().tab_stop(true));
+                        window.set_focus_handle(focus_handle, cx);
+                    }
+                    if let Some(global_id) = global_id {
+                        window.register_pointer_capture_hitbox(global_id, hitbox.id);
+                    }
+                }
+                let fallback_direction = if text_align == TextAlign::Right {
+                    accesskit::TextDirection::RightToLeft
+                } else {
+                    accesskit::TextDirection::LeftToRight
+                };
+                (
+                    InteractiveTextPrepaintState {
+                        hitbox,
+                        selection_quads,
+                        selection,
+                        fallback_direction,
+                        text_align,
+                        scale_factor: window.scale_factor(),
+                    },
+                    interactive_state,
+                )
             },
         )
     }
@@ -1149,19 +1489,230 @@ impl Element for InteractiveText {
     fn paint(
         &mut self,
         global_id: Option<&GlobalElementId>,
-        inspector_id: Option<&InspectorElementId>,
-        bounds: Bounds<Pixels>,
+        _inspector_id: Option<&InspectorElementId>,
+        _bounds: Bounds<Pixels>,
         _: &mut Self::RequestLayoutState,
-        hitbox: &mut Hitbox,
+        prepaint: &mut InteractiveTextPrepaintState,
         window: &mut Window,
         cx: &mut App,
     ) {
+        let selection_state = prepaint.selection.clone();
+        let hitbox = &mut prepaint.hitbox;
         let current_view = window.current_view();
         let text_layout = self.text.layout().clone();
+        let text = text_layout.source();
+        let selectable = self.selectable;
+        let a11y_node_id = global_id.map(GlobalElementId::accesskit_node_id);
         window.with_element_state::<InteractiveTextState, _>(
             global_id.expect("required framework invariant must hold"),
             |interactive_state, window| {
                 let mut interactive_state = interactive_state.unwrap_or_default();
+                if selectable {
+                    let focus_handle = interactive_state
+                        .focus_handle
+                        .as_ref()
+                        .expect("selectable text focus is created during prepaint")
+                        .clone();
+                    window.next_frame.tab_stops.insert(&focus_handle);
+                    window.set_cursor_style(CursorStyle::IBeam, hitbox);
+
+                    let hitbox_for_down = hitbox.clone();
+                    let layout_for_down = text_layout.clone();
+                    let selection_for_down = selection_state.clone();
+                    let focus_for_down = focus_handle.clone();
+                    let text_for_down = text.clone();
+                    window.on_mouse_event(move |event: &MouseDownEvent, phase, window, cx| {
+                        if phase != DispatchPhase::Bubble
+                            || event.button != MouseButton::Left
+                            || !hitbox_for_down.is_hovered(window)
+                        {
+                            return;
+                        }
+                        let index =
+                            selectable_index_at(&text_for_down, &layout_for_down, event.position);
+                        let mut selection = selection_for_down.borrow_mut();
+                        if event.modifiers.shift && event.click_count == 1 {
+                            selection.focus = index;
+                            selection.drag_unit = None;
+                        } else {
+                            let selected = match event.click_count {
+                                2 => word_range_at(&text_for_down, index),
+                                count if count >= 3 => visual_row_at(&selection.visual_rows, index),
+                                _ => index..index,
+                            };
+                            selection.anchor = selected.start;
+                            selection.focus = selected.end;
+                            selection.drag_unit = (!selected.is_empty()).then_some(selected);
+                        }
+                        selection.dragging = true;
+                        drop(selection);
+                        focus_for_down.focus(window, cx);
+                        window.capture_pointer(hitbox_for_down.id);
+                        window.refresh();
+                    });
+
+                    let hitbox_for_move = hitbox.clone();
+                    let layout_for_move = text_layout.clone();
+                    let selection_for_move = selection_state.clone();
+                    let text_for_move = text.clone();
+                    window.on_mouse_event(move |event: &MouseMoveEvent, phase, window, _cx| {
+                        if phase == DispatchPhase::Capture
+                            || event.pressed_button != Some(MouseButton::Left)
+                            || !hitbox_for_move.is_hovered(window)
+                            || !selection_for_move.borrow().dragging
+                        {
+                            return;
+                        }
+                        let index =
+                            selectable_index_at(&text_for_move, &layout_for_move, event.position);
+                        let mut selection = selection_for_move.borrow_mut();
+                        let before = selection.range();
+                        extend_pointer_selection(&mut selection, index);
+                        if selection.range() != before {
+                            drop(selection);
+                            window.refresh();
+                        }
+                    });
+
+                    let layout_for_up = text_layout.clone();
+                    let selection_for_up = selection_state.clone();
+                    let text_for_up = text.clone();
+                    window.on_mouse_event(move |event: &MouseUpEvent, phase, window, cx| {
+                        if phase == DispatchPhase::Capture
+                            || event.button != MouseButton::Left
+                            || !selection_for_up.borrow().dragging
+                        {
+                            return;
+                        }
+                        let index =
+                            selectable_index_at(&text_for_up, &layout_for_up, event.position);
+                        let mut selection = selection_for_up.borrow_mut();
+                        extend_pointer_selection(&mut selection, index);
+                        selection.dragging = false;
+                        selection.drag_unit = None;
+                        let selected = !selection.range().is_empty();
+                        drop(selection);
+                        window.release_pointer();
+                        window.refresh();
+                        if selected {
+                            // A selection gesture is not a click on an
+                            // enclosing link or button. Keep a zero-length
+                            // click composable with those ancestors.
+                            cx.stop_propagation();
+                        }
+                    });
+
+                    let selection_for_key = selection_state.clone();
+                    let text_for_key = text.clone();
+                    window.on_key_event(move |event: &KeyDownEvent, phase, window, cx| {
+                        if phase != DispatchPhase::Bubble {
+                            return;
+                        }
+                        let modifiers = event.keystroke.modifiers;
+                        let key = event.keystroke.key.as_str();
+                        if modifiers.secondary()
+                            && !modifiers.shift
+                            && !modifiers.alt
+                            && !modifiers.function
+                        {
+                            match key {
+                                "a" => {
+                                    let mut selection = selection_for_key.borrow_mut();
+                                    selection.anchor = 0;
+                                    selection.focus = text_for_key.len();
+                                    drop(selection);
+                                    window.refresh();
+                                    cx.stop_propagation();
+                                }
+                                "c" => {
+                                    let range = selection_for_key.borrow().range();
+                                    if !range.is_empty() {
+                                        cx.write_to_clipboard(ClipboardItem::new_string(
+                                            text_for_key[range].to_string(),
+                                        ));
+                                        cx.stop_propagation();
+                                    }
+                                }
+                                _ => {}
+                            }
+                            return;
+                        }
+
+                        if modifiers.control
+                            || modifiers.platform
+                            || modifiers.alt
+                            || modifiers.function
+                        {
+                            return;
+                        }
+                        let mut selection = selection_for_key.borrow_mut();
+                        let next = match key {
+                            "left" if !modifiers.shift && !selection.range().is_empty() => {
+                                selection.range().start
+                            }
+                            "right" if !modifiers.shift && !selection.range().is_empty() => {
+                                selection.range().end
+                            }
+                            "left" => previous_grapheme_boundary(
+                                &text_for_key,
+                                selection.focus.saturating_sub(1),
+                            ),
+                            "right" => next_grapheme_boundary(&text_for_key, selection.focus),
+                            "home" => visual_row_at(&selection.visual_rows, selection.focus).start,
+                            "end" => visual_row_at(&selection.visual_rows, selection.focus).end,
+                            _ => return,
+                        };
+                        selection.focus = next;
+                        if !modifiers.shift {
+                            selection.anchor = next;
+                        }
+                        drop(selection);
+                        window.refresh();
+                        cx.stop_propagation();
+                    });
+
+                    if let Some(node_id) = a11y_node_id
+                        && accessible_text_is_representable(&text)
+                    {
+                        let selection_for_a11y = selection_state.clone();
+                        let text_for_a11y = text.clone();
+                        window.on_a11y_action(
+                            node_id,
+                            accesskit::Action::SetTextSelection,
+                            move |data, window, _| {
+                                let Some(accesskit::ActionData::SetTextSelection(requested)) = data
+                                else {
+                                    return;
+                                };
+                                let selection = selection_for_a11y.borrow();
+                                let Some(published) = selection.published.as_ref() else {
+                                    return;
+                                };
+                                let Some(anchor) = byte_offset_for_published_position(
+                                    &text_for_a11y,
+                                    selection.revision,
+                                    published,
+                                    requested.anchor,
+                                ) else {
+                                    return;
+                                };
+                                let Some(focus) = byte_offset_for_published_position(
+                                    &text_for_a11y,
+                                    selection.revision,
+                                    published,
+                                    requested.focus,
+                                ) else {
+                                    return;
+                                };
+                                drop(selection);
+                                let mut selection = selection_for_a11y.borrow_mut();
+                                selection.anchor = anchor;
+                                selection.focus = focus;
+                                window.refresh();
+                            },
+                        );
+                    }
+                }
                 if let Some(click_listener) = self.click_listener.take() {
                     let mouse_position = window.mouse_position();
                     if let Ok(ix) = text_layout.index_for_position(mouse_position)
@@ -1178,11 +1729,13 @@ impl Element for InteractiveText {
                     if let Some(mouse_down_index) = mouse_down.get() {
                         let hitbox = hitbox.clone();
                         let clickable_ranges = mem::take(&mut self.clickable_ranges);
+                        let selection = selection_state.clone();
                         window.on_mouse_event(
                             move |event: &MouseUpEvent, phase, window: &mut Window, cx| {
                                 if phase == DispatchPhase::Bubble && hitbox.is_hovered(window) {
                                     if let Ok(mouse_up_index) =
                                         text_layout.index_for_position(event.position)
+                                        && (!selectable || selection.borrow().range().is_empty())
                                     {
                                         click_listener(
                                             &clickable_ranges,
@@ -1287,8 +1840,12 @@ impl Element for InteractiveText {
                     );
                 }
 
-                self.text
-                    .paint(None, inspector_id, bounds, &mut (), &mut (), window, cx);
+                self.text.layout.paint_with_overlays(
+                    &self.text.text,
+                    prepaint.selection_quads.drain(..),
+                    window,
+                    cx,
+                );
 
                 ((), interactive_state)
             },
@@ -1307,6 +1864,47 @@ impl IntoElement for InteractiveText {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        AnyWindowHandle, AppContext as _, Context, InputEvent, InteractiveElement as _, Keystroke,
+        Modifiers, ParentElement as _, Render, StatefulInteractiveElement as _, Styled as _,
+        TestAppContext, div, point, px,
+    };
+
+    struct SelectableTextTestView;
+
+    impl Render for SelectableTextTestView {
+        fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+            div().size_full().child(
+                div()
+                    .w(px(120.))
+                    .child(StyledText::new("e\u{301}👩‍💻 hello").selectable("selectable")),
+            )
+        }
+    }
+
+    struct SelectableTextLinkTestView {
+        clicks: Rc<Cell<usize>>,
+    }
+
+    impl Render for SelectableTextLinkTestView {
+        fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+            let clicks = self.clicks.clone();
+            div().size_full().child(
+                div()
+                    .id("link")
+                    .w(px(120.))
+                    .on_click(move |_, _, _| clicks.set(clicks.get() + 1))
+                    .child(StyledText::new("select this").selectable("selectable-link")),
+            )
+        }
+    }
+
+    fn selectable_text_window(cx: &mut TestAppContext) -> AnyWindowHandle {
+        let window: AnyWindowHandle = cx.add_window(|_, _| SelectableTextTestView).into();
+        cx.update_window(window, |_, window, cx| window.draw(cx).clear(cx))
+            .expect("selectable text test window draws");
+        window
+    }
 
     #[test]
     fn test_into_element_for() {
@@ -1317,6 +1915,46 @@ mod tests {
         let _ = div().child("String".to_string());
         let _ = div().child(Cow::Borrowed("Cow"));
         let _ = div().child(SharedString::from("SharedString"));
+    }
+
+    #[test]
+    fn highlighted_text_backgrounds_keep_their_fragment_radii() {
+        let runs = StyledText::compute_runs(
+            "ab",
+            &TextStyle::default(),
+            [
+                (
+                    0..1,
+                    HighlightStyle {
+                        background_color: Some(crate::red()),
+                        background_radius: Some(px(2.)),
+                        ..Default::default()
+                    },
+                ),
+                (
+                    1..2,
+                    HighlightStyle {
+                        background_color: Some(crate::red()),
+                        background_radius: Some(px(4.)),
+                        ..Default::default()
+                    },
+                ),
+            ],
+        );
+        assert_eq!(runs[0].background_radius, Some(px(2.)));
+        assert_eq!(runs[1].background_radius, Some(px(4.)));
+
+        let mut cx = TestAppContext::single();
+        let window = selectable_text_window(&mut cx);
+        cx.update_window(window, |_, window, _| {
+            let line = window
+                .text_system()
+                .shape_line("ab".into(), px(14.), &runs, None);
+            assert_eq!(line.decoration_runs.len(), 2);
+            assert_eq!(line.decoration_runs[0].background_radius, Some(px(2.)));
+            assert_eq!(line.decoration_runs[1].background_radius, Some(px(4.)));
+        })
+        .expect("highlighted text line shapes");
     }
 
     #[test]
@@ -1336,5 +1974,291 @@ mod tests {
             make_text_unstable_id(false).id,
             make_text_unstable_id(true).id
         );
+    }
+
+    #[test]
+    fn selectable_text_snaps_to_extended_graphemes() {
+        let text = "Ae\u{301}👩‍💻Z";
+        assert_eq!(previous_grapheme_boundary(text, 0), 0);
+        assert_eq!(previous_grapheme_boundary(text, 2), 1);
+        assert_eq!(previous_grapheme_boundary(text, 7), 4);
+        assert_eq!(previous_grapheme_boundary(text, text.len()), text.len());
+        assert_eq!(next_grapheme_boundary(text, 0), 1);
+        assert_eq!(next_grapheme_boundary(text, 1), 4);
+        assert_eq!(next_grapheme_boundary(text, 4), text.len() - 1);
+        assert_eq!(next_grapheme_boundary(text, text.len()), text.len());
+    }
+
+    #[test]
+    fn selectable_text_word_and_visual_row_ranges_are_stable() {
+        assert_eq!(word_range_at("hello 世界", 2), 0..5);
+        assert_eq!(word_range_at("hello 世界", 7), 6..9);
+        let rows = [0..5, 5..10, 10..12];
+        assert_eq!(visual_row_at(&rows, 5), 5..10);
+        assert_eq!(visual_row_at(&rows, 12), 10..12);
+
+        let mut selection = TextSelectionState {
+            anchor: 0,
+            focus: 5,
+            drag_unit: Some(0..5),
+            ..Default::default()
+        };
+        extend_pointer_selection(&mut selection, 2);
+        assert_eq!(selection.range(), 0..5);
+        extend_pointer_selection(&mut selection, 8);
+        assert_eq!(selection.range(), 0..8);
+        extend_pointer_selection(&mut selection, 0);
+        assert_eq!(selection.anchor, 0);
+        assert_eq!(selection.focus, 5);
+    }
+
+    #[test]
+    fn selectable_text_keeps_reverse_selection_and_clamps_new_content() {
+        let mut selection = TextSelectionState {
+            anchor: 12,
+            focus: 1,
+            ..Default::default()
+        };
+        selection.update_source(&"hello 世界".into(), std::iter::once(0..12).collect());
+        assert_eq!(selection.anchor, 12);
+        assert_eq!(selection.focus, 1);
+        assert_eq!(selection.range(), 1..12);
+
+        selection.update_source(&"e\u{301}".into(), std::iter::once(0..3).collect());
+        assert_eq!(selection.anchor, 3);
+        assert_eq!(selection.focus, 0);
+        assert_eq!(selection.range(), 0..3);
+    }
+
+    #[test]
+    fn selectable_text_captures_drag_outside_and_copies_exact_graphemes() {
+        let mut cx = TestAppContext::single();
+        let window = selectable_text_window(&mut cx);
+        cx.update_window(window, |_, window, cx| {
+            window.dispatch_event(
+                MouseDownEvent {
+                    position: point(px(1.), px(8.)),
+                    button: MouseButton::Left,
+                    modifiers: Modifiers::none(),
+                    click_count: 1,
+                    first_mouse: false,
+                }
+                .to_platform_input(),
+                cx,
+            );
+            assert!(window.captured_hitbox().is_some());
+            window.draw(cx).clear(cx);
+            window.dispatch_event(
+                MouseMoveEvent {
+                    position: point(px(400.), px(80.)),
+                    modifiers: Modifiers::none(),
+                    pressed_button: Some(MouseButton::Left),
+                }
+                .to_platform_input(),
+                cx,
+            );
+            window.dispatch_event(
+                MouseUpEvent {
+                    position: point(px(400.), px(80.)),
+                    button: MouseButton::Left,
+                    modifiers: Modifiers::none(),
+                    click_count: 1,
+                }
+                .to_platform_input(),
+                cx,
+            );
+            assert!(window.captured_hitbox().is_none());
+
+            let mut modifiers = Modifiers::none();
+            if cfg!(target_os = "macos") {
+                modifiers.platform = true;
+            } else {
+                modifiers.control = true;
+            }
+            window.dispatch_event(
+                KeyDownEvent {
+                    keystroke: Keystroke {
+                        modifiers,
+                        key: "c".into(),
+                        key_char: None,
+                    },
+                    is_held: false,
+                    prefer_character_input: false,
+                }
+                .to_platform_input(),
+                cx,
+            );
+        })
+        .expect("selection events dispatch");
+        assert_eq!(
+            cx.read_from_clipboard().and_then(|item| item.text()),
+            Some("e\u{301}👩‍💻 hello".into())
+        );
+    }
+
+    #[test]
+    fn selectable_text_extends_keyboard_selection_by_grapheme() {
+        let mut cx = TestAppContext::single();
+        let window = selectable_text_window(&mut cx);
+        cx.update_window(window, |_, window, cx| {
+            for event in [
+                MouseDownEvent {
+                    position: point(px(1.), px(8.)),
+                    button: MouseButton::Left,
+                    modifiers: Modifiers::none(),
+                    click_count: 1,
+                    first_mouse: false,
+                }
+                .to_platform_input(),
+                MouseUpEvent {
+                    position: point(px(1.), px(8.)),
+                    button: MouseButton::Left,
+                    modifiers: Modifiers::none(),
+                    click_count: 1,
+                }
+                .to_platform_input(),
+                KeyDownEvent {
+                    keystroke: Keystroke {
+                        modifiers: Modifiers {
+                            shift: true,
+                            ..Modifiers::none()
+                        },
+                        key: "right".into(),
+                        key_char: None,
+                    },
+                    is_held: false,
+                    prefer_character_input: false,
+                }
+                .to_platform_input(),
+            ] {
+                window.dispatch_event(event, cx);
+            }
+
+            let mut modifiers = Modifiers::none();
+            if cfg!(target_os = "macos") {
+                modifiers.platform = true;
+            } else {
+                modifiers.control = true;
+            }
+            window.dispatch_event(
+                KeyDownEvent {
+                    keystroke: Keystroke {
+                        modifiers,
+                        key: "c".into(),
+                        key_char: None,
+                    },
+                    is_held: false,
+                    prefer_character_input: false,
+                }
+                .to_platform_input(),
+                cx,
+            );
+        })
+        .expect("keyboard selection events dispatch");
+        assert_eq!(
+            cx.read_from_clipboard().and_then(|item| item.text()),
+            Some("e\u{301}".into())
+        );
+    }
+
+    #[test]
+    fn selectable_text_publishes_accessible_character_geometry() {
+        let mut cx = TestAppContext::single();
+        let window = selectable_text_window(&mut cx);
+        cx.activate_accessibility(window);
+        cx.update_window(window, |_, window, cx| window.draw(cx).clear(cx))
+            .expect("accessibility frame draws");
+        cx.update_window(window, |_, window, _| {
+            let tree: serde_json::Value = serde_json::from_str(
+                &window
+                    .debug_a11y_tree_json()
+                    .expect("accessibility adapter is active"),
+            )
+            .expect("valid accessibility debug tree");
+            let run = tree["nodes"]
+                .as_object()
+                .and_then(|nodes| {
+                    nodes
+                        .values()
+                        .find(|node| node["aria"]["role"] == "TextRun")
+                })
+                .expect("selectable text run");
+            let lengths = run["aria"]["character_lengths"]
+                .as_array()
+                .expect("grapheme lengths");
+            let positions = run["aria"]["character_positions"]
+                .as_array()
+                .expect("character positions");
+            let widths = run["aria"]["character_widths"]
+                .as_array()
+                .expect("character widths");
+            assert_eq!(positions.len(), lengths.len());
+            assert_eq!(widths.len(), lengths.len());
+            assert!(
+                widths
+                    .iter()
+                    .any(|width| width.as_f64().unwrap_or(0.0) > 0.0)
+            );
+        })
+        .expect("accessibility tree reads");
+    }
+
+    #[test]
+    fn selection_gestures_do_not_activate_an_enclosing_click_target() {
+        let mut cx = TestAppContext::single();
+        let clicks = Rc::new(Cell::new(0));
+        let window: AnyWindowHandle = cx
+            .add_window({
+                let clicks = clicks.clone();
+                move |_, _| SelectableTextLinkTestView { clicks }
+            })
+            .into();
+        cx.update_window(window, |_, window, cx| window.draw(cx).clear(cx))
+            .expect("selectable link test window draws");
+
+        cx.update_window(window, |_, window, cx| {
+            for event in [
+                MouseDownEvent {
+                    position: point(px(1.), px(8.)),
+                    button: MouseButton::Left,
+                    modifiers: Modifiers::none(),
+                    click_count: 1,
+                    first_mouse: false,
+                }
+                .to_platform_input(),
+                MouseUpEvent {
+                    position: point(px(80.), px(8.)),
+                    button: MouseButton::Left,
+                    modifiers: Modifiers::none(),
+                    click_count: 1,
+                }
+                .to_platform_input(),
+            ] {
+                window.dispatch_event(event, cx);
+            }
+            assert_eq!(clicks.get(), 0);
+
+            for event in [
+                MouseDownEvent {
+                    position: point(px(1.), px(8.)),
+                    button: MouseButton::Left,
+                    modifiers: Modifiers::none(),
+                    click_count: 1,
+                    first_mouse: false,
+                }
+                .to_platform_input(),
+                MouseUpEvent {
+                    position: point(px(1.), px(8.)),
+                    button: MouseButton::Left,
+                    modifiers: Modifiers::none(),
+                    click_count: 1,
+                }
+                .to_platform_input(),
+            ] {
+                window.dispatch_event(event, cx);
+            }
+            assert_eq!(clicks.get(), 1);
+        })
+        .expect("link selection events dispatch");
     }
 }

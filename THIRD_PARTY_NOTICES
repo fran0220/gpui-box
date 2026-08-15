@@ -24,6 +24,10 @@ not represented as imported Zed source.
 The renderer-backed linear-gradient primitive for up to eight ordered stops,
 including its Metal, Direct3D, WGPU, and WebGL shaders, is GPUI Box work and
 imports no additional source.
+The read-only selectable-text primitive, bidi range geometry, pointer capture,
+clipboard behavior, and AccessKit text-run publication are GPUI Box work and
+import no editor or product source. Rounded shaped-text backgrounds added with
+that primitive are GPUI Box work as well.
 The AVFoundation and Media Foundation playback services are GPUI Box work and
 use operating-system frameworks; they import no additional third-party source
 or media assets.

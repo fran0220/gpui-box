@@ -33,7 +33,7 @@ use gpui_kit_theme::{
     ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, Theme, TypeScale,
 };
 
-use crate::content::code_view::code_runs;
+use crate::content::code_view::styled_code;
 use crate::content::markdown::CodeSpan;
 use crate::data::{List, ListItem};
 use crate::display::badge::Tone;
@@ -420,7 +420,7 @@ impl RenderOnce for DiffView {
             let mut list = List::new(list_ident.clone(), count, move |index, _, cx| {
                 let row = &rendered[index];
                 let label = cx.strings().text(row.kind.label_key());
-                ListItem::new(row.id.clone(), diff_row(&row.kind, &row_theme))
+                ListItem::new(row.id.clone(), diff_row(&row.id, &row.kind, &row_theme))
                     // Source and paths stay out of diagnostic snapshots. Stable
                     // business ids and the row kind remain addressable.
                     .text(label)
@@ -563,7 +563,7 @@ fn flatten(files: Vec<DiffFile>, presentation: DiffPresentation) -> Vec<FlatRow>
     rows
 }
 
-fn diff_row(kind: &FlatKind, theme: &Theme) -> AnyElement {
+fn diff_row(id: &SharedString, kind: &FlatKind, theme: &Theme) -> AnyElement {
     match kind {
         FlatKind::File(label) => div()
             .row()
@@ -595,12 +595,13 @@ fn diff_row(kind: &FlatKind, theme: &Theme) -> AnyElement {
             side,
             old_number,
             new_number,
-        } => unified_line(side, *old_number, *new_number, theme),
-        FlatKind::Split { old, new } => split_line(old.as_ref(), new.as_ref(), theme),
+        } => unified_line(id, side, *old_number, *new_number, theme),
+        FlatKind::Split { old, new } => split_line(id, old.as_ref(), new.as_ref(), theme),
     }
 }
 
 fn unified_line(
+    id: &SharedString,
     side: &DiffSide,
     old_number: Option<usize>,
     new_number: Option<usize>,
@@ -635,12 +636,20 @@ fn unified_line(
                 .min_w_0()
                 .overflow_hidden()
                 .whitespace_nowrap()
-                .children(code_runs(theme, side.text.as_ref(), &side.spans)),
+                .child(
+                    styled_code(theme, side.text.clone(), &side.spans)
+                        .selectable(SharedString::from(format!("{id}.text"))),
+                ),
         )
         .into_any_element()
 }
 
-fn split_line(old: Option<&DiffSide>, new: Option<&DiffSide>, theme: &Theme) -> AnyElement {
+fn split_line(
+    id: &SharedString,
+    old: Option<&DiffSide>,
+    new: Option<&DiffSide>,
+    theme: &Theme,
+) -> AnyElement {
     div()
         .row()
         .items_center()
@@ -649,7 +658,7 @@ fn split_line(old: Option<&DiffSide>, new: Option<&DiffSide>, theme: &Theme) -> 
         .font_family(theme.typography.mono.clone())
         .text_size(px(theme.typography.code.size))
         .line_height(px(theme.typography.code.line_height))
-        .child(code_side(old, theme))
+        .child(code_side(id, "old", old, theme))
         .child(
             div()
                 .flex_none()
@@ -657,11 +666,11 @@ fn split_line(old: Option<&DiffSide>, new: Option<&DiffSide>, theme: &Theme) -> 
                 .h_full()
                 .bg(theme.colors.hairline_strong),
         )
-        .child(code_side(new, theme))
+        .child(code_side(id, "new", new, theme))
         .into_any_element()
 }
 
-fn code_side(side: Option<&DiffSide>, theme: &Theme) -> AnyElement {
+fn code_side(id: &SharedString, slot: &str, side: Option<&DiffSide>, theme: &Theme) -> AnyElement {
     let mark = side.map_or(DiffLineMark::Context, |side| side.mark);
     let color = mark.tone().color(theme);
     div()
@@ -689,10 +698,10 @@ fn code_side(side: Option<&DiffSide>, theme: &Theme) -> AnyElement {
                 .min_w_0()
                 .overflow_hidden()
                 .whitespace_nowrap()
-                .children(
-                    side.into_iter()
-                        .flat_map(|side| code_runs(theme, side.text.as_ref(), &side.spans)),
-                ),
+                .children(side.map(|side| {
+                    styled_code(theme, side.text.clone(), &side.spans)
+                        .selectable(SharedString::from(format!("{id}.{slot}.text")))
+                })),
         )
         .into_any_element()
 }

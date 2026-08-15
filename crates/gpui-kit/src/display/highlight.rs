@@ -29,13 +29,13 @@
 use std::ops::Range;
 
 use gpui::{
-    App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div,
-    prelude::FluentBuilder, px,
+    App, HighlightStyle, IntoElement, ParentElement, RenderOnce, SharedString, Styled, StyledText,
+    Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius};
 
-use crate::foundation::{Ident, StyledExt};
+use crate::foundation::Ident;
 
 /// A run of text with some of it marked.
 ///
@@ -45,6 +45,7 @@ use crate::foundation::{Ident, StyledExt};
 #[derive(Debug, IntoElement)]
 pub struct HighlightedText {
     ident: Option<Ident>,
+    selection_ident: Option<Ident>,
     text: SharedString,
     hits: Vec<Range<usize>>,
     current: Option<usize>,
@@ -55,6 +56,7 @@ impl HighlightedText {
     pub fn new(text: impl Into<SharedString>) -> Self {
         Self {
             ident: None,
+            selection_ident: None,
             text: text.into(),
             hits: Vec::new(),
             current: None,
@@ -66,6 +68,14 @@ impl HighlightedText {
     /// way a decorative `Badge` publishes nothing.
     pub fn id(mut self, ident: impl Into<Ident>) -> Self {
         self.ident = Some(ident.into());
+        self
+    }
+
+    /// Enables native text selection without publishing the text in a
+    /// semantic snapshot. This is appropriate for redacted logs and other
+    /// caller-owned content whose bounds still need stable transient state.
+    pub fn selectable(mut self, ident: impl Into<Ident>) -> Self {
+        self.selection_ident = Some(ident.into());
         self
     }
 
@@ -149,32 +159,40 @@ impl RenderOnce for HighlightedText {
         // this string produced no mark, and publishing the request would make
         // the tree claim a highlight nobody can see.
         let drawn = self.published_hits();
-        let runs = segments(self.text.as_ref(), &self.hits)
+        let mut offset = 0;
+        let highlights = segments(self.text.as_ref(), &self.hits)
             .into_iter()
-            .map(|segment| {
-                let is_current = segment.hit.is_some() && segment.hit == current;
-                div()
-                    .when(segment.hit.is_some() && !is_current, |element| {
-                        element
-                            .bg(theme
-                                .colors
-                                .accent
-                                .opacity(theme.effects.selected_ring_alpha))
-                            .radius(&theme, Radius::Small)
-                    })
-                    // The current hit takes the accent outright rather than a
-                    // stronger tint of the same wash, so "this one" and "one
-                    // of those" cannot be mistaken for each other.
-                    .when(is_current, |element| {
-                        element
-                            .bg(theme.colors.accent)
-                            .text_color(theme.colors.text_on_accent)
-                            .radius(&theme, Radius::Small)
-                    })
-                    .child(SharedString::from(segment.text))
-            });
+            .filter_map(|segment| {
+                let start = offset;
+                offset += segment.text.len();
+                segment.hit.map(|hit| {
+                    let is_current = Some(hit) == current;
+                    (
+                        start..offset,
+                        HighlightStyle {
+                            color: is_current.then_some(theme.colors.text_on_accent),
+                            background_color: Some(if is_current {
+                                theme.colors.accent
+                            } else {
+                                theme
+                                    .colors
+                                    .accent
+                                    .opacity(theme.effects.selected_ring_alpha)
+                            }),
+                            background_radius: Some(px(theme.radius(Radius::Small))),
+                            ..Default::default()
+                        },
+                    )
+                })
+            })
+            .collect::<Vec<_>>();
+        let text = StyledText::new(self.text.clone()).with_highlights(highlights);
+        let selectable_id = self
+            .selection_ident
+            .as_ref()
+            .map(|ident| ident.child("text").element_id());
 
-        let element = div()
+        let mut element = div()
             .flex()
             .flex_row()
             .flex_wrap()
@@ -183,8 +201,11 @@ impl RenderOnce for HighlightedText {
                     .font_family(theme.typography.mono.clone())
                     .text_size(px(theme.typography.code.size))
                     .line_height(px(theme.typography.code.line_height))
-            })
-            .children(runs);
+            });
+        element = match selectable_id {
+            Some(id) => element.child(text.selectable(id)),
+            None => element.child(text),
+        };
         match self.ident {
             Some(ident) => {
                 // The text itself is the caller's content and is published as

@@ -1,4 +1,7 @@
-use crate::{FontId, GlyphId, Pixels, PlatformTextSystem, Point, SharedString, Size, point, px};
+use crate::{
+    Bounds, FontId, GlyphId, Pixels, PlatformTextSystem, Point, SharedString, Size, TextAlign,
+    point, px, size,
+};
 use collections::FxHashMap;
 use parking_lot::{Mutex, RwLock, RwLockUpgradableReadGuard};
 use smallvec::SmallVec;
@@ -389,6 +392,120 @@ impl WrappedLineLayout {
         }
 
         None
+    }
+
+    /// Returns the painted rectangles occupied by a UTF-8 byte range.
+    ///
+    /// Rectangles follow visual glyph order, so a logical range crossing a
+    /// bidirectional run may produce more than one rectangle on a row. The
+    /// caller is responsible for snapping the range to grapheme boundaries.
+    pub fn bounds_for_range(
+        &self,
+        range: Range<usize>,
+        origin: Point<Pixels>,
+        line_height: Pixels,
+        align: TextAlign,
+        align_width: Pixels,
+    ) -> Vec<Bounds<Pixels>> {
+        if range.is_empty() {
+            return Vec::new();
+        }
+
+        let glyphs = self
+            .unwrapped_layout
+            .runs
+            .iter()
+            .enumerate()
+            .flat_map(|(run_index, run)| {
+                run.glyphs
+                    .iter()
+                    .enumerate()
+                    .map(move |(glyph_index, glyph)| (run_index, glyph_index, glyph))
+            })
+            .collect::<Vec<_>>();
+        if glyphs.is_empty() {
+            return Vec::new();
+        }
+
+        let mut source_boundaries = glyphs
+            .iter()
+            .map(|(_, _, glyph)| glyph.index)
+            .chain([self.len()])
+            .collect::<Vec<_>>();
+        source_boundaries.sort_unstable();
+        source_boundaries.dedup();
+
+        let mut row_starts = vec![0];
+        for boundary in &self.wrap_boundaries {
+            if let Some(index) = glyphs.iter().position(|(run_index, glyph_index, _)| {
+                *run_index == boundary.run_ix && *glyph_index == boundary.glyph_ix
+            }) {
+                row_starts.push(index);
+            }
+        }
+        row_starts.sort_unstable();
+        row_starts.dedup();
+
+        let mut bounds = Vec::new();
+        for (row, start_index) in row_starts.iter().copied().enumerate() {
+            let end_index = row_starts.get(row + 1).copied().unwrap_or(glyphs.len());
+            if start_index >= end_index {
+                continue;
+            }
+            let row_start_x = glyphs[start_index].2.position.x;
+            let row_end_x = glyphs
+                .get(end_index)
+                .map(|(_, _, glyph)| glyph.position.x)
+                .unwrap_or(self.unwrapped_layout.width);
+            let row_width = row_end_x - row_start_x;
+            let row_origin_x = match align {
+                TextAlign::Left => origin.x,
+                TextAlign::Center => origin.x + (align_width - row_width) / 2.,
+                TextAlign::Right => origin.x + align_width - row_width,
+            };
+            let row_origin_y = origin.y + line_height * row;
+            let mut active: Option<Bounds<Pixels>> = None;
+
+            for index in start_index..end_index {
+                let glyph = glyphs[index].2;
+                let source_end = source_boundaries
+                    .iter()
+                    .copied()
+                    .find(|boundary| *boundary > glyph.index)
+                    .unwrap_or(self.len());
+                let selected = glyph.index < range.end && source_end > range.start;
+                let cell_end_x = glyphs
+                    .get(index + 1)
+                    .filter(|_| index + 1 < end_index)
+                    .map(|(_, _, glyph)| glyph.position.x)
+                    .unwrap_or(row_end_x);
+                let left = row_origin_x + glyph.position.x - row_start_x;
+                let right = row_origin_x + cell_end_x - row_start_x;
+
+                if selected {
+                    let cell = Bounds::new(
+                        point(left.min(right), row_origin_y),
+                        size((right - left).abs(), line_height),
+                    );
+                    if let Some(current) = active.as_mut() {
+                        if current.right() == cell.left() {
+                            current.size.width += cell.size.width;
+                        } else {
+                            bounds.push(*current);
+                            *current = cell;
+                        }
+                    } else {
+                        active = Some(cell);
+                    }
+                } else if let Some(current) = active.take() {
+                    bounds.push(current);
+                }
+            }
+            if let Some(current) = active {
+                bounds.push(current);
+            }
+        }
+        bounds
     }
 }
 
@@ -993,6 +1110,78 @@ mod tests {
             .iter()
             .map(|g| f32::from(g.position.x))
             .collect()
+    }
+
+    fn wrapped_layout(glyphs: &[(usize, f32)], len: usize, width: f32) -> WrappedLineLayout {
+        WrappedLineLayout {
+            unwrapped_layout: Arc::new(LineLayout {
+                font_size: px(16.),
+                width: px(width),
+                ascent: px(12.),
+                descent: px(4.),
+                runs: vec![ShapedRun {
+                    font_id: FontId(0),
+                    glyphs: glyphs
+                        .iter()
+                        .map(|(index, x)| glyph_at(*x, *index))
+                        .collect(),
+                }],
+                len,
+            }),
+            wrap_boundaries: SmallVec::new(),
+            wrap_width: None,
+        }
+    }
+
+    #[test]
+    fn range_bounds_follow_wrapping_and_alignment() {
+        let mut layout = wrapped_layout(&[(0, 0.), (1, 10.), (2, 20.), (3, 30.)], 4, 40.);
+        layout.wrap_boundaries.push(WrapBoundary {
+            run_ix: 0,
+            glyph_ix: 2,
+        });
+        layout.wrap_width = Some(px(20.));
+
+        assert_eq!(
+            layout.bounds_for_range(
+                1..3,
+                point(px(5.), px(7.)),
+                px(16.),
+                TextAlign::Right,
+                px(40.),
+            ),
+            vec![
+                Bounds::new(point(px(35.), px(7.)), size(px(10.), px(16.))),
+                Bounds::new(point(px(25.), px(23.)), size(px(10.), px(16.))),
+            ]
+        );
+    }
+
+    #[test]
+    fn range_bounds_follow_visual_cells_in_a_bidirectional_run() {
+        // Logical byte order is 0, 2, 4 while the shaped glyphs are painted
+        // right-to-left as 4, 2, 0.
+        let layout = wrapped_layout(&[(4, 0.), (2, 10.), (0, 20.)], 6, 30.);
+        assert_eq!(
+            layout.bounds_for_range(
+                0..2,
+                point(px(5.), px(7.)),
+                px(16.),
+                TextAlign::Left,
+                px(30.),
+            ),
+            vec![Bounds::new(point(px(25.), px(7.)), size(px(10.), px(16.)),)]
+        );
+        assert_eq!(
+            layout.bounds_for_range(
+                0..4,
+                point(px(5.), px(7.)),
+                px(16.),
+                TextAlign::Left,
+                px(30.),
+            ),
+            vec![Bounds::new(point(px(15.), px(7.)), size(px(20.), px(16.)),)]
+        );
     }
 
     #[test]
