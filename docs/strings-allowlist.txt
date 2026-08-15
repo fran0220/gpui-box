@@ -179,6 +179,8 @@ plain text
 platform
 records the root does not reach
 redacted, {shape}
+series is nonempty
+soft break
 split `{id}` has {found} children, not 2
 stale
 supplied
@@ -188,6 +190,7 @@ unknown
 unknown-limit
 unrenderable, required
 unrendered html
+visible series are drawn by the caller
 withheld
 {chosen} of {loaded} loaded, {total} total
 {count} of {max}
