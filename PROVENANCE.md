@@ -66,6 +66,10 @@ shared inline scene representation and Metal, Direct3D, WGPU, and WebGL shader
 implementations were authored here; they import no additional framework or
 shader source.
 
+Normalized path-stroke trimming and wrapping dash offsets are subsequent GPUI
+Box work at the pre-tessellation path boundary. They use the existing Lyon
+measurement and tessellation dependency and import no source or visual assets.
+
 The read-only selectable-text primitive, wrapped and bidirectional range
 geometry, pointer-capture interaction, clipboard behavior, and AccessKit text
 run publication are subsequent GPUI Box work. Rounded backgrounds for shaped

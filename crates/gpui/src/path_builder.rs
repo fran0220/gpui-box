@@ -28,6 +28,8 @@ pub struct PathBuilder {
     /// PathStyle of the PathBuilder
     pub style: PathStyle,
     dash_array: Option<Vec<Pixels>>,
+    dash_offset: Pixels,
+    stroke_trim: (f32, f32),
 }
 
 impl From<lyon::path::Builder> for PathBuilder {
@@ -79,6 +81,8 @@ impl Default for PathBuilder {
             style: PathStyle::Fill(FillOptions::default()),
             transform: None,
             dash_array: None,
+            dash_offset: Pixels::default(),
+            stroke_trim: (0.0, 1.0),
         }
     }
 }
@@ -106,6 +110,16 @@ impl PathBuilder {
     ///
     /// [MDN](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/stroke-dasharray)
     pub fn dash_array(mut self, dash_array: &[Pixels]) -> Self {
+        assert!(
+            dash_array
+                .iter()
+                .all(|length| length.0.is_finite() && length.0 >= 0.0),
+            "path dash lengths must be finite and non-negative"
+        );
+        if dash_array.is_empty() || dash_array.iter().all(|length| length.0 == 0.0) {
+            self.dash_array = None;
+            return self;
+        }
         // If an odd number of values is provided, then the list of values is repeated to yield an even number of values.
         // Thus, 5,3,2 is equivalent to 5,3,2,5,3,2.
         let array = if dash_array.len() % 2 == 1 {
@@ -115,8 +129,42 @@ impl PathBuilder {
         } else {
             dash_array.to_vec()
         };
+        assert!(
+            array.iter().map(|length| length.0).sum::<f32>().is_finite(),
+            "a path dash pattern length must be finite"
+        );
 
         self.dash_array = Some(array);
+        self
+    }
+
+    /// Advances the dash pattern by this distance at the start of the path.
+    ///
+    /// Sampling a changing offset produces a travelling trace without callers
+    /// splitting the path into short line elements. Negative and oversized
+    /// values wrap around the complete dash pattern.
+    pub fn dash_offset(mut self, offset: Pixels) -> Self {
+        assert!(offset.0.is_finite(), "a path dash offset must be finite");
+        self.dash_offset = offset;
+        self
+    }
+
+    /// Keeps one normalized interval of a stroked path.
+    ///
+    /// `0.0..1.0` is the full measured path. Sampling the end from zero to one
+    /// reveals a stroke while preserving its actual curves, joins, caps, dash
+    /// phase, clipping, and gradient paint. The interval is applied before
+    /// stroke tessellation and is ignored by fill builders.
+    pub fn stroke_trim(mut self, start: f32, end: f32) -> Self {
+        assert!(
+            start.is_finite()
+                && end.is_finite()
+                && (0.0..=1.0).contains(&start)
+                && (0.0..=1.0).contains(&end)
+                && start <= end,
+            "a path stroke trim must be an ordered finite interval in 0.0..=1.0"
+        );
+        self.stroke_trim = (start, end);
         self
     }
 
@@ -249,7 +297,13 @@ impl PathBuilder {
         };
 
         match self.style {
-            PathStyle::Stroke(options) => Self::tessellate_stroke(self.dash_array, &path, &options),
+            PathStyle::Stroke(options) => Self::tessellate_stroke(
+                self.dash_array,
+                self.dash_offset,
+                self.stroke_trim,
+                &path,
+                &options,
+            ),
             PathStyle::Fill(options) => Self::tessellate_fill(&path, &options),
         }
     }
@@ -274,32 +328,57 @@ impl PathBuilder {
 
     fn tessellate_stroke(
         dash_array: Option<Vec<Pixels>>,
+        dash_offset: Pixels,
+        stroke_trim: (f32, f32),
         path: &lyon::path::Path,
         options: &StrokeOptions,
     ) -> Result<Path<Pixels>, Error> {
-        let path = if let Some(dash_array) = dash_array {
+        let selected_path;
+        let path = if dash_array.is_some() || stroke_trim != (0.0, 1.0) {
             let measurements = lyon::algorithms::measure::PathMeasurements::from_path(path, 0.01);
             let mut sampler = measurements
                 .create_sampler(path, lyon::algorithms::measure::SampleType::Normalized);
             let mut builder = lyon::path::Path::builder();
 
             let total_length = sampler.length();
-            let dash_array_len = dash_array.len();
-            let mut pos = 0.;
-            let mut dash_index = 0;
-            while pos < total_length {
-                let dash_length = dash_array[dash_index % dash_array_len].0;
-                let next_pos = (pos + dash_length).min(total_length);
-                if dash_index % 2 == 0 {
-                    let start = pos / total_length;
-                    let end = next_pos / total_length;
-                    sampler.split_range(start..end, &mut builder);
+            if total_length.is_finite() && total_length > 0.0 {
+                let trim_start = stroke_trim.0 * total_length;
+                let trim_end = stroke_trim.1 * total_length;
+                if let Some(dash_array) = dash_array {
+                    let pattern_length = dash_array.iter().map(|length| length.0).sum::<f32>();
+                    let phase = dash_offset.0.rem_euclid(pattern_length);
+                    let mut pattern_before = 0.0;
+                    let mut dash_index = 0;
+                    for (index, length) in dash_array.iter().enumerate() {
+                        if phase < pattern_before + length.0 {
+                            dash_index = index;
+                            break;
+                        }
+                        pattern_before += length.0;
+                    }
+                    let mut position = pattern_before - phase;
+                    while position < trim_end {
+                        let next = position + dash_array[dash_index % dash_array.len()].0;
+                        if dash_index % 2 == 0 {
+                            let start = position.max(trim_start).max(0.0);
+                            let end = next.min(trim_end).min(total_length);
+                            if end > start {
+                                sampler.split_range(
+                                    start / total_length..end / total_length,
+                                    &mut builder,
+                                );
+                            }
+                        }
+                        position = next;
+                        dash_index += 1;
+                    }
+                } else if trim_end > trim_start {
+                    sampler.split_range(stroke_trim.0..stroke_trim.1, &mut builder);
                 }
-                pos = next_pos;
-                dash_index += 1;
             }
 
-            &builder.build()
+            selected_path = builder.build();
+            &selected_path
         } else {
             path
         };
@@ -343,5 +422,101 @@ impl PathBuilder {
         }
 
         path
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn line(builder: PathBuilder, length: f32) -> Path<Pixels> {
+        let mut builder = builder;
+        builder.move_to(point(px(0.0), px(0.0)));
+        builder.line_to(point(px(length), px(0.0)));
+        builder.build().expect("a straight test stroke tessellates")
+    }
+
+    fn assert_near(actual: Pixels, expected: f32) {
+        assert!(
+            (actual.0 - expected).abs() < 0.01,
+            "expected {expected}, got {}",
+            actual.0
+        );
+    }
+
+    #[test]
+    fn stroke_trim_keeps_the_measured_interval_before_tessellation() {
+        let path = line(PathBuilder::stroke(px(2.0)).stroke_trim(0.25, 0.75), 100.0);
+        assert_near(path.bounds.left(), 25.0);
+        assert_near(path.bounds.right(), 75.0);
+    }
+
+    #[test]
+    fn dash_offset_wraps_and_moves_the_pattern_without_segment_elements() {
+        let shifted = line(
+            PathBuilder::stroke(px(2.0))
+                .dash_array(&[px(10.0), px(10.0)])
+                .dash_offset(px(10.0)),
+            40.0,
+        );
+        assert_near(shifted.bounds.left(), 10.0);
+        assert_near(shifted.bounds.right(), 40.0);
+
+        let wrapped = line(
+            PathBuilder::stroke(px(2.0))
+                .dash_array(&[px(10.0), px(10.0)])
+                .dash_offset(px(-10.0)),
+            40.0,
+        );
+        assert_eq!(shifted.vertices.len(), wrapped.vertices.len());
+        for (shifted, wrapped) in shifted.vertices.iter().zip(&wrapped.vertices) {
+            assert_eq!(shifted.xy_position, wrapped.xy_position);
+        }
+    }
+
+    #[test]
+    fn trim_and_dash_phase_share_the_original_path_measurement() {
+        let path = line(
+            PathBuilder::stroke(px(2.0))
+                .dash_array(&[px(10.0), px(10.0)])
+                .dash_offset(px(10.0))
+                .stroke_trim(0.25, 0.75),
+            40.0,
+        );
+        assert_near(path.bounds.left(), 10.0);
+        assert_near(path.bounds.right(), 20.0);
+    }
+
+    #[test]
+    fn empty_and_zero_dash_patterns_are_safe_solid_strokes() {
+        for pattern in [&[][..], &[px(0.0), px(0.0)][..]] {
+            let path = line(PathBuilder::stroke(px(2.0)).dash_array(pattern), 40.0);
+            assert_near(path.bounds.left(), 0.0);
+            assert_near(path.bounds.right(), 40.0);
+        }
+    }
+
+    #[test]
+    fn an_empty_trim_is_a_safe_empty_stroke() {
+        let path = line(PathBuilder::stroke(px(2.0)).stroke_trim(0.5, 0.5), 40.0);
+        assert!(path.vertices.is_empty());
+    }
+
+    #[test]
+    #[should_panic(expected = "path stroke trim must be an ordered finite interval")]
+    fn stroke_trim_refuses_a_reversed_interval() {
+        let _ = PathBuilder::stroke(px(2.0)).stroke_trim(0.8, 0.2);
+    }
+
+    #[test]
+    #[should_panic(expected = "path dash lengths must be finite and non-negative")]
+    fn dash_array_refuses_a_negative_length() {
+        let _ = PathBuilder::stroke(px(2.0)).dash_array(&[px(-1.0), px(2.0)]);
+    }
+
+    #[test]
+    #[should_panic(expected = "path dash pattern length must be finite")]
+    fn dash_array_refuses_an_overflowing_pattern_length() {
+        let _ = PathBuilder::stroke(px(2.0)).dash_array(&[px(f32::MAX), px(f32::MAX)]);
     }
 }

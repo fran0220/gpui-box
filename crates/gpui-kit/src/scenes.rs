@@ -1081,6 +1081,8 @@ fn visual_effects(_window: &mut Window, cx: &mut App) -> AnyElement {
     )
     .color_space(gpui::ColorSpace::Oklab);
     let path_fill = conic;
+    let stroke_fill = radial;
+    let stroke_base = theme.colors.hairline_strong.opacity(0.32);
     let label = |text: &'static str| {
         div()
             .absolute()
@@ -1173,6 +1175,87 @@ fn visual_effects(_window: &mut Window, cx: &mut App) -> AnyElement {
                         )
                         .child(label("Path fill · conic")),
                 ),
+        )
+        .child(crate::foundation::text(
+            &theme,
+            TypeScale::Subtitle,
+            "Measured path strokes",
+        ))
+        .child(
+            div()
+                .relative()
+                .w(px(776.0))
+                .h(px(180.0))
+                .radius(&theme, Radius::Card)
+                .overflow_hidden()
+                .bg(theme.colors.sunken)
+                .border_1()
+                .border_color(theme.colors.hairline)
+                .semantic_in(
+                    cx,
+                    NodeSpec::new("scene.effects.path-strokes", Role::Image)
+                        .text("Measured path stroke effects")
+                        .description("Trimmed, dash-offset, and combined stroke geometry"),
+                )
+                .child(
+                    div().absolute().inset_0().child(
+                        canvas(
+                            |_, _, _| {},
+                            move |bounds, _, window, _| {
+                                let build = |mut builder: gpui::PathBuilder, y: f32| {
+                                    let start =
+                                        point(bounds.left() + px(128.0), bounds.top() + px(y));
+                                    let end =
+                                        point(bounds.right() - px(24.0), bounds.top() + px(y));
+                                    builder.move_to(start);
+                                    builder.cubic_bezier_to(
+                                        end,
+                                        point(start.x + px(132.0), start.y - px(24.0)),
+                                        point(end.x - px(132.0), end.y + px(24.0)),
+                                    );
+                                    builder.build()
+                                };
+
+                                if let Ok(path) = build(gpui::PathBuilder::stroke(px(8.0)), 42.0) {
+                                    window.paint_path(path, stroke_base);
+                                }
+                                if let Ok(path) = build(
+                                    gpui::PathBuilder::stroke(px(8.0)).stroke_trim(0.0, 0.68),
+                                    42.0,
+                                ) {
+                                    window.paint_path(path, stroke_fill);
+                                }
+                                if let Ok(path) = build(
+                                    gpui::PathBuilder::stroke(px(7.0))
+                                        .dash_array(&[px(18.0), px(11.0)])
+                                        .dash_offset(px(9.0)),
+                                    92.0,
+                                ) {
+                                    window.paint_path(path, conic);
+                                }
+                                if let Ok(path) = build(
+                                    gpui::PathBuilder::stroke(px(7.0))
+                                        .dash_array(&[px(14.0), px(8.0)])
+                                        .dash_offset(px(-6.0))
+                                        .stroke_trim(0.16, 0.84),
+                                    142.0,
+                                ) {
+                                    window.paint_path(path, stroke_fill);
+                                }
+                            },
+                        )
+                        .size_full(),
+                    ),
+                )
+                .child(div().absolute().left(px(16.0)).top(px(31.0)).child(
+                    crate::foundation::text(&theme, TypeScale::Caption, "Trim · 68%"),
+                ))
+                .child(div().absolute().left(px(16.0)).top(px(81.0)).child(
+                    crate::foundation::text(&theme, TypeScale::Caption, "Dash phase · 9 px"),
+                ))
+                .child(div().absolute().left(px(16.0)).top(px(131.0)).child(
+                    crate::foundation::text(&theme, TypeScale::Caption, "Trim + phase"),
+                )),
         )
         .into_any_element()
 }

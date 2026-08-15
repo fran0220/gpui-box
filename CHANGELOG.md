@@ -18,6 +18,13 @@ Metal, Direct3D, WGPU, and browser WebGL. Callers choose normalized geometry
 and semantic colors; they no longer approximate glows, wheels, or area washes
 with rings of adjacent elements.
 
+**Measured path-stroke effects.** `PathBuilder::stroke_trim` reveals any
+ordered normalized interval before stroke tessellation, while `dash_offset`
+advances and wraps a validated dash pattern against the same path measurement.
+Curves, transforms, joins, caps, clipping, and gradient paint stay intact;
+empty or all-zero patterns stay safely solid. Node-graph traffic now uses the
+shared trim primitive instead of rebuilding tails from short sampled lines.
+
 **Application paint the role vocabulary does not model.** `Theme` now carries
 the active document's palette and reads an entry by `"group.step"` through
 `Theme::palette_color`. An application whose product has colour the shared

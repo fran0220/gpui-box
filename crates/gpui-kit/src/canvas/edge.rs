@@ -617,8 +617,9 @@ pub(crate) fn paint_route(
     }
 }
 
-/// Three phase-shifted traffic trails. Each trail is made from short straight
-/// samples, so it follows square corners without reintroducing a curve mode.
+/// Three phase-shifted traffic trails cut from the route's measured geometry.
+/// The framework trim keeps joins and future curve modes intact without
+/// rebuilding each tail from a row of short line elements.
 fn paint_comets(
     window: &mut Window,
     route: &OrthogonalRoute,
@@ -628,27 +629,39 @@ fn paint_comets(
     color: Hsla,
 ) {
     const COMETS: usize = 3;
-    const TAIL_STEPS: usize = 7;
     const TAIL: f32 = 0.075;
 
     for comet in 0..COMETS {
         let head = (phase + comet as f32 / COMETS as f32).rem_euclid(1.0);
-        for step in 0..TAIL_STEPS {
-            let end = head - TAIL * step as f32 / TAIL_STEPS as f32;
-            let start = head - TAIL * (step + 1) as f32 / TAIL_STEPS as f32;
-            // A wrapped tail resumes at the start of the route on the next
-            // frame instead of drawing one false segment across the graph.
-            if start < 0.0 || end < 0.0 {
-                continue;
-            }
-            let mut builder = PathBuilder::stroke(px(width * (1.9 - step as f32 * 0.1)));
-            builder.move_to(transform.point(route.sample(start)));
-            builder.line_to(transform.point(route.sample(end)));
-            if let Ok(path) = builder.build() {
-                let opacity = 0.82 * (1.0 - step as f32 / TAIL_STEPS as f32).powf(1.4);
-                window.paint_path(path, color.opacity(opacity));
-            }
+        let tail = head - TAIL;
+        if tail >= 0.0 {
+            paint_comet_interval(window, route, transform, width, tail, head, color);
+        } else {
+            paint_comet_interval(window, route, transform, width, 0.0, head, color);
+            paint_comet_interval(window, route, transform, width, 1.0 + tail, 1.0, color);
         }
+    }
+}
+
+fn paint_comet_interval(
+    window: &mut Window,
+    route: &OrthogonalRoute,
+    transform: RouteTransform,
+    width: f32,
+    start: f32,
+    end: f32,
+    color: Hsla,
+) {
+    let Some(first) = route.points.first() else {
+        return;
+    };
+    let mut builder = PathBuilder::stroke(px(width * 1.9)).stroke_trim(start, end);
+    builder.move_to(transform.point(*first));
+    for point in &route.points[1..] {
+        builder.line_to(transform.point(*point));
+    }
+    if let Ok(path) = builder.build() {
+        window.paint_path(path, color.opacity(0.82));
     }
 }
 

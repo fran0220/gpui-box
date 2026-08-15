@@ -24,6 +24,9 @@ not represented as imported Zed source.
 The renderer-backed linear, elliptical radial, and conic gradient primitives
 for up to eight ordered stops, including their Metal, Direct3D, WGPU, and
 WebGL shaders, are GPUI Box work and import no additional source.
+Normalized path-stroke trimming and wrapping dash offsets are GPUI Box work
+over the existing Lyon measurement and tessellation dependency and import no
+additional source.
 The read-only selectable-text primitive, bidi range geometry, pointer capture,
 clipboard behavior, and AccessKit text-run publication are GPUI Box work and
 import no editor or product source. Rounded shaped-text backgrounds added with

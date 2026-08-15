@@ -46,6 +46,15 @@ different transcendental approximations for the noise. Color conversion and
 edge rasterization remain renderer-specific, which is why each renderer
 retains its own baseline rather than claiming identical bytes across platforms.
 
+`PathBuilder::stroke_trim` keeps an ordered normalized interval of the measured
+source path before Lyon expands the stroke. `dash_offset` advances and wraps a
+validated dash pattern against that same measurement, so trim, phase, joins,
+caps, transforms, clipping, and gradient paint remain one path contract. Empty
+and all-zero dash arrays are solid strokes; negative or non-finite lengths and
+invalid trim intervals are rejected at construction. Motion systems sample the
+two numeric parameters and rebuild one path rather than approximating a trace
+with one element per segment.
+
 Read-only `StyledText` selection is a framework primitive rather than a Kit
 gesture. Its stable element id retains transient anchor/focus state; pointer
 capture continues reverse drags outside the element; grapheme-safe Copy and
