@@ -397,13 +397,26 @@ pub fn menu_label(
     highlighted: bool,
     hover_group: SharedString,
 ) -> gpui::Div {
+    menu_label_state(theme, label, selected, highlighted, false, hover_group)
+}
+
+pub(crate) fn menu_label_state(
+    theme: &Theme,
+    label: impl Into<SharedString>,
+    selected: bool,
+    highlighted: bool,
+    disabled: bool,
+    hover_group: SharedString,
+) -> gpui::Div {
     text(theme, TypeScale::Label, label)
-        .text_color(if selected || highlighted {
+        .text_color(if disabled {
+            theme.colors.text_disabled
+        } else if selected || highlighted {
             theme.colors.text
         } else {
             theme.colors.text_muted
         })
-        .when(!selected && !highlighted, |element| {
+        .when(!disabled && !selected && !highlighted, |element| {
             element.group_hover(hover_group, |style| style.text_color(theme.colors.text))
         })
 }

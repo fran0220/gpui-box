@@ -508,7 +508,7 @@ impl Tabs {
         let ident = self.ident.child(tab.id.as_ref());
         let hover_group = ident.child("hover").semantic_id();
         let color = if disabled {
-            theme.colors.text_faint
+            theme.colors.text_disabled
         } else if selected {
             theme.colors.text
         } else {
@@ -565,7 +565,6 @@ impl Tabs {
             .children(landing.map(|(position, accepted)| {
                 dnd::indicator(&position, accepted, DropAxis::Horizontal, cx)
             }))
-            .when(disabled, |element| element.opacity(theme.opacity.disabled))
             .when(carried, |element| element.opacity(theme.opacity.muted))
             .when(actionable, |element| {
                 element

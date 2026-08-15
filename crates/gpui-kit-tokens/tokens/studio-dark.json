@@ -56,14 +56,18 @@
       "primary": "{neutral.800}",
       "muted": "{neutral.700}",
       "faint": "{neutral.600}",
+      "placeholder": "{neutral.600}",
+      "disabled": "{neutral.600}",
       "onAccent": "{neutral.ink}"
     },
     "interactive": {
       "hover": "{neutral.850}/24",
       "active": "{neutral.850}/29",
       "selected": "{neutral.850}/24",
-      "hairline": "{neutral.900}/24",
-      "hairlineStrong": "{neutral.900}/3d",
+      "hairline": "{neutral.900}/59",
+      "hairlineStrong": "{neutral.900}/66",
+      "track": "{neutral.900}/66",
+      "divider": "{neutral.900}/66",
       "focus": "{indigo.400}"
     },
     "semantic": {
@@ -192,7 +196,7 @@
     "edgeFadeBand": 20,
     "selectedRingAlpha": 0.09,
     "focusRingWidth": 2,
-    "focusRingAlpha": 0.55,
+    "focusRingAlpha": 0.7,
     "glowAlpha": 0.38,
     "glowBlur": 12,
     "glassAlpha": 0.72,

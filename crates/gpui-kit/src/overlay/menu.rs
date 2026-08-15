@@ -19,12 +19,12 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Space, Theme};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Space, Theme, TypeScale};
 
 use crate::controls::button::{Button, ButtonJoin, ButtonVariant};
 use crate::display::icon::flips;
 use crate::foundation::direction::ActiveDirection;
-use crate::foundation::{Ident, Pressable, Sizable, StyledExt};
+use crate::foundation::{Ident, Pressable, Sizable, StyledExt, text};
 use crate::motion;
 use crate::overlay::focus::FocusTrap;
 use crate::overlay::kbd::Kbd;
@@ -465,53 +465,65 @@ fn row<V: 'static>(
                 (None, glyph) => glyph,
             };
 
-            let row =
-                popover::menu_row(theme, false, active || opened)
-                    .id(row_ident.element_id())
-                    .when(active, |element| element.aria_active_descendant())
-                    .when(!item.disabled, |element| {
-                        element.cursor_pointer().pressable(cx)
-                    })
-                    .when(item.disabled, |element| {
-                        element.opacity(theme.opacity.disabled)
-                    })
-                    .child(
-                        div()
-                            .flex()
-                            .flex_none()
-                            .w(px(GLYPH_SLOT))
-                            .justify_center()
-                            .children(glyph.map(|glyph| {
-                                icon(glyph).size(px(14.0)).text_color(theme.colors.text)
-                            })),
+            let row = popover::menu_row(theme, false, active || opened)
+                .id(row_ident.element_id())
+                .when(active, |element| element.aria_active_descendant())
+                .when(!item.disabled, |element| {
+                    element.cursor_pointer().pressable(cx)
+                })
+                .child(
+                    div()
+                        .flex()
+                        .flex_none()
+                        .w(px(GLYPH_SLOT))
+                        .justify_center()
+                        .children(glyph.map(|glyph| {
+                            icon(glyph).size(px(14.0)).text_color(if item.disabled {
+                                theme.colors.text_disabled
+                            } else {
+                                theme.colors.text
+                            })
+                        })),
+                )
+                .child(
+                    text(theme, TypeScale::Label, item.label.clone())
+                        .flex_1()
+                        .text_color(if item.disabled {
+                            theme.colors.text_disabled
+                        } else {
+                            theme.colors.text
+                        }),
+                )
+                .children(
+                    item.shortcut
+                        .clone()
+                        .map(|keystroke| Kbd::new(keystroke).into_any_element()),
+                )
+                .when(submenu, |element| {
+                    // The chevron says "there is more this way", and this
+                    // way is the way the menu reads.
+                    let flipped = flips(Icon::AltArrowRight, cx.layout_direction());
+                    element.child(
+                        icon(Icon::AltArrowRight)
+                            .size(px(12.0))
+                            .text_color(if item.disabled {
+                                theme.colors.text_disabled
+                            } else {
+                                theme.colors.text_muted
+                            })
+                            .when(flipped, |glyph| {
+                                glyph.with_transformation(Transformation::scale(gpui::size(
+                                    -1.0, 1.0,
+                                )))
+                            }),
                     )
-                    .child(div().flex_1().child(item.label.clone()))
-                    .children(
-                        item.shortcut
-                            .clone()
-                            .map(|keystroke| Kbd::new(keystroke).into_any_element()),
-                    )
-                    .when(submenu, |element| {
-                        // The chevron says "there is more this way", and this
-                        // way is the way the menu reads.
-                        let flipped = flips(Icon::AltArrowRight, cx.layout_direction());
-                        element.child(
-                            icon(Icon::AltArrowRight)
-                                .size(px(12.0))
-                                .text_color(theme.colors.text_muted)
-                                .when(flipped, |glyph| {
-                                    glyph.with_transformation(Transformation::scale(gpui::size(
-                                        -1.0, 1.0,
-                                    )))
-                                }),
-                        )
-                    })
-                    .when(!item.disabled, |element| {
-                        element.on_click(cx.listener(move |view, _, window, cx| {
-                            activate(view, path.clone(), window, cx);
-                        }))
-                    })
-                    .semantic_in(cx, spec);
+                })
+                .when(!item.disabled, |element| {
+                    element.on_click(cx.listener(move |view, _, window, cx| {
+                        activate(view, path.clone(), window, cx);
+                    }))
+                })
+                .semantic_in(cx, spec);
 
             motion::row_in(row_ident.child("in").element_id(), theme, index, count, row)
                 .into_any_element()

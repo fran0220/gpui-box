@@ -820,7 +820,7 @@ impl Painter {
         div()
             .w_full()
             .h(px(theme.borders.hairline))
-            .bg(theme.colors.hairline)
+            .bg(theme.colors.divider)
             .semantic_in(
                 cx,
                 NodeSpec::new(ident.semantic_id(), Role::Separator)

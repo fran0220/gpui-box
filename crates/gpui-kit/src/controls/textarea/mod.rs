@@ -1157,7 +1157,7 @@ impl Render for TextArea {
             .when(focused, |element| element.shadow(theme.focus_ring()))
             .text_size(px(metrics.font_size))
             .text_color(if self.disabled {
-                theme.colors.text_faint
+                theme.colors.text_disabled
             } else {
                 theme.colors.text
             })

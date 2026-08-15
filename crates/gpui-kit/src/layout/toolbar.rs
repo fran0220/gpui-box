@@ -328,7 +328,7 @@ fn rule(group: &Ident, theme: &Theme, toolbar: &Ident, cx: &App) -> AnyElement {
         .flex_none()
         .w(px(theme.borders.hairline))
         .h(px(theme.control.get(ControlSize::Sm).height))
-        .bg(theme.colors.hairline)
+        .bg(theme.colors.divider)
         .semantic_in(
             cx,
             NodeSpec::new(group.child("rule").semantic_id(), Role::Separator)

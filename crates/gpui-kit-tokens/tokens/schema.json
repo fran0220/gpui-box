@@ -104,24 +104,37 @@
     "textColors": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["primary", "muted", "faint", "onAccent"],
+      "required": ["primary", "muted", "faint", "placeholder", "disabled", "onAccent"],
       "properties": {
         "primary": { "$ref": "#/$defs/color" },
         "muted": { "$ref": "#/$defs/color" },
         "faint": { "$ref": "#/$defs/color" },
+        "placeholder": { "$ref": "#/$defs/color" },
+        "disabled": { "$ref": "#/$defs/color" },
         "onAccent": { "$ref": "#/$defs/color" }
       }
     },
     "interactiveColors": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["hover", "active", "selected", "hairline", "hairlineStrong", "focus"],
+      "required": [
+        "hover",
+        "active",
+        "selected",
+        "hairline",
+        "hairlineStrong",
+        "track",
+        "divider",
+        "focus"
+      ],
       "properties": {
         "hover": { "$ref": "#/$defs/color" },
         "active": { "$ref": "#/$defs/color" },
         "selected": { "$ref": "#/$defs/color" },
         "hairline": { "$ref": "#/$defs/color" },
         "hairlineStrong": { "$ref": "#/$defs/color" },
+        "track": { "$ref": "#/$defs/color" },
+        "divider": { "$ref": "#/$defs/color" },
         "focus": { "$ref": "#/$defs/color" }
       }
     },

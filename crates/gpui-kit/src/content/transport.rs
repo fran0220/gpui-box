@@ -418,7 +418,7 @@ impl RenderOnce for TransportBar {
                     .right_0()
                     .h(px(TRACK_HEIGHT))
                     .rounded_full()
-                    .bg(theme.colors.hairline_strong),
+                    .bg(theme.colors.track),
             );
 
         // Buffered spans are the host's fact and are drawn as their own band,
@@ -473,7 +473,9 @@ impl RenderOnce for TransportBar {
 
         if let Some(drawn) = drawn {
             let played = if self.state.is_playing() {
-                signature::determined(&theme, drawn).h(px(TRACK_HEIGHT)).into_any_element()
+                signature::determined(&theme, drawn)
+                    .h(px(TRACK_HEIGHT))
+                    .into_any_element()
             } else {
                 div()
                     .absolute()
@@ -484,19 +486,17 @@ impl RenderOnce for TransportBar {
                     .bg(theme.colors.accent)
                     .into_any_element()
             };
-            track = track
-                .child(played)
-                .child(
-                    div()
-                        .absolute()
-                        .left(relative(drawn))
-                        .ml(px(-KNOB / 2.0))
-                        .size(px(KNOB))
-                        .rounded_full()
-                        .bg(theme.colors.text)
-                        .border(px(theme.borders.hairline))
-                        .border_color(theme.colors.hairline_strong),
-                );
+            track = track.child(played).child(
+                div()
+                    .absolute()
+                    .left(relative(drawn))
+                    .ml(px(-KNOB / 2.0))
+                    .size(px(KNOB))
+                    .rounded_full()
+                    .bg(theme.colors.text)
+                    .border(px(theme.borders.hairline))
+                    .border_color(theme.colors.hairline_strong),
+            );
         }
 
         if let (true, Some(total)) = (scrubbable, total) {

@@ -63,12 +63,16 @@ pub struct Colors {
     pub text: Hsla,
     pub text_muted: Hsla,
     pub text_faint: Hsla,
+    pub text_placeholder: Hsla,
+    pub text_disabled: Hsla,
     pub text_on_accent: Hsla,
     pub hover: Hsla,
     pub active: Hsla,
     pub selected: Hsla,
     pub hairline: Hsla,
     pub hairline_strong: Hsla,
+    pub track: Hsla,
+    pub divider: Hsla,
     pub focus: Hsla,
     pub accent: Hsla,
     pub accent_strong: Hsla,
@@ -306,12 +310,16 @@ impl Theme {
                 text: color(tokens.text(TextTone::Primary)),
                 text_muted: color(tokens.text(TextTone::Muted)),
                 text_faint: color(tokens.text(TextTone::Faint)),
+                text_placeholder: color(tokens.text(TextTone::Placeholder)),
+                text_disabled: color(tokens.text(TextTone::Disabled)),
                 text_on_accent: color(tokens.text(TextTone::OnAccent)),
                 hover: color(tokens.interactive(InteractiveColor::Hover)),
                 active: color(tokens.interactive(InteractiveColor::Active)),
                 selected: color(tokens.interactive(InteractiveColor::Selected)),
                 hairline: color(tokens.interactive(InteractiveColor::Hairline)),
                 hairline_strong: color(tokens.interactive(InteractiveColor::HairlineStrong)),
+                track: color(tokens.interactive(InteractiveColor::Track)),
+                divider: color(tokens.interactive(InteractiveColor::Divider)),
                 focus: color(tokens.interactive(InteractiveColor::Focus)),
                 accent: color(tokens.semantic(SemanticColor::Accent)),
                 accent_strong: color(tokens.semantic(SemanticColor::AccentStrong)),
@@ -491,6 +499,8 @@ impl Theme {
             TextTone::Primary => self.colors.text,
             TextTone::Muted => self.colors.text_muted,
             TextTone::Faint => self.colors.text_faint,
+            TextTone::Placeholder => self.colors.text_placeholder,
+            TextTone::Disabled => self.colors.text_disabled,
             TextTone::OnAccent => self.colors.text_on_accent,
         }
     }
@@ -876,7 +886,11 @@ mod tests {
         let error = registry
             .register_json(&value.to_string())
             .expect_err("invisible text must not register");
-        assert!(error.to_string().contains("text.primary on surface.canvas"));
+        assert!(
+            error
+                .to_string()
+                .contains("color.text.primary on color.surface.canvas")
+        );
         assert_eq!(registry.ids(), before);
     }
 

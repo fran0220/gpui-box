@@ -3,9 +3,7 @@
 //! Every animation here runs through GPUI's `with_animation`, which holds a
 //! single static frame when the platform asks for reduced motion.
 
-use gpui::{
-    App, IntoElement, ParentElement, RenderOnce, Styled, Window, div, px, relative,
-};
+use gpui::{App, IntoElement, ParentElement, RenderOnce, Styled, Window, div, px, relative};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::ActiveTheme;
 
@@ -200,7 +198,7 @@ impl Skeleton {
 impl RenderOnce for Skeleton {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme();
-        let color = theme.colors.hover.opacity(0.28);
+        let color = theme.colors.track;
         let radius = theme.radii.control;
         let row_height = self.row_height;
         let period = MotionSpec::new(
@@ -227,20 +225,14 @@ impl RenderOnce for Skeleton {
                     // repeating animation holds delta zero, which parks the
                     // band off the leading edge and leaves a plain
                     // placeholder behind.
-                    .child(
-                        signature::shimmer_band(theme).with_animation(
-                            ident.indexed_element_id(index),
-                            period.repeating(),
-                            move |element, delta| {
-                                let phase =
-                                    motion::staggered_phase(delta, index, SHIMMER_ROW_OFFSET);
-                                element.left(relative(motion::shimmer_offset(
-                                    phase,
-                                    SHIMMER_BAND,
-                                )))
-                            },
-                        ),
-                    )
+                    .child(signature::shimmer_band(theme).with_animation(
+                        ident.indexed_element_id(index),
+                        period.repeating(),
+                        move |element, delta| {
+                            let phase = motion::staggered_phase(delta, index, SHIMMER_ROW_OFFSET);
+                            element.left(relative(motion::shimmer_offset(phase, SHIMMER_BAND)))
+                        },
+                    ))
             }))
     }
 }

@@ -163,7 +163,7 @@ impl RenderOnce for ProgressBar {
                     .h(px(4.0))
                     .rounded_full()
                     .overflow_hidden()
-                    .bg(theme.colors.hairline_strong)
+                    .bg(theme.colors.track)
                     .when_some(drawn, |element, fraction| {
                         element.child(signature::determined(&theme, fraction))
                     })

@@ -16,7 +16,7 @@
         "200": "#ffffff",
         "300": "#e0e0e5",
         "500": "#a3a3a9",
-        "600": "#86868c",
+        "600": "#828289",
         "700": "#55555c",
         "800": "#17171a",
         "850": "#0a0a0c",
@@ -40,9 +40,9 @@
         "400": "#2a6f8f"
       },
       "loader": {
-        "blue": "#6ba7e0",
-        "orange": "#d98442",
-        "pink": "#e2557a"
+        "blue": "#4f7fc0",
+        "orange": "#b76324",
+        "pink": "#c63f67"
       }
     },
     "surface": {
@@ -56,14 +56,18 @@
       "primary": "{neutral.800}",
       "muted": "{neutral.700}",
       "faint": "{neutral.600}",
+      "placeholder": "#68686f",
+      "disabled": "#808087",
       "onAccent": "{neutral.ink}"
     },
     "interactive": {
       "hover": "{neutral.850}/0f",
       "active": "{neutral.850}/1a",
       "selected": "{neutral.850}/0f",
-      "hairline": "{neutral.850}/1a",
-      "hairlineStrong": "{neutral.850}/2e",
+      "hairline": "{neutral.850}/73",
+      "hairlineStrong": "{neutral.850}/80",
+      "track": "{neutral.850}/80",
+      "divider": "{neutral.850}/80",
       "focus": "{indigo.400}"
     },
     "semantic": {
@@ -105,7 +109,7 @@
     "thick": 2
   },
   "opacity": {
-    "disabled": 0.45,
+    "disabled": 0.5,
     "muted": 0.68,
     "scrim": 0.35
   },
@@ -192,7 +196,7 @@
     "edgeFadeBand": 20,
     "selectedRingAlpha": 0.12,
     "focusRingWidth": 2,
-    "focusRingAlpha": 0.45,
+    "focusRingAlpha": 0.8,
     "glowAlpha": 0.22,
     "glowBlur": 12,
     "glassAlpha": 0.78,

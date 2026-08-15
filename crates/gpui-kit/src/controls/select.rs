@@ -431,9 +431,6 @@ impl Select {
             .when(!option.disabled, |element| {
                 element.cursor_pointer().pressable(cx)
             })
-            .when(option.disabled, |element| {
-                element.opacity(theme.opacity.disabled)
-            })
             .child(
                 div()
                     .flex()
@@ -441,17 +438,23 @@ impl Select {
                     .flex_1()
                     .min_w_0()
                     .gap(px(2.0))
-                    .child(popover::menu_label(
+                    .child(popover::menu_label_state(
                         &theme,
                         option.label.clone(),
                         selected,
                         active,
+                        option.disabled,
                         hover_group,
                     ))
                     .when_some(option.description.clone(), |element, description| {
                         element.child(
-                            foundation_text(&theme, TypeScale::Caption, description)
-                                .text_tone(&theme, gpui_kit_theme::TextTone::Muted),
+                            foundation_text(&theme, TypeScale::Caption, description).text_color(
+                                if option.disabled {
+                                    theme.colors.text_disabled
+                                } else {
+                                    theme.colors.text_muted
+                                },
+                            ),
                         )
                     }),
             )
@@ -555,9 +558,6 @@ impl Render for Select {
                 element.border_color(theme.colors.danger)
             })
             .when(focused, |element| element.shadow(theme.focus_ring()))
-            .when(self.disabled, |element| {
-                element.opacity(theme.opacity.disabled)
-            })
             .when(!self.disabled, |element| {
                 element.cursor_pointer().on_mouse_down(
                     MouseButton::Left,
@@ -567,8 +567,10 @@ impl Render for Select {
             .child(
                 foundation_text(&theme, TypeScale::Label, label)
                     .text_size(px(metrics.font_size))
-                    .text_color(if self.disabled || !has_choice {
-                        theme.colors.text_faint
+                    .text_color(if self.disabled {
+                        theme.colors.text_disabled
+                    } else if !has_choice {
+                        theme.colors.text_placeholder
                     } else {
                         theme.colors.text
                     }),

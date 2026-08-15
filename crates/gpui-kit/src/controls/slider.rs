@@ -179,7 +179,7 @@ impl RenderOnce for Slider {
                     .right_0()
                     .h(track_height)
                     .rounded_full()
-                    .bg(theme.colors.hairline_strong),
+                    .bg(theme.colors.track),
             )
             .child(
                 div()

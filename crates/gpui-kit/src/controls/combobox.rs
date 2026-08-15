@@ -564,26 +564,29 @@ impl Combobox {
             .when(!option.disabled, |element| {
                 element.cursor_pointer().pressable(cx)
             })
-            .when(option.disabled, |element| {
-                element.opacity(theme.opacity.disabled)
-            })
             .child(
                 div()
                     .column()
                     .flex_1()
                     .min_w_0()
                     .gap(px(2.0))
-                    .child(popover::menu_label(
+                    .child(popover::menu_label_state(
                         &theme,
                         option.label.clone(),
                         selected,
                         active,
+                        option.disabled,
                         hover_group,
                     ))
                     .when_some(option.description.clone(), |element, description| {
                         element.child(
-                            foundation_text(&theme, TypeScale::Caption, description)
-                                .text_tone(&theme, gpui_kit_theme::TextTone::Muted),
+                            foundation_text(&theme, TypeScale::Caption, description).text_color(
+                                if option.disabled {
+                                    theme.colors.text_disabled
+                                } else {
+                                    theme.colors.text_muted
+                                },
+                            ),
                         )
                     }),
             )

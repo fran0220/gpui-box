@@ -92,7 +92,10 @@ impl Element for TextElement {
         let style = window.text_style();
 
         let (display_text, text_color) = if content.is_empty() {
-            (input.placeholder_text().clone(), theme.colors.text_faint)
+            (
+                input.placeholder_text().clone(),
+                theme.colors.text_placeholder,
+            )
         } else {
             (content, style.color)
         };

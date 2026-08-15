@@ -263,7 +263,7 @@ impl RenderOnce for SplitPane {
             .child(
                 div()
                     .rounded_full()
-                    .bg(theme.colors.hairline_strong)
+                    .bg(theme.colors.divider)
                     .when(horizontal, |grip| {
                         grip.w(px(theme.borders.hairline)).h(px(GRIP))
                     })

@@ -92,7 +92,10 @@ impl Element for TextAreaElement {
         let style = window.text_style();
 
         let (display_text, text_color) = if empty {
-            (area.placeholder_text().clone(), theme.colors.text_faint)
+            (
+                area.placeholder_text().clone(),
+                theme.colors.text_placeholder,
+            )
         } else {
             (content, style.color)
         };

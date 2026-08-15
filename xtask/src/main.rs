@@ -1486,6 +1486,7 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
     let color = &tokens.color;
     let sources: Vec<(String, &str)> = vec![
         ("color.surface.canvas".into(), color.surface.canvas.as_str()),
+        ("color.surface.sunken".into(), color.surface.sunken.as_str()),
         ("color.surface.panel".into(), color.surface.panel.as_str()),
         ("color.surface.raised".into(), color.surface.raised.as_str()),
         (
@@ -1495,6 +1496,11 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
         ("color.text.primary".into(), color.text.primary.as_str()),
         ("color.text.muted".into(), color.text.muted.as_str()),
         ("color.text.faint".into(), color.text.faint.as_str()),
+        (
+            "color.text.placeholder".into(),
+            color.text.placeholder.as_str(),
+        ),
+        ("color.text.disabled".into(), color.text.disabled.as_str()),
         ("color.text.onAccent".into(), color.text.on_accent.as_str()),
         (
             "color.interactive.hover".into(),
@@ -1515,6 +1521,14 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
         (
             "color.interactive.hairlineStrong".into(),
             color.interactive.hairline_strong.as_str(),
+        ),
+        (
+            "color.interactive.track".into(),
+            color.interactive.track.as_str(),
+        ),
+        (
+            "color.interactive.divider".into(),
+            color.interactive.divider.as_str(),
         ),
         (
             "color.interactive.focus".into(),

@@ -435,12 +435,12 @@ impl Cascader {
             .group(hover_group.clone())
             .row_reading(direction)
             .when(!option.disabled, |row| row.cursor_pointer().pressable(cx))
-            .when(option.disabled, |row| row.opacity(theme.opacity.disabled))
-            .child(popover::menu_label(
+            .child(popover::menu_label_state(
                 &theme,
                 option.label.clone(),
                 false,
                 active,
+                option.disabled,
                 hover_group,
             ))
             .when(option.children.is_some(), |row| {

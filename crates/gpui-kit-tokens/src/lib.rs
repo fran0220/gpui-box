@@ -309,6 +309,11 @@ impl TokenDocument {
             TextTone::Primary => ("color.text.primary", self.color.text.primary.as_str()),
             TextTone::Muted => ("color.text.muted", self.color.text.muted.as_str()),
             TextTone::Faint => ("color.text.faint", self.color.text.faint.as_str()),
+            TextTone::Placeholder => (
+                "color.text.placeholder",
+                self.color.text.placeholder.as_str(),
+            ),
+            TextTone::Disabled => ("color.text.disabled", self.color.text.disabled.as_str()),
             TextTone::OnAccent => ("color.text.onAccent", self.color.text.on_accent.as_str()),
         };
         self.resolved(path, value)
@@ -335,6 +340,14 @@ impl TokenDocument {
             InteractiveColor::HairlineStrong => (
                 "color.interactive.hairlineStrong",
                 self.color.interactive.hairline_strong.as_str(),
+            ),
+            InteractiveColor::Track => (
+                "color.interactive.track",
+                self.color.interactive.track.as_str(),
+            ),
+            InteractiveColor::Divider => (
+                "color.interactive.divider",
+                self.color.interactive.divider.as_str(),
             ),
             InteractiveColor::Focus => (
                 "color.interactive.focus",
@@ -587,6 +600,8 @@ pub enum TextTone {
     Primary,
     Muted,
     Faint,
+    Placeholder,
+    Disabled,
     OnAccent,
 }
 
@@ -597,6 +612,8 @@ pub enum InteractiveColor {
     Selected,
     Hairline,
     HairlineStrong,
+    Track,
+    Divider,
     Focus,
 }
 
@@ -920,7 +937,7 @@ pub struct ColorTokens {
 }
 
 impl ColorTokens {
-    fn entries(&self) -> [(&'static str, &str); 24] {
+    fn entries(&self) -> [(&'static str, &str); 28] {
         [
             ("color.surface.canvas", &self.surface.canvas),
             ("color.surface.sunken", &self.surface.sunken),
@@ -930,6 +947,8 @@ impl ColorTokens {
             ("color.text.primary", &self.text.primary),
             ("color.text.muted", &self.text.muted),
             ("color.text.faint", &self.text.faint),
+            ("color.text.placeholder", &self.text.placeholder),
+            ("color.text.disabled", &self.text.disabled),
             ("color.text.onAccent", &self.text.on_accent),
             ("color.interactive.hover", &self.interactive.hover),
             ("color.interactive.active", &self.interactive.active),
@@ -939,6 +958,8 @@ impl ColorTokens {
                 "color.interactive.hairlineStrong",
                 &self.interactive.hairline_strong,
             ),
+            ("color.interactive.track", &self.interactive.track),
+            ("color.interactive.divider", &self.interactive.divider),
             ("color.interactive.focus", &self.interactive.focus),
             ("color.semantic.accent", &self.semantic.accent),
             ("color.semantic.accentStrong", &self.semantic.accent_strong),
@@ -972,6 +993,8 @@ pub struct TextColors {
     pub primary: String,
     pub muted: String,
     pub faint: String,
+    pub placeholder: String,
+    pub disabled: String,
     pub on_accent: String,
 }
 
@@ -983,6 +1006,8 @@ pub struct InteractiveColors {
     pub selected: String,
     pub hairline: String,
     pub hairline_strong: String,
+    pub track: String,
+    pub divider: String,
     pub focus: String,
 }
 
@@ -1389,8 +1414,11 @@ mod tests {
         let error = TokenDocument::parse(&value.to_string()).expect_err("invisible primary text");
         let message = error.to_string();
         assert!(message.contains("token contrast is invalid"));
-        assert!(message.contains("text.primary on surface.canvas is 1.00:1; requires 4.5:1"));
-        assert!(message.contains("text.primary on surface.overlay"));
+        assert!(
+            message
+                .contains("color.text.primary on color.surface.canvas is 1.00:1; requires 4.5:1")
+        );
+        assert!(message.contains("color.text.primary on color.surface.overlay"));
     }
 
     #[test]

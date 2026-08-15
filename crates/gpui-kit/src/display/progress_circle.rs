@@ -90,7 +90,7 @@ impl RenderOnce for ProgressCircle {
         let diameter = (metrics.height * RING_SCALE).round();
         let stroke = theme.borders.thick;
         let radius = (diameter - stroke) / 2.0;
-        let track = theme.colors.hairline_strong;
+        let track = theme.colors.track;
         let signature = signature::stops(&theme);
         let muted = signature[1].opacity(theme.opacity.muted);
 
@@ -139,14 +139,7 @@ impl RenderOnce for ProgressCircle {
                 .into_any_element()
         } else {
             ring_canvas(
-                diameter,
-                radius,
-                stroke,
-                track,
-                signature,
-                muted,
-                drawn,
-                None,
+                diameter, radius, stroke, track, signature, muted, drawn, None,
             )
             .into_any_element()
         };

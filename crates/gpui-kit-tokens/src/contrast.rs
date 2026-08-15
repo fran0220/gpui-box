@@ -1,10 +1,13 @@
 //! The contrast rules every theme must satisfy.
 //!
-//! Roles carry different minimums on purpose: body text must clear WCAG AA,
-//! while faint text and status colors are held to the 3:1 non-text minimum
-//! because they never carry required instructions on their own.
+//! Roles carry different minimums on purpose: primary and muted text clear
+//! WCAG AA, while placeholder and faint text plus every active visual identity
+//! clear 3:1. Disabled text is held to the same product floor even though WCAG
+//! exempts inactive controls; "inactive" is not permission to disappear.
 
-use crate::{Color, SemanticColor, Surface, TextTone, TokenDocument, contrast_ratio};
+use crate::{
+    Color, InteractiveColor, SemanticColor, Surface, TextTone, TokenDocument, contrast_ratio,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ContrastCheck {
@@ -20,25 +23,32 @@ impl ContrastCheck {
     }
 }
 
-const BODY_MINIMUM: f32 = 4.5;
-const LARGE_MINIMUM: f32 = 3.0;
+const TEXT_MINIMUM: f32 = 4.5;
+const NON_TEXT_MINIMUM: f32 = 3.0;
 
 /// Evaluates every required pair for one theme.
 pub fn report(tokens: &TokenDocument) -> Vec<ContrastCheck> {
     let mut checks = Vec::new();
     let surfaces = [
-        ("surface.canvas", Surface::Canvas),
-        ("surface.panel", Surface::Panel),
-        ("surface.raised", Surface::Raised),
-        ("surface.overlay", Surface::Overlay),
+        ("color.surface.canvas", Surface::Canvas),
+        ("color.surface.sunken", Surface::Sunken),
+        ("color.surface.panel", Surface::Panel),
+        ("color.surface.raised", Surface::Raised),
+        ("color.surface.overlay", Surface::Overlay),
     ];
 
     for (surface_name, surface) in surfaces {
         let background = tokens.surface(surface);
         for (tone_name, tone, minimum) in [
-            ("text.primary", TextTone::Primary, BODY_MINIMUM),
-            ("text.muted", TextTone::Muted, BODY_MINIMUM),
-            ("text.faint", TextTone::Faint, LARGE_MINIMUM),
+            ("color.text.primary", TextTone::Primary, TEXT_MINIMUM),
+            ("color.text.muted", TextTone::Muted, TEXT_MINIMUM),
+            ("color.text.faint", TextTone::Faint, NON_TEXT_MINIMUM),
+            (
+                "color.text.placeholder",
+                TextTone::Placeholder,
+                NON_TEXT_MINIMUM,
+            ),
+            ("color.text.disabled", TextTone::Disabled, NON_TEXT_MINIMUM),
         ] {
             checks.push(check(
                 tone_name,
@@ -49,18 +59,62 @@ pub fn report(tokens: &TokenDocument) -> Vec<ContrastCheck> {
             ));
         }
         for (color_name, color) in [
-            ("semantic.danger", SemanticColor::Danger),
-            ("semantic.warning", SemanticColor::Warning),
-            ("semantic.success", SemanticColor::Success),
-            ("semantic.info", SemanticColor::Info),
-            ("semantic.accent", SemanticColor::Accent),
+            ("color.semantic.accent", SemanticColor::Accent),
+            ("color.semantic.accentStrong", SemanticColor::AccentStrong),
+            ("color.semantic.danger", SemanticColor::Danger),
+            ("color.semantic.warning", SemanticColor::Warning),
+            ("color.semantic.success", SemanticColor::Success),
+            ("color.semantic.info", SemanticColor::Info),
         ] {
             checks.push(check(
                 color_name,
                 tokens.semantic(color),
                 surface_name,
                 background,
-                LARGE_MINIMUM,
+                NON_TEXT_MINIMUM,
+            ));
+        }
+        for (color_name, color) in [
+            ("color.interactive.hairline", InteractiveColor::Hairline),
+            (
+                "color.interactive.hairlineStrong",
+                InteractiveColor::HairlineStrong,
+            ),
+            ("color.interactive.track", InteractiveColor::Track),
+            ("color.interactive.divider", InteractiveColor::Divider),
+        ] {
+            checks.push(check(
+                color_name,
+                tokens.interactive(color),
+                surface_name,
+                background,
+                NON_TEXT_MINIMUM,
+            ));
+        }
+        checks.push(check(
+            "color.interactive.focus @ effect.focusRingAlpha",
+            opacity(
+                tokens.interactive(InteractiveColor::Focus),
+                tokens.effect.focus_ring_alpha,
+            ),
+            surface_name,
+            background,
+            NON_TEXT_MINIMUM,
+        ));
+        checks.push(check(
+            "color.text.primary @ opacity.disabled",
+            opacity(tokens.text(TextTone::Primary), tokens.opacity.disabled),
+            surface_name,
+            background,
+            NON_TEXT_MINIMUM,
+        ));
+        for (index, color) in tokens.loader_gradient().into_iter().enumerate() {
+            checks.push(check(
+                &format!("color.loader.gradient.{index}"),
+                color,
+                surface_name,
+                background,
+                NON_TEXT_MINIMUM,
             ));
         }
     }
@@ -69,14 +123,19 @@ pub fn report(tokens: &TokenDocument) -> Vec<ContrastCheck> {
     // emphasis, border and hover color; it is held to the non-text minimum
     // against surfaces above, not to the body minimum against `onAccent`.
     checks.push(check(
-        "text.onAccent",
+        "color.text.onAccent",
         tokens.text(TextTone::OnAccent),
-        "semantic.accent",
+        "color.semantic.accent",
         tokens.semantic(SemanticColor::Accent),
-        BODY_MINIMUM,
+        TEXT_MINIMUM,
     ));
 
     checks
+}
+
+fn opacity(mut color: Color, opacity: f32) -> Color {
+    color.alpha *= opacity;
+    color
 }
 
 pub fn failures(tokens: &TokenDocument) -> Vec<ContrastCheck> {
@@ -121,6 +180,32 @@ mod tests {
     #[test]
     fn the_report_covers_every_surface_and_tone() {
         let checks = report(crate::studio_dark());
-        assert_eq!(checks.len(), 4 * 8 + 1);
+        assert_eq!(checks.len(), 5 * 20 + 1);
+    }
+
+    #[test]
+    fn rendered_alpha_is_part_of_focus_and_disabled_checks() {
+        let checks = report(crate::studio_light());
+        let focus = checks
+            .iter()
+            .find(|check| {
+                check.foreground == "color.interactive.focus @ effect.focusRingAlpha"
+                    && check.background == "color.surface.sunken"
+            })
+            .expect("focus on the field surface");
+        assert!(focus.passes());
+        assert!(
+            focus.ratio
+                < contrast_ratio(
+                    crate::studio_light().interactive(InteractiveColor::Focus),
+                    crate::studio_light().surface(Surface::Sunken),
+                )
+        );
+
+        let disabled = checks
+            .iter()
+            .find(|check| check.foreground == "color.text.primary @ opacity.disabled")
+            .expect("disabled presentation check");
+        assert!(disabled.passes());
     }
 }

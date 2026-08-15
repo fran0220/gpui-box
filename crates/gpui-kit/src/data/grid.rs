@@ -1281,7 +1281,7 @@ impl DataGrid {
                 div()
                     .w(px(theme.borders.hairline))
                     .h_full()
-                    .bg(theme.colors.hairline),
+                    .bg(theme.colors.divider),
             )
             .hover(|style| style.bg(theme.colors.hover));
 
@@ -1682,7 +1682,7 @@ fn row_element(
         .when(context.lines == GridLines::Rows, |element| {
             element
                 .border_b(px(theme.borders.hairline))
-                .border_color(theme.colors.hairline)
+                .border_color(theme.colors.divider)
         })
         .when(selected, |element| element.bg(theme.colors.selected))
         .when(row.disabled, |element| {

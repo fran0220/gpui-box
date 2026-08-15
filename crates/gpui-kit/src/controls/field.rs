@@ -62,12 +62,9 @@ pub fn field_shell(theme: &Theme, size: ControlSize, state: FieldState) -> gpui:
             field.border_color(theme.colors.danger)
         })
         .when(state.focused, |field| field.shadow(theme.focus_ring()))
-        .when(state.disabled, |field| {
-            field.opacity(theme.opacity.disabled)
-        })
         .text_size(px(metrics.font_size))
         .text_color(if state.disabled {
-            theme.colors.text_faint
+            theme.colors.text_disabled
         } else {
             theme.colors.text
         })
