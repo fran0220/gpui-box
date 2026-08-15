@@ -66,6 +66,12 @@ shared inline scene representation and Metal, Direct3D, WGPU, and WebGL shader
 implementations were authored here; they import no additional framework or
 shader source.
 
+The composited sprite-batch scene primitive, explicit atlas source rectangles,
+center-relative transforms, rounded/source-alpha masks, tint modes, and normal,
+additive, and screen pipeline states are subsequent GPUI Box work across Metal,
+Direct3D, WGPU, and WebGL. The procedural RGBA8 image constructor and canonical
+sprite atlas are authored here and import no source, shader, or visual asset.
+
 Normalized path-stroke trimming and wrapping dash offsets are subsequent GPUI
 Box work at the pre-tessellation path boundary. They use the existing Lyon
 measurement and tessellation dependency and import no source or visual assets.

@@ -14,12 +14,12 @@ use crate::{
     PlatformWindow, Point, PolychromeSprite, Priority, PromptButton, PromptLevel, Quad, Render,
     RenderGlyphParams, RenderImage, RenderImageParams, RenderSvgParams, Replay, ResizeEdge,
     SMOOTH_SVG_SCALE_FACTOR, SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y, ScaledPixels, Scene, Shadow,
-    SharedString, Size, StrikethroughStyle, Style, SubpixelSprite, SubscriberSet, Subscription,
-    SystemWindowTab, SystemWindowTabController, TabStopMap, TaffyLayoutEngine, Task,
-    TextRenderingMode, TextStyle, TextStyleRefinement, ThermalState, TransformationMatrix,
-    Underline, UnderlineStyle, WindowAppearance, WindowBackgroundAppearance, WindowBounds,
-    WindowControls, WindowDecorations, WindowOptions, WindowParams, WindowTextSystem, point,
-    prelude::*, profiler, px, rems, size, transparent_black,
+    SharedString, Size, SpriteColorMode, SpriteInstance, StrikethroughStyle, Style, SubpixelSprite,
+    SubscriberSet, Subscription, SystemWindowTab, SystemWindowTabController, TabStopMap,
+    TaffyLayoutEngine, Task, TextRenderingMode, TextStyle, TextStyleRefinement, ThermalState,
+    TransformationMatrix, Underline, UnderlineStyle, WindowAppearance, WindowBackgroundAppearance,
+    WindowBounds, WindowControls, WindowDecorations, WindowOptions, WindowParams, WindowTextSystem,
+    point, prelude::*, profiler, px, rems, size, transparent_black,
 };
 
 use anyhow::{Context as _, Result, anyhow};
@@ -4760,13 +4760,17 @@ impl Window {
 
             self.next_frame.scene.insert_primitive(PolychromeSprite {
                 order: 0,
-                pad: 0,
-                grayscale: false.into(),
+                blend_mode: Default::default(),
+                color_mode: Default::default(),
+                sample_inset: false.into(),
                 bounds,
                 corner_radii: Default::default(),
                 content_mask,
                 tile,
+                transformation: TransformationMatrix::unit(),
+                tint: crate::white(),
                 opacity,
+                pad: 0,
             });
         }
         Ok(())
@@ -4837,8 +4841,178 @@ impl Window {
         Ok(())
     }
 
+    /// Paints a batch of independently transformed samples from one image frame.
+    ///
+    /// The frame is uploaded to the atlas once. Each [`SpriteInstance`] then
+    /// narrows its own half-open source rectangle, applies a center-relative
+    /// transform and rounded/source-alpha mask, and selects normal, additive,
+    /// or screen compositing. Invalid source geometry returns an error instead
+    /// of sampling another atlas tile. This method installs no hitbox or
+    /// accessibility node.
+    pub fn paint_sprite_batch(
+        &mut self,
+        data: Arc<RenderImage>,
+        frame_index: usize,
+        instances: &[SpriteInstance],
+    ) -> Result<()> {
+        self.invalidator.debug_assert_paint();
+        self.paint_sprite_batch_with_opacity_bounds(data, frame_index, instances, None)
+    }
+
+    fn paint_sprite_batch_with_opacity_bounds(
+        &mut self,
+        data: Arc<RenderImage>,
+        frame_index: usize,
+        instances: &[SpriteInstance],
+        opacity_bounds: Option<Bounds<Pixels>>,
+    ) -> Result<()> {
+        anyhow::ensure!(
+            frame_index < data.frame_count(),
+            "sprite frame index {frame_index} is outside {} frame(s)",
+            data.frame_count()
+        );
+        if instances.is_empty() {
+            return Ok(());
+        }
+
+        let frame_size = data.size(frame_index);
+        for (index, instance) in instances.iter().enumerate() {
+            let source = instance.source;
+            let source_right = source.origin.x.0.checked_add(source.size.width.0);
+            let source_bottom = source.origin.y.0.checked_add(source.size.height.0);
+            anyhow::ensure!(
+                source.origin.x.0 >= 0
+                    && source.origin.y.0 >= 0
+                    && source.size.width.0 > 0
+                    && source.size.height.0 > 0
+                    && source_right.is_some_and(|right| right <= frame_size.width.0)
+                    && source_bottom.is_some_and(|bottom| bottom <= frame_size.height.0),
+                "sprite {index} source {:?} is outside the {}×{} frame",
+                source,
+                frame_size.width.0,
+                frame_size.height.0
+            );
+            let destination = instance.destination;
+            anyhow::ensure!(
+                destination.origin.x.0.is_finite()
+                    && destination.origin.y.0.is_finite()
+                    && destination.size.width.0.is_finite()
+                    && destination.size.height.0.is_finite()
+                    && destination.size.width > Pixels::ZERO
+                    && destination.size.height > Pixels::ZERO,
+                "sprite {index} destination must be a finite positive rectangle"
+            );
+            let transform = instance.transform;
+            anyhow::ensure!(
+                transform.scale.width.is_finite()
+                    && transform.scale.height.is_finite()
+                    && transform.rotation.0.is_finite()
+                    && transform.translation.x.0.is_finite()
+                    && transform.translation.y.0.is_finite(),
+                "sprite {index} transform must be finite"
+            );
+            anyhow::ensure!(
+                [
+                    instance.corner_radii.top_left,
+                    instance.corner_radii.top_right,
+                    instance.corner_radii.bottom_right,
+                    instance.corner_radii.bottom_left,
+                ]
+                .into_iter()
+                .all(|radius| radius.0.is_finite() && radius >= Pixels::ZERO),
+                "sprite {index} corner radii must be finite and non-negative"
+            );
+            anyhow::ensure!(
+                instance.opacity.is_finite(),
+                "sprite {index} opacity must be finite"
+            );
+            anyhow::ensure!(
+                [
+                    instance.tint.h,
+                    instance.tint.s,
+                    instance.tint.l,
+                    instance.tint.a,
+                ]
+                .into_iter()
+                .all(f32::is_finite),
+                "sprite {index} tint must be finite"
+            );
+        }
+
+        let params = RenderImageParams {
+            image_id: data.id,
+            frame_index,
+        };
+        let tile = self
+            .sprite_atlas
+            .get_or_insert_with(&params.into(), &mut || {
+                Ok(Some((
+                    frame_size,
+                    Cow::Borrowed(
+                        data.as_bytes(frame_index)
+                            .expect("validated sprite frame must carry pixels"),
+                    ),
+                )))
+            })?
+            .expect("sprite frame upload always returns a tile");
+
+        let content_mask = self.snapped_content_mask();
+        let scale_factor = self.scale_factor();
+        for instance in instances {
+            let source = instance.source;
+            let destination = instance.destination;
+            let transform = instance.transform;
+            let bounds = self.snap_bounds(destination);
+            let center = bounds.center();
+            let translation = transform.translation.scale(scale_factor);
+            let transformation = TransformationMatrix::unit()
+                .translate(center + translation)
+                .rotate(transform.rotation)
+                .scale(transform.scale)
+                .translate(point(ScaledPixels(-center.x.0), ScaledPixels(-center.y.0)));
+            let fade_bounds = opacity_bounds.unwrap_or_else(|| {
+                transformation
+                    .transform_bounds(bounds)
+                    .map(|coordinate| px(coordinate.0 / scale_factor))
+            });
+            let opacity =
+                instance.opacity.clamp(0.0, 1.0) * self.element_opacity_for_bounds(&fade_bounds);
+            if opacity <= 0.0 {
+                continue;
+            }
+
+            let source_is_full_frame =
+                source.origin == Point::default() && source.size == frame_size;
+            let sub_tile = AtlasTile {
+                bounds: Bounds {
+                    origin: tile.bounds.origin + source.origin,
+                    size: source.size,
+                },
+                ..tile
+            };
+            self.next_frame.scene.insert_primitive(PolychromeSprite {
+                order: 0,
+                blend_mode: instance.blend_mode,
+                color_mode: instance.color_mode,
+                sample_inset: (!source_is_full_frame).into(),
+                bounds,
+                content_mask,
+                corner_radii: instance
+                    .corner_radii
+                    .clamp_radii_for_quad_size(destination.size)
+                    .scale(scale_factor),
+                tile: sub_tile,
+                transformation,
+                tint: instance.tint,
+                opacity,
+                pad: 0,
+            });
+        }
+        Ok(())
+    }
+
     /// Paint an image into the scene for the next frame at the current z-index.
-    /// This method will panic if the frame_index is not valid
+    /// This method will panic if the frame_index is not valid.
     ///
     /// This method should only be called as part of the paint phase of element drawing.
     /// Paint an image into `bounds`, positioning and scaling it according to `image_bounds`.
@@ -4856,7 +5030,10 @@ impl Window {
     ) -> Result<()> {
         self.invalidator.debug_assert_paint();
 
-        let fade_bounds = bounds;
+        assert!(
+            frame_index < data.frame_count(),
+            "It's the caller's job to pass a valid frame index"
+        );
         let visible_bounds = bounds.intersect(&image_bounds);
         if visible_bounds.size.width <= Pixels::ZERO || visible_bounds.size.height <= Pixels::ZERO {
             return Ok(());
@@ -4865,28 +5042,12 @@ impl Window {
             return Ok(());
         }
 
-        let params = RenderImageParams {
-            image_id: data.id,
-            frame_index,
-        };
-
-        let tile = self
-            .sprite_atlas
-            .get_or_insert_with(&params.into(), &mut || {
-                Ok(Some((
-                    data.size(frame_index),
-                    Cow::Borrowed(
-                        data.as_bytes(frame_index)
-                            .expect("It's the caller's job to pass a valid frame index"),
-                    ),
-                )))
-            })?
-            .expect("Callback above only returns Some");
-
-        let visible_bounds_snapped = self.snap_bounds(visible_bounds);
-
-        let sub_tile = if visible_bounds == image_bounds {
-            tile
+        let frame_size = data.size(frame_index);
+        let source = if visible_bounds == image_bounds {
+            Bounds {
+                origin: Point::default(),
+                size: frame_size,
+            }
         } else {
             let x_offset_ratio =
                 (visible_bounds.origin.x - image_bounds.origin.x) / image_bounds.size.width;
@@ -4895,53 +5056,41 @@ impl Window {
             let width_ratio = visible_bounds.size.width / image_bounds.size.width;
             let height_ratio = visible_bounds.size.height / image_bounds.size.height;
 
-            let tile_origin_x = tile.bounds.origin.x.0;
-            let tile_origin_y = tile.bounds.origin.y.0;
-            let tile_width = tile.bounds.size.width.0;
-            let tile_height = tile.bounds.size.height.0;
+            let sub_origin_x = (x_offset_ratio * frame_size.width.0 as f32).round() as i32;
+            let sub_origin_y = (y_offset_ratio * frame_size.height.0 as f32).round() as i32;
+            let sub_width = (width_ratio * frame_size.width.0 as f32).round() as i32;
+            let sub_height = (height_ratio * frame_size.height.0 as f32).round() as i32;
 
-            let sub_origin_x = tile_origin_x + (x_offset_ratio * tile_width as f32).round() as i32;
-            let sub_origin_y = tile_origin_y + (y_offset_ratio * tile_height as f32).round() as i32;
-            let sub_width = (width_ratio * tile_width as f32).round() as i32;
-            let sub_height = (height_ratio * tile_height as f32).round() as i32;
+            let clamped_origin_x = sub_origin_x.clamp(0, frame_size.width.0);
+            let clamped_origin_y = sub_origin_y.clamp(0, frame_size.height.0);
+            let clamped_width = sub_width.min(frame_size.width.0 - clamped_origin_x).max(0);
+            let clamped_height = sub_height
+                .min(frame_size.height.0 - clamped_origin_y)
+                .max(0);
 
-            let max_x = tile_origin_x + tile_width;
-            let max_y = tile_origin_y + tile_height;
-
-            let clamped_origin_x = sub_origin_x.clamp(tile_origin_x, max_x);
-            let clamped_origin_y = sub_origin_y.clamp(tile_origin_y, max_y);
-            let clamped_width = sub_width.min(max_x - clamped_origin_x).max(0);
-            let clamped_height = sub_height.min(max_y - clamped_origin_y).max(0);
-
-            AtlasTile {
-                bounds: Bounds {
-                    origin: point(
-                        DevicePixels(clamped_origin_x),
-                        DevicePixels(clamped_origin_y),
-                    ),
-                    size: size(DevicePixels(clamped_width), DevicePixels(clamped_height)),
-                },
-                ..tile
+            Bounds {
+                origin: point(
+                    DevicePixels(clamped_origin_x),
+                    DevicePixels(clamped_origin_y),
+                ),
+                size: size(DevicePixels(clamped_width), DevicePixels(clamped_height)),
             }
         };
 
-        let content_mask = self.snapped_content_mask();
-        let corner_radii = corner_radii
-            .clamp_radii_for_quad_size(visible_bounds.size)
-            .scale(self.scale_factor());
-        let opacity = self.element_opacity_for_bounds(&fade_bounds);
-
-        self.next_frame.scene.insert_primitive(PolychromeSprite {
-            order: 0,
-            pad: 0,
-            grayscale: grayscale.into(),
-            bounds: visible_bounds_snapped,
-            content_mask,
-            corner_radii,
-            tile: sub_tile,
-            opacity,
-        });
-        Ok(())
+        let corner_radii = corner_radii.clamp_radii_for_quad_size(visible_bounds.size);
+        let color_mode = if grayscale {
+            SpriteColorMode::Grayscale
+        } else {
+            SpriteColorMode::Color
+        };
+        self.paint_sprite_batch_with_opacity_bounds(
+            data,
+            frame_index,
+            &[SpriteInstance::new(visible_bounds, source)
+                .corner_radii(corner_radii)
+                .color_mode(color_mode, crate::white())],
+            Some(bounds),
+        )
     }
 
     /// Paint a surface into the scene for the next frame at the current z-index.

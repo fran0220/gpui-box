@@ -18,6 +18,17 @@ Metal, Direct3D, WGPU, and browser WebGL. Callers choose normalized geometry
 and semantic colors; they no longer approximate glows, wheels, or area washes
 with rings of adjacent elements.
 
+**Composited sprite batches.** `Window::paint_sprite_batch` reuses one atlas
+upload for explicit source rectangles with center-relative translation,
+rotation and scale, transformed rounded/source-alpha masks, tint and opacity,
+and normal, additive, or screen hardware compositing. Metal, Direct3D, WGPU,
+and WebGL share the scene ABI and split batches only where texture, paint order,
+or blend state requires it. Invalid batches report an error before painting any
+instance. `RenderImage::from_rgba` also converts procedural RGBA8 pixels to the
+private atlas layout, so a host does not hand-swap channels. The primitive is
+paint-only and does not pretend that alpha holes are hitboxes or accessibility
+nodes; subtree-wide offscreen composition remains deliberately unsupported.
+
 **Measured path-stroke effects.** `PathBuilder::stroke_trim` reveals any
 ordered normalized interval before stroke tessellation, while `dash_offset`
 advances and wraps a validated dash pattern against the same path measurement.

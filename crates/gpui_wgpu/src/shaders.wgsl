@@ -193,6 +193,13 @@ fn to_tile_position(unit_vertex: vec2<f32>, tile: AtlasTile) -> vec2<f32> {
   return (vec2<f32>(tile.bounds.origin) + unit_vertex * vec2<f32>(tile.bounds.size)) / atlas_size;
 }
 
+fn to_inset_tile_position(unit_vertex: vec2<f32>, tile: AtlasTile) -> vec2<f32> {
+    let atlas_size = vec2<f32>(textureDimensions(t_sprite, 0));
+    let first_center = vec2<f32>(tile.bounds.origin) + vec2<f32>(0.5);
+    let center_span = max(vec2<f32>(tile.bounds.size) - vec2<f32>(1.0), vec2<f32>(0.0));
+    return (first_center + unit_vertex * center_span) / atlas_size;
+}
+
 fn distance_from_clip_rect_impl(position: vec2<f32>, clip_bounds: Bounds) -> vec4<f32> {
     let tl = position - clip_bounds.origin;
     let br = clip_bounds.origin + clip_bounds.size - position;
@@ -1337,13 +1344,17 @@ fn fs_mono_sprite(input: MonoSpriteVarying) -> @location(0) vec4<f32> {
 
 struct PolychromeSprite {
     order: u32,
-    pad: u32,
-    grayscale: u32,
-    opacity: f32,
+    blend_mode: u32,
+    color_mode: u32,
+    sample_inset: u32,
     bounds: Bounds,
     content_mask: Bounds,
     corner_radii: Corners,
     tile: AtlasTile,
+    transformation: TransformationMatrix,
+    tint: Hsla,
+    opacity: f32,
+    pad: u32,
 }
 
 
@@ -1351,6 +1362,7 @@ struct PolySpriteVarying {
     @builtin(position) position: vec4<f32>,
     @location(0) tile_position: vec2<f32>,
     @location(1) @interpolate(flat) sprite_id: u32,
+    @location(2) local_position: vec2<f32>,
     @location(3) clip_distances: vec4<f32>,
 }
 
@@ -1360,10 +1372,20 @@ fn vs_poly_sprite(@builtin(vertex_index) vertex_id: u32, @builtin(instance_index
     let sprite = load_poly_sprite(instance_id);
 
     var out = PolySpriteVarying();
-    out.position = to_device_position(unit_vertex, sprite.bounds);
-    out.tile_position = to_tile_position(unit_vertex, sprite.tile);
+    out.position = to_device_position_transformed(unit_vertex, sprite.bounds, sprite.transformation);
+    out.tile_position = select(
+        to_tile_position(unit_vertex, sprite.tile),
+        to_inset_tile_position(unit_vertex, sprite.tile),
+        sprite.sample_inset != 0u,
+    );
     out.sprite_id = instance_id;
-    out.clip_distances = distance_from_clip_rect(unit_vertex, sprite.bounds, sprite.content_mask);
+    out.local_position = sprite.bounds.origin + unit_vertex * sprite.bounds.size;
+    out.clip_distances = distance_from_clip_rect_transformed(
+        unit_vertex,
+        sprite.bounds,
+        sprite.content_mask,
+        sprite.transformation,
+    );
     return out;
 }
 
@@ -1376,14 +1398,24 @@ fn fs_poly_sprite(input: PolySpriteVarying) -> @location(0) vec4<f32> {
     }
 
     let sprite = load_poly_sprite(input.sprite_id);
-    let distance = quad_sdf(input.position.xy, sprite.bounds, sprite.corner_radii);
+    let distance = quad_sdf(input.local_position, sprite.bounds, sprite.corner_radii);
+    let edge_width = max(fwidth(distance), 0.0001);
+    let coverage = saturate(0.5 - distance / edge_width);
 
     var color = sample;
-    if (sprite.grayscale != 0u) {
+    if (sprite.color_mode == 1u) {
         let grayscale = dot(color.rgb, GRAYSCALE_FACTORS);
         color = vec4<f32>(vec3<f32>(grayscale), sample.a);
+    } else if (sprite.color_mode == 2u) {
+        color = hsla_to_rgba(sprite.tint);
+        color.a *= sample.a;
     }
-    return blend_color(color, sprite.opacity * saturate(0.5 - distance));
+    let alpha_factor = sprite.opacity * coverage;
+    if (sprite.blend_mode == 2u) {
+        let alpha = color.a * alpha_factor;
+        return vec4<f32>(color.rgb * alpha, alpha);
+    }
+    return blend_color(color, alpha_factor);
 }
 
 // --- surfaces --- //

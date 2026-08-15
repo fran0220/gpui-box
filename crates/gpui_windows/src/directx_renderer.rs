@@ -131,6 +131,8 @@ struct DirectXRenderPipelines {
     mono_sprites: PipelineState<MonochromeSprite>,
     subpixel_sprites: PipelineState<SubpixelSprite>,
     poly_sprites: PipelineState<PolychromeSprite>,
+    poly_additive_blend: ID3D11BlendState,
+    poly_screen_blend: ID3D11BlendState,
     // The two backdrop passes carry no instance buffer: each draws one full
     // viewport strip and reads everything it needs from `b2`, so they are a
     // shader pair and a blend state rather than a `PipelineState`.
@@ -710,8 +712,17 @@ impl DirectXRenderer {
                 PrimitiveBatch::SubpixelSprites { texture_id, range } => {
                     self.draw_subpixel_sprites(texture_id, range.start, range.len())
                 }
-                PrimitiveBatch::PolychromeSprites { texture_id, range } => {
-                    self.draw_polychrome_sprites(texture_id, range.start, range.len())
+                PrimitiveBatch::PolychromeSprites {
+                    texture_id,
+                    blend_mode,
+                    range,
+                } => {
+                    self.draw_polychrome_sprites(
+                        texture_id,
+                        blend_mode,
+                        range.start,
+                        range.len(),
+                    )
                 }
                 PrimitiveBatch::Surfaces(range) => self.draw_surfaces(&scene.surfaces[range]),
             }
@@ -1286,6 +1297,7 @@ impl DirectXRenderer {
     fn draw_polychrome_sprites(
         &mut self,
         texture_id: AtlasTextureId,
+        blend_mode: SpriteBlendMode,
         start: usize,
         len: usize,
     ) -> Result<()> {
@@ -1294,17 +1306,25 @@ impl DirectXRenderer {
         }
         let devices = self.devices.as_ref().context("devices missing")?;
         let texture_view = self.atlas.get_texture_view(texture_id);
-        self.pipelines.poly_sprites.draw_range_with_texture(
-            &devices.device_context,
-            &texture_view,
-            self.globals
-                .batch_params_buffer
-                .as_ref()
-                .context("batch params buffer missing")?,
-            slice::from_ref(&self.globals.sampler),
-            start as u32,
-            len as u32,
-        )
+        let blend_state = match blend_mode {
+            SpriteBlendMode::Normal => &self.pipelines.poly_sprites.blend_state,
+            SpriteBlendMode::Additive => &self.pipelines.poly_additive_blend,
+            SpriteBlendMode::Screen => &self.pipelines.poly_screen_blend,
+        };
+        self.pipelines
+            .poly_sprites
+            .draw_range_with_texture_and_blend(
+                &devices.device_context,
+                &texture_view,
+                self.globals
+                    .batch_params_buffer
+                    .as_ref()
+                    .context("batch params buffer missing")?,
+                slice::from_ref(&self.globals.sampler),
+                start as u32,
+                len as u32,
+                blend_state,
+            )
     }
 
     fn draw_surfaces(&mut self, surfaces: &[PaintSurface]) -> Result<()> {
@@ -1497,8 +1517,12 @@ impl DirectXRenderPipelines {
             "polychrome_sprite_pipeline",
             ShaderModule::PolychromeSprite,
             16,
-            create_blend_state(device)?,
+            create_blend_state_for_composited_sprite(device, SpriteBlendMode::Normal)?,
         )?;
+        let poly_additive_blend =
+            create_blend_state_for_composited_sprite(device, SpriteBlendMode::Additive)?;
+        let poly_screen_blend =
+            create_blend_state_for_composited_sprite(device, SpriteBlendMode::Screen)?;
 
         Ok(Self {
             shadow_pipeline,
@@ -1509,6 +1533,8 @@ impl DirectXRenderPipelines {
             mono_sprites,
             subpixel_sprites,
             poly_sprites,
+            poly_additive_blend,
+            poly_screen_blend,
             backdrop_blur,
             backdrop_glass,
         })
@@ -1997,6 +2023,39 @@ impl<T> PipelineState<T> {
         }
         Ok(())
     }
+
+    fn draw_range_with_texture_and_blend(
+        &self,
+        device_context: &ID3D11DeviceContext,
+        texture: &[Option<ID3D11ShaderResourceView>],
+        batch_params_buffer: &ID3D11Buffer,
+        sampler: &[Option<ID3D11SamplerState>],
+        first_instance: u32,
+        instance_count: u32,
+        blend_state: &ID3D11BlendState,
+    ) -> Result<()> {
+        anyhow::ensure!(
+            first_instance as usize + instance_count as usize <= self.buffer_size,
+            "DirectX instance range exceeds the {} buffer",
+            self.label
+        );
+        update_batch_start(device_context, batch_params_buffer, first_instance)?;
+        set_pipeline_state(
+            device_context,
+            slice::from_ref(&self.view),
+            D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP,
+            &self.vertex,
+            &self.fragment,
+            blend_state,
+        );
+        unsafe {
+            device_context.PSSetSamplers(0, Some(sampler));
+            device_context.VSSetShaderResources(0, Some(texture));
+            device_context.PSSetShaderResources(0, Some(texture));
+            device_context.DrawInstanced(4, instance_count, 0, 0);
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -2317,6 +2376,39 @@ fn create_blend_state(device: &ID3D11Device) -> Result<ID3D11BlendState> {
     desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
     desc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
     desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
+    desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL.0 as u8;
+    unsafe {
+        let mut state = None;
+        device.CreateBlendState(&desc, Some(&mut state))?;
+        Ok(state.expect("required framework invariant must hold"))
+    }
+}
+
+#[inline]
+fn create_blend_state_for_composited_sprite(
+    device: &ID3D11Device,
+    blend_mode: SpriteBlendMode,
+) -> Result<ID3D11BlendState> {
+    let mut desc = D3D11_BLEND_DESC::default();
+    desc.RenderTarget[0].BlendEnable = true.into();
+    desc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+    desc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+    match blend_mode {
+        SpriteBlendMode::Normal => {
+            desc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+            desc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+        }
+        SpriteBlendMode::Additive => {
+            desc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+            desc.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
+        }
+        SpriteBlendMode::Screen => {
+            desc.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
+            desc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_COLOR;
+        }
+    }
+    desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+    desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_INV_SRC_ALPHA;
     desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL.0 as u8;
     unsafe {
         let mut state = None;

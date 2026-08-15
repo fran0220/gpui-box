@@ -1,4 +1,5 @@
 use crate::{DevicePixels, Pixels, Result, SharedString, Size, size};
+use anyhow::Context as _;
 use smallvec::SmallVec;
 
 use image::{Delay, Frame};
@@ -68,6 +69,35 @@ impl RenderImage {
         }
     }
 
+    /// Creates a single-frame image from tightly packed RGBA8 pixels.
+    ///
+    /// `size` is measured in physical pixels. The byte length must be exactly
+    /// `width × height × 4`; the channels are converted to the renderer's
+    /// internal BGRA layout so callers do not need to know the atlas format.
+    pub fn from_rgba(size: Size<DevicePixels>, mut bytes: Vec<u8>) -> Result<Self> {
+        anyhow::ensure!(
+            size.width.0 > 0 && size.height.0 > 0,
+            "render image size must be positive"
+        );
+        let expected_len = (size.width.0 as usize)
+            .checked_mul(size.height.0 as usize)
+            .and_then(|pixel_count| pixel_count.checked_mul(4))
+            .context("render image dimensions overflow")?;
+        anyhow::ensure!(
+            bytes.len() == expected_len,
+            "RGBA8 image is {} bytes, expected {expected_len} for {}×{} pixels",
+            bytes.len(),
+            size.width.0,
+            size.height.0
+        );
+        for pixel in bytes.chunks_exact_mut(4) {
+            pixel.swap(0, 2);
+        }
+        let buffer = image::RgbaImage::from_raw(size.width.0 as u32, size.height.0 as u32, bytes)
+            .expect("validated RGBA8 dimensions and byte length must construct an image");
+        Ok(Self::new(SmallVec::from_const([Frame::new(buffer)])))
+    }
+
     /// Convert this image into a byte slice.
     pub fn as_bytes(&self, frame_index: usize) -> Option<&[u8]> {
         self.data
@@ -129,5 +159,19 @@ mod tests {
         assert_eq!(image.render_size(0), Size::default());
         assert_eq!(image.delay(0), Delay::from_numer_denom_ms(100, 1));
         let _ = format!("{image:?}");
+    }
+
+    #[test]
+    fn rgba_constructor_validates_and_converts_the_public_pixel_contract() {
+        let image = RenderImage::from_rgba(
+            size(DevicePixels(2), DevicePixels(1)),
+            vec![1, 2, 3, 4, 5, 6, 7, 8],
+        )
+        .expect("valid RGBA8 image");
+        assert_eq!(image.as_bytes(0), Some([3, 2, 1, 4, 7, 6, 5, 8].as_slice()));
+
+        assert!(
+            RenderImage::from_rgba(size(DevicePixels(2), DevicePixels(1)), vec![0; 4],).is_err()
+        );
     }
 }

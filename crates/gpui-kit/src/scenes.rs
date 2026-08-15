@@ -5,12 +5,15 @@
 //! visually in one arrangement and tested in another.
 
 use gpui::{
-    AnyElement, App, Entity, Focusable, Global, IntoElement, SharedString, Window, canvas,
-    conic_gradient_stops, div, linear_color_stop, point, prelude::*, px, radial_gradient_stops,
+    AnyElement, App, Corners, DevicePixels, Entity, Focusable, Global, IntoElement, RenderImage,
+    SharedString, SpriteBlendMode, SpriteColorMode, SpriteInstance, SpriteTransform, Window,
+    bounds, canvas, conic_gradient_stops, div, linear_color_stop, point, prelude::*, px,
+    radial_gradient_stops, radians, size,
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{Radius, Space, TextTone, Theme, TypeScale};
+use std::sync::Arc;
 
 use crate::controls::combobox::Combobox;
 use crate::controls::input::TextInput;
@@ -511,6 +514,55 @@ fn row(theme: &Theme) -> gpui::Div {
         .flex_wrap()
         .gap(px(theme.spacing.sm))
         .items_center()
+}
+
+fn composited_sprite_atlas(theme: &Theme) -> Arc<RenderImage> {
+    const TILE: i32 = 48;
+    const TILES: i32 = 3;
+
+    let accent = theme.colors.accent_strong.to_rgb();
+    let info = theme.colors.info.to_rgb();
+    let mut pixels = Vec::with_capacity((TILE * TILE * TILES * 4) as usize);
+    let byte = |channel: f32| (channel.clamp(0.0, 1.0) * 255.0).round() as u8;
+    for y in 0..TILE {
+        for x in 0..TILE * TILES {
+            let tile = x / TILE;
+            let local_x = x % TILE;
+            let dx = local_x as f32 + 0.5 - TILE as f32 / 2.0;
+            let dy = y as f32 + 0.5 - TILE as f32 / 2.0;
+            let radius = dx.hypot(dy);
+            let (red, green, blue, alpha) = match tile {
+                0 => {
+                    let mix = local_x as f32 / (TILE - 1) as f32;
+                    let alpha = ((TILE as f32 * 0.44 - radius) / 1.5).clamp(0.0, 1.0);
+                    (
+                        accent.r + (info.r - accent.r) * mix,
+                        accent.g + (info.g - accent.g) * mix,
+                        accent.b + (info.b - accent.b) * mix,
+                        alpha,
+                    )
+                }
+                1 => {
+                    let alpha = (1.0 - radius / (TILE as f32 * 0.5)).clamp(0.0, 1.0);
+                    (1.0, 1.0, 1.0, alpha * alpha)
+                }
+                _ => {
+                    let horizontal = (1.0 - dy.abs() / 2.6).clamp(0.0, 1.0)
+                        * (1.0 - dx.abs() / 22.0).clamp(0.0, 1.0);
+                    let vertical = (1.0 - dx.abs() / 2.6).clamp(0.0, 1.0)
+                        * (1.0 - dy.abs() / 22.0).clamp(0.0, 1.0);
+                    let core = (1.0 - radius / 7.0).clamp(0.0, 1.0);
+                    (1.0, 1.0, 1.0, horizontal.max(vertical).max(core))
+                }
+            };
+            pixels.extend_from_slice(&[byte(red), byte(green), byte(blue), byte(alpha)]);
+        }
+    }
+
+    Arc::new(
+        RenderImage::from_rgba(size(DevicePixels(TILE * TILES), DevicePixels(TILE)), pixels)
+            .expect("the procedural sprite atlas has exact RGBA8 dimensions"),
+    )
 }
 
 fn button(_window: &mut Window, cx: &mut App) -> AnyElement {
@@ -1083,6 +1135,11 @@ fn visual_effects(_window: &mut Window, cx: &mut App) -> AnyElement {
     let path_fill = conic;
     let stroke_fill = radial;
     let stroke_base = theme.colors.hairline_strong.opacity(0.32);
+    let sprite_atlas = composited_sprite_atlas(&theme);
+    let additive_tint = theme.colors.accent_strong;
+    let additive_tint_alt = theme.colors.info;
+    let screen_tint = theme.colors.success;
+    let screen_tint_alt = theme.colors.warning;
     let label = |text: &'static str| {
         div()
             .absolute()
@@ -1256,6 +1313,128 @@ fn visual_effects(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .child(div().absolute().left(px(16.0)).top(px(131.0)).child(
                     crate::foundation::text(&theme, TypeScale::Caption, "Trim + phase"),
                 )),
+        )
+        .child(crate::foundation::text(
+            &theme,
+            TypeScale::Subtitle,
+            "Composited sprite batches",
+        ))
+        .child(
+            div()
+                .relative()
+                .w(px(776.0))
+                .h(px(190.0))
+                .radius(&theme, Radius::Card)
+                .overflow_hidden()
+                .bg(theme.colors.sunken)
+                .border_1()
+                .border_color(theme.colors.hairline)
+                .semantic_in(
+                    cx,
+                    NodeSpec::new("scene.effects.sprite-batch", Role::Image)
+                        .text("Composited sprite batch")
+                        .description(
+                            "One atlas with explicit source rectangles, transforms, masks, and normal, additive, and screen blending",
+                        ),
+                )
+                .child(
+                    div().absolute().inset_0().child(
+                        canvas(
+                            |_, _, _| {},
+                            move |frame, _, window, _| {
+                                let source = |column| {
+                                    bounds(
+                                        point(DevicePixels(column * 48), DevicePixels(0)),
+                                        size(DevicePixels(48), DevicePixels(48)),
+                                    )
+                                };
+                                let destination = |x, y, width, height| {
+                                    bounds(
+                                        point(frame.left() + px(x), frame.top() + px(y)),
+                                        size(px(width), px(height)),
+                                    )
+                                };
+                                let sprites = [
+                                    SpriteInstance::new(
+                                        destination(56.0, 26.0, 104.0, 104.0),
+                                        source(0),
+                                    )
+                                    .corner_radii(Corners::all(px(28.0)))
+                                    .transform(
+                                        SpriteTransform::identity().rotate(radians(-0.16)),
+                                    ),
+                                    SpriteInstance::new(
+                                        destination(270.0, 34.0, 96.0, 96.0),
+                                        source(1),
+                                    )
+                                    .color_mode(SpriteColorMode::AlphaMask, additive_tint)
+                                    .blend_mode(SpriteBlendMode::Additive),
+                                    SpriteInstance::new(
+                                        destination(314.0, 34.0, 96.0, 96.0),
+                                        source(1),
+                                    )
+                                    .transform(
+                                        SpriteTransform::identity().rotate(radians(0.22)),
+                                    )
+                                    .color_mode(SpriteColorMode::AlphaMask, additive_tint_alt)
+                                    .blend_mode(SpriteBlendMode::Additive),
+                                    SpriteInstance::new(
+                                        destination(536.0, 24.0, 112.0, 112.0),
+                                        source(2),
+                                    )
+                                    .color_mode(SpriteColorMode::AlphaMask, screen_tint)
+                                    .blend_mode(SpriteBlendMode::Screen),
+                                    SpriteInstance::new(
+                                        destination(582.0, 30.0, 100.0, 100.0),
+                                        source(2),
+                                    )
+                                    .transform(
+                                        SpriteTransform::identity().rotate(radians(0.42)),
+                                    )
+                                    .color_mode(SpriteColorMode::AlphaMask, screen_tint_alt)
+                                    .blend_mode(SpriteBlendMode::Screen),
+                                ];
+                                window
+                                    .paint_sprite_batch(sprite_atlas.clone(), 0, &sprites)
+                                    .expect("the canonical sprite batch is valid");
+                            },
+                        )
+                        .size_full(),
+                    ),
+                )
+                .child(
+                    div()
+                        .absolute()
+                        .left(px(64.0))
+                        .bottom(px(12.0))
+                        .child(crate::foundation::text(
+                            &theme,
+                            TypeScale::Caption,
+                            "Normal · crop + rotate",
+                        )),
+                )
+                .child(
+                    div()
+                        .absolute()
+                        .left(px(282.0))
+                        .bottom(px(12.0))
+                        .child(crate::foundation::text(
+                            &theme,
+                            TypeScale::Caption,
+                            "Additive · alpha mask",
+                        )),
+                )
+                .child(
+                    div()
+                        .absolute()
+                        .left(px(550.0))
+                        .bottom(px(12.0))
+                        .child(crate::foundation::text(
+                            &theme,
+                            TypeScale::Caption,
+                            "Screen · atlas reuse",
+                        )),
+                ),
         )
         .into_any_element()
 }

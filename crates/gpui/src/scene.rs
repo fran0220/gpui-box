@@ -5,8 +5,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    AtlasTextureId, AtlasTile, Background, Bounds, ContentMask, Corners, Edges, Hsla, Pixels,
-    Point, Radians, ScaledPixels, Size, bounds_tree::BoundsTree, point,
+    AtlasTextureId, AtlasTile, Background, Bounds, ContentMask, Corners, DevicePixels, Edges, Hsla,
+    Pixels, Point, Radians, ScaledPixels, Size, bounds_tree::BoundsTree, point, white,
 };
 use std::{
     fmt::Debug,
@@ -130,7 +130,7 @@ impl Scene {
     pub fn insert_primitive(&mut self, primitive: impl Into<Primitive>) {
         let mut primitive = primitive.into();
         let clipped_bounds = primitive
-            .bounds()
+            .cull_bounds()
             .intersect(&primitive.content_mask().bounds);
 
         if clipped_bounds.is_empty() {
@@ -202,7 +202,7 @@ impl Scene {
         self.subpixel_sprites
             .sort_by_key(|sprite| (sprite.order, sprite.tile.tile_id));
         self.polychrome_sprites
-            .sort_by_key(|sprite| (sprite.order, sprite.tile.tile_id));
+            .sort_by_key(|sprite| (sprite.order, sprite.blend_mode, sprite.tile.tile_id));
         self.surfaces.sort_by_key(|surface| surface.order);
         self.backdrop_glass.sort_by_key(|glass| glass.order);
     }
@@ -626,6 +626,21 @@ mod tests {
         assert_eq!(size_of::<GlassLobe>(), 8 * size_of::<f32>());
         assert_eq!(size_of::<GlassMaterial>(), 8 * size_of::<f32>());
         assert_eq!(
+            size_of::<PolychromeSprite>(),
+            size_of::<DrawOrder>()
+                + size_of::<SpriteBlendMode>()
+                + size_of::<SpriteColorMode>()
+                + size_of::<PaddedBool32>()
+                + size_of::<Bounds<ScaledPixels>>()
+                + size_of::<ContentMask<ScaledPixels>>()
+                + size_of::<Corners<ScaledPixels>>()
+                + size_of::<AtlasTile>()
+                + size_of::<TransformationMatrix>()
+                + size_of::<Hsla>()
+                + size_of::<f32>()
+                + size_of::<u32>()
+        );
+        assert_eq!(
             size_of::<BackdropGlass>(),
             size_of::<DrawOrder>()
                 + size_of::<ScaledPixels>()
@@ -674,6 +689,86 @@ mod tests {
             [PrimitiveBatch::Shadows(first), PrimitiveBatch::Shadows(second)]
                 if first == &(0..2) && second == &(2..3)
         ));
+    }
+
+    fn test_polychrome_sprite(blend_mode: SpriteBlendMode) -> PolychromeSprite {
+        use crate::{AtlasTextureKind, TileId, size};
+
+        let bounds = Bounds {
+            origin: point(ScaledPixels(10.0), ScaledPixels(10.0)),
+            size: size(ScaledPixels(20.0), ScaledPixels(20.0)),
+        };
+        PolychromeSprite {
+            order: 1,
+            blend_mode,
+            color_mode: SpriteColorMode::Color,
+            sample_inset: false.into(),
+            bounds,
+            content_mask: ContentMask {
+                bounds: Bounds {
+                    origin: Point::default(),
+                    size: size(ScaledPixels(100.0), ScaledPixels(100.0)),
+                },
+            },
+            corner_radii: Corners::default(),
+            tile: AtlasTile {
+                texture_id: AtlasTextureId {
+                    index: 0,
+                    kind: AtlasTextureKind::Polychrome,
+                },
+                tile_id: TileId(0),
+                padding: 0,
+                bounds: Bounds::default(),
+            },
+            transformation: TransformationMatrix::unit(),
+            tint: white(),
+            opacity: 1.0,
+            pad: 0,
+        }
+    }
+
+    #[test]
+    fn sprite_blend_modes_split_batches_without_splitting_the_atlas() {
+        let mut scene = Scene {
+            polychrome_sprites: vec![
+                test_polychrome_sprite(SpriteBlendMode::Screen),
+                test_polychrome_sprite(SpriteBlendMode::Normal),
+                test_polychrome_sprite(SpriteBlendMode::Additive),
+            ],
+            ..Scene::default()
+        };
+        scene.finish();
+
+        let batches = scene.batches().collect::<Vec<_>>();
+        assert!(matches!(
+            batches.as_slice(),
+            [
+                PrimitiveBatch::PolychromeSprites {
+                    blend_mode: SpriteBlendMode::Normal,
+                    ..
+                },
+                PrimitiveBatch::PolychromeSprites {
+                    blend_mode: SpriteBlendMode::Additive,
+                    ..
+                },
+                PrimitiveBatch::PolychromeSprites {
+                    blend_mode: SpriteBlendMode::Screen,
+                    ..
+                }
+            ]
+        ));
+    }
+
+    #[test]
+    fn transformed_sprite_bounds_drive_scene_culling() {
+        let mut sprite = test_polychrome_sprite(SpriteBlendMode::Normal);
+        sprite.bounds.origin = point(ScaledPixels(150.0), ScaledPixels(10.0));
+        sprite.transformation =
+            TransformationMatrix::unit().translate(point(ScaledPixels(-120.0), ScaledPixels(0.0)));
+
+        let mut scene = Scene::default();
+        scene.insert_primitive(sprite);
+        assert_eq!(scene.polychrome_sprites.len(), 1);
     }
 }
 
@@ -742,6 +837,13 @@ impl Primitive {
             Primitive::SubpixelSprite(sprite) => &sprite.content_mask,
             Primitive::PolychromeSprite(sprite) => &sprite.content_mask,
             Primitive::Surface(surface) => &surface.content_mask,
+        }
+    }
+
+    fn cull_bounds(&self) -> Bounds<ScaledPixels> {
+        match self {
+            Primitive::PolychromeSprite(sprite) => sprite.transformed_bounds(),
+            _ => *self.bounds(),
         }
     }
 }
@@ -948,12 +1050,12 @@ impl<'a> Iterator for BatchIterator<'a> {
                 })
             }
             PrimitiveKind::PolychromeSprite => {
-                let texture_id = self
+                let first = self
                     .polychrome_sprites_iter
                     .peek()
-                    .expect("required framework invariant must hold")
-                    .tile
-                    .texture_id;
+                    .expect("required framework invariant must hold");
+                let texture_id = first.tile.texture_id;
+                let blend_mode = first.blend_mode;
                 let sprites_start = self.polychrome_sprites_start;
                 let mut sprites_end = sprites_start + 1;
                 self.polychrome_sprites_iter.next();
@@ -963,6 +1065,7 @@ impl<'a> Iterator for BatchIterator<'a> {
                         sprite.order < next_glass_order
                             && (sprite.order, batch_kind) < max_order_and_kind
                             && sprite.tile.texture_id == texture_id
+                            && sprite.blend_mode == blend_mode
                     })
                     .is_some()
                 {
@@ -971,6 +1074,7 @@ impl<'a> Iterator for BatchIterator<'a> {
                 self.polychrome_sprites_start = sprites_end;
                 Some(PrimitiveBatch::PolychromeSprites {
                     texture_id,
+                    blend_mode,
                     range: sprites_start..sprites_end,
                 })
             }
@@ -1020,6 +1124,7 @@ pub enum PrimitiveBatch {
     },
     PolychromeSprites {
         texture_id: AtlasTextureId,
+        blend_mode: SpriteBlendMode,
         range: Range<usize>,
     },
     Surfaces(Range<usize>),
@@ -1047,9 +1152,13 @@ impl PrimitiveBatch {
                     texture_id.index
                 )
             }
-            Self::PolychromeSprites { texture_id, range } => {
+            Self::PolychromeSprites {
+                texture_id,
+                blend_mode,
+                range,
+            } => {
                 format!(
-                    "polychrome sprites ({}) on atlas {}",
+                    "polychrome sprites ({}, {blend_mode:?}) on atlas {}",
                     range.len(),
                     texture_id.index
                 )
@@ -1656,11 +1765,189 @@ impl TransformationMatrix {
         }
         Point::new(output[0].into(), output[1].into())
     }
+
+    /// Returns the axis-aligned device-pixel bounds that contain a transformed rectangle.
+    pub fn transform_bounds(&self, bounds: Bounds<ScaledPixels>) -> Bounds<ScaledPixels> {
+        let transform = |input: Point<ScaledPixels>| {
+            let x = self.translation[0]
+                + self.rotation_scale[0][0] * input.x.0
+                + self.rotation_scale[0][1] * input.y.0;
+            let y = self.translation[1]
+                + self.rotation_scale[1][0] * input.x.0
+                + self.rotation_scale[1][1] * input.y.0;
+            point(ScaledPixels(x), ScaledPixels(y))
+        };
+        let corners = [
+            transform(bounds.origin),
+            transform(point(bounds.right(), bounds.top())),
+            transform(bounds.bottom_right()),
+            transform(point(bounds.left(), bounds.bottom())),
+        ];
+        let mut min = corners[0];
+        let mut max = corners[0];
+        for corner in &corners[1..] {
+            min.x = min.x.min(corner.x);
+            min.y = min.y.min(corner.y);
+            max.x = max.x.max(corner.x);
+            max.y = max.y.max(corner.y);
+        }
+        Bounds::from_corners(min, max)
+    }
 }
 
 impl Default for TransformationMatrix {
     fn default() -> Self {
         Self::unit()
+    }
+}
+
+/// The fixed-function compositing equation used for a sprite batch.
+///
+/// Blending is selected per batch rather than per fragment so all renderer
+/// backends use the same hardware equation. Source-over is appropriate for
+/// pictures and portraits, additive for emitted light, and screen for soft
+/// glows that should retain detail in the backdrop.
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd)]
+#[repr(C)]
+pub enum SpriteBlendMode {
+    /// Ordinary source-over alpha compositing.
+    #[default]
+    Normal = 0,
+    /// Adds source light without attenuating the destination color.
+    Additive = 1,
+    /// Lightens using `source + destination × (1 - source)`.
+    Screen = 2,
+}
+
+/// How a sprite sample becomes visible color.
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
+#[repr(C)]
+pub enum SpriteColorMode {
+    /// Preserve all sampled color channels and alpha.
+    #[default]
+    Color = 0,
+    /// Convert sampled RGB to luminance while preserving sampled alpha.
+    Grayscale = 1,
+    /// Use sampled alpha as a mask for [`SpriteInstance::tint`].
+    AlphaMask = 2,
+}
+
+/// A destination-local sprite transform applied around the destination center.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct SpriteTransform {
+    /// Non-uniform scale around the destination center.
+    pub scale: Size<f32>,
+    /// Clockwise rotation around the destination center.
+    pub rotation: Radians,
+    /// Logical-pixel translation applied after scale and rotation.
+    pub translation: Point<Pixels>,
+}
+
+impl Default for SpriteTransform {
+    fn default() -> Self {
+        Self {
+            scale: Size::new(1.0, 1.0),
+            rotation: Radians::default(),
+            translation: Point::default(),
+        }
+    }
+}
+
+impl SpriteTransform {
+    /// Returns the identity transform.
+    pub fn identity() -> Self {
+        Self::default()
+    }
+
+    /// Sets the scale around the destination center.
+    pub fn scale(mut self, scale: Size<f32>) -> Self {
+        self.scale = scale;
+        self
+    }
+
+    /// Sets the clockwise rotation around the destination center.
+    pub fn rotate(mut self, rotation: Radians) -> Self {
+        self.rotation = rotation;
+        self
+    }
+
+    /// Sets the logical-pixel translation after scale and rotation.
+    pub fn translate(mut self, translation: Point<Pixels>) -> Self {
+        self.translation = translation;
+        self
+    }
+}
+
+/// One independently transformed image sample in a composited sprite batch.
+///
+/// `source` is a half-open pixel rectangle in the selected image frame. The
+/// renderer narrows atlas UVs without creating another texture or cache entry.
+/// A sprite is paint-only: source-alpha holes and rounded corners do not invent
+/// hitboxes or accessibility nodes for the caller.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct SpriteInstance {
+    /// Destination bounds before [`SpriteTransform`] is applied.
+    pub destination: Bounds<Pixels>,
+    /// Half-open source rectangle in physical pixels of the image frame.
+    pub source: Bounds<DevicePixels>,
+    /// Destination-local transform around the destination center.
+    pub transform: SpriteTransform,
+    /// Rounded destination mask, transformed together with the destination.
+    pub corner_radii: Corners<Pixels>,
+    /// Additional opacity, clamped to `0.0..=1.0` while painting.
+    pub opacity: f32,
+    /// Sample-to-color conversion.
+    pub color_mode: SpriteColorMode,
+    /// Fixed-function batch compositing equation.
+    pub blend_mode: SpriteBlendMode,
+    /// Color used by [`SpriteColorMode::AlphaMask`].
+    pub tint: Hsla,
+}
+
+impl SpriteInstance {
+    /// Creates a normal, opaque color sprite from an explicit source rectangle.
+    pub fn new(destination: Bounds<Pixels>, source: Bounds<DevicePixels>) -> Self {
+        Self {
+            destination,
+            source,
+            transform: SpriteTransform::default(),
+            corner_radii: Corners::default(),
+            opacity: 1.0,
+            color_mode: SpriteColorMode::Color,
+            blend_mode: SpriteBlendMode::Normal,
+            tint: white(),
+        }
+    }
+
+    /// Sets the destination-local transform.
+    pub fn transform(mut self, transform: SpriteTransform) -> Self {
+        self.transform = transform;
+        self
+    }
+
+    /// Sets the rounded destination mask.
+    pub fn corner_radii(mut self, corner_radii: Corners<Pixels>) -> Self {
+        self.corner_radii = corner_radii;
+        self
+    }
+
+    /// Sets additional sprite opacity.
+    pub fn opacity(mut self, opacity: f32) -> Self {
+        self.opacity = opacity;
+        self
+    }
+
+    /// Sets the sample-to-color conversion and mask tint.
+    pub fn color_mode(mut self, color_mode: SpriteColorMode, tint: Hsla) -> Self {
+        self.color_mode = color_mode;
+        self.tint = tint;
+        self
+    }
+
+    /// Sets the fixed-function batch compositing equation.
+    pub fn blend_mode(mut self, blend_mode: SpriteBlendMode) -> Self {
+        self.blend_mode = blend_mode;
+        self
     }
 }
 
@@ -1707,13 +1994,23 @@ impl From<SubpixelSprite> for Primitive {
 #[expect(missing_docs)]
 pub struct PolychromeSprite {
     pub order: DrawOrder,
-    pub pad: u32,
-    pub grayscale: PaddedBool32,
-    pub opacity: f32,
+    pub blend_mode: SpriteBlendMode,
+    pub color_mode: SpriteColorMode,
+    pub sample_inset: PaddedBool32,
     pub bounds: Bounds<ScaledPixels>,
     pub content_mask: ContentMask<ScaledPixels>,
     pub corner_radii: Corners<ScaledPixels>,
     pub tile: AtlasTile,
+    pub transformation: TransformationMatrix,
+    pub tint: Hsla,
+    pub opacity: f32,
+    pub pad: u32,
+}
+
+impl PolychromeSprite {
+    fn transformed_bounds(&self) -> Bounds<ScaledPixels> {
+        self.transformation.transform_bounds(self.bounds)
+    }
 }
 
 impl From<PolychromeSprite> for Primitive {

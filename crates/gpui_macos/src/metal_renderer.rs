@@ -9,7 +9,8 @@ use cocoa::{
 use gpui::{
     AtlasTextureId, BackdropGlass, Background, Bounds, ContentMask, DevicePixels, DrawOrder,
     LUMINANCE_PROBE_SAMPLES, MAX_LUMINANCE_PROBES, NO_LUMINANCE_PROBE, PaintSurface, Path, Point,
-    PrimitiveBatch, ScaledPixels, Scene, Size, point, probe_sample_luminance, size,
+    PrimitiveBatch, ScaledPixels, Scene, Size, SpriteBlendMode, point, probe_sample_luminance,
+    size,
 };
 #[cfg(any(test, feature = "test-support"))]
 use image::RgbaImage;
@@ -148,7 +149,9 @@ pub(crate) struct MetalRenderer {
     quads_pipeline_state: metal::RenderPipelineState,
     underlines_pipeline_state: metal::RenderPipelineState,
     monochrome_sprites_pipeline_state: metal::RenderPipelineState,
-    polychrome_sprites_pipeline_state: metal::RenderPipelineState,
+    polychrome_sprites_normal_pipeline_state: metal::RenderPipelineState,
+    polychrome_sprites_additive_pipeline_state: metal::RenderPipelineState,
+    polychrome_sprites_screen_pipeline_state: metal::RenderPipelineState,
     surfaces_pipeline_state: metal::RenderPipelineState,
     unit_vertices: metal::Buffer,
     #[allow(clippy::arc_with_non_send_sync)]
@@ -367,13 +370,32 @@ impl MetalRenderer {
             "monochrome_sprite_fragment",
             MTLPixelFormat::BGRA8Unorm,
         );
-        let polychrome_sprites_pipeline_state = build_pipeline_state(
+        let polychrome_sprites_normal_pipeline_state = build_composited_sprite_pipeline_state(
             &device,
             &library,
-            "polychrome_sprites",
+            "polychrome_sprites_normal",
             "polychrome_sprite_vertex",
             "polychrome_sprite_fragment",
             MTLPixelFormat::BGRA8Unorm,
+            SpriteBlendMode::Normal,
+        );
+        let polychrome_sprites_additive_pipeline_state = build_composited_sprite_pipeline_state(
+            &device,
+            &library,
+            "polychrome_sprites_additive",
+            "polychrome_sprite_vertex",
+            "polychrome_sprite_fragment",
+            MTLPixelFormat::BGRA8Unorm,
+            SpriteBlendMode::Additive,
+        );
+        let polychrome_sprites_screen_pipeline_state = build_composited_sprite_pipeline_state(
+            &device,
+            &library,
+            "polychrome_sprites_screen",
+            "polychrome_sprite_vertex",
+            "polychrome_sprite_fragment",
+            MTLPixelFormat::BGRA8Unorm,
+            SpriteBlendMode::Screen,
         );
         let surfaces_pipeline_state = build_pipeline_state(
             &device,
@@ -416,7 +438,9 @@ impl MetalRenderer {
             quads_pipeline_state,
             underlines_pipeline_state,
             monochrome_sprites_pipeline_state,
-            polychrome_sprites_pipeline_state,
+            polychrome_sprites_normal_pipeline_state,
+            polychrome_sprites_additive_pipeline_state,
+            polychrome_sprites_screen_pipeline_state,
             surfaces_pipeline_state,
             unit_vertices,
             instance_buffer_pool,
@@ -851,14 +875,18 @@ impl MetalRenderer {
                         viewport_size,
                         command_encoder,
                     ),
-                PrimitiveBatch::PolychromeSprites { texture_id, range } => self
-                    .draw_polychrome_sprites(
-                        texture_id,
-                        range,
-                        instance_bindings,
-                        viewport_size,
-                        command_encoder,
-                    ),
+                PrimitiveBatch::PolychromeSprites {
+                    texture_id,
+                    blend_mode,
+                    range,
+                } => self.draw_polychrome_sprites(
+                    texture_id,
+                    blend_mode,
+                    range,
+                    instance_bindings,
+                    viewport_size,
+                    command_encoder,
+                ),
                 PrimitiveBatch::Surfaces(range) => self.draw_surfaces(
                     &scene.surfaces[range.clone()],
                     range.start,
@@ -1452,6 +1480,7 @@ impl MetalRenderer {
     fn draw_polychrome_sprites(
         &self,
         texture_id: AtlasTextureId,
+        blend_mode: SpriteBlendMode,
         sprites: Range<usize>,
         instance_bindings: &InstanceBindings,
         viewport_size: Size<DevicePixels>,
@@ -1466,7 +1495,12 @@ impl MetalRenderer {
             DevicePixels(texture.width() as i32),
             DevicePixels(texture.height() as i32),
         );
-        command_encoder.set_render_pipeline_state(&self.polychrome_sprites_pipeline_state);
+        let pipeline = match blend_mode {
+            SpriteBlendMode::Normal => &self.polychrome_sprites_normal_pipeline_state,
+            SpriteBlendMode::Additive => &self.polychrome_sprites_additive_pipeline_state,
+            SpriteBlendMode::Screen => &self.polychrome_sprites_screen_pipeline_state,
+        };
+        command_encoder.set_render_pipeline_state(pipeline);
         command_encoder.set_vertex_buffer(
             SpriteInputIndex::Vertices as u64,
             Some(&self.unit_vertices),
@@ -1689,6 +1723,58 @@ fn build_pipeline_state(
     device
         .new_render_pipeline_state(&descriptor)
         .expect("could not create render pipeline state")
+}
+
+fn build_composited_sprite_pipeline_state(
+    device: &metal::DeviceRef,
+    library: &metal::LibraryRef,
+    label: &str,
+    vertex_fn_name: &str,
+    fragment_fn_name: &str,
+    pixel_format: metal::MTLPixelFormat,
+    blend_mode: SpriteBlendMode,
+) -> metal::RenderPipelineState {
+    let vertex_fn = library
+        .get_function(vertex_fn_name, None)
+        .expect("error locating vertex function");
+    let fragment_fn = library
+        .get_function(fragment_fn_name, None)
+        .expect("error locating fragment function");
+
+    let descriptor = metal::RenderPipelineDescriptor::new();
+    descriptor.set_label(label);
+    descriptor.set_vertex_function(Some(vertex_fn.as_ref()));
+    descriptor.set_fragment_function(Some(fragment_fn.as_ref()));
+    let color_attachment = descriptor
+        .color_attachments()
+        .object_at(0)
+        .expect("required framework invariant must hold");
+    color_attachment.set_pixel_format(pixel_format);
+    color_attachment.set_blending_enabled(true);
+    color_attachment.set_rgb_blend_operation(metal::MTLBlendOperation::Add);
+    color_attachment.set_alpha_blend_operation(metal::MTLBlendOperation::Add);
+    let (source, destination) = match blend_mode {
+        SpriteBlendMode::Normal => (
+            metal::MTLBlendFactor::SourceAlpha,
+            metal::MTLBlendFactor::OneMinusSourceAlpha,
+        ),
+        SpriteBlendMode::Additive => (
+            metal::MTLBlendFactor::SourceAlpha,
+            metal::MTLBlendFactor::One,
+        ),
+        SpriteBlendMode::Screen => (
+            metal::MTLBlendFactor::One,
+            metal::MTLBlendFactor::OneMinusSourceColor,
+        ),
+    };
+    color_attachment.set_source_rgb_blend_factor(source);
+    color_attachment.set_destination_rgb_blend_factor(destination);
+    color_attachment.set_source_alpha_blend_factor(metal::MTLBlendFactor::One);
+    color_attachment.set_destination_alpha_blend_factor(metal::MTLBlendFactor::OneMinusSourceAlpha);
+
+    device
+        .new_render_pipeline_state(&descriptor)
+        .expect("could not create composited sprite pipeline state")
 }
 
 fn build_pipeline_state_no_blend(

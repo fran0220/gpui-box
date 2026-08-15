@@ -799,8 +799,13 @@ impl From<image::ImageError> for ImageCacheError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ParentElement as _, TestAppContext, canvas, div, point, px, size};
+    use crate::{
+        DevicePixels, ParentElement as _, SpriteBlendMode, SpriteColorMode, SpriteInstance,
+        SpriteTransform, TestAppContext, TransformationMatrix, bounds, canvas, div, point, px,
+        radians, size,
+    };
     use image::{Frame, ImageBuffer, Rgba};
+    use std::{cell::Cell, rc::Rc};
 
     const TEST_IMG_ID: &str = "test-img";
 
@@ -893,6 +898,106 @@ mod tests {
             ),
             (50, 0, 100, 100),
         );
+    }
+
+    #[gpui::test]
+    fn sprite_batch_reuses_one_atlas_tile_for_explicit_source_rectangles(cx: &mut TestAppContext) {
+        let window = cx.add_empty_window();
+        let image = test_image_with_size(80, 40);
+        window.draw(point(px(0.), px(0.)), size(px(120.), px(80.)), |_, _| {
+            let image = image.clone();
+            canvas(
+                |_, _, _| (),
+                move |_, _, window, _| {
+                    let instances = [
+                        SpriteInstance::new(
+                            bounds(point(px(8.), px(8.)), size(px(32.), px(32.))),
+                            bounds(
+                                point(DevicePixels(0), DevicePixels(0)),
+                                size(DevicePixels(40), DevicePixels(40)),
+                            ),
+                        )
+                        .color_mode(SpriteColorMode::AlphaMask, crate::white())
+                        .blend_mode(SpriteBlendMode::Additive),
+                        SpriteInstance::new(
+                            bounds(point(px(56.), px(8.)), size(px(32.), px(32.))),
+                            bounds(
+                                point(DevicePixels(40), DevicePixels(0)),
+                                size(DevicePixels(40), DevicePixels(40)),
+                            ),
+                        )
+                        .transform(SpriteTransform::identity().rotate(radians(0.2)))
+                        .color_mode(SpriteColorMode::AlphaMask, crate::white())
+                        .blend_mode(SpriteBlendMode::Additive),
+                    ];
+                    window
+                        .paint_sprite_batch(image.clone(), 0, &instances)
+                        .expect("valid sprite batch paints");
+                },
+            )
+            .size_full()
+            .into_any_element()
+        });
+
+        window.update(|window, _| {
+            let sprites = &window.rendered_frame.scene.polychrome_sprites;
+            assert_eq!(sprites.len(), 2);
+            assert_eq!(sprites[0].tile.tile_id, sprites[1].tile.tile_id);
+            assert_eq!(sprites[0].tile.bounds.size.width, DevicePixels(40));
+            assert_eq!(
+                sprites[1].tile.bounds.origin.x.0 - sprites[0].tile.bounds.origin.x.0,
+                40
+            );
+            assert_eq!(sprites[0].color_mode, SpriteColorMode::AlphaMask);
+            assert_eq!(sprites[0].blend_mode, SpriteBlendMode::Additive);
+            assert_ne!(sprites[1].transformation, TransformationMatrix::unit());
+        });
+    }
+
+    #[gpui::test]
+    fn sprite_batch_reports_a_source_rectangle_outside_the_frame(cx: &mut TestAppContext) {
+        let window = cx.add_empty_window();
+        let failed = Rc::new(Cell::new(false));
+        let observed = failed.clone();
+        window.draw(point(px(0.), px(0.)), size(px(80.), px(80.)), |_, _| {
+            let image = test_image_with_size(40, 40);
+            let failed = failed.clone();
+            canvas(
+                |_, _, _| (),
+                move |_, _, window, _| {
+                    failed.set(
+                        window
+                            .paint_sprite_batch(
+                                image.clone(),
+                                0,
+                                &[
+                                    SpriteInstance::new(
+                                        bounds(point(px(0.), px(0.)), size(px(20.), px(20.))),
+                                        bounds(
+                                            point(DevicePixels(0), DevicePixels(0)),
+                                            size(DevicePixels(20), DevicePixels(20)),
+                                        ),
+                                    ),
+                                    SpriteInstance::new(
+                                        bounds(point(px(24.), px(0.)), size(px(20.), px(20.))),
+                                        bounds(
+                                            point(DevicePixels(30), DevicePixels(0)),
+                                            size(DevicePixels(20), DevicePixels(20)),
+                                        ),
+                                    ),
+                                ],
+                            )
+                            .is_err(),
+                    );
+                },
+            )
+            .size_full()
+            .into_any_element()
+        });
+        assert!(observed.get());
+        window.update(|window, _| {
+            assert!(window.rendered_frame.scene.polychrome_sprites.is_empty());
+        });
     }
 
     #[gpui::test]

@@ -46,6 +46,18 @@ different transcendental approximations for the noise. Color conversion and
 edge rasterization remain renderer-specific, which is why each renderer
 retains its own baseline rather than claiming identical bytes across platforms.
 
+`Window::paint_sprite_batch` samples half-open physical-pixel rectangles from
+one `RenderImage` frame and retains one atlas upload for all instances. Each
+instance carries logical destination bounds, a center-relative transform,
+rounded and source-alpha masking, tint/opacity, and normal, additive, or screen
+compositing. Metal, Direct3D, WGPU, and WebGL apply the same transformed clip
+and scene-culling contract; hardware blend state is selected per contiguous
+paint-ordered batch. Invalid frame, source, destination, transform, or opacity
+facts reject the whole call before any instance is painted. The primitive adds
+no hit testing or accessibility nodes, and it does not claim subtree-wide
+offscreen masks or blends. `RenderImage::from_rgba` is the public procedural
+pixel boundary and hides the renderer's internal channel order.
+
 `PathBuilder::stroke_trim` keeps an ordered normalized interval of the measured
 source path before Lyon expands the stroke. `dash_offset` advances and wraps a
 validated dash pattern against that same measurement, so trim, phase, joins,

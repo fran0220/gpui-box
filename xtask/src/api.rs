@@ -605,7 +605,7 @@ fn read_scenes(source: &str, items: &BTreeMap<String, Item>) -> Vec<SceneRecord>
                 reached.push_str(text);
                 reached.push('\n');
                 for candidate in bodies.keys() {
-                    if !seen.contains(candidate) && text.contains(&format!("{candidate}(")) {
+                    if !seen.contains(candidate) && calls(text, candidate) {
                         pending.push(candidate.clone());
                     }
                 }
@@ -618,6 +618,16 @@ fn read_scenes(source: &str, items: &BTreeMap<String, Item>) -> Vec<SceneRecord>
             })
         })
         .collect()
+}
+
+fn calls(source: &str, function: &str) -> bool {
+    let needle = format!("{function}(");
+    source.match_indices(&needle).any(|(at, _)| {
+        source[..at]
+            .chars()
+            .next_back()
+            .is_none_or(|before| !before.is_alphanumeric() && !matches!(before, '_' | '.' | ':'))
+    })
 }
 
 /// Every function declared in `scenes.rs`, by name, so a scene can be followed
@@ -1045,6 +1055,16 @@ pub enum SelectEvent {
         assert_eq!(scenes[0].name, "badge");
         assert_eq!(scenes[0].uses, vec!["Badge"]);
         assert!(scenes[0].example.contains("Badge::new"));
+    }
+
+    #[test]
+    fn helper_calls_require_an_identifier_boundary() {
+        assert!(calls("let value = form(window, cx);", "form"));
+        assert!(!calls(
+            "SpriteTransform::identity().transform(form)",
+            "form"
+        ));
+        assert!(!calls("builder.transform(value)", "form"));
     }
 
     #[test]

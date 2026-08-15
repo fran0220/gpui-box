@@ -4,7 +4,7 @@ use bytemuck::{Pod, Zeroable};
 use gpui::{
     AtlasTextureId, BackdropGlass, Background, Bounds, DevicePixels, DrawOrder, GpuSpecs,
     LUMINANCE_PROBE_SAMPLES, MAX_GLASS_LOBES, MAX_LUMINANCE_PROBES, NO_LUMINANCE_PROBE, Path,
-    Point, PrimitiveBatch, ScaledPixels, Scene, Size, get_gamma_correction_ratios,
+    Point, PrimitiveBatch, ScaledPixels, Scene, Size, SpriteBlendMode, get_gamma_correction_ratios,
     probe_sample_luminance,
 };
 use log::warn;
@@ -182,7 +182,9 @@ struct WgpuPipelines {
     underlines: wgpu::RenderPipeline,
     mono_sprites: wgpu::RenderPipeline,
     subpixel_sprites: Option<wgpu::RenderPipeline>,
-    poly_sprites: wgpu::RenderPipeline,
+    poly_sprites_normal: wgpu::RenderPipeline,
+    poly_sprites_additive: wgpu::RenderPipeline,
+    poly_sprites_screen: wgpu::RenderPipeline,
     #[allow(dead_code)]
     surfaces: wgpu::RenderPipeline,
     backdrop_blur: wgpu::RenderPipeline,
@@ -1319,17 +1321,60 @@ impl WgpuRenderer {
             None
         };
 
-        let poly_sprites = create_pipeline(
-            "poly_sprites",
-            "vs_poly_sprite",
-            "fs_poly_sprite",
-            &layouts.globals,
-            &layouts.instances,
-            Some(&layouts.texture),
-            wgpu::PrimitiveTopology::TriangleStrip,
-            &[Some(color_target.clone())],
-            1,
-            &shader_module,
+        let create_poly_sprites = |name, target| {
+            create_pipeline(
+                name,
+                "vs_poly_sprite",
+                "fs_poly_sprite",
+                &layouts.globals,
+                &layouts.instances,
+                Some(&layouts.texture),
+                wgpu::PrimitiveTopology::TriangleStrip,
+                &[Some(target)],
+                1,
+                &shader_module,
+            )
+        };
+        let poly_sprites_normal = create_poly_sprites("poly_sprites_normal", color_target.clone());
+        let source_color = if alpha_mode == wgpu::CompositeAlphaMode::PreMultiplied {
+            wgpu::BlendFactor::One
+        } else {
+            wgpu::BlendFactor::SrcAlpha
+        };
+        let sprite_alpha = wgpu::BlendComponent {
+            src_factor: wgpu::BlendFactor::One,
+            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+            operation: wgpu::BlendOperation::Add,
+        };
+        let poly_sprites_additive = create_poly_sprites(
+            "poly_sprites_additive",
+            wgpu::ColorTargetState {
+                format: surface_format,
+                blend: Some(wgpu::BlendState {
+                    color: wgpu::BlendComponent {
+                        src_factor: source_color,
+                        dst_factor: wgpu::BlendFactor::One,
+                        operation: wgpu::BlendOperation::Add,
+                    },
+                    alpha: sprite_alpha,
+                }),
+                write_mask: wgpu::ColorWrites::ALL,
+            },
+        );
+        let poly_sprites_screen = create_poly_sprites(
+            "poly_sprites_screen",
+            wgpu::ColorTargetState {
+                format: surface_format,
+                blend: Some(wgpu::BlendState {
+                    color: wgpu::BlendComponent {
+                        src_factor: wgpu::BlendFactor::One,
+                        dst_factor: wgpu::BlendFactor::OneMinusSrc,
+                        operation: wgpu::BlendOperation::Add,
+                    },
+                    alpha: sprite_alpha,
+                }),
+                write_mask: wgpu::ColorWrites::ALL,
+            },
         );
 
         let surfaces = create_pipeline(
@@ -1390,7 +1435,9 @@ impl WgpuRenderer {
             underlines,
             mono_sprites,
             subpixel_sprites,
-            poly_sprites,
+            poly_sprites_normal,
+            poly_sprites_additive,
+            poly_sprites_screen,
             surfaces,
             backdrop_blur,
             backdrop_composite,
@@ -2211,13 +2258,25 @@ impl WgpuRenderer {
                             &mut pass,
                         );
                     }
-                    PrimitiveBatch::PolychromeSprites { texture_id, range } => self.draw_sprites(
-                        &instance_bindings.polychrome_sprites,
+                    PrimitiveBatch::PolychromeSprites {
                         texture_id,
-                        &self.resources().pipelines.poly_sprites,
-                        instance_range(range),
-                        &mut pass,
-                    ),
+                        blend_mode,
+                        range,
+                    } => {
+                        let pipelines = &self.resources().pipelines;
+                        let pipeline = match blend_mode {
+                            SpriteBlendMode::Normal => &pipelines.poly_sprites_normal,
+                            SpriteBlendMode::Additive => &pipelines.poly_sprites_additive,
+                            SpriteBlendMode::Screen => &pipelines.poly_sprites_screen,
+                        };
+                        self.draw_sprites(
+                            &instance_bindings.polychrome_sprites,
+                            texture_id,
+                            pipeline,
+                            instance_range(range),
+                            &mut pass,
+                        );
+                    }
                     // Surfaces are macOS-only for video playback and are not
                     // implemented by the WGPU renderer.
                     PrimitiveBatch::Surfaces(_surfaces) => {}
@@ -3621,6 +3680,6 @@ mod tests {
         assert_eq!(std::mem::size_of::<Underline>(), 16 * 4);
         assert_eq!(std::mem::size_of::<MonochromeSprite>(), 28 * 4);
         assert_eq!(std::mem::size_of::<SubpixelSprite>(), 28 * 4);
-        assert_eq!(std::mem::size_of::<PolychromeSprite>(), 24 * 4);
+        assert_eq!(std::mem::size_of::<PolychromeSprite>(), 36 * 4);
     }
 }
