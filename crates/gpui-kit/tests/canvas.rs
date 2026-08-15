@@ -142,6 +142,44 @@ fn inspector(cx: &mut TestAppContext) -> (Harness, Calls) {
 }
 
 #[gpui::test]
+fn graph_nodes_keep_distinct_execution_states(cx: &mut TestAppContext) {
+    let states = [
+        ("pending", NodeState::Pending, false, false),
+        ("idle", NodeState::Idle, false, false),
+        ("queued", NodeState::Queued, true, false),
+        ("starting", NodeState::Starting, true, false),
+        ("running", NodeState::Running, true, false),
+        ("waiting", NodeState::Waiting, false, false),
+        ("blocked", NodeState::Blocked, false, true),
+        ("succeeded", NodeState::Succeeded, false, false),
+        ("partial", NodeState::Partial, false, false),
+        ("failed", NodeState::Failed, false, true),
+        ("refused", NodeState::Refused, false, false),
+        ("cancelling", NodeState::Cancelling, true, false),
+        ("cancelled", NodeState::Cancelled, false, false),
+        ("timed-out", NodeState::TimedOut, false, true),
+        ("unavailable", NodeState::Unavailable, false, false),
+    ];
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        div()
+            .column()
+            .children(states.map(|(name, state, _, _)| {
+                GraphNode::new(format!("state.{name}"), name).state(state)
+            }))
+            .into_any_element()
+    });
+
+    for (name, _, busy, invalid) in states {
+        let node = harness
+            .node(&format!("state.{name}"))
+            .expect("state node is published");
+        assert_eq!(node.value.as_deref(), Some(name));
+        assert_eq!(node.busy, busy, "{name} busy state");
+        assert_eq!(node.invalid, invalid, "{name} invalid state");
+    }
+}
+
+#[gpui::test]
 fn ports_publish_business_identity_direction_and_label(cx: &mut TestAppContext) {
     let (mut harness, _) = editor(cx);
 

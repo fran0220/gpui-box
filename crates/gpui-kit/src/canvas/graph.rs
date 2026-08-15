@@ -28,7 +28,7 @@ use super::edge::{
     Anchor, Axis, GraphEdge, GraphEndpoint, OrthogonalRoute, PortSide, RouteTransform, paint_route,
     paint_route_stroke, route_orthogonal, route_preview,
 };
-use super::node::{GraphNode, GraphPort, NodeState, PortDirection};
+use super::node::{GraphNode, GraphPort, PortDirection};
 
 /// The spacing of the dot grid behind the canvas, in pixels.
 const GRID_STEP: f32 = 24.0;
@@ -604,7 +604,7 @@ impl RenderOnce for NodeGraph {
                 || self
                     .nodes
                     .iter()
-                    .any(|placed| placed.node.node_state() == NodeState::Running));
+                    .any(|placed| placed.node.node_state().is_busy()));
         let graph_busy = matches!(self.state, GraphState::Loading) || moving_effects;
         let gesture = keyed::slot::<GestureState>(&self.ident.semantic_id(), cx);
         let animation_phase = if moving_effects && !cx.reduce_motion() {
@@ -1187,7 +1187,7 @@ impl RenderOnce for NodeGraph {
         for placed in self
             .nodes
             .iter()
-            .filter(|placed| placed.node.node_state() == NodeState::Running)
+            .filter(|placed| placed.node.node_state().is_busy())
             .filter(|placed| {
                 geometry
                     .iter()

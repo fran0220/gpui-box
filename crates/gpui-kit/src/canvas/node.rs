@@ -144,42 +144,61 @@ impl NodeMetrics {
     }
 }
 
-/// How a step ended, or that it has not.
+/// The exact execution state a step reports.
 ///
-/// These are five separate answers and stay separate: a step that the host
-/// refused to run is not a step that failed, and a step nobody has reached yet
-/// is not a step that succeeded quietly.
+/// Queued, waiting, blocked, refused, failed, cancelled, and unavailable are
+/// separate answers. Keeping the full vocabulary here prevents a run adapter
+/// from painting a host refusal as a failure or a wait as an unreached step.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum NodeState {
     /// Not reached yet.
     #[default]
     Pending,
+    Idle,
+    Queued,
+    Starting,
     Running,
+    Waiting,
+    Blocked,
     Succeeded,
+    Partial,
     Failed,
     /// The host declined to run it. Shown as a refusal, never as a failure and
     /// never as an empty step.
     Refused,
+    Cancelling,
+    Cancelled,
+    TimedOut,
+    Unavailable,
 }
 
 impl NodeState {
     pub fn color(self, theme: &gpui_kit_theme::Theme) -> Hsla {
         match self {
-            Self::Pending => theme.colors.text_faint,
+            Self::Pending | Self::Idle | Self::Cancelled | Self::Unavailable => {
+                theme.colors.text_faint
+            }
+            Self::Queued | Self::Starting => theme.colors.info,
             Self::Running => theme.colors.accent,
             Self::Succeeded => theme.colors.success,
-            Self::Failed => theme.colors.danger,
-            Self::Refused => theme.colors.warning,
+            Self::Waiting | Self::Partial | Self::Refused | Self::Cancelling => {
+                theme.colors.warning
+            }
+            Self::Blocked | Self::Failed | Self::TimedOut => theme.colors.danger,
         }
     }
 
     fn glyph(self) -> Option<Icon> {
         match self {
-            Self::Pending => None,
-            Self::Running => Some(Icon::Refresh),
+            Self::Pending | Self::Idle => None,
+            Self::Queued | Self::Waiting => Some(Icon::Info),
+            Self::Starting | Self::Running | Self::Cancelling => Some(Icon::Refresh),
+            Self::Blocked | Self::Partial | Self::TimedOut => Some(Icon::Danger),
             Self::Succeeded => Some(Icon::Check),
             Self::Failed => Some(Icon::Close),
             Self::Refused => Some(Icon::Danger),
+            Self::Cancelled => Some(Icon::Close),
+            Self::Unavailable => Some(Icon::CloseCircle),
         }
     }
 
@@ -187,11 +206,32 @@ impl NodeState {
     fn value(self) -> &'static str {
         match self {
             Self::Pending => "pending",
+            Self::Idle => "idle",
+            Self::Queued => "queued",
+            Self::Starting => "starting",
             Self::Running => "running",
+            Self::Waiting => "waiting",
+            Self::Blocked => "blocked",
             Self::Succeeded => "succeeded",
+            Self::Partial => "partial",
             Self::Failed => "failed",
             Self::Refused => "refused",
+            Self::Cancelling => "cancelling",
+            Self::Cancelled => "cancelled",
+            Self::TimedOut => "timed-out",
+            Self::Unavailable => "unavailable",
         }
+    }
+
+    pub(crate) fn is_busy(self) -> bool {
+        matches!(
+            self,
+            Self::Queued | Self::Starting | Self::Running | Self::Cancelling
+        )
+    }
+
+    fn is_invalid(self) -> bool {
+        matches!(self, Self::Blocked | Self::Failed | Self::TimedOut)
     }
 
     /// Whether the state is worth bleeding into the pixels around the card.
@@ -200,7 +240,16 @@ impl NodeState {
     /// node glowed would be a canvas where none of them stood out, which is
     /// the same as no glow at all but more expensive to draw.
     fn is_notable(self) -> bool {
-        matches!(self, Self::Running | Self::Failed | Self::Refused)
+        self.is_busy()
+            || matches!(
+                self,
+                Self::Waiting
+                    | Self::Blocked
+                    | Self::Partial
+                    | Self::Failed
+                    | Self::Refused
+                    | Self::TimedOut
+            )
     }
 }
 
@@ -476,11 +525,10 @@ impl RenderOnce for GraphNode {
         // so a running node and a running tool call turn at one rate.
         let mark = self.state.glyph().map(|glyph| {
             let element = icon(glyph).size(px(metrics.icon_size)).text_color(color);
-            match self.state {
-                NodeState::Running => {
-                    motion::spin(element, self.ident.child("mark").element_id(), &theme, cx)
-                }
-                _ => element.into_any_element(),
+            if self.state.is_busy() {
+                motion::spin(element, self.ident.child("mark").element_id(), &theme, cx)
+            } else {
+                element.into_any_element()
             }
         });
 
@@ -615,8 +663,8 @@ impl RenderOnce for GraphNode {
             .text(self.title.clone())
             .value(self.state.value())
             .selected(self.selected)
-            .busy(self.state == NodeState::Running)
-            .invalid(self.state == NodeState::Failed);
+            .busy(self.state.is_busy())
+            .invalid(self.state.is_invalid());
 
         if self.on_click.is_none() && self.on_delete.is_none() {
             return card.semantic_in(cx, spec).into_any_element();
@@ -666,25 +714,29 @@ mod tests {
         gpui_kit_theme::Theme::studio_dark()
     }
 
-    /// The states exist to be told apart, so no two of them may report the
-    /// same colour or the same word.
+    /// Tone is intentionally shared by related states, so the semantic word
+    /// remains the exact state rather than asking colour to carry identity.
     #[test]
-    fn every_state_is_distinguishable_from_every_other() {
-        let theme = theme();
+    fn every_state_has_a_distinct_semantic_word() {
         let states = [
             NodeState::Pending,
+            NodeState::Idle,
+            NodeState::Queued,
+            NodeState::Starting,
             NodeState::Running,
+            NodeState::Waiting,
+            NodeState::Blocked,
             NodeState::Succeeded,
+            NodeState::Partial,
             NodeState::Failed,
             NodeState::Refused,
+            NodeState::Cancelling,
+            NodeState::Cancelled,
+            NodeState::TimedOut,
+            NodeState::Unavailable,
         ];
         for (index, state) in states.iter().enumerate() {
             for other in &states[index + 1..] {
-                assert_ne!(
-                    state.color(&theme),
-                    other.color(&theme),
-                    "{state:?} {other:?}"
-                );
                 assert_ne!(state.value(), other.value(), "{state:?} {other:?}");
             }
         }
@@ -712,13 +764,23 @@ mod tests {
     }
 
     #[test]
-    fn a_pending_step_carries_no_glyph_and_the_rest_do() {
+    fn pending_and_idle_carry_no_glyph_and_settled_states_do() {
         assert!(NodeState::Pending.glyph().is_none());
+        assert!(NodeState::Idle.glyph().is_none());
         for state in [
+            NodeState::Queued,
+            NodeState::Starting,
             NodeState::Running,
+            NodeState::Waiting,
+            NodeState::Blocked,
             NodeState::Succeeded,
+            NodeState::Partial,
             NodeState::Failed,
             NodeState::Refused,
+            NodeState::Cancelling,
+            NodeState::Cancelled,
+            NodeState::TimedOut,
+            NodeState::Unavailable,
         ] {
             assert!(state.glyph().is_some(), "{state:?}");
         }

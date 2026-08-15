@@ -7113,13 +7113,23 @@
     {
       "name": "NodeState",
       "path": "gpui_kit::canvas::NodeState",
-      "summary": "How a step ended, or that it has not.",
+      "summary": "The exact execution state a step reports.",
       "variants": [
         "Pending",
+        "Idle",
+        "Queued",
+        "Starting",
         "Running",
+        "Waiting",
+        "Blocked",
         "Succeeded",
+        "Partial",
         "Failed",
-        "Refused"
+        "Refused",
+        "Cancelling",
+        "Cancelled",
+        "TimedOut",
+        "Unavailable"
       ],
       "construct": [],
       "options": [

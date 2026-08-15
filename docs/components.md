@@ -682,6 +682,13 @@ plainer component would have to collapse two facts into one.
 | `ThinkingBlock` | builder | the state the disclosure should take | Model reasoning, collapsed by default. Withheld, absent, and collapsed are three states and three presentations |
 | `NodeGraph`, `GraphInteraction` | builder, policy | viewport and selection; Arrange adds node moves; Edit adds node deletion and connection/disconnection proposals | A controlled run canvas over caller-positioned `GraphNode`s and caller-owned `GraphEdge`s. `Inspect` never installs topology-edit actions, while the default `Edit` preserves the complete editor. A node thumbnail is a caller-rendered element slot; the graph fetches and decodes nothing |
 
+`GraphNode` does not compress execution into a success flag. `Pending`, `Idle`,
+`Queued`, `Starting`, `Running`, `Waiting`, `Blocked`, `Succeeded`, `Partial`,
+`Failed`, `Refused`, `Cancelling`, `Cancelled`, `TimedOut`, and `Unavailable`
+remain distinct semantic values. Related states may share a theme tone, but
+wording, a static glyph, busy state, and invalid state preserve the distinction
+when colour or motion is unavailable.
+
 ### A refusal is not an absence and not an error
 
 `ToolCallState` is five states, not a flag beside a result: `PendingApproval`,
