@@ -302,6 +302,10 @@ pub fn catalog() -> Vec<Scene> {
             build: agent_roster,
         },
         Scene {
+            name: "persona",
+            build: persona,
+        },
+        Scene {
             name: "agent-run-canvas",
             build: agent_run_canvas,
         },
@@ -6037,6 +6041,172 @@ fn agent_roster(_window: &mut Window, cx: &mut App) -> AnyElement {
                     ),
                 ),
         )
+        .into_any_element()
+}
+
+fn persona(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let speaking =
+        AgentSnapshot::new(AgentDescriptor::new("guide", "Lyra").role("Expedition guide"))
+            .presence(AgentPresence::Online)
+            .execution(AgentExecutionState::Active(AgentActivity::Speaking));
+    let listening =
+        AgentSnapshot::new(AgentDescriptor::new("listener", "Moss").role("World companion"))
+            .presence(AgentPresence::Online)
+            .execution(AgentExecutionState::Waiting(WaitReason::UserInput));
+    let speaking_voice =
+        VoiceSample::new(VoiceState::Speaking, 0.76, 0.58).expect("scene voice is normalized");
+    let listening_voice =
+        VoiceSample::new(VoiceState::Listening, 0.32, 0.48).expect("scene voice is normalized");
+    let idle = AgentSnapshot::new(AgentDescriptor::new("idle", "Ori").role("Archivist"))
+        .presence(AgentPresence::Away)
+        .execution(AgentExecutionState::Idle);
+    let thinking = AgentSnapshot::new(AgentDescriptor::new("thinking", "Sable").role("Tactician"))
+        .presence(AgentPresence::Online)
+        .execution(AgentExecutionState::Active(AgentActivity::Thinking));
+    let celebrating = AgentSnapshot::new(AgentDescriptor::new("victor", "Kite").role("Pathfinder"))
+        .presence(AgentPresence::Online)
+        .execution(AgentExecutionState::Completed(AgentOutcome::Succeeded));
+    let unavailable_voice = VoiceSample::new(
+        VoiceState::Unavailable("Voice input was not granted.".into()),
+        0.0,
+        0.0,
+    )
+    .expect("scene voice is normalized");
+
+    let content = div()
+        .column()
+        .w(px(680.0))
+        .gap_token(&theme, Space::Md)
+        .child(
+            div()
+                .row_reading(cx.layout_direction())
+                .items_center()
+                .gap_token(&theme, Space::Xl)
+                .child(
+                    PersonaPortrait::new("scene.persona.portrait-speaking", speaking.clone())
+                        .expression(PersonaExpression::Warm)
+                        .voice(speaking_voice.clone())
+                        .sample_at(Duration::from_millis(640)),
+                )
+                .child(
+                    PersonaPortrait::new("scene.persona.portrait-listening", listening.clone())
+                        .expression(PersonaExpression::Focused)
+                        .voice(listening_voice.clone())
+                        .sample_at(Duration::from_millis(640)),
+                )
+                .child(
+                    div()
+                        .column()
+                        .gap_token(&theme, Space::Xs)
+                        .child(
+                            div()
+                                .type_scale(&theme, TypeScale::Label)
+                                .text_tone(&theme, TextTone::Primary)
+                                .child("Voice-reactive"),
+                        )
+                        .child(
+                            VoiceReactive::new("scene.persona.voice", speaking_voice)
+                                .sample_at(Duration::from_millis(640)),
+                        ),
+                ),
+        )
+        .child(
+            PersonaDialogue::new(
+                "scene.persona.dialogue",
+                DialogueTurn::markdown(
+                    "crossroads",
+                    speaking,
+                    "The signal splits at the **crystal bridge.** I can scout either route without advancing the story for you.",
+                )
+                .streaming(true)
+                .choice(DialogueChoice::new("bridge", "Cross the bridge").selected(true))
+                .choice(DialogueChoice::new("cavern", "Enter the cavern"))
+                .choice(
+                    DialogueChoice::new("gate", "Open the sealed gate")
+                        .unavailable("The gate key has not been verified."),
+                ),
+            )
+            .expression(PersonaExpression::Warm)
+            .voice(listening_voice)
+            .on_event(|_, _, _| {}),
+        )
+        .child(
+            div()
+                .row_reading(cx.layout_direction())
+                .items_center()
+                .gap_token(&theme, Space::Xl)
+                .child(
+                    div()
+                        .column()
+                        .items_center()
+                        .gap_token(&theme, Space::Xs)
+                        .child(
+                            PersonaPortrait::new("scene.persona.idle", idle)
+                                .expression(PersonaExpression::Neutral)
+                                .size(68.0),
+                        )
+                        .child(crate::foundation::text(
+                            &theme,
+                            TypeScale::Caption,
+                            "Idle · neutral",
+                        )),
+                )
+                .child(
+                    div()
+                        .column()
+                        .items_center()
+                        .gap_token(&theme, Space::Xs)
+                        .child(
+                            PersonaPortrait::new("scene.persona.thinking", thinking)
+                                .expression(PersonaExpression::Focused)
+                                .size(68.0),
+                        )
+                        .child(crate::foundation::text(
+                            &theme,
+                            TypeScale::Caption,
+                            "Thinking · focused",
+                        )),
+                )
+                .child(
+                    div()
+                        .column()
+                        .items_center()
+                        .gap_token(&theme, Space::Xs)
+                        .child(
+                            PersonaPortrait::new("scene.persona.celebrating", celebrating)
+                                .expression(PersonaExpression::Celebrating)
+                                .size(68.0),
+                        )
+                        .child(crate::foundation::text(
+                            &theme,
+                            TypeScale::Caption,
+                            "Succeeded · celebrating",
+                        )),
+                )
+                .child(
+                    div()
+                        .column()
+                        .items_center()
+                        .gap_token(&theme, Space::Xs)
+                        .child(VoiceReactive::new(
+                            "scene.persona.voice-unavailable",
+                            unavailable_voice,
+                        ))
+                        .child(crate::foundation::text(
+                            &theme,
+                            TypeScale::Caption,
+                            "Unavailable",
+                        )),
+                ),
+        )
+        ;
+
+    stack(&theme)
+        .size_full()
+        .items_center()
+        .justify_center()
+        .child(content)
         .into_any_element()
 }
 

@@ -31,7 +31,7 @@ input, and an entry in `docs/components.md`.
 | Keymap | `KeybindingRecorder`, `KeymapEditor` |
 | Interaction | `Dropzone` |
 | Filtering | `FilterBar` |
-| Agent run | `ToolCallCard`, `StepList`, `ThinkingBlock`, `NodeGraph` |
+| Agent run and persona | `ToolCallCard`, `StepList`, `ThinkingBlock`, `NodeGraph`, `AgentRoster`, `SubagentTree`, `AgentRunCanvas`, `PersonaPortrait`, `VoiceReactive`, `PersonaDialogue` |
 | Structured data | `JsonView`, `SchemaForm` |
 | Connections | `ServerList`, `OfferingCatalog` |
 
@@ -157,6 +157,11 @@ own; both are exercised through every control and overlay that uses them.
   reports a retry. Sending anything, deciding what a resend means, and knowing
   whether a message was really read are the transport's, and this crate has no
   transport.
+- **Capturing a voice or advancing dialogue.** `VoiceReactive` maps a finite
+  normalized host sample to a complete meter and `PersonaDialogue` owns the
+  portrait, safe Markdown, streaming, and choice composition. Microphone
+  access, recognition, synthesis, playback, expression inference, and choosing
+  or applying the next turn remain host facts and capabilities.
 - **Fetching or decoding an image.** `ImageViewer` frames, zooms and pans an
   element the host hands it, and names the source when the host hands it
   nothing. There is no network here and no decoder, so the pixel size of a

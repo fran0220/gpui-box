@@ -104,6 +104,9 @@ actions. They define no account, provider, network, or credential policy.
 | `SubagentTree` | builder | selected agent and requested disclosure state | Derives only parent-child structure from typed `Spawn` links. Expanded branches and selection remain caller-owned; non-spawn delegation, report, handoff, and dependency links do not silently reparent agents |
 | `AgentRunIssues` | builder | — | Renders `AgentRunSnapshot::issues()` as one stable failure notice. Identity-indexed components use it instead of collapsing duplicate or dangling facts into a different roster or topology |
 | `AgentRunCanvas`, `AgentRunLayout` | builder, policy | typed subject selection, viewport, and optional arranged subject positions | Projects one valid `AgentRunSnapshot` directly onto `NodeGraph`: agents, tasks, invocation placeholders, every execution state, and all seven relationship kinds keep their typed identity and localized wording. The built-in layered layout is deterministic and RTL-aware. Inspection never installs topology edits; malformed topology renders `AgentRunIssues` before any identity-indexed projection |
+| `PersonaPortrait` | builder | — | Builds an expressive large portrait on `AgentAvatar` from caller-owned expression, resolved image, tint, execution, and optional normalized `VoiceSample`. It owns expression marks, voice bars, crop, RTL placement, reduced motion, and an optional policy-resolved `EffectPlan`; it fetches no art and observes no microphone |
+| `VoiceReactive` | builder | — | Maps one finite normalized level/envelope and `VoiceState` to the standard accessible meter. Live rendering owns its timeline; reduced motion is static and symmetric; `sample_at` is exact and schedules no frame. Invalid or out-of-range samples are rejected rather than clamped into plausible facts |
+| `PersonaDialogue` | builder | choice and Markdown events stamped with turn identity | Composes `PersonaPortrait`, localized agent activity, safe `Markdown`, streaming presentation, and caller-owned choices. Unavailable choices keep their host reason visible and install no action. Selection and dialogue progression remain caller-owned; host-resolved Markdown images and code spans retain the standalone renderer's security boundary |
 
 The presentation layer is not an agent runtime. It consumes an observed
 `AgentRunSnapshot`, displays waiting/refused/failed/cancelled as distinct facts,
@@ -143,6 +146,12 @@ layer is decorative, the target status/control remains the semantic feedback
 and the layer adds no hitbox or accessibility node. This keeps graceful
 degradation and performance policy out of every downstream chatbot, persona,
 or game surface.
+
+Persona presentation follows the same boundary. Audio capture, recognition,
+playback, portrait download, model expression inference, and dialogue
+progression are host capabilities. Box accepts only resolved assets and typed
+facts, then owns the reusable visual mapping, deterministic sampling,
+accessibility semantics, RTL order, and fallback treatment.
 
 ## Navigation
 

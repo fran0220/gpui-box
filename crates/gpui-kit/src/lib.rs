@@ -108,6 +108,11 @@ pub mod prelude {
         PermissionAction, PermissionChange, PermissionEntry, PermissionMatrix, PermissionSource,
         PermissionState, PermissionSubject,
     };
+    pub use crate::agent::persona::{
+        DialogueChoice, DialogueChoiceAvailability, DialogueTurn, PersonaDialogue,
+        PersonaDialogueEvent, PersonaExpression, PersonaPortrait, VoiceField, VoiceReactive,
+        VoiceSample, VoiceSampleError, VoiceSampleErrorKind, VoiceState,
+    };
     pub use crate::agent::presentation::{
         AgentActivityLine, AgentAppearance, AgentAvatar, AgentCard, AgentGroup, AgentRoster,
         AgentRunIssues, SubagentTree,

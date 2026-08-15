@@ -9,6 +9,7 @@ pub mod cost;
 pub mod model;
 pub mod offering_catalog;
 pub mod permission;
+pub mod persona;
 pub mod presentation;
 pub mod server_list;
 pub mod step_list;
@@ -30,6 +31,11 @@ pub use offering_catalog::{
 pub use permission::{
     PermissionAction, PermissionChange, PermissionEntry, PermissionMatrix, PermissionSource,
     PermissionState, PermissionSubject,
+};
+pub use persona::{
+    DialogueChoice, DialogueChoiceAvailability, DialogueTurn, PersonaDialogue,
+    PersonaDialogueEvent, PersonaExpression, PersonaPortrait, VoiceField, VoiceReactive,
+    VoiceSample, VoiceSampleError, VoiceSampleErrorKind, VoiceState,
 };
 pub use presentation::{
     AgentActivityLine, AgentAppearance, AgentAvatar, AgentCard, AgentGroup, AgentRoster,

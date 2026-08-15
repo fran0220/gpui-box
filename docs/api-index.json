@@ -2421,6 +2421,59 @@
       ]
     },
     {
+      "name": "PersonaDialogue",
+      "kind": "builder",
+      "path": "gpui_kit::agent::PersonaDialogue",
+      "source": "crates/gpui-kit/src/agent/persona.rs",
+      "summary": "Persona-aware dialogue over the safe Markdown renderer.",
+      "construct": [
+        "new(ident: impl Into<Ident>, turn: DialogueTurn) -> Self"
+      ],
+      "options": [
+        "expression(expression: PersonaExpression) -> Self",
+        "voice(sample: VoiceSample) -> Self",
+        "image(image: impl Into<SharedString>) -> Self",
+        "tint(tint: Hsla) -> Self",
+        "on_event(handler: impl Fn(&PersonaDialogueEvent, &mut Window, &mut App) + 'static) -> Self",
+        "markdown_image(source: impl Fn(&SharedString, &ImageRequest, &mut Window, &mut App) -> Option<AnyElement> + 'static) -> Self",
+        "markdown_highlighter(highlighter: impl Fn(&SharedString, &CodeBlock) -> Vec<CodeSpan> + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [
+        "ChoiceRequested",
+        "Markdown"
+      ],
+      "scenes": [
+        "persona"
+      ]
+    },
+    {
+      "name": "PersonaPortrait",
+      "kind": "builder",
+      "path": "gpui_kit::agent::PersonaPortrait",
+      "source": "crates/gpui-kit/src/agent/persona.rs",
+      "summary": "A large expressive portrait built on the standard AgentAvatar.",
+      "construct": [
+        "new(ident: impl Into<Ident>, agent: AgentSnapshot) -> Self"
+      ],
+      "options": [
+        "expression(expression: PersonaExpression) -> Self",
+        "voice(sample: VoiceSample) -> Self",
+        "image(image: impl Into<SharedString>) -> Self",
+        "tint(tint: Hsla) -> Self",
+        "effect(plan: EffectPlan) -> Self",
+        "sample_at(elapsed: Duration) -> Self",
+        "size(size: f32) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "persona"
+      ]
+    },
+    {
       "name": "Popover",
       "kind": "view",
       "path": "gpui_kit::overlay::Popover",
@@ -3772,6 +3825,25 @@
       ]
     },
     {
+      "name": "VoiceReactive",
+      "kind": "builder",
+      "path": "gpui_kit::agent::VoiceReactive",
+      "source": "crates/gpui-kit/src/agent/persona.rs",
+      "summary": "A standard voice-reactive visualization from a normalized host sample.",
+      "construct": [
+        "new(ident: impl Into<Ident>, sample: VoiceSample) -> Self"
+      ],
+      "options": [
+        "sample_at(elapsed: Duration) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "persona"
+      ]
+    },
+    {
       "name": "Wizard",
       "kind": "builder",
       "path": "gpui_kit::navigation::Wizard",
@@ -5100,6 +5172,55 @@
       "options": [],
       "commands": [],
       "queries": []
+    },
+    {
+      "name": "DialogueChoice",
+      "path": "gpui_kit::agent::DialogueChoice",
+      "summary": "One caller-owned action offered after a dialogue turn.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, label: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "detail(detail: impl Into<SharedString>) -> Self",
+        "unavailable(reason: impl Into<SharedString>) -> Self",
+        "selected(selected: bool) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString"
+      ]
+    },
+    {
+      "name": "DialogueChoiceAvailability",
+      "path": "gpui_kit::agent::DialogueChoiceAvailability",
+      "summary": "Whether a dialogue choice can presently be requested.",
+      "variants": [
+        "Available",
+        "Unavailable"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "DialogueTurn",
+      "path": "gpui_kit::agent::DialogueTurn",
+      "summary": "One complete caller-owned persona turn.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, agent: AgentSnapshot, body: impl Into<MessageBody>) -> Self",
+        "markdown(id: impl Into<SharedString>, agent: AgentSnapshot, source: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "streaming(streaming: bool) -> Self",
+        "choice(choice: DialogueChoice) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString"
+      ]
     },
     {
       "name": "Diff",
@@ -7457,6 +7578,38 @@
       ]
     },
     {
+      "name": "PersonaDialogueEvent",
+      "path": "gpui_kit::agent::PersonaDialogueEvent",
+      "summary": "What persona dialogue reports without applying it.",
+      "variants": [
+        "ChoiceRequested",
+        "Markdown"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "PersonaExpression",
+      "path": "gpui_kit::agent::PersonaExpression",
+      "summary": "A caller-observed expression, independent of execution state.",
+      "variants": [
+        "Neutral",
+        "Warm",
+        "Focused",
+        "Concerned",
+        "Celebrating",
+        "Custom"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "name() -> &str"
+      ]
+    },
+    {
       "name": "Phase",
       "path": "gpui_kit::motion::Phase",
       "summary": "Where an element is in its arrival or departure.",
@@ -9266,6 +9419,76 @@
       ]
     },
     {
+      "name": "VoiceField",
+      "path": "gpui_kit::agent::VoiceField",
+      "summary": "Which normalized voice field failed validation.",
+      "variants": [
+        "Level",
+        "Envelope"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "VoiceSample",
+      "path": "gpui_kit::agent::VoiceSample",
+      "summary": "One bounded, caller-sampled voice observation.",
+      "variants": [],
+      "construct": [
+        "new(state: VoiceState, level: f32, envelope: f32) -> Result<Self, VoiceSampleError>",
+        "silent() -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "state() -> &VoiceState",
+        "level() -> f32",
+        "envelope() -> f32"
+      ]
+    },
+    {
+      "name": "VoiceSampleError",
+      "path": "gpui_kit::agent::VoiceSampleError",
+      "summary": "A rejected voice sample. Invalid values are never clamped into plausible audio facts.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "VoiceSampleErrorKind",
+      "path": "gpui_kit::agent::VoiceSampleErrorKind",
+      "summary": "Why a voice sample was rejected.",
+      "variants": [
+        "NonFinite",
+        "OutOfRange"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "VoiceState",
+      "path": "gpui_kit::agent::VoiceState",
+      "summary": "Whether a host-observed voice channel is active.",
+      "variants": [
+        "Silent",
+        "Listening",
+        "Speaking",
+        "Unavailable"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "name() -> &'static str"
+      ]
+    },
+    {
       "name": "WaitReason",
       "path": "gpui_kit::agent::WaitReason",
       "summary": "Why an agent or task is waiting rather than making progress.",
@@ -9944,6 +10167,16 @@
         "Tree"
       ],
       "example": "fn agent_roster(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let direction = cx.layout_direction();\n    let run = scene_agent_run();\n    let root = run\n        .agents\n        .first()\n        .cloned()\n        .expect(\"the canonical multi-agent scene has a root agent\");\n\n    stack(&theme)\n        .w(px(720.0))\n        .child(\n            div()\n                .row_reading(direction)\n                .items_center()\n                .justify_between()\n                .child(\n                    div()\n                        .column()\n                        .gap_token(&theme, Space::Xs)\n                        .child(\n                            div()\n                                .type_scale(&theme, TypeScale::Title)\n                                .text_tone(&theme, TextTone::Primary)\n                                .child(\"Release review\"),\n                        )\n                        .child(AgentActivityLine::new(\n                            \"scene.agent-roster.run-state\",\n                            run.execution.clone(),\n                        )),\n                )\n                .child(\n                    AgentGroup::new(\"scene.agent-roster.group\", run.agents.clone()).max_visible(3),\n                ),\n        )\n        .child(\n            AgentCard::new(\"scene.agent-roster.root\", root)\n                .task_label(\"Synthesis\")\n                .selected(true)\n                .on_action(|_, _, _| {}),\n        )\n        .child(\n            div()\n                .row_reading(direction)\n                .items_start()\n                .gap_token(&theme, Space::Lg)\n                .child(\n                    div().w(px(420.0)).child(\n                        AgentRoster::from_run(\"scene.agent-roster.list\", &run)\n                            .selected(\"researcher\")\n                            .visible_rows(4)\n                            .on_action(|_, _, _| {}),\n                    ),\n                )\n                .child(\n                    div().w(px(270.0)).child(\n                        SubagentTree::new(\"scene.agent-roster.tree\", run)\n                            .expanded([\"orchestrator\".into(), \"researcher\".into()])\n                            .selected(\"researcher\")\n                            .visible_rows(4)\n                            .on_toggle(|_, _, _, _| {})\n                            .on_action(|_, _, _| {}),\n                    ),\n                ),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "persona",
+      "capture": "cargo run -p xtask -- headless capture persona",
+      "uses": [
+        "PersonaDialogue",
+        "PersonaPortrait",
+        "VoiceReactive"
+      ],
+      "example": "fn persona(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let speaking =\n        AgentSnapshot::new(AgentDescriptor::new(\"guide\", \"Lyra\").role(\"Expedition guide\"))\n            .presence(AgentPresence::Online)\n            .execution(AgentExecutionState::Active(AgentActivity::Speaking));\n    let listening =\n        AgentSnapshot::new(AgentDescriptor::new(\"listener\", \"Moss\").role(\"World companion\"))\n            .presence(AgentPresence::Online)\n            .execution(AgentExecutionState::Waiting(WaitReason::UserInput));\n    let speaking_voice =\n        VoiceSample::new(VoiceState::Speaking, 0.76, 0.58).expect(\"scene voice is normalized\");\n    let listening_voice =\n        VoiceSample::new(VoiceState::Listening, 0.32, 0.48).expect(\"scene voice is normalized\");\n    let idle = AgentSnapshot::new(AgentDescriptor::new(\"idle\", \"Ori\").role(\"Archivist\"))\n        .presence(AgentPresence::Away)\n        .execution(AgentExecutionState::Idle);\n    let thinking = AgentSnapshot::new(AgentDescriptor::new(\"thinking\", \"Sable\").role(\"Tactician\"))\n        .presence(AgentPresence::Online)\n        .execution(AgentExecutionState::Active(AgentActivity::Thinking));\n    let celebrating = AgentSnapshot::new(AgentDescriptor::new(\"victor\", \"Kite\").role(\"Pathfinder\"))\n        .presence(AgentPresence::Online)\n        .execution(AgentExecutionState::Completed(AgentOutcome::Succeeded));\n    let unavailable_voice = VoiceSample::new(\n        VoiceState::Unavailable(\"Voice input was not granted.\".into()),\n        0.0,\n        0.0,\n    )\n    .expect(\"scene voice is normalized\");\n\n    let content = div()\n        .column()\n        .w(px(680.0))\n        .gap_token(&theme, Space::Md)\n        .child(\n            div()\n                .row_reading(cx.layout_direction())\n                .items_center()\n                .gap_token(&theme, Space::Xl)\n                .child(\n                    PersonaPortrait::new(\"scene.persona.portrait-speaking\", speaking.clone())\n                        .expression(PersonaExpression::Warm)\n                        .voice(speaking_voice.clone())\n                        .sample_at(Duration::from_millis(640)),\n                )\n                .child(\n                    PersonaPortrait::new(\"scene.persona.portrait-listening\", listening.clone())\n                        .expression(PersonaExpression::Focused)\n                        .voice(listening_voice.clone())\n                        .sample_at(Duration::from_millis(640)),\n                )\n                .child(\n                    div()\n                        .column()\n                        .gap_token(&theme, Space::Xs)\n                        .child(\n                            div()\n                                .type_scale(&theme, TypeScale::Label)\n                                .text_tone(&theme, TextTone::Primary)\n                                .child(\"Voice-reactive\"),\n                        )\n                        .child(\n                            VoiceReactive::new(\"scene.persona.voice\", speaking_voice)\n                                .sample_at(Duration::from_millis(640)),\n                        ),\n                ),\n        )\n        .child(\n            PersonaDialogue::new(\n                \"scene.persona.dialogue\",\n                DialogueTurn::markdown(\n                    \"crossroads\",\n                    speaking,\n                    \"The signal splits at the **crystal bridge.** I can scout either route without advancing the story for you.\",\n                )\n                .streaming(true)\n                .choice(DialogueChoice::new(\"bridge\", \"Cross the bridge\").selected(true))\n                .choice(DialogueChoice::new(\"cavern\", \"Enter the cavern\"))\n                .choice(\n                    DialogueChoice::new(\"gate\", \"Open the sealed gate\")\n                        .unavailable(\"The gate key has not been verified.\"),\n                ),\n            )\n            .expression(PersonaExpression::Warm)\n            .voice(listening_voice)\n            .on_event(|_, _, _| {}),\n        )\n        .child(\n            div()\n                .row_reading(cx.layout_direction())\n                .items_center()\n                .gap_token(&theme, Space::Xl)\n                .child(\n                    div()\n                        .column()\n                        .items_center()\n                        .gap_token(&theme, Space::Xs)\n                        .child(\n                            PersonaPortrait::new(\"scene.persona.idle\", idle)\n                                .expression(PersonaExpression::Neutral)\n                                .size(68.0),\n                        )\n                        .child(crate::foundation::text(\n                            &theme,\n                            TypeScale::Caption,\n                            \"Idle · neutral\",\n                        )),\n                )\n                .child(\n                    div()\n                        .column()\n                        .items_center()\n                        .gap_token(&theme, Space::Xs)\n                        .child(\n                            PersonaPortrait::new(\"scene.persona.thinking\", thinking)\n                                .expression(PersonaExpression::Focused)\n                                .size(68.0),\n                        )\n                        .child(crate::foundation::text(\n                            &theme,\n                            TypeScale::Caption,\n                            \"Thinking · focused\",\n                        )),\n                )\n                .child(\n                    div()\n                        .column()\n                        .items_center()\n                        .gap_token(&theme, Space::Xs)\n                        .child(\n                            PersonaPortrait::new(\"scene.persona.celebrating\", celebrating)\n                                .expression(PersonaExpression::Celebrating)\n                                .size(68.0),\n                        )\n                        .child(crate::foundation::text(\n                            &theme,\n                            TypeScale::Caption,\n                            \"Succeeded · celebrating\",\n                        )),\n                )\n                .child(\n                    div()\n                        .column()\n                        .items_center()\n                        .gap_token(&theme, Space::Xs)\n                        .child(VoiceReactive::new(\n                            \"scene.persona.voice-unavailable\",\n                            unavailable_voice,\n                        ))\n                        .child(crate::foundation::text(\n                            &theme,\n                            TypeScale::Caption,\n                            \"Unavailable\",\n                        )),\n                ),\n        )\n        ;\n\n    stack(&theme)\n        .size_full()\n        .items_center()\n        .justify_center()\n        .child(content)\n        .into_any_element()\n}"
     },
     {
       "name": "agent-run-canvas",

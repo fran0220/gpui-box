@@ -17,6 +17,15 @@ reported and never silently merged. Markdown events include the block id that
 produced them, so a host applies the same link and image policy it already uses
 for a standalone document.
 
+`PersonaDialogue` keeps the same boundary while adding an expressive speaker,
+localized execution status, streaming treatment, and typed choices. Its
+`PersonaDialogueEvent::Markdown` carries the turn id alongside the unchanged
+`MarkdownEvent`; `markdown_image` and `markdown_highlighter` are the same
+host-resolution seams as the standalone renderer. A disabled choice shows the
+host's refusal and installs no callback. The component never opens a link,
+fetches portrait or document art, samples a microphone, recognizes speech, or
+advances the dialogue.
+
 ## The Markdown security posture
 
 ### Raw HTML is shown, never run, and never dropped

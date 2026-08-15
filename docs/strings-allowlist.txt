@@ -106,6 +106,7 @@ POSITION
 Pagination
 PasswordInput
 PermissionMatrix
+PersonaDialogue
 Placed
 PlatformMediaTransport
 Popover
@@ -181,6 +182,8 @@ glTF
 markdown stream closed `{end:?}` past its root
 month unknown
 more than one root: {}
+must be between 0 and 1
+must be finite
 no record without a parent
 not applicable
 not fetched
@@ -205,6 +208,7 @@ unknown-limit
 unrenderable, required
 unrendered html
 visible series are drawn by the caller
+voice {field} {reason}
 withheld
 {chosen} of {loaded} loaded, {total} total
 {count} of {max}

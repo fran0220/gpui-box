@@ -344,7 +344,10 @@ agent product model to GPUI Box Kit.
   `PermissionAction`, `PermissionSubject`, `PermissionChange`, and
   `PermissionMatrix` in `agent/permission.rs`;
 - `ServerState`, `OfferingKind`, `Offering`, `Catalog`, `ServerEntry`, and
-  `ServerList` in `agent/server_list.rs`; and
+  `ServerList` in `agent/server_list.rs`;
+- `PersonaExpression`, `VoiceState`, `VoiceSample`, `DialogueChoice`,
+  `DialogueTurn`, `PersonaDialogueEvent`, `PersonaPortrait`, `VoiceReactive`,
+  and `PersonaDialogue` in `agent/persona.rs`; and
 - `Basis`, `Quantity`, `Reading`, `Limit`, `LastVerified`, `CostLine`,
   `CostMeter`, and `ContextGauge` in `agent/cost.rs`.
 
@@ -360,8 +363,10 @@ the remaining interactive builders store callbacks over `Window` and `App`.
 **Emitted actions.** `ToolCallCard` reports retry; `ThinkingBlock` reports the
 requested expanded state; `ApprovalEvent` reports approved scope or declined;
 `PermissionMatrix` reports `PermissionChange`; and `ServerList` reports select,
-retry, and expanded state. `StepList`, cost views, and `Timeline` are
-display-only unless their composed details carry controls.
+retry, and expanded state. `PersonaDialogue` reports choices and unchanged
+Markdown events with turn identity. `StepList`, cost views, portraits, voice
+meters, and `Timeline` are display-only unless their composed details carry
+controls.
 
 **Verdict.** The vocabulary pieces are unusually strong and truthful. The gap
 is an aggregate, bounded composition contract for one run or timeline card,
