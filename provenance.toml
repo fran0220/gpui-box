@@ -72,3 +72,19 @@ relationship = "vendored-abi-neutral-future-compatibility-fix"
 license = "MIT"
 license_text = "vendor/block/LICENSE"
 source_sha256 = "51e54353cee1cc853e567d140d35b4a74e27d5cbdbcbe68e979269f39209906a"
+
+[[external_dependency]]
+name = "rasterlottie"
+version = "0.2.2"
+url = "https://github.com/neodyland/rasterlottie"
+relationship = "optional-pure-rust-dotlottie-raster-backend"
+license = "MIT OR Apache-2.0"
+cargo_git_dependency = false
+
+[[external_dependency]]
+name = "zip"
+version = "8.6.0"
+url = "https://github.com/zip-rs/zip2"
+relationship = "optional-bounded-dotlottie-archive-validation"
+license = "MIT"
+cargo_git_dependency = false

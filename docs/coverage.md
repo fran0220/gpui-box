@@ -33,6 +33,7 @@ input, and an entry in `docs/components.md`.
 | Filtering | `FilterBar` |
 | Agent run and persona | `ToolCallCard`, `StepList`, `ThinkingBlock`, `NodeGraph`, `AgentRoster`, `SubagentTree`, `AgentRunCanvas`, `PersonaPortrait`, `VoiceReactive`, `PersonaDialogue` |
 | Game experience | `PartyRoster`, `ObjectiveTracker`, `AbilityBar`, `RewardReveal` |
+| Visual effects | `EffectParticles`, `CinematicEffect` |
 | Structured data | `JsonView`, `SchemaForm` |
 | Connections | `ServerList`, `OfferingCatalog` |
 
@@ -63,6 +64,14 @@ fetches nor decodes. `GraphInteraction::Inspect` permits only pan, zoom, and
 selection proposals; `Arrange` additionally permits movement; `Edit` adds
 deletion, connection, and disconnection. The caller remains authoritative for
 the selection, topology, positions, and viewport shown on the next frame.
+
+`CinematicEffect` is covered without making an animation runtime mandatory.
+The `cinematic-effects` scene stages a resolved deterministic sample, explicit
+runtime and invalid-archive fallbacks, and a reduced-motion poster. Component
+tests drive exact sampling, frame ownership, RTL mirroring, typed semantics,
+and diagnostic redaction. The optional pure-Rust adapter is separately tested
+against archive and animation limits under `--all-features`; a default build
+retains identical recipes and always-available particle fallback behavior.
 
 ## Systems, which span more than one component
 

@@ -90,6 +90,7 @@ async-fs = "2.1"
 async-tar = "0.6"
 async-task = "4.7"
 backtrace = "0.3"
+base64 = "0.23"
 bitflags = "2.6.0"
 block = "0.1"
 block2 = "0.6"
@@ -205,6 +206,7 @@ quote = "1.0.9"
 rand = "0.9"
 rayon = "1.8"
 raw-window-handle = "0.6"
+rasterlottie = { version = "0.2.2", default-features = false, features = ["dotlottie", "images", "text"] }
 regex = "1.5"
 resvg = { version = "0.46.0", default-features = false, features = [
     "text",
@@ -306,6 +308,7 @@ windows = { version = "0.61", features = [
 ] }
 windows-capture = "=1.4.4"
 windows-core = "0.61"
+zip = { version = "8.6", default-features = false, features = ["deflate"] }
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

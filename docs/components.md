@@ -147,6 +147,21 @@ and the layer adds no hitbox or accessibility node. This keeps graceful
 degradation and performance policy out of every downstream chatbot, persona,
 or game surface.
 
+`CinematicEffect` consumes the same plan and upgrades it through a semantic
+`CinematicRecipe`: Box owns the product-neutral asset slot, duration, poster
+sample, directional RTL rule, deterministic timeline, localized semantics,
+and particle fallback. The host resolves a slot to `DotLottieAsset` bytes and
+prepares a `DotLottieClip`; no public type accepts a URL, path, filename,
+third-party runtime value, shader, expression, or arbitrary program. Playback
+and state-machine integration use caller-owned `DotLottiePlayback` facts and
+typed `DotLottieRequest` intents. The optional `dotlottie` feature provides
+`RasterDotLottieAdapter`; core contracts and unavailable/invalid-asset
+fallbacks compile without it. The adapter rejects archives outside bounded
+encoded/expanded size, compression, entry, canvas, frame, duration, animation,
+state-machine, embedded-image-count, source-dimension, or aggregate image-pixel
+limits, sanitizes every admitted entry and inspects image headers before
+decoding, and returns complete RGBA frames through `RenderImage`.
+
 Persona presentation follows the same boundary. Audio capture, recognition,
 playback, portrait download, model expression inference, and dialogue
 progression are host capabilities. Box accepts only resolved assets and typed

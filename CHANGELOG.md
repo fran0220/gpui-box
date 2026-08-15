@@ -10,6 +10,21 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ### Added
 
+**Semantic cinematic effects and optional dotLottie playback.**
+`CinematicEffect` maps an existing `EffectPlan` to policy-owned asset slots,
+durations, poster frames, RTL mirroring, localized semantics, and the built-in
+particle fallback, so chat, persona, agent-run, and game surfaces choose an
+event rather than a filename or timeline. Hosts supply resolved bytes and own
+typed play, pause, stop, seek, and bounded state-machine-input requests. The
+optional `dotlottie` feature adds a pure-Rust `rasterlottie` adapter with
+encoded, archive, expansion-ratio, entry, dimension, pixel, frame-rate, frame,
+duration, animation-count, state-machine-count, embedded-image-count, source
+dimension, and aggregate target-pixel ceilings. Validation fully expands each
+admitted entry into a bounded sanitized archive and inspects image headers
+before the decoder sees it. Without the feature, after any rejection, and under
+reduced motion, the same core API renders an explicit particle fallback or
+deterministic poster rather than a blank effect.
+
 **Renderer-backed radial and conic gradients.** `Background` now carries
 linear, elliptical radial, and clockwise conic geometry through the same
 bounded two-to-eight-stop scene ABI. Quads and filled paths share sRGB/Oklab

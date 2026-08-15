@@ -400,6 +400,7 @@
       "scenes": [
         "badge",
         "card",
+        "cinematic-effects",
         "table",
         "data-grid",
         "data-grid-editing",
@@ -656,6 +657,7 @@
       "reports": [],
       "scenes": [
         "card",
+        "cinematic-effects",
         "auth-sign-in",
         "auth-verification",
         "frost",
@@ -737,6 +739,28 @@
         "command-palette",
         "drawer",
         "motion-state"
+      ]
+    },
+    {
+      "name": "CinematicEffect",
+      "kind": "builder",
+      "path": "gpui_kit::effects::CinematicEffect",
+      "source": "crates/gpui-kit/src/effects/dotlottie.rs",
+      "summary": "A semantic one-shot effect with an optional prepared dotLottie clip.",
+      "construct": [
+        "new(ident: impl Into<Ident>, plan: EffectPlan) -> Self"
+      ],
+      "options": [
+        "clip(clip: Rc<dyn DotLottieClip>) -> Self",
+        "resolved(clip: Result<Rc<dyn DotLottieClip>, DotLottieError>) -> Self",
+        "unavailable(error: DotLottieError) -> Self",
+        "sample_at(elapsed: Duration) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "cinematic-effects"
       ]
     },
     {
@@ -1960,6 +1984,7 @@
       "reports": [],
       "scenes": [
         "card",
+        "cinematic-effects",
         "frost",
         "motion-flip"
       ]
@@ -4929,6 +4954,26 @@
       ]
     },
     {
+      "name": "CinematicRecipe",
+      "path": "gpui_kit::effects::CinematicRecipe",
+      "summary": "Semantic cinematic recipe selected from an EffectPlan.",
+      "variants": [
+        "Arrival",
+        "Delegation",
+        "Handoff",
+        "Aggregation",
+        "Success",
+        "Reward",
+        "Attention",
+        "Refusal",
+        "Failure"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "Clock",
       "path": "gpui_kit::datetime::Clock",
       "summary": "The clock the host keeps: how far its hours run, and what it calls the two halves of a twelve-hour day.",
@@ -5572,6 +5617,173 @@
         "lines() -> usize",
         "truncate(max: usize) -> (Self, usize)"
       ]
+    },
+    {
+      "name": "DotLottieAsset",
+      "path": "gpui_kit::effects::DotLottieAsset",
+      "summary": "Resolved .lottie bytes supplied by the host.",
+      "variants": [],
+      "construct": [
+        "new(bytes: impl Into<Arc<[u8]>>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "encoded_len() -> usize",
+        "is_empty() -> bool",
+        "bytes() -> &[u8]"
+      ]
+    },
+    {
+      "name": "DotLottieError",
+      "path": "gpui_kit::effects::DotLottieError",
+      "summary": "Typed adapter failure with an optional host-facing diagnostic.",
+      "variants": [],
+      "construct": [
+        "new(kind: DotLottieErrorKind, detail: impl Into<SharedString>) -> Self",
+        "kind(kind: DotLottieErrorKind) -> Self",
+        "runtime_unavailable() -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "detail() -> &str"
+      ]
+    },
+    {
+      "name": "DotLottieErrorKind",
+      "path": "gpui_kit::effects::DotLottieErrorKind",
+      "summary": "Stable category for validation, preparation, and rendering failures.",
+      "variants": [
+        "RuntimeUnavailable",
+        "InvalidLimits",
+        "EmptyAsset",
+        "EncodedSize",
+        "ArchiveInvalid",
+        "ArchiveEntries",
+        "ArchiveEntrySize",
+        "ArchiveExpandedSize",
+        "ArchiveCompressionRatio",
+        "AnimationCount",
+        "StateMachineCount",
+        "ImageCount",
+        "ImageSize",
+        "CanvasSize",
+        "FrameRate",
+        "FrameCount",
+        "Duration",
+        "UnsupportedFeature",
+        "InvalidInput",
+        "RenderFailed"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "DotLottieInput",
+      "path": "gpui_kit::effects::DotLottieInput",
+      "summary": "A bounded state-machine input name and value.",
+      "variants": [],
+      "construct": [
+        "new(name: impl Into<SharedString>, value: DotLottieInputValue) -> Result<Self, DotLottieError>"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "name() -> &str"
+      ]
+    },
+    {
+      "name": "DotLottieInputValue",
+      "path": "gpui_kit::effects::DotLottieInputValue",
+      "summary": "Values a host runtime may route into an already-selected state machine.",
+      "variants": [
+        "Boolean",
+        "Number",
+        "Trigger"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "DotLottieLimits",
+      "path": "gpui_kit::effects::DotLottieLimits",
+      "summary": "Limits applied before a host-provided .lottie archive is prepared.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "DotLottieMetadata",
+      "path": "gpui_kit::effects::DotLottieMetadata",
+      "summary": "Validated metadata for the animation selected by the archive manifest.",
+      "variants": [],
+      "construct": [],
+      "options": [
+        "frame_rate() -> f32"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "DotLottiePlayback",
+      "path": "gpui_kit::effects::DotLottiePlayback",
+      "summary": "A truthful playback snapshot. It does not mutate or advance itself.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "DotLottiePlaybackState",
+      "path": "gpui_kit::effects::DotLottiePlaybackState",
+      "summary": "Caller-owned transport facts for a stateful dotLottie host runtime.",
+      "variants": [
+        "Stopped",
+        "Playing",
+        "Paused",
+        "Completed",
+        "Unavailable"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "DotLottieRequest",
+      "path": "gpui_kit::effects::DotLottieRequest",
+      "summary": "Typed requests for a host-owned playback or state-machine runtime.",
+      "variants": [
+        "Play",
+        "Pause",
+        "Stop",
+        "Seek",
+        "Input"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "DotLottieSample",
+      "path": "gpui_kit::effects::DotLottieSample",
+      "summary": "One exact, normalized sample requested from a prepared clip.",
+      "variants": [],
+      "construct": [
+        "at_progress(progress: f32, mirror_x: bool) -> Result<Self, DotLottieError>"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "DragItem",
@@ -8225,6 +8437,16 @@
       "queries": []
     },
     {
+      "name": "RasterDotLottieAdapter",
+      "path": "gpui_kit::effects::RasterDotLottieAdapter",
+      "summary": "Pure-Rust deterministic dotLottie adapter enabled by the dotlottie Cargo feature.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "Reaction",
       "path": "gpui_kit::content::Reaction",
       "summary": "A reaction and how many people left it.",
@@ -9705,6 +9927,16 @@
       "queries": []
     },
     {
+      "name": "UnavailableDotLottieAdapter",
+      "path": "gpui_kit::effects::UnavailableDotLottieAdapter",
+      "summary": "Explicit adapter used when no dotLottie runtime is linked or available.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "UnreadCount",
       "path": "gpui_kit::overlay::UnreadCount",
       "summary": "How many unread notifications there are, or how many there are at least.",
@@ -10072,6 +10304,17 @@
         "EffectParticles"
       ],
       "example": "fn visual_effects(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let radial = radial_gradient_stops(\n        point(0.32, 0.36),\n        point(0.68, 0.72),\n        [\n            linear_color_stop(theme.colors.accent_strong, 0.0),\n            linear_color_stop(theme.colors.info.opacity(0.86), 0.34),\n            linear_color_stop(theme.colors.accent.opacity(0.38), 0.7),\n            linear_color_stop(theme.colors.canvas.opacity(0.0), 1.0),\n        ],\n    )\n    .color_space(gpui::ColorSpace::Oklab);\n    let conic = conic_gradient_stops(\n        -24.0,\n        point(0.5, 0.5),\n        [\n            linear_color_stop(theme.colors.accent_strong, 0.0),\n            linear_color_stop(theme.colors.info, 0.22),\n            linear_color_stop(theme.colors.success, 0.48),\n            linear_color_stop(theme.colors.warning, 0.72),\n            linear_color_stop(theme.colors.danger, 1.0),\n        ],\n    )\n    .color_space(gpui::ColorSpace::Oklab);\n    let path_fill = conic;\n    let stroke_fill = radial;\n    let stroke_base = theme.colors.hairline_strong.opacity(0.32);\n    let sprite_atlas = composited_sprite_atlas(&theme);\n    let additive_tint = theme.colors.accent_strong;\n    let additive_tint_alt = theme.colors.info;\n    let screen_tint = theme.colors.success;\n    let screen_tint_alt = theme.colors.warning;\n    let mut effect_planner = EffectPlanner::new(EffectPolicy::new(EffectQuality::Cinematic));\n    let success_particles = effect_planner.plan(\n        EffectEvent::new(\n            \"scene-success\",\n            \"visual-effects\",\n            \"success-card\",\n            VisualCue::Success,\n        ),\n        1,\n        false,\n    );\n    let reward_particles = effect_planner.plan(\n        EffectEvent::new(\n            \"scene-reward\",\n            \"visual-effects\",\n            \"reward-card\",\n            VisualCue::Reward,\n        ),\n        1,\n        false,\n    );\n    let mut static_planner = EffectPlanner::new(EffectPolicy::new(EffectQuality::Cinematic));\n    let static_particles = static_planner.plan(\n        EffectEvent::new(\n            \"scene-static\",\n            \"visual-effects-static\",\n            \"static-card\",\n            VisualCue::Reward,\n        ),\n        1,\n        true,\n    );\n    let label = |text: &'static str| {\n        div()\n            .absolute()\n            .bottom(px(theme.spacing.sm))\n            .left(px(theme.spacing.sm))\n            .px_token(&theme, Space::Sm)\n            .py_token(&theme, Space::Xs)\n            .radius(&theme, Radius::Pill)\n            .bg(theme.colors.panel.opacity(0.9))\n            .border_1()\n            .border_color(theme.colors.hairline_strong)\n            .child(crate::foundation::text(&theme, TypeScale::Caption, text))\n    };\n\n    stack(&theme)\n        .child(crate::foundation::text(\n            &theme,\n            TypeScale::Subtitle,\n            \"Renderer-backed gradients\",\n        ))\n        .child(\n            row(&theme)\n                .gap_token(&theme, Space::Md)\n                .child(\n                    div()\n                        .relative()\n                        .w(px(248.0))\n                        .h(px(164.0))\n                        .radius(&theme, Radius::Card)\n                        .overflow_hidden()\n                        .bg(radial)\n                        .semantic_in(\n                            cx,\n                            NodeSpec::new(\"scene.effects.radial\", Role::Image)\n                                .text(\"Elliptical radial gradient\")\n                                .description(\"Four ordered Oklab color stops\"),\n                        )\n                        .child(label(\"Radial · 4 stops\")),\n                )\n                .child(\n                    div()\n                        .relative()\n                        .w(px(248.0))\n                        .h(px(164.0))\n                        .radius(&theme, Radius::Card)\n                        .overflow_hidden()\n                        .bg(conic)\n                        .semantic_in(\n                            cx,\n                            NodeSpec::new(\"scene.effects.conic\", Role::Image)\n                                .text(\"Clockwise conic gradient\")\n                                .description(\"Five ordered Oklab color stops\"),\n                        )\n                        .child(label(\"Conic · 5 stops\")),\n                )\n                .child(\n                    div()\n                        .relative()\n                        .w(px(248.0))\n                        .h(px(164.0))\n                        .radius(&theme, Radius::Card)\n                        .overflow_hidden()\n                        .bg(theme.colors.sunken)\n                        .semantic_in(\n                            cx,\n                            NodeSpec::new(\"scene.effects.path-gradient\", Role::Image)\n                                .text(\"Conic gradient path fill\")\n                                .description(\"The same renderer primitive clipped by a GPUI path\"),\n                        )\n                        .child(\n                            div().absolute().inset_0().child(\n                                canvas(\n                                    |_, _, _| {},\n                                    move |bounds, _, window, _| {\n                                        let inset = px(22.0);\n                                        let center = bounds.center();\n                                        let mut builder = gpui::PathBuilder::fill();\n                                        builder.move_to(point(center.x, bounds.top() + inset));\n                                        builder.line_to(point(bounds.right() - inset, center.y));\n                                        builder.line_to(point(center.x, bounds.bottom() - inset));\n                                        builder.line_to(point(bounds.left() + inset, center.y));\n                                        builder.close();\n                                        if let Ok(path) = builder.build() {\n                                            window.paint_path(path, path_fill);\n                                        }\n                                    },\n                                )\n                                .size_full(),\n                            ),\n                        )\n                        .child(label(\"Path fill · conic\")),\n                ),\n        )\n        .child(crate::foundation::text(\n            &theme,\n            TypeScale::Subtitle,\n            \"Measured path strokes\",\n        ))\n        .child(\n            div()\n                .relative()\n                .w(px(776.0))\n                .h(px(180.0))\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .bg(theme.colors.sunken)\n                .border_1()\n                .border_color(theme.colors.hairline)\n                .semantic_in(\n                    cx,\n                    NodeSpec::new(\"scene.effects.path-strokes\", Role::Image)\n                        .text(\"Measured path stroke effects\")\n                        .description(\"Trimmed, dash-offset, and combined stroke geometry\"),\n                )\n                .child(\n                    div().absolute().inset_0().child(\n                        canvas(\n                            |_, _, _| {},\n                            move |bounds, _, window, _| {\n                                let build = |mut builder: gpui::PathBuilder, y: f32| {\n                                    let start =\n                                        point(bounds.left() + px(128.0), bounds.top() + px(y));\n                                    let end =\n                                        point(bounds.right() - px(24.0), bounds.top() + px(y));\n                                    builder.move_to(start);\n                                    builder.cubic_bezier_to(\n                                        end,\n                                        point(start.x + px(132.0), start.y - px(24.0)),\n                                        point(end.x - px(132.0), end.y + px(24.0)),\n                                    );\n                                    builder.build()\n                                };\n\n                                if let Ok(path) = build(gpui::PathBuilder::stroke(px(8.0)), 42.0) {\n                                    window.paint_path(path, stroke_base);\n                                }\n                                if let Ok(path) = build(\n                                    gpui::PathBuilder::stroke(px(8.0)).stroke_trim(0.0, 0.68),\n                                    42.0,\n                                ) {\n                                    window.paint_path(path, stroke_fill);\n                                }\n                                if let Ok(path) = build(\n                                    gpui::PathBuilder::stroke(px(7.0))\n                                        .dash_array(&[px(18.0), px(11.0)])\n                                        .dash_offset(px(9.0)),\n                                    92.0,\n                                ) {\n                                    window.paint_path(path, conic);\n                                }\n                                if let Ok(path) = build(\n                                    gpui::PathBuilder::stroke(px(7.0))\n                                        .dash_array(&[px(14.0), px(8.0)])\n                                        .dash_offset(px(-6.0))\n                                        .stroke_trim(0.16, 0.84),\n                                    142.0,\n                                ) {\n                                    window.paint_path(path, stroke_fill);\n                                }\n                            },\n                        )\n                        .size_full(),\n                    ),\n                )\n                .child(div().absolute().left(px(16.0)).top(px(31.0)).child(\n                    crate::foundation::text(&theme, TypeScale::Caption, \"Trim · 68%\"),\n                ))\n                .child(div().absolute().left(px(16.0)).top(px(81.0)).child(\n                    crate::foundation::text(&theme, TypeScale::Caption, \"Dash phase · 9 px\"),\n                ))\n                .child(div().absolute().left(px(16.0)).top(px(131.0)).child(\n                    crate::foundation::text(&theme, TypeScale::Caption, \"Trim + phase\"),\n                )),\n        )\n        .child(crate::foundation::text(\n            &theme,\n            TypeScale::Subtitle,\n            \"Composited sprite batches\",\n        ))\n        .child(\n            div()\n                .relative()\n                .w(px(776.0))\n                .h(px(190.0))\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .bg(theme.colors.sunken)\n                .border_1()\n                .border_color(theme.colors.hairline)\n                .semantic_in(\n                    cx,\n                    NodeSpec::new(\"scene.effects.sprite-batch\", Role::Image)\n                        .text(\"Composited sprite batch\")\n                        .description(\n                            \"One atlas with explicit source rectangles, transforms, masks, and normal, additive, and screen blending\",\n                        ),\n                )\n                .child(\n                    div().absolute().inset_0().child(\n                        canvas(\n                            |_, _, _| {},\n                            move |frame, _, window, _| {\n                                let source = |column| {\n                                    bounds(\n                                        point(DevicePixels(column * 48), DevicePixels(0)),\n                                        size(DevicePixels(48), DevicePixels(48)),\n                                    )\n                                };\n                                let destination = |x, y, width, height| {\n                                    bounds(\n                                        point(frame.left() + px(x), frame.top() + px(y)),\n                                        size(px(width), px(height)),\n                                    )\n                                };\n                                let sprites = [\n                                    SpriteInstance::new(\n                                        destination(56.0, 26.0, 104.0, 104.0),\n                                        source(0),\n                                    )\n                                    .corner_radii(Corners::all(px(28.0)))\n                                    .transform(\n                                        SpriteTransform::identity().rotate(radians(-0.16)),\n                                    ),\n                                    SpriteInstance::new(\n                                        destination(270.0, 34.0, 96.0, 96.0),\n                                        source(1),\n                                    )\n                                    .color_mode(SpriteColorMode::AlphaMask, additive_tint)\n                                    .blend_mode(SpriteBlendMode::Additive),\n                                    SpriteInstance::new(\n                                        destination(314.0, 34.0, 96.0, 96.0),\n                                        source(1),\n                                    )\n                                    .transform(\n                                        SpriteTransform::identity().rotate(radians(0.22)),\n                                    )\n                                    .color_mode(SpriteColorMode::AlphaMask, additive_tint_alt)\n                                    .blend_mode(SpriteBlendMode::Additive),\n                                    SpriteInstance::new(\n                                        destination(536.0, 24.0, 112.0, 112.0),\n                                        source(2),\n                                    )\n                                    .color_mode(SpriteColorMode::AlphaMask, screen_tint)\n                                    .blend_mode(SpriteBlendMode::Screen),\n                                    SpriteInstance::new(\n                                        destination(582.0, 30.0, 100.0, 100.0),\n                                        source(2),\n                                    )\n                                    .transform(\n                                        SpriteTransform::identity().rotate(radians(0.42)),\n                                    )\n                                    .color_mode(SpriteColorMode::AlphaMask, screen_tint_alt)\n                                    .blend_mode(SpriteBlendMode::Screen),\n                                ];\n                                window\n                                    .paint_sprite_batch(sprite_atlas.clone(), 0, &sprites)\n                                    .expect(\"the canonical sprite batch is valid\");\n                            },\n                        )\n                        .size_full(),\n                    ),\n                )\n                .child(\n                    div()\n                        .absolute()\n                        .left(px(64.0))\n                        .bottom(px(12.0))\n                        .child(crate::foundation::text(\n                            &theme,\n                            TypeScale::Caption,\n                            \"Normal · crop + rotate\",\n                        )),\n                )\n                .child(\n                    div()\n                        .absolute()\n                        .left(px(282.0))\n                        .bottom(px(12.0))\n                        .child(crate::foundation::text(\n                            &theme,\n                            TypeScale::Caption,\n                            \"Additive · alpha mask\",\n                        )),\n                )\n                .child(\n                    div()\n                        .absolute()\n                        .left(px(550.0))\n                        .bottom(px(12.0))\n                        .child(crate::foundation::text(\n                            &theme,\n                            TypeScale::Caption,\n                            \"Screen · atlas reuse\",\n                        )),\n                ),\n        )\n        .child(crate::foundation::text(\n            &theme,\n            TypeScale::Subtitle,\n            \"Policy-owned particle recipes\",\n        ))\n        .child(\n            row(&theme)\n                .gap_token(&theme, Space::Md)\n                .child(\n                    div()\n                        .relative()\n                        .w(px(248.0))\n                        .h(px(164.0))\n                        .radius(&theme, Radius::Card)\n                        .overflow_hidden()\n                        .bg(theme.colors.sunken)\n                        .border_1()\n                        .border_color(theme.colors.hairline)\n                        .semantic_in(\n                            cx,\n                            NodeSpec::new(\"scene.effects.particles-success\", Role::Image)\n                                .text(\"Deterministic success burst\")\n                                .description(\n                                    \"A policy-owned recipe sampled at a fixed absolute time\",\n                                ),\n                        )\n                        .child(\n                            EffectParticles::new(success_particles)\n                                .sample_at(Duration::from_millis(420)),\n                        )\n                        .child(label(\"Success · 36 instances\")),\n                )\n                .child(\n                    div()\n                        .relative()\n                        .w(px(248.0))\n                        .h(px(164.0))\n                        .radius(&theme, Radius::Card)\n                        .overflow_hidden()\n                        .bg(theme.colors.sunken)\n                        .border_1()\n                        .border_color(theme.colors.hairline)\n                        .semantic_in(\n                            cx,\n                            NodeSpec::new(\"scene.effects.particles-reward\", Role::Image)\n                                .text(\"Deterministic reward celebration\")\n                                .description(\n                                    \"Two emitters share one atlas upload and one sprite batch\",\n                                ),\n                        )\n                        .child(\n                            EffectParticles::new(reward_particles)\n                                .sample_at(Duration::from_millis(620)),\n                        )\n                        .child(label(\"Reward · 2 emitters\")),\n                )\n                .child(\n                    div()\n                        .relative()\n                        .w(px(248.0))\n                        .h(px(164.0))\n                        .radius(&theme, Radius::Card)\n                        .overflow_hidden()\n                        .bg(theme.colors.sunken)\n                        .border_1()\n                        .border_color(theme.colors.hairline)\n                        .semantic_in(\n                            cx,\n                            NodeSpec::new(\"scene.effects.particles-static\", Role::Image)\n                                .text(\"Reduced motion particle fallback\")\n                                .description(\n                                    \"A fixed bounded constellation with no animation frames\",\n                                ),\n                        )\n                        .child(EffectParticles::new(static_particles))\n                        .child(label(\"Static · no timeline\")),\n                ),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "cinematic-effects",
+      "capture": "cargo run -p xtask -- headless capture cinematic-effects",
+      "uses": [
+        "Badge",
+        "Card",
+        "CinematicEffect",
+        "ListRow"
+      ],
+      "example": "fn cinematic_effects(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let clip: Rc<dyn DotLottieClip> = Rc::new(SceneCinematicClip);\n    let mut planner = EffectPlanner::new(EffectPolicy::new(EffectQuality::Cinematic));\n    let success = planner.plan(\n        EffectEvent::new(\n            \"scene-cinematic-success\",\n            \"cinematic-effects\",\n            \"success\",\n            VisualCue::Success,\n        ),\n        1,\n        false,\n    );\n    let handoff = planner.plan(\n        EffectEvent::new(\n            \"scene-cinematic-handoff\",\n            \"cinematic-effects\",\n            \"handoff\",\n            VisualCue::Handoff,\n        ),\n        1,\n        false,\n    );\n    let reward = planner.plan(\n        EffectEvent::new(\n            \"scene-cinematic-reward\",\n            \"cinematic-effects\",\n            \"reward\",\n            VisualCue::Reward,\n        ),\n        1,\n        false,\n    );\n    let mut static_planner = EffectPlanner::new(EffectPolicy::new(EffectQuality::Cinematic));\n    let static_reward = static_planner.plan(\n        EffectEvent::new(\n            \"scene-cinematic-static\",\n            \"cinematic-effects-static\",\n            \"reward\",\n            VisualCue::Reward,\n        ),\n        1,\n        true,\n    );\n\n    let card = |title: &'static str, detail: &'static str, effect: AnyElement| {\n        div()\n            .column()\n            .w(px(372.0))\n            .h(px(228.0))\n            .radius(&theme, Radius::Card)\n            .overflow_hidden()\n            .bg(theme.colors.sunken)\n            .border_1()\n            .border_color(theme.colors.hairline)\n            .child(div().relative().w_full().h(px(154.0)).child(effect))\n            .child(\n                div()\n                    .column()\n                    .gap_token(&theme, Space::Xs)\n                    .px_token(&theme, Space::Md)\n                    .py_token(&theme, Space::Sm)\n                    .child(crate::foundation::text(&theme, TypeScale::Label, title))\n                    .child(\n                        crate::foundation::text(&theme, TypeScale::Caption, detail)\n                            .text_color(theme.colors.text_muted),\n                    ),\n            )\n    };\n\n    stack(&theme)\n        .w(px(808.0))\n        .child(crate::foundation::text(\n            &theme,\n            TypeScale::Subtitle,\n            \"Semantic cinematic effects\",\n        ))\n        .child(caption(\n            &theme,\n            \"events choose recipes; hosts resolve bytes and own playback requests\",\n        ))\n        .child(\n            row(&theme)\n                .gap_token(&theme, Space::Md)\n                .child(card(\n                    \"Handoff · deterministic sample\",\n                    \"A resolved clip sampled at 575 ms; RTL mirrors its directional trail.\",\n                    CinematicEffect::new(\"scene.cinematic.handoff\", handoff)\n                        .clip(clip.clone())\n                        .sample_at(Duration::from_millis(575))\n                        .into_any_element(),\n                ))\n                .child(card(\n                    \"Success · runtime unavailable\",\n                    \"The semantic recipe falls back to the policy-owned particle burst.\",\n                    CinematicEffect::new(\"scene.cinematic.success\", success)\n                        .unavailable(DotLottieError::new(\n                            DotLottieErrorKind::RuntimeUnavailable,\n                            \"dotLottie backend is not installed\",\n                        ))\n                        .sample_at(Duration::from_millis(520))\n                        .into_any_element(),\n                )),\n        )\n        .child(\n            row(&theme)\n                .gap_token(&theme, Space::Md)\n                .child(card(\n                    \"Reward · invalid asset fallback\",\n                    \"A refused archive stays explicit while a bounded particle recipe renders.\",\n                    CinematicEffect::new(\"scene.cinematic.invalid\", reward)\n                        .unavailable(DotLottieError::new(\n                            DotLottieErrorKind::ArchiveInvalid,\n                            \"animation archive did not pass validation\",\n                        ))\n                        .sample_at(Duration::from_millis(620))\n                        .into_any_element(),\n                ))\n                .child(card(\n                    \"Reward · reduced-motion poster\",\n                    \"The same recipe becomes a deterministic poster with no frame timeline.\",\n                    CinematicEffect::new(\"scene.cinematic.poster\", static_reward)\n                        .clip(clip)\n                        .into_any_element(),\n                )),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "choice",

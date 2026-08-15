@@ -13,7 +13,8 @@ use gpui::{
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{Radius, Space, TextTone, Theme, TypeScale};
-use std::sync::Arc;
+use std::rc::Rc;
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use crate::controls::combobox::Combobox;
@@ -76,6 +77,10 @@ pub fn catalog() -> Vec<Scene> {
         Scene {
             name: "visual-effects",
             build: visual_effects,
+        },
+        Scene {
+            name: "cinematic-effects",
+            build: cinematic_effects,
         },
         Scene {
             name: "choice",
@@ -1554,6 +1559,223 @@ fn visual_effects(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .child(EffectParticles::new(static_particles))
                         .child(label("Static · no timeline")),
                 ),
+        )
+        .into_any_element()
+}
+
+#[derive(Debug)]
+struct SceneCinematicClip;
+
+impl DotLottieClip for SceneCinematicClip {
+    fn metadata(&self) -> DotLottieMetadata {
+        DotLottieMetadata {
+            width: 240,
+            height: 140,
+            frame_count: 120,
+            frame_rate_millihertz: 60_000,
+            duration: Duration::from_secs(2),
+            animation_count: 1,
+            state_machine_count: 0,
+        }
+    }
+
+    fn render(&self, sample: DotLottieSample) -> Result<Arc<RenderImage>, DotLottieError> {
+        static HANDOFF_LTR: OnceLock<Arc<RenderImage>> = OnceLock::new();
+        static HANDOFF_RTL: OnceLock<Arc<RenderImage>> = OnceLock::new();
+        static POSTER: OnceLock<Arc<RenderImage>> = OnceLock::new();
+
+        const WIDTH: u32 = 240;
+        const HEIGHT: u32 = 140;
+        let cache = match (sample.progress_per_mille(), sample.mirror_x()) {
+            (500, false) => Some(&HANDOFF_LTR),
+            (500, true) => Some(&HANDOFF_RTL),
+            (700, false) => Some(&POSTER),
+            _ => None,
+        };
+        if let Some(image) = cache.and_then(OnceLock::get) {
+            return Ok(image.clone());
+        }
+        let progress = sample.progress_per_mille() as f32 / 1_000.0;
+        let direction = if sample.mirror_x() { -1.0 } else { 1.0 };
+        let angle = progress * std::f32::consts::TAU;
+        let orbit_x = 120.0 + direction * angle.cos() * 64.0;
+        let orbit_y = 70.0 + angle.sin() * 31.0;
+        let pulse = 0.72 + (angle * 2.0).sin() * 0.12;
+        let mut pixels = vec![0; (WIDTH * HEIGHT * 4) as usize];
+
+        for y in 0..HEIGHT {
+            for x in 0..WIDTH {
+                let dx = x as f32 - 120.0;
+                let dy = y as f32 - 70.0;
+                let distance = ((dx / 1.65).powi(2) + dy.powi(2)).sqrt();
+                let ring = (1.0 - (distance - 38.0).abs() / 3.2).clamp(0.0, 1.0);
+                let haze = (1.0 - distance / 76.0).clamp(0.0, 1.0).powi(3) * 0.28;
+                let orb_distance =
+                    ((x as f32 - orbit_x).powi(2) + (y as f32 - orbit_y).powi(2)).sqrt();
+                let orb = (1.0 - orb_distance / 13.0).clamp(0.0, 1.0).powi(2);
+                let directional_streak = if (y as f32 - orbit_y).abs() < 1.4 {
+                    let trail = direction * (orbit_x - x as f32);
+                    (1.0 - trail / 54.0).clamp(0.0, 1.0) * (trail / 8.0).clamp(0.0, 1.0) * 0.52
+                } else {
+                    0.0
+                };
+                let star = if dx.abs() < 1.15 || dy.abs() < 1.15 {
+                    (1.0 - distance / 28.0).clamp(0.0, 1.0) * 0.82
+                } else {
+                    0.0
+                };
+                let alpha = (ring * pulse + haze + orb + directional_streak + star).clamp(0.0, 1.0);
+                let purple = (0.35 + progress * 0.4 + dy.abs() / 180.0).clamp(0.0, 1.0);
+                let cyan = 1.0 - purple;
+                let index = ((y * WIDTH + x) * 4) as usize;
+                pixels[index] = ((72.0 * purple + 54.0 * cyan + orb * 170.0) * alpha) as u8;
+                pixels[index + 1] = ((46.0 * purple + 212.0 * cyan + orb * 80.0) * alpha) as u8;
+                pixels[index + 2] = ((238.0 * purple + 246.0 * cyan + orb * 45.0) * alpha) as u8;
+                pixels[index + 3] = (alpha * 255.0) as u8;
+            }
+        }
+
+        let image = Arc::new(
+            RenderImage::from_rgba(
+                size(DevicePixels(WIDTH as i32), DevicePixels(HEIGHT as i32)),
+                pixels,
+            )
+            .map_err(|_| DotLottieError::kind(DotLottieErrorKind::RenderFailed))?,
+        );
+        if let Some(cache) = cache {
+            let _ = cache.set(image.clone());
+            return Ok(cache.get().cloned().unwrap_or(image));
+        }
+        Ok(image)
+    }
+}
+
+fn cinematic_effects(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let clip: Rc<dyn DotLottieClip> = Rc::new(SceneCinematicClip);
+    let mut planner = EffectPlanner::new(EffectPolicy::new(EffectQuality::Cinematic));
+    let success = planner.plan(
+        EffectEvent::new(
+            "scene-cinematic-success",
+            "cinematic-effects",
+            "success",
+            VisualCue::Success,
+        ),
+        1,
+        false,
+    );
+    let handoff = planner.plan(
+        EffectEvent::new(
+            "scene-cinematic-handoff",
+            "cinematic-effects",
+            "handoff",
+            VisualCue::Handoff,
+        ),
+        1,
+        false,
+    );
+    let reward = planner.plan(
+        EffectEvent::new(
+            "scene-cinematic-reward",
+            "cinematic-effects",
+            "reward",
+            VisualCue::Reward,
+        ),
+        1,
+        false,
+    );
+    let mut static_planner = EffectPlanner::new(EffectPolicy::new(EffectQuality::Cinematic));
+    let static_reward = static_planner.plan(
+        EffectEvent::new(
+            "scene-cinematic-static",
+            "cinematic-effects-static",
+            "reward",
+            VisualCue::Reward,
+        ),
+        1,
+        true,
+    );
+
+    let card = |title: &'static str, detail: &'static str, effect: AnyElement| {
+        div()
+            .column()
+            .w(px(372.0))
+            .h(px(228.0))
+            .radius(&theme, Radius::Card)
+            .overflow_hidden()
+            .bg(theme.colors.sunken)
+            .border_1()
+            .border_color(theme.colors.hairline)
+            .child(div().relative().w_full().h(px(154.0)).child(effect))
+            .child(
+                div()
+                    .column()
+                    .gap_token(&theme, Space::Xs)
+                    .px_token(&theme, Space::Md)
+                    .py_token(&theme, Space::Sm)
+                    .child(crate::foundation::text(&theme, TypeScale::Label, title))
+                    .child(
+                        crate::foundation::text(&theme, TypeScale::Caption, detail)
+                            .text_color(theme.colors.text_muted),
+                    ),
+            )
+    };
+
+    stack(&theme)
+        .w(px(808.0))
+        .child(crate::foundation::text(
+            &theme,
+            TypeScale::Subtitle,
+            "Semantic cinematic effects",
+        ))
+        .child(caption(
+            &theme,
+            "events choose recipes; hosts resolve bytes and own playback requests",
+        ))
+        .child(
+            row(&theme)
+                .gap_token(&theme, Space::Md)
+                .child(card(
+                    "Handoff · deterministic sample",
+                    "A resolved clip sampled at 575 ms; RTL mirrors its directional trail.",
+                    CinematicEffect::new("scene.cinematic.handoff", handoff)
+                        .clip(clip.clone())
+                        .sample_at(Duration::from_millis(575))
+                        .into_any_element(),
+                ))
+                .child(card(
+                    "Success · runtime unavailable",
+                    "The semantic recipe falls back to the policy-owned particle burst.",
+                    CinematicEffect::new("scene.cinematic.success", success)
+                        .unavailable(DotLottieError::new(
+                            DotLottieErrorKind::RuntimeUnavailable,
+                            "dotLottie backend is not installed",
+                        ))
+                        .sample_at(Duration::from_millis(520))
+                        .into_any_element(),
+                )),
+        )
+        .child(
+            row(&theme)
+                .gap_token(&theme, Space::Md)
+                .child(card(
+                    "Reward · invalid asset fallback",
+                    "A refused archive stays explicit while a bounded particle recipe renders.",
+                    CinematicEffect::new("scene.cinematic.invalid", reward)
+                        .unavailable(DotLottieError::new(
+                            DotLottieErrorKind::ArchiveInvalid,
+                            "animation archive did not pass validation",
+                        ))
+                        .sample_at(Duration::from_millis(620))
+                        .into_any_element(),
+                ))
+                .child(card(
+                    "Reward · reduced-motion poster",
+                    "The same recipe becomes a deterministic poster with no frame timeline.",
+                    CinematicEffect::new("scene.cinematic.poster", static_reward)
+                        .clip(clip)
+                        .into_any_element(),
+                )),
         )
         .into_any_element()
 }

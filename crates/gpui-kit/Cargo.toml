@@ -18,21 +18,28 @@ fixtures = []
 # Native playback remains the normal component contract. Deterministic visual
 # harnesses can disable it while retaining the same player and transport types.
 native-media = ["media/native-playback"]
+# Deterministic, pure-Rust `.lottie` decoding and raster sampling. The public
+# effects contracts and particle/poster fallbacks remain available without it.
+dotlottie = ["dep:base64", "dep:image", "dep:rasterlottie", "dep:zip"]
 
 [dependencies]
 unicode-segmentation.workspace = true
+base64 = { workspace = true, optional = true }
 gpui.workspace = true
 gpui-kit-assets.workspace = true
 gpui-kit-semantics.workspace = true
 gpui-kit-theme.workspace = true
 gpui-kit-tokens.workspace = true
+image = { workspace = true, optional = true }
 media = { workspace = true, default-features = false }
 pulldown-cmark.workspace = true
+rasterlottie = { workspace = true, optional = true }
 # Parsing only, for the bounded glTF reader in `media::gltf`. Nothing here
 # serializes, and nothing here resolves a URI.
 serde = { workspace = true }
 serde_json.workspace = true
 web-time.workspace = true
+zip = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { workspace = true, features = ["Win32_Foundation"] }

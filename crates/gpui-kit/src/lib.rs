@@ -207,10 +207,16 @@ pub mod prelude {
     pub use crate::display::status::{Callout, StatusDot, StatusLine};
     pub use crate::display::tag::Tag;
     pub use crate::display::timeline::{EntryTime, Timeline, TimelineEntry, TimelineGroup};
+    #[cfg(feature = "dotlottie")]
+    pub use crate::effects::RasterDotLottieAdapter;
     pub use crate::effects::{
-        EffectBudget, EffectCost, EffectEvent, EffectFallback, EffectImportance, EffectParticles,
-        EffectPlan, EffectPlanner, EffectPolicy, EffectPresentation, EffectQuality, EffectRecipe,
-        EffectSuppression, VisualCue, effect_policy, plan_effect, set_effect_policy,
+        CinematicEffect, CinematicRecipe, DotLottieAdapter, DotLottieAsset, DotLottieClip,
+        DotLottieError, DotLottieErrorKind, DotLottieInput, DotLottieInputValue, DotLottieLimits,
+        DotLottieMetadata, DotLottiePlayback, DotLottiePlaybackState, DotLottieRequest,
+        DotLottieSample, EffectBudget, EffectCost, EffectEvent, EffectFallback, EffectImportance,
+        EffectParticles, EffectPlan, EffectPlanner, EffectPolicy, EffectPresentation,
+        EffectQuality, EffectRecipe, EffectSuppression, UnavailableDotLottieAdapter, VisualCue,
+        effect_policy, plan_effect, set_effect_policy,
     };
     pub use crate::foundation::direction::{
         ActiveDirection, DirectionalExt, LayoutDirection, LogicalSide, PhysicalSide,

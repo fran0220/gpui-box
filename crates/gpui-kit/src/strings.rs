@@ -217,6 +217,13 @@ string_keys! {
     VideoNoFrames => "video.no-frames", "No picture";
     VideoNoFramesDetail => "video.no-frames-detail", "The transport holds this video and no frames have been supplied for it.";
 
+    // Optional cinematic effects. These strings are accessibility descriptions;
+    // the decorative layer itself draws no text or control.
+    EffectCinematic => "effect.cinematic", "Cinematic visual effect";
+    EffectAdapterFrame => "effect.adapter-frame", "Rendered by the animation adapter.";
+    EffectStaticPoster => "effect.static-poster", "Static poster because motion is reduced.";
+    EffectParticleFallback => "effect.particle-fallback", "Animation unavailable; showing the built-in visual fallback.";
+
     // The bounded model viewer.
     ModelEmpty => "model.empty", "No model";
     ModelEmptyDetail => "model.empty-detail", "Nothing has been handed to this viewer.";

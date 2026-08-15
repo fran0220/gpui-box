@@ -394,8 +394,12 @@ The identity, snapshot, state, validation, and event shapes are mirrorable but
 deliberately do not derive serde. Resolved image paths, `Icon`, `Hsla`, and
 `EffectPlan` are renderer values: a wire contract should carry opaque
 policy-checked resource ids and a semantic visual cue, then let the host select
-the icon, tint, and bounded effect plan. It must not expose arbitrary particle,
-shader, duration, or animation recipes.
+the icon, tint, and bounded effect plan. `EffectPlan::cinematic_recipe` then
+selects Box-owned asset slots, timing, poster, RTL, and fallback policy; the
+host may resolve a slot to bytes and route typed `DotLottieRequest` intents,
+but the wire vocabulary still must not expose arbitrary particle, shader,
+duration, animation filename, state-machine program, or third-party runtime
+types.
 
 **Emitted actions.** `PartyRosterEvent` and `ObjectiveTrackerEvent` report
 selection by business identity. `AbilityBarEvent::Activate` is intent only and

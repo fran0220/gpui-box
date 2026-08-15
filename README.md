@@ -60,7 +60,10 @@ The core defaults enable `font-kit`, Wayland, X11, and Windows manifest support;
 turn defaults off and select `wayland`, `x11`, `windows-manifest`,
 `screen-capture`, `inspector`, or other core features when a host needs a
 narrower build. `gpui-box-kit`'s `fixtures` feature is only the deterministic
-calendar used by scenes and tests; keep it off in products.
+calendar used by scenes and tests; keep it off in products. Its optional
+`dotlottie` feature adds the bounded pure-Rust `.lottie` raster adapter.
+Semantic cinematic recipes, typed playback requests, deterministic posters,
+and particle fallbacks remain available without that feature.
 
 Requires Rust 1.97 and edition 2024.
 

@@ -73,6 +73,23 @@ constellation for quality, budget, or reduced-motion fallbacks. Platform
 renderers require no new particle pipeline because the final submission is one
 ordinary sprite batch.
 
+`CinematicEffect` is platform-neutral and available in every Kit build. It
+maps the same semantic plans to Box-owned cinematic slots, timelines, poster
+samples, directional RTL behavior, and particle fallback. The optional
+`gpui-box-kit/dotlottie` feature links the crates.io `rasterlottie` 0.2 adapter
+and accepts only host-resolved archive bytes. Before decoding, Box enforces hard
+and host-tightenable limits for encoded size, entries, per-entry and total
+expansion, compression ratio, canvas area, frame rate/count/duration, animation
+count, state-machine count, embedded-image count, source dimensions, and
+aggregate image target pixels; rejects traversal, duplicate paths, symlinks,
+and encryption; inspects embedded image headers before full decoding; and
+rebuilds a bounded stored archive from fully read entries. The adapter returns
+deterministic RGBA samples and exposes no third-party type. A build without the
+feature and any preparation/rendering failure remain truthful
+runtime-unavailable or typed-error states and render the policy-owned fallback.
+Reduced motion chooses the recipe's deterministic poster and owns no frame
+timeline.
+
 `PathBuilder::stroke_trim` keeps an ordered normalized interval of the measured
 source path before Lyon expands the stroke. `dash_offset` advances and wraps a
 validated dash pattern against that same measurement, so trim, phase, joins,

@@ -103,6 +103,27 @@ The `gpui-box-media` AVFoundation and Media Foundation playback services are
 also subsequent GPUI Box work. They call operating-system frameworks supplied
 by macOS and Windows and import no third-party player source or media assets.
 
+## P09: optional dotLottie raster backend
+
+- Backend: `rasterlottie` 0.2.2
+- Source: <https://github.com/neodyland/rasterlottie>
+- License: MIT OR Apache-2.0
+- Copyright: Copyright (c) 2026 neodyland contributors
+- Archive reader: `zip` 8.6.0, <https://github.com/zip-rs/zip2>, MIT,
+  Copyright (c) 2014 Mathijs van de Nes
+- Relationship: optional crates.io dependencies; no Cargo Git source
+
+GPUI Box's public dotLottie contracts, semantic recipes, poster behavior, and
+particle fallbacks are authored here and expose no backend type. The optional
+`gpui-box-kit/dotlottie` feature uses `rasterlottie` only after Box validates
+and fully reads a host-provided archive under hard and host-tightenable limits,
+inspects embedded image dimensions and aggregate target pixels, then rebuilds a
+bounded stored archive for decoding. The official `dotlottie-rs` crate is not
+linked: its crates.io alpha depends on native Conan/bindgen/ThorVG artifacts
+while current releases are Git-only, which conflicts with the repository's
+crates.io/local package authority. No animation, visual asset, URL, path, or
+product model is imported.
+
 ## P08: `block` 0.1.6 compatibility fork
 
 - Source: <https://github.com/SSheldon/rust-block>

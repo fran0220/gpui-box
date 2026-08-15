@@ -59,6 +59,7 @@ Dialog
 DiffView
 Dock
 DockPanel
+DotLottieAsset
 Drawer
 Dropzone
 Element(..)
@@ -207,6 +208,7 @@ series is nonempty
 soft break
 split `{id}` has {found} children, not 2
 stale
+stateMachines
 supplied
 the built-in particle atlas has exact RGBA8 dimensions
 time unknown

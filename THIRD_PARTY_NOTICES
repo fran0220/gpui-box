@@ -42,6 +42,26 @@ use operating-system frameworks; they import no additional third-party source
 or media assets.
 License text: licenses/ZED-APACHE-2.0.txt
 
+rasterlottie 0.2.2
+--------------------------------------------------------------------------------
+Source: https://github.com/neodyland/rasterlottie
+License: MIT OR Apache-2.0
+Copyright (c) 2026 neodyland contributors
+Scope: optional pure-Rust `.lottie` parsing and deterministic raster sampling
+behind the `gpui-box-kit/dotlottie` feature. GPUI Box supplies the bounded
+archive admission, public contracts, semantic recipes, playback intents,
+posters, and particle fallbacks. No animation asset is bundled.
+License texts are distributed in the crates.io package as `LICENSE-MIT` and
+`LICENSE-APACHE`.
+
+zip 8.6.0
+--------------------------------------------------------------------------------
+Source: https://github.com/zip-rs/zip2
+License: MIT
+Copyright (c) 2014 Mathijs van de Nes
+Scope: optional `.lottie` archive validation and bounded archive rebuilding.
+License text is distributed in the crates.io package as `LICENSE`.
+
 block 0.1.6
 --------------------------------------------------------------------------------
 Source: https://github.com/SSheldon/rust-block

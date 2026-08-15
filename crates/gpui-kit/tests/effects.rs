@@ -1,10 +1,16 @@
 //! Semantic visual events choose policy-owned recipes and never make callers
 //! hand-write accessibility, replay, or budget fallbacks.
 
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::sync::Arc;
 use std::time::Duration;
 
-use gpui::{IntoElement, ParentElement, Styled, TestAppContext, div, px};
+use gpui::{
+    DevicePixels, IntoElement, ParentElement, RenderImage, Styled, TestAppContext, div, px, size,
+};
 use gpui_kit::prelude::*;
+use gpui_kit::semantics::Role;
 use gpui_kit_testkit::harness::Harness;
 
 fn animated_plan(id: &'static str, cue: VisualCue) -> EffectPlan {
@@ -14,6 +20,44 @@ fn animated_plan(id: &'static str, cue: VisualCue) -> EffectPlan {
         1,
         false,
     )
+}
+
+#[derive(Debug)]
+struct RecordingClip {
+    samples: Rc<RefCell<Vec<DotLottieSample>>>,
+}
+
+impl DotLottieClip for RecordingClip {
+    fn metadata(&self) -> DotLottieMetadata {
+        DotLottieMetadata {
+            width: 1,
+            height: 1,
+            frame_rate_millihertz: 60_000,
+            frame_count: 60,
+            duration: Duration::from_secs(1),
+            animation_count: 1,
+            state_machine_count: 0,
+        }
+    }
+
+    fn render(&self, sample: DotLottieSample) -> Result<Arc<RenderImage>, DotLottieError> {
+        self.samples.borrow_mut().push(sample);
+        Ok(Arc::new(
+            RenderImage::from_rgba(
+                size(DevicePixels(1), DevicePixels(1)),
+                vec![70, 210, 245, 255],
+            )
+            .expect("valid recording frame"),
+        ))
+    }
+}
+
+fn recording_clip() -> (Rc<RefCell<Vec<DotLottieSample>>>, Rc<dyn DotLottieClip>) {
+    let samples = Rc::new(RefCell::new(Vec::new()));
+    let clip = Rc::new(RecordingClip {
+        samples: samples.clone(),
+    });
+    (samples, clip)
 }
 
 #[gpui::test]
@@ -122,6 +166,165 @@ fn active_reduced_motion_stops_an_already_animated_particle_plan(cx: &mut TestAp
         0,
         "the component rechecks accessibility instead of trusting a stale animated plan"
     );
+}
+
+#[gpui::test]
+fn exact_cinematic_samples_own_no_timeline_and_mirror_direction_in_rtl(cx: &mut TestAppContext) {
+    let plan = animated_plan("cinematic-handoff", VisualCue::Handoff);
+    let (samples, clip) = recording_clip();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        div()
+            .w(px(240.0))
+            .h(px(160.0))
+            .child(
+                CinematicEffect::new("cinematic.handoff", plan.clone())
+                    .clip(clip.clone())
+                    .sample_at(Duration::from_millis(575)),
+            )
+            .into_any_element()
+    });
+
+    let node = harness.node("cinematic.handoff").expect("semantic image");
+    assert_eq!(node.role, Role::Image);
+    assert_eq!(node.value.as_deref(), Some("adapter-frame"));
+    let sample = *samples.borrow().last().expect("clip sampled");
+    assert_eq!(sample.progress_per_mille(), 500);
+    assert!(!sample.mirror_x());
+    assert_eq!(
+        harness.update(|window, cx| window.simulate_next_frame(cx)),
+        0,
+        "an exact cinematic sample schedules no frame"
+    );
+
+    harness.update(|_, cx| set_layout_direction(LayoutDirection::RightToLeft, cx));
+    harness.snapshot();
+    let sample = *samples.borrow().last().expect("RTL clip sampled");
+    assert_eq!(sample.progress_per_mille(), 500);
+    assert!(sample.mirror_x());
+}
+
+#[gpui::test]
+fn reduced_motion_uses_the_semantic_poster_and_stops_cinematic_playback(cx: &mut TestAppContext) {
+    let plan = animated_plan("cinematic-reduced", VisualCue::Reward);
+    let (samples, clip) = recording_clip();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        div()
+            .w(px(240.0))
+            .h(px(160.0))
+            .child(CinematicEffect::new("cinematic.poster", plan.clone()).clip(clip.clone()))
+            .into_any_element()
+    });
+    harness.update(|_, cx| cx.set_reduce_motion(true));
+
+    let node = harness.node("cinematic.poster").expect("semantic poster");
+    assert_eq!(node.value.as_deref(), Some("poster"));
+    assert_eq!(
+        samples
+            .borrow()
+            .last()
+            .expect("poster sampled")
+            .progress_per_mille(),
+        CinematicRecipe::Reward.poster_progress_per_mille()
+    );
+    harness.update(|window, cx| {
+        window.simulate_next_frame(cx);
+    });
+    assert_eq!(
+        harness.update(|window, cx| window.simulate_next_frame(cx)),
+        0,
+        "the poster owns no timeline"
+    );
+}
+
+#[gpui::test]
+fn unavailable_cinematic_assets_publish_a_typed_particle_fallback(cx: &mut TestAppContext) {
+    let plan = animated_plan("cinematic-invalid", VisualCue::Success);
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        div()
+            .w(px(240.0))
+            .h(px(160.0))
+            .child(
+                CinematicEffect::new("cinematic.invalid", plan.clone())
+                    .unavailable(DotLottieError::new(
+                        DotLottieErrorKind::ArchiveInvalid,
+                        "secret host parser detail",
+                    ))
+                    .sample_at(Duration::from_millis(500)),
+            )
+            .into_any_element()
+    });
+
+    let node = harness
+        .node("cinematic.invalid")
+        .expect("semantic fallback");
+    assert_eq!(node.value.as_deref(), Some("fallback-archive-invalid"));
+    assert!(
+        !node
+            .description
+            .as_deref()
+            .unwrap_or_default()
+            .contains("secret"),
+        "host parser details never enter semantic snapshots"
+    );
+}
+
+#[gpui::test]
+fn cinematic_timeline_owns_frames_and_suppressed_replays_render_nothing(cx: &mut TestAppContext) {
+    let live_plan = animated_plan("cinematic-live", VisualCue::Arrival);
+    let (live_samples, live_clip) = recording_clip();
+    let mut live = Harness::new(cx, gpui_kit::install, move |_, _| {
+        div()
+            .w(px(240.0))
+            .h(px(160.0))
+            .child(
+                CinematicEffect::new("cinematic.live", live_plan.clone()).clip(live_clip.clone()),
+            )
+            .into_any_element()
+    });
+    assert!(
+        live.update(|window, cx| window.simulate_next_frame(cx)) > 0,
+        "a live adapter-backed recipe requests its own frame"
+    );
+    assert!(!live_samples.borrow().is_empty());
+
+    let mut planner = EffectPlanner::new(EffectPolicy::new(EffectQuality::Cinematic));
+    let event = EffectEvent::new(
+        "cinematic-replay",
+        "effects-test",
+        "target",
+        VisualCue::Reward,
+    );
+    let _ = planner.plan(event.clone(), 1, false);
+    let replay = planner.plan(event, 1, false);
+    let (replay_samples, replay_clip) = recording_clip();
+    let mut suppressed = Harness::new(cx, gpui_kit::install, move |_, _| {
+        div()
+            .w(px(240.0))
+            .h(px(160.0))
+            .child(
+                CinematicEffect::new("cinematic.replay", replay.clone()).clip(replay_clip.clone()),
+            )
+            .into_any_element()
+    });
+    assert!(suppressed.node("cinematic.replay").is_none());
+    assert!(replay_samples.borrow().is_empty());
+}
+
+#[test]
+fn dotlottie_requests_are_typed_intents_and_do_not_claim_outcomes() {
+    let input = DotLottieInput::new("mood.intensity", DotLottieInputValue::Number(0.72))
+        .expect("bounded input");
+    let requests = [
+        DotLottieRequest::Play,
+        DotLottieRequest::Pause,
+        DotLottieRequest::Stop,
+        DotLottieRequest::Seek(Duration::from_millis(420)),
+        DotLottieRequest::Input(input.clone()),
+    ];
+
+    assert_eq!(input.name(), "mood.intensity");
+    assert_eq!(input.value(), DotLottieInputValue::Number(0.72));
+    assert_eq!(requests.last(), Some(&DotLottieRequest::Input(input)));
 }
 
 #[test]

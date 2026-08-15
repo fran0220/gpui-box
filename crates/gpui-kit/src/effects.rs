@@ -28,6 +28,10 @@ use web_time::Instant;
 use crate::foundation::direction::ActiveDirection;
 use crate::motion::keyed;
 
+mod dotlottie;
+
+pub use dotlottie::*;
+
 /// How much optional visual richness the host permits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum EffectQuality {
