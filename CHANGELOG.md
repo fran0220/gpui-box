@@ -29,6 +29,18 @@ private atlas layout, so a host does not hand-swap channels. The primitive is
 paint-only and does not pretend that alpha holes are hitboxes or accessibility
 nodes; subtree-wide offscreen composition remains deliberately unsupported.
 
+**Deterministic batched particles.** `ParticleEmitter` samples bounded CPU
+trajectories from a stable seed and absolute elapsed time, then
+`Window::paint_particle_batch` submits every live instance through one
+atlas-backed sprite batch. Birth order, spawn area, velocity, acceleration,
+size, rotation, fades, tint, masks, and hardware compositing remain identical
+across dropped-frame histories; invalid or over-4,096-slot batches fail before
+painting. Kit's `EffectParticles` consumes an `EffectPlan` directly and owns
+the recipe topology, procedural atlas, theme palette, RTL mirroring, timing,
+frame requests, and fixed reduced-motion fallback. Downstream chat and game
+surfaces therefore report semantic effects instead of building one element per
+particle or selecting shaders, particle counts, colors, and degradation rules.
+
 **Measured path-stroke effects.** `PathBuilder::stroke_trim` reveals any
 ordered normalized interval before stroke tessellation, while `dash_offset`
 advances and wraps a validated dash pattern against the same path measurement.

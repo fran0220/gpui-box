@@ -27,6 +27,9 @@ WebGL shaders, are GPUI Box work and import no additional source.
 The composited sprite-batch ABI, atlas source rectangles, transforms, masks,
 tint modes, and normal/additive/screen pipeline states across those renderers
 are GPUI Box work and import no additional source or visual assets.
+The deterministic CPU particle sampler, bounded emitter API, procedural
+alpha-mask atlas, and policy-owned Kit recipes are GPUI Box work and import no
+additional source, shader, or visual assets.
 Normalized path-stroke trimming and wrapping dash offsets are GPUI Box work
 over the existing Lyon measurement and tessellation dependency and import no
 additional source.

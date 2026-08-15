@@ -130,8 +130,17 @@ bounded, per-surface replay history prevents reconnects or rebuilt trees from
 replaying a celebration.
 
 The planner is the policy boundary, not a particle renderer. Components and
-agent runtimes provide semantic events; shared stroke, compositing, sprite, and
-batched particle primitives consume the resulting plan. This keeps graceful
+agent runtimes provide semantic events. `EffectParticles` consumes the plan and
+fills a caller-bounded layer with one deterministic CPU-sampled, atlas-backed
+sprite batch. It owns cue topology, theme colors, RTL trace direction, elapsed
+time, frame scheduling, and the smaller fixed constellation used for `Static`.
+Particle tints stay semantic but are reinforced toward the active text tone,
+so tiny marks retain a contrast floor across the standard light/dark surfaces;
+an active reduced-motion preference also converts an already-running plan
+immediately. `sample_at` exists only for deterministic replay, scrubbers, and
+captures. Suppressed plans and zero-emitter recipes paint nothing. Because the
+layer is decorative, the target status/control remains the semantic feedback
+and the layer adds no hitbox or accessibility node. This keeps graceful
 degradation and performance policy out of every downstream chatbot, persona,
 or game surface.
 

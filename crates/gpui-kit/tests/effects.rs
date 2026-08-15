@@ -1,9 +1,20 @@
 //! Semantic visual events choose policy-owned recipes and never make callers
 //! hand-write accessibility, replay, or budget fallbacks.
 
-use gpui::{IntoElement, TestAppContext, div};
+use std::time::Duration;
+
+use gpui::{IntoElement, ParentElement, Styled, TestAppContext, div, px};
 use gpui_kit::prelude::*;
 use gpui_kit_testkit::harness::Harness;
+
+fn animated_plan(id: &'static str, cue: VisualCue) -> EffectPlan {
+    let mut planner = EffectPlanner::new(EffectPolicy::new(EffectQuality::Cinematic));
+    planner.plan(
+        EffectEvent::new(id, "effects-test", "target", cue),
+        1,
+        false,
+    )
+}
 
 #[gpui::test]
 fn installed_policy_defaults_balanced_and_can_be_replaced(cx: &mut TestAppContext) {
@@ -59,6 +70,57 @@ fn active_reduced_motion_and_replay_policy_are_applied_centrally(cx: &mut TestAp
         replay.presentation,
         EffectPresentation::Suppressed(EffectSuppression::Replay),
         "changing accessibility policy does not replay an event"
+    );
+}
+
+#[gpui::test]
+fn particle_layer_owns_frame_scheduling_and_stops_for_exact_samples(cx: &mut TestAppContext) {
+    let plan = animated_plan("animated", VisualCue::Reward);
+    let animated_plan = plan.clone();
+    let mut animated = Harness::new(cx, gpui_kit::install, move |_, _| {
+        div()
+            .w(px(240.0))
+            .h(px(160.0))
+            .child(EffectParticles::new(animated_plan.clone()))
+            .into_any_element()
+    });
+    assert!(
+        animated.update(|window, cx| window.simulate_next_frame(cx)) > 0,
+        "a live policy-owned recipe requests its own frame"
+    );
+
+    let mut sampled = Harness::new(cx, gpui_kit::install, move |_, _| {
+        div()
+            .w(px(240.0))
+            .h(px(160.0))
+            .child(EffectParticles::new(plan.clone()).sample_at(Duration::from_millis(620)))
+            .into_any_element()
+    });
+    assert_eq!(
+        sampled.update(|window, cx| window.simulate_next_frame(cx)),
+        0,
+        "an exact replay sample owns no timeline"
+    );
+}
+
+#[gpui::test]
+fn active_reduced_motion_stops_an_already_animated_particle_plan(cx: &mut TestAppContext) {
+    let plan = animated_plan("reduce-running", VisualCue::Success);
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        div()
+            .w(px(240.0))
+            .h(px(160.0))
+            .child(EffectParticles::new(plan.clone()))
+            .into_any_element()
+    });
+    harness.update(|_, cx| cx.set_reduce_motion(true));
+    harness.update(|window, cx| {
+        window.simulate_next_frame(cx);
+    });
+    assert_eq!(
+        harness.update(|window, cx| window.simulate_next_frame(cx)),
+        0,
+        "the component rechecks accessibility instead of trusting a stale animated plan"
     );
 }
 

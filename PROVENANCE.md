@@ -72,6 +72,11 @@ additive, and screen pipeline states are subsequent GPUI Box work across Metal,
 Direct3D, WGPU, and WebGL. The procedural RGBA8 image constructor and canonical
 sprite atlas are authored here and import no source, shader, or visual asset.
 
+The deterministic CPU particle sampler, bounded emitter contract, absolute-time
+birth and trajectory math, built-in alpha-mask atlas, and policy-owned Kit
+recipes are subsequent GPUI Box work. They reuse that sprite-batch renderer and
+import no simulation source, shader, or visual asset.
+
 Normalized path-stroke trimming and wrapping dash offsets are subsequent GPUI
 Box work at the pre-tessellation path boundary. They use the existing Lyon
 measurement and tessellation dependency and import no source or visual assets.

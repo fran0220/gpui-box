@@ -14,9 +14,18 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::rc::Rc;
+use std::sync::Arc;
+use std::time::Duration;
 
-use gpui::{App, Global, SharedString};
+use gpui::{
+    App, Bounds, DevicePixels, Global, Hsla, IntoElement, ParticleEmitter, Pixels, Radians,
+    RenderImage, RenderOnce, SharedString, SpriteBlendMode, SpriteColorMode, Styled, Window,
+    bounds, canvas, div, point, px, radians, size,
+};
+use gpui_kit_theme::ActiveTheme;
+use web_time::Instant;
 
+use crate::foundation::direction::ActiveDirection;
 use crate::motion::keyed;
 
 /// How much optional visual richness the host permits.
@@ -86,17 +95,7 @@ impl VisualCue {
     }
 
     fn cost(self) -> EffectCost {
-        match self {
-            Self::Arrival => EffectCost::new(1, 1, 24, 48_000),
-            Self::Delegation => EffectCost::new(1, 1, 18, 56_000),
-            Self::Handoff => EffectCost::new(1, 1, 24, 72_000),
-            Self::Aggregation => EffectCost::new(1, 1, 32, 64_000),
-            Self::Success => EffectCost::new(1, 1, 36, 48_000),
-            Self::Reward => EffectCost::new(1, 2, 96, 120_000),
-            Self::Attention => EffectCost::new(1, 0, 0, 36_000),
-            Self::Refusal => EffectCost::new(1, 0, 0, 36_000),
-            Self::Failure => EffectCost::new(1, 1, 12, 48_000),
-        }
+        self.recipe().cost()
     }
 }
 
@@ -152,6 +151,26 @@ pub enum EffectRecipe {
     FailurePulse,
 }
 
+impl EffectRecipe {
+    /// Returns the renderer work reserved when this recipe is admitted.
+    ///
+    /// The particle renderer uses the same count, so planner accounting and
+    /// emitted topology cannot silently drift apart.
+    pub fn cost(self) -> EffectCost {
+        match self {
+            Self::ArrivalHalo => EffectCost::new(1, 1, 24, 48_000),
+            Self::DelegationTrace => EffectCost::new(1, 1, 18, 56_000),
+            Self::HandoffTrace => EffectCost::new(1, 1, 24, 72_000),
+            Self::AggregationPulse => EffectCost::new(1, 1, 32, 64_000),
+            Self::SuccessBurst => EffectCost::new(1, 1, 36, 48_000),
+            Self::RewardCelebration => EffectCost::new(1, 2, 96, 120_000),
+            Self::AttentionPulse => EffectCost::new(1, 0, 0, 36_000),
+            Self::RefusalMark => EffectCost::new(1, 0, 0, 36_000),
+            Self::FailurePulse => EffectCost::new(1, 1, 12, 48_000),
+        }
+    }
+}
+
 /// How the chosen recipe is allowed to appear.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum EffectPresentation {
@@ -200,6 +219,383 @@ impl EffectPlan {
     pub fn visible(&self) -> bool {
         !matches!(self.presentation, EffectPresentation::Suppressed(_))
     }
+}
+
+/// Decorative, batched particles for one policy-resolved [`EffectPlan`].
+///
+/// The component fills the bounds its parent gives it. It owns recipe
+/// topology, palette, timing, deterministic sampling, RTL mirroring, reduced
+/// motion fallback, and animation-frame requests; a caller supplies no
+/// particle parameters. Replay-suppressed plans render nothing. Static plans
+/// render a small fixed constellation and never schedule a frame.
+///
+/// Particles are deliberately absent for zero-emitter recipes such as
+/// `AttentionPulse` and `RefusalMark`: the semantic control or status remains
+/// the required feedback, while this component is only its decorative layer.
+#[derive(Debug, IntoElement)]
+pub struct EffectParticles {
+    plan: EffectPlan,
+    sample_at: Option<Duration>,
+}
+
+impl EffectParticles {
+    /// Creates a full-bounds particle layer from a centrally resolved plan.
+    pub fn new(plan: EffectPlan) -> Self {
+        Self {
+            plan,
+            sample_at: None,
+        }
+    }
+
+    /// Samples an animated plan at an exact absolute time without scheduling.
+    ///
+    /// This is for deterministic captures, replay tooling, and scrubbers.
+    /// Static presentations ignore the supplied time and retain their fixed
+    /// reduced-motion fallback.
+    pub fn sample_at(mut self, elapsed: Duration) -> Self {
+        self.sample_at = Some(elapsed);
+        self
+    }
+}
+
+impl RenderOnce for EffectParticles {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        if matches!(self.plan.presentation, EffectPresentation::Suppressed(_)) {
+            return div().size_full().into_any_element();
+        }
+
+        let static_presentation =
+            cx.reduce_motion() || matches!(self.plan.presentation, EffectPresentation::Static(_));
+        let elapsed = particle_elapsed(&self.plan, self.sample_at, static_presentation, window, cx);
+        let theme = cx.theme();
+        let contrast_tint = |color: Hsla| color.blend(theme.colors.text.opacity(0.28));
+        let palette = EffectPalette {
+            accent: contrast_tint(theme.colors.accent_strong),
+            info: contrast_tint(theme.colors.info),
+            success: contrast_tint(theme.colors.success),
+            warning: contrast_tint(theme.colors.warning),
+            danger: contrast_tint(theme.colors.danger),
+        };
+        let rtl = cx.is_rtl();
+        let plan = self.plan;
+        let atlas = effect_particle_atlas();
+
+        canvas(
+            |_, _, _| {},
+            move |frame, _, window, _| {
+                let emitters = particle_emitters(&plan, frame, palette, rtl, static_presentation);
+                window
+                    .paint_particle_batch(atlas.clone(), 0, elapsed, &emitters)
+                    .expect("policy-owned particle recipes must remain valid");
+            },
+        )
+        .size_full()
+        .into_any_element()
+    }
+}
+
+#[derive(Debug, Default)]
+struct ParticleClock(Option<Instant>);
+
+fn particle_elapsed(
+    plan: &EffectPlan,
+    sample_at: Option<Duration>,
+    static_presentation: bool,
+    window: &mut Window,
+    cx: &mut App,
+) -> Duration {
+    if static_presentation {
+        return Duration::from_millis(100);
+    }
+    if let Some(elapsed) = sample_at {
+        return elapsed;
+    }
+
+    let key: SharedString =
+        format!("effect-particles:{}", replay_key(&plan.surface, &plan.id)).into();
+    let slot = keyed::slot::<ParticleClock>(&key, cx);
+    let now = cx.background_executor().now();
+    let elapsed = {
+        let mut clock = slot.borrow_mut();
+        let started = *clock.0.get_or_insert(now);
+        now.saturating_duration_since(started)
+    };
+    if elapsed < particle_recipe_duration(plan.recipe) {
+        window.request_animation_frame();
+    }
+    elapsed
+}
+
+fn particle_recipe_duration(recipe: EffectRecipe) -> Duration {
+    Duration::from_millis(match recipe {
+        EffectRecipe::ArrivalHalo => 900,
+        EffectRecipe::DelegationTrace => 970,
+        EffectRecipe::HandoffTrace => 1_150,
+        EffectRecipe::AggregationPulse => 900,
+        EffectRecipe::SuccessBurst => 1_100,
+        EffectRecipe::RewardCelebration => 1_680,
+        EffectRecipe::FailurePulse => 750,
+        EffectRecipe::AttentionPulse | EffectRecipe::RefusalMark => 0,
+    })
+}
+
+#[derive(Clone, Copy)]
+struct EffectPalette {
+    accent: Hsla,
+    info: Hsla,
+    success: Hsla,
+    warning: Hsla,
+    danger: Hsla,
+}
+
+fn particle_emitters(
+    plan: &EffectPlan,
+    frame: Bounds<Pixels>,
+    palette: EffectPalette,
+    rtl: bool,
+    static_presentation: bool,
+) -> Vec<ParticleEmitter> {
+    if plan.recipe.cost().emitters == 0 {
+        return Vec::new();
+    }
+    if static_presentation {
+        return static_particle_emitters(plan, frame, palette);
+    }
+
+    let center = frame.center();
+    let logical_start_x = if rtl {
+        frame.right() - frame.size.width * 0.16
+    } else {
+        frame.left() + frame.size.width * 0.16
+    };
+    let reading_direction = if rtl {
+        Radians(std::f32::consts::PI)
+    } else {
+        Radians::default()
+    };
+    let source = particle_source;
+    let emitter = |seed, tile, origin, count, tint, blend| {
+        ParticleEmitter::new(seed, source(tile), origin, count)
+            .color_mode(SpriteColorMode::AlphaMask, tint)
+            .blend_mode(blend)
+    };
+
+    match plan.recipe {
+        EffectRecipe::ArrivalHalo => vec![
+            emitter(
+                plan.seed,
+                1,
+                center,
+                plan.recipe.cost().particles,
+                palette.info,
+                SpriteBlendMode::Screen,
+            )
+            .lifetime(Duration::from_millis(900))
+            .speed(12.0, 64.0)
+            .size(size(px(18.0), px(18.0)), size(px(2.0), px(2.0)))
+            .fade(0.0, 0.45),
+        ],
+        EffectRecipe::DelegationTrace => vec![
+            emitter(
+                plan.seed,
+                0,
+                point(logical_start_x, center.y),
+                plan.recipe.cost().particles,
+                palette.accent,
+                SpriteBlendMode::Normal,
+            )
+            .spawn_area(size(Pixels::ZERO, frame.size.height * 0.18))
+            .emission_span(Duration::from_millis(420))
+            .lifetime(Duration::from_millis(550))
+            .direction(reading_direction, radians(0.18))
+            .speed(105.0, 145.0)
+            .size(size(px(8.0), px(8.0)), size(px(3.0), px(3.0)))
+            .fade(0.0, 0.45),
+        ],
+        EffectRecipe::HandoffTrace => vec![
+            emitter(
+                plan.seed,
+                2,
+                point(logical_start_x, center.y),
+                plan.recipe.cost().particles,
+                palette.info,
+                SpriteBlendMode::Screen,
+            )
+            .spawn_area(size(Pixels::ZERO, frame.size.height * 0.22))
+            .emission_span(Duration::from_millis(500))
+            .lifetime(Duration::from_millis(650))
+            .direction(reading_direction, radians(0.24))
+            .speed(120.0, 175.0)
+            .size(size(px(11.0), px(11.0)), size(px(4.0), px(4.0)))
+            .rotation(Radians::default(), radians(0.8), radians(1.1))
+            .fade(0.0, 0.5),
+        ],
+        EffectRecipe::AggregationPulse => vec![
+            emitter(
+                plan.seed,
+                1,
+                center,
+                plan.recipe.cost().particles,
+                palette.accent,
+                SpriteBlendMode::Screen,
+            )
+            .lifetime(Duration::from_millis(900))
+            .speed(30.0, 82.0)
+            .size(size(px(15.0), px(15.0)), size(px(3.0), px(3.0)))
+            .fade(0.0, 0.52),
+        ],
+        EffectRecipe::SuccessBurst => vec![
+            emitter(
+                plan.seed,
+                2,
+                point(center.x, frame.bottom() - frame.size.height * 0.22),
+                plan.recipe.cost().particles,
+                palette.success,
+                SpriteBlendMode::Normal,
+            )
+            .lifetime(Duration::from_millis(1_100))
+            .direction(radians(-std::f32::consts::FRAC_PI_2), radians(2.2))
+            .speed(70.0, 145.0)
+            .acceleration(point(0.0, 92.0))
+            .size(size(px(18.0), px(18.0)), size(px(7.0), px(7.0)))
+            .rotation(Radians::default(), radians(1.8), radians(1.4))
+            .fade(0.0, 0.38),
+        ],
+        EffectRecipe::RewardCelebration => {
+            let count = plan.recipe.cost().particles / 2;
+            vec![
+                emitter(
+                    plan.seed,
+                    2,
+                    point(center.x, frame.bottom() - frame.size.height * 0.12),
+                    count,
+                    palette.warning,
+                    SpriteBlendMode::Normal,
+                )
+                .emission_span(Duration::from_millis(180))
+                .lifetime(Duration::from_millis(1_500))
+                .direction(radians(-std::f32::consts::FRAC_PI_2), radians(2.65))
+                .speed(105.0, 205.0)
+                .acceleration(point(0.0, 155.0))
+                .size(size(px(12.0), px(8.0)), size(px(7.0), px(4.0)))
+                .rotation(Radians::default(), radians(2.8), radians(4.2))
+                .fade(0.0, 0.26),
+                emitter(
+                    plan.seed ^ 0x9e37_79b9_7f4a_7c15,
+                    0,
+                    point(center.x, frame.bottom() - frame.size.height * 0.12),
+                    count,
+                    palette.accent,
+                    SpriteBlendMode::Normal,
+                )
+                .emission_span(Duration::from_millis(180))
+                .lifetime(Duration::from_millis(1_500))
+                .direction(radians(-std::f32::consts::FRAC_PI_2), radians(2.9))
+                .speed(95.0, 190.0)
+                .acceleration(point(0.0, 150.0))
+                .size(size(px(9.0), px(9.0)), size(px(4.0), px(4.0)))
+                .rotation(Radians::default(), radians(2.2), radians(-3.4))
+                .fade(0.0, 0.3),
+            ]
+        }
+        EffectRecipe::FailurePulse => vec![
+            emitter(
+                plan.seed,
+                1,
+                center,
+                plan.recipe.cost().particles,
+                palette.danger,
+                SpriteBlendMode::Normal,
+            )
+            .lifetime(Duration::from_millis(750))
+            .speed(20.0, 58.0)
+            .size(size(px(13.0), px(13.0)), size(px(3.0), px(3.0)))
+            .fade(0.0, 0.5),
+        ],
+        EffectRecipe::AttentionPulse | EffectRecipe::RefusalMark => Vec::new(),
+    }
+}
+
+fn static_particle_emitters(
+    plan: &EffectPlan,
+    frame: Bounds<Pixels>,
+    palette: EffectPalette,
+) -> Vec<ParticleEmitter> {
+    let (tile, tint) = match plan.recipe {
+        EffectRecipe::ArrivalHalo | EffectRecipe::HandoffTrace => (2, palette.info),
+        EffectRecipe::DelegationTrace | EffectRecipe::AggregationPulse => (0, palette.accent),
+        EffectRecipe::SuccessBurst => (2, palette.success),
+        EffectRecipe::RewardCelebration => (1, palette.warning),
+        EffectRecipe::FailurePulse => (1, palette.danger),
+        EffectRecipe::AttentionPulse | EffectRecipe::RefusalMark => return Vec::new(),
+    };
+    let count = (plan.recipe.cost().particles / 6).clamp(3, 9);
+    vec![
+        ParticleEmitter::new(plan.seed, particle_source(tile), frame.center(), count)
+            .spawn_area(size(frame.size.width * 0.14, frame.size.height * 0.2))
+            .lifetime(Duration::from_secs(1))
+            .speed(0.0, 0.0)
+            .size(size(px(17.0), px(17.0)), size(px(17.0), px(17.0)))
+            .size_variation(0.45)
+            .fade(0.0, 0.0)
+            .color_mode(SpriteColorMode::AlphaMask, tint)
+            .blend_mode(SpriteBlendMode::Normal),
+    ]
+}
+
+const PARTICLE_TILE: i32 = 32;
+
+fn particle_source(tile: i32) -> Bounds<DevicePixels> {
+    bounds(
+        point(DevicePixels(tile * PARTICLE_TILE), DevicePixels(0)),
+        size(DevicePixels(PARTICLE_TILE), DevicePixels(PARTICLE_TILE)),
+    )
+}
+
+thread_local! {
+    static EFFECT_PARTICLE_ATLAS: Arc<RenderImage> = Arc::new(build_effect_particle_atlas());
+}
+
+fn effect_particle_atlas() -> Arc<RenderImage> {
+    EFFECT_PARTICLE_ATLAS.with(Arc::clone)
+}
+
+fn build_effect_particle_atlas() -> RenderImage {
+    const TILES: i32 = 3;
+    let mut pixels = Vec::with_capacity((PARTICLE_TILE * PARTICLE_TILE * TILES * 4) as usize);
+    for y in 0..PARTICLE_TILE {
+        for x in 0..PARTICLE_TILE * TILES {
+            let tile = x / PARTICLE_TILE;
+            let local_x = x % PARTICLE_TILE;
+            let dx = local_x as f32 + 0.5 - PARTICLE_TILE as f32 / 2.0;
+            let dy = y as f32 + 0.5 - PARTICLE_TILE as f32 / 2.0;
+            let radius = dx.hypot(dy);
+            let alpha = match tile {
+                0 => ((PARTICLE_TILE as f32 * 0.3 - radius) / 1.25).clamp(0.0, 1.0),
+                1 => {
+                    let glow = (1.0 - radius / (PARTICLE_TILE as f32 * 0.5)).clamp(0.0, 1.0);
+                    glow * glow
+                }
+                _ => {
+                    let horizontal = (1.0 - dy.abs() / 1.9).clamp(0.0, 1.0)
+                        * (1.0 - dx.abs() / 14.0).clamp(0.0, 1.0);
+                    let vertical = (1.0 - dx.abs() / 1.9).clamp(0.0, 1.0)
+                        * (1.0 - dy.abs() / 14.0).clamp(0.0, 1.0);
+                    let core = (1.0 - radius / 4.5).clamp(0.0, 1.0);
+                    horizontal.max(vertical).max(core)
+                }
+            };
+            pixels.extend_from_slice(&[255, 255, 255, (alpha * 255.0).round() as u8]);
+        }
+    }
+    RenderImage::from_rgba(
+        size(
+            DevicePixels(PARTICLE_TILE * TILES),
+            DevicePixels(PARTICLE_TILE),
+        ),
+        pixels,
+    )
+    .expect("the built-in particle atlas has exact RGBA8 dimensions")
 }
 
 /// Estimated renderer work consumed by one animated recipe.
@@ -501,6 +897,101 @@ mod tests {
 
     fn event(id: &'static str, surface: &'static str, cue: VisualCue) -> EffectEvent {
         EffectEvent::new(id, surface, "target", cue)
+    }
+
+    fn plan(recipe: EffectRecipe, presentation: EffectPresentation) -> EffectPlan {
+        EffectPlan {
+            id: "effect".into(),
+            surface: "surface".into(),
+            target: "target".into(),
+            origin: None,
+            cue: VisualCue::Success,
+            recipe,
+            presentation,
+            seed: 17,
+        }
+    }
+
+    fn palette() -> EffectPalette {
+        EffectPalette {
+            accent: gpui::white(),
+            info: gpui::white(),
+            success: gpui::white(),
+            warning: gpui::white(),
+            danger: gpui::white(),
+        }
+    }
+
+    fn frame() -> Bounds<Pixels> {
+        bounds(point(px(20.0), px(30.0)), size(px(320.0), px(180.0)))
+    }
+
+    #[test]
+    fn animated_particle_topology_matches_the_budget_authority() {
+        let recipes = [
+            EffectRecipe::ArrivalHalo,
+            EffectRecipe::DelegationTrace,
+            EffectRecipe::HandoffTrace,
+            EffectRecipe::AggregationPulse,
+            EffectRecipe::SuccessBurst,
+            EffectRecipe::RewardCelebration,
+            EffectRecipe::AttentionPulse,
+            EffectRecipe::RefusalMark,
+            EffectRecipe::FailurePulse,
+        ];
+        for recipe in recipes {
+            let emitters = particle_emitters(
+                &plan(recipe, EffectPresentation::Animated),
+                frame(),
+                palette(),
+                false,
+                false,
+            );
+            assert_eq!(emitters.len(), usize::from(recipe.cost().emitters));
+            assert_eq!(
+                emitters.iter().map(ParticleEmitter::count).sum::<u32>(),
+                recipe.cost().particles
+            );
+            assert_eq!(
+                emitters
+                    .iter()
+                    .map(ParticleEmitter::total_duration)
+                    .max()
+                    .unwrap_or_default(),
+                particle_recipe_duration(recipe)
+            );
+        }
+    }
+
+    #[test]
+    fn static_fallback_is_bounded_and_has_no_timeline() {
+        let recipe = EffectRecipe::RewardCelebration;
+        let emitters = particle_emitters(
+            &plan(
+                recipe,
+                EffectPresentation::Static(EffectFallback::ReducedMotion),
+            ),
+            frame(),
+            palette(),
+            false,
+            true,
+        );
+        assert_eq!(emitters.len(), 1);
+        assert!(emitters[0].count() < recipe.cost().particles);
+        assert_eq!(
+            particle_recipe_duration(EffectRecipe::AttentionPulse),
+            Duration::ZERO
+        );
+    }
+
+    #[test]
+    fn the_built_in_atlas_has_three_bounded_alpha_masks() {
+        let atlas = build_effect_particle_atlas();
+        assert_eq!(
+            atlas.size(0),
+            size(DevicePixels(96), DevicePixels(PARTICLE_TILE))
+        );
+        assert_eq!(atlas.as_bytes(0).expect("one frame").len(), 96 * 32 * 4);
     }
 
     #[test]

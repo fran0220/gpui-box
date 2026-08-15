@@ -58,6 +58,21 @@ no hit testing or accessibility nodes, and it does not claim subtree-wide
 offscreen masks or blends. `RenderImage::from_rgba` is the public procedural
 pixel boundary and hides the renderer's internal channel order.
 
+`Window::paint_particle_batch` is a deterministic CPU sampler above that same
+sprite ABI. One or more `ParticleEmitter`s use integer seed lanes and absolute
+elapsed time, so sampling order and dropped frames do not alter birth times,
+positions, dimensions, rotation, or opacity. A call admits at most 4,096
+declared slots and validates every emitter and atlas source before scene
+insertion. It performs no compute-shader simulation and creates no per-particle
+element. Kit's `EffectParticles` is the policy-owned adapter: it maps
+`EffectPlan` recipes to emitter topology, semantic theme colors and a built-in
+procedural alpha atlas; reinforces tiny semantic marks toward the active text
+tone for standard-surface contrast; mirrors directional traces under RTL;
+schedules only while an animated recipe is live; and uses a fixed smaller
+constellation for quality, budget, or reduced-motion fallbacks. Platform
+renderers require no new particle pipeline because the final submission is one
+ordinary sprite batch.
+
 `PathBuilder::stroke_trim` keeps an ordered normalized interval of the measured
 source path before Lyon expands the stroke. `dash_offset` advances and wraps a
 validated dash pattern against that same measurement, so trim, phase, joins,

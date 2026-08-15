@@ -202,8 +202,8 @@ pub mod prelude {
     pub use crate::display::tag::Tag;
     pub use crate::display::timeline::{EntryTime, Timeline, TimelineEntry, TimelineGroup};
     pub use crate::effects::{
-        EffectBudget, EffectCost, EffectEvent, EffectFallback, EffectImportance, EffectPlan,
-        EffectPlanner, EffectPolicy, EffectPresentation, EffectQuality, EffectRecipe,
+        EffectBudget, EffectCost, EffectEvent, EffectFallback, EffectImportance, EffectParticles,
+        EffectPlan, EffectPlanner, EffectPolicy, EffectPresentation, EffectQuality, EffectRecipe,
         EffectSuppression, VisualCue, effect_policy, plan_effect, set_effect_policy,
     };
     pub use crate::foundation::direction::{

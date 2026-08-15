@@ -14,6 +14,7 @@ use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{Radius, Space, TextTone, Theme, TypeScale};
 use std::sync::Arc;
+use std::time::Duration;
 
 use crate::controls::combobox::Combobox;
 use crate::controls::input::TextInput;
@@ -1140,6 +1141,38 @@ fn visual_effects(_window: &mut Window, cx: &mut App) -> AnyElement {
     let additive_tint_alt = theme.colors.info;
     let screen_tint = theme.colors.success;
     let screen_tint_alt = theme.colors.warning;
+    let mut effect_planner = EffectPlanner::new(EffectPolicy::new(EffectQuality::Cinematic));
+    let success_particles = effect_planner.plan(
+        EffectEvent::new(
+            "scene-success",
+            "visual-effects",
+            "success-card",
+            VisualCue::Success,
+        ),
+        1,
+        false,
+    );
+    let reward_particles = effect_planner.plan(
+        EffectEvent::new(
+            "scene-reward",
+            "visual-effects",
+            "reward-card",
+            VisualCue::Reward,
+        ),
+        1,
+        false,
+    );
+    let mut static_planner = EffectPlanner::new(EffectPolicy::new(EffectQuality::Cinematic));
+    let static_particles = static_planner.plan(
+        EffectEvent::new(
+            "scene-static",
+            "visual-effects-static",
+            "static-card",
+            VisualCue::Reward,
+        ),
+        1,
+        true,
+    );
     let label = |text: &'static str| {
         div()
             .absolute()
@@ -1434,6 +1467,84 @@ fn visual_effects(_window: &mut Window, cx: &mut App) -> AnyElement {
                             TypeScale::Caption,
                             "Screen · atlas reuse",
                         )),
+                ),
+        )
+        .child(crate::foundation::text(
+            &theme,
+            TypeScale::Subtitle,
+            "Policy-owned particle recipes",
+        ))
+        .child(
+            row(&theme)
+                .gap_token(&theme, Space::Md)
+                .child(
+                    div()
+                        .relative()
+                        .w(px(248.0))
+                        .h(px(164.0))
+                        .radius(&theme, Radius::Card)
+                        .overflow_hidden()
+                        .bg(theme.colors.sunken)
+                        .border_1()
+                        .border_color(theme.colors.hairline)
+                        .semantic_in(
+                            cx,
+                            NodeSpec::new("scene.effects.particles-success", Role::Image)
+                                .text("Deterministic success burst")
+                                .description(
+                                    "A policy-owned recipe sampled at a fixed absolute time",
+                                ),
+                        )
+                        .child(
+                            EffectParticles::new(success_particles)
+                                .sample_at(Duration::from_millis(420)),
+                        )
+                        .child(label("Success · 36 instances")),
+                )
+                .child(
+                    div()
+                        .relative()
+                        .w(px(248.0))
+                        .h(px(164.0))
+                        .radius(&theme, Radius::Card)
+                        .overflow_hidden()
+                        .bg(theme.colors.sunken)
+                        .border_1()
+                        .border_color(theme.colors.hairline)
+                        .semantic_in(
+                            cx,
+                            NodeSpec::new("scene.effects.particles-reward", Role::Image)
+                                .text("Deterministic reward celebration")
+                                .description(
+                                    "Two emitters share one atlas upload and one sprite batch",
+                                ),
+                        )
+                        .child(
+                            EffectParticles::new(reward_particles)
+                                .sample_at(Duration::from_millis(620)),
+                        )
+                        .child(label("Reward · 2 emitters")),
+                )
+                .child(
+                    div()
+                        .relative()
+                        .w(px(248.0))
+                        .h(px(164.0))
+                        .radius(&theme, Radius::Card)
+                        .overflow_hidden()
+                        .bg(theme.colors.sunken)
+                        .border_1()
+                        .border_color(theme.colors.hairline)
+                        .semantic_in(
+                            cx,
+                            NodeSpec::new("scene.effects.particles-static", Role::Image)
+                                .text("Reduced motion particle fallback")
+                                .description(
+                                    "A fixed bounded constellation with no animation frames",
+                                ),
+                        )
+                        .child(EffectParticles::new(static_particles))
+                        .child(label("Static · no timeline")),
                 ),
         )
         .into_any_element()

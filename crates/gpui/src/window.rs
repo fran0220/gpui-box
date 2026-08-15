@@ -9,7 +9,7 @@ use crate::{
     GlobalElementId, GlyphId, GpuSpecs, Hsla, InputHandler, IsZero, KeyBinding, KeyContext,
     KeyDownEvent, KeyEvent, Keystroke, KeystrokeEvent, LayoutId, LineLayoutIndex, MAX_GLASS_LOBES,
     Modifiers, ModifiersChangedEvent, MonochromeSprite, MouseButton, MouseEvent, MouseMoveEvent,
-    MouseUpEvent, Path, Pixels, PlatformAtlas, PlatformDisplay, PlatformInput,
+    MouseUpEvent, ParticleEmitter, Path, Pixels, PlatformAtlas, PlatformDisplay, PlatformInput,
     PlatformInputHandler, PlatformViewHandle, PlatformViewPlacement, PlatformViewRegistry,
     PlatformWindow, Point, PolychromeSprite, Priority, PromptButton, PromptLevel, Quad, Render,
     RenderGlyphParams, RenderImage, RenderImageParams, RenderSvgParams, Replay, ResizeEdge,
@@ -1406,6 +1406,29 @@ fn default_bounds(display_id: Option<DisplayId>, cx: &mut App) -> WindowBounds {
         (false, false) => display_bounds.origin,
     };
     window_bounds_ctor(Bounds::new(final_origin, base_size))
+}
+
+fn validate_image_source(
+    source: Bounds<DevicePixels>,
+    frame_size: Size<DevicePixels>,
+    kind: &str,
+    index: usize,
+) -> Result<()> {
+    let source_right = source.origin.x.0.checked_add(source.size.width.0);
+    let source_bottom = source.origin.y.0.checked_add(source.size.height.0);
+    anyhow::ensure!(
+        source.origin.x.0 >= 0
+            && source.origin.y.0 >= 0
+            && source.size.width.0 > 0
+            && source.size.height.0 > 0
+            && source_right.is_some_and(|right| right <= frame_size.width.0)
+            && source_bottom.is_some_and(|bottom| bottom <= frame_size.height.0),
+        "{kind} {index} source {:?} is outside the {}×{} frame",
+        source,
+        frame_size.width.0,
+        frame_size.height.0
+    );
+    Ok(())
 }
 
 impl Window {
@@ -4841,6 +4864,38 @@ impl Window {
         Ok(())
     }
 
+    /// Samples deterministic CPU particle emitters and paints the live sprites
+    /// in one atlas-backed batch.
+    ///
+    /// `elapsed` is absolute time since the semantic effect began, not a frame
+    /// delta. Re-sampling the same emitters at the same instant yields the same
+    /// instances regardless of prior frames. All emitter definitions and the
+    /// aggregate slot ceiling are validated before the scene is modified. The
+    /// returned count is the number of live instances painted at this instant.
+    /// This method installs no hitbox or accessibility node.
+    pub fn paint_particle_batch(
+        &mut self,
+        data: Arc<RenderImage>,
+        frame_index: usize,
+        elapsed: Duration,
+        emitters: &[ParticleEmitter],
+    ) -> Result<usize> {
+        self.invalidator.debug_assert_paint();
+        anyhow::ensure!(
+            frame_index < data.frame_count(),
+            "particle frame index {frame_index} is outside {} frame(s)",
+            data.frame_count()
+        );
+        let frame_size = data.size(frame_index);
+        for (index, emitter) in emitters.iter().enumerate() {
+            validate_image_source(emitter.source(), frame_size, "particle emitter", index)?;
+        }
+        let instances = crate::particles::sample_particle_emitters(emitters, elapsed)?;
+        let count = instances.len();
+        self.paint_sprite_batch(data, frame_index, &instances)?;
+        Ok(count)
+    }
+
     /// Paints a batch of independently transformed samples from one image frame.
     ///
     /// The frame is uploaded to the atlas once. Each [`SpriteInstance`] then
@@ -4878,20 +4933,7 @@ impl Window {
         let frame_size = data.size(frame_index);
         for (index, instance) in instances.iter().enumerate() {
             let source = instance.source;
-            let source_right = source.origin.x.0.checked_add(source.size.width.0);
-            let source_bottom = source.origin.y.0.checked_add(source.size.height.0);
-            anyhow::ensure!(
-                source.origin.x.0 >= 0
-                    && source.origin.y.0 >= 0
-                    && source.size.width.0 > 0
-                    && source.size.height.0 > 0
-                    && source_right.is_some_and(|right| right <= frame_size.width.0)
-                    && source_bottom.is_some_and(|bottom| bottom <= frame_size.height.0),
-                "sprite {index} source {:?} is outside the {}×{} frame",
-                source,
-                frame_size.width.0,
-                frame_size.height.0
-            );
+            validate_image_source(source, frame_size, "sprite", index)?;
             let destination = instance.destination;
             anyhow::ensure!(
                 destination.origin.x.0.is_finite()

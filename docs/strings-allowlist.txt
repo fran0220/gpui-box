@@ -189,6 +189,7 @@ object
 pane `{id}` has children
 plain text
 platform
+policy-owned particle recipes must remain valid
 records the root does not reach
 redacted, {shape}
 series is nonempty
@@ -196,6 +197,7 @@ soft break
 split `{id}` has {found} children, not 2
 stale
 supplied
+the built-in particle atlas has exact RGBA8 dimensions
 time unknown
 true
 unknown
