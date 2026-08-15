@@ -68,6 +68,7 @@ pub mod datetime;
 pub mod display;
 pub mod effects;
 pub mod foundation;
+pub mod game;
 pub mod interaction;
 pub mod layout;
 pub mod media;
@@ -219,6 +220,14 @@ pub mod prelude {
         ActiveTheme, ControlSize, Density, Disableable, Elevation, FocusRing, HoverLift, Ident,
         Layer, Pressable, Selectable, Sizable, StyledExt, ThemeRegistry, activate_theme,
         set_density, text,
+    };
+    pub use crate::game::{
+        Ability, AbilityBar, AbilityBarEvent, AbilityCharges, AbilityChargesError, AbilityId,
+        AbilitySet, AbilitySetIssue, AbilityState, GameFraction, GameFractionError, Objective,
+        ObjectiveId, ObjectiveIssue, ObjectiveSnapshot, ObjectiveState, ObjectiveTracker,
+        ObjectiveTrackerEvent, PartyGauge, PartyGaugeState, PartyIssue, PartyMember, PartyRoster,
+        PartyRosterEvent, PartySnapshot, RewardId, RewardItem, RewardItemId, RewardReveal,
+        RewardRevealEvent, RewardSnapshot, RewardState,
     };
     pub use crate::interaction::dnd::{
         ActiveDrag, DragItem, DropAxis, DropIntent, DropPosition, StagedDrag,

@@ -153,6 +153,24 @@ progression are host capabilities. Box accepts only resolved assets and typed
 facts, then owns the reusable visual mapping, deterministic sampling,
 accessibility semantics, RTL order, and fallback treatment.
 
+## Game experience
+
+| Component | Kind | Reports | Notes |
+|---|---|---|---|
+| `PartyRoster` | builder | selected member identity | Consumes `PartySnapshot` and the standard agent/persona model, then owns portrait, activity, gauge, selected, compact-wrap, and RTL presentation. Duplicate member or per-member gauge identities render one issue surface instead of a collapsed roster |
+| `ObjectiveTracker` | builder | selected objective identity | Owns state marks, hierarchy indentation, progress, semantics, and RTL from a caller-owned `ObjectiveSnapshot`. Duplicate ids, dangling parents, and cycles refuse the complete identity-indexed projection rather than drawing a believable but invented hierarchy |
+| `AbilityBar` | builder | activation request by ability identity | Maps ready, cooldown, disabled, and unavailable facts plus charges, cost, shortcut, and icon into one keyboard-ready control family. Only `Ready` installs an action; requesting activation consumes no charge, starts no cooldown, pays no cost, and claims no result |
+| `RewardReveal` | builder | reveal or claim request by reward identity | Hidden, revealed, claimed, and unavailable remain caller-owned facts. Revealed items use business ids, optional resolved art, localized quantity grammar, staggered reduced-motion-aware arrival, and an optional policy-resolved `EffectPlan`. Duplicate item ids render an issue instead of one invented item |
+
+`GameFraction` and `AbilityCharges` reject non-finite, out-of-range, zero-maximum,
+and above-maximum facts rather than clamping them into plausible telemetry. The
+game module deliberately owns no combat formula, inventory, quest progression,
+reward outcome, save data, asset transport, input mapping, or game engine. A
+host supplies those facts and handles the typed requests; the components own
+the state-to-visual mapping, topology validation, semantic ids, responsive
+wrapping, locale hooks, RTL, motion, and graceful effect degradation that a
+downstream chatbot or game surface should not have to recreate.
+
 ## Navigation
 
 | Component | Kind | Reports | Notes |

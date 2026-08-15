@@ -386,6 +386,37 @@ string_keys! {
     CostUnavailable => "cost.unavailable", "Unavailable";
     CostLastVerified => "cost.last-verified", "Last verified {0}";
     ContextUnknownLimit => "context.unknown-limit", "Limit unknown";
+
+    // Product-neutral game compositions. Names, values, reasons, costs, and
+    // objective wording remain caller-owned; these are only the reusable UI
+    // grammar around those facts.
+    GamePartyDuplicateMember => "game.party.duplicate-member", "Party member {0} appears more than once.";
+    GamePartyDuplicateGauge => "game.party.duplicate-gauge", "Party member {0} has more than one gauge named {1}.";
+    GameGaugeUnknown => "game.gauge.unknown", "Unknown";
+    GameObjectiveLocked => "game.objective.locked", "Locked";
+    GameObjectiveActive => "game.objective.active", "Active";
+    GameObjectiveCompleted => "game.objective.completed", "Completed";
+    GameObjectiveFailed => "game.objective.failed", "Failed";
+    GameObjectiveUnavailable => "game.objective.unavailable", "Unavailable";
+    GameObjectiveDuplicate => "game.objective.duplicate", "Objective {0} appears more than once.";
+    GameObjectiveDanglingParent => "game.objective.dangling-parent", "Objective {0} names missing parent {1}.";
+    GameObjectiveCycle => "game.objective.cycle", "The objective hierarchy contains a cycle at {0}.";
+    GameAbilityReady => "game.ability.ready", "Ready";
+    GameAbilityCooldown => "game.ability.cooldown", "Cooldown: {0}";
+    GameAbilityDisabled => "game.ability.disabled", "Disabled";
+    GameAbilityUnavailable => "game.ability.unavailable", "Unavailable";
+    GameAbilityCharges => "game.ability.charges", "Charges: {0}/{1}";
+    GameAbilityCost => "game.ability.cost", "Cost: {0}";
+    GameAbilityDuplicate => "game.ability.duplicate", "Ability {0} appears more than once.";
+    GameRewardHidden => "game.reward.hidden", "Reward hidden";
+    GameRewardRevealed => "game.reward.revealed", "Reward revealed";
+    GameRewardClaimed => "game.reward.claimed", "Reward claimed";
+    GameRewardUnavailable => "game.reward.unavailable", "Reward unavailable";
+    GameRewardReveal => "game.reward.reveal", "Reveal";
+    GameRewardClaim => "game.reward.claim", "Claim";
+    GameRewardQuantity => "game.reward.quantity", "×{0}";
+    GameRewardDuplicateItem => "game.reward.duplicate-item", "Reward item {0} appears more than once.";
+
     // Structured value view. `null`, `true`, `{}` and `[]` are JSON syntax
     // rather than words, so they are not here: translating them would produce
     // a document nobody could paste back.

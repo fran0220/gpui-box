@@ -32,6 +32,7 @@ input, and an entry in `docs/components.md`.
 | Interaction | `Dropzone` |
 | Filtering | `FilterBar` |
 | Agent run and persona | `ToolCallCard`, `StepList`, `ThinkingBlock`, `NodeGraph`, `AgentRoster`, `SubagentTree`, `AgentRunCanvas`, `PersonaPortrait`, `VoiceReactive`, `PersonaDialogue` |
+| Game experience | `PartyRoster`, `ObjectiveTracker`, `AbilityBar`, `RewardReveal` |
 | Structured data | `JsonView`, `SchemaForm` |
 | Connections | `ServerList`, `OfferingCatalog` |
 
@@ -162,6 +163,13 @@ own; both are exercised through every control and overlay that uses them.
   portrait, safe Markdown, streaming, and choice composition. Microphone
   access, recognition, synthesis, playback, expression inference, and choosing
   or applying the next turn remain host facts and capabilities.
+- **Running a game or deciding an outcome.** `PartyRoster`, `ObjectiveTracker`,
+  `AbilityBar`, and `RewardReveal` own reusable character/game presentation,
+  malformed-topology refusal, typed intents, RTL, reduced motion, semantics,
+  and policy-resolved effects. Combat formulas, cooldown clocks, input maps,
+  objective progression, reward eligibility, inventory mutation, persistence,
+  networking, and asset fetching remain authoritative host systems. The UI
+  never converts a click into a successful action or an item into an owned one.
 - **Fetching or decoding an image.** `ImageViewer` frames, zooms and pans an
   element the host hands it, and names the source when the host hands it
   nothing. There is no network here and no decoder, so the pixel size of a
@@ -384,21 +392,22 @@ motion, area fills, pointer and keyboard crosshairs, exact host-formatted text,
 and stale-data retention. Domains, ticks, aggregation, and queries remain host
 facts rather than drawing work.
 
-Agent applications need a family this library is still filling in. A
-conversation is not the unit; a run made of steps is, and `ToolCallCard`,
-`StepList` and `ThinkingBlock` are covered above. Still wanted:
-`ApprovalPrompt` and `PermissionMatrix` where the default is
-refusal and the scope of "always" is stated, `CostMeter` and a context gauge
-that says when a number is an estimate. `OfferingCatalog` covers Tool, Skill,
-and Resource results together rather than creating separate `ToolCatalog` and
-`SkillCard` APIs; per-server attribution is part of every result because two
-servers may offer the same name. `LogStream`, `DiffView`, `JsonView`,
-`SchemaForm`, `ServerList`, `OfferingCatalog` and `NodeGraph` are covered above.
+Agent and game applications now have product-neutral run, persona, party,
+objective, ability, and reward families rather than one-off downstream cards.
+`ApprovalPrompt`, `PermissionMatrix`, `CostMeter`, and the context gauge keep
+approval, scope, and estimated costs explicit. `OfferingCatalog` covers Tool,
+Skill, and Resource results together rather than creating separate
+`ToolCatalog` and `SkillCard` APIs; per-server attribution is part of every
+result because two servers may offer the same name. `LogStream`, `DiffView`,
+`JsonView`, `SchemaForm`, `ServerList`, `OfferingCatalog`, and `NodeGraph` are
+covered above.
 
-`NodeGraph` covers drawing a run that branched or was retried; it does not
-cover arranging one. A caller with a topology and no coordinates needs a layout
-pass, and a layered or force-directed one is a plausible future addition here
-precisely because it is separable from the drawing.
+`NodeGraph` remains the lower-level graph whose caller supplies coordinates.
+`AgentRunCanvas` is the high-level run composition for a caller that has only
+typed topology: `AgentRunLayout` supplies its deterministic layered,
+RTL-aware placement. A product-specific force layout or manually persisted
+coordinates can still use `NodeGraph` directly without creating a second run
+presentation contract downstream.
 
 ### Capabilities that are not components
 

@@ -28,6 +28,7 @@ or product model into GPUI Box Kit.
 | Table / DataGrid | **Feasible, but the hardest v1 family** | Cells are elements, virtual rows and details are closures, and reorder uses drag runtime types. A purpose-built row/cell DTO is required. |
 | Content / document | **Feasible with bounded source and resource contracts** | Text models mirror well. Images, highlighting, and media are supplied through host closures or runtime elements. |
 | Agent run | **Feasible from existing primitives; aggregate missing** | Run steps, approvals, permissions, tool calls, cost, and thinking exist, but there is no single serialized run/card composition contract. |
+| Game experience | **High from typed snapshots and events** | Party, objective, ability, and reward models mirror cleanly. Portrait images and effect plans remain host/runtime resources rather than wire recipes. |
 | Controls / display | **Broadly feasible** | Scalar state mirrors well. Interactive controls emit heterogeneous GPUI callbacks/events; file drops and clipboard work are runtime capabilities. |
 
 This is a **yes** for a full vocabulary, not a claim that the current Rust
@@ -371,6 +372,43 @@ controls.
 **Verdict.** The vocabulary pieces are unusually strong and truthful. The gap
 is an aggregate, bounded composition contract for one run or timeline card,
 not the absence of agent components.
+
+### Game experience
+
+**Host projection.** A product-neutral game surface needs stable member,
+gauge, objective, ability, reward, and reward-item identities; explicit state,
+progress, charges, cost, shortcut, refusal, and availability facts; resolved
+portrait/item resource ids; and select, activate, reveal, and claim actions.
+Rules, progression, inventory, outcome, persistence, transport, and input maps
+remain outside the visual vocabulary.
+
+**Current Rust types.** `GameFraction`, `PartyGaugeState`, `PartyGauge`,
+`PartyMember`, `PartySnapshot`, `ObjectiveState`, `Objective`,
+`ObjectiveSnapshot`, `AbilityCharges`, `AbilityState`, `Ability`, `AbilitySet`,
+`RewardItem`, `RewardState`, and `RewardSnapshot` are in
+`crates/gpui-kit/src/game/model.rs`. `PartyRoster`, `ObjectiveTracker`,
+`AbilityBar`, `RewardReveal`, and their event enums are in
+`game/presentation.rs`.
+
+The identity, snapshot, state, validation, and event shapes are mirrorable but
+deliberately do not derive serde. Resolved image paths, `Icon`, `Hsla`, and
+`EffectPlan` are renderer values: a wire contract should carry opaque
+policy-checked resource ids and a semantic visual cue, then let the host select
+the icon, tint, and bounded effect plan. It must not expose arbitrary particle,
+shader, duration, or animation recipes.
+
+**Emitted actions.** `PartyRosterEvent` and `ObjectiveTrackerEvent` report
+selection by business identity. `AbilityBarEvent::Activate` is intent only and
+is installed only for `Ready`; it changes no cooldown, charge, cost, target, or
+outcome. `RewardRevealEvent` reports reveal or claim requests; it does not
+change the reward state or inventory. Duplicate and malformed identities
+produce issue presentation and no identity-indexed action surface.
+
+**Verdict.** This is a strong DTO candidate because the complete reusable
+state-to-visual mapping now sits behind typed snapshots. The adapter should
+mirror those records, preserve validation failures, map semantic cues through
+host effect policy, and wait for the next authoritative snapshot after every
+request.
 
 ### Controls / display
 

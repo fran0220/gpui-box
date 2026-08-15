@@ -3,6 +3,28 @@
   "library": "gpui-box-kit",
   "components": [
     {
+      "name": "AbilityBar",
+      "kind": "builder",
+      "path": "gpui_kit::game::AbilityBar",
+      "source": "crates/gpui-kit/src/game/presentation.rs",
+      "summary": "Standard ability controls with cooldown, charge, cost, shortcut, and refusal presentation.",
+      "construct": [
+        "new(ident: impl Into<Ident>, abilities: AbilitySet) -> Self"
+      ],
+      "options": [
+        "selected(selected: impl Into<AbilityId>) -> Self",
+        "on_event(handler: impl Fn(&AbilityBarEvent, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [
+        "Activate"
+      ],
+      "scenes": [
+        "game-ui"
+      ]
+    },
+    {
       "name": "Accordion",
       "kind": "builder",
       "path": "gpui_kit::navigation::Accordion",
@@ -2246,6 +2268,28 @@
       ]
     },
     {
+      "name": "ObjectiveTracker",
+      "kind": "builder",
+      "path": "gpui_kit::game::ObjectiveTracker",
+      "source": "crates/gpui-kit/src/game/presentation.rs",
+      "summary": "A hierarchical objective tracker with strict identity validation.",
+      "construct": [
+        "new(ident: impl Into<Ident>, snapshot: ObjectiveSnapshot) -> Self"
+      ],
+      "options": [
+        "selected(selected: impl Into<ObjectiveId>) -> Self",
+        "on_event(handler: impl Fn(&ObjectiveTrackerEvent, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [
+        "Select"
+      ],
+      "scenes": [
+        "game-ui"
+      ]
+    },
+    {
       "name": "OfferingCatalog",
       "kind": "builder",
       "path": "gpui_kit::agent::OfferingCatalog",
@@ -2355,6 +2399,28 @@
       "reports": [],
       "scenes": [
         "pagination"
+      ]
+    },
+    {
+      "name": "PartyRoster",
+      "kind": "builder",
+      "path": "gpui_kit::game::PartyRoster",
+      "source": "crates/gpui-kit/src/game/presentation.rs",
+      "summary": "A responsive party roster over standard agent and persona presentation.",
+      "construct": [
+        "new(ident: impl Into<Ident>, party: PartySnapshot) -> Self"
+      ],
+      "options": [
+        "selected(selected: impl Into<AgentId>) -> Self",
+        "on_event(handler: impl Fn(&PartyRosterEvent, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [
+        "SelectMember"
+      ],
+      "scenes": [
+        "game-ui"
       ]
     },
     {
@@ -2630,6 +2696,30 @@
         "calendar",
         "date-range",
         "date-time"
+      ]
+    },
+    {
+      "name": "RewardReveal",
+      "kind": "builder",
+      "path": "gpui_kit::game::RewardReveal",
+      "source": "crates/gpui-kit/src/game/presentation.rs",
+      "summary": "A complete reward reveal composition with optional policy-resolved effects.",
+      "construct": [
+        "new(ident: impl Into<Ident>, reward: RewardSnapshot) -> Self"
+      ],
+      "options": [
+        "effect(effect: EffectPlan) -> Self",
+        "sample_at(elapsed: Duration) -> Self",
+        "on_event(handler: impl Fn(&RewardRevealEvent, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [
+        "RevealRequested",
+        "ClaimRequested"
+      ],
+      "scenes": [
+        "game-ui"
       ]
     },
     {
@@ -3875,6 +3965,111 @@
     }
   ],
   "types": [
+    {
+      "name": "Ability",
+      "path": "gpui_kit::game::Ability",
+      "summary": "Stable identity of an ability.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<AbilityId>, label: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "detail(detail: impl Into<SharedString>) -> Self",
+        "icon(icon: Icon) -> Self",
+        "shortcut(shortcut: impl Into<SharedString>) -> Self",
+        "cost(cost: impl Into<SharedString>) -> Self",
+        "charges(charges: AbilityCharges) -> Self",
+        "state(state: AbilityState) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &AbilityId"
+      ]
+    },
+    {
+      "name": "AbilityBarEvent",
+      "path": "gpui_kit::game::AbilityBarEvent",
+      "summary": "What an ability bar reports without applying cooldown, charge, or cost.",
+      "variants": [
+        "Activate"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "AbilityCharges",
+      "path": "gpui_kit::game::AbilityCharges",
+      "summary": "Remaining and maximum charges for one ability.",
+      "variants": [],
+      "construct": [
+        "new(current: usize, maximum: usize) -> Result<Self, AbilityChargesError>"
+      ],
+      "options": [
+        "current() -> usize",
+        "maximum() -> usize"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "AbilityChargesError",
+      "path": "gpui_kit::game::AbilityChargesError",
+      "summary": "Why charge counts were rejected.",
+      "variants": [
+        "ZeroMaximum",
+        "AboveMaximum"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "AbilitySet",
+      "path": "gpui_kit::game::AbilitySet",
+      "summary": "A caller-owned ability set.",
+      "variants": [],
+      "construct": [
+        "new(abilities: impl IntoIterator<Item = Ability>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "abilities() -> &[Ability]",
+        "issues() -> Vec<AbilitySetIssue>"
+      ]
+    },
+    {
+      "name": "AbilitySetIssue",
+      "path": "gpui_kit::game::AbilitySetIssue",
+      "summary": "A duplicate ability fact.",
+      "variants": [
+        "DuplicateId"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "AbilityState",
+      "path": "gpui_kit::game::AbilityState",
+      "summary": "Caller-owned ability availability.",
+      "variants": [
+        "Ready",
+        "CoolingDown",
+        "Disabled",
+        "Unavailable"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "name() -> &'static str"
+      ]
+    },
     {
       "name": "AccordionSection",
       "path": "gpui_kit::navigation::AccordionSection",
@@ -6018,6 +6213,33 @@
       ]
     },
     {
+      "name": "GameFraction",
+      "path": "gpui_kit::game::GameFraction",
+      "summary": "A validated scalar in the closed interval from zero to one.",
+      "variants": [],
+      "construct": [
+        "new(value: f32) -> Result<Self, GameFractionError>"
+      ],
+      "options": [
+        "get() -> f32"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "GameFractionError",
+      "path": "gpui_kit::game::GameFractionError",
+      "summary": "Why a game fraction was rejected instead of clamped into a believable progress fact.",
+      "variants": [
+        "NonFinite",
+        "OutOfRange"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "GlassPreset",
       "path": "gpui_kit::overlay::GlassPreset",
       "summary": "How a glass surface responds to light.",
@@ -7339,6 +7561,84 @@
       "queries": []
     },
     {
+      "name": "Objective",
+      "path": "gpui_kit::game::Objective",
+      "summary": "One stable objective and its optional parent relationship.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<ObjectiveId>, title: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "detail(detail: impl Into<SharedString>) -> Self",
+        "parent(parent: impl Into<ObjectiveId>) -> Self",
+        "state(state: ObjectiveState) -> Self",
+        "progress(progress: GameFraction) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &ObjectiveId"
+      ]
+    },
+    {
+      "name": "ObjectiveIssue",
+      "path": "gpui_kit::game::ObjectiveIssue",
+      "summary": "A malformed objective relationship.",
+      "variants": [
+        "DuplicateId",
+        "DanglingParent",
+        "ParentCycle"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "ObjectiveSnapshot",
+      "path": "gpui_kit::game::ObjectiveSnapshot",
+      "summary": "A caller-owned objective document with structural validation.",
+      "variants": [],
+      "construct": [
+        "new(objectives: impl IntoIterator<Item = Objective>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "objectives() -> &[Objective]",
+        "issues() -> Vec<ObjectiveIssue>"
+      ]
+    },
+    {
+      "name": "ObjectiveState",
+      "path": "gpui_kit::game::ObjectiveState",
+      "summary": "Caller-owned objective state. Rules decide it; the tracker only presents it.",
+      "variants": [
+        "Locked",
+        "Active",
+        "Completed",
+        "Failed",
+        "Unavailable"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "name() -> &'static str"
+      ]
+    },
+    {
+      "name": "ObjectiveTrackerEvent",
+      "path": "gpui_kit::game::ObjectiveTrackerEvent",
+      "summary": "What an objective tracker reports without selecting or completing it.",
+      "variants": [
+        "Select"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "Offering",
       "path": "gpui_kit::agent::Offering",
       "summary": "One thing a server offers.",
@@ -7466,6 +7766,95 @@
       ],
       "commands": [],
       "queries": []
+    },
+    {
+      "name": "PartyGauge",
+      "path": "gpui_kit::game::PartyGauge",
+      "summary": "One stable caller-named gauge on a party member.",
+      "variants": [],
+      "construct": [
+        "known(id: impl Into<SharedString>, label: impl Into<SharedString>, fraction: GameFraction, display: impl Into<SharedString>) -> Self",
+        "unknown(id: impl Into<SharedString>, label: impl Into<SharedString>) -> Self",
+        "unavailable(id: impl Into<SharedString>, label: impl Into<SharedString>, reason: impl Into<SharedString>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString"
+      ]
+    },
+    {
+      "name": "PartyGaugeState",
+      "path": "gpui_kit::game::PartyGaugeState",
+      "summary": "What is known about one party gauge such as health, guard, or mana.",
+      "variants": [
+        "Unknown",
+        "Known",
+        "Unavailable"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "PartyIssue",
+      "path": "gpui_kit::game::PartyIssue",
+      "summary": "A malformed party fact that must be shown instead of collapsed.",
+      "variants": [
+        "DuplicateMember",
+        "DuplicateGauge"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "PartyMember",
+      "path": "gpui_kit::game::PartyMember",
+      "summary": "One caller-owned party member over the shared agent identity vocabulary.",
+      "variants": [],
+      "construct": [
+        "new(agent: AgentSnapshot) -> Self"
+      ],
+      "options": [
+        "expression(expression: PersonaExpression) -> Self",
+        "image(image: impl Into<SharedString>) -> Self",
+        "tint(tint: Hsla) -> Self",
+        "gauge(gauge: PartyGauge) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &AgentId"
+      ]
+    },
+    {
+      "name": "PartyRosterEvent",
+      "path": "gpui_kit::game::PartyRosterEvent",
+      "summary": "What a party roster reports without changing its caller-owned selection.",
+      "variants": [
+        "SelectMember"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "PartySnapshot",
+      "path": "gpui_kit::game::PartySnapshot",
+      "summary": "The complete party snapshot consumed by PartyRoster.",
+      "variants": [],
+      "construct": [
+        "new(members: impl IntoIterator<Item = PartyMember>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "issues() -> Vec<PartyIssue>",
+        "members() -> &[PartyMember]"
+      ]
     },
     {
       "name": "PasswordInputEvent",
@@ -7903,6 +8292,74 @@
       "commands": [],
       "queries": [
         "as_str() -> &'static str"
+      ]
+    },
+    {
+      "name": "RewardItem",
+      "path": "gpui_kit::game::RewardItem",
+      "summary": "One reward item. Quantity is a count, not a formatted string, so Kit can present it consistently without interpreting the item.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<RewardItemId>, label: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "detail(detail: impl Into<SharedString>) -> Self",
+        "quantity(quantity: usize) -> Self",
+        "icon(icon: Icon) -> Self",
+        "image(image: impl Into<SharedString>) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &RewardItemId"
+      ]
+    },
+    {
+      "name": "RewardRevealEvent",
+      "path": "gpui_kit::game::RewardRevealEvent",
+      "summary": "What a reward reveal reports without revealing or claiming anything.",
+      "variants": [
+        "RevealRequested",
+        "ClaimRequested"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "RewardSnapshot",
+      "path": "gpui_kit::game::RewardSnapshot",
+      "summary": "One reward composition and all caller-owned items it may reveal.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<RewardId>, title: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "detail(detail: impl Into<SharedString>) -> Self",
+        "item(item: RewardItem) -> Self",
+        "state(state: RewardState) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &RewardId",
+        "issues() -> Vec<RewardItemId>"
+      ]
+    },
+    {
+      "name": "RewardState",
+      "path": "gpui_kit::game::RewardState",
+      "summary": "Caller-owned reward reveal state.",
+      "variants": [
+        "Hidden",
+        "Revealed",
+        "Claimed",
+        "Unavailable"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "name() -> &'static str"
       ]
     },
     {
@@ -10177,6 +10634,17 @@
         "VoiceReactive"
       ],
       "example": "fn persona(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let speaking =\n        AgentSnapshot::new(AgentDescriptor::new(\"guide\", \"Lyra\").role(\"Expedition guide\"))\n            .presence(AgentPresence::Online)\n            .execution(AgentExecutionState::Active(AgentActivity::Speaking));\n    let listening =\n        AgentSnapshot::new(AgentDescriptor::new(\"listener\", \"Moss\").role(\"World companion\"))\n            .presence(AgentPresence::Online)\n            .execution(AgentExecutionState::Waiting(WaitReason::UserInput));\n    let speaking_voice =\n        VoiceSample::new(VoiceState::Speaking, 0.76, 0.58).expect(\"scene voice is normalized\");\n    let listening_voice =\n        VoiceSample::new(VoiceState::Listening, 0.32, 0.48).expect(\"scene voice is normalized\");\n    let idle = AgentSnapshot::new(AgentDescriptor::new(\"idle\", \"Ori\").role(\"Archivist\"))\n        .presence(AgentPresence::Away)\n        .execution(AgentExecutionState::Idle);\n    let thinking = AgentSnapshot::new(AgentDescriptor::new(\"thinking\", \"Sable\").role(\"Tactician\"))\n        .presence(AgentPresence::Online)\n        .execution(AgentExecutionState::Active(AgentActivity::Thinking));\n    let celebrating = AgentSnapshot::new(AgentDescriptor::new(\"victor\", \"Kite\").role(\"Pathfinder\"))\n        .presence(AgentPresence::Online)\n        .execution(AgentExecutionState::Completed(AgentOutcome::Succeeded));\n    let unavailable_voice = VoiceSample::new(\n        VoiceState::Unavailable(\"Voice input was not granted.\".into()),\n        0.0,\n        0.0,\n    )\n    .expect(\"scene voice is normalized\");\n\n    let content = div()\n        .column()\n        .w(px(680.0))\n        .gap_token(&theme, Space::Md)\n        .child(\n            div()\n                .row_reading(cx.layout_direction())\n                .items_center()\n                .gap_token(&theme, Space::Xl)\n                .child(\n                    PersonaPortrait::new(\"scene.persona.portrait-speaking\", speaking.clone())\n                        .expression(PersonaExpression::Warm)\n                        .voice(speaking_voice.clone())\n                        .sample_at(Duration::from_millis(640)),\n                )\n                .child(\n                    PersonaPortrait::new(\"scene.persona.portrait-listening\", listening.clone())\n                        .expression(PersonaExpression::Focused)\n                        .voice(listening_voice.clone())\n                        .sample_at(Duration::from_millis(640)),\n                )\n                .child(\n                    div()\n                        .column()\n                        .gap_token(&theme, Space::Xs)\n                        .child(\n                            div()\n                                .type_scale(&theme, TypeScale::Label)\n                                .text_tone(&theme, TextTone::Primary)\n                                .child(\"Voice-reactive\"),\n                        )\n                        .child(\n                            VoiceReactive::new(\"scene.persona.voice\", speaking_voice)\n                                .sample_at(Duration::from_millis(640)),\n                        ),\n                ),\n        )\n        .child(\n            PersonaDialogue::new(\n                \"scene.persona.dialogue\",\n                DialogueTurn::markdown(\n                    \"crossroads\",\n                    speaking,\n                    \"The signal splits at the **crystal bridge.** I can scout either route without advancing the story for you.\",\n                )\n                .streaming(true)\n                .choice(DialogueChoice::new(\"bridge\", \"Cross the bridge\").selected(true))\n                .choice(DialogueChoice::new(\"cavern\", \"Enter the cavern\"))\n                .choice(\n                    DialogueChoice::new(\"gate\", \"Open the sealed gate\")\n                        .unavailable(\"The gate key has not been verified.\"),\n                ),\n            )\n            .expression(PersonaExpression::Warm)\n            .voice(listening_voice)\n            .on_event(|_, _, _| {}),\n        )\n        .child(\n            div()\n                .row_reading(cx.layout_direction())\n                .items_center()\n                .gap_token(&theme, Space::Xl)\n                .child(\n                    div()\n                        .column()\n                        .items_center()\n                        .gap_token(&theme, Space::Xs)\n                        .child(\n                            PersonaPortrait::new(\"scene.persona.idle\", idle)\n                                .expression(PersonaExpression::Neutral)\n                                .size(68.0),\n                        )\n                        .child(crate::foundation::text(\n                            &theme,\n                            TypeScale::Caption,\n                            \"Idle · neutral\",\n                        )),\n                )\n                .child(\n                    div()\n                        .column()\n                        .items_center()\n                        .gap_token(&theme, Space::Xs)\n                        .child(\n                            PersonaPortrait::new(\"scene.persona.thinking\", thinking)\n                                .expression(PersonaExpression::Focused)\n                                .size(68.0),\n                        )\n                        .child(crate::foundation::text(\n                            &theme,\n                            TypeScale::Caption,\n                            \"Thinking · focused\",\n                        )),\n                )\n                .child(\n                    div()\n                        .column()\n                        .items_center()\n                        .gap_token(&theme, Space::Xs)\n                        .child(\n                            PersonaPortrait::new(\"scene.persona.celebrating\", celebrating)\n                                .expression(PersonaExpression::Celebrating)\n                                .size(68.0),\n                        )\n                        .child(crate::foundation::text(\n                            &theme,\n                            TypeScale::Caption,\n                            \"Succeeded · celebrating\",\n                        )),\n                )\n                .child(\n                    div()\n                        .column()\n                        .items_center()\n                        .gap_token(&theme, Space::Xs)\n                        .child(VoiceReactive::new(\n                            \"scene.persona.voice-unavailable\",\n                            unavailable_voice,\n                        ))\n                        .child(crate::foundation::text(\n                            &theme,\n                            TypeScale::Caption,\n                            \"Unavailable\",\n                        )),\n                ),\n        )\n        ;\n\n    stack(&theme)\n        .size_full()\n        .items_center()\n        .justify_center()\n        .child(content)\n        .into_any_element()\n}"
+    },
+    {
+      "name": "game-ui",
+      "capture": "cargo run -p xtask -- headless capture game-ui",
+      "uses": [
+        "AbilityBar",
+        "ObjectiveTracker",
+        "PartyRoster",
+        "RewardReveal"
+      ],
+      "example": "fn game_ui(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let direction = cx.layout_direction();\n    let normalized = |value| GameFraction::new(value).expect(\"scene fraction is normalized\");\n    let lyra = AgentSnapshot::new(AgentDescriptor::new(\"lyra\", \"Lyra\").role(\"Pathfinder\"))\n        .presence(AgentPresence::Online)\n        .execution(AgentExecutionState::Active(AgentActivity::UsingTool(\n            \"prism scanner\".into(),\n        )));\n    let orin = AgentSnapshot::new(AgentDescriptor::new(\"orin\", \"Orin\").role(\"Warden\"))\n        .presence(AgentPresence::Online)\n        .execution(AgentExecutionState::Waiting(WaitReason::Dependency(\n            \"beacon\".into(),\n        )));\n    let party = PartySnapshot::new([\n        PartyMember::new(lyra)\n            .expression(PersonaExpression::Focused)\n            .gauge(PartyGauge::known(\n                \"resolve\",\n                \"Resolve\",\n                normalized(0.72),\n                \"72 / 100\",\n            )),\n        PartyMember::new(orin)\n            .expression(PersonaExpression::Neutral)\n            .gauge(PartyGauge::unknown(\"bond\", \"Bond\"))\n            .gauge(PartyGauge::unavailable(\n                \"aegis\",\n                \"Aegis\",\n                \"Telemetry was not verified\",\n            )),\n    ]);\n    let objectives = ObjectiveSnapshot::new([\n        Objective::new(\"beacon\", \"Restore the beacon\")\n            .detail(\"Bring the relay online without inventing an outcome.\")\n            .state(ObjectiveState::Active)\n            .progress(normalized(0.64)),\n        Objective::new(\"crystals\", \"Align the crystals\")\n            .parent(\"beacon\")\n            .state(ObjectiveState::Completed),\n        Objective::new(\"signal\", \"Trace the signal\")\n            .parent(\"beacon\")\n            .state(ObjectiveState::Locked),\n        Objective::new(\"archive\", \"Recover the archive\")\n            .parent(\"beacon\")\n            .state(ObjectiveState::Failed(\n                \"The archive host refused access.\".into(),\n            )),\n    ]);\n    let abilities = AbilitySet::new([\n        Ability::new(\"dash\", \"Phase dash\")\n            .shortcut(\"Q\")\n            .charges(AbilityCharges::new(2, 3).expect(\"scene charges are valid\")),\n        Ability::new(\"nova\", \"Nova pulse\")\n            .shortcut(\"W\")\n            .cost(\"30 focus\")\n            .state(AbilityState::CoolingDown {\n                remaining_fraction: normalized(0.4),\n                remaining: \"2.4s\".into(),\n            }),\n        Ability::new(\"ward\", \"Signal ward\")\n            .shortcut(\"E\")\n            .state(AbilityState::Disabled(\"No open target\".into())),\n        Ability::new(\"gate\", \"Open gate\")\n            .shortcut(\"R\")\n            .state(AbilityState::Unavailable(\n                \"The route has not been verified\".into(),\n            )),\n    ]);\n    let reward = RewardSnapshot::new(\"beacon-cache\", \"Beacon cache\")\n        .detail(\"The host has confirmed this reveal; claiming remains a request.\")\n        .state(RewardState::Revealed)\n        .item(RewardItem::new(\"shard\", \"Prism shard\").quantity(3))\n        .item(RewardItem::new(\"key\", \"Signal key\").detail(\"Opens one relay\"));\n    let mut planner = EffectPlanner::new(EffectPolicy::new(EffectQuality::Cinematic));\n    let reward_effect = planner.plan(\n        EffectEvent::new(\n            \"beacon-cache-revealed\",\n            \"game-ui\",\n            \"beacon-cache\",\n            VisualCue::Reward,\n        ),\n        1,\n        false,\n    );\n    let heading = |text: &'static str| {\n        div()\n            .type_scale(&theme, TypeScale::Subtitle)\n            .text_tone(&theme, TextTone::Primary)\n            .child(text)\n    };\n\n    stack(&theme)\n        .size_full()\n        .items_center()\n        .child(\n            div()\n                .column()\n                .w(px(820.0))\n                .gap_token(&theme, Space::Lg)\n                .child(\n                    div()\n                        .column()\n                        .gap_token(&theme, Space::Xs)\n                        .child(\n                            div()\n                                .type_scale(&theme, TypeScale::Title)\n                                .text_tone(&theme, TextTone::Primary)\n                                .child(\"Expedition interface\"),\n                        )\n                        .child(\n                            div()\n                                .type_scale(&theme, TypeScale::Caption)\n                                .text_tone(&theme, TextTone::Muted)\n                                .child(\n                                    \"Typed facts in, typed requests out; progression stays with the host.\",\n                                ),\n                        ),\n                )\n                .child(\n                    div()\n                        .column()\n                        .gap_token(&theme, Space::Sm)\n                        .child(heading(\"Party\"))\n                        .child(\n                            PartyRoster::new(\"scene.game-ui.party\", party)\n                                .selected(\"lyra\")\n                                .on_event(|_, _, _| {}),\n                        ),\n                )\n                .child(\n                    div()\n                        .row_reading(direction)\n                        .items_start()\n                        .gap_token(&theme, Space::Lg)\n                        .child(\n                            div()\n                                .column()\n                                .w(px(400.0))\n                                .gap_token(&theme, Space::Sm)\n                                .child(heading(\"Objectives\"))\n                                .child(\n                                    ObjectiveTracker::new(\n                                        \"scene.game-ui.objectives\",\n                                        objectives,\n                                    )\n                                    .selected(\"beacon\")\n                                    .on_event(|_, _, _| {}),\n                                ),\n                        )\n                        .child(\n                            div()\n                                .column()\n                                .w(px(400.0))\n                                .gap_token(&theme, Space::Sm)\n                                .child(heading(\"Reward\"))\n                                .child(\n                                    RewardReveal::new(\"scene.game-ui.reward\", reward)\n                                        .effect(reward_effect)\n                                        .sample_at(Duration::from_millis(620))\n                                        .on_event(|_, _, _| {}),\n                                ),\n                        ),\n                )\n                .child(\n                    div()\n                        .column()\n                        .gap_token(&theme, Space::Sm)\n                        .child(heading(\"Abilities\"))\n                        .child(\n                            AbilityBar::new(\"scene.game-ui.abilities\", abilities)\n                                .selected(\"dash\")\n                                .on_event(|_, _, _| {}),\n                        ),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "agent-run-canvas",

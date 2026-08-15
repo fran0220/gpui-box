@@ -17,6 +17,7 @@
 *
 /
 :
+AbilityBar
 Accordion
 AccordionSection
 AgentCard
@@ -98,12 +99,14 @@ Notice
 Notification
 NotificationCenter
 NumberInput
+ObjectiveTracker
 OfferingCatalog
 OneTimeCodeInput
 Option::is_none
 Overlay
 POSITION
 Pagination
+PartyRoster
 PasswordInput
 PermissionMatrix
 PersonaDialogue
@@ -112,6 +115,7 @@ PlatformMediaTransport
 Popover
 Radio
 RangePicker
+RewardReveal
 Row
 SCALAR
 SchemaForm
@@ -169,6 +173,8 @@ Wizard
 `{id}` appears more than once
 `{id}` names a parent `{parent}` that is absent
 a keyframe list is never empty
+ability charge maximum must be positive
+ability charges cannot exceed their maximum
 an actionable card has one
 an actionable row has one
 array
@@ -178,6 +184,8 @@ empty array
 empty object
 end before start
 false
+game fraction must be between 0 and 1
+game fraction must be finite
 glTF
 markdown stream closed `{end:?}` past its root
 month unknown
