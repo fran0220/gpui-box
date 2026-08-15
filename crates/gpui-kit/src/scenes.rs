@@ -290,6 +290,10 @@ pub fn catalog() -> Vec<Scene> {
             build: agent_document,
         },
         Scene {
+            name: "agent-roster",
+            build: agent_roster,
+        },
+        Scene {
             name: "conversation",
             build: conversation,
         },
@@ -5403,6 +5407,130 @@ fn agent_document(_window: &mut Window, cx: &mut App) -> AnyElement {
                                 "The host refused to provide this document.".into(),
                             ),
                         ),
+                    ),
+                ),
+        )
+        .into_any_element()
+}
+
+fn scene_agent_run() -> AgentRunSnapshot {
+    AgentRunSnapshot::new("release-review", "orchestrator")
+        .execution(AgentExecutionState::Active(AgentActivity::Aggregating))
+        .agents([
+            AgentSnapshot::new(
+                AgentDescriptor::new("orchestrator", "Atlas").role("Run coordinator"),
+            )
+            .presence(AgentPresence::Online)
+            .execution(AgentExecutionState::Active(AgentActivity::Aggregating))
+            .current_task("synthesis"),
+            AgentSnapshot::new(
+                AgentDescriptor::new("researcher", "Nova").role("Repository research"),
+            )
+            .presence(AgentPresence::Online)
+            .execution(AgentExecutionState::Active(AgentActivity::UsingTool(
+                "repository search".into(),
+            )))
+            .current_task("evidence"),
+            AgentSnapshot::new(AgentDescriptor::new("reviewer", "Sage").role("Independent review"))
+                .presence(AgentPresence::Away)
+                .execution(AgentExecutionState::Waiting(WaitReason::Approval))
+                .current_task("review"),
+            AgentSnapshot::new(AgentDescriptor::new("verifier", "Bolt").role("Test verification"))
+                .presence(AgentPresence::Online)
+                .execution(AgentExecutionState::Completed(AgentOutcome::Succeeded))
+                .current_task("tests"),
+        ])
+        .tasks([
+            AgentTaskSnapshot::new("synthesis", "Synthesis").owner("orchestrator"),
+            AgentTaskSnapshot::new("evidence", "Evidence").owner("researcher"),
+            AgentTaskSnapshot::new("review", "Review").owner("reviewer"),
+            AgentTaskSnapshot::new("tests", "Tests").owner("verifier"),
+        ])
+        .links([
+            RunLink::new(
+                "spawn-researcher",
+                RunSubjectId::Agent("orchestrator".into()),
+                RunSubjectId::Agent("researcher".into()),
+                RunLinkKind::Spawn,
+            ),
+            RunLink::new(
+                "spawn-reviewer",
+                RunSubjectId::Agent("orchestrator".into()),
+                RunSubjectId::Agent("reviewer".into()),
+                RunLinkKind::Spawn,
+            ),
+            RunLink::new(
+                "spawn-verifier",
+                RunSubjectId::Agent("researcher".into()),
+                RunSubjectId::Agent("verifier".into()),
+                RunLinkKind::Spawn,
+            ),
+        ])
+}
+
+fn agent_roster(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let direction = cx.layout_direction();
+    let run = scene_agent_run();
+    let root = run
+        .agents
+        .first()
+        .cloned()
+        .expect("the canonical multi-agent scene has a root agent");
+
+    stack(&theme)
+        .w(px(720.0))
+        .child(
+            div()
+                .row_reading(direction)
+                .items_center()
+                .justify_between()
+                .child(
+                    div()
+                        .column()
+                        .gap_token(&theme, Space::Xs)
+                        .child(
+                            div()
+                                .type_scale(&theme, TypeScale::Title)
+                                .text_tone(&theme, TextTone::Primary)
+                                .child("Release review"),
+                        )
+                        .child(AgentActivityLine::new(
+                            "scene.agent-roster.run-state",
+                            run.execution.clone(),
+                        )),
+                )
+                .child(
+                    AgentGroup::new("scene.agent-roster.group", run.agents.clone()).max_visible(3),
+                ),
+        )
+        .child(
+            AgentCard::new("scene.agent-roster.root", root)
+                .task_label("Synthesis")
+                .selected(true)
+                .on_action(|_, _, _| {}),
+        )
+        .child(
+            div()
+                .row_reading(direction)
+                .items_start()
+                .gap_token(&theme, Space::Lg)
+                .child(
+                    div().w(px(420.0)).child(
+                        AgentRoster::from_run("scene.agent-roster.list", &run)
+                            .selected("researcher")
+                            .visible_rows(4)
+                            .on_action(|_, _, _| {}),
+                    ),
+                )
+                .child(
+                    div().w(px(270.0)).child(
+                        SubagentTree::new("scene.agent-roster.tree", run)
+                            .expanded(["orchestrator".into(), "researcher".into()])
+                            .selected("researcher")
+                            .visible_rows(4)
+                            .on_toggle(|_, _, _, _| {})
+                            .on_action(|_, _, _| {}),
                     ),
                 ),
         )

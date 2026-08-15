@@ -105,6 +105,10 @@ pub mod prelude {
         PermissionAction, PermissionChange, PermissionEntry, PermissionMatrix, PermissionSource,
         PermissionState, PermissionSubject,
     };
+    pub use crate::agent::presentation::{
+        AgentActivityLine, AgentAppearance, AgentAvatar, AgentCard, AgentGroup, AgentRoster,
+        AgentRunIssues, SubagentTree,
+    };
     pub use crate::agent::server_list::{
         Catalog, Offering, OfferingKind, ServerEntry, ServerList, ServerState,
     };

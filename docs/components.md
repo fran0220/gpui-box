@@ -92,6 +92,24 @@ actions. They define no account, provider, network, or credential policy.
 | `FailurePanel` | builder | A region the host could not produce, in the host's own words. Not an error boundary and deliberately not named one: GPUI has no fallible render and no catchable render panic, so this takes a failure the host is already holding, through `from_result`. It publishes `failed`, never empty |
 | `Icon` | builder | A glyph from the bundled catalog, sized from the `control.*` glyph step and coloured from a semantic role rather than an `Hsla`. Emits nothing: a glyph that can be clicked is `IconButton`. Decorative by default and published only when named, so a glyph that repeats the label beside it is not announced twice |
 
+## Agent experience
+
+| Component | Kind | Reports | Notes |
+|---|---|---|---|
+| `AgentAvatar`, `AgentAppearance` | builder, data | — | Renders a caller-owned `AgentSnapshot` as identity, presence, execution halo, and a non-colour execution glyph. Optional image and role tint are separate appearance facts. Busy motion follows reduced-motion policy; a static status mark remains when motion is off |
+| `AgentActivityLine` | builder | — | Maps every typed execution, activity, wait, refusal, and terminal state to localized visible wording and a non-colour mark |
+| `AgentCard` | builder | selected agent | A complete agent identity, role, activity, and current caller-owned task. It installs no selection handler until the caller provides one |
+| `AgentGroup` | builder | — | An RTL-aware overlapping identity group with a truthful `+N` overflow count |
+| `AgentRoster` | builder | selected agent | A virtualized roster consuming `AgentSnapshot` and `AgentTaskSnapshot` directly. Selection remains caller-owned and row IDs are agent business identities |
+| `SubagentTree` | builder | selected agent and requested disclosure state | Derives only parent-child structure from typed `Spawn` links. Expanded branches and selection remain caller-owned; non-spawn delegation, report, handoff, and dependency links do not silently reparent agents |
+| `AgentRunIssues` | builder | — | Renders `AgentRunSnapshot::issues()` as one stable failure notice. Identity-indexed components use it instead of collapsing duplicate or dangling facts into a different roster or topology |
+
+The presentation layer is not an agent runtime. It consumes an observed
+`AgentRunSnapshot`, displays waiting/refused/failed/cancelled as distinct facts,
+and reports caller-owned actions. `AgentRunSnapshot::issues()` remains the
+source of structural validation: components never repair duplicate identities
+or dangling topology into a different run.
+
 ## Navigation
 
 | Component | Kind | Reports | Notes |

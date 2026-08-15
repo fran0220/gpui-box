@@ -8,6 +8,7 @@ pub mod cost;
 pub mod model;
 pub mod offering_catalog;
 pub mod permission;
+pub mod presentation;
 pub mod server_list;
 pub mod step_list;
 pub mod thinking;
@@ -27,6 +28,10 @@ pub use offering_catalog::{
 pub use permission::{
     PermissionAction, PermissionChange, PermissionEntry, PermissionMatrix, PermissionSource,
     PermissionState, PermissionSubject,
+};
+pub use presentation::{
+    AgentActivityLine, AgentAppearance, AgentAvatar, AgentCard, AgentGroup, AgentRoster,
+    AgentRunIssues, SubagentTree,
 };
 pub use server_list::{Catalog, Offering, OfferingKind, ServerEntry, ServerList, ServerState};
 pub use step_list::{RunLength, Step, StepList, StepState};

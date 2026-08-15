@@ -29,6 +29,68 @@
       ]
     },
     {
+      "name": "AgentActivityLine",
+      "kind": "builder",
+      "path": "gpui_kit::agent::AgentActivityLine",
+      "source": "crates/gpui-kit/src/agent/presentation.rs",
+      "summary": "The localized execution sentence and its non-colour status mark.",
+      "construct": [
+        "new(ident: impl Into<Ident>, execution: AgentExecutionState) -> Self"
+      ],
+      "options": [
+        "tint(tint: Hsla) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "agent-roster"
+      ]
+    },
+    {
+      "name": "AgentAvatar",
+      "kind": "builder",
+      "path": "gpui_kit::agent::AgentAvatar",
+      "source": "crates/gpui-kit/src/agent/presentation.rs",
+      "summary": "A status-coloured agent identity with a separate presence mark.",
+      "construct": [
+        "new(ident: impl Into<Ident>, agent: AgentSnapshot) -> Self"
+      ],
+      "options": [
+        "image(image: impl Into<SharedString>) -> Self",
+        "tint(tint: Hsla) -> Self",
+        "size(size: f32) -> Self",
+        "parent(parent: impl Into<Ident>) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": []
+    },
+    {
+      "name": "AgentCard",
+      "kind": "builder",
+      "path": "gpui_kit::agent::AgentCard",
+      "source": "crates/gpui-kit/src/agent/presentation.rs",
+      "summary": "A complete summary of one agent and its current caller-owned task.",
+      "construct": [
+        "new(ident: impl Into<Ident>, agent: AgentSnapshot) -> Self"
+      ],
+      "options": [
+        "task_label(label: impl Into<SharedString>) -> Self",
+        "image(image: impl Into<SharedString>) -> Self",
+        "tint(tint: Hsla) -> Self",
+        "selected(selected: bool) -> Self",
+        "on_action(handler: impl Fn(AgentUiAction, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "agent-roster"
+      ]
+    },
+    {
       "name": "AgentDocument",
       "kind": "builder",
       "path": "gpui_kit::content::AgentDocument",
@@ -53,6 +115,67 @@
       "scenes": [
         "agent-document"
       ]
+    },
+    {
+      "name": "AgentGroup",
+      "kind": "builder",
+      "path": "gpui_kit::agent::AgentGroup",
+      "source": "crates/gpui-kit/src/agent/presentation.rs",
+      "summary": "A compact overlapping group of agent identities with an overflow count.",
+      "construct": [
+        "new(ident: impl Into<Ident>, agents: impl IntoIterator<Item = AgentSnapshot>) -> Self"
+      ],
+      "options": [
+        "max_visible(max_visible: usize) -> Self",
+        "appearances(appearances: impl IntoIterator<Item = AgentAppearance>) -> Self",
+        "size(size: f32) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "agent-roster"
+      ]
+    },
+    {
+      "name": "AgentRoster",
+      "kind": "builder",
+      "path": "gpui_kit::agent::AgentRoster",
+      "source": "crates/gpui-kit/src/agent/presentation.rs",
+      "summary": "A virtualized list of agents with standard identity and activity rows.",
+      "construct": [
+        "new(ident: impl Into<Ident>, agents: impl IntoIterator<Item = AgentSnapshot>) -> Self",
+        "from_run(ident: impl Into<Ident>, run: &AgentRunSnapshot) -> Self"
+      ],
+      "options": [
+        "tasks(tasks: impl IntoIterator<Item = AgentTaskSnapshot>) -> Self",
+        "appearances(appearances: impl IntoIterator<Item = AgentAppearance>) -> Self",
+        "selected(selected: impl Into<AgentId>) -> Self",
+        "visible_rows(rows: usize) -> Self",
+        "on_action(handler: impl Fn(AgentUiAction, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "agent-roster"
+      ]
+    },
+    {
+      "name": "AgentRunIssues",
+      "kind": "builder",
+      "path": "gpui_kit::agent::AgentRunIssues",
+      "source": "crates/gpui-kit/src/agent/presentation.rs",
+      "summary": "A single truthful notice for malformed multi-agent snapshot structure.",
+      "construct": [
+        "new(ident: impl Into<Ident>, issues: impl IntoIterator<Item = AgentModelIssue>) -> Self",
+        "from_run(ident: impl Into<Ident>, run: &AgentRunSnapshot) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": []
     },
     {
       "name": "AnchorList",
@@ -522,6 +645,7 @@
         "frost",
         "motion-flip",
         "agent-document",
+        "agent-roster",
         "tool-call",
         "step-list",
         "reading-direction",
@@ -3117,6 +3241,29 @@
       ]
     },
     {
+      "name": "SubagentTree",
+      "kind": "builder",
+      "path": "gpui_kit::agent::SubagentTree",
+      "source": "crates/gpui-kit/src/agent/presentation.rs",
+      "summary": "A caller-controlled hierarchy derived from Spawn links in a run.",
+      "construct": [
+        "new(ident: impl Into<Ident>, run: AgentRunSnapshot) -> Self"
+      ],
+      "options": [
+        "expanded(expanded: impl IntoIterator<Item = AgentId>) -> Self",
+        "selected(selected: impl Into<AgentId>) -> Self",
+        "visible_rows(rows: usize) -> Self",
+        "on_toggle(handler: impl Fn(AgentId, bool, &mut Window, &mut App) + 'static) -> Self",
+        "on_action(handler: impl Fn(AgentUiAction, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "agent-roster"
+      ]
+    },
+    {
       "name": "Switch",
       "kind": "builder",
       "path": "gpui_kit::controls::Switch",
@@ -3532,6 +3679,7 @@
         "motion-state",
         "drag-tree",
         "split-tree",
+        "agent-roster",
         "thinking",
         "json-view",
         "server-list",
@@ -3568,6 +3716,7 @@
         "motion-state",
         "drag-tree",
         "split-tree",
+        "agent-roster",
         "thinking",
         "json-view",
         "server-list",
@@ -3722,6 +3871,7 @@
         "tree",
         "drag-tree",
         "split-tree",
+        "agent-roster",
         "reading-direction"
       ]
     },
@@ -3927,6 +4077,21 @@
       "queries": [
         "as_str() -> &'static str"
       ]
+    },
+    {
+      "name": "AgentAppearance",
+      "path": "gpui_kit::agent::AgentAppearance",
+      "summary": "Optional caller-owned art for an agent identity.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<AgentId>) -> Self"
+      ],
+      "options": [
+        "image(image: impl Into<SharedString>) -> Self",
+        "tint(tint: Hsla) -> Self"
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "AgentBlockKind",
@@ -9815,6 +9980,22 @@
         "ToolCallCard"
       ],
       "example": "fn agent_document(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(680.0))\n        .child(\n            AgentDocument::new(\"scene.agent-document\")\n                .block(\n                    AgentDocumentBlock::markdown(\n                        \"summary\",\n                        \"## Review complete\\n\\nThe run kept its **verified result** while the refresh failed.\",\n                    )\n                    .revision(3),\n                )\n                .block(\n                    AgentDocumentBlock::code(\n                        \"patch\",\n                        CodeView::from_text(\n                            \"scene.agent-document.patch\",\n                            \"pub fn bounded_retry(attempt: usize) -> bool {\\n    attempt < 3\\n}\",\n                        )\n                        .language(\"rust\"),\n                    )\n                    .label(\"Proposed code\")\n                    .revision(2),\n                )\n                .block(\n                    AgentDocumentBlock::tool_call(\n                        \"verification\",\n                        ToolCallCard::new(\"scene.agent-document.tool\", \"cargo test\")\n                            .state(ToolCallState::Succeeded {\n                                output: ToolOutput::Silent,\n                            })\n                            .elapsed(\"1.4 s\"),\n                    )\n                    .revision(1),\n                )\n                .block(AgentDocumentBlock::notice(\n                    \"refresh\",\n                    \"The last refresh failed; the result above is the last verified value.\",\n                    Tone::Warning,\n                )),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.agent-document.rule\")\n                .label(\"Document states\"),\n        )\n        .child(\n            div()\n                .row_reading(cx.layout_direction())\n                .gap_token(&theme, Space::Lg)\n                .child(\n                    div().flex_1().child(\n                        AgentDocument::new(\"scene.agent-document.empty\")\n                            .state(AgentDocumentState::Empty(\"No results were returned.\".into())),\n                    ),\n                )\n                .child(\n                    div().flex_1().child(\n                        AgentDocument::new(\"scene.agent-document.unavailable\").state(\n                            AgentDocumentState::Unavailable(\n                                \"The host refused to provide this document.\".into(),\n                            ),\n                        ),\n                    ),\n                ),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "agent-roster",
+      "capture": "cargo run -p xtask -- headless capture agent-roster",
+      "uses": [
+        "AgentActivityLine",
+        "AgentCard",
+        "AgentGroup",
+        "AgentRoster",
+        "Card",
+        "SubagentTree",
+        "Toggle",
+        "ToggleGroup",
+        "Tree"
+      ],
+      "example": "fn agent_roster(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let direction = cx.layout_direction();\n    let run = scene_agent_run();\n    let root = run\n        .agents\n        .first()\n        .cloned()\n        .expect(\"the canonical multi-agent scene has a root agent\");\n\n    stack(&theme)\n        .w(px(720.0))\n        .child(\n            div()\n                .row_reading(direction)\n                .items_center()\n                .justify_between()\n                .child(\n                    div()\n                        .column()\n                        .gap_token(&theme, Space::Xs)\n                        .child(\n                            div()\n                                .type_scale(&theme, TypeScale::Title)\n                                .text_tone(&theme, TextTone::Primary)\n                                .child(\"Release review\"),\n                        )\n                        .child(AgentActivityLine::new(\n                            \"scene.agent-roster.run-state\",\n                            run.execution.clone(),\n                        )),\n                )\n                .child(\n                    AgentGroup::new(\"scene.agent-roster.group\", run.agents.clone()).max_visible(3),\n                ),\n        )\n        .child(\n            AgentCard::new(\"scene.agent-roster.root\", root)\n                .task_label(\"Synthesis\")\n                .selected(true)\n                .on_action(|_, _, _| {}),\n        )\n        .child(\n            div()\n                .row_reading(direction)\n                .items_start()\n                .gap_token(&theme, Space::Lg)\n                .child(\n                    div().w(px(420.0)).child(\n                        AgentRoster::from_run(\"scene.agent-roster.list\", &run)\n                            .selected(\"researcher\")\n                            .visible_rows(4)\n                            .on_action(|_, _, _| {}),\n                    ),\n                )\n                .child(\n                    div().w(px(270.0)).child(\n                        SubagentTree::new(\"scene.agent-roster.tree\", run)\n                            .expanded([\"orchestrator\".into(), \"researcher\".into()])\n                            .selected(\"researcher\")\n                            .visible_rows(4)\n                            .on_toggle(|_, _, _, _| {})\n                            .on_action(|_, _, _| {}),\n                    ),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "conversation",

@@ -448,6 +448,32 @@ string_keys! {
     AgentReasoningWithheld => "agent.reasoning-withheld", "Withheld";
     AgentReasoningThinking => "agent.reasoning-thinking", "Thinking";
     AgentReasoningAbsent => "agent.reasoning-absent", "No reasoning was returned";
+    AgentIdle => "agent.idle", "Idle";
+    AgentQueued => "agent.queued", "Queued";
+    AgentStarting => "agent.starting", "Starting";
+    AgentPlanning => "agent.planning", "Planning";
+    AgentUsingTool => "agent.using-tool", "Using {0}";
+    AgentSpeaking => "agent.speaking", "Speaking";
+    AgentAggregating => "agent.aggregating", "Aggregating results";
+    AgentWaitingInput => "agent.waiting-input", "Waiting for input";
+    AgentWaitingDependency => "agent.waiting-dependency", "Waiting for a dependency";
+    AgentWaitingAgent => "agent.waiting-agent", "Waiting for another agent";
+    AgentWaitingRateLimit => "agent.waiting-rate-limit", "Waiting for a rate limit";
+    AgentBlockedBecause => "agent.blocked-because", "Blocked: {0}";
+    AgentCancelling => "agent.cancelling", "Cancelling";
+    AgentPartialBecause => "agent.partial-because", "Partially completed: {0}";
+    AgentFailedBecause => "agent.failed-because", "Failed: {0}";
+    AgentRefusedBecause => "agent.refused-because", "Refused: {0}";
+    AgentCancelled => "agent.cancelled", "Cancelled";
+    AgentTimedOutBecause => "agent.timed-out-because", "Timed out: {0}";
+    AgentUnavailableBecause => "agent.unavailable-because", "Unavailable: {0}";
+    AgentIssueMissingRoot => "agent.issue.missing-root", "Root agent {0} is missing";
+    AgentIssueDuplicateAgent => "agent.issue.duplicate-agent", "Agent identity {0} is duplicated";
+    AgentIssueDuplicateTask => "agent.issue.duplicate-task", "Task identity {0} is duplicated";
+    AgentIssueDuplicateLink => "agent.issue.duplicate-link", "Run link identity {0} is duplicated";
+    AgentIssueMissingTaskOwner => "agent.issue.missing-task-owner", "Task {0} references missing owner {1}";
+    AgentIssueMissingLinkEndpoint => "agent.issue.missing-link-endpoint", "Run link {0} references missing endpoint {1}";
+    AgentIssueSelfLink => "agent.issue.self-link", "Run link {0} references itself";
 
     // Document tabs. A clean tab carries no wording at all, which is why
     // there is no key here for one: silence is the whole message.

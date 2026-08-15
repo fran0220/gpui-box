@@ -19,8 +19,11 @@
 :
 Accordion
 AccordionSection
+AgentCard
 AgentDocument
 AgentDocumentBlock
+AgentGroup
+AgentRoster
 AnchorList
 AnimatedNumber
 ApprovalPrompt
@@ -127,6 +130,7 @@ StatusBar
 StatusItem
 Step
 StepList
+SubagentTree
 Submit
 Switch
 Table

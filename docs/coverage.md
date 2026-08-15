@@ -216,6 +216,7 @@ that rubric, not that every possible interaction was exercised.
 |---|---|
 | `accordion` | Medium: disabled title and detail are too faint in both themes. |
 | `actions` | High: dark toolbar icons, shortcuts, menu outline, and separators nearly disappear. |
+| `agent-roster` | Clean. |
 | `anchor-list` | Medium: dark explanatory copy is nearly invisible. |
 | `animated-number`, `aspect-ratio` | Clean. |
 | `approval` | Medium: dark secondary action is weak; the focus ring and labelled divider need clearance. |
