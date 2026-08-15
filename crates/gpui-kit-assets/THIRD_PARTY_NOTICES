@@ -19,6 +19,18 @@ Copyright 2022 The Noto Project Authors
 Files: assets/fonts/KeySymbols.ttf
 License text: licenses/OFL-1.1.txt
 
+Noto Sans Arabic and Noto Sans Hebrew
+--------------------------------------------------------------------------------
+Source: https://github.com/google/fonts
+Revision: 352f6b7d9d6cc4fa9e242b931291d31b21a6dc84
+Versions: Noto Sans Arabic 2.012; Noto Sans Hebrew 3.001
+License: SIL Open Font License 1.1, no Reserved Font Name
+Copyright 2022 The Noto Project Authors (Arabic)
+Copyright 2022 The Noto Project Authors (Hebrew)
+Files: assets/fonts/NotoSansArabic.ttf, assets/fonts/NotoSansHebrew.ttf
+Checksums and exact upstream paths: assets/SOURCE.md
+License text: licenses/OFL-1.1.txt
+
 Solar Icons
 --------------------------------------------------------------------------------
 Source: Solar Icons, Linear weight, by 480 Design

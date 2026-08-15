@@ -196,6 +196,7 @@ impl RenderOnce for HighlightedText {
             .flex()
             .flex_row()
             .flex_wrap()
+            .font_fallbacks(gpui_kit_assets::text_fallbacks())
             .when(self.monospace, |element| {
                 element
                     .font_family(theme.typography.mono.clone())

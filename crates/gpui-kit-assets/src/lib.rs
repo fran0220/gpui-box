@@ -3,8 +3,9 @@
 //! See `assets/SOURCE.md` and the repository `THIRD_PARTY_NOTICES`.
 
 use std::borrow::Cow;
+use std::sync::OnceLock;
 
-use gpui::{App, AssetSource, Result, SharedString, Styled as _, Svg, svg};
+use gpui::{App, AssetSource, FontFallbacks, Result, SharedString, Styled as _, Svg, svg};
 
 /// Whether a glyph's meaning is carried by the direction it reads in.
 ///
@@ -143,6 +144,8 @@ static FONT_GEIST_MONO: &[u8] = include_bytes!("../assets/fonts/GeistMono.ttf");
 static FONT_GEIST_MEDIUM: &[u8] = include_bytes!("../assets/fonts/Geist-Medium.ttf");
 static FONT_GEIST_SEMIBOLD: &[u8] = include_bytes!("../assets/fonts/Geist-SemiBold.ttf");
 static FONT_GEIST_BOLD: &[u8] = include_bytes!("../assets/fonts/Geist-Bold.ttf");
+static FONT_NOTO_SANS_ARABIC: &[u8] = include_bytes!("../assets/fonts/NotoSansArabic.ttf");
+static FONT_NOTO_SANS_HEBREW: &[u8] = include_bytes!("../assets/fonts/NotoSansHebrew.ttf");
 /// The seven keyboard symbols `Kbd` can emit that no Geist face draws.
 ///
 /// Without it those glyphs render only where the platform happens to own a
@@ -150,15 +153,30 @@ static FONT_GEIST_BOLD: &[u8] = include_bytes!("../assets/fonts/Geist-Bold.ttf")
 /// the host machine had installed. See `assets/SOURCE.md`.
 static FONT_KEY_SYMBOLS: &[u8] = include_bytes!("../assets/fonts/KeySymbols.ttf");
 
-pub fn font_bytes() -> [&'static [u8]; 6] {
+pub fn font_bytes() -> [&'static [u8]; 8] {
     [
         FONT_GEIST,
         FONT_GEIST_MONO,
         FONT_GEIST_MEDIUM,
         FONT_GEIST_SEMIBOLD,
         FONT_GEIST_BOLD,
+        FONT_NOTO_SANS_ARABIC,
+        FONT_NOTO_SANS_HEBREW,
         FONT_KEY_SYMBOLS,
     ]
+}
+
+/// The deterministic script fallbacks carried by every Kit text style.
+pub fn text_fallbacks() -> FontFallbacks {
+    static FALLBACKS: OnceLock<FontFallbacks> = OnceLock::new();
+    FALLBACKS
+        .get_or_init(|| {
+            FontFallbacks::from_fonts(vec![
+                "Noto Sans Arabic".to_owned(),
+                "Noto Sans Hebrew".to_owned(),
+            ])
+        })
+        .clone()
 }
 
 pub fn register_fonts(cx: &App) {
@@ -229,5 +247,13 @@ mod tests {
         for bytes in font_bytes() {
             assert!(bytes.len() > 1024);
         }
+    }
+
+    #[test]
+    fn script_fallbacks_are_stable_and_ordered() {
+        assert_eq!(
+            text_fallbacks().fallback_list(),
+            ["Noto Sans Arabic", "Noto Sans Hebrew"]
+        );
     }
 }

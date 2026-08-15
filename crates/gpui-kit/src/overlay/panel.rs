@@ -29,6 +29,7 @@ pub fn heading(
         .text_size(px(theme.typography.title.size))
         .line_height(px(theme.typography.title.line_height))
         .font_weight(gpui::FontWeight(theme.typography.title.weight))
+        .font_fallbacks(gpui_kit_assets::text_fallbacks())
         .child(title.clone())
         .semantic_in(
             cx,
@@ -49,6 +50,7 @@ pub fn description(
     div()
         .text_size(px(theme.typography.body.size))
         .line_height(px(theme.typography.body.line_height))
+        .font_fallbacks(gpui_kit_assets::text_fallbacks())
         .text_color(theme.colors.text_muted)
         .child(description.clone())
         .semantic_in(

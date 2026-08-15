@@ -21,6 +21,7 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Radius, Space, Surface
 
 use crate::controls::button::{Button, IconButton};
 use crate::controls::input::{TextInput, TextInputEvent};
+use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{
     Disableable, Ident, Selectable, Sizable, StyledExt, text as foundation_text,
 };
@@ -279,6 +280,7 @@ impl Focusable for SearchField {
 impl Render for SearchField {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
+        let direction = cx.layout_direction();
         let count_ident = self.ident.child("count");
         let sentence = self.count.sentence(cx);
 
@@ -328,7 +330,7 @@ impl Render for SearchField {
 
         div()
             .id(self.ident.element_id())
-            .row()
+            .row_reading(direction)
             .w_full()
             .gap_token(&theme, Space::Sm)
             .px_token(&theme, Space::Sm)
@@ -519,6 +521,7 @@ impl Sizable for FindReplace {
 impl Render for FindReplace {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
+        let direction = cx.layout_direction();
         let count = self.search.read(cx).count().clone();
         let counted = count.exact().filter(|total| *total > 0);
         let one_live =
@@ -597,7 +600,7 @@ impl Render for FindReplace {
             .child(self.search.clone())
             .child(
                 div()
-                    .row()
+                    .row_reading(direction)
                     .w_full()
                     .gap_token(&theme, Space::Sm)
                     .child(

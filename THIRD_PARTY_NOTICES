@@ -87,6 +87,18 @@ Scope: KeySymbols.ttf seven-glyph subset, renamed “GPUI Kit Key Symbols”.
 Recipe: crates/gpui-kit-assets/assets/SOURCE.md
 License text: licenses/NOTO-OFL-1.1.txt
 
+Noto Sans Arabic and Noto Sans Hebrew
+--------------------------------------------------------------------------------
+Source: https://github.com/google/fonts
+Revision: 352f6b7d9d6cc4fa9e242b931291d31b21a6dc84
+Versions: 2.012 and 3.001
+License: SIL Open Font License 1.1, no Reserved Font Name
+Copyright 2022 The Noto Project Authors (Arabic)
+Copyright 2022 The Noto Project Authors (Hebrew)
+Scope: deterministic script fallbacks under crates/gpui-kit-assets/assets/fonts.
+Checksums and exact upstream paths: crates/gpui-kit-assets/assets/SOURCE.md
+License text: licenses/NOTO-OFL-1.1.txt
+
 Solar Icons
 --------------------------------------------------------------------------------
 Source: Solar Icons, Linear weight, by 480 Design

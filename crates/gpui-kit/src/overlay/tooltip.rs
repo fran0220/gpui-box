@@ -73,6 +73,7 @@ impl RenderOnce for Tooltip {
             .elevation(&theme, Elevation::Overlay)
             .text_size(px(theme.typography.label.size))
             .line_height(px(theme.typography.label.line_height))
+            .font_fallbacks(gpui_kit_assets::text_fallbacks())
             .text_color(theme.colors.text)
             .child(self.text.clone());
 

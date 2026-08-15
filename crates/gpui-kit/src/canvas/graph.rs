@@ -601,6 +601,7 @@ impl RenderOnce for NodeGraph {
             .relative()
             .size_full()
             .overflow_hidden()
+            .font_fallbacks(gpui_kit_assets::text_fallbacks())
             .surface(&theme, Surface::Canvas);
 
         if let Some(report) = self

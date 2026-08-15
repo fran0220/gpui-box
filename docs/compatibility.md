@@ -56,6 +56,15 @@ document-selection coordinator rather than inferring bytes from row indexes.
 own rounded quad, preserving range-highlight geometry without changing shaping,
 wrapping, hit testing, or accessibility bounds.
 
+Font fallback is also an explicit framework contract. `Styled::font_fallbacks`
+inherits an ordered family chain; offscreen Cosmic shaping splits grapheme-safe
+runs by registered-font coverage, macOS resolves registered family names, and
+DirectWrite searches the application collection before the system collection.
+Kit registers Geist plus Noto Sans Arabic and Noto Sans Hebrew and applies the
+two Noto families to its type styles. Mixed RTL script output therefore does
+not depend on fonts installed by a downstream host. Locale-specific copy,
+number/date formatting, and language policy remain host-owned.
+
 Browser checks are:
 
 ```bash

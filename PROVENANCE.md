@@ -73,6 +73,11 @@ force Kit highlights to recompose text into separate layout elements. They use
 the workspace's existing Unicode segmentation and bidirectional libraries and
 import no editor or product source.
 
+The explicit `Styled::font_fallbacks` refinement, grapheme-aware fallback run
+selection, and DirectWrite lookup across registered and system collections are
+subsequent GPUI Box work. They make caller-declared font chains a consistent
+framework contract across native and offscreen renderers and import no source.
+
 The full-frame platform-view clipping and macOS restacking implementation is
 also subsequent GPUI Box work. It extends the product-neutral host contract on
 both native platforms and imports no platform-view source from Zed or another
@@ -141,7 +146,7 @@ License text: `licenses/COMET-MIT.txt`.
 Comet-authored generic glyphs in that directory remain under MIT and are
 identified by the adjacent `assets/SOURCE.md`.
 
-## P05: Noto Sans Symbols families
+## P05: Noto Sans Symbols and script fallback families
 
 - Source: <https://github.com/notofonts/notofonts.github.io>
 - Revision: `c16b117609abbe4e60b3f2bd4433bdb3d0accb2e`
@@ -154,6 +159,16 @@ This is a seven-glyph subset (`⌘ ⌃ ⌥ ⏎ ⌦ ⌫ ␣`), renamed `GPUI Kit 
 Symbols` to avoid shadowing an installed Noto family. The exact recipe is in
 `crates/gpui-kit-assets/assets/SOURCE.md`; license text is
 `licenses/NOTO-OFL-1.1.txt`.
+
+The complete Noto Sans Arabic 2.012 and Noto Sans Hebrew 3.001 variable faces
+come from <https://github.com/google/fonts> revision
+`352f6b7d9d6cc4fa9e242b931291d31b21a6dc84`, paths
+`ofl/notosansarabic/NotoSansArabic[wdth,wght].ttf` and
+`ofl/notosanshebrew/NotoSansHebrew[wdth,wght].ttf`. They are unmodified,
+licensed under OFL 1.1 with no Reserved Font Name, and live at
+`crates/gpui-kit-assets/assets/fonts/NotoSansArabic.ttf` and
+`NotoSansHebrew.ttf`. Exact SHA-256 checksums are recorded in the asset crate's
+`assets/SOURCE.md`.
 
 ## P06: Framework test and fallback fonts
 

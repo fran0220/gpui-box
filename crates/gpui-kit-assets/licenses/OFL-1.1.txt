@@ -3,6 +3,13 @@ Reserved Font Names: "Geist" and "Geist Mono".
 
 Noto Sans Symbols and Noto Sans Symbols 2:
 Copyright 2022 The Noto Project Authors (https://github.com/notofonts/symbols)
+
+Noto Sans Arabic:
+Copyright 2022 The Noto Project Authors (https://github.com/notofonts/arabic)
+
+Noto Sans Hebrew:
+Copyright 2022 The Noto Project Authors (https://github.com/notofonts/hebrew)
+
 No Reserved Font Name is declared for the Noto sources.
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.

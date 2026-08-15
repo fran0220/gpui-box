@@ -608,6 +608,7 @@ impl Render for Cascader {
         let theme = cx.theme().clone();
         let metrics = theme.control.get(self.size);
         let focused = self.focus_handle.is_focused(window);
+        let direction = cx.layout_direction();
         let placeholder = self
             .placeholder
             .clone()
@@ -631,7 +632,7 @@ impl Render for Cascader {
         let menu = self.open.then(|| self.menu(cx));
         let trigger = div()
             .w_full()
-            .flex()
+            .row_reading(direction)
             .items_center()
             .justify_between()
             .h(px(metrics.height))

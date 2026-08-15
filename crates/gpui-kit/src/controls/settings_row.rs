@@ -16,6 +16,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, Theme, TypeScale};
 
 use crate::display::badge::Badge;
+use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{Ident, StyledExt, text as foundation_text};
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -139,6 +140,7 @@ impl SettingsRow {
     }
 
     fn render_in(self, theme: &Theme, cx: &mut App) -> AnyElement {
+        let direction = cx.layout_direction();
         let withheld = self.withheld.clone();
         let ident = self.ident.clone();
 
@@ -157,7 +159,7 @@ impl SettingsRow {
             .gap(px(2.0))
             .child(
                 foundation_text(theme, TypeScale::Label, self.label.clone())
-                    .row()
+                    .row_reading(direction)
                     .gap_token(theme, Space::Sm)
                     .children(
                         self.badge
@@ -184,7 +186,7 @@ impl SettingsRow {
                 }))
                 .child(
                     div()
-                        .row()
+                        .row_reading(direction)
                         .gap(px(theme.space(Space::Xs)))
                         .child(
                             icon(withheld.glyph())
@@ -215,7 +217,7 @@ impl SettingsRow {
         };
 
         div()
-            .row()
+            .row_reading(direction)
             .w_full()
             .items_center()
             .gap_token(theme, Space::Md)
@@ -310,11 +312,12 @@ impl SettingsSection {
 impl RenderOnce for SettingsSection {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
+        let direction = cx.layout_direction();
         let dimmed = self.dimmed.clone();
         let ident = self.ident.clone();
 
         let heading = div()
-            .row()
+            .row_reading(direction)
             .w_full()
             .gap_token(&theme, Space::Sm)
             .child(
@@ -342,7 +345,7 @@ impl RenderOnce for SettingsSection {
 
         let reason = dimmed.clone().map(|reason| {
             div()
-                .row()
+                .row_reading(direction)
                 .w_full()
                 .gap_token(&theme, Space::Xs)
                 .child(

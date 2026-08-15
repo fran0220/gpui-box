@@ -101,9 +101,11 @@ reuses its id, and switches with `gpui_kit::activate_theme`.
 
 ## Typography
 
-The theme provides Geist and Geist Mono with platform fallbacks. Size,
-line-height, and weight travel as one `TypeStep`; consumers should not mix a
-size from one step with line-height from another.
+The theme provides Geist and Geist Mono. Kit type styles carry bundled Noto Sans
+Arabic and Noto Sans Hebrew as an explicit ordered fallback chain rather than
+depending on fonts installed by the host. Size, line-height, and weight travel
+as one `TypeStep`; consumers should not mix a size from one step with
+line-height from another.
 
 Static Medium, SemiBold, and Bold font files are included because not every
 GPUI text backend applies a variable font's weight axis.

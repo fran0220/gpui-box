@@ -107,6 +107,7 @@ impl RenderOnce for Avatar {
             .bg(background)
             .border(px(theme.borders.hairline))
             .border_color(border)
+            .font_fallbacks(gpui_kit_assets::text_fallbacks())
             .text_size(px(self.size * 0.36))
             .text_color(foreground)
             .when_some(self.image.clone(), |element, source| {

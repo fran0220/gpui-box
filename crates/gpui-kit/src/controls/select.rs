@@ -17,6 +17,7 @@ use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TypeScale};
 
+use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{
     Disableable, Ident, Pressable, Sizable, StyledExt, text as foundation_text,
 };
@@ -504,6 +505,7 @@ impl Focusable for Select {
 impl Render for Select {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
+        let direction = cx.layout_direction();
         let metrics = theme.control.get(self.size);
         let focused = self.focus_handle.is_focused(window);
         let label = self
@@ -545,8 +547,7 @@ impl Render for Select {
                     .on_key_down(cx.listener(Self::on_key_down))
             })
             .w_full()
-            .flex()
-            .flex_row()
+            .row_reading(direction)
             .items_center()
             .justify_between()
             .gap(px(theme.space(Space::Sm)))

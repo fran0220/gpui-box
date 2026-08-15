@@ -40,8 +40,10 @@ use gpui_kit_theme::{
 use crate::controls::button::Button;
 use crate::display::badge::{Badge, Tone};
 use crate::display::empty::{EmptyKind, EmptyState};
+use crate::display::icon::flips;
 use crate::display::loading::PulseLoader;
 use crate::display::status::{Callout, StatusDot};
+use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -438,6 +440,7 @@ impl RenderOnce for ServerList {
 
 impl ServerList {
     fn server_element(&self, server: &ServerEntry, theme: &Theme, cx: &mut App) -> AnyElement {
+        let direction = cx.layout_direction();
         let ident = self.ident.child(server.id.as_ref());
         let metrics = theme.control.get(self.size);
         let open = self.expanded.contains(&server.id);
@@ -460,6 +463,12 @@ impl ServerList {
                     icon(Icon::AltArrowRight)
                         .size(px(metrics.icon_size))
                         .text_color(theme.colors.text_muted)
+                        // Open, it points down, which is not directional.
+                        .when(!open && flips(Icon::AltArrowRight, direction), |glyph| {
+                            glyph.with_transformation(gpui::Transformation::scale(gpui::size(
+                                -1.0, 1.0,
+                            )))
+                        })
                         .when(open, |glyph| {
                             glyph.with_transformation(gpui::Transformation::rotate(radians(
                                 FRAC_PI_2,
@@ -492,7 +501,7 @@ impl ServerList {
 
         let mut header = div()
             .id(ident.element_id())
-            .row()
+            .row_reading(direction)
             .w_full()
             .gap_token(theme, Space::Sm)
             .p_token(theme, Space::Sm)
@@ -715,12 +724,13 @@ impl ServerList {
         theme: &Theme,
         cx: &mut App,
     ) -> AnyElement {
+        let direction = cx.layout_direction();
         let ident = server_ident.child("offering").child(offering.id.as_ref());
         let metrics = theme.control.get(self.size);
         let _ = server;
 
         div()
-            .row()
+            .row_reading(direction)
             .w_full()
             .items_start()
             .gap_token(theme, Space::Sm)

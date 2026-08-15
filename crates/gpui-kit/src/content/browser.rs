@@ -31,6 +31,7 @@ use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
 
 use crate::controls::button::IconButton;
 use crate::display::empty::{EmptyKind, EmptyState};
+use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -172,6 +173,7 @@ impl BrowserPanel {
 impl RenderOnce for BrowserPanel {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
+        let direction = cx.layout_direction();
         let strings = cx.strings().clone();
         let panel_id = self.ident.semantic_id();
         let viewport_ident = self.ident.child("viewport");
@@ -198,7 +200,7 @@ impl RenderOnce for BrowserPanel {
         };
 
         let bar = div()
-            .row()
+            .row_reading(direction)
             .w_full()
             .items_center()
             .gap_token(&theme, Space::Xs)

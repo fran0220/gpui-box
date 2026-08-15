@@ -64,6 +64,8 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TextTone, Theme, TypeScale};
 use unicode_segmentation::UnicodeSegmentation;
 
+use crate::display::icon::flips;
+use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -521,14 +523,23 @@ enum Move {
     Toggle(SharedString, bool),
 }
 
-/// The same movement a tree has, over the rows a frame disclosed. Right opens
-/// a shut value or descends into an open one; left shuts an open value or
-/// climbs to the key that holds it.
-fn keystroke_move(key: &str, lines: &[Line], selected: Option<&SharedString>) -> Option<Move> {
+/// The same movement a tree has, over the rows a frame disclosed. The arrow
+/// toward children opens or descends; its logical opposite shuts or climbs.
+fn keystroke_move(
+    key: &str,
+    direction: LayoutDirection,
+    lines: &[Line],
+    selected: Option<&SharedString>,
+) -> Option<Move> {
     let at = lines
         .iter()
         .position(|line| Some(&line.path) == selected)
         .filter(|_| selected.is_some());
+    let key = match direction.arrow_step(key) {
+        Some(1) => "toward-children",
+        Some(_) => "toward-parent",
+        None => key,
+    };
     match key {
         "up" | "down" => {
             let next = match (key, at) {
@@ -541,7 +552,7 @@ fn keystroke_move(key: &str, lines: &[Line], selected: Option<&SharedString>) ->
         }
         "home" => lines.first().map(|line| Move::Select(line.path.clone())),
         "end" => lines.last().map(|line| Move::Select(line.path.clone())),
-        "right" => {
+        "toward-children" => {
             let line = lines.get(at?)?;
             if line.has_members && !line.open {
                 Some(Move::Toggle(line.path.clone(), true))
@@ -552,7 +563,7 @@ fn keystroke_move(key: &str, lines: &[Line], selected: Option<&SharedString>) ->
                     .map(Move::Select)
             }
         }
-        "left" => {
+        "toward-parent" => {
             let line = lines.get(at?)?;
             if line.has_members && line.open {
                 Some(Move::Toggle(line.path.clone(), false))
@@ -616,15 +627,19 @@ impl RenderOnce for JsonView {
             .child(rows);
 
         if !view.disabled && (view.on_select.is_some() || view.on_toggle.is_some()) {
+            let direction = cx.layout_direction();
             let selected = view.selected.clone();
             let select = view.on_select.clone();
             let toggle = view.on_toggle.clone();
             let lines = Rc::clone(&lines);
             let scroll = scroll.clone();
             container = container.on_key_down(move |event, window, cx| {
-                let Some(next) =
-                    keystroke_move(event.keystroke.key.as_str(), &lines, selected.as_ref())
-                else {
+                let Some(next) = keystroke_move(
+                    event.keystroke.key.as_str(),
+                    direction,
+                    &lines,
+                    selected.as_ref(),
+                ) else {
                     return;
                 };
                 match next {
@@ -670,6 +685,7 @@ fn row_element(
     _window: &mut Window,
     cx: &mut App,
 ) -> AnyElement {
+    let direction = cx.layout_direction();
     let ident = view.row_ident(&line.path);
     let selected = view.selected.as_ref() == Some(&line.path);
     let selectable = !view.disabled && view.on_select.is_some();
@@ -692,6 +708,13 @@ fn row_element(
                 icon(Icon::AltArrowRight)
                     .size(px(icon_size))
                     .text_color(theme.colors.text_muted)
+                    // Open, it points down, which is not directional.
+                    .when(
+                        !line.open && flips(Icon::AltArrowRight, direction),
+                        |glyph| {
+                            glyph.with_transformation(Transformation::scale(gpui::size(-1.0, 1.0)))
+                        },
+                    )
                     .when(line.open, |glyph| {
                         glyph.with_transformation(Transformation::rotate(radians(FRAC_PI_2)))
                     }),
@@ -727,13 +750,15 @@ fn row_element(
 
     let mut row = div()
         .id(ident.element_id())
-        .row()
+        .row_reading(direction)
         .w_full()
         .h(px(height))
-        .pr(px(theme.space(Space::Sm)))
-        .pl(px(theme.space(Space::Sm)
-            + line.level.saturating_sub(1) as f32
-                * theme.space(Space::Md)))
+        .pe(direction, px(theme.space(Space::Sm)))
+        .ps(
+            direction,
+            px(theme.space(Space::Sm)
+                + line.level.saturating_sub(1) as f32 * theme.space(Space::Md)),
+        )
         .gap(px(theme.space(Space::Xs)))
         .when(selected, |element| element.bg(theme.colors.selected))
         .when(view.disabled, |element| {
@@ -758,12 +783,14 @@ fn row_element(
         .child(
             text(theme, TypeScale::Code, line.label.clone())
                 .flex_none()
+                .text_start(direction)
                 .text_tone(theme, TextTone::Muted),
         )
         .child(
             text(theme, TypeScale::Code, line.shown.clone())
                 .flex_1()
                 .overflow_hidden()
+                .text_start(direction)
                 .text_color(value_color),
         );
 
@@ -773,7 +800,7 @@ fn row_element(
         row = row.child(
             div()
                 .flex_none()
-                .row()
+                .row_reading(direction)
                 .gap(px(theme.space(Space::Xs)))
                 .child(
                     text(
@@ -912,7 +939,7 @@ mod tests {
     fn right_opens_a_shut_value_and_then_descends() {
         let shut = lines(&[]);
         let steps = SharedString::from("steps");
-        match keystroke_move("right", &shut, Some(&steps)) {
+        match keystroke_move("right", LayoutDirection::LeftToRight, &shut, Some(&steps)) {
             Some(Move::Toggle(path, next)) => {
                 assert_eq!(path.as_ref(), "steps");
                 assert!(next);
@@ -920,9 +947,22 @@ mod tests {
             _ => panic!("right must open a shut value"),
         }
         let open = lines(&["steps"]);
-        match keystroke_move("right", &open, Some(&steps)) {
+        match keystroke_move("right", LayoutDirection::LeftToRight, &open, Some(&steps)) {
             Some(Move::Select(path)) => assert_eq!(path.as_ref(), "steps/0"),
             _ => panic!("right must descend into an open value"),
+        }
+    }
+
+    #[test]
+    fn left_opens_a_shut_value_in_right_to_left_layout() {
+        let shut = lines(&[]);
+        let steps = SharedString::from("steps");
+        match keystroke_move("left", LayoutDirection::RightToLeft, &shut, Some(&steps)) {
+            Some(Move::Toggle(path, next)) => {
+                assert_eq!(path.as_ref(), "steps");
+                assert!(next);
+            }
+            _ => panic!("left must open a shut value in RTL"),
         }
     }
 
@@ -930,8 +970,8 @@ mod tests {
     fn a_move_stops_at_the_ends() {
         let shut = lines(&[]);
         let last = SharedString::from("steps");
-        assert!(keystroke_move("down", &shut, Some(&last)).is_none());
+        assert!(keystroke_move("down", LayoutDirection::LeftToRight, &shut, Some(&last)).is_none());
         let first = SharedString::from("name");
-        assert!(keystroke_move("up", &shut, Some(&first)).is_none());
+        assert!(keystroke_move("up", LayoutDirection::LeftToRight, &shut, Some(&first)).is_none());
     }
 }

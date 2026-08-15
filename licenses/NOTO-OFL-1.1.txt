@@ -1,8 +1,10 @@
 Copyright 2022 The Noto Project Authors (https://github.com/notofonts/symbols)
+Copyright 2022 The Noto Project Authors (https://github.com/notofonts/arabic)
+Copyright 2022 The Noto Project Authors (https://github.com/notofonts/hebrew)
 
-No Reserved Font Name is declared, so a subset may keep or change the name.
-The face bundled here is renamed regardless, so that it cannot shadow a full
-Noto family installed on the host.
+No Reserved Font Name is declared. The Symbols subset is renamed so that it
+cannot shadow a full Noto family installed on the host; the unmodified Arabic
+and Hebrew fallback families retain their upstream names.
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

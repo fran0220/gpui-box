@@ -132,7 +132,10 @@ Text is shaped by cosmic-text from the bundled fonts only. Loading the
 machine's own fonts would shape text differently from one machine to the next,
 which is also why `crates/gpui-kit-assets` bundles `KeySymbols.ttf`: without
 it the macOS `⌘ ⌃ ⌥` glyphs came from whatever font the host happened to have,
-and the gate rendered them as missing-glyph boxes.
+and the gate rendered them as missing-glyph boxes. Noto Sans Arabic and Noto
+Sans Hebrew are bundled and named in every Kit type style for the same reason;
+the `reading-direction` scene exercises mixed RTL scripts, Latin, punctuation,
+paths, and numbers without consulting machine fonts.
 
 Gradient noise is deterministic for the same reason. Metal, Direct3D, and WGPU
 derive their triangular dither from the integer identity of the screen pixel.

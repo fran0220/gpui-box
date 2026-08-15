@@ -2573,6 +2573,27 @@ fn reading_direction(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .on_select(|_, _, _| {}),
         )
         .child(
+            Card::new()
+                .id("scene.rtl.mixed")
+                .child(
+                    crate::foundation::text(
+                        &theme,
+                        TypeScale::Body,
+                        "الإصدار v2.4 — build 17 — גרסה יציבה",
+                    )
+                    .text_start(direction),
+                )
+                .child(
+                    crate::foundation::text(
+                        &theme,
+                        TypeScale::Caption,
+                        "المسار /workspace/run-4821، 64% مكتمل",
+                    )
+                    .text_start(direction)
+                    .text_tone(&theme, TextTone::Muted),
+                ),
+        )
+        .child(
             div()
                 .row_reading(direction)
                 .gap(px(theme.space(Space::Md)))
@@ -2616,6 +2637,18 @@ fn reading_direction(_window: &mut Window, cx: &mut App) -> AnyElement {
                             ),
                     ),
                 ),
+        )
+        .child(
+            JsonView::new(
+                "scene.rtl.json",
+                JsonValue::object([
+                    ("الحالة", JsonValue::string("جاهز build-17")),
+                    ("גרסה", JsonValue::string("v2.4 مستقرة")),
+                ]),
+            )
+            .root_label("تفاصيل التشغيل")
+            .selected("الحالة")
+            .on_select(|_, _, _| {}),
         )
         .child(
             div()

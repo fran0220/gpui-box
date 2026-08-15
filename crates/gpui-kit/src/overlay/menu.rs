@@ -23,7 +23,7 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Space, Theme, TypeScal
 
 use crate::controls::button::{Button, ButtonJoin, ButtonVariant};
 use crate::display::icon::flips;
-use crate::foundation::direction::ActiveDirection;
+use crate::foundation::direction::{ActiveDirection, LayoutDirection};
 use crate::foundation::{Ident, Pressable, Sizable, StyledExt, text};
 use crate::motion;
 use crate::overlay::focus::FocusTrap;
@@ -755,7 +755,7 @@ impl Menu {
         if !self.open {
             return;
         }
-        let handled = handle_key(&mut self.state, &self.items, event);
+        let handled = handle_key(&mut self.state, &self.items, event, cx.layout_direction());
         match handled {
             Handled::Moved => {
                 cx.notify();
@@ -783,13 +783,41 @@ enum Handled {
     None,
 }
 
+/// Resolves a physical sideways key into logical submenu motion. `true`
+/// enters a child and `false` returns to its parent.
+fn submenu_intent(key: MenuKey, direction: LayoutDirection) -> Option<bool> {
+    match (key, direction) {
+        (MenuKey::Right, LayoutDirection::LeftToRight)
+        | (MenuKey::Left, LayoutDirection::RightToLeft) => Some(true),
+        (MenuKey::Left, LayoutDirection::LeftToRight)
+        | (MenuKey::Right, LayoutDirection::RightToLeft) => Some(false),
+        _ => None,
+    }
+}
+
 /// Applies one keystroke to the cursor, shared by both menu views.
-fn handle_key(state: &mut MenuState, items: &[MenuItem], event: &KeyDownEvent) -> Handled {
+fn handle_key(
+    state: &mut MenuState,
+    items: &[MenuItem],
+    event: &KeyDownEvent,
+    direction: LayoutDirection,
+) -> Handled {
     let key = popover::classify_key(
         event.keystroke.key.as_str(),
         event.keystroke.modifiers.platform,
         event.keystroke.modifiers.control,
     );
+    // A sideways key that entered or left a submenu is this menu's; one that
+    // found no submenu to move through did nothing, which lets a menubar take
+    // the same key and step to its next top-level menu instead.
+    if let Some(enter) = submenu_intent(key, direction) {
+        let moved = if enter {
+            state.enter(items)
+        } else {
+            state.leave()
+        };
+        return if moved { Handled::Moved } else { Handled::None };
+    }
     match key {
         MenuKey::Down => {
             state.step(items, 1);
@@ -798,24 +826,6 @@ fn handle_key(state: &mut MenuState, items: &[MenuItem], event: &KeyDownEvent) -
         MenuKey::Up => {
             state.step(items, -1);
             Handled::Moved
-        }
-        // A sideways key that entered or left a submenu is this menu's; one
-        // that found no submenu to move through did nothing, and saying so is
-        // what lets a container the menu sits in — a menubar — take the same
-        // key and step to the next menu instead.
-        MenuKey::Right => {
-            if state.enter(items) {
-                Handled::Moved
-            } else {
-                Handled::None
-            }
-        }
-        MenuKey::Left => {
-            if state.leave() {
-                Handled::Moved
-            } else {
-                Handled::None
-            }
         }
         MenuKey::Enter => match state.active {
             Some(active) => {
@@ -1096,7 +1106,7 @@ impl ContextMenu {
         if !self.open {
             return;
         }
-        match handle_key(&mut self.state, &self.items, event) {
+        match handle_key(&mut self.state, &self.items, event, cx.layout_direction()) {
             Handled::Moved => {
                 cx.notify();
                 cx.stop_propagation();
@@ -1254,6 +1264,26 @@ mod tests {
         assert_eq!(state.path, Vec::<usize>::new());
         assert_eq!(state.active, Some(5), "the cursor returns to the submenu");
         assert!(!state.leave(), "there is nothing left to fold away");
+    }
+
+    #[test]
+    fn submenu_keys_follow_the_reading_direction() {
+        assert_eq!(
+            submenu_intent(MenuKey::Right, LayoutDirection::LeftToRight),
+            Some(true)
+        );
+        assert_eq!(
+            submenu_intent(MenuKey::Left, LayoutDirection::LeftToRight),
+            Some(false)
+        );
+        assert_eq!(
+            submenu_intent(MenuKey::Left, LayoutDirection::RightToLeft),
+            Some(true)
+        );
+        assert_eq!(
+            submenu_intent(MenuKey::Right, LayoutDirection::RightToLeft),
+            Some(false)
+        );
     }
 
     #[test]

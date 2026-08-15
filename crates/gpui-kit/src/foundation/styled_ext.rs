@@ -39,6 +39,7 @@ pub trait StyledExt: Styled + Sized {
         self.text_size(px(style.size))
             .line_height(px(style.line_height))
             .font_weight(FontWeight(style.weight))
+            .font_fallbacks(gpui_kit_assets::text_fallbacks())
     }
 
     fn radius(self, theme: &Theme, radius: Radius) -> Self {

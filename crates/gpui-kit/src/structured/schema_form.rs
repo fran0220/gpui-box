@@ -59,6 +59,7 @@ use crate::datetime::{
 };
 use crate::display::badge::Tone;
 use crate::display::status::Callout;
+use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -1609,12 +1610,13 @@ impl Render for SchemaForm {
 impl SchemaForm {
     fn field_element(&self, field: &Field, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
+        let direction = cx.layout_direction();
         let ident = self.ident.child(field.path.as_ref());
         let indent = px(field.level.saturating_sub(1) as f32 * theme.space(Space::Lg));
 
         if let Control::Group = field.control {
             return div()
-                .ml(indent)
+                .ms(direction, indent)
                 .column()
                 .gap_token(&theme, Space::Xs)
                 .child(text(&theme, TypeScale::Subtitle, field.label.clone()))
@@ -1701,7 +1703,7 @@ impl SchemaForm {
                             .child("file")
                             .child(id.to_string())
                             .element_id())
-                        .row()
+                        .row_reading(direction)
                         .items_center()
                         .justify_between()
                         .gap_token(&theme, Space::Sm)
@@ -1814,13 +1816,13 @@ impl SchemaForm {
                         .radius(&theme, gpui_kit_theme::Radius::Card)
                         .child(
                             div()
-                                .row()
+                                .row_reading(direction)
                                 .items_center()
                                 .justify_between()
                                 .child(text(&theme, TypeScale::Label, label))
                                 .child(
                                     div()
-                                        .row()
+                                        .row_reading(direction)
                                         .items_center()
                                         .child(move_up)
                                         .child(move_down)
@@ -1920,7 +1922,7 @@ impl SchemaForm {
         };
 
         div()
-            .ml(indent)
+            .ms(direction, indent)
             .child(form_field.child(body))
             .into_any_element()
     }

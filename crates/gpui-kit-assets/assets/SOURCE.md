@@ -33,6 +33,20 @@ two results with `fontTools.merge`, then rewrite the name records to the family
 a host that has one; the copied metrics keep a fallback glyph from changing the
 line box of the Geist run it appears in.
 
+`NotoSansArabic.ttf` and `NotoSansHebrew.ttf` are the unmodified variable
+families from `google/fonts` revision
+`352f6b7d9d6cc4fa9e242b931291d31b21a6dc84`:
+
+| File | Upstream path | Version | SHA-256 |
+|---|---|---:|---|
+| `NotoSansArabic.ttf` | `ofl/notosansarabic/NotoSansArabic[wdth,wght].ttf` | 2.012 | `63111b5b2e074dd48cc67692e0a2726d86ee94c1c37fe8598257b7b4e87e869e` |
+| `NotoSansHebrew.ttf` | `ofl/notosanshebrew/NotoSansHebrew[wdth,wght].ttf` | 3.001 | `7ef36a2c3593758cdb622e1bdef4f84523e92fbc3ccc667438dd80ff54c2de88` |
+
+Both are SIL Open Font License 1.1 fonts with no Reserved Font Name. They are
+registered with Geist and carried as an explicit ordered fallback chain, so
+Arabic and Hebrew output is reproducible in headless, native, and browser
+renderers instead of depending on machine fonts.
+
 ## Icons
 
 Most icons are Solar Icons, Linear weight, by 480 Design, licensed under

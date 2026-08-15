@@ -449,6 +449,7 @@ impl RenderOnce for DiffView {
             .id(self.ident.element_id())
             .column()
             .w_full()
+            .font_fallbacks(gpui_kit_assets::text_fallbacks())
             .p_token(&theme, Space::Sm)
             .radius(&theme, Radius::Card)
             .frame(&theme, Surface::Raised, Elevation::Raised)

@@ -20,6 +20,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TextTone, Theme, TypeScale};
 
 use crate::display::badge::Badge;
+use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{
     Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text as foundation_text,
 };
@@ -228,6 +229,7 @@ impl Sidebar {
         cx: &mut App,
     ) -> AnyElement {
         let metrics = theme.control.get(self.size);
+        let direction = cx.layout_direction();
         let ident = self.ident.child(item.id.as_ref());
         let active = self.active.as_ref() == Some(&item.id);
         let disabled = self.disabled || item.disabled;
@@ -248,14 +250,13 @@ impl Sidebar {
 
         let mut row = div()
             .id(ident.element_id())
-            .flex()
-            .flex_row()
+            .row_reading(direction)
             .items_center()
             .h(px(metrics.height))
             .w_full()
             .gap(px(theme.space(Space::Sm)))
-            .pl(px(theme.space(Space::Sm) + indent))
-            .pr(px(theme.space(Space::Sm)))
+            .ps(direction, px(theme.space(Space::Sm) + indent))
+            .pe(direction, px(theme.space(Space::Sm)))
             .radius(theme, Radius::Control)
             .when(self.collapsed, |element| element.justify_center())
             .when(active, |element| element.bg(theme.colors.selected))

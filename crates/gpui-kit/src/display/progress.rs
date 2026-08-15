@@ -142,6 +142,7 @@ impl RenderOnce for ProgressBar {
             .flex_col()
             .gap(px(theme.space(Space::Xs)))
             .w_full()
+            .font_fallbacks(gpui_kit_assets::text_fallbacks())
             .when_some(self.label.clone(), |element, label| {
                 element.child(
                     div()

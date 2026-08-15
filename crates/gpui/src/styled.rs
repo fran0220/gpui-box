@@ -1,8 +1,8 @@
 use crate::{
     self as gpui, AbsoluteLength, AlignContent, AlignItems, AlignSelf, BorderStyle, CursorStyle,
-    DefiniteLength, Display, Fill, FlexDirection, FlexWrap, Font, FontFeatures, FontStyle,
-    FontWeight, GridPlacement, GridTemplate, GridTemplateMinSize, Hsla, JustifyContent, Length,
-    SharedString, StrikethroughStyle, StyleRefinement, TextAlign, TextOverflow,
+    DefiniteLength, Display, Fill, FlexDirection, FlexWrap, Font, FontFallbacks, FontFeatures,
+    FontStyle, FontWeight, GridPlacement, GridTemplate, GridTemplateMinSize, Hsla, JustifyContent,
+    Length, SharedString, StrikethroughStyle, StyleRefinement, TextAlign, TextOverflow,
     TextStyleRefinement, UnderlineStyle, WhiteSpace, px, relative, rems,
 };
 pub use gpui_macros::{
@@ -716,6 +716,12 @@ pub trait Styled: Sized {
         self
     }
 
+    /// Sets the ordered fallback font families of this element and its children.
+    fn font_fallbacks(mut self, fallbacks: FontFallbacks) -> Self {
+        self.text_style().font_fallbacks = Some(fallbacks);
+        self
+    }
+
     /// Sets the font of this element and its children.
     fn font(mut self, font: Font) -> Self {
         let Font {
@@ -900,5 +906,30 @@ pub trait Styled: Sized {
     fn debug_below(mut self) -> Self {
         self.style().debug_below = Some(true);
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Default)]
+    struct Subject(StyleRefinement);
+
+    impl Styled for Subject {
+        fn style(&mut self) -> &mut StyleRefinement {
+            &mut self.0
+        }
+    }
+
+    #[test]
+    fn font_fallbacks_refine_only_the_fallback_chain() {
+        let fallbacks = FontFallbacks::from_fonts(vec!["Noto Sans Arabic".to_owned()]);
+        let subject = Subject::default()
+            .font_family("Geist")
+            .font_fallbacks(fallbacks.clone());
+
+        assert_eq!(subject.0.text.font_family.as_deref(), Some("Geist"));
+        assert_eq!(subject.0.text.font_fallbacks, Some(fallbacks));
     }
 }

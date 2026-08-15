@@ -1156,6 +1156,7 @@ impl Render for TextArea {
             })
             .when(focused, |element| element.shadow(theme.focus_ring()))
             .text_size(px(metrics.font_size))
+            .font_fallbacks(gpui_kit_assets::text_fallbacks())
             .text_color(if self.disabled {
                 theme.colors.text_disabled
             } else {

@@ -286,10 +286,11 @@ impl RenderOnce for Accordion {
                     // Indented to the title rather than to the
                     // chevron, so the body reads as belonging to the
                     // section it hangs under.
-                    .pl(px(metrics.padding_x
-                        + metrics.icon_size
-                        + theme.space(Space::Sm)))
-                    .pr(px(metrics.padding_x))
+                    .ps(
+                        direction,
+                        px(metrics.padding_x + metrics.icon_size + theme.space(Space::Sm)),
+                    )
+                    .pe(direction, px(metrics.padding_x))
                     .pb(px(theme.space(Space::Sm)))
                     .child(body);
                 let record = {

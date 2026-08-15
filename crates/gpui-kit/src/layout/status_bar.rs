@@ -29,6 +29,7 @@ use crate::controls::button::Button;
 use crate::display::badge::Tone;
 use crate::display::progress_circle::ProgressCircle;
 use crate::display::status::StatusDot;
+use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
 use crate::state::{AsyncStatus, AsyncValue};
 use crate::strings::{ActiveStrings, StringKey};
@@ -304,6 +305,7 @@ impl StatusBar {
     }
 
     fn item_element(&self, item: StatusItem, theme: &Theme, cx: &mut App) -> AnyElement {
+        let direction = cx.layout_direction();
         let ident = self.ident.child(item.id.as_ref());
         let disabled = self.disabled || item.disabled;
 
@@ -329,7 +331,7 @@ impl StatusBar {
         };
 
         let mut row = div()
-            .row()
+            .row_reading(direction)
             .flex_none()
             .h(px(theme.control.get(ControlSize::Xs).height))
             .px_token(theme, Space::Xs)
@@ -413,11 +415,12 @@ impl Disableable for StatusBar {
 impl RenderOnce for StatusBar {
     fn render(mut self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
+        let direction = cx.layout_direction();
         let count: usize = self.groups.iter().map(Vec::len).sum();
         let groups = std::mem::take(&mut self.groups);
         let mut strip = div()
             .id(self.ident.element_id())
-            .row()
+            .row_reading(direction)
             .w_full()
             .flex_none()
             .h(px(HEIGHT))
@@ -433,12 +436,12 @@ impl RenderOnce for StatusBar {
                 .collect();
             strip = strip.child(
                 div()
-                    .row()
+                    .row_reading(direction)
                     .min_w(px(0.0))
                     .overflow_hidden()
                     .gap_token(&theme, Space::Xs)
                     // The centre group takes the slack so the end group stays
-                    // pinned to the right edge whatever the middle holds.
+                    // pinned to the logical end whatever the middle holds.
                     .when(position == 1, |group| group.flex_1().justify_center())
                     .when(position == 2, |group| group.justify_end())
                     .children(elements),

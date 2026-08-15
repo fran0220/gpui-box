@@ -20,6 +20,7 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TextTone, TypeScale};
 
 use crate::controls::button::{Button, ButtonVariant, IconButton};
 use crate::controls::select::Select;
+use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{
     Disableable, Ident, Selectable, Sizable, StyledExt, text as foundation_text,
 };
@@ -200,6 +201,7 @@ pub(crate) fn slots(page: usize, total: usize, siblings: usize) -> Vec<PageSlot>
 impl RenderOnce for Pagination {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
+        let direction = cx.layout_direction();
         let actionable = !self.disabled && self.on_select.is_some();
         let handler = self.on_select.clone().filter(|_| actionable);
         let ident = self.ident.clone();
@@ -252,8 +254,7 @@ impl RenderOnce for Pagination {
 
         let numbers = self.total.count().map(|total| {
             let mut range = div()
-                .flex()
-                .flex_row()
+                .row_reading(direction)
                 .items_center()
                 .gap(px(theme.space(Space::Xs)));
             for slot in slots(self.page, total, self.siblings) {
@@ -318,9 +319,10 @@ impl RenderOnce for Pagination {
                     cx.numbers().count(total).as_ref(),
                 ],
             ),
-            PageTotal::Unknown { .. } => {
-                strings.format(StringKey::PaginationPage, &[cx.numbers().count(self.page).as_ref()])
-            }
+            PageTotal::Unknown { .. } => strings.format(
+                StringKey::PaginationPage,
+                &[cx.numbers().count(self.page).as_ref()],
+            ),
         };
         let status = foundation_text(&theme, TypeScale::Caption, status_text.clone())
             .text_tone(&theme, TextTone::Muted)
@@ -338,8 +340,7 @@ impl RenderOnce for Pagination {
 
         div()
             .id(ident.element_id())
-            .flex()
-            .flex_row()
+            .row_reading(direction)
             .items_center()
             .flex_wrap()
             .gap(px(theme.space(Space::Sm)))

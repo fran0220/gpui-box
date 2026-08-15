@@ -25,6 +25,7 @@ use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Space, Surface, Theme};
 
+use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{Ident, Sizable, StyledExt};
 use crate::overlay::{Menu, MenuItem};
 use crate::strings::{ActiveStrings, StringKey};
@@ -225,6 +226,7 @@ impl Sizable for Toolbar {
 impl RenderOnce for Toolbar {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
+        let direction = cx.layout_direction();
         let total = self.item_count();
         let cut = self.cut();
         let ident = self.ident.clone();
@@ -259,8 +261,7 @@ impl RenderOnce for Toolbar {
                     }
                     drawn.push(
                         div()
-                            .flex()
-                            .flex_row()
+                            .row_reading(direction)
                             .items_center()
                             .gap(px(theme.space(Space::Xs)))
                             .children(inline)
@@ -288,8 +289,7 @@ impl RenderOnce for Toolbar {
 
         div()
             .id(ident.element_id())
-            .flex()
-            .flex_row()
+            .row_reading(direction)
             .items_center()
             .w_full()
             .gap(px(theme.space(Space::Sm)))

@@ -123,6 +123,7 @@ impl RenderOnce for EmptyState {
             .flex_col()
             .items_center()
             .justify_center()
+            .font_fallbacks(gpui_kit_assets::text_fallbacks())
             .p(px(theme.space(Space::Lg)))
             .w_full()
             .child(motion::content_in(
@@ -199,6 +200,7 @@ impl RenderOnce for Divider {
             .flex_row()
             .items_center()
             .w_full()
+            .font_fallbacks(gpui_kit_assets::text_fallbacks())
             .gap(px(theme.space(Space::Sm)))
             .child(rule())
             .when_some(self.label.clone(), |element, label| {

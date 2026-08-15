@@ -1170,6 +1170,7 @@ impl Render for TextInput {
                     .disabled(self.disabled),
             )
         };
+        let shell = shell.font_fallbacks(gpui_kit_assets::text_fallbacks());
 
         let content = self.content.clone();
         let (anchor, focus) = if self.selection_reversed {

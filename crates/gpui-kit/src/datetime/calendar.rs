@@ -24,7 +24,7 @@ use crate::datetime::adapter::{Day, MonthCell, MonthGrid, MonthKey, SharedDateAd
 use crate::datetime::range::DayRange;
 use crate::display::badge::Tone;
 use crate::display::empty::{EmptyKind, EmptyState};
-use crate::foundation::direction::ActiveDirection;
+use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
 use crate::foundation::{
     Disableable, FocusRing, Ident, Sizable, StyledExt, text as foundation_text,
 };
@@ -408,6 +408,7 @@ impl Calendar {
 
     fn header(&self, month: Option<MonthKey>, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
+        let direction = cx.layout_direction();
         let label = month
             .map(|month| self.adapter.month_label(month))
             .unwrap_or_else(|| cx.strings().text(StringKey::CalendarNoMonth));
@@ -416,7 +417,7 @@ impl Calendar {
         let backward = calendar.clone();
 
         div()
-            .row()
+            .row_reading(direction)
             .w_full()
             .gap_token(&theme, Space::Sm)
             .child(
@@ -459,9 +460,9 @@ impl Calendar {
             .into_any_element()
     }
 
-    fn weekday_header(&self, theme: &Theme) -> AnyElement {
+    fn weekday_header(&self, theme: &Theme, direction: LayoutDirection) -> AnyElement {
         div()
-            .row()
+            .row_reading(direction)
             .children(self.adapter.weekday_labels().into_iter().map(|label| {
                 foundation_text(theme, TypeScale::Caption, label)
                     .w(px(CELL_SIZE))
@@ -601,13 +602,14 @@ impl Calendar {
 
     fn body(&self, grid: &MonthGrid, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
+        let direction = cx.layout_direction();
         let grid_ident = self.ident.child("grid");
         let weeks: Vec<AnyElement> = grid
             .weeks
             .iter()
             .map(|week| {
                 div()
-                    .row()
+                    .row_reading(direction)
                     .children(
                         week.iter()
                             .map(|cell| self.cell(*cell, cx))
@@ -619,7 +621,7 @@ impl Calendar {
 
         div()
             .column()
-            .child(self.weekday_header(&theme))
+            .child(self.weekday_header(&theme, direction))
             .child(div().column().children(weeks))
             .semantic_in(
                 cx,
@@ -646,6 +648,7 @@ impl Focusable for Calendar {
 impl Render for Calendar {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
+        let direction = cx.layout_direction();
         let month = self.shown_month();
         let today = self.adapter.today();
         let header = self.header(month, cx);
@@ -660,7 +663,7 @@ impl Render for Calendar {
                     month_in(
                         self.ident.child(animation_id).element_id(),
                         &theme,
-                        self.travel,
+                        self.travel * if direction.is_rtl() { -1 } else { 1 },
                         body,
                     )
                     .into_any_element()

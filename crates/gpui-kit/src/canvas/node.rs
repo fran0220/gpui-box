@@ -584,6 +584,7 @@ impl RenderOnce for GraphNode {
             .w(px(metrics.width))
             .when_some(metrics.height, |element, height| element.h(px(height)))
             .column()
+            .font_fallbacks(gpui_kit_assets::text_fallbacks())
             .gap(px(metrics.gap))
             .p(px(metrics.padding))
             .rounded(px(metrics.radius))

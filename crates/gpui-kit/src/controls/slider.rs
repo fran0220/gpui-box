@@ -9,6 +9,7 @@ use gpui::{
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TypeScale};
 
+use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
 use crate::foundation::{
     Disableable, FocusRing, Ident, Sizable, StyledExt, text as foundation_text,
 };
@@ -141,6 +142,7 @@ impl Sizable for Slider {
 impl RenderOnce for Slider {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
+        let direction = cx.layout_direction();
         let metrics = theme.control.get(self.size);
         let actionable = !self.disabled && self.on_change.is_some();
         let dragging = keyed::slot::<PointerDriven>(&self.ident.semantic_id(), cx);
@@ -153,6 +155,7 @@ impl RenderOnce for Slider {
             window,
             cx,
         );
+        let physical_fraction = directed_fraction(fraction, direction);
         let track_height = px(4.0);
         // The handle is the control's only tappable part, so it is sized from
         // the same scale step the other controls take their glyphs from.
@@ -185,7 +188,7 @@ impl RenderOnce for Slider {
                 div()
                     .absolute()
                     .left_0()
-                    .w(gpui::relative(fraction))
+                    .w(gpui::relative(physical_fraction))
                     .h(track_height)
                     .rounded_full()
                     .bg(theme.colors.accent),
@@ -196,7 +199,7 @@ impl RenderOnce for Slider {
                     // The knob is centred on the value, so its own width is
                     // taken out of the offset rather than pushing the handle
                     // past the end of the track.
-                    .left(gpui::relative(fraction))
+                    .left(gpui::relative(physical_fraction))
                     .ml(-(knob / 2.0))
                     .size(knob)
                     .rounded_full()
@@ -217,8 +220,10 @@ impl RenderOnce for Slider {
                     return;
                 }
                 down_dragging.borrow_mut().0 = true;
-                let fraction =
-                    (f32::from(event.position.x - bounds.left()) / width).clamp(0.0, 1.0);
+                let fraction = directed_fraction(
+                    (f32::from(event.position.x - bounds.left()) / width).clamp(0.0, 1.0),
+                    direction,
+                );
                 down(
                     quantize(min + fraction * (max - min), min, max, step),
                     window,
@@ -242,8 +247,10 @@ impl RenderOnce for Slider {
                     return;
                 }
                 move_dragging.borrow_mut().0 = true;
-                let fraction =
-                    (f32::from(event.position.x - bounds.left()) / width).clamp(0.0, 1.0);
+                let fraction = directed_fraction(
+                    (f32::from(event.position.x - bounds.left()) / width).clamp(0.0, 1.0),
+                    direction,
+                );
                 drag(
                     quantize(min + fraction * (max - min), min, max, step),
                     window,
@@ -279,8 +286,7 @@ impl RenderOnce for Slider {
             .when_some(self.label.clone(), |element, label| {
                 element.child(
                     div()
-                        .flex()
-                        .flex_row()
+                        .row_reading(direction)
                         .justify_between()
                         .child(
                             foundation_text(&theme, TypeScale::Label, label)
@@ -313,12 +319,17 @@ impl RenderOnce for Slider {
         if actionable && let Some(handler) = self.on_change.clone() {
             let (min, max) = (self.min, self.max);
             frame.interactivity().on_key_down(move |event, window, cx| {
-                let next = match event.keystroke.key.as_str() {
-                    "left" | "down" => value - keyboard_step,
-                    "right" | "up" => value + keyboard_step,
-                    "home" => min,
-                    "end" => max,
-                    _ => return,
+                let key = event.keystroke.key.as_str();
+                let next = match direction.arrow_step(key) {
+                    Some(1) => value + keyboard_step,
+                    Some(_) => value - keyboard_step,
+                    None => match key {
+                        "down" => value - keyboard_step,
+                        "up" => value + keyboard_step,
+                        "home" => min,
+                        "end" => max,
+                        _ => return,
+                    },
                 };
                 handler(next.clamp(min, max), window, cx);
                 cx.stop_propagation();
@@ -326,6 +337,16 @@ impl RenderOnce for Slider {
         }
 
         frame
+    }
+}
+
+/// Converts between a logical fraction and a physical left-origin fraction.
+/// The operation is its own inverse, so pointer input and paint use one rule.
+fn directed_fraction(fraction: f32, direction: LayoutDirection) -> f32 {
+    if direction.is_rtl() {
+        1.0 - fraction
+    } else {
+        fraction
     }
 }
 
@@ -339,5 +360,17 @@ fn quantize(value: f32, min: f32, max: f32, step: Option<f32>) -> f32 {
             (min + steps * step).clamp(min, max)
         }
         None => value,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn right_to_left_values_start_at_the_right_edge() {
+        assert_eq!(directed_fraction(0.0, LayoutDirection::RightToLeft), 1.0);
+        assert_eq!(directed_fraction(1.0, LayoutDirection::RightToLeft), 0.0);
+        assert_eq!(directed_fraction(0.25, LayoutDirection::LeftToRight), 0.25);
     }
 }

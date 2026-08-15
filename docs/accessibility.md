@@ -107,7 +107,10 @@ boundaries as editing, including combining sequences and emoji ZWJ sequences.
 TextArea run boundaries come from its shaped visual rows, hard line breaks
 remain in the preceding row, and line links never cross a shaped wrap or hard
 break. Resolved Unicode bidi levels split mixed-direction text into truthful
-logical-order runs; no whole-chunk first-strong direction is inferred. A final
+logical-order runs; no whole-chunk first-strong direction is inferred.
+Kit type styles bundle and explicitly select Arabic and Hebrew fallback faces,
+so those logical runs remain visible even in deterministic renderers with no
+system font database. A final
 line break publishes a distinct empty-line position. IME offsets are converted
 between UTF-8 and UTF-16, including surrogate pairs. Accessibility selection
 requests carry revision-bearing run ids and the exact stored source revision,

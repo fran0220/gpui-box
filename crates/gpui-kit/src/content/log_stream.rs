@@ -381,6 +381,7 @@ impl RenderOnce for LogStream {
             .id(self.ident.element_id())
             .column()
             .w_full()
+            .font_fallbacks(gpui_kit_assets::text_fallbacks())
             .gap_token(&theme, Space::Xs)
             .p_token(&theme, Space::Sm)
             .radius(&theme, Radius::Card)
