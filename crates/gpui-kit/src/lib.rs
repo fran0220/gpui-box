@@ -167,7 +167,9 @@ pub mod prelude {
     pub use crate::display::avatar::Avatar;
     pub use crate::display::badge::{Badge, Tone};
     pub use crate::display::card::{Card, ListRow};
-    pub use crate::display::chart::{BarChart, ChartAxes, ChartSeries, ChartState, LineChart};
+    pub use crate::display::chart::{
+        BarChart, ChartAxes, ChartPoint, ChartSelection, ChartSeries, ChartState, LineChart,
+    };
     pub use crate::display::description_list::{
         DescriptionItem, DescriptionList, DescriptionValue,
     };

@@ -1,34 +1,80 @@
 //! Cartesian readings over host-owned series.
 //!
-//! A chart does not invent a domain, a tick, a locale, or a colour. The host
-//! supplies those the way a sparkline already supplies normalized points.
-//! What this module adds is the frame an application dashboard actually
-//! needs: axes that can carry the host's labels, more than one series, and
-//! a published current point a test can ask for.
+//! A chart does not invent a domain, a tick, a locale, an aggregation, or a
+//! colour. The host supplies normalized coordinates and exact visible text.
+//! This module owns the reusable presentation work downstream applications
+//! should not have to redraw: axes, legends, keyed data motion, area fills,
+//! crosshair interaction, and truthful loading and refresh states.
 //!
-//! Motion belongs to [`crate::motion::Transition`] keyed by series id, not to
-//! a second animation system. This first surface paints the settled geometry
-//! so a downstream host can stop drawing its own axes.
+//! Geometry follows caller-owned business ids. A point that moves keeps its
+//! [`Transition`] while a point that enters or leaves runs a [`Presence`]
+//! lifecycle. Semantic values always come from the newest caller input; only
+//! pixels interpolate. Reduced motion settles both systems immediately.
+//!
+//! [`Transition`]: crate::motion::Transition
+//! [`Presence`]: crate::motion::Presence
+
+use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 
 use gpui::{
-    App, Hsla, IntoElement, ParentElement, PathBuilder, RenderOnce, SharedString, Styled, Window,
-    canvas, div, point, px,
+    AnyElement, App, Bounds, CursorStyle, Hsla, InteractiveElement, IntoElement, ParentElement,
+    PathBuilder, Pixels, Point, RenderOnce, SharedString, Styled, Window, canvas, div,
+    linear_color_stop, linear_gradient_stops, point, px, relative,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Space, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
 
+use crate::display::badge::Tone;
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::loading::PulseLoader;
 use crate::display::sparkline::SparklinePoint;
-use crate::foundation::{Ident, StyledExt};
-use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
+use crate::display::status::StatusDot;
+use crate::foundation::{FocusRing, Ident, StyledExt};
+use crate::layout::measure;
+use crate::motion::{self, Presence, Stagger, Transition, keyed};
+use crate::strings::{ActiveStrings, StringKey};
+
+/// One host-owned point in a chart series.
+///
+/// `id` is business identity and remains stable when the point moves or its
+/// text changes. `label` and `value` are exact host-formatted strings: the
+/// crosshair swaps them atomically and never interpolates between strings.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChartPoint {
+    pub id: SharedString,
+    pub position: SparklinePoint,
+    pub label: SharedString,
+    pub value: SharedString,
+}
+
+impl ChartPoint {
+    pub fn new(
+        id: impl Into<SharedString>,
+        x: f32,
+        y: f32,
+        label: impl Into<SharedString>,
+        value: impl Into<SharedString>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            position: SparklinePoint::new(x, y),
+            label: label.into(),
+            value: value.into(),
+        }
+    }
+
+    pub fn is_bounded(&self) -> bool {
+        self.position.is_bounded()
+    }
+}
 
 /// One named series. Identity is the caller's, never the draw order.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChartSeries {
     pub id: SharedString,
     pub label: SharedString,
-    pub points: Vec<SparklinePoint>,
+    pub points: Vec<ChartPoint>,
     pub color: Option<Hsla>,
 }
 
@@ -42,7 +88,7 @@ impl ChartSeries {
         }
     }
 
-    pub fn points(mut self, points: impl IntoIterator<Item = SparklinePoint>) -> Self {
+    pub fn points(mut self, points: impl IntoIterator<Item = ChartPoint>) -> Self {
         self.points = points.into_iter().collect();
         self
     }
@@ -98,6 +144,12 @@ pub enum ChartState {
     Empty,
     Unavailable(SharedString),
     Error(SharedString),
+    /// A refresh failed, so the last verified series remain visible with the
+    /// host's exact explanation instead of being replaced by an empty chart.
+    Stale {
+        series: Vec<ChartSeries>,
+        reason: SharedString,
+    },
 }
 
 impl ChartState {
@@ -108,9 +160,36 @@ impl ChartState {
             Self::Empty => "empty",
             Self::Unavailable(_) => "unavailable",
             Self::Error(_) => "error",
+            Self::Stale { .. } => "stale",
+        }
+    }
+
+    fn visible_series(&self) -> Option<(&[ChartSeries], Option<&SharedString>)> {
+        match self {
+            Self::Ready(series) => Some((series, None)),
+            Self::Stale { series, reason } => Some((series, Some(reason))),
+            _ => None,
         }
     }
 }
+
+/// The business identity of the point under the crosshair.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ChartSelection {
+    pub series_id: SharedString,
+    pub point_id: SharedString,
+}
+
+impl ChartSelection {
+    pub fn new(series_id: impl Into<SharedString>, point_id: impl Into<SharedString>) -> Self {
+        Self {
+            series_id: series_id.into(),
+            point_id: point_id.into(),
+        }
+    }
+}
+
+type CurrentHandler = Rc<dyn Fn(ChartSelection, &mut Window, &mut App)>;
 
 /// A bar chart over one host-owned series of categorized values.
 #[derive(Debug, IntoElement)]
@@ -138,26 +217,54 @@ impl BarChart {
 }
 
 impl RenderOnce for BarChart {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let (body, spec): (gpui::AnyElement, NodeSpec) = match &self.state {
-            ChartState::Ready(series) => {
-                let count = series
-                    .first()
-                    .map(|series| series.points.len())
-                    .unwrap_or(0);
+        let (body, spec): (AnyElement, NodeSpec) = match self.state.visible_series() {
+            Some((series, stale)) => {
+                let active = active_points(series, &theme)
+                    .into_iter()
+                    .filter(|point| point.series_order == 0)
+                    .collect::<Vec<_>>();
+                let count = active.len();
                 (
-                    ready_bars(&self.ident, &self.label, &self.axes, series, &theme, cx),
-                    NodeSpec::new(self.ident.semantic_id(), Role::Group)
-                        .text(self.label.clone())
-                        .value(self.state.name())
-                        .range(0.0, count as f32, count as f32),
+                    ready_bars(
+                        &self.ident,
+                        &self.label,
+                        &self.axes,
+                        active,
+                        stale.cloned(),
+                        &theme,
+                        window,
+                        cx,
+                    ),
+                    chart_spec(&self.ident, &self.label, &self.state, count, stale),
                 )
             }
-            other => line_like_state(&self.ident, &self.label, other, cx),
+            None => line_like_state(&self.ident, &self.label, &self.state, cx),
         };
-        div().w_full().child(body).semantic_in(cx, spec)
+        div()
+            .w_full()
+            .font_fallbacks(gpui_kit_assets::text_fallbacks())
+            .child(body)
+            .semantic_in(cx, spec)
     }
+}
+
+fn chart_spec(
+    ident: &Ident,
+    label: &SharedString,
+    state: &ChartState,
+    count: usize,
+    stale: Option<&SharedString>,
+) -> NodeSpec {
+    let mut spec = NodeSpec::new(ident.semantic_id(), Role::Group)
+        .text(label.clone())
+        .value(state.name())
+        .range(0.0, count as f32, count as f32);
+    if let Some(reason) = stale {
+        spec = spec.description(reason.clone());
+    }
+    spec
 }
 
 fn line_like_state(
@@ -165,55 +272,101 @@ fn line_like_state(
     label: &SharedString,
     state: &ChartState,
     cx: &App,
-) -> (gpui::AnyElement, NodeSpec) {
+) -> (AnyElement, NodeSpec) {
+    let theme = cx.theme().clone();
     match state {
         ChartState::Loading => (
-            PulseLoader::new(ident.child("loading"))
-                .label(cx.strings().text(StringKey::Loading))
-                .into_any_element(),
+            non_ready_body(
+                label,
+                PulseLoader::new(ident.child("loading"))
+                    .label(cx.strings().text(StringKey::Loading)),
+                &theme,
+            ),
             NodeSpec::new(ident.semantic_id(), Role::Status)
                 .text(label.clone())
                 .busy(true)
                 .value(state.name()),
         ),
         ChartState::Empty => (
-            EmptyState::new(
-                ident.child("empty"),
-                cx.strings().text(StringKey::ChartEmpty),
-            )
-            .kind(EmptyKind::Empty)
-            .into_any_element(),
+            non_ready_body(
+                label,
+                EmptyState::new(
+                    ident.child("empty"),
+                    cx.strings().text(StringKey::ChartEmpty),
+                )
+                .kind(EmptyKind::Empty),
+                &theme,
+            ),
             NodeSpec::new(ident.semantic_id(), Role::Status)
                 .text(label.clone())
                 .value(state.name()),
         ),
         ChartState::Unavailable(reason) => (
-            EmptyState::new(ident.child("unavailable"), reason.clone())
-                .kind(EmptyKind::Unavailable)
-                .into_any_element(),
+            non_ready_body(
+                label,
+                EmptyState::new(ident.child("unavailable"), reason.clone())
+                    .kind(EmptyKind::Unavailable),
+                &theme,
+            ),
             NodeSpec::new(ident.semantic_id(), Role::Status)
                 .text(label.clone())
+                .description(reason.clone())
                 .value(state.name()),
         ),
         ChartState::Error(reason) => (
-            EmptyState::new(ident.child("error"), reason.clone())
-                .kind(EmptyKind::Failed)
-                .into_any_element(),
+            non_ready_body(
+                label,
+                EmptyState::new(ident.child("error"), reason.clone()).kind(EmptyKind::Failed),
+                &theme,
+            ),
             NodeSpec::new(ident.semantic_id(), Role::Status)
                 .text(label.clone())
+                .description(reason.clone())
+                .invalid(true)
                 .value(state.name()),
         ),
-        ChartState::Ready(_) => unreachable!("ready is drawn by the caller"),
+        ChartState::Ready(_) | ChartState::Stale { .. } => {
+            unreachable!("visible series are drawn by the caller")
+        }
     }
 }
 
+fn non_ready_body(
+    label: &SharedString,
+    body: impl IntoElement,
+    theme: &gpui_kit_theme::Theme,
+) -> AnyElement {
+    div()
+        .column()
+        .w_full()
+        .gap_token(theme, Space::Xs)
+        .child(chart_heading(label, None, theme))
+        .child(
+            div()
+                .flex()
+                .items_center()
+                .justify_center()
+                .w_full()
+                .h(px(160.0))
+                .overflow_hidden()
+                .radius(theme, Radius::Small)
+                .surface(theme, Surface::Canvas)
+                .child(body),
+        )
+        .into_any_element()
+}
+
 /// A line chart over one or more host-owned series.
-#[derive(Debug, IntoElement)]
+#[derive(IntoElement)]
 pub struct LineChart {
     ident: Ident,
     label: SharedString,
     axes: ChartAxes,
     state: ChartState,
+    area: bool,
+    crosshair: bool,
+    current: Option<ChartSelection>,
+    on_current: Option<CurrentHandler>,
 }
 
 impl LineChart {
@@ -223,6 +376,10 @@ impl LineChart {
             label: label.into(),
             axes: ChartAxes::default(),
             state,
+            area: false,
+            crosshair: false,
+            current: None,
+            on_current: None,
         }
     }
 
@@ -230,71 +387,594 @@ impl LineChart {
         self.axes = axes;
         self
     }
-}
 
-impl RenderOnce for LineChart {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let theme = cx.theme().clone();
-        let (body, spec): (gpui::AnyElement, NodeSpec) = match &self.state {
-            ChartState::Ready(series) => {
-                let count = series.len();
-                (
-                    ready_chart(&self.ident, &self.label, &self.axes, series, &theme, cx),
-                    NodeSpec::new(self.ident.semantic_id(), Role::Group)
-                        .text(self.label.clone())
-                        .value(self.state.name())
-                        .range(0.0, count as f32, count as f32),
-                )
-            }
-            other => line_like_state(&self.ident, &self.label, other, cx),
-        };
+    /// Fills every series down to the normalized baseline with a three-stop
+    /// gradient derived from that series' caller-owned colour.
+    pub fn area(mut self) -> Self {
+        self.area = true;
+        self
+    }
 
-        div().w_full().child(body).semantic_in(cx, spec)
+    /// Enables pointer and keyboard crosshair navigation.
+    pub fn crosshair(mut self) -> Self {
+        self.crosshair = true;
+        self
+    }
+
+    /// Seeds or controls the current crosshair by business identity.
+    pub fn current(
+        mut self,
+        series_id: impl Into<SharedString>,
+        point_id: impl Into<SharedString>,
+    ) -> Self {
+        self.current = Some(ChartSelection::new(series_id, point_id));
+        self.crosshair = true;
+        self
+    }
+
+    /// Reports the nearest point immediately when pointer or keyboard input
+    /// changes the crosshair. The component keeps only this transient visual
+    /// current; the host decides whether the reported point changes anything.
+    pub fn on_current(
+        mut self,
+        handler: impl Fn(ChartSelection, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_current = Some(Rc::new(handler));
+        self.crosshair = true;
+        self
     }
 }
 
+impl RenderOnce for LineChart {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let theme = cx.theme().clone();
+        let (body, spec): (AnyElement, NodeSpec) = match self.state.visible_series() {
+            Some((series, stale)) => {
+                let active = active_points(series, &theme);
+                let count = active.len();
+                (
+                    ready_chart(
+                        &self.ident,
+                        &self.label,
+                        &self.axes,
+                        series,
+                        active,
+                        stale.cloned(),
+                        self.area,
+                        self.crosshair,
+                        self.current,
+                        self.on_current,
+                        &theme,
+                        window,
+                        cx,
+                    ),
+                    chart_spec(&self.ident, &self.label, &self.state, count, stale),
+                )
+            }
+            None => line_like_state(&self.ident, &self.label, &self.state, cx),
+        };
+
+        div()
+            .w_full()
+            .font_fallbacks(gpui_kit_assets::text_fallbacks())
+            .child(body)
+            .semantic_in(cx, spec)
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ActivePoint {
+    selection: ChartSelection,
+    series_label: SharedString,
+    point: ChartPoint,
+    color: Hsla,
+    series_order: usize,
+    point_order: usize,
+}
+
+fn active_points(series: &[ChartSeries], theme: &gpui_kit_theme::Theme) -> Vec<ActivePoint> {
+    let mut series_ids = HashSet::new();
+    let mut active = Vec::new();
+    for (series_order, series) in series.iter().enumerate() {
+        if !series_ids.insert(series.id.clone()) {
+            continue;
+        }
+        let mut point_ids = HashSet::new();
+        for (point_order, sample) in series.points.iter().enumerate() {
+            if !sample.is_bounded() || !point_ids.insert(sample.id.clone()) {
+                continue;
+            }
+            active.push(ActivePoint {
+                selection: ChartSelection::new(series.id.clone(), sample.id.clone()),
+                series_label: series.label.clone(),
+                point: sample.clone(),
+                color: series.color.unwrap_or(theme.colors.accent),
+                series_order,
+                point_order,
+            });
+        }
+    }
+    active
+}
+
+fn point_key(selection: &ChartSelection) -> SharedString {
+    Ident::new("series")
+        .child(selection.series_id.as_ref())
+        .child("point")
+        .child(selection.point_id.as_ref())
+        .semantic_id()
+}
+
+struct AnimatedPoint {
+    selection: ChartSelection,
+    color: Hsla,
+    series_order: usize,
+    point_order: usize,
+    position: Transition<Point<f32>>,
+    presence: Presence,
+}
+
+#[derive(Default)]
+struct ChartMotion {
+    points: HashMap<SharedString, AnimatedPoint>,
+}
+
+#[derive(Debug, Clone)]
+struct PaintPoint {
+    selection: ChartSelection,
+    color: Hsla,
+    series_order: usize,
+    point_order: usize,
+    position: Point<f32>,
+    opacity: f32,
+}
+
+fn sync_motion(
+    ident: &Ident,
+    active: &[ActivePoint],
+    theme: &gpui_kit_theme::Theme,
+    window: &mut Window,
+    cx: &mut App,
+) -> Vec<PaintPoint> {
+    let cell = keyed::slot::<ChartMotion>(&ident.child("motion").semantic_id(), cx);
+    let mut motion_state = cell.borrow_mut();
+    let active_keys = active
+        .iter()
+        .map(|point| point_key(&point.selection))
+        .collect::<HashSet<_>>();
+
+    for (key, point) in &mut motion_state.points {
+        if !active_keys.contains(key) {
+            point.presence.hide();
+        }
+    }
+
+    let mut new_keys = active
+        .iter()
+        .map(|point| point_key(&point.selection))
+        .filter(|key| !motion_state.points.contains_key(key))
+        .collect::<Vec<_>>();
+    new_keys.sort();
+    let new_ranks = new_keys
+        .iter()
+        .enumerate()
+        .map(|(rank, key)| (key.clone(), rank))
+        .collect::<HashMap<_, _>>();
+    let stagger = Stagger::rows();
+
+    for target in active {
+        let key = point_key(&target.selection);
+        let target_position = point(target.point.position.x, target.point.position.y);
+        if let Some(animated) = motion_state.points.get_mut(&key) {
+            animated.color = target.color;
+            animated.series_order = target.series_order;
+            animated.point_order = target.point_order;
+            animated.position = animated.position.spec(motion::resize(theme));
+            animated.position.set(target_position);
+            animated.presence.show();
+        } else {
+            let rank = new_ranks.get(&key).copied().unwrap_or_default();
+            let enter = stagger.spec(rank, new_keys.len(), motion::entrance(theme));
+            let mut presence = Presence::hidden(enter, motion::state_change(theme));
+            presence.show();
+            motion_state.points.insert(
+                key,
+                AnimatedPoint {
+                    selection: target.selection.clone(),
+                    color: target.color,
+                    series_order: target.series_order,
+                    point_order: target.point_order,
+                    position: Transition::new(target_position, motion::resize(theme)),
+                    presence,
+                },
+            );
+        }
+    }
+
+    let mut painted = Vec::new();
+    for animated in motion_state.points.values_mut() {
+        let progress = animated.presence.animate(window, cx).clamp(0.0, 1.0);
+        if !animated.presence.is_rendered() {
+            continue;
+        }
+        let position = animated.position.animate(window, cx);
+        painted.push(PaintPoint {
+            selection: animated.selection.clone(),
+            color: animated.color,
+            series_order: animated.series_order,
+            point_order: animated.point_order,
+            position: point(position.x, position.y * progress),
+            opacity: progress,
+        });
+    }
+    motion_state
+        .points
+        .retain(|_, point| point.presence.is_rendered());
+    painted.sort_by_key(|point| (point.series_order, point.point_order));
+    painted
+}
+
+#[derive(Default)]
+struct ChartInteraction {
+    initialized: bool,
+    declared: Option<ChartSelection>,
+    current: Option<ChartSelection>,
+}
+
+fn current_cell(
+    ident: &Ident,
+    declared: Option<ChartSelection>,
+    active: &[ActivePoint],
+    cx: &mut App,
+) -> Rc<std::cell::RefCell<ChartInteraction>> {
+    let cell = keyed::slot::<ChartInteraction>(&ident.child("interaction").semantic_id(), cx);
+    {
+        let mut state = cell.borrow_mut();
+        if !state.initialized || state.declared != declared {
+            state.current = declared.clone();
+            state.declared = declared;
+            state.initialized = true;
+        }
+        if state
+            .current
+            .as_ref()
+            .is_none_or(|selection| !active.iter().any(|point| &point.selection == selection))
+        {
+            state.current = active.first().map(|point| point.selection.clone());
+        }
+    }
+    cell
+}
+
+fn update_current(
+    cell: &Rc<std::cell::RefCell<ChartInteraction>>,
+    next: ChartSelection,
+    report: Option<&CurrentHandler>,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    let changed = cell.borrow().current.as_ref() != Some(&next);
+    if !changed {
+        return;
+    }
+    cell.borrow_mut().current = Some(next.clone());
+    if let Some(report) = report {
+        report(next, window, cx);
+    }
+    window.refresh();
+}
+
+fn nearest_point(
+    active: &[ActivePoint],
+    bounds: Bounds<Pixels>,
+    pointer: Point<Pixels>,
+) -> Option<ChartSelection> {
+    let width = f32::from(bounds.size.width);
+    let height = f32::from(bounds.size.height);
+    if width <= 0.0 || height <= 0.0 {
+        return None;
+    }
+    active
+        .iter()
+        .min_by(|left, right| {
+            let distance = |point: &ActivePoint| {
+                let x = f32::from(pointer.x - bounds.origin.x) - point.point.position.x * width;
+                let y = f32::from(pointer.y - bounds.origin.y)
+                    - (1.0 - point.point.position.y) * height;
+                x * x + y * y
+            };
+            distance(left)
+                .partial_cmp(&distance(right))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .map(|point| point.selection.clone())
+}
+
+fn step_point(
+    active: &[ActivePoint],
+    current: Option<&ChartSelection>,
+    key: &str,
+) -> Option<ChartSelection> {
+    let current = current
+        .and_then(|selection| active.iter().find(|point| &point.selection == selection))
+        .or_else(|| active.first())?;
+    let mut same_series = active
+        .iter()
+        .filter(|point| point.selection.series_id == current.selection.series_id)
+        .collect::<Vec<_>>();
+    same_series.sort_by(|left, right| {
+        left.point
+            .position
+            .x
+            .partial_cmp(&right.point.position.x)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(left.point_order.cmp(&right.point_order))
+    });
+    let place = same_series
+        .iter()
+        .position(|point| point.selection == current.selection)
+        .unwrap_or_default();
+    match key {
+        "left" => same_series.get(place.saturating_sub(1)).copied(),
+        "right" => same_series
+            .get((place + 1).min(same_series.len() - 1))
+            .copied(),
+        "home" => same_series.first().copied(),
+        "end" => same_series.last().copied(),
+        "up" | "down" => {
+            let offset = if key == "up" { -1 } else { 1 };
+            let next_series = (current.series_order as isize + offset)
+                .clamp(0, active.last()?.series_order as isize)
+                as usize;
+            active
+                .iter()
+                .filter(|point| point.series_order == next_series)
+                .min_by(|left, right| {
+                    (left.point.position.x - current.point.position.x)
+                        .abs()
+                        .partial_cmp(&(right.point.position.x - current.point.position.x).abs())
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+        }
+        _ => return None,
+    }
+    .map(|point| point.selection.clone())
+}
+
+#[allow(clippy::too_many_arguments)]
 fn ready_chart(
     ident: &Ident,
     label: &SharedString,
     axes: &ChartAxes,
     series: &[ChartSeries],
+    active: Vec<ActivePoint>,
+    stale: Option<SharedString>,
+    area: bool,
+    crosshair: bool,
+    declared: Option<ChartSelection>,
+    report: Option<CurrentHandler>,
     theme: &gpui_kit_theme::Theme,
-    cx: &App,
-) -> gpui::AnyElement {
+    window: &mut Window,
+    cx: &mut App,
+) -> AnyElement {
     let stroke = theme.borders.thick;
-    let plotted: Vec<(Hsla, Vec<SparklinePoint>)> = series
-        .iter()
-        .map(|series| {
-            let color = series.color.unwrap_or(theme.colors.accent);
-            let points = series
-                .points
-                .iter()
-                .copied()
-                .filter(|point| point.is_bounded())
-                .collect();
-            (color, points)
+    let painted = sync_motion(ident, &active, theme, window, cx);
+    let measured = measure::cell(&ident.child("plot-bounds").semantic_id(), cx);
+    let interaction = crosshair.then(|| current_cell(ident, declared, &active, cx));
+    let current = interaction.as_ref().and_then(|state| {
+        let selection = state.borrow().current.clone()?;
+        active
+            .iter()
+            .find(|point| point.selection == selection)
+            .cloned()
+    });
+    let crosshair_position = current.as_ref().map(|current| {
+        motion::tracked(
+            &ident.child("crosshair").semantic_id(),
+            point(current.point.position.x, current.point.position.y),
+            motion::state_change(theme),
+            window,
+            cx,
+        )
+    });
+
+    let plot_spec = if crosshair {
+        let mut spec = NodeSpec::new(ident.child("plot").semantic_id(), Role::Slider)
+            .parent(ident.semantic_id())
+            .text(label.clone())
+            .range(
+                0.0,
+                active.len().saturating_sub(1) as f32,
+                current
+                    .as_ref()
+                    .and_then(|current| {
+                        active
+                            .iter()
+                            .position(|point| point.selection == current.selection)
+                    })
+                    .unwrap_or_default() as f32,
+            );
+        if let Some(current) = &current {
+            spec = spec.value(current.point.value.clone());
+        }
+        spec
+    } else {
+        NodeSpec::new(ident.child("plot").semantic_id(), Role::Image)
+            .parent(ident.semantic_id())
+            .text(label.clone())
+            .read_only(true)
+    };
+
+    let chart_canvas = line_canvas(
+        painted,
+        stroke,
+        area,
+        crosshair_position,
+        theme.colors.hairline_strong,
+    );
+    let current_tip = current.as_ref().map(|current| {
+        current_tooltip(
+            ident,
+            current,
+            crosshair_position.unwrap_or_else(|| point(0.0, 0.0)),
+            theme,
+            cx,
+        )
+    });
+    let mut plot = div()
+        .on_children_prepainted({
+            let measured = Rc::clone(&measured);
+            move |bounds, window, _| {
+                if let Some(first) = bounds.first() {
+                    measure::record(&measured, *first, window);
+                }
+            }
         })
-        .collect();
+        .id(ident.child("plot").element_id())
+        .relative()
+        .flex_1()
+        .min_w_0()
+        .h(px(160.0))
+        .overflow_hidden()
+        .radius(theme, Radius::Small)
+        .surface(theme, Surface::Canvas)
+        .child(chart_canvas)
+        .children(current_tip);
+    if let Some(interaction) = interaction {
+        plot = plot
+            .tab_index(0)
+            .focus_ring(theme)
+            .cursor(CursorStyle::Crosshair);
+        let pointer_points = Rc::new(active.clone());
+        let pointer_bounds = Rc::clone(&measured);
+        let pointer_state = Rc::clone(&interaction);
+        let pointer_report = report.clone();
+        plot = plot.on_mouse_move(move |event, window, cx| {
+            if let Some(next) = nearest_point(&pointer_points, pointer_bounds.get(), event.position)
+            {
+                update_current(&pointer_state, next, pointer_report.as_ref(), window, cx);
+            }
+        });
+        let key_points = Rc::new(active.clone());
+        let key_state = Rc::clone(&interaction);
+        let key_report = report;
+        plot = plot.on_key_down(move |event, window, cx| {
+            let current = key_state.borrow().current.clone();
+            if let Some(next) = step_point(&key_points, current.as_ref(), &event.keystroke.key) {
+                update_current(&key_state, next, key_report.as_ref(), window, cx);
+                cx.stop_propagation();
+            }
+        });
+    }
+    let plot = plot.semantic_in(cx, plot_spec);
+
+    let has_y_axis = axes.y_start.is_some() || axes.y_end.is_some();
 
     div()
         .column()
         .w_full()
         .gap_token(theme, Space::Xs)
+        .child(chart_heading(label, axes.y_label.clone(), theme))
+        .children(stale.map(|reason| stale_warning(ident, reason, theme, cx)))
+        .child(
+            div()
+                .row()
+                .items_start()
+                .gap_token(theme, Space::Xs)
+                .children(y_axis(axes, theme))
+                .child(plot),
+        )
+        .child(x_axis(axes, has_y_axis, theme))
+        .child(series_legend(ident, series, theme, cx))
+        .into_any_element()
+}
+
+fn chart_heading(
+    label: &SharedString,
+    y_label: Option<SharedString>,
+    theme: &gpui_kit_theme::Theme,
+) -> AnyElement {
+    div()
+        .row()
+        .items_baseline()
+        .justify_between()
+        .gap_token(theme, Space::Sm)
         .child(
             div()
                 .type_scale(theme, TypeScale::Label)
                 .text_color(theme.colors.text)
                 .child(label.clone()),
         )
-        .children(axes.y_end.clone().map(|end| {
+        .children(y_label.map(|label| {
             div()
                 .type_scale(theme, TypeScale::Caption)
-                .text_color(theme.colors.text_faint)
-                .child(end)
+                .text_color(theme.colors.text_muted)
+                .child(label)
         }))
-        .child(line_canvas(plotted, stroke))
+        .into_any_element()
+}
+
+fn stale_warning(
+    ident: &Ident,
+    reason: SharedString,
+    theme: &gpui_kit_theme::Theme,
+    cx: &App,
+) -> AnyElement {
+    div()
+        .row()
+        .items_center()
+        .gap_token(theme, Space::Xs)
+        .type_scale(theme, TypeScale::Caption)
+        .text_color(theme.colors.warning)
+        .child(StatusDot::new(Tone::Warning))
+        .child(reason.clone())
+        .semantic_in(
+            cx,
+            NodeSpec::new(ident.child("stale").semantic_id(), Role::Status)
+                .parent(ident.semantic_id())
+                .text(reason)
+                .value("stale"),
+        )
+        .into_any_element()
+}
+
+fn y_axis(axes: &ChartAxes, theme: &gpui_kit_theme::Theme) -> Option<AnyElement> {
+    (axes.y_start.is_some() || axes.y_end.is_some()).then(|| {
+        div()
+            .column()
+            .flex_none()
+            .w(px(44.0))
+            .h(px(160.0))
+            .justify_between()
+            .type_scale(theme, TypeScale::Caption)
+            .text_color(theme.colors.text_faint)
+            .children(axes.y_end.clone())
+            .children(axes.y_start.clone())
+            .into_any_element()
+    })
+}
+
+fn axis_offset(axes: &ChartAxes, theme: &gpui_kit_theme::Theme) -> f32 {
+    if axes.y_start.is_some() || axes.y_end.is_some() {
+        44.0 + theme.space(Space::Xs)
+    } else {
+        0.0
+    }
+}
+
+fn x_axis(axes: &ChartAxes, has_y_axis: bool, theme: &gpui_kit_theme::Theme) -> AnyElement {
+    div()
+        .column()
+        .ml(px(if has_y_axis {
+            axis_offset(axes, theme)
+        } else {
+            0.0
+        }))
+        .gap_token(theme, Space::Xs)
         .child(
             div()
+                // Cartesian endpoints are physical data coordinates, not a
+                // reading-order row: x=0 remains left and x=1 remains right.
                 .row()
                 .justify_between()
                 .type_scale(theme, TypeScale::Caption)
@@ -302,116 +982,219 @@ fn ready_chart(
                 .children(axes.x_start.clone())
                 .children(axes.x_end.clone()),
         )
+        .children(axes.x_label.clone().map(|label| {
+            div()
+                .type_scale(theme, TypeScale::Caption)
+                .text_align(gpui::TextAlign::Center)
+                .text_color(theme.colors.text_muted)
+                .child(label)
+        }))
+        .into_any_element()
+}
+
+fn series_legend(
+    ident: &Ident,
+    series: &[ChartSeries],
+    theme: &gpui_kit_theme::Theme,
+    cx: &App,
+) -> AnyElement {
+    let mut ids = HashSet::new();
+    div()
+        .row()
+        .flex_wrap()
+        .gap_token(theme, Space::Sm)
+        .children(series.iter().filter_map(|series| {
+            if !ids.insert(series.id.clone()) {
+                return None;
+            }
+            let color = series.color.unwrap_or(theme.colors.accent);
+            Some(
+                div()
+                    .row()
+                    .items_center()
+                    .gap_token(theme, Space::Xs)
+                    .child(div().size(px(8.0)).rounded_full().bg(color))
+                    .child(
+                        div()
+                            .type_scale(theme, TypeScale::Caption)
+                            .text_color(theme.colors.text_muted)
+                            .child(series.label.clone()),
+                    )
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(
+                            ident
+                                .child("series")
+                                .child(series.id.as_ref())
+                                .semantic_id(),
+                            Role::Status,
+                        )
+                        .parent(ident.semantic_id())
+                        .text(series.label.clone())
+                        .value(series.id.clone()),
+                    ),
+            )
+        }))
+        .into_any_element()
+}
+
+fn current_tooltip(
+    ident: &Ident,
+    current: &ActivePoint,
+    shown: Point<f32>,
+    theme: &gpui_kit_theme::Theme,
+    cx: &App,
+) -> AnyElement {
+    let semantic_id = ident
+        .child("series")
+        .child(current.selection.series_id.as_ref())
+        .child("point")
+        .child(current.selection.point_id.as_ref())
+        .semantic_id();
+    div()
+        .absolute()
+        .left(relative(shown.x.clamp(0.0, 0.72)))
+        .top(px(8.0))
+        .column()
+        .gap(px(1.0))
+        .px_token(theme, Space::Xs)
+        .py(px(4.0))
+        .radius(theme, Radius::Small)
+        .frame(theme, Surface::Overlay, Elevation::Overlay)
         .child(
             div()
-                .row()
-                .flex_wrap()
-                .gap_token(theme, Space::Sm)
-                .children(series.iter().map(|series| {
-                    let color = series.color.unwrap_or(theme.colors.accent);
-                    div()
-                        .row()
-                        .items_center()
-                        .gap_token(theme, Space::Xs)
-                        .child(div().size(px(8.0)).rounded_full().bg(color))
-                        .child(
-                            div()
-                                .type_scale(theme, TypeScale::Caption)
-                                .text_color(theme.colors.text_muted)
-                                .child(series.label.clone()),
-                        )
-                        .semantic_in(
-                            cx,
-                            NodeSpec::new(
-                                ident.child(series.id.as_ref()).semantic_id(),
-                                Role::Status,
-                            )
-                            .parent(ident.semantic_id())
-                            .text(series.label.clone())
-                            .value(series.id.clone()),
-                        )
-                })),
+                .type_scale(theme, TypeScale::Caption)
+                .text_color(theme.colors.text_faint)
+                .child(current.series_label.clone()),
+        )
+        .child(
+            div()
+                .type_scale(theme, TypeScale::Caption)
+                .text_color(theme.colors.text_muted)
+                .child(current.point.label.clone()),
+        )
+        .child(
+            div()
+                .type_scale(theme, TypeScale::Label)
+                .text_color(theme.colors.text)
+                .child(current.point.value.clone()),
+        )
+        .semantic_in(
+            cx,
+            NodeSpec::new(semantic_id, Role::Status)
+                .parent(
+                    ident
+                        .child("series")
+                        .child(current.selection.series_id.as_ref())
+                        .semantic_id(),
+                )
+                .text(current.point.label.clone())
+                .value(current.point.value.clone())
+                .selected(true),
         )
         .into_any_element()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn ready_bars(
     ident: &Ident,
     label: &SharedString,
     axes: &ChartAxes,
-    series: &[ChartSeries],
+    active: Vec<ActivePoint>,
+    stale: Option<SharedString>,
     theme: &gpui_kit_theme::Theme,
-    cx: &App,
-) -> gpui::AnyElement {
-    let first = series.first();
-    let color = first
-        .and_then(|series| series.color)
-        .unwrap_or(theme.colors.accent);
-    let points = first
-        .map(|series| {
-            series
-                .points
-                .iter()
-                .copied()
-                .filter(|point| point.is_bounded())
-                .collect::<Vec<_>>()
+    window: &mut Window,
+    cx: &mut App,
+) -> AnyElement {
+    let painted = sync_motion(ident, &active, theme, window, cx);
+    let active_by_key = active
+        .iter()
+        .map(|point| (point_key(&point.selection), point))
+        .collect::<HashMap<_, _>>();
+    let bars = painted
+        .iter()
+        .map(|point| {
+            let key = point_key(&point.selection);
+            let bar = div()
+                .flex_1()
+                .h(relative(point.position.y.clamp(0.0, 1.0)))
+                .rounded_t(px(theme.radii.small))
+                .bg(point.color.opacity(point.opacity));
+            match active_by_key.get(&key) {
+                Some(active) => bar
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(
+                            ident
+                                .child("series")
+                                .child(active.selection.series_id.as_ref())
+                                .child("point")
+                                .child(active.selection.point_id.as_ref())
+                                .semantic_id(),
+                            Role::Status,
+                        )
+                        .parent(ident.semantic_id())
+                        .text(active.point.label.clone())
+                        .value(active.point.value.clone()),
+                    )
+                    .into_any_element(),
+                None => bar.into_any_element(),
+            }
         })
-        .unwrap_or_default();
+        .collect::<Vec<_>>();
 
+    let offset = axis_offset(axes, theme);
     div()
         .column()
         .w_full()
         .gap_token(theme, Space::Xs)
-        .child(
-            div()
-                .type_scale(theme, TypeScale::Label)
-                .text_color(theme.colors.text)
-                .child(label.clone()),
-        )
-        .children(axes.y_end.clone().map(|end| {
-            div()
-                .type_scale(theme, TypeScale::Caption)
-                .text_color(theme.colors.text_faint)
-                .child(end)
-        }))
+        .child(chart_heading(label, axes.y_label.clone(), theme))
+        .children(stale.map(|reason| stale_warning(ident, reason, theme, cx)))
         .child(
             div()
                 .row()
                 .items_end()
-                .gap(px(6.0))
-                .h(px(160.0))
                 .w_full()
-                .children(points.into_iter().enumerate().map(|(index, point)| {
-                    let percent = cx.numbers().percent(point.y);
+                .gap_token(theme, Space::Xs)
+                .children(y_axis(axes, theme))
+                .child(
                     div()
+                        .row()
+                        .items_end()
                         .flex_1()
-                        .h(gpui::relative(point.y.max(0.04)))
-                        .rounded_t(px(theme.radii.small))
-                        .bg(color)
-                        .semantic_in(
-                            cx,
-                            NodeSpec::new(
-                                ident.child(format!("bar-{index}")).semantic_id(),
-                                Role::Status,
-                            )
-                            .parent(ident.semantic_id())
-                            .value(percent),
-                        )
-                })),
+                        .min_w_0()
+                        .gap(px(6.0))
+                        .h(px(160.0))
+                        .children(bars),
+                ),
         )
         .child(
             div()
                 .row()
-                .justify_between()
-                .type_scale(theme, TypeScale::Caption)
-                .text_color(theme.colors.text_faint)
-                .children(axes.x_start.clone())
-                .children(axes.x_end.clone()),
+                .ml(px(offset))
+                .gap(px(6.0))
+                .children(active.iter().map(|point| {
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .truncate()
+                        .type_scale(theme, TypeScale::Caption)
+                        .text_align(gpui::TextAlign::Center)
+                        .text_color(theme.colors.text_faint)
+                        .child(point.point.label.clone())
+                })),
         )
+        .child(x_axis(axes, offset > 0.0, theme))
         .into_any_element()
 }
 
-fn line_canvas(series: Vec<(Hsla, Vec<SparklinePoint>)>, stroke: f32) -> impl IntoElement {
+fn line_canvas(
+    points: Vec<PaintPoint>,
+    stroke: f32,
+    area: bool,
+    crosshair: Option<Point<f32>>,
+    crosshair_color: Hsla,
+) -> impl IntoElement {
     canvas(
         |_, _, _| {},
         move |bounds, _, window, _| {
@@ -421,39 +1204,171 @@ fn line_canvas(series: Vec<(Hsla, Vec<SparklinePoint>)>, stroke: f32) -> impl In
             if width <= 0.0 || height <= 0.0 {
                 return;
             }
-            let at = |sample: SparklinePoint| {
+            let at = |sample: Point<f32>| {
                 point(
                     bounds.origin.x + px(inset + sample.x * width),
                     bounds.origin.y + px(inset + (1.0 - sample.y) * height),
                 )
             };
-            for (color, points) in &series {
-                if points.len() < 2 {
+            let mut grouped: HashMap<SharedString, Vec<&PaintPoint>> = HashMap::new();
+            for sample in &points {
+                grouped
+                    .entry(sample.selection.series_id.clone())
+                    .or_default()
+                    .push(sample);
+            }
+            let mut grouped = grouped.into_values().collect::<Vec<_>>();
+            grouped.sort_by_key(|series| series[0].series_order);
+
+            if area {
+                for series in &grouped {
+                    if series.len() < 2 {
+                        continue;
+                    }
+                    let opacity =
+                        series.iter().map(|point| point.opacity).sum::<f32>() / series.len() as f32;
+                    let color = series[0].color;
+                    let mut builder = PathBuilder::fill();
+                    builder.move_to(at(point(series[0].position.x, 0.0)));
+                    for sample in series {
+                        builder.line_to(at(sample.position));
+                    }
+                    builder.line_to(at(point(
+                        series.last().expect("series is nonempty").position.x,
+                        0.0,
+                    )));
+                    builder.close();
+                    if let Ok(path) = builder.build() {
+                        window.paint_path(
+                            path,
+                            linear_gradient_stops(
+                                180.0,
+                                [
+                                    linear_color_stop(color.opacity(0.30 * opacity), 0.0),
+                                    linear_color_stop(color.opacity(0.14 * opacity), 0.58),
+                                    linear_color_stop(color.opacity(0.0), 1.0),
+                                ],
+                            ),
+                        );
+                    }
+                }
+            }
+
+            for series in grouped {
+                if series.len() < 2 {
                     continue;
                 }
+                let opacity =
+                    series.iter().map(|point| point.opacity).sum::<f32>() / series.len() as f32;
                 let mut builder = PathBuilder::stroke(px(stroke));
-                builder.move_to(at(points[0]));
-                for sample in points.iter().copied().skip(1) {
-                    builder.line_to(at(sample));
+                builder.move_to(at(series[0].position));
+                for sample in series.iter().skip(1) {
+                    builder.line_to(at(sample.position));
                 }
                 if let Ok(path) = builder.build() {
-                    window.paint_path(path, *color);
+                    window.paint_path(path, series[0].color.opacity(opacity));
+                }
+            }
+
+            if let Some(crosshair) = crosshair {
+                let target = at(crosshair);
+                let mut vertical = PathBuilder::stroke(px(1.0));
+                vertical.move_to(point(target.x, bounds.top()));
+                vertical.line_to(point(target.x, bounds.bottom()));
+                if let Ok(path) = vertical.build() {
+                    window.paint_path(path, crosshair_color.opacity(0.72));
+                }
+                let mut horizontal = PathBuilder::stroke(px(1.0));
+                horizontal.move_to(point(bounds.left(), target.y));
+                horizontal.line_to(point(bounds.right(), target.y));
+                if let Ok(path) = horizontal.build() {
+                    window.paint_path(path, crosshair_color.opacity(0.46));
                 }
             }
         },
     )
     .w_full()
-    .h(px(160.0))
+    .h_full()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn point_at(id: &str, x: f32, y: f32) -> ChartPoint {
+        ChartPoint::new(id, x, y, id, format!("{id}-value"))
+    }
+
     #[test]
-    fn a_series_keeps_the_caller_id() {
-        let series = ChartSeries::new("cpu", "CPU").points([SparklinePoint::new(0.0, 0.2)]);
+    fn points_keep_business_identity_and_exact_text() {
+        let point = ChartPoint::new("minute-42", 0.4, 0.7, "12:42", "73.2%");
+        let series = ChartSeries::new("cpu", "CPU").points([point.clone()]);
         assert_eq!(series.id.as_ref(), "cpu");
-        assert_eq!(ChartState::Empty.name(), "empty");
+        assert_eq!(series.points[0], point);
+        assert_eq!(series.points[0].value.as_ref(), "73.2%");
+    }
+
+    #[test]
+    fn stale_keeps_verified_series_and_names_itself() {
+        let state = ChartState::Stale {
+            series: vec![ChartSeries::new("cpu", "CPU").points([point_at("now", 1.0, 0.5)])],
+            reason: "refresh failed".into(),
+        };
+        let (series, reason) = state.visible_series().expect("verified data remains");
+        assert_eq!(series[0].points[0].id.as_ref(), "now");
+        assert_eq!(reason.expect("stale reason").as_ref(), "refresh failed");
+        assert_eq!(state.name(), "stale");
+    }
+
+    #[test]
+    fn invalid_and_duplicate_business_ids_are_not_published() {
+        let theme = gpui_kit_theme::Theme::studio_dark();
+        let series = vec![
+            ChartSeries::new("cpu", "CPU").points([
+                point_at("same", 0.0, 0.2),
+                point_at("same", 0.4, 0.4),
+                point_at("outside", 1.2, 0.4),
+            ]),
+            ChartSeries::new("cpu", "duplicate series").points([point_at("other", 1.0, 0.8)]),
+        ];
+        let active = active_points(&series, &theme);
+        assert_eq!(active.len(), 1);
+        assert_eq!(active[0].selection, ChartSelection::new("cpu", "same"));
+    }
+
+    #[test]
+    fn nearest_uses_the_rendered_two_dimensional_distance() {
+        let theme = gpui_kit_theme::Theme::studio_dark();
+        let active = active_points(
+            &[ChartSeries::new("cpu", "CPU")
+                .points([point_at("low", 0.2, 0.2), point_at("high", 0.8, 0.8)])],
+            &theme,
+        );
+        let bounds = Bounds::new(point(px(10.0), px(20.0)), gpui::size(px(200.0), px(100.0)));
+        assert_eq!(
+            nearest_point(&active, bounds, point(px(174.0), px(38.0))),
+            Some(ChartSelection::new("cpu", "high"))
+        );
+    }
+
+    #[test]
+    fn keyboard_steps_by_geometry_without_replacing_business_ids() {
+        let theme = gpui_kit_theme::Theme::studio_dark();
+        let active = active_points(
+            &[
+                ChartSeries::new("cpu", "CPU")
+                    .points([point_at("late", 0.8, 0.2), point_at("early", 0.2, 0.2)]),
+                ChartSeries::new("memory", "Memory").points([point_at("nearest", 0.75, 0.6)]),
+            ],
+            &theme,
+        );
+        assert_eq!(
+            step_point(&active, Some(&ChartSelection::new("cpu", "early")), "right"),
+            Some(ChartSelection::new("cpu", "late"))
+        );
+        assert_eq!(
+            step_point(&active, Some(&ChartSelection::new("cpu", "late")), "down"),
+            Some(ChartSelection::new("memory", "nearest"))
+        );
     }
 }

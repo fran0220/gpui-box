@@ -1810,18 +1810,18 @@ fn diff_view(_window: &mut Window, cx: &mut App) -> AnyElement {
 fn chart(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     let cpu = [
-        SparklinePoint::new(0.0, 0.20),
-        SparklinePoint::new(0.25, 0.45),
-        SparklinePoint::new(0.5, 0.38),
-        SparklinePoint::new(0.75, 0.70),
-        SparklinePoint::new(1.0, 0.62),
+        ChartPoint::new("00:00", 0.0, 0.20, "00:00", "20%"),
+        ChartPoint::new("00:15", 0.25, 0.45, "00:15", "45%"),
+        ChartPoint::new("00:30", 0.5, 0.38, "00:30", "38%"),
+        ChartPoint::new("00:45", 0.75, 0.70, "00:45", "70%"),
+        ChartPoint::new("01:00", 1.0, 0.62, "01:00", "62%"),
     ];
     let memory = [
-        SparklinePoint::new(0.0, 0.40),
-        SparklinePoint::new(0.25, 0.42),
-        SparklinePoint::new(0.5, 0.55),
-        SparklinePoint::new(0.75, 0.58),
-        SparklinePoint::new(1.0, 0.61),
+        ChartPoint::new("00:00", 0.0, 0.40, "00:00", "40%"),
+        ChartPoint::new("00:15", 0.25, 0.42, "00:15", "42%"),
+        ChartPoint::new("00:30", 0.5, 0.55, "00:30", "55%"),
+        ChartPoint::new("00:45", 0.75, 0.58, "00:45", "58%"),
+        ChartPoint::new("01:00", 1.0, 0.61, "01:00", "61%"),
     ];
     stack(&theme)
         .w(px(520.0))
@@ -1833,17 +1833,26 @@ fn chart(_window: &mut Window, cx: &mut App) -> AnyElement {
             LineChart::new(
                 "scene.chart.ready",
                 "Fixture load",
-                ChartState::Ready(vec![
-                    ChartSeries::new("cpu", "CPU")
-                        .points(cpu)
-                        .tint(identity_tint(&theme, "loader.blue")),
-                    ChartSeries::new("memory", "Memory")
-                        .points(memory)
-                        .tint(identity_tint(&theme, "loader.orange")),
-                ]),
+                ChartState::Stale {
+                    series: vec![
+                        ChartSeries::new("cpu", "CPU")
+                            .points(cpu)
+                            .tint(identity_tint(&theme, "loader.blue")),
+                        ChartSeries::new("memory", "Memory")
+                            .points(memory)
+                            .tint(identity_tint(&theme, "loader.orange")),
+                    ],
+                    reason: "Refresh failed; showing last verified sample".into(),
+                },
             )
+            .area()
+            .crosshair()
+            .current("cpu", "00:45")
+            .on_current(|_, _, _| {})
             .axes(
                 ChartAxes::default()
+                    .x_label("Time")
+                    .y_label("Utilization")
                     .x_ends("00:00", "01:00")
                     .y_ends("0%", "100%"),
             ),
@@ -1858,10 +1867,10 @@ fn chart(_window: &mut Window, cx: &mut App) -> AnyElement {
                 "scene.chart.bars",
                 "Fixture share",
                 ChartState::Ready(vec![ChartSeries::new("share", "Share").points([
-                    SparklinePoint::new(0.0, 0.35),
-                    SparklinePoint::new(0.33, 0.70),
-                    SparklinePoint::new(0.66, 0.45),
-                    SparklinePoint::new(1.0, 0.90),
+                    ChartPoint::new("alpha", 0.0, 0.35, "Alpha", "35 jobs"),
+                    ChartPoint::new("beta", 0.33, 0.70, "Beta", "70 jobs"),
+                    ChartPoint::new("gamma", 0.66, 0.45, "Gamma", "45 jobs"),
+                    ChartPoint::new("delta", 1.0, 0.90, "Delta", "90 jobs"),
                 ])]),
             )
             .axes(ChartAxes::default().y_ends("0", "max")),

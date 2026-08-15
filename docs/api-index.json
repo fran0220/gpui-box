@@ -1796,7 +1796,11 @@
         "new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: ChartState) -> Self"
       ],
       "options": [
-        "axes(axes: ChartAxes) -> Self"
+        "axes(axes: ChartAxes) -> Self",
+        "area() -> Self",
+        "crosshair() -> Self",
+        "current(series_id: impl Into<SharedString>, point_id: impl Into<SharedString>) -> Self",
+        "on_current(handler: impl Fn(ChartSelection, &mut Window, &mut App) + 'static) -> Self"
       ],
       "commands": [],
       "queries": [],
@@ -4252,6 +4256,32 @@
       "queries": []
     },
     {
+      "name": "ChartPoint",
+      "path": "gpui_kit::display::ChartPoint",
+      "summary": "One host-owned point in a chart series.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, x: f32, y: f32, label: impl Into<SharedString>, value: impl Into<SharedString>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "is_bounded() -> bool"
+      ]
+    },
+    {
+      "name": "ChartSelection",
+      "path": "gpui_kit::display::ChartSelection",
+      "summary": "The business identity of the point under the crosshair.",
+      "variants": [],
+      "construct": [
+        "new(series_id: impl Into<SharedString>, point_id: impl Into<SharedString>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "ChartSeries",
       "path": "gpui_kit::display::ChartSeries",
       "summary": "One named series. Identity is the caller's, never the draw order.",
@@ -4260,7 +4290,7 @@
         "new(id: impl Into<SharedString>, label: impl Into<SharedString>) -> Self"
       ],
       "options": [
-        "points(points: impl IntoIterator<Item = SparklinePoint>) -> Self",
+        "points(points: impl IntoIterator<Item = ChartPoint>) -> Self",
         "tint(color: Hsla) -> Self"
       ],
       "commands": [],
@@ -4275,7 +4305,8 @@
         "Ready",
         "Empty",
         "Unavailable",
-        "Error"
+        "Error",
+        "Stale"
       ],
       "construct": [],
       "options": [],
@@ -9744,7 +9775,7 @@
         "BarChart",
         "LineChart"
       ],
-      "example": "fn chart(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let cpu = [\n        SparklinePoint::new(0.0, 0.20),\n        SparklinePoint::new(0.25, 0.45),\n        SparklinePoint::new(0.5, 0.38),\n        SparklinePoint::new(0.75, 0.70),\n        SparklinePoint::new(1.0, 0.62),\n    ];\n    let memory = [\n        SparklinePoint::new(0.0, 0.40),\n        SparklinePoint::new(0.25, 0.42),\n        SparklinePoint::new(0.5, 0.55),\n        SparklinePoint::new(0.75, 0.58),\n        SparklinePoint::new(1.0, 0.61),\n    ];\n    stack(&theme)\n        .w(px(520.0))\n        .child(caption(\n            &theme,\n            \"host-owned series, host-owned axis wording, no invented scale\",\n        ))\n        .child(\n            LineChart::new(\n                \"scene.chart.ready\",\n                \"Fixture load\",\n                ChartState::Ready(vec![\n                    ChartSeries::new(\"cpu\", \"CPU\")\n                        .points(cpu)\n                        .tint(identity_tint(&theme, \"loader.blue\")),\n                    ChartSeries::new(\"memory\", \"Memory\")\n                        .points(memory)\n                        .tint(identity_tint(&theme, \"loader.orange\")),\n                ]),\n            )\n            .axes(\n                ChartAxes::default()\n                    .x_ends(\"00:00\", \"01:00\")\n                    .y_ends(\"0%\", \"100%\"),\n            ),\n        )\n        .child(LineChart::new(\n            \"scene.chart.empty\",\n            \"Fixture load\",\n            ChartState::Empty,\n        ))\n        .child(\n            BarChart::new(\n                \"scene.chart.bars\",\n                \"Fixture share\",\n                ChartState::Ready(vec![ChartSeries::new(\"share\", \"Share\").points([\n                    SparklinePoint::new(0.0, 0.35),\n                    SparklinePoint::new(0.33, 0.70),\n                    SparklinePoint::new(0.66, 0.45),\n                    SparklinePoint::new(1.0, 0.90),\n                ])]),\n            )\n            .axes(ChartAxes::default().y_ends(\"0\", \"max\")),\n        )\n        .into_any_element()\n}"
+      "example": "fn chart(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let cpu = [\n        ChartPoint::new(\"00:00\", 0.0, 0.20, \"00:00\", \"20%\"),\n        ChartPoint::new(\"00:15\", 0.25, 0.45, \"00:15\", \"45%\"),\n        ChartPoint::new(\"00:30\", 0.5, 0.38, \"00:30\", \"38%\"),\n        ChartPoint::new(\"00:45\", 0.75, 0.70, \"00:45\", \"70%\"),\n        ChartPoint::new(\"01:00\", 1.0, 0.62, \"01:00\", \"62%\"),\n    ];\n    let memory = [\n        ChartPoint::new(\"00:00\", 0.0, 0.40, \"00:00\", \"40%\"),\n        ChartPoint::new(\"00:15\", 0.25, 0.42, \"00:15\", \"42%\"),\n        ChartPoint::new(\"00:30\", 0.5, 0.55, \"00:30\", \"55%\"),\n        ChartPoint::new(\"00:45\", 0.75, 0.58, \"00:45\", \"58%\"),\n        ChartPoint::new(\"01:00\", 1.0, 0.61, \"01:00\", \"61%\"),\n    ];\n    stack(&theme)\n        .w(px(520.0))\n        .child(caption(\n            &theme,\n            \"host-owned series, host-owned axis wording, no invented scale\",\n        ))\n        .child(\n            LineChart::new(\n                \"scene.chart.ready\",\n                \"Fixture load\",\n                ChartState::Stale {\n                    series: vec![\n                        ChartSeries::new(\"cpu\", \"CPU\")\n                            .points(cpu)\n                            .tint(identity_tint(&theme, \"loader.blue\")),\n                        ChartSeries::new(\"memory\", \"Memory\")\n                            .points(memory)\n                            .tint(identity_tint(&theme, \"loader.orange\")),\n                    ],\n                    reason: \"Refresh failed; showing last verified sample\".into(),\n                },\n            )\n            .area()\n            .crosshair()\n            .current(\"cpu\", \"00:45\")\n            .on_current(|_, _, _| {})\n            .axes(\n                ChartAxes::default()\n                    .x_label(\"Time\")\n                    .y_label(\"Utilization\")\n                    .x_ends(\"00:00\", \"01:00\")\n                    .y_ends(\"0%\", \"100%\"),\n            ),\n        )\n        .child(LineChart::new(\n            \"scene.chart.empty\",\n            \"Fixture load\",\n            ChartState::Empty,\n        ))\n        .child(\n            BarChart::new(\n                \"scene.chart.bars\",\n                \"Fixture share\",\n                ChartState::Ready(vec![ChartSeries::new(\"share\", \"Share\").points([\n                    ChartPoint::new(\"alpha\", 0.0, 0.35, \"Alpha\", \"35 jobs\"),\n                    ChartPoint::new(\"beta\", 0.33, 0.70, \"Beta\", \"70 jobs\"),\n                    ChartPoint::new(\"gamma\", 0.66, 0.45, \"Gamma\", \"45 jobs\"),\n                    ChartPoint::new(\"delta\", 1.0, 0.90, \"Delta\", \"90 jobs\"),\n                ])]),\n            )\n            .axes(ChartAxes::default().y_ends(\"0\", \"max\")),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "code-view",

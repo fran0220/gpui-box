@@ -60,10 +60,14 @@ formatting Rust digits. The English adapter is a fallback, not a locale.
 supplies a date adapter or a file policy those fields stay visible as
 unrenderable rather than disappearing.
 
-**Line chart.** `LineChart` paints one or more host-owned series inside a
-frame whose axis wording the host already wrote. It invents no domain and
-keeps Loading / Empty / Unavailable / Error / Ready distinct. `BarChart`
-draws the same contract as categorized bars.
+**Charts.** `ChartPoint` gives every sample caller-owned business identity and
+exact display text. `LineChart` and `BarChart` now run keyed enter/update/exit
+motion without delaying semantic values; reduced motion settles immediately.
+Line charts can add renderer-backed multi-stop area fills and an animated
+crosshair whose pointer and keyboard callbacks report business ids while its
+tooltip swaps exact strings atomically. A failed refresh can retain the last
+verified series as an explicit stale state. Axis wording, domains, queries,
+aggregation, and locale policy remain host-owned.
 
 **Schema date fields.** `SchemaKind::Date`, `Time`, and `DateRange` now
 construct the existing date controls when the host has installed a

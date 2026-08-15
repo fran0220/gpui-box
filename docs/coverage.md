@@ -177,9 +177,12 @@ own; both are exercised through every control and overlay that uses them.
   a document that needs them is one an application converts before it arrives.
 - **Inventing a scale, a locale, or a series policy.** A chart still does not
   own data. Axes, ticks, domains, stacking, aggregation, and "2 minutes ago"
-  are facts the host already has or can compute; Box paints them. The old
-  Kit-era refusal of charts themselves is lifted: line, bar, area, and
-  distribution surfaces are in scope as application primitives. A
+  are facts the host already has or can compute; Box paints them. Line and bar
+  geometry now enters, updates, and exits by caller business id; area fill,
+  exact-text crosshair tooltips, keyboard traversal, and stale-data retention
+  are component behavior rather than downstream drawing work. The old Kit-era
+  refusal of charts themselves is lifted: line, bar, area, and distribution
+  surfaces are in scope as application primitives. A
   business-intelligence toolkit — live query, crossfilter, annotation
   layers, financial overlays — is still a product, not a substrate.
 - **Owning a platform picker.** Colour, file, and print dialogs that replace

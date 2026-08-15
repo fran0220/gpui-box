@@ -4,7 +4,9 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use gpui::{IntoElement, ParentElement, Styled, TestAppContext, div, px};
+use gpui::{
+    IntoElement, Modifiers, MouseMoveEvent, ParentElement, Styled, TestAppContext, div, point, px,
+};
 use gpui_kit::prelude::*;
 use gpui_kit_testkit::harness::Harness;
 
@@ -342,4 +344,105 @@ fn browser_long_content_stays_inside_a_narrow_contract(cx: &mut TestAppContext) 
     assert!(f32::from(panel.size.width) <= 184.0);
     assert!(address.right() <= panel.right());
     assert!(viewport.right() <= panel.right());
+}
+
+fn chart_series() -> Vec<ChartSeries> {
+    vec![ChartSeries::new("cpu", "CPU").points([
+        ChartPoint::new("early", 0.15, 0.2, "00:15", "20%"),
+        ChartPoint::new("late", 0.85, 0.8, "00:45", "80%"),
+    ])]
+}
+
+#[gpui::test]
+fn chart_pointer_and_keyboard_report_business_identity(cx: &mut TestAppContext) {
+    let reports = Rc::new(RefCell::new(Vec::<ChartSelection>::new()));
+    let sink = Rc::clone(&reports);
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let sink = Rc::clone(&sink);
+        div()
+            .w(px(420.0))
+            .child(
+                LineChart::new("chart", "CPU", ChartState::Ready(chart_series()))
+                    .crosshair()
+                    .current("cpu", "early")
+                    .on_current(move |selection, _, _| sink.borrow_mut().push(selection)),
+            )
+            .into_any_element()
+    });
+
+    let plot = harness.bounds("chart.plot").expect("plot bounds");
+    let pointer = point(
+        plot.left() + plot.size.width * 0.85,
+        plot.top() + plot.size.height * 0.2,
+    );
+    harness.context().simulate_event(MouseMoveEvent {
+        position: pointer,
+        pressed_button: None,
+        modifiers: Modifiers::none(),
+    });
+    harness.context().run_until_parked();
+
+    assert_eq!(
+        reports.borrow().last(),
+        Some(&ChartSelection::new("cpu", "late"))
+    );
+    assert_eq!(
+        harness
+            .node("chart.series.cpu.point.late")
+            .expect("current point")
+            .value
+            .as_deref(),
+        Some("80%")
+    );
+
+    harness.update(|window, cx| window.focus_next(cx));
+    harness.keystrokes("left");
+    assert_eq!(
+        reports.borrow().last(),
+        Some(&ChartSelection::new("cpu", "early"))
+    );
+}
+
+#[gpui::test]
+fn chart_semantics_take_new_text_before_pixels_settle(cx: &mut TestAppContext) {
+    let state = Rc::new(RefCell::new(ChartState::Ready(vec![
+        ChartSeries::new("cpu", "CPU").points([ChartPoint::new("now", 0.25, 0.2, "Now", "20%")]),
+    ])));
+    let scene = Rc::clone(&state);
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        LineChart::new("chart", "CPU", scene.borrow().clone())
+            .area()
+            .current("cpu", "now")
+            .into_any_element()
+    });
+
+    state.replace(ChartState::Stale {
+        series: vec![
+            ChartSeries::new("cpu", "CPU")
+                .points([ChartPoint::new("now", 0.75, 0.9, "Now", "90%")]),
+        ],
+        reason: "refresh failed".into(),
+    });
+    harness.update(|_, cx| cx.refresh_windows());
+
+    assert_eq!(
+        harness
+            .node("chart.series.cpu.point.now")
+            .expect("current point")
+            .value
+            .as_deref(),
+        Some("90%"),
+        "only the geometry travels; current text is the newest host fact"
+    );
+    let chart = harness.node("chart").expect("chart");
+    assert_eq!(chart.value.as_deref(), Some("stale"));
+    assert_eq!(chart.description.as_deref(), Some("refresh failed"));
+    assert_eq!(
+        harness
+            .node("chart.stale")
+            .expect("visible refresh warning")
+            .text
+            .as_deref(),
+        Some("refresh failed")
+    );
 }

@@ -48,6 +48,14 @@ GPUI's reduced-motion flag controls `with_animation`. Do not create wall-clock
 animation loops that ignore it. Essential state remains understandable when
 entrance and repeating animations snap to rest states.
 
+Charts keep semantic values separate from animated geometry. Pointer movement
+and Left/Right navigation move the crosshair by stable caller-owned series and
+point ids, publish the current point immediately, and report exact
+caller-formatted label and value text; neither coordinates nor displayed text
+are interpolated into invented facts. Reduced motion settles both series and
+crosshair geometry immediately. A failed refresh retains the last verified
+series as stale data and exposes the caller's failure reason.
+
 ## Content boundaries
 
 Long paths and external content must not cover controls or escape the viewport.
