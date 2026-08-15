@@ -240,9 +240,7 @@ impl Scene {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        BackgroundTag, ColorSpace, LinearColorStop, MAX_LINEAR_GRADIENT_STOPS,
-    };
+    use crate::{BackgroundTag, ColorSpace, LinearColorStop, MAX_LINEAR_GRADIENT_STOPS};
 
     #[test]
     fn empty_layers_do_not_make_a_scene_drawable() {

@@ -77,21 +77,13 @@ impl ChartAxes {
         self
     }
 
-    pub fn x_ends(
-        mut self,
-        start: impl Into<SharedString>,
-        end: impl Into<SharedString>,
-    ) -> Self {
+    pub fn x_ends(mut self, start: impl Into<SharedString>, end: impl Into<SharedString>) -> Self {
         self.x_start = Some(start.into());
         self.x_end = Some(end.into());
         self
     }
 
-    pub fn y_ends(
-        mut self,
-        start: impl Into<SharedString>,
-        end: impl Into<SharedString>,
-    ) -> Self {
+    pub fn y_ends(mut self, start: impl Into<SharedString>, end: impl Into<SharedString>) -> Self {
         self.y_start = Some(start.into());
         self.y_end = Some(end.into());
         self
@@ -130,11 +122,7 @@ pub struct BarChart {
 }
 
 impl BarChart {
-    pub fn new(
-        ident: impl Into<Ident>,
-        label: impl Into<SharedString>,
-        state: ChartState,
-    ) -> Self {
+    pub fn new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: ChartState) -> Self {
         Self {
             ident: ident.into(),
             label: label.into(),
@@ -154,7 +142,10 @@ impl RenderOnce for BarChart {
         let theme = cx.theme().clone();
         let (body, spec): (gpui::AnyElement, NodeSpec) = match &self.state {
             ChartState::Ready(series) => {
-                let count = series.first().map(|series| series.points.len()).unwrap_or(0);
+                let count = series
+                    .first()
+                    .map(|series| series.points.len())
+                    .unwrap_or(0);
                 (
                     ready_bars(&self.ident, &self.label, &self.axes, series, &theme, cx),
                     NodeSpec::new(self.ident.semantic_id(), Role::Group)
@@ -186,9 +177,12 @@ fn line_like_state(
                 .value(state.name()),
         ),
         ChartState::Empty => (
-            EmptyState::new(ident.child("empty"), cx.strings().text(StringKey::ChartEmpty))
-                .kind(EmptyKind::Empty)
-                .into_any_element(),
+            EmptyState::new(
+                ident.child("empty"),
+                cx.strings().text(StringKey::ChartEmpty),
+            )
+            .kind(EmptyKind::Empty)
+            .into_any_element(),
             NodeSpec::new(ident.semantic_id(), Role::Status)
                 .text(label.clone())
                 .value(state.name()),
@@ -223,11 +217,7 @@ pub struct LineChart {
 }
 
 impl LineChart {
-    pub fn new(
-        ident: impl Into<Ident>,
-        label: impl Into<SharedString>,
-        state: ChartState,
-    ) -> Self {
+    pub fn new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: ChartState) -> Self {
         Self {
             ident: ident.into(),
             label: label.into(),
@@ -259,10 +249,7 @@ impl RenderOnce for LineChart {
             other => line_like_state(&self.ident, &self.label, other, cx),
         };
 
-        div()
-            .w_full()
-            .child(body)
-            .semantic_in(cx, spec)
+        div().w_full().child(body).semantic_in(cx, spec)
     }
 }
 
@@ -326,12 +313,7 @@ fn ready_chart(
                         .row()
                         .items_center()
                         .gap_token(theme, Space::Xs)
-                        .child(
-                            div()
-                                .size(px(8.0))
-                                .rounded_full()
-                                .bg(color),
-                        )
+                        .child(div().size(px(8.0)).rounded_full().bg(color))
                         .child(
                             div()
                                 .type_scale(theme, TypeScale::Caption)
