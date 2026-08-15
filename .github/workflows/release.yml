@@ -81,7 +81,7 @@ jobs:
       - name: Install Linux GPUI libraries
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev libegl1-mesa-dev libfontconfig1-dev libudev-dev libvulkan-dev libwayland-dev libx11-dev libx11-xcb-dev libxcb-randr0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-x11-dev mesa-vulkan-drivers
       - uses: dtolnay/rust-toolchain@master
-        with: { toolchain: 1.97.0, components: "rustfmt, clippy" }
+        with: { toolchain: 1.97.1, components: "rustfmt, clippy" }
       - uses: Swatinem/rust-cache@v2
         with:
           # Do not restore pre-cleanup package proof trees into release
@@ -125,7 +125,7 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev libegl1-mesa-dev libfontconfig1-dev libudev-dev libvulkan-dev libwayland-dev libx11-dev libx11-xcb-dev libxcb-randr0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-x11-dev mesa-vulkan-drivers
       - uses: dtolnay/rust-toolchain@master
-        with: { toolchain: 1.97.0, components: "clippy" }
+        with: { toolchain: 1.97.1, components: "clippy" }
       - uses: Swatinem/rust-cache@v2
       - name: Run native media lifecycle tests
         run: cargo test -p gpui-box-media --all-features --locked
@@ -152,7 +152,7 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev libegl1-mesa-dev libfontconfig1-dev libudev-dev libvulkan-dev libwayland-dev libx11-dev libx11-xcb-dev libxcb-randr0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-x11-dev mesa-vulkan-drivers
       - uses: dtolnay/rust-toolchain@master
-        with: { toolchain: 1.97.0 }
+        with: { toolchain: 1.97.1 }
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: tools/headless-visual -> target
@@ -172,7 +172,7 @@ jobs:
       - uses: actions/checkout@v5
         with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0 }
       - uses: dtolnay/rust-toolchain@master
-        with: { toolchain: 1.97.0 }
+        with: { toolchain: 1.97.1 }
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: tools/headless-visual -> target
@@ -223,7 +223,7 @@ jobs:
       - uses: actions/checkout@v5
         with: { ref: "${{ needs.preflight.outputs.release_commit }}", fetch-depth: 0 }
       - uses: dtolnay/rust-toolchain@master
-        with: { toolchain: 1.97.0, targets: wasm32-unknown-unknown }
+        with: { toolchain: 1.97.1, targets: wasm32-unknown-unknown }
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
         with: { tool: "wasm-bindgen-cli@0.2.126" }
@@ -243,7 +243,7 @@ jobs:
         if: ${{ inputs.version != '0.1.0' && runner.os == 'Linux' }}
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev libegl1-mesa-dev libfontconfig1-dev libudev-dev libvulkan-dev libwayland-dev libx11-dev libx11-xcb-dev libxcb-randr0-dev libxcb-xfixes0-dev libxcb1-dev libxkbcommon-x11-dev mesa-vulkan-drivers
       - uses: dtolnay/rust-toolchain@master
-        with: { toolchain: 1.97.0 }
+        with: { toolchain: 1.97.1 }
       - name: Install cargo-semver-checks
         if: ${{ inputs.version != '0.1.0' }}
         uses: taiki-e/install-action@v2
@@ -270,7 +270,7 @@ jobs:
           test "$(git -C release rev-parse HEAD)" = "${{ needs.preflight.outputs.release_commit }}"
           test -z "$(git -C release status --porcelain)"
       - uses: dtolnay/rust-toolchain@master
-        with: { toolchain: 1.97.0 }
+        with: { toolchain: 1.97.1 }
       - uses: actions/download-artifact@v7
         with:
           name: gpui-box-${{ inputs.version }}-${{ needs.preflight.outputs.release_commit }}-crates
@@ -304,7 +304,7 @@ jobs:
           test "$(git -C release rev-parse HEAD)" = "${{ needs.preflight.outputs.release_commit }}"
           test -z "$(git -C release status --porcelain)"
       - uses: dtolnay/rust-toolchain@master
-        with: { toolchain: 1.97.0 }
+        with: { toolchain: 1.97.1 }
       - uses: actions/download-artifact@v7
         with:
           name: gpui-box-${{ inputs.version }}-${{ needs.preflight.outputs.release_commit }}-crates
