@@ -17,6 +17,7 @@
 //! it did not; nothing is played, so [`TransportBar`] reports every control
 //! and moves no head. A duration nobody knows is a state, not a zero.
 
+pub mod agent_document;
 pub mod browser;
 pub mod code_view;
 pub mod diff_view;
@@ -26,6 +27,9 @@ pub mod markdown;
 pub mod message_list;
 pub mod transport;
 
+pub use agent_document::{
+    AgentBlockKind, AgentDocument, AgentDocumentBlock, AgentDocumentEvent, AgentDocumentState,
+};
 pub use browser::{BrowserPanel, ViewportState};
 pub use code_view::{CodeLine, CodeView, LineMark};
 pub use diff_view::{DiffFile, DiffHunk, DiffLine, DiffPresentation, DiffView, DiffViewEvent};

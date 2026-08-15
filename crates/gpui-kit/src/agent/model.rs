@@ -784,8 +784,12 @@ mod tests {
     #[test]
     fn visual_event_identity_round_trips_through_json() {
         let id = VisualEventId::new("event-7");
-        let json = serde_json::to_string(&id).unwrap();
+        let json = serde_json::to_string(&id).expect("visual event identity serializes");
         assert_eq!(json, "\"event-7\"");
-        assert_eq!(serde_json::from_str::<VisualEventId>(&json).unwrap(), id);
+        assert_eq!(
+            serde_json::from_str::<VisualEventId>(&json)
+                .expect("visual event identity deserializes"),
+            id
+        );
     }
 }

@@ -116,6 +116,7 @@ pub mod prelude {
         NodeGraph, NodeGraphEvent, NodeMetric, NodeState, Placed, PortDirection, PortSide,
     };
     pub use crate::content::{
+        AgentBlockKind, AgentDocument, AgentDocumentBlock, AgentDocumentEvent, AgentDocumentState,
         Attachment, BrowserPanel, BufferedRange, CodeBlock, CodeLine, CodeSpan, CodeView,
         DeliveryState, DiffFile, DiffHunk, DiffLine, DiffPresentation, DiffView, DiffViewEvent,
         FitMode, ImageFrame, ImageRequest, ImageSize, ImageState, ImageViewer, ImageViewerEvent,

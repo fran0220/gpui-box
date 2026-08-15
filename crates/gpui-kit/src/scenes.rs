@@ -286,6 +286,10 @@ pub fn catalog() -> Vec<Scene> {
             build: markdown,
         },
         Scene {
+            name: "agent-document",
+            build: agent_document,
+        },
+        Scene {
             name: "conversation",
             build: conversation,
         },
@@ -5331,6 +5335,76 @@ fn markdown(_window: &mut Window, cx: &mut App) -> AnyElement {
             Markdown::new("scene.markdown.short", SCENE_DOCUMENT)
                 .max_lines(4)
                 .on_event(|_, _, _| {}),
+        )
+        .into_any_element()
+}
+
+fn agent_document(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(680.0))
+        .child(
+            AgentDocument::new("scene.agent-document")
+                .block(
+                    AgentDocumentBlock::markdown(
+                        "summary",
+                        "## Review complete\n\nThe run kept its **verified result** while the refresh failed.",
+                    )
+                    .revision(3),
+                )
+                .block(
+                    AgentDocumentBlock::code(
+                        "patch",
+                        CodeView::from_text(
+                            "scene.agent-document.patch",
+                            "pub fn bounded_retry(attempt: usize) -> bool {\n    attempt < 3\n}",
+                        )
+                        .language("rust"),
+                    )
+                    .label("Proposed code")
+                    .revision(2),
+                )
+                .block(
+                    AgentDocumentBlock::tool_call(
+                        "verification",
+                        ToolCallCard::new("scene.agent-document.tool", "cargo test")
+                            .state(ToolCallState::Succeeded {
+                                output: ToolOutput::Silent,
+                            })
+                            .elapsed("1.4 s"),
+                    )
+                    .revision(1),
+                )
+                .block(AgentDocumentBlock::notice(
+                    "refresh",
+                    "The last refresh failed; the result above is the last verified value.",
+                    Tone::Warning,
+                )),
+        )
+        .child(
+            Divider::new()
+                .id("scene.agent-document.rule")
+                .label("Document states"),
+        )
+        .child(
+            div()
+                .row_reading(cx.layout_direction())
+                .gap_token(&theme, Space::Lg)
+                .child(
+                    div().flex_1().child(
+                        AgentDocument::new("scene.agent-document.empty")
+                            .state(AgentDocumentState::Empty("No results were returned.".into())),
+                    ),
+                )
+                .child(
+                    div().flex_1().child(
+                        AgentDocument::new("scene.agent-document.unavailable").state(
+                            AgentDocumentState::Unavailable(
+                                "The host refused to provide this document.".into(),
+                            ),
+                        ),
+                    ),
+                ),
         )
         .into_any_element()
 }

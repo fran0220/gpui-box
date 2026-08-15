@@ -1,12 +1,21 @@
 # Content
 
-`Markdown` and `MessageList` are the two surfaces in this library that draw
-text nobody in the application wrote. A button's label is authored; a
-document's contents, and a message's body, are not. They arrive from a file, a
-model, or another person, and they may contain a tag, a destination, or an
-image reference that would act on the reader if anything here acted on it.
+`Markdown`, `AgentDocument`, and `MessageList` are the surfaces in this library
+that draw text nobody in the application wrote. A button's label is authored;
+a document's contents, a typed model result, and a message's body are not. They
+arrive from a file, a model, or another person, and they may contain a tag, a
+destination, or an image reference that would act on the reader if anything
+here acted on it.
 
 So nothing here acts. This file is the posture written down.
+
+`AgentDocument` keeps Markdown in that prose role instead of making it the
+protocol for every model result. Its stable, revisioned blocks carry existing
+code, diff, schema, chart, image, tool-call, notice, choice, and artifact
+components. A reconnect updates the caller-owned block id; duplicate ids are
+reported and never silently merged. Markdown events include the block id that
+produced them, so a host applies the same link and image policy it already uses
+for a standalone document.
 
 ## The Markdown security posture
 

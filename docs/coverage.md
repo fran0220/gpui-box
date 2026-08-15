@@ -23,7 +23,7 @@ input, and an entry in `docs/components.md`.
 | Navigation | `Tabs`, `Accordion`, `Collapsible`, `Breadcrumb`, `Sidebar`, `Pagination`, `Wizard`, `UndoHistory` |
 | Data | `List` (virtualized), `Table`, `DataGrid` (virtualized), `BulkBar`, `Tree` |
 | Date and time | `Calendar`, `DateInput`, `RangePicker`, `TimeInput` |
-| Content | `Markdown`, `MessageList`, `ImageViewer`, `TransportBar`, `BrowserPanel` (shell only), `LogStream`, `DiffView` |
+| Content | `Markdown`, `AgentDocument`, `MessageList`, `ImageViewer`, `TransportBar`, `BrowserPanel` (shell only), `LogStream`, `DiffView` |
 | Display | `Badge`, `Tag`, `Avatar`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `StatusDot`, `StatusLine`, `Callout`, `PulseLoader`, `GradientSpinner`, `Skeleton`, `ProgressCircle`, `DescriptionList`, `Timeline`, `Sparkline`, `LineChart`, `BarChart` |
 | Overlay | `Overlay`, `Dialog`, `Drawer`, `Popover`, `Menu`, `ContextMenu`, `Menubar`, `CommandPalette`, `Tooltip`, `HoverCard`, `Toast`, `ToastLayer`, `Kbd` |
 | Layout | `SplitPane`, `SplitTree`, `ScrollArea`, `Toolbar`, `AspectRatio` |

@@ -19,6 +19,8 @@
 :
 Accordion
 AccordionSection
+AgentDocument
+AgentDocumentBlock
 AnchorList
 AnimatedNumber
 ApprovalPrompt
@@ -54,6 +56,7 @@ Dock
 DockPanel
 Drawer
 Dropzone
+Element(..)
 EmptyState
 FailurePanel
 FilterBar
@@ -87,11 +90,13 @@ Menubar
 MessageList
 ModelViewer
 NodeGraph
+Notice
 Notification
 NotificationCenter
 NumberInput
 OfferingCatalog
 OneTimeCodeInput
+Option::is_none
 Overlay
 POSITION
 Pagination
@@ -128,6 +133,7 @@ Table
 Tabs
 Tag
 TagInput
+Text
 TextArea
 TextInput
 ThinkingBlock
@@ -148,6 +154,7 @@ TreeGrid
 UndoHistory
 UploadList
 VEC3
+Vec::is_empty
 VideoPlayer
 Wizard
 [REDACTED]

@@ -29,6 +29,32 @@
       ]
     },
     {
+      "name": "AgentDocument",
+      "kind": "builder",
+      "path": "gpui_kit::content::AgentDocument",
+      "source": "crates/gpui-kit/src/content/agent_document.rs",
+      "summary": "A read-only sequence of typed agent output blocks.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "state(state: AgentDocumentState) -> Self",
+        "block(block: AgentDocumentBlock) -> Self",
+        "blocks(blocks: impl IntoIterator<Item = AgentDocumentBlock>) -> Self",
+        "on_event(handler: impl Fn(&AgentDocumentEvent, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "duplicate_ids() -> Vec<SharedString>"
+      ],
+      "reports": [
+        "Markdown"
+      ],
+      "scenes": [
+        "agent-document"
+      ]
+    },
+    {
       "name": "AnchorList",
       "kind": "builder",
       "path": "gpui_kit::navigation::AnchorList",
@@ -495,6 +521,7 @@
         "auth-verification",
         "frost",
         "motion-flip",
+        "agent-document",
         "tool-call",
         "step-list",
         "reading-direction",
@@ -602,6 +629,7 @@
       ],
       "reports": [],
       "scenes": [
+        "agent-document",
         "code-view"
       ]
     },
@@ -1089,6 +1117,7 @@
         "drawer",
         "ide-shell",
         "markdown",
+        "agent-document",
         "conversation",
         "image-viewer",
         "transport",
@@ -1932,6 +1961,7 @@
       ],
       "scenes": [
         "markdown",
+        "agent-document",
         "conversation"
       ]
     },
@@ -3565,6 +3595,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
+        "agent-document",
         "tool-call",
         "step-list"
       ]
@@ -3898,6 +3929,31 @@
       ]
     },
     {
+      "name": "AgentBlockKind",
+      "path": "gpui_kit::content::AgentBlockKind",
+      "summary": "The semantic kind of one document block.",
+      "variants": [
+        "Text",
+        "Markdown",
+        "Code",
+        "ToolCall",
+        "Diff",
+        "Artifact",
+        "Schema",
+        "Chart",
+        "Image",
+        "Notice",
+        "Choice",
+        "Custom"
+      ],
+      "construct": [],
+      "options": [
+        "as_str() -> &'static str"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "AgentDescriptor",
       "path": "gpui_kit::agent::AgentDescriptor",
       "summary": "Identity and caller-owned description of one agent.",
@@ -3911,6 +3967,68 @@
       ],
       "commands": [],
       "queries": []
+    },
+    {
+      "name": "AgentDocumentBlock",
+      "path": "gpui_kit::content::AgentDocumentBlock",
+      "summary": "One stable part of an AgentDocument.",
+      "variants": [],
+      "construct": [
+        "text(id: impl Into<SharedString>, text: impl Into<SharedString>) -> Self",
+        "markdown(id: impl Into<SharedString>, source: impl Into<SharedString>) -> Self",
+        "element(id: impl Into<SharedString>, kind: AgentBlockKind, element: impl IntoElement) -> Self",
+        "code(id: impl Into<SharedString>, element: impl IntoElement) -> Self",
+        "tool_call(id: impl Into<SharedString>, element: impl IntoElement) -> Self",
+        "diff(id: impl Into<SharedString>, element: impl IntoElement) -> Self",
+        "artifact(id: impl Into<SharedString>, element: impl IntoElement) -> Self",
+        "schema(id: impl Into<SharedString>, element: impl IntoElement) -> Self",
+        "chart(id: impl Into<SharedString>, element: impl IntoElement) -> Self",
+        "image(id: impl Into<SharedString>, element: impl IntoElement) -> Self",
+        "choice(id: impl Into<SharedString>, element: impl IntoElement) -> Self",
+        "custom(id: impl Into<SharedString>, element: impl IntoElement) -> Self",
+        "notice(id: impl Into<SharedString>, message: impl Into<SharedString>, tone: Tone) -> Self"
+      ],
+      "options": [
+        "revision(revision: u64) -> Self",
+        "streaming(streaming: bool) -> Self",
+        "label(label: impl Into<SharedString>) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &SharedString",
+        "kind() -> AgentBlockKind"
+      ]
+    },
+    {
+      "name": "AgentDocumentEvent",
+      "path": "gpui_kit::content::AgentDocumentEvent",
+      "summary": "An action originating in a typed document block.",
+      "variants": [
+        "Markdown"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "AgentDocumentState",
+      "path": "gpui_kit::content::AgentDocumentState",
+      "summary": "What is known about the document as a whole.",
+      "variants": [
+        "Idle",
+        "Loading",
+        "Ready",
+        "Empty",
+        "Unavailable",
+        "Failed"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "as_str() -> &'static str"
+      ]
     },
     {
       "name": "AgentExecutionState",
@@ -9684,6 +9802,19 @@
         "Markdown"
       ],
       "example": "fn markdown(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(640.0))\n        .child(Markdown::new(\"scene.markdown.document\", SCENE_DOCUMENT).on_event(|_, _, _| {}))\n        .child(Divider::new().id(\"scene.markdown.rule\").label(\"Truncated\"))\n        .child(\n            Markdown::new(\"scene.markdown.short\", SCENE_DOCUMENT)\n                .max_lines(4)\n                .on_event(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "agent-document",
+      "capture": "cargo run -p xtask -- headless capture agent-document",
+      "uses": [
+        "AgentDocument",
+        "Card",
+        "CodeView",
+        "Divider",
+        "Markdown",
+        "ToolCallCard"
+      ],
+      "example": "fn agent_document(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(680.0))\n        .child(\n            AgentDocument::new(\"scene.agent-document\")\n                .block(\n                    AgentDocumentBlock::markdown(\n                        \"summary\",\n                        \"## Review complete\\n\\nThe run kept its **verified result** while the refresh failed.\",\n                    )\n                    .revision(3),\n                )\n                .block(\n                    AgentDocumentBlock::code(\n                        \"patch\",\n                        CodeView::from_text(\n                            \"scene.agent-document.patch\",\n                            \"pub fn bounded_retry(attempt: usize) -> bool {\\n    attempt < 3\\n}\",\n                        )\n                        .language(\"rust\"),\n                    )\n                    .label(\"Proposed code\")\n                    .revision(2),\n                )\n                .block(\n                    AgentDocumentBlock::tool_call(\n                        \"verification\",\n                        ToolCallCard::new(\"scene.agent-document.tool\", \"cargo test\")\n                            .state(ToolCallState::Succeeded {\n                                output: ToolOutput::Silent,\n                            })\n                            .elapsed(\"1.4 s\"),\n                    )\n                    .revision(1),\n                )\n                .block(AgentDocumentBlock::notice(\n                    \"refresh\",\n                    \"The last refresh failed; the result above is the last verified value.\",\n                    Tone::Warning,\n                )),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.agent-document.rule\")\n                .label(\"Document states\"),\n        )\n        .child(\n            div()\n                .row_reading(cx.layout_direction())\n                .gap_token(&theme, Space::Lg)\n                .child(\n                    div().flex_1().child(\n                        AgentDocument::new(\"scene.agent-document.empty\")\n                            .state(AgentDocumentState::Empty(\"No results were returned.\".into())),\n                    ),\n                )\n                .child(\n                    div().flex_1().child(\n                        AgentDocument::new(\"scene.agent-document.unavailable\").state(\n                            AgentDocumentState::Unavailable(\n                                \"The host refused to provide this document.\".into(),\n                            ),\n                        ),\n                    ),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "conversation",
