@@ -141,8 +141,8 @@ struct Background {
     color_space: u32,
     solid: Hsla,
     gradient_angle_or_pattern_height: f32,
-    colors: array<LinearColorStop, 2>,
-    pad: u32,
+    colors: array<LinearColorStop, 8>,
+    color_stop_count: u32,
 }
 
 struct AtlasTextureId {
@@ -401,28 +401,28 @@ struct GradientColor {
     color1: vec4<f32>,
 }
 
-fn prepare_gradient_color(tag: u32, color_space: u32,
-    solid: Hsla, colors: array<LinearColorStop, 2>) -> GradientColor {
+fn prepare_gradient_pair(color_space: u32, color0: Hsla, color1: Hsla) -> GradientColor {
     var result = GradientColor();
+    result.color0 = hsla_to_rgba(color0);
+    result.color1 = hsla_to_rgba(color1);
 
+    if (color_space == 0u) {
+        result.color0 = linear_to_srgba(result.color0);
+        result.color1 = linear_to_srgba(result.color1);
+    } else if (color_space == 1u) {
+        result.color0 = linear_srgb_to_oklab(result.color0);
+        result.color1 = linear_srgb_to_oklab(result.color1);
+    }
+    return result;
+}
+
+fn prepare_gradient_color(tag: u32, color_space: u32,
+    solid: Hsla, colors: array<LinearColorStop, 8>) -> GradientColor {
+    var result = GradientColor();
     if (tag == 0u || tag == 2u || tag == 3u) {
         result.solid = hsla_to_rgba(solid);
     } else if (tag == 1u) {
-        // The hsla_to_rgba is returns a linear sRGB color
-        result.color0 = hsla_to_rgba(colors[0].color);
-        result.color1 = hsla_to_rgba(colors[1].color);
-
-        // Prepare color space in vertex for avoid conversion
-        // in fragment shader for performance reasons
-        if (color_space == 0u) {
-            // sRGB
-            result.color0 = linear_to_srgba(result.color0);
-            result.color1 = linear_to_srgba(result.color1);
-        } else if (color_space == 1u) {
-            // Oklab
-            result.color0 = linear_srgb_to_oklab(result.color0);
-            result.color1 = linear_srgb_to_oklab(result.color1);
-        }
+        result = prepare_gradient_pair(color_space, colors[0].color, colors[1].color);
     }
 
     return result;
@@ -467,9 +467,6 @@ fn gradient_color(background: Background, position: vec2<f32>, bounds: Bounds,
             let angle = background.gradient_angle_or_pattern_height;
             let radians = (angle % 360.0 - 90.0) * M_PI_F / 180.0;
             var direction = vec2<f32>(cos(radians), sin(radians));
-            let stop0_percentage = background.colors[0].percentage;
-            let stop1_percentage = background.colors[1].percentage;
-
             // Expand the short side to be the same as the long side
             if (bounds.size.x > bounds.size.y) {
                 direction.y *= bounds.size.y / bounds.size.x;
@@ -489,17 +486,37 @@ fn gradient_color(background: Background, position: vec2<f32>, bounds: Bounds,
                 t = (t + half_size.y) / bounds.size.y;
             }
 
-            // Adjust t based on the stop percentages
-            t = (t - stop0_percentage) / (stop1_percentage - stop0_percentage);
-            t = clamp(t, 0.0, 1.0);
+            // Select the two stops surrounding this pixel. The stop count and
+            // fixed capacity match GPUI's renderer ABI on every backend.
+            let stop_count = clamp(background.color_stop_count, 2u, 8u);
+            var upper = stop_count - 1u;
+            for (var index = 1u; index < 8u; index += 1u) {
+                if (index < stop_count && t <= background.colors[index].percentage) {
+                    upper = index;
+                    break;
+                }
+            }
+            let lower = upper - 1u;
+            let start = background.colors[lower].percentage;
+            let end = background.colors[upper].percentage;
+            t = select(
+                select(1.0, 0.0, t < end),
+                clamp((t - start) / (end - start), 0.0, 1.0),
+                end > start,
+            );
+            let segment = prepare_gradient_pair(
+                background.color_space,
+                background.colors[lower].color,
+                background.colors[upper].color,
+            );
 
             var encoded_color = vec4<f32>(0.0);
             switch (background.color_space) {
                 default: {
-                    encoded_color = mix(color0, color1, t);
+                    encoded_color = mix(segment.color0, segment.color1, t);
                 }
                 case 1u: {
-                    let oklab_color = mix(color0, color1, t);
+                    let oklab_color = mix(segment.color0, segment.color1, t);
                     encoded_color = linear_to_srgba(oklab_to_linear_srgb(oklab_color));
                 }
             }

@@ -21,6 +21,9 @@ scripts/sync-zed/ and provenance.toml and are verified entirely offline; they
 are attribution records, not active update lanes. The later platform-view lifetime
 attachment, full-frame clipping, and macOS restacking are GPUI Box work and are
 not represented as imported Zed source.
+The renderer-backed linear-gradient primitive for up to eight ordered stops,
+including its Metal, Direct3D, WGPU, and WebGL shaders, is GPUI Box work and
+imports no additional source.
 The AVFoundation and Media Foundation playback services are GPUI Box work and
 use operating-system frameworks; they import no additional third-party source
 or media assets.

@@ -63,8 +63,8 @@ struct Background {
     uint color_space;
     Hsla solid;
     float gradient_angle_or_pattern_height;
-    LinearColorStop colors[2];
-    uint pad;
+    LinearColorStop colors[8];
+    uint color_stop_count;
 };
 
 struct GradientColor {
@@ -314,23 +314,25 @@ float quad_sdf(float2 pt, Bounds bounds, Corners corner_radii) {
     return quad_sdf_impl(corner_center_to_point, corner_radius);
 }
 
-GradientColor prepare_gradient_color(uint tag, uint color_space, Hsla solid, LinearColorStop colors[2]) {
+GradientColor prepare_gradient_pair(uint color_space, Hsla color0, Hsla color1) {
+    GradientColor output;
+    output.color0 = hsla_to_rgba(color0);
+    output.color1 = hsla_to_rgba(color1);
+
+    if (color_space == 1) {
+        output.color0 = srgb_to_oklab(output.color0);
+        output.color1 = srgb_to_oklab(output.color1);
+    }
+    return output;
+}
+
+GradientColor prepare_gradient_color(uint tag, uint color_space, Hsla solid, LinearColorStop colors[8]) {
     GradientColor output;
     if (tag == 0 || tag == 2 || tag == 3) {
         output.solid = hsla_to_rgba(solid);
     } else if (tag == 1) {
-        output.color0 = hsla_to_rgba(colors[0].color);
-        output.color1 = hsla_to_rgba(colors[1].color);
-
-        // Prepare color space in vertex for avoid conversion
-        // in fragment shader for performance reasons
-        if (color_space == 1) {
-            // Oklab
-            output.color0 = srgb_to_oklab(output.color0);
-            output.color1 = srgb_to_oklab(output.color1);
-        }
+        output = prepare_gradient_pair(color_space, colors[0].color, colors[1].color);
     }
-
     return output;
 }
 
@@ -398,18 +400,35 @@ float4 gradient_color(Background background,
                 t = (t + half_size.y) / bounds.size.y;
             }
 
-            // Adjust t based on the stop percentages
-            t = (t - background.colors[0].percentage)
-                / (background.colors[1].percentage
-                - background.colors[0].percentage);
-            t = clamp(t, 0.0, 1.0);
+            // Select the two stops surrounding this pixel. The stop count and
+            // fixed capacity match GPUI's renderer ABI on every backend.
+            uint stop_count = clamp(background.color_stop_count, 2u, 8u);
+            uint upper = stop_count - 1u;
+            [unroll]
+            for (uint index = 1u; index < 8u; index++) {
+                if (index < stop_count && t <= background.colors[index].percentage) {
+                    upper = index;
+                    break;
+                }
+            }
+            uint lower = upper - 1u;
+            float start = background.colors[lower].percentage;
+            float end = background.colors[upper].percentage;
+            t = end > start ? clamp((t - start) / (end - start), 0.0, 1.0)
+                            : (t < end ? 0.0 : 1.0);
+
+            GradientColor segment = prepare_gradient_pair(
+                background.color_space,
+                background.colors[lower].color,
+                background.colors[upper].color
+            );
 
             switch (background.color_space) {
                 case 0:
-                    color = lerp(color0, color1, t);
+                    color = lerp(segment.color0, segment.color1, t);
                     break;
                 case 1: {
-                    float4 oklab_color = lerp(color0, color1, t);
+                    float4 oklab_color = lerp(segment.color0, segment.color1, t);
                     color = oklab_to_srgb(oklab_color);
                     break;
                 }

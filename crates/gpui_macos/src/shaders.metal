@@ -1235,18 +1235,36 @@ float4 fill_color(Background background,
           t = (t + half_size.y) / bounds.size.height;
       }
 
-      // Adjust t based on the stop percentages
-      t = (t - background.colors[0].percentage)
-        / (background.colors[1].percentage
-        - background.colors[0].percentage);
-      t = clamp(t, 0.0, 1.0);
+      // Select the two stops surrounding this pixel. The stop count and
+      // fixed capacity match GPUI's renderer ABI on every backend.
+      uint stop_count = clamp(background.color_stop_count, 2u, 8u);
+      uint upper = stop_count - 1u;
+      for (uint index = 1u; index < 8u; index++) {
+        if (index < stop_count && t <= background.colors[index].percentage) {
+          upper = index;
+          break;
+        }
+      }
+      uint lower = upper - 1u;
+      float start = background.colors[lower].percentage;
+      float end = background.colors[upper].percentage;
+      t = end > start ? clamp((t - start) / (end - start), 0.0, 1.0)
+                      : (t < end ? 0.0 : 1.0);
+
+      GradientColor segment = prepare_fill_color(
+        background.tag,
+        background.color_space,
+        background.solid,
+        background.colors[lower].color,
+        background.colors[upper].color
+      );
 
       switch (background.color_space) {
         case 0:
-          color = mix(color0, color1, t);
+          color = mix(segment.color0, segment.color1, t);
           break;
         case 1: {
-          float4 oklab_color = mix(color0, color1, t);
+          float4 oklab_color = mix(segment.color0, segment.color1, t);
           color = oklab_to_srgb(oklab_color);
           break;
         }

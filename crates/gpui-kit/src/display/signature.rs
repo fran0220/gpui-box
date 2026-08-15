@@ -12,8 +12,8 @@
 //! surface claimed is not told which colours it wore.
 
 use gpui::{
-    AnimationExt as _, AnyElement, App, Background, Div, Hsla, IntoElement, ParentElement, Styled,
-    div, linear_color_stop, linear_gradient, relative,
+    AnimationExt as _, AnyElement, App, Div, Hsla, IntoElement, ParentElement, Styled, div,
+    linear_color_stop, linear_gradient_stops, relative,
 };
 use gpui_kit_theme::Theme;
 
@@ -31,37 +31,16 @@ pub(crate) fn stops(theme: &Theme) -> [Hsla; 3] {
 }
 
 /// A left-to-right wash across the three stops.
-///
-/// The renderer takes two colour stops per gradient, so the wash is two
-/// halves rather than one three-stop block. Together they still read as
-/// one signature.
 pub(crate) fn wash(theme: &Theme) -> impl IntoElement {
     let [start, mid, end] = stops(theme);
-    div()
-        .absolute()
-        .inset_0()
-        .flex()
-        .flex_row()
-        .child(
-            div()
-                .h_full()
-                .w(relative(0.5))
-                .bg(linear_gradient(
-                    90.0,
-                    linear_color_stop(start, 0.0),
-                    linear_color_stop(mid, 1.0),
-                )),
-        )
-        .child(
-            div()
-                .h_full()
-                .w(relative(0.5))
-                .bg(linear_gradient(
-                    90.0,
-                    linear_color_stop(mid, 0.0),
-                    linear_color_stop(end, 1.0),
-                )),
-        )
+    div().absolute().inset_0().bg(linear_gradient_stops(
+        90.0,
+        [
+            linear_color_stop(start, 0.0),
+            linear_color_stop(mid, 0.5),
+            linear_color_stop(end, 1.0),
+        ],
+    ))
 }
 
 /// A colour along the signature, for a canvas that cannot take children.
@@ -100,29 +79,17 @@ pub(crate) fn unknown(id: impl Into<gpui::ElementId>, theme: &Theme, cx: &App) -
         .absolute()
         .top_0()
         .bottom_0()
-        .flex()
-        .flex_row()
         .w(relative(SWEEP_BAND))
-        .child(div().h_full().w(relative(1.0 / 3.0)).bg(linear_gradient(
+        .bg(linear_gradient_stops(
             90.0,
-            linear_color_stop(start.opacity(0.0), 0.0),
-            linear_color_stop(start, 1.0),
-        )))
-        .child(
-            div()
-                .h_full()
-                .w(relative(1.0 / 3.0))
-                .bg(linear_gradient(
-                    90.0,
-                    linear_color_stop(start, 0.0),
-                    linear_color_stop(mid, 1.0),
-                )),
-        )
-        .child(div().h_full().w(relative(1.0 / 3.0)).bg(linear_gradient(
-            90.0,
-            linear_color_stop(end, 0.0),
-            linear_color_stop(end.opacity(0.0), 1.0),
-        )));
+            [
+                linear_color_stop(start.opacity(0.0), 0.0),
+                linear_color_stop(start, 0.25),
+                linear_color_stop(mid, 0.5),
+                linear_color_stop(end, 0.75),
+                linear_color_stop(end.opacity(0.0), 1.0),
+            ],
+        ));
 
     if motion::reduce_motion(cx) {
         return band.left(relative(0.08)).into_any_element();
@@ -148,38 +115,15 @@ pub(crate) fn shimmer_band(theme: &Theme) -> Div {
         .absolute()
         .top_0()
         .bottom_0()
-        .flex()
-        .flex_row()
         .w(relative(0.38))
-        .child(div().h_full().w(relative(0.5)).bg(linear_gradient(
+        .bg(linear_gradient_stops(
             90.0,
-            linear_color_stop(start.opacity(0.0), 0.0),
-            linear_color_stop(mid, 1.0),
-        )))
-        .child(div().h_full().w(relative(0.5)).bg(linear_gradient(
-            90.0,
-            linear_color_stop(mid, 0.0),
-            linear_color_stop(end.opacity(0.0), 1.0),
-        )))
-}
-
-/// Unused helper kept so a caller that needs the raw gradient pair can
-/// build its own geometry without re-deriving the stops.
-#[allow(dead_code)]
-pub(crate) fn halves(theme: &Theme) -> [Background; 2] {
-    let [start, mid, end] = stops(theme);
-    [
-        linear_gradient(
-            90.0,
-            linear_color_stop(start, 0.0),
-            linear_color_stop(mid, 1.0),
-        ),
-        linear_gradient(
-            90.0,
-            linear_color_stop(mid, 0.0),
-            linear_color_stop(end, 1.0),
-        ),
-    ]
+            [
+                linear_color_stop(start.opacity(0.0), 0.0),
+                linear_color_stop(mid, 0.5),
+                linear_color_stop(end.opacity(0.0), 1.0),
+            ],
+        ))
 }
 
 #[cfg(test)]

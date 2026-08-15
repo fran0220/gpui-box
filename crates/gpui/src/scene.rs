@@ -240,6 +240,9 @@ impl Scene {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        BackgroundTag, ColorSpace, LinearColorStop, MAX_LINEAR_GRADIENT_STOPS,
+    };
 
     #[test]
     fn empty_layers_do_not_make_a_scene_drawable() {
@@ -612,6 +615,15 @@ mod tests {
     fn the_gpu_facing_structs_carry_no_compiler_inserted_padding() {
         use std::mem::size_of;
 
+        assert_eq!(
+            size_of::<Background>(),
+            size_of::<BackgroundTag>()
+                + size_of::<ColorSpace>()
+                + size_of::<Hsla>()
+                + size_of::<f32>()
+                + MAX_LINEAR_GRADIENT_STOPS * size_of::<LinearColorStop>()
+                + size_of::<u32>()
+        );
         assert_eq!(size_of::<GlassLobe>(), 8 * size_of::<f32>());
         assert_eq!(size_of::<GlassMaterial>(), 8 * size_of::<f32>());
         assert_eq!(
