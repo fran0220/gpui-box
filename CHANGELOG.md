@@ -51,6 +51,19 @@ library's job. Box still refuses to invent calendar arithmetic, locale
 wording, transports, and OS window chrome; it no longer refuses the
 surfaces a downstream desktop app has to put on screen.
 
+**Number adapter.** Counts go through `NumberAdapter` the way dates go
+through `DateAdapter`. `ProgressBar` asks it for `3 of 12` instead of
+formatting Rust digits. The English adapter is a fallback, not a locale.
+
+**Schema shapes a settings page can name.** `SchemaKind` now includes
+`Date`, `Time`, `DateRange`, `Files`, and repeating `List`. Until a host
+supplies a date adapter or a file policy those fields stay visible as
+unrenderable rather than disappearing.
+
+**Line chart.** `LineChart` paints one or more host-owned series inside a
+frame whose axis wording the host already wrote. It invents no domain and
+keeps Loading / Empty / Unavailable / Error / Ready distinct.
+
 ## [0.1.2] - 2026-08-13
 
 ### Added

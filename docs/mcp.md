@@ -1,14 +1,16 @@
 # GPUI Box catalog tools
 
-Install the published stdio server with:
+The crates.io package is the last published cohort (`0.1.1`). Workspace
+`main` is ahead of that cohort and is the catalog a downstream application
+should read. Install from a checkout:
 
 ```bash
-cargo install gpui-box-mcp --version 0.1.2
+cargo build --release -p gpui-box-mcp
 gpui-box-mcp --help
 ```
 
-This is the registry interface for the `0.1.2` release. For workspace
-development use `cargo build --release -p gpui-box-mcp`.
+`cargo install gpui-box-mcp` without a git revision still installs `0.1.1`.
+Do not pass `--version 0.1.2`: that tag was never published.
 
 The server deliberately contains no embedded static catalog. It reads the
 calling project's GPUI Box checkout: set `GPUI_BOX_ROOT` to the checkout root,

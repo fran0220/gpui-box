@@ -24,7 +24,7 @@ input, and an entry in `docs/components.md`.
 | Data | `List` (virtualized), `Table`, `DataGrid` (virtualized), `BulkBar`, `Tree` |
 | Date and time | `Calendar`, `DateInput`, `RangePicker`, `TimeInput` |
 | Content | `Markdown`, `MessageList`, `ImageViewer`, `TransportBar`, `BrowserPanel` (shell only), `LogStream`, `DiffView` |
-| Display | `Badge`, `Tag`, `Avatar`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `StatusDot`, `StatusLine`, `Callout`, `PulseLoader`, `GradientSpinner`, `Skeleton`, `ProgressCircle`, `DescriptionList`, `Timeline`, `Sparkline` |
+| Display | `Badge`, `Tag`, `Avatar`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `StatusDot`, `StatusLine`, `Callout`, `PulseLoader`, `GradientSpinner`, `Skeleton`, `ProgressCircle`, `DescriptionList`, `Timeline`, `Sparkline`, `LineChart` |
 | Overlay | `Overlay`, `Dialog`, `Drawer`, `Popover`, `Menu`, `ContextMenu`, `Menubar`, `CommandPalette`, `Tooltip`, `HoverCard`, `Toast`, `ToastLayer`, `Kbd` |
 | Layout | `SplitPane`, `SplitTree`, `ScrollArea`, `Toolbar`, `AspectRatio` |
 | Shell | `Dock`, `StatusBar` |
@@ -421,25 +421,28 @@ What is affected, found while converting the components:
 | `Calendar`, `DateInput`, `RangePicker`, `TimeInput` | nothing: dates already come from the host `DateAdapter` | already correct, and the model the rest should follow |
 
 The shape of the answer is visible in the date components, which own no
-calendar and ask a host-supplied `DateAdapter` for every date they show. A
-number reader of the same shape — asked for a count, a plural category, a
-percentage, a duration — would close this without pulling a formatting library
-into product-neutral infrastructure. That is a batch of its own, and none of it
-is started.
+calendar and ask a host-supplied `DateAdapter` for every date they show.
+`NumberAdapter` is that reader: a host supplies digits, plural category,
+`count of total`, and percent marks. `ProgressBar` already asks it.
+Pagination, Transport, ImageViewer, and the remaining count sites still
+format Rust digits and are the rest of this batch.
 
 ### Delivery
 
 `CHANGELOG.md` and the versioning policy in `README.md` now say what a consumer
 pins and what breaks them, including the two breaks the compiler cannot see: a
-token key and a semantic id. What is still missing is a performance budget, so
-nothing fails when a virtualized list gets slower, and published documentation;
-the gallery is local. Publishing to a registry is impossible while GPUI is a git
-dependency.
+token key and a semantic id. The publishable crates are a crates.io cohort;
+GPUI Box is no longer a git dependency of itself. What is still missing is a
+performance budget, so nothing fails when a virtualized list gets slower.
+The hosted catalog at gpui-box.origingame.dev is the published documentation;
+it is deployed from a checkout and is not itself a crates.io release.
 
-The visual regression gate is `headless check` on supported native platforms:
-macOS and Windows. It renders offscreen at a fixed device-pixel size, so it does
-not depend on a composited, frontmost window or the host display. Linux
-compatibility is deferred; prior llvmpipe images are retained but non-gating.
+The visual regression gate is `headless check` on macOS (Metal) and Windows
+(WARP). It renders offscreen at a fixed device-pixel size, so it does not
+depend on a composited, frontmost window or the host display. Linux is a
+compile-and-capability surface: CI builds the native graph there, but does
+not compare llvmpipe pixels. Prior images under
+`snapshots/headless/linux` are retired and non-gating.
 `docs/screenshot-testing.md` describes the gate and review workflow.
 
 ## Rules every covered component follows
