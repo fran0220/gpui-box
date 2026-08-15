@@ -46,7 +46,7 @@ use crate::display::status::StatusLine;
 use crate::foundation::{Disableable, FocusRing, Ident, Selectable, Sizable, StyledExt};
 use crate::layout::measure;
 use crate::motion::{self, keyed};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// How tall the scrubber's track is, and how wide the volume control is.
 /// Neither value repeats anywhere else.
@@ -648,7 +648,7 @@ impl RenderOnce for TransportBar {
                 .range(0.0, 1.0)
                 .value(self.volume)
                 .control_size(ControlSize::Sm)
-                .display(format!("{}%", (self.volume * 100.0).round() as i64))
+                .display(cx.numbers().percent(self.volume))
                 .disabled(!actionable);
             if actionable {
                 control = control.on_change(move |value, window, cx| {

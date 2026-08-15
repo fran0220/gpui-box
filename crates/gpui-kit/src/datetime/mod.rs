@@ -25,7 +25,7 @@ pub mod time_input;
 
 pub use adapter::{
     Clock, DateAdapter, Day, MonthCell, MonthGrid, MonthKey, Selectability, SharedDateAdapter,
-    TimeOfDay,
+    TimeOfDay, installed_adapter, reset_date_adapter, set_date_adapter,
 };
 pub use calendar::{Calendar, CalendarEvent, DayMark};
 pub use date_input::{DateInput, DateInputEvent};

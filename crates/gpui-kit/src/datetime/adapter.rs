@@ -234,6 +234,30 @@ pub trait DateAdapter {
 /// The adapter as the components hold it.
 pub type SharedDateAdapter = Rc<dyn DateAdapter>;
 
+struct InstalledDates(SharedDateAdapter);
+
+impl gpui::Global for InstalledDates {}
+
+/// Reads a host-installed date adapter, if one is present.
+pub fn installed_adapter(cx: &gpui::App) -> Option<SharedDateAdapter> {
+    cx.try_global::<InstalledDates>()
+        .map(|installed| Rc::clone(&installed.0))
+}
+
+/// Installs the adapter date fields read. Replaces any previous one.
+pub fn set_date_adapter(adapter: impl DateAdapter + 'static, cx: &mut gpui::App) {
+    cx.set_global(InstalledDates(Rc::new(adapter)));
+    cx.refresh_windows();
+}
+
+/// Removes the installed adapter so date fields become unrenderable again.
+pub fn reset_date_adapter(cx: &mut gpui::App) {
+    if cx.has_global::<InstalledDates>() {
+        cx.remove_global::<InstalledDates>();
+        cx.refresh_windows();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -169,6 +169,18 @@ impl DateInput {
         self.value
     }
 
+    /// The day the adapter last accepted from the typed text, if any.
+    pub fn parsed_day(&self, cx: &App) -> Option<Day> {
+        if let Some(day) = self.value {
+            return Some(day);
+        }
+        let text = self.shown_text(cx);
+        if text.trim().is_empty() {
+            return None;
+        }
+        self.adapter.parse_day(text.as_ref()).ok()
+    }
+
     /// The adapter's reason for refusing the current text, or `None`.
     pub fn message(&self) -> Option<&SharedString> {
         self.message.as_ref()

@@ -62,7 +62,13 @@ unrenderable rather than disappearing.
 
 **Line chart.** `LineChart` paints one or more host-owned series inside a
 frame whose axis wording the host already wrote. It invents no domain and
-keeps Loading / Empty / Unavailable / Error / Ready distinct.
+keeps Loading / Empty / Unavailable / Error / Ready distinct. `BarChart`
+draws the same contract as categorized bars.
+
+**Schema date fields.** `SchemaKind::Date`, `Time`, and `DateRange` now
+construct the existing date controls when the host has installed a
+`DateAdapter` through `set_date_adapter`. Without one they stay
+unrenderable. `Files` and repeating `List` still wait on a host policy.
 
 ## [0.1.2] - 2026-08-13
 

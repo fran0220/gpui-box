@@ -208,6 +208,10 @@ impl RangePicker {
         &self.calendar
     }
 
+    pub fn current_range(&self) -> Option<DayRange> {
+        self.range
+    }
+
     pub fn state(&self) -> RangeState {
         RangeState::from_range(self.range)
     }

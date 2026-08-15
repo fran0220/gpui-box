@@ -23,7 +23,7 @@ use crate::controls::select::Select;
 use crate::foundation::{
     Disableable, Ident, Selectable, Sizable, StyledExt, text as foundation_text,
 };
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type SelectHandler = Rc<dyn Fn(usize, &mut Window, &mut App)>;
 
@@ -262,7 +262,7 @@ impl RenderOnce for Pagination {
                         let current = number == self.page;
                         let page_id = format!("page-{number}");
                         let mut button = Button::new(ident.child(page_id))
-                            .label(number.to_string())
+                            .label(cx.numbers().count(number))
                             .variant(if current {
                                 ButtonVariant::Secondary
                             } else {
@@ -295,10 +295,10 @@ impl RenderOnce for Pagination {
                                     cx,
                                     NodeSpec::new(gap.semantic_id(), Role::Text)
                                         .parent(ident.semantic_id())
-                                        .value(hidden.to_string())
+                                        .value(cx.numbers().count(hidden))
                                         .text(strings.format(
                                             StringKey::PaginationMorePages,
-                                            &[&hidden.to_string()],
+                                            &[cx.numbers().count(hidden).as_ref()],
                                         )),
                                 ),
                         )
@@ -313,10 +313,13 @@ impl RenderOnce for Pagination {
         let status_text = match self.total {
             PageTotal::Known(total) => strings.format(
                 StringKey::PaginationPageOfTotal,
-                &[&self.page.to_string(), &total.to_string()],
+                &[
+                    cx.numbers().count(self.page).as_ref(),
+                    cx.numbers().count(total).as_ref(),
+                ],
             ),
             PageTotal::Unknown { .. } => {
-                strings.format(StringKey::PaginationPage, &[&self.page.to_string()])
+                strings.format(StringKey::PaginationPage, &[cx.numbers().count(self.page).as_ref()])
             }
         };
         let status = foundation_text(&theme, TypeScale::Caption, status_text.clone())
@@ -330,7 +333,7 @@ impl RenderOnce for Pagination {
 
         let mut spec = NodeSpec::new(ident.semantic_id(), Role::Group).disabled(self.disabled);
         if let Some(total) = self.total.count() {
-            spec = spec.value(total.to_string());
+            spec = spec.value(cx.numbers().count(total));
         }
 
         div()

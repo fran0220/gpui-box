@@ -43,7 +43,7 @@ use crate::controls::segmented::{Segment, SegmentedControl};
 use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
 use crate::layout::measure;
 use crate::motion::keyed;
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// How tall the frame is when the caller says nothing. The value occurs once.
 const DEFAULT_HEIGHT: f32 = 320.0;
@@ -480,10 +480,7 @@ impl RenderOnce for ImageViewer {
 
         let index = self.index();
         let count = self.frames.len();
-        let position = cx.strings().format(
-            StringKey::CountOfTotal,
-            &[&(index + 1).to_string(), &count.to_string()],
-        );
+        let position = cx.numbers().count_of_total(index + 1, count);
 
         let measured = measure::cell(&ident.child("frame").semantic_id(), cx);
         let state = keyed::slot::<Viewport>(&ident.semantic_id(), cx);

@@ -48,6 +48,10 @@ use crate::controls::number_input::{NumberInput, NumberInputEvent};
 use crate::controls::select::{Select, SelectEvent, SelectOption};
 use crate::controls::tag_input::{TagInput, TagInputEvent};
 use crate::controls::toggle::Switch;
+use crate::datetime::{
+    DateInput, DateInputEvent, Day, RangePicker, RangePickerEvent, TimeInput, TimeInputEvent,
+    installed_adapter,
+};
 use crate::display::badge::Tone;
 use crate::display::status::Callout;
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text};
@@ -265,6 +269,19 @@ pub enum FieldValue {
     Boolean(bool),
     Choice(SharedString),
     List(Vec<SharedString>),
+    /// A calendar day the host adapter already accepted.
+    Day(i64),
+    /// A time of day, as hour / minute / optional second.
+    Time {
+        hour: u32,
+        minute: u32,
+        second: Option<u32>,
+    },
+    /// Two days, start then optional end.
+    Range {
+        start: i64,
+        end: Option<i64>,
+    },
     /// Nothing was entered. Distinct from an empty string, which somebody
     /// typed on purpose.
     Absent,
@@ -294,6 +311,9 @@ enum Control {
     Choice(Entity<Select>),
     OpenChoice(Entity<Combobox>),
     List(Entity<TagInput>),
+    Date(Entity<DateInput>),
+    Time(Entity<TimeInput>),
+    DateRange(Entity<RangePicker>),
     /// A heading over the fields beneath it. It holds nothing.
     Group,
     Unrenderable(SharedString),
@@ -511,9 +531,30 @@ impl SchemaForm {
             // without dropping fields. Wiring them to DateInput / Dropzone
             // still needs a host adapter or a file policy; until that is
             // supplied the field stays visible as unrenderable.
-            SchemaKind::Date | SchemaKind::Time | SchemaKind::DateRange => {
-                Control::Unrenderable(cx.strings().text(StringKey::SchemaNeedsAdapter))
-            }
+            SchemaKind::Date => match installed_adapter(cx) {
+                Some(adapter) => {
+                    let input = cx.new(|cx| DateInput::new(control_ident, adapter, window, cx));
+                    self.watch_date(&path, &input, cx);
+                    Control::Date(input)
+                }
+                None => Control::Unrenderable(cx.strings().text(StringKey::SchemaNeedsAdapter)),
+            },
+            SchemaKind::Time => match installed_adapter(cx) {
+                Some(adapter) => {
+                    let input = cx.new(|cx| TimeInput::new(control_ident, adapter, window, cx));
+                    self.watch_time(&path, &input, cx);
+                    Control::Time(input)
+                }
+                None => Control::Unrenderable(cx.strings().text(StringKey::SchemaNeedsAdapter)),
+            },
+            SchemaKind::DateRange => match installed_adapter(cx) {
+                Some(adapter) => {
+                    let picker = cx.new(|cx| RangePicker::new(control_ident, adapter, window, cx));
+                    self.watch_range(&path, &picker, cx);
+                    Control::DateRange(picker)
+                }
+                None => Control::Unrenderable(cx.strings().text(StringKey::SchemaNeedsAdapter)),
+            },
             SchemaKind::Files { .. } | SchemaKind::List { .. } => {
                 Control::Unrenderable(cx.strings().text(StringKey::SchemaNeedsHost))
             }
@@ -630,6 +671,47 @@ impl SchemaForm {
         ));
     }
 
+    fn watch_date(&mut self, path: &SharedString, input: &Entity<DateInput>, cx: &mut Context<Self>) {
+        let path = path.clone();
+        self._subscriptions.push(cx.subscribe(
+            input,
+            move |form, _, event: &DateInputEvent, cx| match event {
+                DateInputEvent::Changed(_) | DateInputEvent::Unparsable { .. } => {
+                    form.changed(path.clone(), cx)
+                }
+                DateInputEvent::Submit => cx.emit(SchemaFormEvent::Submitted),
+                _ => {}
+            },
+        ));
+    }
+
+    fn watch_time(&mut self, path: &SharedString, input: &Entity<TimeInput>, cx: &mut Context<Self>) {
+        let path = path.clone();
+        self._subscriptions.push(cx.subscribe(
+            input,
+            move |form, _, event: &TimeInputEvent, cx| match event {
+                TimeInputEvent::Changed(_) => form.changed(path.clone(), cx),
+            },
+        ));
+    }
+
+    fn watch_range(
+        &mut self,
+        path: &SharedString,
+        picker: &Entity<RangePicker>,
+        cx: &mut Context<Self>,
+    ) {
+        let path = path.clone();
+        self._subscriptions.push(cx.subscribe(
+            picker,
+            move |form, _, event: &RangePickerEvent, cx| match event {
+                RangePickerEvent::StartPicked(_) | RangePickerEvent::EndPicked(_) => {
+                    form.changed(path.clone(), cx)
+                }
+            },
+        ));
+    }
+
     fn changed(&mut self, path: SharedString, cx: &mut Context<Self>) {
         // The form's own complaint was about this field being empty, and it is
         // not empty any more; the host's stands until the host withdraws it.
@@ -734,6 +816,15 @@ impl SchemaForm {
                     combobox.update(cx, |combobox, cx| combobox.set_disabled(disabled, cx))
                 }
                 Control::List(tags) => tags.update(cx, |tags, cx| tags.set_disabled(disabled, cx)),
+                Control::Date(input) => {
+                    input.update(cx, |input, cx| input.set_disabled(disabled, cx))
+                }
+                Control::Time(input) => {
+                    input.update(cx, |input, cx| input.set_disabled(disabled, cx))
+                }
+                Control::DateRange(picker) => {
+                    picker.update(cx, |picker, cx| picker.set_disabled(disabled, cx))
+                }
                 Control::Boolean(_) | Control::Group | Control::Unrenderable(_) => {}
             }
         }
@@ -768,6 +859,30 @@ impl SchemaForm {
             Control::List(tags) => match tags.read(cx).current() {
                 [] => FieldValue::Absent,
                 tags => FieldValue::List(tags.to_vec()),
+            },
+            Control::Date(input) => match input.read(cx).parsed_day(cx) {
+                Some(Day(day)) => FieldValue::Day(day),
+                None => FieldValue::Absent,
+            },
+            Control::Time(input) => {
+                let time = input.read(cx).current();
+                FieldValue::Time {
+                    hour: time.hour,
+                    minute: time.minute,
+                    second: time.second,
+                }
+            }
+            Control::DateRange(picker) => match picker.read(cx).state() {
+                crate::datetime::RangeState::Unset => FieldValue::Absent,
+                crate::datetime::RangeState::Incomplete { start } => FieldValue::Range {
+                    start: start.0,
+                    end: None,
+                },
+                crate::datetime::RangeState::Complete { start, end }
+                | crate::datetime::RangeState::Inverted { start, end } => FieldValue::Range {
+                    start: start.0,
+                    end: Some(end.0),
+                },
             },
             Control::Unrenderable(_) => FieldValue::Unrenderable,
             Control::Group => FieldValue::Absent,
@@ -922,6 +1037,9 @@ impl SchemaForm {
             Control::Choice(select) => select.clone().into_any_element(),
             Control::OpenChoice(combobox) => combobox.clone().into_any_element(),
             Control::List(tags) => tags.clone().into_any_element(),
+            Control::Date(input) => input.clone().into_any_element(),
+            Control::Time(input) => input.clone().into_any_element(),
+            Control::DateRange(picker) => picker.clone().into_any_element(),
             Control::Boolean(on) => {
                 let on = *on;
                 let path = field.path.clone();

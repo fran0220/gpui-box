@@ -161,13 +161,13 @@ pub mod prelude {
         BlockedDay, BlockedReport, Calendar, CalendarEvent, Clock, DateAdapter, DateInput,
         DateInputEvent, Day, DayMark, DayRange, MonthCell, MonthGrid, MonthKey, RangePicker,
         RangePickerEvent, RangeState, Selectability, SharedDateAdapter, TimeInput, TimeInputEvent,
-        TimeOfDay, TimeSegment,
+        TimeOfDay, TimeSegment, installed_adapter, reset_date_adapter, set_date_adapter,
     };
     pub use crate::display::animated_number::{AnimatedNumber, grouped};
     pub use crate::display::avatar::Avatar;
     pub use crate::display::badge::{Badge, Tone};
     pub use crate::display::card::{Card, ListRow};
-    pub use crate::display::chart::{ChartAxes, ChartSeries, ChartState, LineChart};
+    pub use crate::display::chart::{BarChart, ChartAxes, ChartSeries, ChartState, LineChart};
     pub use crate::display::description_list::{
         DescriptionItem, DescriptionList, DescriptionValue,
     };

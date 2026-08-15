@@ -21,7 +21,7 @@ use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::loading::PulseLoader;
 use crate::display::sparkline::SparklinePoint;
 use crate::foundation::{Ident, StyledExt};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// One named series. Identity is the caller's, never the draw order.
 #[derive(Debug, Clone, PartialEq)]
@@ -120,6 +120,99 @@ impl ChartState {
     }
 }
 
+/// A bar chart over one host-owned series of categorized values.
+#[derive(Debug, IntoElement)]
+pub struct BarChart {
+    ident: Ident,
+    label: SharedString,
+    axes: ChartAxes,
+    state: ChartState,
+}
+
+impl BarChart {
+    pub fn new(
+        ident: impl Into<Ident>,
+        label: impl Into<SharedString>,
+        state: ChartState,
+    ) -> Self {
+        Self {
+            ident: ident.into(),
+            label: label.into(),
+            axes: ChartAxes::default(),
+            state,
+        }
+    }
+
+    pub fn axes(mut self, axes: ChartAxes) -> Self {
+        self.axes = axes;
+        self
+    }
+}
+
+impl RenderOnce for BarChart {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let theme = cx.theme().clone();
+        let (body, spec): (gpui::AnyElement, NodeSpec) = match &self.state {
+            ChartState::Ready(series) => {
+                let count = series.first().map(|series| series.points.len()).unwrap_or(0);
+                (
+                    ready_bars(&self.ident, &self.label, &self.axes, series, &theme, cx),
+                    NodeSpec::new(self.ident.semantic_id(), Role::Group)
+                        .text(self.label.clone())
+                        .value(self.state.name())
+                        .range(0.0, count as f32, count as f32),
+                )
+            }
+            other => line_like_state(&self.ident, &self.label, other, cx),
+        };
+        div().w_full().child(body).semantic_in(cx, spec)
+    }
+}
+
+fn line_like_state(
+    ident: &Ident,
+    label: &SharedString,
+    state: &ChartState,
+    cx: &App,
+) -> (gpui::AnyElement, NodeSpec) {
+    match state {
+        ChartState::Loading => (
+            PulseLoader::new(ident.child("loading"))
+                .label(cx.strings().text(StringKey::Loading))
+                .into_any_element(),
+            NodeSpec::new(ident.semantic_id(), Role::Status)
+                .text(label.clone())
+                .busy(true)
+                .value(state.name()),
+        ),
+        ChartState::Empty => (
+            EmptyState::new(ident.child("empty"), cx.strings().text(StringKey::ChartEmpty))
+                .kind(EmptyKind::Empty)
+                .into_any_element(),
+            NodeSpec::new(ident.semantic_id(), Role::Status)
+                .text(label.clone())
+                .value(state.name()),
+        ),
+        ChartState::Unavailable(reason) => (
+            EmptyState::new(ident.child("unavailable"), reason.clone())
+                .kind(EmptyKind::Unavailable)
+                .into_any_element(),
+            NodeSpec::new(ident.semantic_id(), Role::Status)
+                .text(label.clone())
+                .value(state.name()),
+        ),
+        ChartState::Error(reason) => (
+            EmptyState::new(ident.child("error"), reason.clone())
+                .kind(EmptyKind::Failed)
+                .into_any_element(),
+            NodeSpec::new(ident.semantic_id(), Role::Status)
+                .text(label.clone())
+                .value(state.name()),
+        ),
+        ChartState::Ready(_) => unreachable!("ready is drawn by the caller"),
+    }
+}
+
 /// A line chart over one or more host-owned series.
 #[derive(Debug, IntoElement)]
 pub struct LineChart {
@@ -153,39 +246,6 @@ impl RenderOnce for LineChart {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let (body, spec): (gpui::AnyElement, NodeSpec) = match &self.state {
-            ChartState::Loading => (
-                PulseLoader::new(self.ident.child("loading"))
-                    .label(cx.strings().text(StringKey::Loading))
-                    .into_any_element(),
-                NodeSpec::new(self.ident.semantic_id(), Role::Status)
-                    .text(self.label.clone())
-                    .busy(true)
-                    .value(self.state.name()),
-            ),
-            ChartState::Empty => (
-                EmptyState::new(self.ident.child("empty"), cx.strings().text(StringKey::ChartEmpty))
-                    .kind(EmptyKind::Empty)
-                    .into_any_element(),
-                NodeSpec::new(self.ident.semantic_id(), Role::Status)
-                    .text(self.label.clone())
-                    .value(self.state.name()),
-            ),
-            ChartState::Unavailable(reason) => (
-                EmptyState::new(self.ident.child("unavailable"), reason.clone())
-                    .kind(EmptyKind::Unavailable)
-                    .into_any_element(),
-                NodeSpec::new(self.ident.semantic_id(), Role::Status)
-                    .text(self.label.clone())
-                    .value(self.state.name()),
-            ),
-            ChartState::Error(reason) => (
-                EmptyState::new(self.ident.child("error"), reason.clone())
-                    .kind(EmptyKind::Failed)
-                    .into_any_element(),
-                NodeSpec::new(self.ident.semantic_id(), Role::Status)
-                    .text(self.label.clone())
-                    .value(self.state.name()),
-            ),
             ChartState::Ready(series) => {
                 let count = series.len();
                 (
@@ -196,6 +256,7 @@ impl RenderOnce for LineChart {
                         .range(0.0, count as f32, count as f32),
                 )
             }
+            other => line_like_state(&self.ident, &self.label, other, cx),
         };
 
         div()
@@ -288,6 +349,82 @@ fn ready_chart(
                             .value(series.id.clone()),
                         )
                 })),
+        )
+        .into_any_element()
+}
+
+fn ready_bars(
+    ident: &Ident,
+    label: &SharedString,
+    axes: &ChartAxes,
+    series: &[ChartSeries],
+    theme: &gpui_kit_theme::Theme,
+    cx: &App,
+) -> gpui::AnyElement {
+    let first = series.first();
+    let color = first
+        .and_then(|series| series.color)
+        .unwrap_or(theme.colors.accent);
+    let points = first
+        .map(|series| {
+            series
+                .points
+                .iter()
+                .copied()
+                .filter(|point| point.is_bounded())
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    div()
+        .column()
+        .w_full()
+        .gap_token(theme, Space::Xs)
+        .child(
+            div()
+                .type_scale(theme, TypeScale::Label)
+                .text_color(theme.colors.text)
+                .child(label.clone()),
+        )
+        .children(axes.y_end.clone().map(|end| {
+            div()
+                .type_scale(theme, TypeScale::Caption)
+                .text_color(theme.colors.text_faint)
+                .child(end)
+        }))
+        .child(
+            div()
+                .row()
+                .items_end()
+                .gap(px(6.0))
+                .h(px(160.0))
+                .w_full()
+                .children(points.into_iter().enumerate().map(|(index, point)| {
+                    let percent = cx.numbers().percent(point.y);
+                    div()
+                        .flex_1()
+                        .h(gpui::relative(point.y.max(0.04)))
+                        .rounded_t(px(theme.radii.small))
+                        .bg(color)
+                        .semantic_in(
+                            cx,
+                            NodeSpec::new(
+                                ident.child(format!("bar-{index}")).semantic_id(),
+                                Role::Status,
+                            )
+                            .parent(ident.semantic_id())
+                            .value(percent),
+                        )
+                })),
+        )
+        .child(
+            div()
+                .row()
+                .justify_between()
+                .type_scale(theme, TypeScale::Caption)
+                .text_color(theme.colors.text_faint)
+                .children(axes.x_start.clone())
+                .children(axes.x_end.clone()),
         )
         .into_any_element()
 }

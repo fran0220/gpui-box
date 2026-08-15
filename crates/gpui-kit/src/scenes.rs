@@ -1853,6 +1853,19 @@ fn chart(_window: &mut Window, cx: &mut App) -> AnyElement {
             "Fixture load",
             ChartState::Empty,
         ))
+        .child(
+            BarChart::new(
+                "scene.chart.bars",
+                "Fixture share",
+                ChartState::Ready(vec![ChartSeries::new("share", "Share").points([
+                    SparklinePoint::new(0.0, 0.35),
+                    SparklinePoint::new(0.33, 0.70),
+                    SparklinePoint::new(0.66, 0.45),
+                    SparklinePoint::new(1.0, 0.90),
+                ])]),
+            )
+            .axes(ChartAxes::default().y_ends("0", "max")),
+        )
         .into_any_element()
 }
 
