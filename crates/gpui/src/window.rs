@@ -5,8 +5,8 @@ use crate::{
     AsyncWindowContext, AtlasTile, AvailableSpace, BackdropGlass, Background, BorderStyle, Bounds,
     BoxShadow, Capslock, Context, Corners, CursorHideMode, CursorStyle, Decorations, DevicePixels,
     DispatchActionListener, DispatchNodeId, DispatchTree, DisplayId, Edges, Effect, Entity,
-    EntityId, EventEmitter, FileDropEvent, FontId, GlassLobe, GlassMaterial, Global,
-    GlobalElementId, GlyphId, GpuSpecs, Hsla, InputHandler, IsZero, KeyBinding, KeyContext,
+    EntityId, EventEmitter, ExternalDropEvent, FileDropEvent, FontId, GlassLobe, GlassMaterial,
+    Global, GlobalElementId, GlyphId, GpuSpecs, Hsla, InputHandler, IsZero, KeyBinding, KeyContext,
     KeyDownEvent, KeyEvent, Keystroke, KeystrokeEvent, LayoutId, LineLayoutIndex, MAX_GLASS_LOBES,
     Modifiers, ModifiersChangedEvent, MonochromeSprite, MouseButton, MouseEvent, MouseMoveEvent,
     MouseUpEvent, ParticleEmitter, Path, Pixels, PlatformAtlas, PlatformDisplay, PlatformInput,
@@ -5709,6 +5709,53 @@ impl Window {
                     PlatformInput::FileDrop(FileDropEvent::Ended)
                 }
             },
+            // Non-path native data uses the same typed drag machinery as paths, while keeping its
+            // bytes deferred behind ExternalDropData until the receiving drop handler asks for it.
+            PlatformInput::ExternalDrop(external_drop) => match external_drop {
+                ExternalDropEvent::Entered { position, drop } => {
+                    self.mouse_position = position;
+                    if cx.active_drag.is_none() {
+                        // AnyDrag is window-thread state but uses Arc for type-erased sharing.
+                        #[allow(clippy::arc_with_non_send_sync)]
+                        let value = Arc::new(drop.clone());
+                        cx.active_drag = Some(AnyDrag {
+                            value,
+                            view: cx.new(|_| drop).into(),
+                            cursor_offset: position,
+                            cursor_style: None,
+                            external_payload_source: None,
+                        });
+                    }
+                    PlatformInput::MouseMove(MouseMoveEvent {
+                        position,
+                        pressed_button: Some(MouseButton::Left),
+                        modifiers: Modifiers::default(),
+                    })
+                }
+                ExternalDropEvent::Pending { position } => {
+                    self.mouse_position = position;
+                    PlatformInput::MouseMove(MouseMoveEvent {
+                        position,
+                        pressed_button: Some(MouseButton::Left),
+                        modifiers: Modifiers::default(),
+                    })
+                }
+                ExternalDropEvent::Submit { position } => {
+                    cx.activate(true);
+                    self.mouse_position = position;
+                    PlatformInput::MouseUp(MouseUpEvent {
+                        button: MouseButton::Left,
+                        position,
+                        modifiers: Modifiers::default(),
+                        click_count: 1,
+                    })
+                }
+                ExternalDropEvent::Exited => {
+                    cx.active_drag.take();
+                    self.refresh();
+                    PlatformInput::ExternalDrop(ExternalDropEvent::Exited)
+                }
+            },
             PlatformInput::Touch(touch) => PlatformInput::Touch(touch),
             PlatformInput::KeyDown(_) | PlatformInput::KeyUp(_) => event,
         };
@@ -7468,7 +7515,8 @@ mod tests {
 
     use crate::{
         AnyWindowHandle, AppContext as _, Bounds, Context, DragMoveEvent, Empty,
-        ExternalDragPayload, ExternalPaths, FileDragPaths, FileDropEvent, FocusHandle,
+        ExternalDragPayload, ExternalDrop, ExternalDropData, ExternalDropEvent, ExternalDropItem,
+        ExternalImage, ExternalPaths, FileDragPaths, FileDropEvent, FocusHandle, ImageFormat,
         InputEvent as _, InteractiveElement as _, IntoElement, MouseButton, MouseDownEvent,
         MouseMoveEvent, ParentElement, Pixels, Point, Render, StatefulInteractiveElement as _,
         Styled, TestAppContext, Window, WindowAppearance, WindowOptions, canvas, div, point, px,
@@ -7481,6 +7529,56 @@ mod tests {
         fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
             div()
         }
+    }
+
+    struct ExternalDropView(Rc<Cell<bool>>);
+
+    impl Render for ExternalDropView {
+        fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+            div().size_full().on_drop({
+                let dropped = self.0.clone();
+                move |_: &ExternalDrop, _, _| dropped.set(true)
+            })
+        }
+    }
+
+    #[gpui::test]
+    fn non_path_external_drop_uses_typed_drag_dispatch(cx: &mut TestAppContext) {
+        let dropped = Rc::new(Cell::new(false));
+        let window: AnyWindowHandle = cx
+            .add_window({
+                let dropped = dropped.clone();
+                move |_, _| ExternalDropView(dropped)
+            })
+            .into();
+        let position = point(px(10.), px(10.));
+        let result = cx.update_window(window, |_, window, cx| {
+            window.draw(cx).clear(cx);
+            let drop = ExternalDrop::new([ExternalDropItem::Image(ExternalImage {
+                format: ImageFormat::Png,
+                data: ExternalDropData::from_bytes(Vec::from(&b"png"[..])),
+            })]);
+            window.dispatch_event(
+                ExternalDropEvent::Entered { position, drop }.to_platform_input(),
+                cx,
+            );
+            assert!(
+                cx.active_drag
+                    .as_ref()
+                    .is_some_and(|drag| { drag.value.downcast_ref::<ExternalDrop>().is_some() })
+            );
+            assert!(!dropped.get());
+            window.dispatch_event(
+                ExternalDropEvent::Submit { position }.to_platform_input(),
+                cx,
+            );
+            assert!(dropped.get());
+            assert!(cx.active_drag.is_none());
+        });
+        assert!(
+            result.is_ok(),
+            "failed to dispatch external drop: {result:?}"
+        );
     }
 
     struct OpensWindowOnPaint {

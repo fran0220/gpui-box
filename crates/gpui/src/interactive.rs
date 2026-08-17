@@ -1,9 +1,10 @@
 use crate::{
-    Bounds, Capslock, Context, Empty, IntoElement, Keystroke, Modifiers, Pixels, Point, Render,
-    Window, point, seal::Sealed,
+    Bounds, Capslock, Context, Empty, ImageFormat, IntoElement, Keystroke, Modifiers, Pixels,
+    Point, Render, Result, SharedString, Window, point, seal::Sealed,
 };
+use futures::{FutureExt as _, future::LocalBoxFuture};
 use smallvec::SmallVec;
-use std::{any::Any, fmt::Debug, ops::Deref, path::PathBuf};
+use std::{any::Any, fmt::Debug, ops::Deref, path::PathBuf, sync::Arc};
 
 /// An event from a platform input source.
 pub trait InputEvent: Sealed + 'static {
@@ -685,6 +686,198 @@ impl ExternalPaths {
     }
 }
 
+/// A bounded, asynchronously readable native drag payload.
+///
+/// Platforms publish the available kind and metadata while the pointer is hovering, but defer
+/// reading the bytes until a drop target explicitly calls [`Self::read`]. This keeps images and
+/// virtual files out of the window event path and lets the receiver apply its own byte limit.
+#[derive(Clone)]
+pub struct ExternalDropData {
+    len: Option<u64>,
+    read: Arc<dyn Fn(u64) -> LocalBoxFuture<'static, Result<Arc<[u8]>>>>,
+}
+
+impl ExternalDropData {
+    /// Creates a deferred payload. `len` is the source's declared size when available.
+    pub fn new(
+        len: Option<u64>,
+        read: impl Fn(u64) -> LocalBoxFuture<'static, Result<Arc<[u8]>>> + 'static,
+    ) -> Self {
+        Self {
+            len,
+            read: Arc::new(read),
+        }
+    }
+
+    /// Creates a payload whose bytes are already in memory, primarily for application-created
+    /// drags and tests.
+    pub fn from_bytes(bytes: impl Into<Arc<[u8]>>) -> Self {
+        let bytes = bytes.into();
+        let len = bytes.len() as u64;
+        Self::new(Some(len), move |limit| {
+            let bytes = bytes.clone();
+            async move {
+                anyhow::ensure!(len <= limit, "external drop item exceeds the byte limit");
+                Ok(bytes)
+            }
+            .boxed_local()
+        })
+    }
+
+    /// Returns the source's declared size, if it supplied one without reading the content.
+    pub fn len(&self) -> Option<u64> {
+        self.len
+    }
+
+    /// Returns whether the source declared this item empty.
+    pub fn is_empty(&self) -> bool {
+        self.len == Some(0)
+    }
+
+    /// Reads at most `limit` bytes.
+    ///
+    /// A source that declares or returns more data than the limit is refused. Receivers should
+    /// still apply an aggregate limit when reading more than one item.
+    pub fn read(&self, limit: u64) -> LocalBoxFuture<'static, Result<Arc<[u8]>>> {
+        if self.len.is_some_and(|len| len > limit) {
+            return async { anyhow::bail!("external drop item exceeds the byte limit") }
+                .boxed_local();
+        }
+        let future = (self.read)(limit);
+        async move {
+            let bytes = future.await?;
+            anyhow::ensure!(
+                bytes.len() as u64 <= limit,
+                "external drop source returned more than the byte limit"
+            );
+            Ok(bytes)
+        }
+        .boxed_local()
+    }
+}
+
+impl Debug for ExternalDropData {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("ExternalDropData")
+            .field("len", &self.len)
+            .finish_non_exhaustive()
+    }
+}
+
+/// An encoded image offered by a native drag source.
+#[derive(Clone, Debug)]
+pub struct ExternalImage {
+    /// The encoded image format.
+    pub format: ImageFormat,
+    /// The deferred encoded bytes.
+    pub data: ExternalDropData,
+}
+
+/// Text offered by a native drag source.
+#[derive(Clone, Debug)]
+pub struct ExternalText {
+    /// The MIME type reported by the platform.
+    pub mime_type: SharedString,
+    /// The deferred UTF-8 bytes.
+    pub data: ExternalDropData,
+}
+
+/// A URL offered by a native drag source.
+#[derive(Clone, Debug)]
+pub struct ExternalUrl {
+    /// The deferred UTF-8 URL bytes. GPUI never downloads the URL.
+    pub data: ExternalDropData,
+}
+
+/// A file whose content is supplied by the drag source instead of an on-disk path.
+#[derive(Clone, Debug)]
+pub struct ExternalFile {
+    name: SharedString,
+    /// The MIME type reported by the source, if any.
+    pub mime_type: Option<SharedString>,
+    /// The deferred file content.
+    pub data: ExternalDropData,
+}
+
+impl ExternalFile {
+    /// Creates a virtual file after validating that `name` is one portable path component.
+    pub fn new(
+        name: impl Into<SharedString>,
+        mime_type: Option<SharedString>,
+        data: ExternalDropData,
+    ) -> Result<Self> {
+        let name = name.into();
+        anyhow::ensure!(
+            is_safe_external_file_name(&name),
+            "unsafe external file name"
+        );
+        Ok(Self {
+            name,
+            mime_type,
+            data,
+        })
+    }
+
+    /// Returns the sanitized display and destination file name.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+fn is_safe_external_file_name(name: &str) -> bool {
+    !name.is_empty()
+        && name != "."
+        && name != ".."
+        && !name
+            .chars()
+            .any(|character| character.is_control() || matches!(character, '/' | '\\' | ':' | '\0'))
+}
+
+/// One item offered by a native drag source that has no real filesystem path.
+#[derive(Clone, Debug)]
+pub enum ExternalDropItem {
+    /// An encoded image.
+    Image(ExternalImage),
+    /// Plain or rich text represented as bytes plus a MIME type.
+    Text(ExternalText),
+    /// A URL, delivered without downloading it.
+    Url(ExternalUrl),
+    /// A promised or virtual file.
+    File(ExternalFile),
+}
+
+/// Non-path data offered by a native drag source.
+///
+/// Real filesystem paths continue to use [`ExternalPaths`] so existing drop targets remain
+/// source-compatible. When a source offers both paths and encoded representations, platforms
+/// prefer the paths and do not publish a duplicate `ExternalDrop` session.
+#[derive(Clone, Debug, Default)]
+pub struct ExternalDrop(pub SmallVec<[ExternalDropItem; 2]>);
+
+impl ExternalDrop {
+    /// Creates a non-path external drop from its offered items.
+    pub fn new(items: impl IntoIterator<Item = ExternalDropItem>) -> Self {
+        Self(items.into_iter().collect())
+    }
+
+    /// Returns the offered items without reading their content.
+    pub fn items(&self) -> &[ExternalDropItem] {
+        &self.0
+    }
+
+    /// Returns whether no supported items were offered.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+impl Render for ExternalDrop {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        Empty
+    }
+}
+
 /// Data offered to the platform when an internal drag leaves the window and is
 /// promoted to a native drag session.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -751,6 +944,38 @@ impl InputEvent for FileDropEvent {
 }
 impl MouseEvent for FileDropEvent {}
 
+/// A native drag event for encoded images, text, URLs, and virtual files.
+#[derive(Debug, Clone)]
+pub enum ExternalDropEvent {
+    /// Supported kinds and metadata have entered the window. Item bytes remain deferred.
+    Entered {
+        /// The pointer position relative to the window.
+        position: Point<Pixels>,
+        /// The offered non-path items.
+        drop: ExternalDrop,
+    },
+    /// The drag is moving over the window.
+    Pending {
+        /// The pointer position relative to the window.
+        position: Point<Pixels>,
+    },
+    /// The user dropped the offered items.
+    Submit {
+        /// The pointer position relative to the window.
+        position: Point<Pixels>,
+    },
+    /// The drag left the window without a drop.
+    Exited,
+}
+
+impl Sealed for ExternalDropEvent {}
+impl InputEvent for ExternalDropEvent {
+    fn to_platform_input(self) -> PlatformInput {
+        PlatformInput::ExternalDrop(self)
+    }
+}
+impl MouseEvent for ExternalDropEvent {}
+
 /// An enum corresponding to all kinds of platform input events.
 #[derive(Clone, Debug)]
 pub enum PlatformInput {
@@ -776,6 +1001,8 @@ pub enum PlatformInput {
     Pinch(PinchEvent),
     /// Files were dragged and dropped onto the window.
     FileDrop(FileDropEvent),
+    /// Non-path native data was dragged and dropped onto the window.
+    ExternalDrop(ExternalDropEvent),
     /// A raw touch event on a touch screen.
     Touch(TouchEvent),
 }
@@ -794,6 +1021,7 @@ impl PlatformInput {
             PlatformInput::ScrollWheel(event) => Some(event),
             PlatformInput::Pinch(event) => Some(event),
             PlatformInput::FileDrop(event) => Some(event),
+            PlatformInput::ExternalDrop(event) => Some(event),
             PlatformInput::Touch(_) => None,
         }
     }
@@ -811,6 +1039,7 @@ impl PlatformInput {
             PlatformInput::ScrollWheel(_) => None,
             PlatformInput::Pinch(_) => None,
             PlatformInput::FileDrop(_) => None,
+            PlatformInput::ExternalDrop(_) => None,
             PlatformInput::Touch(_) => None,
         }
     }
@@ -828,8 +1057,9 @@ impl PlatformInput {
 mod test {
 
     use crate::{
-        self as gpui, AppContext as _, Context, FocusHandle, InteractiveElement, IntoElement,
-        KeyBinding, Keystroke, ParentElement, Render, TestAppContext, Window, div,
+        self as gpui, AppContext as _, Context, ExternalDropData, ExternalFile, FocusHandle,
+        InteractiveElement, IntoElement, KeyBinding, Keystroke, ParentElement, Render,
+        SharedString, TestAppContext, Window, div,
     };
 
     struct TestView {
@@ -901,5 +1131,42 @@ mod test {
                 assert!(test_view.saw_action);
             })
             .expect("required framework invariant must hold");
+    }
+
+    #[test]
+    fn external_drop_data_enforces_declared_and_returned_limits() {
+        let declared = ExternalDropData::from_bytes(Vec::from(&b"image"[..]));
+        assert!(pollster::block_on(declared.read(4)).is_err());
+        assert_eq!(
+            pollster::block_on(declared.read(5))
+                .expect("payload at the exact limit should be readable")
+                .as_ref(),
+            b"image"
+        );
+
+        let undeclared = ExternalDropData::new(None, |_| {
+            Box::pin(async { Ok(Vec::from(&b"too large"[..]).into()) })
+        });
+        assert!(pollster::block_on(undeclared.read(3)).is_err());
+    }
+
+    #[test]
+    fn virtual_file_names_are_portable_single_components() {
+        let data = || ExternalDropData::from_bytes(Vec::<u8>::new());
+        assert!(ExternalFile::new("photo.png", None, data()).is_ok());
+        for unsafe_name in [
+            "",
+            ".",
+            "..",
+            "../secret",
+            "folder/file",
+            "folder\\file",
+            "C:drive",
+        ] {
+            assert!(
+                ExternalFile::new(SharedString::from(unsafe_name), None, data()).is_err(),
+                "accepted unsafe virtual file name {unsafe_name:?}"
+            );
+        }
     }
 }

@@ -2638,6 +2638,7 @@ dependencies = [
  "objc2-user-notifications",
  "parking_lot",
  "pathfinder_geometry",
+ "pollster 0.4.0",
  "raw-window-handle",
  "semver",
  "smallvec",

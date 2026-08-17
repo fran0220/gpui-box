@@ -207,6 +207,22 @@ The adopted item is labelled by **count** — "3 files" — and never by path. A
 path is user-generated content, and the label is published in the semantic
 tree.
 
+GPUI also adopts native drags that have no real path as `ExternalDrop`. Its
+items describe encoded images, MIME-tagged text, URLs, and promised or virtual
+files. Hover inspects only the offered kinds and metadata. The bytes stay behind
+`ExternalDropData::read(limit)` until the receiving drop handler explicitly
+reads them, and the framework refuses a source that declares or returns more
+than that per-item limit. A receiver remains responsible for an aggregate
+limit across items. URLs are delivered as bytes and are never downloaded by
+the framework. Virtual file names are restricted to one portable path
+component.
+
+Path compatibility is deliberate: a source that offers a real filesystem path
+is still exposed as `ExternalPaths`, and platforms prefer it over duplicate
+encoded representations. Existing `on_drop::<ExternalPaths>` handlers do not
+need to change; handlers that accept non-path data use
+`on_drop::<ExternalDrop>`.
+
 ## Staging, for captures
 
 A still image cannot photograph a gesture, and a capture that waited for a real

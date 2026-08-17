@@ -32,7 +32,7 @@ static CLIPBOARD_SVG_FORMAT: LazyLock<u32> =
     LazyLock::new(|| register_clipboard_format(windows::core::w!("image/svg+xml")));
 static CLIPBOARD_GIF_FORMAT: LazyLock<u32> =
     LazyLock::new(|| register_clipboard_format(windows::core::w!("GIF")));
-static CLIPBOARD_PNG_FORMAT: LazyLock<u32> =
+pub(crate) static CLIPBOARD_PNG_FORMAT: LazyLock<u32> =
     LazyLock::new(|| register_clipboard_format(windows::core::w!("PNG")));
 static CLIPBOARD_JPG_FORMAT: LazyLock<u32> =
     LazyLock::new(|| register_clipboard_format(windows::core::w!("JFIF")));
@@ -46,7 +46,7 @@ static IMAGE_FORMATS_MAP: LazyLock<FxHashMap<u32, ImageFormat>> = LazyLock::new(
     map
 });
 
-fn register_clipboard_format(format: PCWSTR) -> u32 {
+pub(crate) fn register_clipboard_format(format: PCWSTR) -> u32 {
     let ret = unsafe { RegisterClipboardFormatW(format) };
     if ret == 0 {
         panic!(
@@ -271,7 +271,7 @@ fn read_files() -> Option<ClipboardEntry> {
 }
 
 /// DIB is BMP without the 14-byte BITMAPFILEHEADER. Prepend one.
-fn convert_dib_to_bmp(dib: &[u8]) -> Option<Vec<u8>> {
+pub(crate) fn convert_dib_to_bmp(dib: &[u8]) -> Option<Vec<u8>> {
     if dib.len() < 40 {
         return None;
     }

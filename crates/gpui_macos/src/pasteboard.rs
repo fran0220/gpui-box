@@ -1,23 +1,269 @@
 use core::slice;
+use std::cell::Cell;
 use std::ffi::{CStr, c_void};
 use std::path::PathBuf;
+use std::rc::Rc;
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicUsize, Ordering},
+};
+use std::time::Duration;
 
+use block::ConcreteBlock;
 use cocoa::{
     appkit::{
         NSFilenamesPboardType, NSPasteboard, NSPasteboardTypePNG, NSPasteboardTypeString,
         NSPasteboardTypeTIFF,
     },
     base::{id, nil},
-    foundation::{NSArray, NSData, NSFastEnumeration, NSString},
+    foundation::{NSArray, NSData, NSDictionary, NSFastEnumeration, NSString},
 };
-use objc::{msg_send, rc::StrongPtr, runtime::Object, sel, sel_impl};
+use futures::{
+    FutureExt as _,
+    future::{Either, select},
+};
+use objc::{class, msg_send, rc::StrongPtr, runtime::Object, sel, sel_impl};
 use smallvec::SmallVec;
 use strum::IntoEnumIterator as _;
 
 use crate::ns_string;
 use gpui::{
-    ClipboardEntry, ClipboardItem, ClipboardString, ExternalPaths, Image, ImageFormat, hash,
+    BackgroundExecutor, ClipboardEntry, ClipboardItem, ClipboardString, ExternalDrop,
+    ExternalDropData, ExternalDropItem, ExternalFile, ExternalImage, ExternalPaths, ExternalText,
+    ExternalUrl, Image, ImageFormat, SharedString, hash,
 };
+
+/// Inspects a dragging pasteboard without requesting any item data. The returned readers remain
+/// locked until the platform marks the matching drag as dropped.
+pub(crate) fn external_drop_from_pasteboard(
+    pasteboard: id,
+    read_permitted: Rc<Cell<bool>>,
+    executor: BackgroundExecutor,
+) -> Option<ExternalDrop> {
+    unsafe {
+        let types: id = pasteboard.types();
+        if types == nil {
+            return None;
+        }
+
+        if let Some(files) =
+            promised_files_from_pasteboard(pasteboard, read_permitted.clone(), executor)
+            && !files.is_empty()
+        {
+            return Some(ExternalDrop::new(files));
+        }
+
+        let images = [
+            (NSPasteboardTypePNG, ImageFormat::Png),
+            (ns_string("public.jpeg"), ImageFormat::Jpeg),
+            (ns_string("org.webmproject.webp"), ImageFormat::Webp),
+            (NSPasteboardTypeTIFF, ImageFormat::Tiff),
+        ];
+        for (pasteboard_type, format) in images {
+            if msg_send![types, containsObject: pasteboard_type] {
+                return Some(ExternalDrop::new([ExternalDropItem::Image(
+                    ExternalImage {
+                        format,
+                        data: deferred_pasteboard_data(pasteboard, pasteboard_type, read_permitted),
+                    },
+                )]));
+            }
+        }
+
+        let url_type = ns_string("public.url");
+        if msg_send![types, containsObject: url_type] {
+            return Some(ExternalDrop::new([ExternalDropItem::Url(ExternalUrl {
+                data: deferred_pasteboard_data(pasteboard, url_type, read_permitted),
+            })]));
+        }
+
+        let text_type = ns_string("public.utf8-plain-text");
+        if msg_send![types, containsObject: text_type] {
+            return Some(ExternalDrop::new([ExternalDropItem::Text(ExternalText {
+                mime_type: SharedString::new_static("text/plain;charset=utf-8"),
+                data: deferred_pasteboard_data(pasteboard, text_type, read_permitted),
+            })]));
+        }
+    }
+    None
+}
+
+unsafe fn promised_files_from_pasteboard(
+    pasteboard: id,
+    read_permitted: Rc<Cell<bool>>,
+    executor: BackgroundExecutor,
+) -> Option<Vec<ExternalDropItem>> {
+    let receiver_class = class!(NSFilePromiseReceiver) as *const _ as id;
+    let classes = unsafe { NSArray::arrayWithObject(nil, receiver_class) };
+    let receivers: id =
+        unsafe { msg_send![pasteboard, readObjectsForClasses: classes options: nil] };
+    if receivers == nil {
+        return None;
+    }
+
+    let mut files = Vec::new();
+    for receiver in unsafe { receivers.iter() } {
+        let names: id = unsafe { msg_send![receiver, fileNames] };
+        if names == nil {
+            continue;
+        }
+        let names = unsafe {
+            names
+                .iter()
+                .filter_map(|name| {
+                    let pointer = NSString::UTF8String(name);
+                    (!pointer.is_null())
+                        .then(|| CStr::from_ptr(pointer).to_string_lossy().into_owned())
+                })
+                .collect::<Vec<_>>()
+        };
+        for name in &names {
+            let data = deferred_promised_file(
+                receiver,
+                name.clone(),
+                names.len(),
+                read_permitted.clone(),
+                executor.clone(),
+            );
+            if let Ok(file) = ExternalFile::new(name.clone(), None, data) {
+                files.push(ExternalDropItem::File(file));
+            }
+        }
+    }
+    Some(files)
+}
+
+fn deferred_promised_file(
+    receiver: id,
+    name: String,
+    callback_count: usize,
+    read_permitted: Rc<Cell<bool>>,
+    executor: BackgroundExecutor,
+) -> ExternalDropData {
+    let receiver = Rc::new(unsafe { StrongPtr::retain(receiver) });
+    ExternalDropData::new(None, move |limit| {
+        let receiver = receiver.clone();
+        let name = name.clone();
+        let read_permitted = read_permitted.clone();
+        let executor = executor.clone();
+        async move {
+            anyhow::ensure!(
+                read_permitted.get(),
+                "external drop data cannot be read before the drop"
+            );
+            let destination =
+                std::env::temp_dir().join(format!("gpui-drop-{}", uuid::Uuid::new_v4()));
+            std::fs::create_dir(&destination)?;
+            let (sender, receiver_result) = futures::channel::oneshot::channel();
+            let sender = Arc::new(Mutex::new(Some(sender)));
+            let remaining = Arc::new(AtomicUsize::new(callback_count));
+            let destination_for_callback = destination.clone();
+            let callback = ConcreteBlock::new(move |url: id, error: id| {
+                let result = if error != nil {
+                    Some(Err(anyhow::anyhow!("native file promise failed")))
+                } else {
+                    let path: id = unsafe { msg_send![url, path] };
+                    let pointer = unsafe { NSString::UTF8String(path) };
+                    if pointer.is_null() {
+                        Some(Err(anyhow::anyhow!("native file promise returned no path")))
+                    } else {
+                        let path = PathBuf::from(unsafe {
+                            CStr::from_ptr(pointer).to_string_lossy().into_owned()
+                        });
+                        if path.file_name().and_then(|part| part.to_str()) == Some(name.as_str()) {
+                            Some(
+                                std::fs::metadata(&path)
+                                    .and_then(|metadata| {
+                                        if metadata.len() > limit {
+                                            Err(std::io::Error::other(
+                                                "external drop item exceeds the byte limit",
+                                            ))
+                                        } else {
+                                            std::fs::read(path)
+                                        }
+                                    })
+                                    .map(Arc::from)
+                                    .map_err(anyhow::Error::from),
+                            )
+                        } else {
+                            None
+                        }
+                    }
+                };
+                if let Some(result) = result
+                    && let Some(sender) =
+                        sender.lock().expect("file promise sender poisoned").take()
+                {
+                    let _ = sender.send(result);
+                }
+                if remaining.fetch_sub(1, Ordering::AcqRel) == 1 {
+                    let _ = std::fs::remove_dir_all(&destination_for_callback);
+                }
+            })
+            .copy();
+
+            unsafe {
+                let destination_string = ns_string(destination.to_string_lossy().as_ref());
+                let destination_url: id =
+                    msg_send![class!(NSURL), fileURLWithPath: destination_string];
+                let options = NSDictionary::dictionary(nil);
+                let queue: id = msg_send![class!(NSOperationQueue), new];
+                let _: () = msg_send![
+                    **receiver,
+                    receivePromisedFilesAtDestination: destination_url
+                    options: options
+                    operationQueue: queue
+                    reader: &*callback
+                ];
+                let _: () = msg_send![queue, release];
+            }
+
+            let timeout = executor.timer(Duration::from_secs(30));
+            match select(receiver_result, timeout).await {
+                Either::Left((result, _)) => result.map_err(anyhow::Error::from)?,
+                Either::Right(_) => {
+                    let _ = std::fs::remove_dir_all(destination);
+                    anyhow::bail!("native file promise timed out")
+                }
+            }
+        }
+        .boxed_local()
+    })
+}
+
+fn deferred_pasteboard_data(
+    pasteboard: id,
+    pasteboard_type: id,
+    read_permitted: Rc<Cell<bool>>,
+) -> ExternalDropData {
+    let pasteboard = Rc::new(unsafe { StrongPtr::retain(pasteboard) });
+    let pasteboard_type = Rc::new(unsafe { StrongPtr::retain(pasteboard_type) });
+    ExternalDropData::new(None, move |limit| {
+        let pasteboard = pasteboard.clone();
+        let pasteboard_type = pasteboard_type.clone();
+        let read_permitted = read_permitted.clone();
+        async move {
+            anyhow::ensure!(
+                read_permitted.get(),
+                "external drop data cannot be read before the drop"
+            );
+            let data: id = unsafe { pasteboard.dataForType(**pasteboard_type) };
+            anyhow::ensure!(
+                data != nil,
+                "external drop source no longer provides the data"
+            );
+            let len = unsafe { data.length() as u64 };
+            anyhow::ensure!(len <= limit, "external drop item exceeds the byte limit");
+            let bytes = unsafe { data.bytes() };
+            if bytes.is_null() {
+                return Ok(Arc::<[u8]>::from([]));
+            }
+            let bytes = unsafe { slice::from_raw_parts(bytes.cast::<u8>(), len as usize) };
+            Ok(Arc::from(bytes))
+        }
+        .boxed_local()
+    })
+}
 
 pub struct Pasteboard {
     inner: StrongPtr,
@@ -328,6 +574,8 @@ impl UTType {
 
 #[cfg(test)]
 mod tests {
+    use std::{cell::Cell, rc::Rc};
+
     use cocoa::{
         appkit::{NSFilenamesPboardType, NSPasteboard, NSPasteboardTypeString},
         base::{id, nil},
@@ -546,5 +794,35 @@ mod tests {
             }
             other => panic!("expected Image, got {:?}", other),
         }
+    }
+
+    #[test]
+    fn external_drop_bytes_stay_locked_until_drop_and_obey_limit() {
+        let pasteboard = Pasteboard::unique();
+        let bytes = b"encoded-image";
+        unsafe {
+            pasteboard.inner.clearContents();
+            let types = NSArray::arrayWithObjects(nil, &[NSPasteboardTypePNG]);
+            pasteboard.inner.declareTypes_owner(types, nil);
+            let data =
+                NSData::dataWithBytes_length_(nil, bytes.as_ptr().cast(), bytes.len() as u64);
+            pasteboard.inner.setData_forType(data, NSPasteboardTypePNG);
+        }
+
+        let permitted = Rc::new(Cell::new(false));
+        let data = deferred_pasteboard_data(
+            *pasteboard.inner,
+            unsafe { NSPasteboardTypePNG },
+            permitted.clone(),
+        );
+        assert!(pollster::block_on(data.read(1024)).is_err());
+        permitted.set(true);
+        assert!(pollster::block_on(data.read(4)).is_err());
+        assert_eq!(
+            pollster::block_on(data.read(1024))
+                .expect("permitted pasteboard data within the limit should be readable")
+                .as_ref(),
+            bytes
+        );
     }
 }

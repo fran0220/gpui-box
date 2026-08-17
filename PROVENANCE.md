@@ -89,6 +89,11 @@ force Kit highlights to recompose text into separate layout elements. They use
 the workspace's existing Unicode segmentation and bidirectional libraries and
 import no editor or product source.
 
+The bounded native external-data drag bridge for encoded images, MIME-tagged
+text, URLs, and promised or virtual files on macOS and Windows is subsequent
+GPUI Box work. It uses operating-system drag and pasteboard APIs and imports no
+third-party or product source.
+
 The explicit `Styled::font_fallbacks` refinement, grapheme-aware fallback run
 selection, and DirectWrite lookup across registered and system collections are
 subsequent GPUI Box work. They make caller-declared font chains a consistent

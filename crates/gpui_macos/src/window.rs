@@ -25,13 +25,13 @@ use cocoa::{
 use dispatch2::DispatchQueue;
 use gpui::{
     AnyWindowHandle, BackgroundExecutor, Bounds, Capslock, CursorStyle, ExternalDragPayload,
-    ExternalPaths, FileDropEvent, ForegroundExecutor, KeyDownEvent, Keystroke, Modifiers,
-    ModifiersChangedEvent, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels,
-    PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformViewHandle,
-    PlatformViewHosting, PlatformViewUpdate, PlatformWindow, Point, PromptButton, PromptLevel,
-    RequestFrameOptions, SharedString, Size, SystemWindowTab, WindowAppearance,
-    WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowKind, WindowParams,
-    flip_bounds_origin_y, platform_view_content_origin, point, px, size,
+    ExternalDropEvent, ExternalPaths, FileDropEvent, ForegroundExecutor, KeyDownEvent, Keystroke,
+    Modifiers, ModifiersChangedEvent, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
+    Pixels, PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler,
+    PlatformViewHandle, PlatformViewHosting, PlatformViewUpdate, PlatformWindow, Point,
+    PromptButton, PromptLevel, RequestFrameOptions, SharedString, Size, SystemWindowTab,
+    WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowKind,
+    WindowParams, flip_bounds_origin_y, platform_view_content_origin, point, px, size,
 };
 #[cfg(any(test, feature = "test-support"))]
 use image::RgbaImage;
@@ -624,6 +624,7 @@ struct MacWindowState {
     keystroke_for_do_command: Option<Keystroke>,
     do_command_handled: Option<bool>,
     external_files_dragged: bool,
+    external_drop_read_permitted: Option<Rc<Cell<bool>>>,
     // Whether the next left-mouse click is also the focusing click.
     first_mouse: bool,
     // When true, the whole content view is reported as app-owned titlebar content via
@@ -984,7 +985,19 @@ impl MacWindow {
             let () = msg_send![
                 native_window,
                 registerForDraggedTypes:
-                    NSArray::arrayWithObject(nil, NSFilenamesPboardType)
+                    NSArray::arrayWithObjects(nil, &[
+                        NSFilenamesPboardType,
+                        ns_string("public.file-url"),
+                        ns_string("public.png"),
+                        ns_string("public.jpeg"),
+                        ns_string("org.webmproject.webp"),
+                        ns_string("public.tiff"),
+                        ns_string("public.url"),
+                        ns_string("public.utf8-plain-text"),
+                        ns_string("com.apple.filepromise"),
+                        ns_string("com.apple.NSFilePromiseItemMetaData"),
+                        ns_string("com.apple.NSFilePromiseItem"),
+                    ])
             ];
             let () = msg_send![
                 native_window,
@@ -1042,6 +1055,7 @@ impl MacWindow {
                 keystroke_for_do_command: None,
                 do_command_handled: None,
                 external_files_dragged: false,
+                external_drop_read_permitted: None,
                 first_mouse: false,
                 app_owns_titlebar_drag,
                 fullscreen_restore_bounds: Bounds::default(),
@@ -3454,11 +3468,25 @@ extern "C" fn dragging_entered(this: &Object, _: Sel, dragging_info: id) -> NSDr
     let position = drag_event_position(&window_state, dragging_info);
     let paths = external_paths_from_event(dragging_info);
     if let Some(event) = paths.map(|paths| FileDropEvent::Entered { position, paths })
-        && send_file_drop_event(window_state, event)
+        && send_file_drop_event(window_state.clone(), event)
     {
         if is_source_window {
             return NSDragOperationMove;
         }
+        return NSDragOperationCopy;
+    }
+    let pasteboard: id = unsafe { msg_send![dragging_info, draggingPasteboard] };
+    let read_permitted = Rc::new(Cell::new(false));
+    let executor = window_state.lock().background_executor.clone();
+    if let Some(drop) = crate::pasteboard::external_drop_from_pasteboard(
+        pasteboard,
+        read_permitted.clone(),
+        executor,
+    ) && send_external_drop_event(
+        window_state.clone(),
+        ExternalDropEvent::Entered { position, drop },
+    ) {
+        window_state.lock().external_drop_read_permitted = Some(read_permitted);
         return NSDragOperationCopy;
     }
     NSDragOperationNone
@@ -3468,7 +3496,13 @@ extern "C" fn dragging_updated(this: &Object, _: Sel, dragging_info: id) -> NSDr
     let is_source_window = is_drag_from_this_window(this, dragging_info);
     let window_state = unsafe { get_window_state(this) };
     let position = drag_event_position(&window_state, dragging_info);
-    if send_file_drop_event(window_state, FileDropEvent::Pending { position }) {
+    let rich_drop_active = window_state.lock().external_drop_read_permitted.is_some();
+    let accepted = if rich_drop_active {
+        send_external_drop_event(window_state, ExternalDropEvent::Pending { position })
+    } else {
+        send_file_drop_event(window_state, FileDropEvent::Pending { position })
+    };
+    if accepted {
         if is_source_window {
             NSDragOperationMove
         } else {
@@ -3481,35 +3515,66 @@ extern "C" fn dragging_updated(this: &Object, _: Sel, dragging_info: id) -> NSDr
 
 extern "C" fn dragging_exited(this: &Object, _: Sel, _: id) {
     let window_state = unsafe { get_window_state(this) };
-    send_file_drop_event(window_state, FileDropEvent::Exited);
+    send_drag_exited(window_state);
 }
 
 extern "C" fn perform_drag_operation(this: &Object, _: Sel, dragging_info: id) -> BOOL {
     let window_state = unsafe { get_window_state(this) };
     let position = drag_event_position(&window_state, dragging_info);
-    send_file_drop_event(window_state, FileDropEvent::Submit { position }).to_objc()
+    let read_permitted = window_state.lock().external_drop_read_permitted.clone();
+    if let Some(read_permitted) = read_permitted {
+        read_permitted.set(true);
+        send_external_drop_event(window_state, ExternalDropEvent::Submit { position }).to_objc()
+    } else {
+        send_file_drop_event(window_state, FileDropEvent::Submit { position }).to_objc()
+    }
 }
 
 fn external_paths_from_event(dragging_info: *mut Object) -> Option<ExternalPaths> {
     let mut paths = SmallVec::new();
     let pasteboard: id = unsafe { msg_send![dragging_info, draggingPasteboard] };
     let filenames = unsafe { NSPasteboard::propertyListForType(pasteboard, NSFilenamesPboardType) };
-    if filenames == nil {
-        return None;
+    if filenames != nil {
+        for file in unsafe { filenames.iter() } {
+            let path = unsafe {
+                let f = NSString::UTF8String(file);
+                CStr::from_ptr(f).to_string_lossy().into_owned()
+            };
+            paths.push(PathBuf::from(path))
+        }
+    } else {
+        let items: id = unsafe { msg_send![pasteboard, pasteboardItems] };
+        if items == nil {
+            return None;
+        }
+        let file_url_type = unsafe { ns_string("public.file-url") };
+        for item in unsafe { items.iter() } {
+            let url_string: id = unsafe { msg_send![item, stringForType: file_url_type] };
+            if url_string == nil {
+                continue;
+            }
+            let url: id = unsafe { msg_send![class!(NSURL), URLWithString: url_string] };
+            let path: id = unsafe { msg_send![url, path] };
+            if path != nil {
+                let pointer = unsafe { NSString::UTF8String(path) };
+                if !pointer.is_null() {
+                    paths.push(PathBuf::from(unsafe {
+                        CStr::from_ptr(pointer).to_string_lossy().into_owned()
+                    }));
+                }
+            }
+        }
     }
-    for file in unsafe { filenames.iter() } {
-        let path = unsafe {
-            let f = NSString::UTF8String(file);
-            CStr::from_ptr(f).to_string_lossy().into_owned()
-        };
-        paths.push(PathBuf::from(path))
+    if paths.is_empty() {
+        None
+    } else {
+        Some(ExternalPaths(paths))
     }
-    Some(ExternalPaths(paths))
 }
 
 extern "C" fn conclude_drag_operation(this: &Object, _: Sel, _: id) {
     let window_state = unsafe { get_window_state(this) };
-    send_file_drop_event(window_state, FileDropEvent::Exited);
+    send_drag_exited(window_state);
 }
 
 extern "C" fn dragging_session_source_operation_mask(
@@ -3594,6 +3659,32 @@ fn send_file_drop_event(
         if let Some(external_files_dragged) = external_files_dragged {
             lock.external_files_dragged = external_files_dragged;
         }
+        true
+    } else {
+        false
+    }
+}
+
+fn send_drag_exited(window_state: Arc<Mutex<MacWindowState>>) {
+    if window_state.lock().external_drop_read_permitted.is_some() {
+        send_external_drop_event(window_state, ExternalDropEvent::Exited);
+    } else {
+        send_file_drop_event(window_state, FileDropEvent::Exited);
+    }
+}
+
+fn send_external_drop_event(
+    window_state: Arc<Mutex<MacWindowState>>,
+    event: ExternalDropEvent,
+) -> bool {
+    let mut lock = window_state.lock();
+    if matches!(event, ExternalDropEvent::Exited) {
+        lock.external_drop_read_permitted = None;
+    }
+    if let Some(mut callback) = lock.event_callback.take() {
+        drop(lock);
+        callback(PlatformInput::ExternalDrop(event));
+        window_state.lock().event_callback = Some(callback);
         true
     } else {
         false

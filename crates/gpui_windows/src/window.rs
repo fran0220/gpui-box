@@ -6,12 +6,15 @@ use std::{
     path::PathBuf,
     rc::{Rc, Weak},
     str::FromStr,
-    sync::{Arc, Once, atomic::AtomicBool},
+    sync::{Arc, LazyLock, Once, atomic::AtomicBool},
     time::{Duration, Instant},
 };
 
 use anyhow::{Context as _, Result};
-use futures::channel::oneshot::{self, Receiver};
+use futures::{
+    FutureExt as _,
+    channel::oneshot::{self, Receiver},
+};
 use gpui_util::ResultExt;
 use raw_window_handle as rwh;
 use smallvec::SmallVec;
@@ -21,7 +24,13 @@ use windows::{
         Graphics::Dwm::*,
         Graphics::Gdi::*,
         System::{
-            Com::*, Diagnostics::Debug::MessageBeep, LibraryLoader::*, Ole::*, SystemServices::*,
+            Com::*,
+            DataExchange::RegisterClipboardFormatW,
+            Diagnostics::Debug::MessageBeep,
+            LibraryLoader::*,
+            Memory::{GlobalLock, GlobalSize, GlobalUnlock},
+            Ole::*,
+            SystemServices::*,
         },
         UI::{Controls::*, HiDpi::*, Input::KeyboardAndMouse::*, Shell::*, WindowsAndMessaging::*},
     },
@@ -1124,14 +1133,25 @@ impl accesskit::ActionHandler for A11yActionHandler {
     }
 }
 
+static URL_FORMAT: LazyLock<u16> =
+    LazyLock::new(|| unsafe { RegisterClipboardFormatW(w!("UniformResourceLocatorW")) as u16 });
+static FILE_DESCRIPTOR_FORMAT: LazyLock<u16> =
+    LazyLock::new(|| unsafe { RegisterClipboardFormatW(w!("FileGroupDescriptorW")) as u16 });
+static FILE_CONTENTS_FORMAT: LazyLock<u16> =
+    LazyLock::new(|| unsafe { RegisterClipboardFormatW(w!("FileContents")) as u16 });
+
 #[implement(IDropTarget)]
-struct WindowsDragDropHandler(pub Rc<WindowsWindowInner>);
+struct WindowsDragDropHandler {
+    window: Rc<WindowsWindowInner>,
+    accepted: Cell<bool>,
+    external_drop_read_permitted: RefCell<Option<Rc<Cell<bool>>>>,
+}
 
 impl WindowsDragDropHandler {
     fn handle_drag_drop(&self, input: PlatformInput) {
-        if let Some(mut func) = self.0.state.callbacks.input.take() {
+        if let Some(mut func) = self.window.state.callbacks.input.take() {
             func(input);
-            self.0.state.callbacks.input.set(Some(func));
+            self.window.state.callbacks.input.set(Some(func));
         }
     }
 }
@@ -1156,6 +1176,8 @@ impl IDropTarget_Impl for WindowsDragDropHandler_Impl {
             };
             let cursor_position = POINT { x: pt.x, y: pt.y };
             if idata_obj.QueryGetData(&config as _) == S_OK {
+                self.accepted.set(true);
+                self.external_drop_read_permitted.borrow_mut().take();
                 *pdweffect = DROPEFFECT_COPY;
                 let Some(mut idata) = idata_obj.GetData(&config as _).log_err() else {
                     return Ok(());
@@ -1172,10 +1194,10 @@ impl IDropTarget_Impl for WindowsDragDropHandler_Impl {
                 });
                 ReleaseStgMedium(&mut idata);
                 let mut cursor_position = cursor_position;
-                ScreenToClient(self.0.hwnd, &mut cursor_position)
+                ScreenToClient(self.window.hwnd, &mut cursor_position)
                     .ok()
                     .log_err();
-                let scale_factor = self.0.state.scale_factor.get();
+                let scale_factor = self.window.state.scale_factor.get();
                 let input = PlatformInput::FileDrop(FileDropEvent::Entered {
                     position: logical_point(
                         cursor_position.x as f32,
@@ -1185,12 +1207,31 @@ impl IDropTarget_Impl for WindowsDragDropHandler_Impl {
                     paths: ExternalPaths(paths),
                 });
                 self.handle_drag_drop(input);
+            } else if let Some((drop, read_permitted)) = external_drop_from_data_object(&idata_obj)
+            {
+                self.accepted.set(true);
+                *self.external_drop_read_permitted.borrow_mut() = Some(read_permitted);
+                *pdweffect = DROPEFFECT_COPY;
+                let mut cursor_position = cursor_position;
+                ScreenToClient(self.window.hwnd, &mut cursor_position)
+                    .ok()
+                    .log_err();
+                let scale_factor = self.window.state.scale_factor.get();
+                self.handle_drag_drop(PlatformInput::ExternalDrop(ExternalDropEvent::Entered {
+                    position: logical_point(
+                        cursor_position.x as f32,
+                        cursor_position.y as f32,
+                        scale_factor,
+                    ),
+                    drop,
+                }));
             } else {
+                self.accepted.set(false);
                 *pdweffect = DROPEFFECT_NONE;
             }
-            self.0
+            self.window
                 .drop_target_helper
-                .DragEnter(self.0.hwnd, idata_obj, &cursor_position, *pdweffect)
+                .DragEnter(self.window.hwnd, idata_obj, &cursor_position, *pdweffect)
                 .log_err();
         }
         Ok(())
@@ -1204,33 +1245,52 @@ impl IDropTarget_Impl for WindowsDragDropHandler_Impl {
     ) -> windows::core::Result<()> {
         let mut cursor_position = POINT { x: pt.x, y: pt.y };
         unsafe {
-            *pdweffect = DROPEFFECT_COPY;
-            self.0
+            *pdweffect = if self.accepted.get() {
+                DROPEFFECT_COPY
+            } else {
+                DROPEFFECT_NONE
+            };
+            self.window
                 .drop_target_helper
                 .DragOver(&cursor_position, *pdweffect)
                 .log_err();
-            ScreenToClient(self.0.hwnd, &mut cursor_position)
+            ScreenToClient(self.window.hwnd, &mut cursor_position)
                 .ok()
                 .log_err();
         }
-        let scale_factor = self.0.state.scale_factor.get();
-        let input = PlatformInput::FileDrop(FileDropEvent::Pending {
-            position: logical_point(
+        if self.accepted.get() {
+            let scale_factor = self.window.state.scale_factor.get();
+            let position = logical_point(
                 cursor_position.x as f32,
                 cursor_position.y as f32,
                 scale_factor,
-            ),
-        });
-        self.handle_drag_drop(input);
+            );
+            let input = if self.external_drop_read_permitted.borrow().is_some() {
+                PlatformInput::ExternalDrop(ExternalDropEvent::Pending { position })
+            } else {
+                PlatformInput::FileDrop(FileDropEvent::Pending { position })
+            };
+            self.handle_drag_drop(input);
+        }
 
         Ok(())
     }
 
     fn DragLeave(&self) -> windows::core::Result<()> {
         unsafe {
-            self.0.drop_target_helper.DragLeave().log_err();
+            self.window.drop_target_helper.DragLeave().log_err();
         }
-        let input = PlatformInput::FileDrop(FileDropEvent::Exited);
+        let input = if self
+            .external_drop_read_permitted
+            .borrow_mut()
+            .take()
+            .is_some()
+        {
+            PlatformInput::ExternalDrop(ExternalDropEvent::Exited)
+        } else {
+            PlatformInput::FileDrop(FileDropEvent::Exited)
+        };
+        self.accepted.set(false);
         self.handle_drag_drop(input);
 
         Ok(())
@@ -1247,26 +1307,341 @@ impl IDropTarget_Impl for WindowsDragDropHandler_Impl {
         let mut cursor_position = POINT { x: pt.x, y: pt.y };
         unsafe {
             *pdweffect = DROPEFFECT_COPY;
-            self.0
+            self.window
                 .drop_target_helper
                 .Drop(idata_obj, &cursor_position, *pdweffect)
                 .log_err();
-            ScreenToClient(self.0.hwnd, &mut cursor_position)
+            ScreenToClient(self.window.hwnd, &mut cursor_position)
                 .ok()
                 .log_err();
         }
-        let scale_factor = self.0.state.scale_factor.get();
-        let input = PlatformInput::FileDrop(FileDropEvent::Submit {
-            position: logical_point(
+        if self.accepted.replace(false) {
+            let scale_factor = self.window.state.scale_factor.get();
+            let position = logical_point(
                 cursor_position.x as f32,
                 cursor_position.y as f32,
                 scale_factor,
-            ),
-        });
-        self.handle_drag_drop(input);
+            );
+            let input = if let Some(read_permitted) =
+                self.external_drop_read_permitted.borrow_mut().take()
+            {
+                read_permitted.set(true);
+                PlatformInput::ExternalDrop(ExternalDropEvent::Submit { position })
+            } else {
+                PlatformInput::FileDrop(FileDropEvent::Submit { position })
+            };
+            self.handle_drag_drop(input);
+        }
 
         Ok(())
     }
+}
+
+fn query_data_object(data_object: &IDataObject, format: u16, medium: TYMED) -> bool {
+    let config = FORMATETC {
+        cfFormat: format,
+        ptd: std::ptr::null_mut(),
+        dwAspect: DVASPECT_CONTENT.0,
+        lindex: -1,
+        tymed: medium.0 as u32,
+    };
+    unsafe { data_object.QueryGetData(&config) == S_OK }
+}
+
+fn external_drop_from_data_object(
+    data_object: &IDataObject,
+) -> Option<(ExternalDrop, Rc<Cell<bool>>)> {
+    let read_permitted = Rc::new(Cell::new(false));
+    if let Some(files) = external_virtual_files(data_object, read_permitted.clone())
+        && !files.is_empty()
+    {
+        return Some((ExternalDrop::new(files), read_permitted));
+    }
+
+    let item = if query_data_object(
+        data_object,
+        *crate::clipboard::CLIPBOARD_PNG_FORMAT as u16,
+        TYMED_HGLOBAL,
+    ) {
+        ExternalDropItem::Image(ExternalImage {
+            format: ImageFormat::Png,
+            data: deferred_hglobal_data(
+                data_object.clone(),
+                *crate::clipboard::CLIPBOARD_PNG_FORMAT as u16,
+                read_permitted.clone(),
+                |bytes| Some(bytes.to_vec()),
+            ),
+        })
+    } else if query_data_object(data_object, CF_DIB.0, TYMED_HGLOBAL) {
+        ExternalDropItem::Image(ExternalImage {
+            format: ImageFormat::Bmp,
+            data: deferred_hglobal_data(
+                data_object.clone(),
+                CF_DIB.0,
+                read_permitted.clone(),
+                crate::clipboard::convert_dib_to_bmp,
+            ),
+        })
+    } else if query_data_object(data_object, CF_DIBV5.0, TYMED_HGLOBAL) {
+        ExternalDropItem::Image(ExternalImage {
+            format: ImageFormat::Bmp,
+            data: deferred_hglobal_data(
+                data_object.clone(),
+                CF_DIBV5.0,
+                read_permitted.clone(),
+                crate::clipboard::convert_dib_to_bmp,
+            ),
+        })
+    } else if query_data_object(data_object, *URL_FORMAT, TYMED_HGLOBAL) {
+        ExternalDropItem::Url(ExternalUrl {
+            data: deferred_hglobal_data(
+                data_object.clone(),
+                *URL_FORMAT,
+                read_permitted.clone(),
+                utf16_hglobal_to_utf8,
+            ),
+        })
+    } else if query_data_object(data_object, CF_UNICODETEXT.0, TYMED_HGLOBAL) {
+        ExternalDropItem::Text(ExternalText {
+            mime_type: SharedString::new_static("text/plain;charset=utf-8"),
+            data: deferred_hglobal_data(
+                data_object.clone(),
+                CF_UNICODETEXT.0,
+                read_permitted.clone(),
+                utf16_hglobal_to_utf8,
+            ),
+        })
+    } else {
+        return None;
+    };
+    Some((ExternalDrop::new([item]), read_permitted))
+}
+
+fn external_virtual_files(
+    data_object: &IDataObject,
+    read_permitted: Rc<Cell<bool>>,
+) -> Option<Vec<ExternalDropItem>> {
+    if !query_data_object(data_object, *FILE_DESCRIPTOR_FORMAT, TYMED_HGLOBAL) {
+        return None;
+    }
+    let config = FORMATETC {
+        cfFormat: *FILE_DESCRIPTOR_FORMAT,
+        ptd: std::ptr::null_mut(),
+        dwAspect: DVASPECT_CONTENT.0,
+        lindex: -1,
+        tymed: TYMED_HGLOBAL.0 as u32,
+    };
+    let mut medium = unsafe { data_object.GetData(&config).ok()? };
+    let descriptors = unsafe {
+        let global = medium.u.hGlobal;
+        if global.is_invalid() {
+            None
+        } else {
+            let size = GlobalSize(global);
+            let pointer = GlobalLock(global);
+            let result = (!pointer.is_null() && size <= 1024 * 1024).then(|| {
+                let bytes = std::slice::from_raw_parts(pointer.cast::<u8>(), size);
+                parse_file_descriptors(bytes)
+            });
+            if !pointer.is_null() {
+                GlobalUnlock(global).ok();
+            }
+            result.flatten()
+        }
+    };
+    unsafe { ReleaseStgMedium(&mut medium) };
+
+    let files = descriptors?
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, (name, len))| {
+            ExternalFile::new(
+                name,
+                None,
+                deferred_file_contents(
+                    data_object.clone(),
+                    index as i32,
+                    len,
+                    read_permitted.clone(),
+                ),
+            )
+            .ok()
+            .map(ExternalDropItem::File)
+        })
+        .collect();
+    Some(files)
+}
+
+fn parse_file_descriptors(bytes: &[u8]) -> Option<Vec<(String, Option<u64>)>> {
+    let count = u32::from_le_bytes(bytes.get(..4)?.try_into().ok()?) as usize;
+    if count == 0 || count > 128 {
+        return None;
+    }
+    let descriptor_size = std::mem::size_of::<FILEDESCRIPTORW>();
+    let required = 4usize.checked_add(count.checked_mul(descriptor_size)?)?;
+    if required > bytes.len() {
+        return None;
+    }
+    let mut descriptors = Vec::with_capacity(count);
+    for index in 0..count {
+        let offset = 4 + index * descriptor_size;
+        let descriptor = unsafe {
+            std::ptr::read_unaligned(bytes.as_ptr().add(offset).cast::<FILEDESCRIPTORW>())
+        };
+        let file_name = descriptor.cFileName;
+        let name_end = file_name
+            .iter()
+            .position(|character| *character == 0)
+            .unwrap_or(file_name.len());
+        let name = String::from_utf16(&file_name[..name_end]).ok()?;
+        let len = (descriptor.dwFlags & FD_FILESIZE.0 as u32 != 0).then_some(
+            (u64::from(descriptor.nFileSizeHigh) << 32) | u64::from(descriptor.nFileSizeLow),
+        );
+        descriptors.push((name, len));
+    }
+    Some(descriptors)
+}
+
+fn deferred_file_contents(
+    data_object: IDataObject,
+    index: i32,
+    len: Option<u64>,
+    read_permitted: Rc<Cell<bool>>,
+) -> ExternalDropData {
+    ExternalDropData::new(len, move |limit| {
+        let data_object = data_object.clone();
+        let read_permitted = read_permitted.clone();
+        async move {
+            anyhow::ensure!(
+                read_permitted.get(),
+                "external drop data cannot be read before the drop"
+            );
+            let config = FORMATETC {
+                cfFormat: *FILE_CONTENTS_FORMAT,
+                ptd: std::ptr::null_mut(),
+                dwAspect: DVASPECT_CONTENT.0,
+                lindex: index,
+                tymed: TYMED_ISTREAM.0 as u32 | TYMED_HGLOBAL.0 as u32,
+            };
+            let mut medium = unsafe { data_object.GetData(&config)? };
+            let result = if medium.tymed == TYMED_ISTREAM.0 as u32 {
+                let stream = unsafe { (&*medium.u.pstm).clone() }
+                    .ok_or_else(|| anyhow::anyhow!("virtual file returned no stream"))?;
+                read_stream_bounded(&stream, limit)
+            } else if medium.tymed == TYMED_HGLOBAL.0 as u32 {
+                unsafe { copy_hglobal_bounded(medium.u.hGlobal, limit) }
+            } else {
+                Err(anyhow::anyhow!(
+                    "virtual file returned an unsupported medium"
+                ))
+            };
+            unsafe { ReleaseStgMedium(&mut medium) };
+            result.map(Arc::from)
+        }
+        .boxed_local()
+    })
+}
+
+fn read_stream_bounded(stream: &IStream, limit: u64) -> Result<Vec<u8>> {
+    let mut output = Vec::new();
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let remaining = limit.saturating_sub(output.len() as u64);
+        let requested = buffer.len().min(remaining.saturating_add(1) as usize) as u32;
+        let mut read = 0;
+        unsafe {
+            stream
+                .Read(buffer.as_mut_ptr().cast(), requested, Some(&mut read))
+                .ok()?
+        };
+        if read == 0 {
+            return Ok(output);
+        }
+        output.extend_from_slice(&buffer[..read as usize]);
+        anyhow::ensure!(
+            output.len() as u64 <= limit,
+            "external drop item exceeds the byte limit"
+        );
+    }
+}
+
+unsafe fn copy_hglobal_bounded(global: HGLOBAL, limit: u64) -> Result<Vec<u8>> {
+    anyhow::ensure!(
+        !global.is_invalid(),
+        "external drop returned an invalid handle"
+    );
+    let size = unsafe { GlobalSize(global) };
+    anyhow::ensure!(
+        size as u64 <= limit,
+        "external drop item exceeds the byte limit"
+    );
+    let pointer = unsafe { GlobalLock(global) };
+    anyhow::ensure!(!pointer.is_null(), "external drop data could not be locked");
+    let result = unsafe { std::slice::from_raw_parts(pointer.cast::<u8>(), size) }.to_vec();
+    unsafe { GlobalUnlock(global) }.ok();
+    Ok(result)
+}
+
+fn deferred_hglobal_data(
+    data_object: IDataObject,
+    format: u16,
+    read_permitted: Rc<Cell<bool>>,
+    convert: fn(&[u8]) -> Option<Vec<u8>>,
+) -> ExternalDropData {
+    ExternalDropData::new(None, move |limit| {
+        let data_object = data_object.clone();
+        let read_permitted = read_permitted.clone();
+        async move {
+            anyhow::ensure!(
+                read_permitted.get(),
+                "external drop data cannot be read before the drop"
+            );
+            let config = FORMATETC {
+                cfFormat: format,
+                ptd: std::ptr::null_mut(),
+                dwAspect: DVASPECT_CONTENT.0,
+                lindex: -1,
+                tymed: TYMED_HGLOBAL.0 as u32,
+            };
+            let mut medium = unsafe { data_object.GetData(&config)? };
+            let result = unsafe {
+                let global = medium.u.hGlobal;
+                anyhow::ensure!(
+                    !global.is_invalid(),
+                    "external drop returned an invalid handle"
+                );
+                let size = GlobalSize(global);
+                anyhow::ensure!(
+                    size as u64 <= limit.saturating_mul(2).max(limit),
+                    "external drop item exceeds the byte limit"
+                );
+                let pointer = GlobalLock(global);
+                anyhow::ensure!(!pointer.is_null(), "external drop data could not be locked");
+                let source = std::slice::from_raw_parts(pointer.cast::<u8>(), size);
+                let converted = convert(source)
+                    .ok_or_else(|| anyhow::anyhow!("external drop data is malformed"));
+                GlobalUnlock(global).ok();
+                converted
+            };
+            unsafe { ReleaseStgMedium(&mut medium) };
+            let bytes = result?;
+            anyhow::ensure!(
+                bytes.len() as u64 <= limit,
+                "external drop item exceeds the byte limit"
+            );
+            Ok(Arc::from(bytes))
+        }
+        .boxed_local()
+    })
+}
+
+fn utf16_hglobal_to_utf8(bytes: &[u8]) -> Option<Vec<u8>> {
+    let words = bytes
+        .chunks_exact(2)
+        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+        .take_while(|word| *word != 0)
+        .collect::<Vec<_>>();
+    String::from_utf16(&words).ok().map(String::into_bytes)
 }
 
 #[derive(Debug, Clone)]
@@ -1495,7 +1870,11 @@ pub(crate) fn get_module_handle() -> HMODULE {
 
 fn register_drag_drop(window: &Rc<WindowsWindowInner>) -> Result<()> {
     let window_handle = window.hwnd;
-    let handler = WindowsDragDropHandler(window.clone());
+    let handler = WindowsDragDropHandler {
+        window: window.clone(),
+        accepted: Cell::new(false),
+        external_drop_read_permitted: RefCell::new(None),
+    };
     // The lifetime of `IDropTarget` is handled by Windows, it won't release until
     // we call `RevokeDragDrop`.
     // So, it's safe to drop it here.
@@ -1655,9 +2034,37 @@ fn set_non_rude_hwnd(hwnd: HWND, non_rude: bool) {
 
 #[cfg(test)]
 mod tests {
-    use super::ClickState;
+    use super::{ClickState, parse_file_descriptors};
     use gpui::{DevicePixels, MouseButton, point};
     use std::time::Duration;
+    use windows::Win32::UI::Shell::{FD_FILESIZE, FILEDESCRIPTORW};
+
+    #[test]
+    fn virtual_file_descriptors_are_bounded_and_preserve_name_and_size() {
+        let mut descriptor = FILEDESCRIPTORW::default();
+        descriptor.dwFlags = FD_FILESIZE.0 as u32;
+        descriptor.nFileSizeLow = 37;
+        let mut name = [0u16; 260];
+        for (destination, source) in name.iter_mut().zip("photo.png".encode_utf16()) {
+            *destination = source;
+        }
+        descriptor.cFileName = name;
+
+        let mut bytes = 1u32.to_le_bytes().to_vec();
+        bytes.extend_from_slice(unsafe {
+            std::slice::from_raw_parts(
+                (&raw const descriptor).cast::<u8>(),
+                std::mem::size_of::<FILEDESCRIPTORW>(),
+            )
+        });
+        assert_eq!(
+            parse_file_descriptors(&bytes),
+            Some(vec![("photo.png".to_owned(), Some(37))])
+        );
+
+        bytes[..4].copy_from_slice(&129u32.to_le_bytes());
+        assert_eq!(parse_file_descriptors(&bytes), None);
+    }
 
     #[test]
     fn test_double_click_interval() {

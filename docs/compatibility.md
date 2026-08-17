@@ -151,6 +151,22 @@ compose route. Its AccessKit adapter mirrors roles, focus, actions, values, and
 canvas-scaled bounds into semantic DOM, but the JSON semantic snapshot is only
 a testing/debug surface.
 
+## Native external data drag and drop
+
+macOS and Windows preserve the existing `ExternalPaths` contract for real
+filesystem paths and additionally expose pathless native data as
+`ExternalDrop`. Both platforms identify encoded images, UTF-8 text, URLs, and
+promised or virtual files during hover without reading item content. Content is
+read only after drop through a caller-supplied per-item byte limit; virtual
+names are sanitized, and URLs are never fetched by GPUI. macOS uses dragging
+pasteboards and file-promise receivers. Windows uses OLE `IDataObject`,
+including PNG/DIB, Unicode text, URL, and
+`FileGroupDescriptorW`/`FileContents` (`IStream` or `HGLOBAL`). A source that
+also exposes a real path remains a path drop to avoid duplicate delivery.
+
+Linux keeps its existing real-path drag support and does not yet publish the
+new pathless payload. Web has no native desktop drag bridge in this cohort.
+
 ## Framework development contract
 
 GPUI Box is the sole framework and platform development authority. Changes are
