@@ -105,7 +105,9 @@ does not compile was failed by this file, not by the compiler.
 
 `docs/llms.txt` is the entry point for a program reading this repository, and
 `tools/mcp` serves the same catalog as MCP tools, including one that renders a
-scene and returns the image.
+scene and returns the image. The stdio server and the hosted Worker both read
+this tree's index, not crates.io `gpui-box-mcp`. Hosted `/mcp` is the last
+deploy of the repository; stdio (`tools/mcp/run.sh`) is the working copy.
 
 ## Validation
 

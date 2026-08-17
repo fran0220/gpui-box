@@ -176,35 +176,51 @@ fn search(root: &Path, query: &str, kind: &str) -> Result<String> {
     let index = index(root)?;
     let empty = Vec::new();
     let components = index["components"].as_array().unwrap_or(&empty);
+    let types = index["types"].as_array().unwrap_or(&empty);
     let words: Vec<String> = query.split_whitespace().map(str::to_lowercase).collect();
+    // An empty query is the component catalog. Types outnumber components and
+    // dumping them is not a way to start. A non-empty query searches both,
+    // because CardHeader and CardVariant live next to Card.
+    let include_components = kind.is_empty() || kind == "builder" || kind == "view";
+    let include_types = kind == "type" || (kind.is_empty() && !query.is_empty());
 
     let mut lines = Vec::new();
-    for component in components {
-        if !kind.is_empty() && component["kind"].as_str() != Some(kind) {
-            continue;
+    if include_components {
+        for component in components {
+            if (kind == "builder" || kind == "view") && component["kind"].as_str() != Some(kind) {
+                continue;
+            }
+            if !matches_query(component, &words) {
+                continue;
+            }
+            lines.push(format!(
+                "{} ({}) — {}\n  path: {}\n  scenes: {}",
+                component["name"].as_str().unwrap_or_default(),
+                component["kind"].as_str().unwrap_or_default(),
+                component["summary"].as_str().unwrap_or("(no summary)"),
+                component["path"].as_str().unwrap_or_default(),
+                names(&component["scenes"])
+            ));
         }
-        let haystack = format!(
-            "{} {} {}",
-            component["name"], component["summary"], component["path"]
-        )
-        .to_lowercase();
-        if !words.iter().all(|word| haystack.contains(word)) {
-            continue;
+    }
+    if include_types {
+        for ty in types {
+            if !matches_query(ty, &words) {
+                continue;
+            }
+            lines.push(format!(
+                "{} (type) — {}\n  path: {}",
+                ty["name"].as_str().unwrap_or_default(),
+                ty["summary"].as_str().unwrap_or("(no summary)"),
+                ty["path"].as_str().unwrap_or_default()
+            ));
         }
-        lines.push(format!(
-            "{} ({}) — {}\n  path: {}\n  scenes: {}",
-            component["name"].as_str().unwrap_or_default(),
-            component["kind"].as_str().unwrap_or_default(),
-            component["summary"].as_str().unwrap_or("(no summary)"),
-            component["path"].as_str().unwrap_or_default(),
-            names(&component["scenes"])
-        ));
     }
 
     if lines.is_empty() {
         return Ok(format!(
-            "Nothing matches {query:?}. Search with one word, or an empty query \
-             to list all {} components.",
+            "Nothing matches {query:?}. Search with one word, kind=type for \
+             supporting types, or an empty query to list all {} components.",
             components.len()
         ));
     }
@@ -215,37 +231,58 @@ fn search(root: &Path, query: &str, kind: &str) -> Result<String> {
     ))
 }
 
+fn matches_query(entry: &Value, words: &[String]) -> bool {
+    if words.is_empty() {
+        return true;
+    }
+    let haystack =
+        format!("{} {} {}", entry["name"], entry["summary"], entry["path"]).to_lowercase();
+    words.iter().all(|word| haystack.contains(word))
+}
+
 fn component(root: &Path, name: &str) -> Result<String> {
     let index = index(root)?;
     let empty = Vec::new();
-    let found = index["components"]
+    if let Some(component) = index["components"]
         .as_array()
         .unwrap_or(&empty)
         .iter()
-        .find(|component| component["name"].as_str() == Some(name));
+        .find(|component| component["name"].as_str() == Some(name))
+    {
+        return Ok(format_mountable(component));
+    }
+    if let Some(ty) = index["types"]
+        .as_array()
+        .unwrap_or(&empty)
+        .iter()
+        .find(|ty| ty["name"].as_str() == Some(name))
+    {
+        return Ok(format_type(ty));
+    }
 
-    let Some(component) = found else {
-        // A near miss is more useful than a refusal, because the caller is
-        // usually one character or one plural away.
-        let close: Vec<&str> = index["components"]
-            .as_array()
-            .unwrap_or(&empty)
-            .iter()
-            .filter_map(|component| component["name"].as_str())
-            .filter(|candidate| {
-                candidate.to_lowercase().contains(&name.to_lowercase())
-                    || name.to_lowercase().contains(&candidate.to_lowercase())
-            })
-            .collect();
-        if close.is_empty() {
-            bail!("no component named {name:?}. Call search_components to find one.");
-        }
-        bail!(
-            "no component named {name:?}. Did you mean: {}?",
-            close.join(", ")
-        );
-    };
+    // A near miss is more useful than a refusal, because the caller is
+    // usually one character or one plural away.
+    let close: Vec<&str> = index["components"]
+        .as_array()
+        .unwrap_or(&empty)
+        .iter()
+        .chain(index["types"].as_array().unwrap_or(&empty))
+        .filter_map(|entry| entry["name"].as_str())
+        .filter(|candidate| {
+            candidate.to_lowercase().contains(&name.to_lowercase())
+                || name.to_lowercase().contains(&candidate.to_lowercase())
+        })
+        .collect();
+    if close.is_empty() {
+        bail!("no component or type named {name:?}. Call search_components to find one.");
+    }
+    bail!(
+        "no component or type named {name:?}. Did you mean: {}?",
+        close.join(", ")
+    )
+}
 
+fn format_mountable(component: &Value) -> String {
     let kind = component["kind"].as_str().unwrap_or_default();
     let mut out = format!(
         "{} ({})\n{}\n\npath:   {}\nsource: {}\n",
@@ -284,7 +321,23 @@ fn component(root: &Path, name: &str) -> Result<String> {
              or render_scene(name) to look at it.\n"
         ));
     }
-    Ok(out)
+    out
+}
+
+fn format_type(ty: &Value) -> String {
+    let mut out = format!(
+        "{} (type)\n{}\n\npath: {}\n\nA supporting type: construct it and pass it \
+         to a component. It is not mounted on its own.\n",
+        ty["name"].as_str().unwrap_or_default(),
+        ty["summary"].as_str().unwrap_or("(no summary)"),
+        ty["path"].as_str().unwrap_or_default(),
+    );
+    section(&mut out, "variants", &ty["variants"]);
+    section(&mut out, "construct", &ty["construct"]);
+    section(&mut out, "options (chain onto the value)", &ty["options"]);
+    section(&mut out, "commands (need a Context)", &ty["commands"]);
+    section(&mut out, "queries", &ty["queries"]);
+    out
 }
 
 fn scene(root: &Path, name: &str) -> Result<String> {
@@ -506,5 +559,45 @@ mod tests {
         let error = call(&root, &json!({ "name": "nope", "arguments": {} }))
             .expect_err("an unknown tool is an error");
         assert!(error.to_string().contains("nope"), "{error}");
+    }
+
+    #[test]
+    fn component_answers_a_supporting_type() {
+        let root = root().expect("the repository root");
+        let body = call(
+            &root,
+            &json!({ "name": "component", "arguments": { "name": "CardHeader" } }),
+        )
+        .expect("CardHeader is in the index");
+        let text = body["content"][0]["text"].as_str().expect("text");
+        assert!(text.starts_with("CardHeader (type)"), "{text}");
+        assert!(text.contains("supporting type"), "{text}");
+    }
+
+    #[test]
+    fn search_finds_types_next_to_components() {
+        let root = root().expect("the repository root");
+        let body = call(
+            &root,
+            &json!({ "name": "search_components", "arguments": { "query": "card" } }),
+        )
+        .expect("card matches");
+        let text = body["content"][0]["text"].as_str().expect("text");
+        assert!(text.contains("Card (builder)"), "{text}");
+        assert!(text.contains("CardHeader (type)"), "{text}");
+        assert!(text.contains("CardVariant (type)"), "{text}");
+    }
+
+    #[test]
+    fn empty_search_lists_components_not_every_type() {
+        let root = root().expect("the repository root");
+        let body = call(
+            &root,
+            &json!({ "name": "search_components", "arguments": { "query": "" } }),
+        )
+        .expect("empty query");
+        let text = body["content"][0]["text"].as_str().expect("text");
+        assert!(text.contains("Card (builder)"), "{text}");
+        assert!(!text.contains("CardHeader (type)"), "{text}");
     }
 }

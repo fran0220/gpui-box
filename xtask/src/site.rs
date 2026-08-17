@@ -639,9 +639,10 @@ fn mcp_page(root: &Path, components: &[Value], scenes: &[Value]) -> Result<Strin
         .join("");
     let body = format!(
         r#"<h1>MCP</h1>
-<p class="lead">The same catalog, answered for an agent. Hosted
-<code>render_scene</code> returns the committed capture. Working-copy rendering
-needs the stdio server from a checkout.</p>
+<p class="lead">The same catalog as this repository, answered for an agent —
+not the crates.io cohort. Hosted <code>render_scene</code> returns the
+committed capture. Working-copy rendering needs the stdio server from a
+checkout.</p>
 <pre><code>{{
   "mcpServers": {{
     "gpui-box": {{ "url": "https://gpui-box.origingame.dev/mcp" }}

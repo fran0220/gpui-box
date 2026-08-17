@@ -12,7 +12,8 @@ deterministic scene fixtures. It contains no OriginGame/Forge domain logic,
 credentials, transports, accounts, or product models.
 
 **Catalog endpoint:** <https://gpui-box.origingame.dev> ·
-**Hosted MCP:** <https://gpui-box.origingame.dev/mcp>
+**Hosted MCP (last deploy of this tree):** <https://gpui-box.origingame.dev/mcp> ·
+**Checkout MCP:** `tools/mcp/run.sh`
 
 ## Packages
 

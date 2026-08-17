@@ -52,9 +52,12 @@ Do not hand-edit `docs/api-index.json`, `docs/token-reference.md`,
 `docs/strings-allowlist.txt`, or headless PNGs. Their `xtask` generate/capture
 commands own them.
 
-The checkout-backed `gpui-box-mcp` reads `GPUI_BOX_ROOT` or discovers upward
-from cwd. `render_scene` requires the complete checkout. The hosted static
-catalog is <https://gpui-box.origingame.dev>.
+The checkout-backed `gpui-box-mcp` (`tools/mcp/run.sh`) reads `GPUI_BOX_ROOT`
+or discovers upward from cwd and is the catalog for this working copy.
+`render_scene` requires the complete checkout. The hosted endpoint at
+<https://gpui-box.origingame.dev> deploys the same repository catalog; it is
+not a crates.io install. crates.io `gpui-box-mcp` without a git revision is
+still the last published cohort (`0.1.1`).
 
 References: `docs/components.md`, `docs/component-contracts.md`,
 `docs/coverage.md`, `docs/truthful-ui.md`, `docs/token-model.md`,

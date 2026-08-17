@@ -92,12 +92,12 @@ async function dispatch(method, params, env) {
         capabilities: { tools: {} },
         serverInfo: { name: "gpui-box", version: VERSION },
         instructions:
-          "The GPUI Box component catalog, served from the published " +
-          "revision. Signatures come from an index generated out of the " +
-          "source, and render_scene returns the image the gate captured for " +
-          "that scene. It cannot show a component you are changing locally — " +
-          "run the stdio server in a working copy for that. Prefer these " +
-          "tools over recall.",
+          "The GPUI Box Kit component catalog, served from the current " +
+          "repository catalog (this deployment of main, ahead of crates.io). " +
+          "Signatures come from an index generated out of the source, and " +
+          "render_scene returns the image the gate captured for that scene. " +
+          "It cannot show uncommitted local edits — run the stdio server in " +
+          "a working copy for that. Prefer these tools over recall.",
       };
     case "tools/list":
       return { tools: TOOLS };
@@ -148,62 +148,88 @@ async function asset(env, path) {
   return response.text();
 }
 
+function matchesQuery(entry, words) {
+  if (words.length === 0) return true;
+  const haystack = `${entry.name} ${entry.summary} ${entry.path}`.toLowerCase();
+  return words.every((word) => haystack.includes(word));
+}
+
 function search(index, query, kind) {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  const found = index.components.filter((entry) => {
-    if (kind && entry.kind !== kind) return false;
-    const haystack = `${entry.name} ${entry.summary} ${entry.path}`.toLowerCase();
-    return words.every((word) => haystack.includes(word));
-  });
+  const includeComponents = !kind || kind === "builder" || kind === "view";
+  const includeTypes = kind === "type" || (!kind && query.length > 0);
+  const lines = [];
 
-  if (found.length === 0) {
-    return `Nothing matches ${JSON.stringify(query)}. Search with one word, or an empty query to list all ${index.components.length} components.`;
+  if (includeComponents) {
+    for (const entry of index.components) {
+      if ((kind === "builder" || kind === "view") && entry.kind !== kind) continue;
+      if (!matchesQuery(entry, words)) continue;
+      lines.push(
+        `${entry.name} (${entry.kind}) — ${entry.summary || "(no summary)"}\n  path: ${entry.path}\n  scenes: ${(entry.scenes || []).join(", ")}`,
+      );
+    }
   }
-  const lines = found.map(
-    (entry) =>
-      `${entry.name} (${entry.kind}) — ${entry.summary || "(no summary)"}\n  path: ${entry.path}\n  scenes: ${entry.scenes.join(", ")}`,
-  );
-  return `${found.length} match(es)\n\n${lines.join("\n\n")}`;
+  if (includeTypes) {
+    for (const entry of index.types || []) {
+      if (!matchesQuery(entry, words)) continue;
+      lines.push(
+        `${entry.name} (type) — ${entry.summary || "(no summary)"}\n  path: ${entry.path}`,
+      );
+    }
+  }
+
+  if (lines.length === 0) {
+    return `Nothing matches ${JSON.stringify(query)}. Search with one word, kind=type for supporting types, or an empty query to list all ${index.components.length} components.`;
+  }
+  return `${lines.length} match(es)\n\n${lines.join("\n\n")}`;
+}
+
+function section(title, values) {
+  return values && values.length ? `\n${title}:\n${values.map((v) => `  ${v}`).join("\n")}\n` : "";
 }
 
 function component(index, name) {
   const found = index.components.find((entry) => entry.name === name);
-  if (!found) {
-    // A near miss is more useful than a refusal, because the caller is
-    // usually one character or one plural away.
-    const close = index.components
-      .map((entry) => entry.name)
-      .filter(
-        (candidate) =>
-          candidate.toLowerCase().includes(name.toLowerCase()) ||
-          name.toLowerCase().includes(candidate.toLowerCase()),
-      );
-    throw new Error(
-      close.length
-        ? `no component named ${JSON.stringify(name)}. Did you mean: ${close.join(", ")}?`
-        : `no component named ${JSON.stringify(name)}. Call search_components to find one.`,
+  if (found) {
+    let out = `${found.name} (${found.kind})\n${found.summary || "(no summary)"}\n\npath:   ${found.path}\nsource: ${found.source}\n`;
+    out +=
+      found.kind === "view"
+        ? "\nA view survives a frame: hold it in an Entity with cx.new(...) and reach it with .update(...).\n"
+        : "\nA builder is RenderOnce: construct and mount it in one expression.\n";
+    out += section("construct", found.construct);
+    out += section("options (chain onto the value)", found.options);
+    out += section("commands (need a Context)", found.commands);
+    out += section("queries", found.queries);
+    out += section("reports", found.reports);
+    if (found.scenes && found.scenes.length) {
+      out += `\nscenes that render it: ${found.scenes.join(", ")}\nCall scene(name) for verified example code, or render_scene(name) to look at it.\n`;
+    }
+    return out;
+  }
+
+  const ty = (index.types || []).find((entry) => entry.name === name);
+  if (ty) {
+    let out = `${ty.name} (type)\n${ty.summary || "(no summary)"}\n\npath: ${ty.path}\n\nA supporting type: construct it and pass it to a component. It is not mounted on its own.\n`;
+    out += section("variants", ty.variants);
+    out += section("construct", ty.construct);
+    out += section("options (chain onto the value)", ty.options);
+    out += section("commands (need a Context)", ty.commands);
+    out += section("queries", ty.queries);
+    return out;
+  }
+
+  const close = [...index.components, ...(index.types || [])]
+    .map((entry) => entry.name)
+    .filter(
+      (candidate) =>
+        candidate.toLowerCase().includes(name.toLowerCase()) ||
+        name.toLowerCase().includes(candidate.toLowerCase()),
     );
-  }
-
-  let out = `${found.name} (${found.kind})\n${found.summary || "(no summary)"}\n\npath:   ${found.path}\nsource: ${found.source}\n`;
-  out +=
-    found.kind === "view"
-      ? "\nA view survives a frame: hold it in an Entity with cx.new(...) and reach it with .update(...).\n"
-      : "\nA builder is RenderOnce: construct and mount it in one expression.\n";
-
-  const section = (title, values) =>
-    values && values.length ? `\n${title}:\n${values.map((v) => `  ${v}`).join("\n")}\n` : "";
-
-  out += section("construct", found.construct);
-  out += section("options (chain onto the value)", found.options);
-  out += section("commands (need a Context)", found.commands);
-  out += section("queries", found.queries);
-  out += section("reports", found.reports);
-
-  if (found.scenes.length) {
-    out += `\nscenes that render it: ${found.scenes.join(", ")}\nCall scene(name) for verified example code, or render_scene(name) to look at it.\n`;
-  }
-  return out;
+  throw new Error(
+    close.length
+      ? `no component or type named ${JSON.stringify(name)}. Did you mean: ${close.join(", ")}?`
+      : `no component or type named ${JSON.stringify(name)}. Call search_components to find one.`,
+  );
 }
 
 function scene(index, name) {

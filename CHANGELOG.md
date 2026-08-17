@@ -8,6 +8,16 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ## [Unreleased]
 
+### Changed
+
+**The catalog tools follow this repository, not the crates.io cohort.**
+`search_components` and `component` now answer supporting types from
+`docs/api-index.json` (`CardHeader`, `CardVariant`, `AsyncValue`, and the
+rest) as well as mountable components. The hosted Worker states that it
+serves the current deploy of this tree rather than a published crate.
+`tools/mcp/run.sh` starts the checkout stdio server. The product-UI skill
+names current Kit types instead of gallery-only helpers.
+
 ### Added
 
 **A surface separation and tone distinction contract in the token layer.**

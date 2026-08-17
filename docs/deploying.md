@@ -14,9 +14,10 @@ static catalog around it, copies the shared MCP tool description, and deploys
 one Cloudflare Worker. `/` is the catalog home: compose, scenes, and
 components. `/docs/` and `/mcp/` are the only other pages. `/compose/` is the
 full GPUI surface, also embedded twice on the home page so both themes stay
-visible. Agents POST JSON-RPC to `/mcp`. Hosted `render_scene` returns
-committed catalog captures rather than compiling per request; the stdio server
-in [`mcp.md`](mcp.md) is required for working-copy rendering.
+visible. Agents POST JSON-RPC to `/mcp`. The hosted catalog is this repository's last
+deploy, not a crates.io install. Hosted `render_scene` returns committed
+catalog captures rather than compiling per request; the stdio server in
+[`mcp.md`](mcp.md) is required for working-copy rendering.
 
 ```json
 {

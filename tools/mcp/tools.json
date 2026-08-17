@@ -1,18 +1,18 @@
 [
   {
     "name": "search_components",
-    "description": "Find components by name, summary, or module. Returns each match with its kind, path, one-line summary, and the scenes that render it. Start here.",
+    "description": "Find components or supporting types by name, summary, or module. Returns each match with its kind, path, one-line summary, and the scenes that render it. An empty query lists components only. Start here.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "query": {
           "type": "string",
-          "description": "Words to match, or empty for everything"
+          "description": "Words to match, or empty for every component"
         },
         "kind": {
           "type": "string",
-          "enum": ["builder", "view"],
-          "description": "Optional: builders mount in one expression, views are held in an Entity"
+          "enum": ["builder", "view", "type"],
+          "description": "Optional: builders mount in one expression, views are held in an Entity, types are constructed and passed in"
         }
       },
       "required": ["query"]
@@ -20,7 +20,7 @@
   },
   {
     "name": "component",
-    "description": "The exact public API of one component: constructors, chainable options, commands that need a Context, queries, the events it reports, and its scenes. These signatures are generated from the source, so prefer them over recall.",
+    "description": "The exact public API of one component or supporting type: constructors, chainable options, commands that need a Context, queries, reported events, variants, and scenes. These signatures are generated from the source, so prefer them over recall.",
     "inputSchema": {
       "type": "object",
       "properties": {
