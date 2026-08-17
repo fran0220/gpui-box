@@ -109,6 +109,24 @@ scene and returns the image. The stdio server and the hosted Worker both read
 this tree's index, not crates.io `gpui-box-mcp`. Hosted `/mcp` is the last
 deploy of the repository; stdio (`tools/mcp/run.sh`) is the working copy.
 
+## Hosted MCP after every push
+
+The public catalog at `https://gpui-box.origingame.dev/mcp` must track
+`origin/main`, not crates.io. Do not publish a crates.io MCP bump as part of
+ordinary Kit work.
+
+After every `git push` to `main`:
+
+1. `tools/site/deploy.sh` (set `CLOUDFLARE_ACCOUNT_ID` when more than one
+   Cloudflare account is logged in);
+2. confirm hosted `/api-index.json` has the same component and scene counts
+   as `docs/api-index.json` on that commit;
+3. confirm `POST /mcp` `search_components` with an empty query returns that
+   same count.
+
+A push that changes the catalog and leaves the Worker on the previous
+deploy is unfinished.
+
 ## Validation
 
 ```bash
