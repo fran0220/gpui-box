@@ -1284,10 +1284,57 @@ impl PlatformTextSystem for NoopTextSystem {
     }
 }
 
+/// Default glyph-compositing gamma when the platform does not report one.
+///
+/// Matches the WGPU fallback and the historical DirectWrite 1.8 default.
+pub const DEFAULT_TEXT_GAMMA: f32 = 1.8;
+
+/// Contrast boost applied to dark grayscale foregrounds.
+///
+/// Matches the WGPU fallback. DirectWrite supplies its own value on Windows.
+pub const DEFAULT_GRAYSCALE_ENHANCED_CONTRAST: f32 = 1.0;
+
+/// Contrast boost applied to subpixel coverage.
+///
+/// Unused on macOS, which stays grayscale-only. Matches the WGPU fallback.
+pub const DEFAULT_SUBPIXEL_ENHANCED_CONTRAST: f32 = 0.5;
+
+/// Perceptual alpha correction applied when compositing atlas glyph coverage.
+///
+/// Windows and WGPU already reshape grayscale (and subpixel) coverage with this
+/// layout before the hardware blend. Metal uses the same defaults so a tintable
+/// A8 mask is not left as a raw `color.a *= sample.a` multiply.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TextGammaParams {
+    /// Four-term polynomial used by [`apply_contrast_and_gamma_correction`].
+    pub gamma_ratios: [f32; 4],
+    /// Contrast boost applied to dark grayscale foregrounds.
+    pub grayscale_enhanced_contrast: f32,
+    /// Contrast boost applied to subpixel coverage.
+    pub subpixel_enhanced_contrast: f32,
+    /// Pad to 32 bytes so Metal constant-buffer layout stays aligned.
+    pub pad: [f32; 2],
+}
+
+impl TextGammaParams {
+    /// Parameters used by Metal and the WGPU fallback path.
+    pub fn grayscale_default() -> Self {
+        Self {
+            gamma_ratios: get_gamma_correction_ratios(DEFAULT_TEXT_GAMMA),
+            grayscale_enhanced_contrast: DEFAULT_GRAYSCALE_ENHANCED_CONTRAST,
+            subpixel_enhanced_contrast: DEFAULT_SUBPIXEL_ENHANCED_CONTRAST,
+            pad: [0.0; 2],
+        }
+    }
+}
+
+const _: () = assert!(std::mem::size_of::<TextGammaParams>() == 32);
+
 // Adapted from https://github.com/microsoft/terminal/blob/1283c0f5b99a2961673249fa77c6b986efb5086c/src/renderer/atlas/dwrite.cpp
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
-/// Compute gamma correction ratios for subpixel text rendering.
+/// Compute gamma correction ratios for grayscale and subpixel text compositing.
 #[allow(dead_code)]
 pub fn get_gamma_correction_ratios(gamma: f32) -> [f32; 4] {
     const GAMMA_INCORRECT_TARGET_RATIOS: [[f32; 4]; 13] = [
@@ -1318,6 +1365,47 @@ pub fn get_gamma_correction_ratios(gamma: f32) -> [f32; 4] {
         ratios[2] * NORM13,
         ratios[3] * NORM24,
     ]
+}
+
+// Adapted from https://github.com/microsoft/terminal/blob/1283c0f5b99a2961673249fa77c6b986efb5086c/src/renderer/atlas/dwrite.hlsl
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+fn color_brightness(color: [f32; 3]) -> f32 {
+    0.30 * color[0] + 0.59 * color[1] + 0.11 * color[2]
+}
+
+fn light_on_dark_contrast(enhanced_contrast: f32, color: [f32; 3]) -> f32 {
+    let brightness = color_brightness(color);
+    let multiplier = (4.0 * (0.75 - brightness)).clamp(0.0, 1.0);
+    enhanced_contrast * multiplier
+}
+
+fn enhance_contrast(alpha: f32, k: f32) -> f32 {
+    alpha * (k + 1.0) / (alpha * k + 1.0)
+}
+
+fn apply_alpha_correction(a: f32, b: f32, g: [f32; 4]) -> f32 {
+    let brightness_adjustment = g[0] * b + g[1];
+    let correction = brightness_adjustment * a + (g[2] * b + g[3]);
+    a + a * (1.0 - a) * correction
+}
+
+/// Reshape atlas coverage so grayscale text composites with the same
+/// perceptual contrast and gamma curve as Direct3D and WGPU.
+///
+/// `sample` is the single-channel coverage from the glyph (or SVG) atlas.
+/// `color` is the unpremultiplied RGB tint. The returned value replaces the
+/// raw coverage before `color.a *= coverage`.
+pub fn apply_contrast_and_gamma_correction(
+    sample: f32,
+    color: [f32; 3],
+    enhanced_contrast_factor: f32,
+    gamma_ratios: [f32; 4],
+) -> f32 {
+    let enhanced_contrast = light_on_dark_contrast(enhanced_contrast_factor, color);
+    let brightness = color_brightness(color);
+    let contrasted = enhance_contrast(sample, enhanced_contrast);
+    apply_alpha_correction(contrasted, brightness, gamma_ratios)
 }
 
 #[derive(PartialEq, Eq, Hash, Clone)]
@@ -3004,5 +3092,95 @@ mod tests {
     #[test]
     fn test_window_button_layout_parse_all_invalid() {
         assert!(WindowButtonLayout::parse("asdfghjkl").is_err());
+    }
+}
+
+#[cfg(test)]
+mod text_gamma_tests {
+    use super::*;
+
+    #[test]
+    fn gamma_1_and_no_contrast_leave_coverage_unchanged() {
+        let ratios = get_gamma_correction_ratios(1.0);
+        let white = [1.0, 1.0, 1.0];
+        let black = [0.0, 0.0, 0.0];
+        for sample in [0.0, 0.25, 0.5, 0.75, 1.0] {
+            assert_eq!(
+                apply_contrast_and_gamma_correction(sample, white, 0.0, ratios),
+                sample
+            );
+            assert_eq!(
+                apply_contrast_and_gamma_correction(sample, black, 0.0, ratios),
+                sample
+            );
+        }
+    }
+
+    #[test]
+    fn default_params_raise_light_on_dark_mid_coverage() {
+        let params = TextGammaParams::grayscale_default();
+        let corrected = apply_contrast_and_gamma_correction(
+            0.5,
+            [1.0, 1.0, 1.0],
+            params.grayscale_enhanced_contrast,
+            params.gamma_ratios,
+        );
+        assert!(
+            corrected > 0.5,
+            "light-on-dark mid coverage should thicken, got {corrected}"
+        );
+    }
+
+    #[test]
+    fn default_params_keep_coverage_endpoints() {
+        let params = TextGammaParams::grayscale_default();
+        for color in [[1.0, 1.0, 1.0], [0.0, 0.0, 0.0]] {
+            assert_eq!(
+                apply_contrast_and_gamma_correction(
+                    0.0,
+                    color,
+                    params.grayscale_enhanced_contrast,
+                    params.gamma_ratios,
+                ),
+                0.0
+            );
+            assert_eq!(
+                apply_contrast_and_gamma_correction(
+                    1.0,
+                    color,
+                    params.grayscale_enhanced_contrast,
+                    params.gamma_ratios,
+                ),
+                1.0
+            );
+        }
+    }
+
+    #[test]
+    fn default_params_reshape_dark_on_light_mid_coverage() {
+        let params = TextGammaParams::grayscale_default();
+        let corrected = apply_contrast_and_gamma_correction(
+            0.5,
+            [0.0, 0.0, 0.0],
+            params.grayscale_enhanced_contrast,
+            params.gamma_ratios,
+        );
+        assert_ne!(
+            corrected, 0.5,
+            "dark-on-light mid coverage should be reshaped"
+        );
+    }
+
+    #[test]
+    fn contrast_boost_applies_to_dark_foregrounds_only() {
+        let white = [1.0, 1.0, 1.0];
+        let black = [0.0, 0.0, 0.0];
+        let identity = get_gamma_correction_ratios(1.0);
+        assert_eq!(
+            apply_contrast_and_gamma_correction(0.5, white, 1.0, identity),
+            0.5
+        );
+        let darkened = apply_contrast_and_gamma_correction(0.5, black, 1.0, identity);
+        assert!(darkened > 0.5, "got {darkened}");
     }
 }

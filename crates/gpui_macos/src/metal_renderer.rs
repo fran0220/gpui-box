@@ -9,8 +9,8 @@ use cocoa::{
 use gpui::{
     AtlasTextureId, BackdropGlass, Background, Bounds, ContentMask, DevicePixels, DrawOrder,
     LUMINANCE_PROBE_SAMPLES, MAX_LUMINANCE_PROBES, NO_LUMINANCE_PROBE, PaintSurface, Path, Point,
-    PrimitiveBatch, ScaledPixels, Scene, Size, SpriteBlendMode, point, probe_sample_luminance,
-    size,
+    PrimitiveBatch, ScaledPixels, Scene, Size, SpriteBlendMode, TextGammaParams, point,
+    probe_sample_luminance, size,
 };
 #[cfg(any(test, feature = "test-support"))]
 use image::RgbaImage;
@@ -161,6 +161,7 @@ pub(crate) struct MetalRenderer {
     path_intermediate_texture: Option<metal::Texture>,
     path_intermediate_msaa_texture: Option<metal::Texture>,
     path_sample_count: u32,
+    text_gamma_params: TextGammaParams,
     /// Offscreen render target reused across `render_scene` calls when
     /// rendering headlessly without reading pixels back.
     #[cfg(any(test, feature = "test-support"))]
@@ -449,6 +450,7 @@ impl MetalRenderer {
             path_intermediate_texture: None,
             path_intermediate_msaa_texture: None,
             path_sample_count: PATH_SAMPLE_COUNT,
+            text_gamma_params: TextGammaParams::grayscale_default(),
             #[cfg(any(test, feature = "test-support"))]
             headless_render_target: None,
         }
@@ -1466,6 +1468,11 @@ impl MetalRenderer {
             Some(&instance_bindings.monochrome_sprites.buffer),
             instance_bindings.monochrome_sprites.offset as u64,
         );
+        command_encoder.set_fragment_bytes(
+            SpriteInputIndex::GammaParams as u64,
+            mem::size_of_val(&self.text_gamma_params) as u64,
+            &self.text_gamma_params as *const TextGammaParams as *const _,
+        );
         command_encoder.set_fragment_texture(SpriteInputIndex::AtlasTexture as u64, Some(&texture));
 
         command_encoder.draw_primitives_instanced_base_instance(
@@ -2102,6 +2109,7 @@ enum SpriteInputIndex {
     ViewportSize = 2,
     AtlasTextureSize = 3,
     AtlasTexture = 4,
+    GammaParams = 5,
 }
 
 #[repr(C)]

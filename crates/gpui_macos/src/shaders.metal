@@ -37,6 +37,39 @@ float radians(float degrees);
 float4 fill_color(Background background, float2 position, Bounds_ScaledPixels bounds,
   float4 solid_color, float4 color0, float4 color1);
 
+// Contrast and gamma correction adapted from
+// https://github.com/microsoft/terminal/blob/1283c0f5b99a2961673249fa77c6b986efb5086c/src/renderer/atlas/dwrite.hlsl
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+float color_brightness(float3 color) {
+  return dot(color, float3(0.30, 0.59, 0.11));
+}
+
+float light_on_dark_contrast(float enhanced_contrast, float3 color) {
+  float brightness = color_brightness(color);
+  float multiplier = saturate(4.0 * (0.75 - brightness));
+  return enhanced_contrast * multiplier;
+}
+
+float enhance_contrast(float alpha, float k) {
+  return alpha * (k + 1.0) / (alpha * k + 1.0);
+}
+
+float apply_alpha_correction(float a, float b, float4 g) {
+  float brightness_adjustment = g.x * b + g.y;
+  float correction = brightness_adjustment * a + (g.z * b + g.w);
+  return a + a * (1.0 - a) * correction;
+}
+
+float apply_contrast_and_gamma_correction(float sample, float3 color,
+                                          float enhanced_contrast_factor,
+                                          float4 gamma_ratios) {
+  float enhanced_contrast = light_on_dark_contrast(enhanced_contrast_factor, color);
+  float brightness = color_brightness(color);
+  float contrasted = enhance_contrast(sample, enhanced_contrast);
+  return apply_alpha_correction(contrasted, brightness, gamma_ratios);
+}
+
 struct GradientColor {
   float4 solid;
   float4 color0;
@@ -658,6 +691,8 @@ vertex MonochromeSpriteVertexOutput monochrome_sprite_vertex(
 fragment float4 monochrome_sprite_fragment(
     MonochromeSpriteFragmentInput input [[stage_in]],
     constant MonochromeSprite *sprites [[buffer(SpriteInputIndex_Sprites)]],
+    constant TextGammaParams *gamma_params
+    [[buffer(SpriteInputIndex_GammaParams)]],
     texture2d<float> atlas_texture [[texture(SpriteInputIndex_AtlasTexture)]]) {
   if (any(input.clip_distance < float4(0.0))) {
     return float4(0.0);
@@ -668,7 +703,11 @@ fragment float4 monochrome_sprite_fragment(
   float4 sample =
       atlas_texture.sample(atlas_texture_sampler, input.tile_position);
   float4 color = input.color;
-  color.a *= sample.a;
+  float alpha_corrected = apply_contrast_and_gamma_correction(
+      sample.a, color.rgb, gamma_params->grayscale_enhanced_contrast,
+      float4(gamma_params->gamma_ratios[0], gamma_params->gamma_ratios[1],
+             gamma_params->gamma_ratios[2], gamma_params->gamma_ratios[3]));
+  color.a *= alpha_corrected;
   return color;
 }
 

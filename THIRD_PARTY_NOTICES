@@ -24,6 +24,9 @@ not represented as imported Zed source.
 The renderer-backed linear, elliptical radial, and conic gradient primitives
 for up to eight ordered stops, including their Metal, Direct3D, WGPU, and
 WebGL shaders, are GPUI Box work and import no additional source.
+The Metal monochrome-sprite contrast and gamma correction uses the same
+Microsoft Terminal / DirectWrite algorithm already present in the imported
+Direct3D and WGPU shaders; it is not a new third-party source drop.
 The composited sprite-batch ABI, atlas source rectangles, transforms, masks,
 tint modes, and normal/additive/screen pipeline states across those renderers
 are GPUI Box work and import no additional source or visual assets.
