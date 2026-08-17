@@ -10,6 +10,44 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ### Added
 
+**A surface separation and tone distinction contract in the token layer.**
+`TokenDocument::validate` now measures both in CIE L\*, because the WCAG ratio
+compresses near black and near white and a theme can pass it while looking
+like one flat plane. Six nestings — canvas to panel, panel to card, card to
+raised, and the overlay against what it covers — must differ by at least three
+L\* in the declared direction, and the `muted`, `faint`, `placeholder` and
+`disabled` rungs must each differ by three L\* measured as distance from the
+canvas, so one rule holds in both appearances. Both bundled Studio themes were
+retuned to pass: dark had been drawing three of those four tones as the same
+grey, and light had `placeholder` stronger than `faint`. `xtask tokens
+generate` prints both tables, the contrast gate reports both sets of failures,
+and `docs/token-model.md` states the contract. Every macOS baseline was
+re-rendered; the Windows set still has to be accepted on Windows.
+
+**A card component family, and one definition of the card shell.** `Card`
+carries `Elevated`, `Outlined` and `Ghost` variants, a `CardHeader` with
+title, subtitle and action, and media, body, footer and `divided` regions
+whose padding collapses against an adjacent region rather than doubling. It is
+selectable and disableable, a disabled card installs no handler, and an
+actionable card without a `name` falls back to its header title so it cannot
+reach the audit unnamed. `StyledExt::card_surface` is the same shell for the
+twelve components that own a richer semantic node than a grouping and so
+cannot be wrapped in a `Card`; the agent, game and notification surfaces that
+each hand-rolled their own now use it.
+
+**Slots, container-size response, a theme escape hatch, and shape in flip.**
+`Slotted::SLOTS` lets a caller replace a component's `EMPTY`, `FAILED` or
+`LOADING` region by name, and a name the component does not declare panics
+instead of silently rendering the default. `Responsive` reports a
+`ContainerSize` that is either `Measured` or honestly `Unmeasured` — never a
+guess — and `Toolbar` now computes its overflow cut from the widths it
+measured last frame, so a moved item cannot make room for itself and
+oscillate. `ThemeOverlay` adjusts the theme for one subtree across
+request_layout, prepaint and paint, so a host can restyle a region without any
+component learning about it. `Flip::shape` interpolates radius, border width,
+border colour and background over the spring that already carries position and
+size, and snaps under reduced motion.
+
 **Semantic cinematic effects and optional dotLottie playback.**
 `CinematicEffect` maps an existing `EffectPlan` to policy-owned asset slots,
 durations, poster frames, RTL mirroring, localized semantics, and the built-in
