@@ -256,13 +256,20 @@ The active baselines live in `snapshots/headless/{macos,windows}/scenes`.
 Metal and WARP land antialiased edges differently, so each supported
 renderer verifies its own baseline.
 
-A token change moves every image on every renderer, and the two sets can only
-be accepted on the machine that renders them. The surface-separation and
-tone-distinction retune re-rendered all 216 macOS baselines here; the Windows
-set has not been re-accepted, so `headless (windows-2025)` fails until a
-Windows machine or CI job runs `cargo run -p xtask -- headless capture` and
-commits the result. Do not paper over that by copying macOS bytes: a baseline
+A token change moves every image on every renderer, and each set can only be
+accepted on a machine with that renderer. The surface-separation and
+tone-distinction retune re-rendered all 216 macOS baselines and all 214 that
+WARP can produce; a baseline is never copied between renderers, because one
 from the wrong renderer verifies nothing.
+
+`visual-effects` has no Windows baseline. WARP does not bring it to a stable
+frame within the 32 draws the harness allows, so it is captured on macOS only
+and `headless capture` with no arguments fails on Windows at that scene. Name
+the scenes, or capture the rest and leave this one, until either the scene
+settles under a software rasterizer or the harness is given a documented
+per-renderer exclusion. Silently accepting an unsettled frame is not an
+option: the whole point of the baseline is that the same input produces the
+same bytes.
 
 The harness is its own Cargo workspace because its renderer dependencies and
 lockfile are platform-specific. It resolves the same local GPUI Box package
