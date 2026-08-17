@@ -9143,6 +9143,7 @@
       ],
       "options": [
         "icon(glyph: Icon) -> Self",
+        "image(path: impl Into<SharedString>) -> Self",
         "badge(badge: impl Into<SharedString>) -> Self",
         "disabled(disabled: bool) -> Self",
         "children(children: impl IntoIterator<Item = SidebarItem>) -> Self"

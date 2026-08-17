@@ -20,6 +20,13 @@ names current Kit types instead of gallery-only helpers.
 
 ### Added
 
+**A sidebar place can carry a caller-owned image in the glyph slot.**
+`SidebarItem::image(path)` takes the same asset-source path `Avatar::image`
+uses. It shares the leading slot with `icon()`, so the last call wins, and
+the type stays `Clone + PartialEq + Eq`. A collapsed rail still draws the
+image. This is for product marks a catalog glyph cannot name; it is not a
+generic leading element.
+
 **A surface separation and tone distinction contract in the token layer.**
 `TokenDocument::validate` now measures both in CIE L\*, because the WCAG ratio
 compresses near black and near white and a theme can pass it while looking

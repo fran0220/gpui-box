@@ -37,12 +37,19 @@ const NESTING_INDENT: f32 = 16.0;
 
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 
+/// What sits in the glyph slot: a catalog mark, or a caller-owned image.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum SidebarLeading {
+    Glyph(Icon),
+    Image(SharedString),
+}
+
 /// One place in the rail.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SidebarItem {
     id: SharedString,
     label: SharedString,
-    icon: Option<Icon>,
+    leading: Option<SidebarLeading>,
     badge: Option<SharedString>,
     disabled: bool,
     children: Vec<SidebarItem>,
@@ -53,7 +60,7 @@ impl SidebarItem {
         Self {
             id: id.into(),
             label: label.into(),
-            icon: None,
+            leading: None,
             badge: None,
             disabled: false,
             children: Vec::new(),
@@ -61,7 +68,13 @@ impl SidebarItem {
     }
 
     pub fn icon(mut self, glyph: Icon) -> Self {
-        self.icon = Some(glyph);
+        self.leading = Some(SidebarLeading::Glyph(glyph));
+        self
+    }
+
+    /// A resource path or URI the asset source can resolve, same as [`Avatar::image`].
+    pub fn image(mut self, path: impl Into<SharedString>) -> Self {
+        self.leading = Some(SidebarLeading::Image(path.into()));
         self
     }
 
@@ -270,10 +283,17 @@ impl Sidebar {
                     .flex_none()
                     .w(px(metrics.icon_size))
                     .justify_center()
-                    .children(
-                        item.icon
-                            .map(|glyph| icon(glyph).size(px(metrics.icon_size)).text_color(color)),
-                    )
+                    .children(item.leading.as_ref().map(|leading| {
+                        match leading {
+                            SidebarLeading::Glyph(glyph) => icon(*glyph)
+                                .size(px(metrics.icon_size))
+                                .text_color(color)
+                                .into_any_element(),
+                            SidebarLeading::Image(source) => gpui::img(source.clone())
+                                .size(px(metrics.icon_size))
+                                .into_any_element(),
+                        }
+                    }))
                     .flip(&glyph_slot, window, cx),
             )
             .when(!self.collapsed, |element| {
@@ -415,5 +435,26 @@ impl RenderOnce for Sidebar {
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::List).expanded(!self.collapsed),
             )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn image_and_icon_replace_the_same_leading_slot() {
+        let with_glyph = SidebarItem::new("claude", "Claude Code").icon(Icon::Terminal);
+        let with_image = SidebarItem::new("claude", "Claude Code").image("agents/claude.svg");
+        let replaced = with_glyph.clone().image("agents/claude.svg");
+
+        assert_ne!(with_glyph, with_image);
+        assert_eq!(replaced, with_image);
+        assert_eq!(
+            with_image.leading,
+            Some(SidebarLeading::Image(SharedString::from(
+                "agents/claude.svg"
+            )))
+        );
     }
 }

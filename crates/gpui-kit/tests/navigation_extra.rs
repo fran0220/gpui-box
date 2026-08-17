@@ -28,6 +28,7 @@ fn places() -> Vec<SidebarSection> {
                 .badge("12")
                 .children([SidebarItem::new("runs.active", "Active").icon(Icon::Refresh)]),
             SidebarItem::new("files", "Files").icon(Icon::Folder),
+            SidebarItem::new("claude", "Claude Code").image("agents/claude.svg"),
         ]),
         SidebarSection::new("admin")
             .title("Administration")
@@ -140,6 +141,18 @@ fn a_collapsed_rail_narrows_the_drawing_and_keeps_every_name(cx: &mut TestAppCon
 
     collapsed.click("workspace.rail.files");
     assert_eq!(*calls.borrow(), vec!["files".to_string()]);
+}
+
+#[gpui::test]
+fn an_image_place_still_publishes_its_name(cx: &mut TestAppContext) {
+    let (mut harness, calls) = sidebar(cx, false);
+    let node = harness.node("workspace.rail.claude").expect("published");
+
+    assert_eq!(node.text.as_deref(), Some("Claude Code"));
+    assert_eq!(node.level, Some(1));
+
+    harness.click("workspace.rail.claude");
+    assert_eq!(*calls.borrow(), vec!["claude".to_string()]);
 }
 
 // --------------------------------------------------------------- pagination
