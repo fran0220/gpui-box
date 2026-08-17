@@ -53,7 +53,7 @@ Appearance: `Dark`.
 | `color.text.onAccent` | `{neutral.ink}` | `#0e0e0e` |
 | `color.interactive.hover` | `{neutral.850}/24` | `#ebebeb24` |
 | `color.interactive.active` | `{neutral.850}/29` | `#ebebeb29` |
-| `color.interactive.selected` | `{neutral.850}/24` | `#ebebeb24` |
+| `color.interactive.selected` | `{neutral.850}/40` | `#ebebeb40` |
 | `color.interactive.hairline` | `{neutral.900}/59` | `#ffffff59` |
 | `color.interactive.hairlineStrong` | `{neutral.900}/66` | `#ffffff66` |
 | `color.interactive.track` | `{neutral.900}/66` | `#ffffff66` |
@@ -358,7 +358,7 @@ Appearance: `Light`.
 | `color.text.onAccent` | `{neutral.ink}` | `#ffffff` |
 | `color.interactive.hover` | `{neutral.850}/0f` | `#0a0a0c0f` |
 | `color.interactive.active` | `{neutral.850}/1a` | `#0a0a0c1a` |
-| `color.interactive.selected` | `{neutral.850}/0f` | `#0a0a0c0f` |
+| `color.interactive.selected` | `{neutral.850}/24` | `#0a0a0c24` |
 | `color.interactive.hairline` | `{neutral.850}/80` | `#0a0a0c80` |
 | `color.interactive.hairlineStrong` | `{neutral.850}/8c` | `#0a0a0c8c` |
 | `color.interactive.track` | `{neutral.850}/8c` | `#0a0a0c8c` |

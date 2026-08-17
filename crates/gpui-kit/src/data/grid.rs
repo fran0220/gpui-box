@@ -388,13 +388,12 @@ impl EditingCell {
     }
 }
 
-/// Whether a grid draws rules between its rows.
+/// Whether a table or grid draws rules between its rows.
 ///
-/// A grid groups with alignment and with the wash a row takes under the
-/// pointer, which is enough at the row heights this library ships. Rules are
-/// the answer to one specific problem — a dense grid whose rows are short
-/// enough that the eye loses which cell belongs to which record — and they
-/// stay off until a caller says that is the problem they have.
+/// [`crate::data::Table`] defaults to [`GridLines::Rows`]: a short glanceable
+/// table needs the eye to stay on a record. [`DataGrid`] defaults to
+/// [`GridLines::None`]: its row height and selection wash are usually enough,
+/// and a caller who has a dense log turns the rules on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum GridLines {
     #[default]
@@ -998,6 +997,8 @@ impl DataGrid {
             .px_token(theme, Space::Sm)
             .gap_token(theme, Space::Sm)
             .surface(theme, Surface::Raised)
+            .border_b(px(theme.borders.hairline))
+            .border_color(theme.colors.divider)
             .when(self.hierarchy, |header| {
                 header.row_reading(cx.layout_direction())
             });
@@ -1710,16 +1711,13 @@ fn row_element(
                 .border_color(theme.colors.divider)
         })
         .when(selected, |element| element.bg(theme.colors.selected))
-        .when(row.disabled, |element| {
-            element.opacity(theme.opacity.disabled)
-        })
         .when(selectable, |element| {
             element
                 .cursor_pointer()
                 .tab_index(0)
                 .pressable(cx)
                 .when(!selected, |element| {
-                    element.hover(|style| style.bg(theme.colors.hover.opacity(0.3)))
+                    element.hover(|style| style.bg(theme.colors.hover))
                 })
                 .focus_ring(theme)
         })
@@ -1972,7 +1970,7 @@ fn cell_element(
     let published =
         context.hierarchy || cell.as_ref().is_some_and(|cell| cell.published) || editable;
     let text = cell.as_ref().and_then(|cell| cell.text.clone());
-    let mut content = cell.map(|cell| cell.content.into_element(theme));
+    let mut content = cell.map(|cell| cell.content.into_element(theme, row.disabled));
     if logical_start && context.hierarchy {
         let hierarchy = row.hierarchy.clone();
         let direction = cx.layout_direction();

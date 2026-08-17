@@ -63,7 +63,7 @@
     "interactive": {
       "hover": "{neutral.850}/24",
       "active": "{neutral.850}/29",
-      "selected": "{neutral.850}/24",
+      "selected": "{neutral.850}/40",
       "hairline": "{neutral.900}/59",
       "hairlineStrong": "{neutral.900}/66",
       "track": "{neutral.900}/66",

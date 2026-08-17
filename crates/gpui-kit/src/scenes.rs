@@ -3100,18 +3100,19 @@ fn table(_window: &mut Window, cx: &mut App) -> AnyElement {
             .text(label)
             .published(true)
     };
+    let columns = [
+        Column::new("name", "Run").flex(2.0).sortable(true),
+        Column::new("state", "State").fixed(110.0),
+        Column::new("duration", "Duration")
+            .fixed(96.0)
+            .align(Align::End)
+            .sortable(true),
+    ];
     stack(&theme)
         .w(px(600.0))
         .child(
             Table::new("scene.table.runs")
-                .columns([
-                    Column::new("name", "Run").flex(2.0).sortable(true),
-                    Column::new("state", "State").fixed(110.0),
-                    Column::new("duration", "Duration")
-                        .fixed(96.0)
-                        .align(Align::End)
-                        .sortable(true),
-                ])
+                .columns(columns.clone())
                 .sorted_by("duration", SortDirection::Descending)
                 .selected("run-b12")
                 .rows([
@@ -3139,6 +3140,22 @@ fn table(_window: &mut Window, cx: &mut App) -> AnyElement {
                 ])
                 .visible_rows(6)
                 .on_sort(|_, _, _, _| {})
+                .on_select(|_, _, _| {}),
+        )
+        .child(
+            Table::new("scene.table.stale")
+                .columns(columns.clone())
+                .rows([Row::new("run-a04")
+                    .text("Indexing")
+                    .cell("name", "Indexing")
+                    .cell("state", state("Ready", Tone::Success))
+                    .cell("duration", "4m 12s")])
+                .failure("The host refused the refresh")
+                .on_select(|_, _, _| {}),
+        )
+        .child(
+            Table::new("scene.table.empty")
+                .columns(columns)
                 .on_select(|_, _, _| {}),
         )
         .into_any_element()

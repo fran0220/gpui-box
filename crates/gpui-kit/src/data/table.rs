@@ -52,6 +52,9 @@
 //! when the data set is larger than the viewport, or when the surface needs
 //! any of the above. If a surface would work as either, pick `Table`: it is
 //! smaller, and a grid's machinery costs something even when nothing uses it.
+//!
+//! Loading, empty, and a refresh failure are distinct. A failure over rows
+//! that are still true keeps those rows and states the refusal above them.
 
 use std::ops::Range;
 use std::rc::Rc;
@@ -61,13 +64,18 @@ use gpui::{
     RenderOnce, SharedString, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px, uniform_list,
 };
+use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{
     ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TextTone, Theme, TypeScale,
 };
 
+use crate::data::grid::GridLines;
 use crate::data::viewport::scroll_handle;
+use crate::display::empty::{EmptyKind, EmptyState};
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
+use crate::strings::{ActiveStrings, StringKey};
 
 type SortHandler = Rc<dyn Fn(SharedString, SortDirection, &mut Window, &mut App)>;
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
@@ -173,10 +181,14 @@ pub(crate) enum CellContent {
 }
 
 impl CellContent {
-    pub(crate) fn into_element(self, theme: &Theme) -> AnyElement {
+    pub(crate) fn into_element(self, theme: &Theme, disabled: bool) -> AnyElement {
         match self {
             Self::Element(element) => element,
-            Self::Plain(value) => text(theme, TypeScale::Body, value).into_any_element(),
+            Self::Plain(value) => text(theme, TypeScale::Body, value)
+                .when(disabled, |element| {
+                    element.text_tone(theme, TextTone::Disabled)
+                })
+                .into_any_element(),
         }
     }
 }
@@ -303,6 +315,7 @@ struct Body {
     columns: Vec<Column>,
     selected: Option<SharedString>,
     disabled: bool,
+    lines: GridLines,
     on_select: Option<SelectHandler>,
 }
 
@@ -319,6 +332,11 @@ pub struct Table {
     visible_rows: Option<usize>,
     size: ControlSize,
     disabled: bool,
+    lines: GridLines,
+    loading: bool,
+    failure: Option<SharedString>,
+    empty: Option<EmptyState>,
+    slots: Slots,
     on_sort: Option<SortHandler>,
     on_select: Option<SelectHandler>,
 }
@@ -350,6 +368,11 @@ impl Table {
             visible_rows: None,
             size: ControlSize::Md,
             disabled: false,
+            lines: GridLines::Rows,
+            loading: false,
+            failure: None,
+            empty: None,
+            slots: Slots::default(),
             on_sort: None,
             on_select: None,
         }
@@ -422,6 +445,36 @@ impl Table {
         self
     }
 
+    /// Row rules. The default is [`GridLines::Rows`].
+    pub fn lines(mut self, lines: GridLines) -> Self {
+        self.lines = lines;
+        self
+    }
+
+    /// A first load with nothing to show yet. A refresh over rows that already
+    /// exist is not this; see [`Table::failure`].
+    pub fn loading(mut self, loading: bool) -> Self {
+        self.loading = loading;
+        self
+    }
+
+    /// A refresh that failed. Rows the table already has stay on screen with
+    /// the failure stated above them; only a failure with nothing behind it
+    /// takes the surface over.
+    pub fn failure(mut self, failure: impl Into<SharedString>) -> Self {
+        self.failure = Some(failure.into());
+        self
+    }
+
+    /// What to show when the query succeeded and returned nothing.
+    ///
+    /// This is the typed form of the [`slot::EMPTY`] slot. A filled slot wins
+    /// over it.
+    pub fn empty(mut self, empty: EmptyState) -> Self {
+        self.empty = Some(empty);
+        self
+    }
+
     pub fn on_sort(
         mut self,
         handler: impl Fn(SharedString, SortDirection, &mut Window, &mut App) + 'static,
@@ -445,7 +498,9 @@ impl Table {
             .h(px(height))
             .px(px(theme.space(Space::Sm)))
             .gap(px(theme.space(Space::Sm)))
-            .surface(theme, Surface::Raised);
+            .surface(theme, Surface::Raised)
+            .border_b(px(theme.borders.hairline))
+            .border_color(theme.colors.divider);
 
         for column in &self.columns {
             let ident = self.ident.child("header").child(column.key.as_ref());
@@ -532,6 +587,7 @@ impl Table {
             columns: self.columns.clone(),
             selected: self.selected.clone(),
             disabled: self.disabled,
+            lines: self.lines,
             on_select: self.on_select.clone(),
         }
     }
@@ -550,17 +606,19 @@ impl Body {
             .h(px(height))
             .px(px(theme.space(Space::Sm)))
             .gap(px(theme.space(Space::Sm)))
-            .when(selected, |element| element.bg(theme.colors.selected))
-            .when(row.disabled, |element| {
-                element.opacity(theme.opacity.disabled)
+            .when(self.lines == GridLines::Rows, |element| {
+                element
+                    .border_b(px(theme.borders.hairline))
+                    .border_color(theme.colors.divider)
             })
+            .when(selected, |element| element.bg(theme.colors.selected))
             .when(actionable, |element| {
                 element
                     .cursor_pointer()
                     .tab_index(0)
                     .pressable(cx)
                     .when(!selected, |element| {
-                        element.hover(|style| style.bg(theme.colors.hover.opacity(0.3)))
+                        element.hover(|style| style.bg(theme.colors.hover))
                     })
                     .focus_ring(theme)
             });
@@ -571,7 +629,7 @@ impl Body {
             let text = cell.as_ref().and_then(|cell| cell.text.clone());
             let frame = cell_frame(div(), column, theme)
                 .overflow_hidden()
-                .children(cell.map(|cell| cell.content.into_element(theme)));
+                .children(cell.map(|cell| cell.content.into_element(theme, row.disabled)));
 
             let frame = if published {
                 let cell_ident = ident.child(column.key.as_ref());
@@ -618,62 +676,67 @@ impl Sizable for Table {
 }
 
 impl RenderOnce for Table {
-    fn render(mut self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let metrics = theme.control.get(self.size);
         let height = self.row_height.unwrap_or(metrics.height);
         let count = self.count();
         let header = self.header(&theme, height, cx);
-        let context = self.body();
-
-        let body = match self.source.take() {
-            Some(source) => {
-                let ident = self.ident.child("body");
-                let scroll = scroll_handle(&ident, cx);
-                let theme = theme.clone();
-                uniform_list(
-                    ident.element_id(),
-                    count,
-                    move |range: Range<usize>, window, cx| {
-                        range
-                            .map(|index| {
-                                let row = (source.render_row)(index, window, cx);
-                                context.row_element(&theme, height, row, cx)
-                            })
-                            .collect::<Vec<_>>()
-                    },
-                )
-                .track_scroll(&scroll)
-                .w_full()
-                .with_sizing_behavior(if self.visible_rows.is_some() {
-                    ListSizingBehavior::Auto
-                } else {
-                    ListSizingBehavior::Infer
-                })
-                // A short collection still ends where its last row ends, the
-                // way a materialized body capped by `max_h` does, so a cap is
-                // not a claim about how much data there is.
-                .when_some(self.visible_rows, |element, rows| {
-                    element.h(px(height * count.min(rows) as f32))
-                })
-                .into_any_element()
-            }
-            None => {
-                let rows = std::mem::take(&mut self.rows);
-                div()
-                    .id(self.ident.child("body").element_id())
-                    .column()
-                    .w_full()
-                    .overflow_y_scroll()
-                    .when_some(self.visible_rows, |element, rows| {
-                        element.max_h(px(height * rows as f32))
-                    })
-                    .children(
-                        rows.into_iter()
-                            .map(|row| context.row_element(&theme, height, row, cx))
-                            .collect::<Vec<_>>(),
+        let banner = self.banner(&theme, cx);
+        let vacancy = self.empty.take();
+        let body = if count == 0 {
+            self.vacant(&theme, height, vacancy, window, cx)
+        } else {
+            let context = self.body();
+            match self.source.take() {
+                Some(source) => {
+                    let ident = self.ident.child("body");
+                    let scroll = scroll_handle(&ident, cx);
+                    let theme = theme.clone();
+                    uniform_list(
+                        ident.element_id(),
+                        count,
+                        move |range: Range<usize>, window, cx| {
+                            range
+                                .map(|index| {
+                                    let row = (source.render_row)(index, window, cx);
+                                    context.row_element(&theme, height, row, cx)
+                                })
+                                .collect::<Vec<_>>()
+                        },
                     )
+                    .track_scroll(&scroll)
+                    .w_full()
+                    .with_sizing_behavior(if self.visible_rows.is_some() {
+                        ListSizingBehavior::Auto
+                    } else {
+                        ListSizingBehavior::Infer
+                    })
+                    // A short collection still ends where its last row ends, the
+                    // way a materialized body capped by `max_h` does, so a cap is
+                    // not a claim about how much data there is.
+                    .when_some(self.visible_rows, |element, rows| {
+                        element.h(px(height * count.min(rows) as f32))
+                    })
                     .into_any_element()
+                }
+                None => {
+                    let rows = std::mem::take(&mut self.rows);
+                    div()
+                        .id(self.ident.child("body").element_id())
+                        .column()
+                        .w_full()
+                        .overflow_y_scroll()
+                        .when_some(self.visible_rows, |element, rows| {
+                            element.max_h(px(height * rows as f32))
+                        })
+                        .children(
+                            rows.into_iter()
+                                .map(|row| context.row_element(&theme, height, row, cx))
+                                .collect::<Vec<_>>(),
+                        )
+                        .into_any_element()
+                }
             }
         };
 
@@ -684,12 +747,136 @@ impl RenderOnce for Table {
             .radius(&theme, Radius::Card)
             .frame(&theme, Surface::Panel, Elevation::Raised)
             .overflow_hidden()
+            .children(banner)
             .child(header)
             .child(body)
             .semantic_in(
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::Table).value(count.to_string()),
             )
+    }
+}
+
+impl Table {
+    /// The refusal or failure shown above rows that are still true.
+    fn banner(&self, theme: &Theme, cx: &mut App) -> Option<AnyElement> {
+        let failure = self.failure.clone()?;
+        if self.count() == 0 {
+            return None;
+        }
+        let ident = self.ident.child("failure");
+        Some(
+            div()
+                .row()
+                .w_full()
+                .gap_token(theme, Space::Xs)
+                .px_token(theme, Space::Sm)
+                .py_token(theme, Space::Xs)
+                .bg(theme
+                    .colors
+                    .danger
+                    .opacity(theme.effects.selected_ring_alpha))
+                .child(
+                    icon(Icon::Danger)
+                        .size(px(theme.control.sm.icon_size))
+                        .text_color(theme.colors.danger),
+                )
+                .child(text(theme, TypeScale::Body, failure.clone()))
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(ident.semantic_id(), Role::Status)
+                        .parent(self.ident.semantic_id())
+                        .text(failure)
+                        .value("stale")
+                        .invalid(true),
+                )
+                .into_any_element(),
+        )
+    }
+
+    /// What a table with no rows shows, which is never the same thing twice.
+    fn vacant(
+        &self,
+        theme: &Theme,
+        row_height: f32,
+        vacancy: Option<EmptyState>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> AnyElement {
+        if let Some(replacement) = self
+            .slots
+            .render(slot::LOADING, window, cx)
+            .filter(|_| self.loading)
+        {
+            return replacement;
+        }
+
+        if self.loading {
+            let ident = self.ident.child("loading");
+            return div()
+                .column()
+                .w_full()
+                .children((0..self.visible_rows.unwrap_or(4)).map(|index| {
+                    div()
+                        .id(ident.indexed_element_id(index))
+                        .w_full()
+                        .h(px(row_height))
+                        .px_token(theme, Space::Sm)
+                        .flex()
+                        .items_center()
+                        .child(
+                            div()
+                                .w_full()
+                                .h(px(theme.spacing.sm))
+                                .radius(theme, Radius::Small)
+                                .bg(theme.colors.hover),
+                        )
+                }))
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(ident.semantic_id(), Role::Status)
+                        .parent(self.ident.semantic_id())
+                        .text(cx.strings().text(StringKey::GridLoadingRows))
+                        .value("loading")
+                        .busy(true),
+                )
+                .into_any_element();
+        }
+
+        if let Some(failure) = self.failure.clone() {
+            if let Some(replacement) = self.slots.render(slot::FAILED, window, cx) {
+                return replacement;
+            }
+            return EmptyState::new(
+                self.ident.child("empty"),
+                cx.strings().text(StringKey::GridLoadFailed),
+            )
+            .kind(EmptyKind::Failed)
+            .detail(failure)
+            .into_any_element();
+        }
+
+        if let Some(replacement) = self.slots.render(slot::EMPTY, window, cx) {
+            return replacement;
+        }
+
+        match vacancy {
+            Some(empty) => empty.into_any_element(),
+            None => EmptyState::new(
+                self.ident.child("empty"),
+                cx.strings().text(StringKey::GridEmpty),
+            )
+            .kind(EmptyKind::Empty)
+            .into_any_element(),
+        }
+    }
+}
+
+impl Slotted for Table {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
     }
 }
 

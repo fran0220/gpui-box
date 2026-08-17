@@ -262,7 +262,7 @@ that rubric, not that every possible interaction was exercised.
 | `conversation` | High: duplicated long message groups and an unconstrained reading column obscure the intended scroll states. |
 | `copy-button` | Low: success is repeated as adjacent `Copied` labels. |
 | `cost-meter` | High: dark labels, refusal reasons, and unknown values are nearly invisible. |
-| `data-grid` | High: muted table structure and managed state are unreadable in dark; chip baselines and compact type are inconsistent. |
+| `data-grid` | Medium: chip baselines and compact type are inconsistent. Dark row hover/selected are now separate washes; managed rows no longer fade the whole row. |
 | `data-grid-editing` | Medium: editor and cell baselines differ and the focus edge collides with a grid line. |
 | `date-range` | Medium: disabled/range dates lack contrast and adjacent-month dates lack hierarchy. |
 | `date-time` | Medium: light separators sit low and error copy touches the field. |
@@ -278,7 +278,7 @@ that rubric, not that every possible interaction was exercised.
 | `failure-panel` | Medium: top copy clips in light; secondary failure detail is weak and icon/text centring differs. |
 | `filter-bar` | Low: light Add-filter/chip baselines differ; dark is clean. |
 | `find-replace` | High: dark explanatory copy disappears, controls are over-wide, and count/arrows are crowded. |
-| `form` | High: the Region popup covers field help; dark unselected text is too faint and errors touch fields. |
+| `form` | Medium: the Region popup covers field help; dark unselected text is still faint. Errors now clear the field. |
 | `frost` | High: dark frost lacks enough edge/surface evidence; light needs bottom clearance and consistent stripes. The edge evidence a frosted surface is missing is what `glass` carries; `Frost` stays frosted deliberately, being the material every renderer can produce. |
 | `glass` | Medium: refraction, dispersion and the specular rim are rendered by every renderer the repository ships — Metal, WGPU and DirectX — and the DirectX output was compared against WGPU on the same machine, agreeing to one step outside the text. The renderer on the web target draws no backdrop at all, so a surface there is its tint alone. The component now drives all four interactive capabilities: `track_pointer` moves the highlight with the pointer, `pressable` deepens the refraction by `effect.glassPressDepth` on a spring, `adaptive` claims a luminance probe slot and deepens the tint against an opposing backdrop with the flip band as hysteresis, and `GlassGroup` fuses up to eight panes into one body. The scene shows fusion and the settled adaptive flip; a pointer-lit or pressed surface cannot appear in a still, so those are reviewed in the gallery. Two accepted limits: a probe reading arrives one frame after the backdrop moved, so a backdrop change whose window then draws no further frame keeps the old tint until the next paint (the renderer does not yet request that frame itself), and on the web target `Window::backdrop_luminance` returns `None`, so an adaptive surface honestly keeps its thin tint. The scene holds macOS and Windows baselines; CI no longer runs the Linux headless comparison, so the Linux set under `snapshots/headless/linux` is retired rather than kept current. The two renderers that convolve their own blur hold a per-frame render-pass budget (256, enough for a full complement of sixteen probed surfaces at the themes' standard blur), and their behaviour past it diverges deliberately: DirectX keeps a surface's optics and probe and drops only its blur, while WGPU skips the surface whole — a scene dense enough to hit that edge renders differently per renderer, which is a recorded gap rather than supported behaviour. |
 | `hover-card` | Medium: helper and body copy are too faint, especially in dark. |
@@ -319,7 +319,7 @@ that rubric, not that every possible interaction was exercised.
 | `split-pane`, `split-tree` | High: dark dividers and drag handles nearly disappear. |
 | `status` | Medium: two short status messages stretch nearly the full canvas. |
 | `step-list` | Medium: dark status/detail text is weak and the status column is too distant. |
-| `table` | Medium: the dark managed row is nearly invisible. |
+| `table` | Low: the scene now shows ready, a stale refresh, and empty. Managed rows keep their badges; hover and selected are separate washes. |
 | `tabs` | Medium: scene body falls back to large default text and dark disabled tab is too faint. |
 | `textarea` | High: dark placeholders, disabled text, and field surfaces disappear. |
 | `thinking` | Medium: dark secondary/empty copy is weak and short rows stretch full-width. |

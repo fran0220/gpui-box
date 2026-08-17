@@ -337,6 +337,77 @@ fn a_header_that_does_not_sort_is_not_a_button(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn an_empty_table_is_not_a_ready_table_with_no_rows(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        Table::new("data.table")
+            .columns([Column::new("name", "Run")])
+            .into_any_element()
+    });
+
+    let empty = harness.node("data.table.empty").expect("published");
+    assert_eq!(empty.value.as_deref(), Some("empty"));
+    assert_eq!(
+        harness
+            .node("data.table")
+            .expect("published")
+            .value
+            .as_deref(),
+        Some("0")
+    );
+    assert!(rows_of(&mut harness, "data.table").is_empty());
+}
+
+#[gpui::test]
+fn a_loading_table_with_no_rows_is_busy_not_empty(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        Table::new("data.table")
+            .columns([Column::new("name", "Run")])
+            .loading(true)
+            .into_any_element()
+    });
+
+    let loading = harness.node("data.table.loading").expect("published");
+    assert!(loading.busy);
+    assert_eq!(loading.value.as_deref(), Some("loading"));
+    assert!(harness.node("data.table.empty").is_none());
+}
+
+#[gpui::test]
+fn a_failed_refresh_keeps_the_table_rows_that_are_still_true(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        Table::new("data.table")
+            .columns([Column::new("name", "Run")])
+            .rows([Row::new("run-a04")
+                .text("Indexing")
+                .cell("name", "Indexing")])
+            .failure("The host refused the refresh")
+            .into_any_element()
+    });
+
+    assert!(harness.node("data.table.run-a04").is_some());
+    let banner = harness.node("data.table.failure").expect("published");
+    assert_eq!(banner.role, Role::Status);
+    assert_eq!(banner.value.as_deref(), Some("stale"));
+    assert_eq!(banner.text.as_deref(), Some("The host refused the refresh"));
+    assert!(banner.invalid);
+    assert!(harness.node("data.table.empty").is_none());
+}
+
+#[gpui::test]
+fn a_table_failure_with_nothing_behind_it_takes_the_surface(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        Table::new("data.table")
+            .columns([Column::new("name", "Run")])
+            .failure("The host refused the refresh")
+            .into_any_element()
+    });
+
+    let empty = harness.node("data.table.empty").expect("published");
+    assert_eq!(empty.value.as_deref(), Some("failed"));
+    assert!(rows_of(&mut harness, "data.table").is_empty());
+}
+
+#[gpui::test]
 fn a_disabled_table_row_installs_no_handler(cx: &mut TestAppContext) {
     let (mut harness, _sorts, selects) = table(cx, None);
 

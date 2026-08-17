@@ -389,7 +389,7 @@ never the better failure.
 |---|---|---|---|
 | `List` | builder | the row that was picked | Virtualized over GPUI's `uniform_list`. The caller renders one index at a time and stamps each row with its own identity. Up, down, home, and end move the reported selection, skip refusals, and scroll the reported row into view |
 | `DiagnosticsList`, `Diagnostic` | builder | filter, selection, diagnostic action, and retry intents | Composes `FilterBar`, `List`, severity `Badge`s, and caller-owned action buttons. Diagnostic identity, location, message, selection, filters, and actions remain caller-owned; the list never opens a file or executes a fix. Loading, empty, unavailable, error, and a ready set with no filter matches remain distinct |
-| `Table` | builder | the sort a header click implies, and the row that was picked | Sorting is caller-owned: the table reports `(key, next direction)` and renders whatever order it is handed. Columns are fixed or flex, and the header stays put while the body scrolls. Not virtualized — reach for `DataGrid` past a few hundred rows |
+| `Table` | builder | the sort a header click implies, and the row that was picked | Sorting is caller-owned: the table reports `(key, next direction)` and renders whatever order it is handed. Columns are fixed or flex, and the header stays put while the body scrolls. Row rules default on; loading, empty, and a refresh failure stay distinct. Not virtualized — reach for `DataGrid` past a few hundred rows |
 | `DataGrid` | builder | a sort, a column width, a column order, a selection change, a disclosure, and a finished edit | The heavyweight tabular surface: virtualized over `uniform_list`, resizable and reorderable columns, a left-pinned group, three selection modes with a truthful select-all, opened rows with a detail region, and cells that become fields. It applies none of it |
 | `TreeGrid`, `TreeGridRow` | builder | caller-owned selection and expansion intents | A DataGrid-backed hierarchy over caller-flattened visible rows. Rows supply stable ids, levels, parent ids and branch state. Disclosure and indentation live in the first ordered column. Fixed/flex columns only; no horizontal scrolling or frozen columns |
 | `BulkBar` | builder | the wider selection, and the dismissal that clears the selection | Appears over a selection through `Presence`, states the count it actually has, and offers "select all N" as a separate named action when more rows exist than the host has loaded |
@@ -455,6 +455,11 @@ what they are handed:
 
 If a surface would work as either, pick `Table`. It is smaller, and a grid's
 machinery costs something even when nothing uses it.
+
+`Table` now keeps the same vacancy contract as `DataGrid`: a first load with
+no rows is busy, a successful empty query is empty, and a refresh failure
+keeps any rows that are still true and states the refusal above them. Row
+rules default on for `Table` and stay off for `DataGrid`.
 
 ### What DataGrid does not do
 
