@@ -159,6 +159,7 @@ impl RenderOnce for FormField {
         let error = self.error.clone().map(|text| {
             foundation_text(&theme, TypeScale::Caption, text.clone())
                 .text_color(theme.colors.danger)
+                .mt_token(&theme, Space::Sm)
                 .semantic_in(
                     cx,
                     NodeSpec::new(self.ident.child("error").semantic_id(), Role::Status)
