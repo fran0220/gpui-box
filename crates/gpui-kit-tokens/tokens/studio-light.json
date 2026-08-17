@@ -9,14 +9,14 @@
     "palette": {
       "neutral": {
         "0": "#000000",
-        "25": "#e6e6ea",
-        "50": "#eeeef1",
-        "100": "#ffffff",
+        "25": "#e0e0e5",
+        "50": "#ebebef",
+        "100": "#f5f5f8",
         "150": "#ffffff",
         "200": "#ffffff",
-        "300": "#e0e0e5",
-        "500": "#a3a3a9",
-        "600": "#828289",
+        "300": "#d4d4da",
+        "500": "#9a9aa1",
+        "600": "#78787f",
         "700": "#55555c",
         "800": "#17171a",
         "850": "#0a0a0c",
@@ -24,8 +24,8 @@
         "ink": "#ffffff"
       },
       "indigo": {
-        "400": "#4f5bd5",
-        "600": "#3b46b8"
+        "400": "#4952c9",
+        "600": "#363fa8"
       },
       "red": {
         "400": "#d5322f"
@@ -40,9 +40,9 @@
         "400": "#2a6f8f"
       },
       "loader": {
-        "blue": "#4f7fc0",
-        "orange": "#b76324",
-        "pink": "#c63f67"
+        "blue": "#4776b5",
+        "orange": "#ad5c20",
+        "pink": "#bc3a60"
       }
     },
     "surface": {
@@ -55,19 +55,19 @@
     "text": {
       "primary": "{neutral.800}",
       "muted": "{neutral.700}",
-      "faint": "{neutral.600}",
-      "placeholder": "#68686f",
-      "disabled": "#808087",
+      "faint": "#64646b",
+      "placeholder": "#6f6f76",
+      "disabled": "#7a7a81",
       "onAccent": "{neutral.ink}"
     },
     "interactive": {
       "hover": "{neutral.850}/0f",
       "active": "{neutral.850}/1a",
       "selected": "{neutral.850}/0f",
-      "hairline": "{neutral.850}/73",
-      "hairlineStrong": "{neutral.850}/80",
-      "track": "{neutral.850}/80",
-      "divider": "{neutral.850}/80",
+      "hairline": "{neutral.850}/80",
+      "hairlineStrong": "{neutral.850}/8c",
+      "track": "{neutral.850}/8c",
+      "divider": "{neutral.850}/8c",
       "focus": "{indigo.400}"
     },
     "semantic": {

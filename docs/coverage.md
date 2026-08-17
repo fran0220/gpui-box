@@ -342,6 +342,51 @@ contract. It also does not turn disabled content invisible, treat a refusal as
 empty data, invent a decoder/browser/graph layout, or add application policy to
 make a fixture look fuller.
 
+#### What closed the table
+
+The table above stays as the pre-change inventory. What closed most of it was
+not per-scene patching but two machine-checked rules in the token layer, each
+of which had been failing silently in every theme:
+
+- **Surface separation.** Every nesting step — canvas to panel, panel to card,
+  card to raised, and the overlay against what it covers — now has to differ by
+  at least three CIE L\* points, in the right direction, or
+  `TokenDocument::validate` refuses the theme. The dark neutral ramp was
+  respaced and the light one retuned to pass it. That is what made the card,
+  table, dock and popup boundaries in dozens of the `High` rows visible;
+  `contrast.rs` and `docs/token-model.md` carry the contract.
+- **Tone distinction.** `muted`, `faint`, `placeholder` and `disabled` were
+  three different facts wearing one grey in dark, and an inverted ladder in
+  light, while every foreground/background contrast pair passed. Each rung now
+  has to differ by three L\* measured as distance from the canvas, so one rule
+  holds in both appearances. That is what made the disabled control, the
+  placeholder, the divider and the explanatory line in the remaining `High`
+  and `Medium` rows tell themselves apart.
+
+`Card`, `CardHeader` and `StyledExt::card_surface` replaced three incompatible
+hand-rolled card shells, which is what closed the surface-rhythm findings in
+the agent, game and notification rows.
+
+After recapturing all 216 macOS baselines against the retuned themes, the rows
+that still showed a defect were fixed individually:
+
+| Scene | What was left, and what was done |
+|---|---|
+| `keymap-editor` | `Defaults` was a step larger than its peer `Current bindings`; both are now `Label`. |
+| `ide-shell` | The `Problems` panel carried a badge counting three problems and one string that claimed Unavailable and Empty at once. It now makes one claim and counts nothing it cannot list. The shell also fills the scene rather than leaving the lower third empty. |
+| `notification-center` | The unread marker sat in the trailing flow, so it landed beside the action on one row and beside the close control on the next. It is now a fixed slot beside the title. |
+| `node-graph` | An edge label was drawn six pixels from the midpoint that also carries the disconnect chip, so the two overlapped. The label now clears the chip's radius. |
+| `cascader` | The trigger stretched to the scene while its popup kept its own width. The scene now gives the trigger the width of the surface it opens. |
+
+This re-review was one reviewer over the 216 recaptured macOS images, not a
+repeat of the eight-reviewer pass, and it read the rows the table had flagged
+most closely. Three findings were looked at and deliberately left: a
+conversation and a diff still fill the width they are given, because the
+reading measure is the caller's; the transport's mute control keeps a different
+form when muted, because that difference is the state; and a scrolled popup
+still shows a partial row at its clip, because that is what being scrolled
+looks like.
+
 ### Motion, which is where the largest gap is
 
 The primitives in `docs/motion.md` cover a value moving from one state to
@@ -350,7 +395,7 @@ springs described as a duration and a bounce. Two things are left.
 
 | Gap | Why it matters |
 |---|---|
-| Shape in `flip` | `flip_size` records a rectangle, so position and size are continuous, but a radius, a border and a colour are not: a pill that becomes a card changes shape on the frame it changes kind. |
+| Shape in `flip` | `Flip::shape` interpolates radius, border width, border colour and background over the same spring that carries position and size, and `Shaping::shaped` applies the result, so a row becoming a card travels between the two forms. The caller states both forms and applies what comes back, because `Flipped` wraps an element it did not build and cannot reach the style inside it. What is still not interpolated is anything with no numeric path between the two forms — a shadow set, a gradient, or a change of element kind. |
 | Overscroll | `motion::rubber_band` damps a pull past a boundary, but nothing in the library overscrolls: a `ScrollArea` stops dead at its end, so the band is available to a caller and used by no component here. |
 
 ### Media capabilities beyond native playback
@@ -428,9 +473,9 @@ presentation contract downstream.
 | Number, date, and quantity formatting | Every word is now host-replaceable, but every *number* beside one is still formatted by Rust. See "Numbers a catalogue cannot fix" below. |
 | Assistive technology gaps | Basic semantics, grapheme-based editable and read-only text runs, read-only character geometry, selection actions, and explicit live-region properties now reach GPUI's AccessKit platform tree. Editable character geometry/native caret tracking, verified screen-reader announcement timing, native-child handoff, and native Windows session verification remain absent. Linux compatibility, including native AT-SPI validation, is deferred; see `docs/accessibility.md`. |
 | Validation vocabulary | `FormField` shows an error it is handed. When to validate, field against form, and validation still in flight have no shared shape. |
-| Composition | There is no `Slot`: a caller cannot replace a node inside a component, only configure it. |
-| Size response | No breakpoint or container query. `Toolbar` overflow is declared rather than measured, which is the same gap seen from one component. |
-| Style escape hatch | Beyond tokens there is no supported way to override one instance. |
+| Composition | `Slotted` lets a caller replace a node a component authored rather than only configure it. A component publishes its positions as `SLOTS`, and a name outside that list panics rather than silently rendering nothing. `DataGrid` (`empty`, `failed`, `loading`) and `UploadList` (`empty`) are converted; the remaining sixteen components that author their own `EmptyState` still offer no position, and no component yet slots a node that is not a whole-region state. |
+| Size response | `Responsive` builds its content from its own measured width, so a component laid out in a sidebar and in a full-width page arranges itself differently without either of them consulting the window. `ContainerSize` reports `Unmeasured` for the one frame before there is a width rather than guessing at one. `Toolbar` now measures its cut from the widths it recorded last frame; `overflow_after` remains for a caller who already knows. What is still missing is a declarative breakpoint vocabulary — every caller writes its own thresholds — and there is no way to respond to a size a component cannot itself be given, such as the width of a sibling. |
+| Style escape hatch | `ThemeOverlay` installs a caller-adjusted `Theme` for one subtree and pops it afterwards, in every element phase, so an override cannot reach a sibling. What comes back is a whole `Theme`, so the subtree still reads a complete token set and a component inside it cannot tell it was overridden. There is still no way to override *one property of one instance* without constructing a theme for it, which is deliberate: a per-instance colour is how a library stops being one. |
 | Non-virtualized `Table` and `Tree` | `List`, `DataGrid`, and `MessageList` virtualize. These two lay out every row. |
 
 ### Numbers a catalogue cannot fix

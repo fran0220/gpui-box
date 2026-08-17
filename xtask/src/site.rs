@@ -1044,8 +1044,8 @@ mod tests {
         let css = site_style();
         assert!(css.contains(":root, [data-theme=\"studio-dark\"]"));
         assert!(css.contains("[data-theme=\"studio-light\"]"));
-        assert!(css.contains("--canvas: #0a0a0a;"));
-        assert!(css.contains("--canvas: #eeeef1;"));
+        assert!(css.contains("--canvas: #131313;"));
+        assert!(css.contains("--canvas: #ebebef;"));
         assert!(css.contains("--radius-card: 12px;"));
         assert!(css.contains("--motion-quick: 150ms;"));
     }

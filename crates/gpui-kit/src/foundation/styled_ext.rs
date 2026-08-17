@@ -19,6 +19,25 @@ pub fn text(theme: &Theme, scale: TypeScale, content: impl Into<SharedString>) -
         .child(content.into())
 }
 
+/// How a card separates itself from what is behind it.
+///
+/// The colour step does the separating in every case: a theme that meets the
+/// surface separation floor has already made the boundary legible, so what a
+/// variant chooses is the second piece of evidence on top of it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CardVariant {
+    /// A shadow. One card, or a few, on the surface behind them.
+    #[default]
+    Elevated,
+    /// A hairline and no shadow, for a grid of cards. Shadows are drawn per
+    /// card and know nothing of each other, so a dozen at close range stack
+    /// into a wash that reads as one smudged region instead of twelve things.
+    Outlined,
+    /// Neither: structure, padding, identity and interaction, without
+    /// claiming to be a plane of its own.
+    Ghost,
+}
+
 /// Token-addressed styling helpers.
 ///
 /// These exist so component code names a semantic role instead of repeating a
@@ -84,6 +103,22 @@ pub trait StyledExt: Styled + Sized {
     fn hairline_strong(self, theme: &Theme) -> Self {
         self.border(px(theme.borders.hairline))
             .border_color(theme.colors.hairline_strong)
+    }
+
+    /// The shell every card-shaped surface in the library is made of.
+    ///
+    /// [`Card`](crate::display::card::Card) is the component a caller reaches
+    /// for; this is the same shell for a component that already owns a richer
+    /// semantic node than a grouping and so cannot be wrapped in one. Both go
+    /// through here, because a card that means the same thing and is drawn two
+    /// ways is two components wearing one name.
+    fn card_surface(self, theme: &Theme, variant: CardVariant) -> Self {
+        let element = self.radius(theme, Radius::Card);
+        match variant {
+            CardVariant::Elevated => element.frame(theme, Surface::Panel, Elevation::Raised),
+            CardVariant::Outlined => element.surface(theme, Surface::Panel).hairline(theme),
+            CardVariant::Ghost => element,
+        }
     }
 
     /// A surface that is a distinct thing from the one behind it.

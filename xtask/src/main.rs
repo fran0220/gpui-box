@@ -1455,6 +1455,20 @@ fn contrast_gate() -> Result<()> {
                 failure.minimum
             );
         }
+        for failure in contrast::separation_failures(document) {
+            failed = true;
+            eprintln!(
+                "{}: {} over {} gains {:.1} L*, below the {:.1} minimum",
+                document.meta.id, failure.near, failure.behind, failure.distance, failure.minimum
+            );
+        }
+        for failure in contrast::distinction_failures(document) {
+            failed = true;
+            eprintln!(
+                "{}: {} stands only {:.1} L* further from the page than {}, below the {:.1} minimum",
+                document.meta.id, failure.tone, failure.distance, failure.against, failure.minimum
+            );
+        }
     }
     if failed {
         bail!("contrast requirements are not met");
@@ -1728,6 +1742,38 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
             output,
             "| `{}` | `{}` | {:.2} | {:.1} |",
             check.foreground, check.background, check.ratio, check.minimum
+        )?;
+    }
+
+    output.push_str(
+        "\n### Surface separation\n\n\
+         How far each surface reads from the one behind it, in CIE L\\*. The WCAG ratio \
+         cannot answer this: it flattens everything near black, so two surfaces nobody \
+         can tell apart and two that are plainly different both report about 1.03:1.\n\n\
+         | Surface | Behind | Distance | Minimum |\n|---|---|---:|---:|\n",
+    );
+    for check in contrast::separation_report(tokens) {
+        writeln!(
+            output,
+            "| `{}` | `{}` | {:.1} | {:.1} |",
+            check.near, check.behind, check.distance, check.minimum
+        )?;
+    }
+
+    output.push_str(
+        "\n### Tone distinction\n\n\
+         How much further from the page each tone stands than the next one down, \
+         in CIE L\\*. Contrast alone cannot answer this: three tones that are all \
+         legible and all the same colour pass every ratio in the table above and \
+         still leave a reader unable to tell a value that is merely secondary from \
+         one that is absent from one that cannot be used.\n\n\
+         | Tone | Above | Distance | Minimum |\n|---|---|---:|---:|\n",
+    );
+    for check in contrast::distinction_report(tokens) {
+        writeln!(
+            output,
+            "| `{}` | `{}` | {:.1} | {:.1} |",
+            check.tone, check.against, check.distance, check.minimum
         )?;
     }
     Ok(())

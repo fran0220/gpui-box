@@ -41,7 +41,7 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use gpui::{
-    App, AvailableSpace, Bounds, Element, ElementId, GlobalElementId, InspectorElementId,
+    App, AvailableSpace, Bounds, Element, ElementId, GlobalElementId, Hsla, InspectorElementId,
     IntoElement, LayoutId, Pixels, Point, SharedString, Size, Style, Window, px, size,
 };
 use gpui_kit_theme::{ActiveTheme, SpringPreset};
@@ -69,6 +69,85 @@ const MEMORY: Duration = Duration::from_millis(500);
 /// idle window advances one and not the other; whichever runs out first ends
 /// the handoff.
 const HANDOFF_GRACE: u64 = 30;
+
+/// The visual form an element is drawn with, as opposed to where it is.
+///
+/// A slide moves an element; it does not restyle it, because [`Flipped`]
+/// wraps an `AnyElement` it did not build and cannot reach the radius or the
+/// border inside it. So the caller keeps ownership of the shape and asks the
+/// handle what to draw with this frame, the same way it asks a container for
+/// its width. What comes back is a shape, not a style: applying it is
+/// [`Shaping::shaped`], and everything else about the element stays the
+/// caller's.
+///
+/// This is what a row becoming a card needs. The two forms differ by a radius,
+/// a border and a surface, and cutting between them on the frame the layout
+/// changes is the one part of that transition a reader actually notices.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Shape {
+    pub radius: Pixels,
+    pub border: Pixels,
+    pub border_color: Hsla,
+    pub background: Hsla,
+}
+
+impl Shape {
+    /// A shape that is a surface and nothing else.
+    pub fn surface(background: Hsla) -> Self {
+        Self {
+            radius: px(0.0),
+            border: px(0.0),
+            border_color: gpui::transparent_black(),
+            background,
+        }
+    }
+
+    pub fn radius(mut self, radius: f32) -> Self {
+        self.radius = px(radius);
+        self
+    }
+
+    /// A border of `width` in `color`.
+    ///
+    /// A width of zero still carries its colour, so a shape animating from no
+    /// border to one grows the line rather than fading a colour in from
+    /// whatever happened to be behind it.
+    pub fn border(mut self, width: f32, color: Hsla) -> Self {
+        self.border = px(width);
+        self.border_color = color;
+        self
+    }
+}
+
+impl Interpolate for Shape {
+    fn lerp(self, other: Self, t: f32) -> Self {
+        Self {
+            radius: self.radius.lerp(other.radius, t),
+            border: self.border.lerp(other.border, t),
+            border_color: self.border_color.lerp(other.border_color, t),
+            background: self.background.lerp(other.background, t),
+        }
+    }
+
+    fn distance(self, other: Self) -> f32 {
+        self.radius.distance(other.radius)
+            + self.border.distance(other.border)
+            + self.border_color.distance(other.border_color)
+            + self.background.distance(other.background)
+    }
+}
+
+/// Applies a [`Shape`] to an element.
+pub trait Shaping: gpui::Styled + Sized {
+    fn shaped(self, shape: Shape) -> Self {
+        self.rounded(shape.radius)
+            .border(shape.border)
+            .border_color(shape.border_color)
+            .bg(shape.background)
+    }
+}
+
+impl<E: gpui::Styled> Shaping for E {}
 
 #[derive(Default)]
 struct FlipState {
@@ -100,6 +179,11 @@ struct FlipState {
     recorded_at: Option<Instant>,
     /// When the size transition was last advanced.
     size_frame: Option<Instant>,
+    /// The shape the element is being drawn with, animating toward the shape
+    /// the caller asked for. `None` until an element opts into shape.
+    shape: Option<Transition<Shape>>,
+    /// When the shape transition was last advanced.
+    shape_frame: Option<Instant>,
     /// The frame an element last claimed this id on.
     seen_frame: Option<u64>,
     /// The last frame on which two elements were sharing this id, plus one.
@@ -166,6 +250,37 @@ impl FlipState {
         transition.value()
     }
 
+    /// Records the shape the caller asked for, and returns the shape to draw
+    /// with. Retargeting mid-flight continues from what is on screen, the way
+    /// a size change does.
+    fn record_shape(&mut self, target: Shape, spec: MotionSpec, now: Instant) -> Shape {
+        let mut transition = self
+            .shape
+            .unwrap_or_else(|| Transition::new(target, spec))
+            .spec(spec);
+        if let Some(last) = self.shape_frame {
+            transition.advance(now.saturating_duration_since(last));
+        }
+        self.shape_frame = Some(now);
+        if transition.target() != target {
+            transition.set(target);
+        }
+        self.shape = Some(transition);
+        transition.value()
+    }
+
+    /// Puts the element at the shape asked for with nothing in flight.
+    fn settle_shape(&mut self, target: Shape, spec: MotionSpec, now: Instant) -> Shape {
+        let mut transition = self
+            .shape
+            .unwrap_or_else(|| Transition::new(target, spec))
+            .spec(spec);
+        transition.snap(target);
+        self.shape = Some(transition);
+        self.shape_frame = Some(now);
+        transition.value()
+    }
+
     /// Puts the element at its natural size with nothing in flight.
     fn settle_size(&mut self, natural: Size<Pixels>, spec: MotionSpec, now: Instant) {
         self.natural = Some(natural);
@@ -202,6 +317,8 @@ impl FlipState {
             self.size = None;
             self.natural = None;
             self.size_frame = None;
+            self.shape = None;
+            self.shape_frame = None;
         }
         self.recorded_at = Some(now);
     }
@@ -279,6 +396,38 @@ impl Flip {
         self.state.borrow().size.map(|size| size.value())
     }
 
+    /// The shape to draw with this frame, animating toward `target`.
+    ///
+    /// The caller applies it with [`Shaping::shaped`]; the handle only says
+    /// what the shape is right now. Under reduced motion the answer is
+    /// `target` from the first frame.
+    ///
+    /// ```ignore
+    /// let handle = flip(id, cx);
+    /// let shape = handle.shape(if open { card } else { row }, window, cx);
+    /// div().shaped(shape).flip(&handle, window, cx)
+    /// ```
+    pub fn shape(&self, target: Shape, window: &mut Window, cx: &App) -> Shape {
+        let spring = Spring::preset(cx.theme(), SpringPreset::Grab);
+        let spec = MotionSpec::sprung(spring);
+        let now = Instant::now();
+        let mut state = self.state.borrow_mut();
+        let drawn = if cx.reduce_motion() {
+            state.settle_shape(target, spec, now)
+        } else {
+            state.record_shape(target, spec, now)
+        };
+        if state.shape.is_some_and(|shape| shape.is_animating()) {
+            window.request_animation_frame();
+        }
+        drawn
+    }
+
+    /// The shape currently painted, once an element has asked for one.
+    pub fn drawn_shape(&self) -> Option<Shape> {
+        self.state.borrow().shape.map(|shape| shape.value())
+    }
+
     /// The size layout would give the element if nothing were animating.
     pub fn target_size(&self) -> Option<Size<Pixels>> {
         self.state.borrow().natural
@@ -298,7 +447,10 @@ impl Flip {
     pub fn is_animating(&self) -> bool {
         let offset = self.offset();
         let sliding = offset.x.abs() > px(EPSILON) || offset.y.abs() > px(EPSILON);
-        sliding || self.state.borrow().size.is_some_and(|s| s.is_animating())
+        let state = self.state.borrow();
+        sliding
+            || state.size.is_some_and(|size| size.is_animating())
+            || state.shape.is_some_and(|shape| shape.is_animating())
     }
 }
 

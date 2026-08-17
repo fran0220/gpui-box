@@ -187,7 +187,7 @@ pub mod prelude {
     pub use crate::display::animated_number::{AnimatedNumber, grouped};
     pub use crate::display::avatar::Avatar;
     pub use crate::display::badge::{Badge, Tone};
-    pub use crate::display::card::{Card, ListRow};
+    pub use crate::display::card::{Card, CardHeader, CardVariant, ListRow};
     pub use crate::display::chart::{
         BarChart, ChartAxes, ChartPoint, ChartSelection, ChartSeries, ChartState, LineChart,
     };
@@ -222,10 +222,11 @@ pub mod prelude {
         ActiveDirection, DirectionalExt, LayoutDirection, LogicalSide, PhysicalSide,
         set_layout_direction,
     };
+    pub use crate::foundation::slot;
     pub use crate::foundation::{
         ActiveTheme, ControlSize, Density, Disableable, Elevation, FocusRing, HoverLift, Ident,
-        Layer, Pressable, Selectable, Sizable, StyledExt, ThemeRegistry, activate_theme,
-        set_density, text,
+        Layer, Pressable, Selectable, Sizable, SlotRender, Slots, Slotted, StyledExt, ThemeOverlay,
+        ThemeRegistry, activate_theme, set_density, text,
     };
     pub use crate::game::{
         Ability, AbilityBar, AbilityBarEvent, AbilityCharges, AbilityChargesError, AbilityId,
@@ -239,10 +240,10 @@ pub mod prelude {
         ActiveDrag, DragItem, DropAxis, DropIntent, DropPosition, StagedDrag,
     };
     pub use crate::layout::{
-        AspectFit, AspectRatio, Dock, DockEvent, DockPanel, DockRegion, FadeEdges, ScrollArea,
-        ScrollAxis, ScrollFade, SplitAxis, SplitChange, SplitKind, SplitLayout, SplitPane,
-        SplitPaneSpec, SplitRecord, SplitRecordError, SplitSide, SplitTree, StatusBar, StatusGroup,
-        StatusItem, Toolbar, ToolbarItem, scroll_offset,
+        AspectFit, AspectRatio, ContainerSize, Dock, DockEvent, DockPanel, DockRegion, FadeEdges,
+        Responsive, ScrollArea, ScrollAxis, ScrollFade, SplitAxis, SplitChange, SplitKind,
+        SplitLayout, SplitPane, SplitPaneSpec, SplitRecord, SplitRecordError, SplitSide, SplitTree,
+        StatusBar, StatusGroup, StatusItem, Toolbar, ToolbarItem, scroll_offset,
     };
     pub use crate::media::{
         AudioPlayer, FixtureTransport, MediaAvailability, MediaCommand, MediaEvent, MediaOrigin,
@@ -252,7 +253,8 @@ pub mod prelude {
         NativeMediaSubscription, PlatformMediaTransport, VideoPlayer,
     };
     pub use crate::motion::{
-        Flip, Flipping, Keyframe, Keyframes, Presence, ScrollLink, Transition, Velocity, flip,
+        Flip, Flipping, Keyframe, Keyframes, Presence, ScrollLink, Shape, Shaping, Transition,
+        Velocity, flip,
     };
     pub use crate::navigation::{
         Accordion, AccordionSection, Anchor, AnchorList, Breadcrumb, Collapsible, Crumb,

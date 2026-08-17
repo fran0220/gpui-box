@@ -912,7 +912,14 @@ impl RenderOnce for NodeGraph {
                     ),
                     viewport,
                 );
-                let gap = 6.0 * viewport.zoom;
+                // The disconnect chip is drawn on the same midpoint, so the
+                // label has to clear its radius rather than the line's.
+                let chip_radius = if self.on_event.is_some() && self.interaction.edits_topology() {
+                    9.0
+                } else {
+                    0.0
+                };
+                let gap = (chip_radius + 6.0) * viewport.zoom;
                 let label = div()
                     .absolute()
                     .whitespace_nowrap()

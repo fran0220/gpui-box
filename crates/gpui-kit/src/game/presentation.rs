@@ -19,7 +19,9 @@ use crate::display::progress::ProgressBar;
 use crate::display::status::Callout;
 use crate::effects::{EffectParticles, EffectPlan};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Selectable, Sizable, StyledExt};
+use crate::foundation::{
+    CardVariant, Disableable, FocusRing, Ident, Pressable, Selectable, Sizable, StyledExt,
+};
 use crate::motion::{Animated, Entrance};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey, Strings};
 
@@ -179,8 +181,7 @@ fn party_member(
         .gap_token(theme, Space::Md)
         .w(px(310.0))
         .p_token(theme, Space::Md)
-        .radius(theme, Radius::Card)
-        .border(px(theme.borders.hairline))
+        .card_surface(theme, CardVariant::Outlined)
         .border_color(if chosen {
             theme.colors.hairline_strong
         } else {
@@ -415,9 +416,7 @@ fn objective_row(
         .gap_token(theme, Space::Xs)
         .ms(direction, px(depth as f32 * theme.space(Space::Lg)))
         .p_token(theme, Space::Md)
-        .radius(theme, Radius::Card)
-        .border(px(theme.borders.hairline))
-        .border_color(theme.colors.hairline)
+        .card_surface(theme, CardVariant::Outlined)
         .bg(if chosen {
             theme.colors.selected
         } else {
@@ -708,11 +707,8 @@ fn ability_control(
         .column()
         .gap_token(theme, Space::Sm)
         .w(px(168.0))
-        .p_token(theme, Space::Sm)
-        .radius(theme, Radius::Card)
-        .border(px(theme.borders.hairline))
-        .border_color(theme.colors.hairline)
-        .bg(theme.colors.panel)
+        .p_token(theme, Space::Md)
+        .card_surface(theme, CardVariant::Outlined)
         .child(button)
         .child(metadata)
         .children(reason.map(|reason| {
@@ -931,11 +927,8 @@ impl RenderOnce for RewardReveal {
             .gap_token(&theme, Space::Md)
             .w_full()
             .p_token(&theme, Space::Lg)
-            .radius(&theme, Radius::Card)
+            .card_surface(&theme, CardVariant::Outlined)
             .overflow_hidden()
-            .border(px(theme.borders.hairline))
-            .border_color(theme.colors.hairline)
-            .bg(theme.colors.panel)
             .children(effect)
             .child(
                 div()

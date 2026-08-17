@@ -41,10 +41,10 @@ use gpui::{
     prelude::FluentBuilder, px, relative,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TextTone, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Space, TextTone, TypeScale};
 
 use crate::display::badge::{Badge, Tone};
-use crate::foundation::{Ident, StyledExt, text};
+use crate::foundation::{CardVariant, Ident, StyledExt, text};
 use crate::strings::{ActiveStrings, StringKey};
 
 /// How a number was arrived at.
@@ -374,8 +374,7 @@ impl RenderOnce for CostMeter {
             .w_full()
             .gap_token(&theme, Space::Sm)
             .p_token(&theme, Space::Md)
-            .radius(&theme, Radius::Card)
-            .frame(&theme, Surface::Panel, Elevation::Raised)
+            .card_surface(&theme, CardVariant::Elevated)
             .when_some(self.label.clone(), |element, label| {
                 element.child(
                     text(&theme, TypeScale::Caption, label).text_tone(&theme, TextTone::Faint),

@@ -8,8 +8,10 @@
 pub mod direction;
 mod ident;
 mod interaction;
+pub mod slot;
 pub(crate) mod stepping;
 mod styled_ext;
+mod theme_overlay;
 
 pub use direction::{
     ActiveDirection, DirectionalExt, LayoutDirection, LogicalSide, PhysicalSide,
@@ -17,7 +19,9 @@ pub use direction::{
 };
 pub use ident::Ident;
 pub use interaction::{HoverLift, Pressable};
-pub use styled_ext::{FocusRing, StyledExt, text};
+pub use slot::{SlotRender, Slots, Slotted};
+pub use styled_ext::{CardVariant, FocusRing, StyledExt, text};
+pub use theme_overlay::ThemeOverlay;
 
 pub use gpui_kit_theme::{
     ActiveTheme, ControlSize, Density, Elevation, Layer, ThemeRegistry, activate_theme, set_density,

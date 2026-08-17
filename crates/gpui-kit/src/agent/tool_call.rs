@@ -30,13 +30,13 @@ use std::rc::Rc;
 use gpui::{App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div, px};
 use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TextTone, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TextTone, Theme, TypeScale};
 
 use crate::controls::button::Button;
 use crate::display::badge::{Badge, Tone};
 use crate::display::icon::{Icon as IconView, IconTone};
 use crate::display::status::Callout;
-use crate::foundation::{Ident, Sizable, StyledExt, text};
+use crate::foundation::{CardVariant, Ident, Sizable, StyledExt, text};
 use crate::strings::{ActiveStrings, StringKey};
 
 type RetryHandler = Rc<dyn Fn(&mut Window, &mut App)>;
@@ -496,8 +496,7 @@ impl RenderOnce for ToolCallCard {
             .column()
             .gap_token(&theme, Space::Sm)
             .p_token(&theme, Space::Md)
-            .radius(&theme, Radius::Card)
-            .frame(&theme, Surface::Panel, Elevation::Raised)
+            .card_surface(&theme, CardVariant::Elevated)
             .child(header)
             .children(arguments)
             .children(outcome)

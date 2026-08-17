@@ -588,7 +588,15 @@ impl Theme {
         }
     }
 
+    /// The theme in force here, which is the innermost override if a subtree
+    /// installed one and the registry's active theme otherwise.
     pub fn get(cx: &App) -> &Self {
+        if let Some(overridden) = cx
+            .try_global::<ThemeOverrides>()
+            .and_then(|overrides| overrides.0.last())
+        {
+            return overridden;
+        }
         cx.global::<ThemeRegistry>().active()
     }
 
@@ -637,6 +645,37 @@ impl Theme {
 impl Default for Theme {
     fn default() -> Self {
         Self::studio_dark()
+    }
+}
+
+/// The stack of subtree theme overrides, innermost last.
+///
+/// A component reads [`Theme::get`] and cannot tell whether the theme it got
+/// came from the registry or from an ancestor that overrode it, which is what
+/// makes the escape hatch work without every component learning about it.
+#[derive(Default)]
+pub struct ThemeOverrides(Vec<Theme>);
+
+impl Global for ThemeOverrides {}
+
+/// Installs `theme` for everything rendered until the matching [`pop_theme`].
+///
+/// This is the low half of the subtree escape hatch. Callers use
+/// `gpui_kit::ThemeOverlay`, which pairs the two around one child and cannot
+/// leak an override into a sibling.
+pub fn push_theme(cx: &mut App, theme: Theme) {
+    if !cx.has_global::<ThemeOverrides>() {
+        cx.set_global(ThemeOverrides::default());
+    }
+    cx.update_global::<ThemeOverrides, ()>(|overrides, _| overrides.0.push(theme));
+}
+
+/// Removes the innermost override installed by [`push_theme`].
+pub fn pop_theme(cx: &mut App) {
+    if cx.has_global::<ThemeOverrides>() {
+        cx.update_global::<ThemeOverrides, ()>(|overrides, _| {
+            overrides.0.pop();
+        });
     }
 }
 

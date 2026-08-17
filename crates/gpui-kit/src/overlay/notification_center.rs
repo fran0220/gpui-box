@@ -25,13 +25,13 @@ use gpui::{
     IntoElement, ParentElement, Render, SharedString, Styled, Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Surface, TypeScale};
 
 use crate::controls::button::{Button, IconButton};
 use crate::display::badge::{Badge, Tone};
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::status::StatusDot;
-use crate::foundation::{Ident, Sizable, StyledExt};
+use crate::foundation::{CardVariant, Ident, Sizable, StyledExt};
 use crate::overlay::toast::{self, Toast};
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -445,15 +445,23 @@ impl NotificationCenter {
                     .gap_token(&theme, Space::Xs)
                     .child(
                         div()
-                            .type_scale(&theme, TypeScale::Label)
-                            // A record that has been read steps back rather
-                            // than disappearing: it is still a report.
-                            .text_color(if notification.read {
-                                theme.colors.text_muted
-                            } else {
-                                theme.colors.text
-                            })
-                            .child(notification.message.clone()),
+                            .row()
+                            .items_center()
+                            .gap_token(&theme, Space::Xs)
+                            .child(
+                                div()
+                                    .type_scale(&theme, TypeScale::Label)
+                                    // A record that has been read steps back
+                                    // rather than disappearing: it is still a
+                                    // report.
+                                    .text_color(if notification.read {
+                                        theme.colors.text_muted
+                                    } else {
+                                        theme.colors.text
+                                    })
+                                    .child(notification.message.clone()),
+                            )
+                            .children(unread_mark),
                     )
                     .children(notification.detail.clone().map(|detail| {
                         div()
@@ -468,7 +476,6 @@ impl NotificationCenter {
                             .child(at)
                     })),
             )
-            .children(unread_mark)
             .children(action)
             .child(dismiss)
             .semantic_in(
@@ -559,8 +566,7 @@ impl Render for NotificationCenter {
             .id(self.ident.element_id())
             .column()
             .w_full()
-            .radius(&theme, Radius::Card)
-            .frame(&theme, Surface::Panel, Elevation::Raised)
+            .card_surface(&theme, CardVariant::Elevated)
             .child(
                 div()
                     .row()

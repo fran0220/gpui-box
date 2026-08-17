@@ -74,7 +74,7 @@ actions. They define no account, provider, network, or credential policy.
 | Component | Kind | Notes |
 |---|---|---|
 | `Badge`, `StatusDot`, `StatusLine`, `Callout` | builder | Status vocabulary |
-| `Card`, `ListRow` | builder | Grouping |
+| `Card`, `CardHeader`, `ListRow` | builder | Grouping. See [The card is the container, and there is one of it](#the-card-is-the-container-and-there-is-one-of-it) |
 | `ProgressBar` | builder | Reports a position only when the extent is known. In-flight fill is the working signature from `color.loader.gradient`, not accent |
 | `AnimatedNumber` | builder | Counts to a new value, and publishes the target from the frame it changes: a number in flight is not a fact. A caller-supplied format function decides the text |
 | `Tag` | builder | Removal exists only when removal is allowed. Accepts a caller-owned `tint` the way `Badge` does; the published tone name is unchanged |
@@ -91,6 +91,60 @@ actions. They define no account, provider, network, or credential policy.
 | `BarChart` | builder | Categorized bars over one host-owned series. Bars enter, update, and exit by `ChartPoint` identity and expose the same truthful state contract as `LineChart` |
 | `FailurePanel` | builder | A region the host could not produce, in the host's own words. Not an error boundary and deliberately not named one: GPUI has no fallible render and no catchable render panic, so this takes a failure the host is already holding, through `from_result`. It publishes `failed`, never empty |
 | `Icon` | builder | A glyph from the bundled catalog, sized from the `control.*` glyph step and coloured from a semantic role rather than an `Hsla`. Emits nothing: a glyph that can be clicked is `IconButton`. Decorative by default and published only when named, so a glyph that repeats the label beside it is not announced twice |
+
+### The card is the container, and there is one of it
+
+A card is a surface that groups content, so it owns the whole vocabulary of
+one: a `media` band flush to its edges, a `CardHeader` with a title, an
+optional subtitle and an optional control, body content, a `footer`, and
+`divided` to put a hairline between adjacent regions and between body rows.
+A caller reaching for a card gets all of it or none of it, and never a
+rectangle it has to finish by hand.
+
+That last sentence is the point of the component rather than a description of
+it. Before it existed, `Card` offered a radius, a surface and a click, thirty
+nine source files each drew the rest themselves, and no two of them agreed:
+`agent/*` padded by `Space::Md` and cast a shadow, `game/*` drew a hairline
+and cast none, and the component itself padded by `Space::Lg`. Three answers
+to one question is not a style; it is the absence of one. A container that
+cannot carry a title is a container every caller has to escape.
+
+`variant` names how the card separates itself from what is behind it:
+
+| Variant | Evidence | Reach for it when |
+|---|---|---|
+| `Elevated` | A shadow | One card, or a few, on the surface behind them |
+| `Outlined` | A hairline, no shadow | A grid. Shadows are drawn per card and know nothing of each other, so a dozen at close range stack into a wash that reads as one smudged region instead of twelve things |
+| `Ghost` | Neither | Structure, padding, identity and interaction without claiming to be a plane |
+
+The colour step is doing the separating in all three cases: a theme that meets
+the surface separation floor in `docs/token-model.md` has already made the
+boundary legible, and a variant chooses the second piece of evidence on top of
+it. This is why a card carries no line by default. The library reserves lines
+for what they alone can say — focus, invalidity, a drop target — and `divided`
+is the deliberate exception, because it draws a line *between two pieces of
+content on one surface* rather than around the surface.
+
+`selected` is an inset ring, so choosing a card moves nothing around it.
+`disabled` publishes the refusal, changes the text tone, and installs no
+handler at all; it does not fade the card out from under the reader, because
+unavailable is a fact to be read and not a thing to be hidden. A card that is
+itself one action drops its header's control, since two targets inside one
+target is a click whose outcome depends on which pixel it landed on.
+
+`ListRow` carries `leading` and `trailing` slots rather than relying on child
+order, so a list of rows lines its text up whether or not a given row has an
+icon or a badge. A row takes the press response and not the hover lift: a row
+that rose would leave the card it belongs to.
+
+A component that is already a card but owns a richer semantic node than a
+grouping — `ToolCallCard` is a tool invocation, `ApprovalRequest` is a form —
+cannot be wrapped in one, so the shell itself is the shared piece:
+`StyledExt::card_surface(theme, variant)` is the single definition of what a
+card is made of, and `Card` is a caller-facing composition on top of it. That
+is the whole of the fix: those components each drew the shell by hand before,
+and a card that means the same thing and is drawn two ways is two components
+wearing one name.
 
 ## Agent experience
 

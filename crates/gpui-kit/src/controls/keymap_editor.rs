@@ -535,7 +535,7 @@ impl Render for KeymapEditor {
                             .gap_token(&theme, Space::Xs)
                             .child(foundation_text(
                                 &theme,
-                                TypeScale::Body,
+                                TypeScale::Label,
                                 cx.strings().text(StringKey::KeymapDefaults),
                             ))
                             .children(defaults)

@@ -33,9 +33,7 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{
-    ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TextTone, Theme, TypeScale,
-};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TextTone, Theme, TypeScale};
 
 use crate::controls::button::Button;
 use crate::display::badge::{Badge, Tone};
@@ -44,7 +42,9 @@ use crate::display::icon::flips;
 use crate::display::loading::PulseLoader;
 use crate::display::status::{Callout, StatusDot};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
+use crate::foundation::{
+    CardVariant, Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text,
+};
 use crate::strings::{ActiveStrings, StringKey};
 
 use std::f32::consts::FRAC_PI_2;
@@ -603,8 +603,7 @@ impl ServerList {
             .column()
             .w_full()
             .gap_token(theme, Space::Xs)
-            .radius(theme, Radius::Card)
-            .frame(theme, Surface::Panel, Elevation::Raised)
+            .card_surface(theme, CardVariant::Elevated)
             .child(header)
             .children(reason)
             .children(retry)

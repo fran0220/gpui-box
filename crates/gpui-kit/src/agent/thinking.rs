@@ -28,10 +28,10 @@ use gpui::{
 };
 use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TextTone, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Space, TextTone, TypeScale};
 
 use crate::display::icon::{Icon as IconView, IconTone};
-use crate::foundation::{FocusRing, Ident, Pressable, Sizable, StyledExt, text};
+use crate::foundation::{CardVariant, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
 use crate::strings::{ActiveStrings, StringKey};
 
 type ToggleHandler = Rc<dyn Fn(bool, &mut Window, &mut App)>;
@@ -308,8 +308,7 @@ impl RenderOnce for ThinkingBlock {
         div()
             .w_full()
             .column()
-            .radius(&theme, Radius::Card)
-            .frame(&theme, Surface::Panel, Elevation::Raised)
+            .card_surface(&theme, CardVariant::Elevated)
             .overflow_hidden()
             .child(header)
             .children(body)

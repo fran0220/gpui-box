@@ -28,6 +28,10 @@ pub enum TokenError {
     Invalid { path: String, message: String },
     #[error("token contrast is invalid:\n{0}")]
     Contrast(String),
+    #[error("token surface separation is invalid:\n{0}")]
+    Separation(String),
+    #[error("token tones are not distinguishable:\n{0}")]
+    Distinction(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -284,6 +288,38 @@ impl TokenDocument {
                         format!(
                             "  {} on {} is {:.2}:1; requires {:.1}:1",
                             failure.foreground, failure.background, failure.ratio, failure.minimum
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ));
+        }
+
+        let failures = contrast::separation_failures(self);
+        if !failures.is_empty() {
+            return Err(TokenError::Separation(
+                failures
+                    .iter()
+                    .map(|failure| {
+                        format!(
+                            "  {} over {} gains {:.1} L*; requires {:.1}",
+                            failure.near, failure.behind, failure.distance, failure.minimum
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ));
+        }
+
+        let failures = contrast::distinction_failures(self);
+        if !failures.is_empty() {
+            return Err(TokenError::Distinction(
+                failures
+                    .iter()
+                    .map(|failure| {
+                        format!(
+                            "  {} reads {:.1} L* from {}; requires {:.1}",
+                            failure.tone, failure.distance, failure.against, failure.minimum
                         )
                     })
                     .collect::<Vec<_>>()
@@ -1292,7 +1328,7 @@ mod tests {
         let tokens = studio_dark();
         assert_eq!(
             tokens.surface(Surface::Canvas),
-            Color::parse("literal", "#0a0a0a").expect("literal")
+            Color::parse("literal", "#131313").expect("literal")
         );
         assert_eq!(
             tokens.interactive(InteractiveColor::Hover),

@@ -41,6 +41,7 @@ ButtonGroup
 Calendar
 Cancel
 Card
+CardHeader
 Cascader
 Cell
 Change
@@ -116,6 +117,7 @@ PlatformMediaTransport
 Popover
 Radio
 RangePicker
+Responsive
 RewardReveal
 Row
 SCALAR
@@ -130,6 +132,7 @@ SettingsRow
 SettingsSection
 Sidebar
 Slider
+Slots
 SplitButton
 SplitPane
 SplitTree
@@ -224,6 +227,7 @@ withheld
 {count} of {max}
 {count} {noun}
 {lines} lines
+{name} is not a slot this component names; it offers {:?}
 {number} {unit}
 {scrolled:.0} of {max:.0}
 {title} — {href}

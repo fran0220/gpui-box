@@ -35,13 +35,13 @@ use gpui::{
     KeyDownEvent, ParentElement, Render, SharedString, Styled, Window, div, prelude::FluentBuilder,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Space, TypeScale};
 
 use crate::controls::button::{Button, ButtonVariant};
 use crate::display::badge::Tone;
 use crate::display::description_list::{DescriptionItem, DescriptionList};
 use crate::display::status::StatusLine;
-use crate::foundation::{Ident, StyledExt, text};
+use crate::foundation::{CardVariant, Ident, StyledExt, text};
 use crate::strings::{ActiveStrings, StringKey};
 
 /// What a standing approval covers.
@@ -464,8 +464,7 @@ impl Render for ApprovalPrompt {
             .w_full()
             .gap_token(&theme, Space::Md)
             .p_token(&theme, Space::Lg)
-            .radius(&theme, Radius::Card)
-            .frame(&theme, gpui_kit_theme::Surface::Raised, Elevation::Raised)
+            .card_surface(&theme, CardVariant::Elevated)
             .track_focus(&self.focus_handle)
             .when(pending, |element| {
                 element.on_key_down(cx.listener(Self::on_key))

@@ -9,11 +9,11 @@
     "palette": {
       "neutral": {
         "0": "#000000",
-        "25": "#050505",
-        "50": "#0a0a0a",
-        "100": "#151515",
-        "150": "#1c1c1c",
-        "200": "#242424",
+        "25": "#0a0a0a",
+        "50": "#131313",
+        "100": "#1b1b1b",
+        "150": "#242424",
+        "200": "#282828",
         "300": "#303030",
         "500": "#565656",
         "600": "#8f8f8f",
@@ -56,8 +56,8 @@
       "primary": "{neutral.800}",
       "muted": "{neutral.700}",
       "faint": "{neutral.600}",
-      "placeholder": "{neutral.600}",
-      "disabled": "{neutral.600}",
+      "placeholder": "#868686",
+      "disabled": "#7d7d7d",
       "onAccent": "{neutral.ink}"
     },
     "interactive": {

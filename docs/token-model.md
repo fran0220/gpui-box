@@ -85,6 +85,80 @@ colors, which never carry required instructions on their own.
 text-bearing fill, so it is held to the non-text minimum. `cargo run -p xtask --
 tokens check` applies the same contract to the bundled documents.
 
+### Surface separation
+
+A contrast ratio answers whether a foreground is legible on a background. It
+does not answer whether two backgrounds are distinguishable, and the two
+questions need different measures. The WCAG ratio adds 0.05 to both sides so
+that black text stays measurable, which compresses everything near black into
+almost no range: `#050505` behind `#0a0a0a` reports 1.03:1, and so does a step
+a reader can point at. Near white it fails the other way, by reporting a
+comfortable-looking number for a step nobody can see.
+
+So surfaces are compared in CIE L\*, which is uniform across the range, and
+every nesting two surfaces can form must gain at least **3 L\*** over the one
+behind it:
+
+| Surface | Behind |
+|---|---|
+| `sunken` | below `canvas`, and below `panel` |
+| `panel` | above `canvas` |
+| `raised` | above `panel` |
+| `overlay` | above `panel`, and above `canvas` |
+
+The ramp climbs away from the page in **both** appearances: a well is below
+what holds it, a panel is above the page, and a block inside a panel is above
+the panel. A light theme therefore does not paint the page white and leave
+nothing above it. The page is tinted, and white is what the ramp climbs to,
+which is how a native window already separates its background from its
+content. `overlay` is checked against what it opens over rather than against
+`raised`, because a popover and a code block never touch.
+
+This rule exists because its absence was not theoretical. `studio-light` gave
+`panel`, `raised` and `overlay` the same `#ffffff`: a card, the code block
+inside it, and the popover over it were one undivided field of color, every
+contrast pair passed, and nothing in the build said so. `studio-dark` crammed
+its whole ramp between `#050505` and `#242424`, so a card sat on the page with
+1.08:1 between them and a black shadow that a near-black page absorbed.
+
+`ThemeRegistry::register_json` rejects a violation with `TokenError::Separation`,
+naming each nesting, its measured distance and its minimum.
+
+### Tone distinction
+
+The same argument applies to the foreground, and the same measure answers it.
+`muted`, `faint`, `placeholder` and `disabled` are four different facts, not
+four intensities of one: information that is secondary, detail that supports
+it, a description of a value that is **not there**, and a value that is there
+and **cannot be used**. A theme that gives two of them one colour has not
+styled them alike, it has stopped saying which one holds, and this library's
+own rule is that unavailable and absent are distinct states rather than
+degrees of the same one.
+
+Each rung must therefore stand at least **3 L\*** closer to the page than the
+one above it:
+
+| Tone | Stands closer to the page than |
+|---|---|
+| `muted` | `primary` |
+| `faint` | `muted` |
+| `placeholder` | `faint` |
+| `disabled` | `placeholder` |
+
+Distance from the page, rather than lightness, is what makes one rule hold in
+both appearances: a dimmer fact is darker in a light theme and lighter in a
+dark one, and both are the same movement toward the canvas.
+
+This rule also exists because its absence was not theoretical. `studio-dark`
+drew `faint`, `placeholder` and `disabled` in one grey. Every contrast pair
+passed — all three were perfectly legible — and eight reviewers reported
+across a dozen scenes that unavailable values were unreadable. They were not
+unreadable. They were indistinguishable, which the contrast table had no way
+to say.
+
+`TokenError::Distinction` reports a violation, naming each pair, its measured
+distance and its minimum.
+
 ## Elevation, layers, and density
 
 `elevation` describes the shadow each surface casts, `zIndex` fixes the paint

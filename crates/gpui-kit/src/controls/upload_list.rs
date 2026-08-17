@@ -41,6 +41,7 @@ use crate::display::badge::Tone;
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::progress::ProgressBar;
 use crate::display::status::StatusDot;
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text as foundation_text};
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -215,6 +216,7 @@ pub struct UploadList {
     on_retry: Option<FileHandler>,
     on_cancel: Option<FileHandler>,
     on_remove: Option<FileHandler>,
+    slots: Slots,
 }
 
 impl std::fmt::Debug for UploadList {
@@ -241,6 +243,7 @@ impl UploadList {
             on_retry: None,
             on_cancel: None,
             on_remove: None,
+            slots: Slots::default(),
         }
     }
 
@@ -488,7 +491,7 @@ impl Sizable for UploadList {
 }
 
 impl RenderOnce for UploadList {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let overall = self.overall();
         let overall_ident = self.ident.child("overall");
@@ -509,12 +512,14 @@ impl RenderOnce for UploadList {
             .collect();
 
         let body = if rows.is_empty() {
-            EmptyState::new(
-                self.ident.child("empty"),
-                cx.strings().text(StringKey::UploadEmpty),
-            )
-            .kind(EmptyKind::Unstarted)
-            .into_any_element()
+            self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                EmptyState::new(
+                    self.ident.child("empty"),
+                    cx.strings().text(StringKey::UploadEmpty),
+                )
+                .kind(EmptyKind::Unstarted)
+                .into_any_element()
+            })
         } else {
             div().column().w_full().children(rows).into_any_element()
         };
@@ -537,6 +542,14 @@ impl RenderOnce for UploadList {
                     .disabled(self.disabled)
                     .value(self.uploads.len().to_string()),
             )
+    }
+}
+
+impl Slotted for UploadList {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
     }
 }
 

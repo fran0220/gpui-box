@@ -34,9 +34,9 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TextTone, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Radius, Space, TextTone, Theme, TypeScale};
 
-use crate::foundation::{FocusRing, Ident, StyledExt, text};
+use crate::foundation::{CardVariant, FocusRing, Ident, StyledExt, text};
 use crate::strings::{ActiveStrings, StringKey};
 
 type ChangeHandler = Rc<dyn Fn(PermissionChange, &mut Window, &mut App)>;
@@ -358,8 +358,7 @@ impl RenderOnce for PermissionMatrix {
         div()
             .column()
             .w_full()
-            .radius(&theme, Radius::Card)
-            .frame(&theme, Surface::Panel, Elevation::Raised)
+            .card_surface(&theme, CardVariant::Elevated)
             .child(heading)
             .children(rows)
             .semantic_in(

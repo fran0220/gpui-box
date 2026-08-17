@@ -91,6 +91,26 @@ impl Color {
         }
         0.2126 * linear(self.red) + 0.7152 * linear(self.green) + 0.0722 * linear(self.blue)
     }
+
+    /// CIE L\*, perceptual lightness from 0 to 100.
+    ///
+    /// This is the measure two backgrounds are compared by, and the WCAG
+    /// ratio is not. That ratio adds 0.05 to both sides so that black text
+    /// stays measurable, which compresses everything near black into almost
+    /// no range at all: `#050505` against `#0a0a0a` reads 1.03:1, the same
+    /// answer it would give for two colors nobody could tell apart, and so
+    /// does a step that is plainly visible. L\* is uniform across the range,
+    /// so one threshold means the same thing on a dark theme and a light one.
+    pub fn lightness(self) -> f32 {
+        const EPSILON: f32 = 216.0 / 24389.0;
+        const KAPPA: f32 = 24389.0 / 27.0;
+        let luminance = self.luminance();
+        if luminance > EPSILON {
+            116.0 * luminance.cbrt() - 16.0
+        } else {
+            KAPPA * luminance
+        }
+    }
 }
 
 /// Composites `foreground` over an opaque `background`.

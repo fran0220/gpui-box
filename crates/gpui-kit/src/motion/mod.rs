@@ -52,7 +52,7 @@ mod transition;
 pub use animated::{Animated, Entrance};
 pub use busy::{Activity, breathe, breathing_dot, spin, sweep};
 pub use easing::{CubicBezier, Easing};
-pub use flip::{Flip, Flipped, Flipping, flip, shared_flip, tracked_ids};
+pub use flip::{Flip, Flipped, Flipping, Shape, Shaping, flip, shared_flip, tracked_ids};
 pub use gesture::{Flick, VELOCITY_WINDOW, Velocity, VelocityTracker, flick, rubber_band};
 pub use interpolate::Interpolate;
 pub use keyframes::{Keyframe, Keyframes};

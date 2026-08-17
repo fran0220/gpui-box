@@ -351,6 +351,15 @@ fn item(id: &'static str, label: &'static str, glyph: Icon) -> ToolbarItem {
 }
 
 fn toolbar(cx: &mut TestAppContext, limit: Option<usize>, with_menu: bool) -> Harness {
+    toolbar_at(cx, 600.0, limit, with_menu)
+}
+
+fn toolbar_at(
+    cx: &mut TestAppContext,
+    width: f32,
+    limit: Option<usize>,
+    with_menu: bool,
+) -> Harness {
     let slot: Rc<RefCell<Option<Entity<Menu>>>> = Rc::new(RefCell::new(None));
     let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
         let menu = slot
@@ -376,7 +385,7 @@ fn toolbar(cx: &mut TestAppContext, limit: Option<usize>, with_menu: bool) -> Ha
         if with_menu {
             bar = bar.overflow_menu(menu);
         }
-        div().w(px(600.0)).child(bar).into_any_element()
+        div().w(px(width)).child(bar).into_any_element()
     });
     harness.snapshot();
     harness
@@ -423,6 +432,57 @@ fn with_nowhere_to_move_them_every_action_stays_on_the_bar(cx: &mut TestAppConte
     assert!(harness.node("editor.toolbar.editor.share").is_some());
     assert!(harness.node("editor.toolbar.editor.publish").is_some());
     assert!(harness.node("editor.toolbar.overflow").is_none());
+}
+
+/// With no declared cut, the bar draws everything on the frame that produces
+/// the measurements and cuts on the next one. The items are moved into the
+/// menu, never dropped, which is what the trigger's count has to agree with.
+#[gpui::test]
+fn a_bar_with_no_room_measures_its_own_cut(cx: &mut TestAppContext) {
+    let mut harness = toolbar_at(cx, 96.0, None, true);
+
+    harness.frame();
+    harness.snapshot();
+
+    let trigger = harness
+        .node("editor.toolbar.overflow")
+        .expect("a bar too narrow for its actions publishes a trigger without being told to");
+    let hidden: usize = trigger
+        .value
+        .as_deref()
+        .expect("the trigger says how many actions it stands for")
+        .parse()
+        .expect("a count");
+    assert!(hidden > 0, "a 96px bar cannot hold four controls");
+
+    let drawn = [
+        "editor.undo",
+        "editor.redo",
+        "editor.share",
+        "editor.publish",
+    ]
+    .into_iter()
+    .filter(|id| harness.node(&format!("editor.toolbar.{id}")).is_some())
+    .count();
+    assert_eq!(
+        drawn + hidden,
+        4,
+        "every action is either drawn or in the menu, and never both or neither"
+    );
+}
+
+#[gpui::test]
+fn a_bar_with_room_to_spare_cuts_nothing(cx: &mut TestAppContext) {
+    let mut harness = toolbar_at(cx, 900.0, None, true);
+
+    harness.frame();
+    harness.snapshot();
+
+    assert!(
+        harness.node("editor.toolbar.overflow").is_none(),
+        "a bar that fits publishes no trigger"
+    );
+    assert!(harness.node("editor.toolbar.editor.publish").is_some());
 }
 
 #[gpui::test]

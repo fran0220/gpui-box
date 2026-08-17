@@ -1,18 +1,27 @@
 //! A horizontal bar of grouped actions, with the rest behind an overflow menu.
 //!
-//! # Why overflow is declared, not measured
+//! # Where the cut comes from
 //!
 //! A truthful overflow needs to know how wide every item is before it decides
-//! which ones fit. GPUI measures during layout, which happens after the
-//! element tree has been built, and a toolbar child is an `AnyElement` that
-//! can be consumed exactly once — so a builder cannot measure a child and then
-//! still move it into a menu. Guessing at widths would produce a bar that
-//! claims to have dropped items it in fact drew, which is worse than not
-//! overflowing at all.
+//! which ones fit, and GPUI produces that during layout, after the element
+//! tree has been built. A builder cannot measure a child and then still move
+//! it into a menu, because a child is an `AnyElement` and is consumed once.
 //!
-//! So the caller declares the cut with [`Toolbar::overflow_after`], and the
-//! toolbar guarantees the part it can: an item past the cut is **moved**, never
-//! dropped. It becomes a row in the overflow [`Menu`],
+//! So the bar measures the frame it drew and cuts the next one. Each item
+//! records its own width under its business id, the bar records its own, and
+//! the widths survive the rebuild because they are keyed by identity rather
+//! than held in the builder. The first frame draws every item — that is what
+//! produces the measurements — and the measurement asks for the frame that
+//! uses them, so the settled state is the next frame rather than the next
+//! interaction. The arithmetic runs over remembered widths rather than
+//! current ones, so an item that moved into the menu cannot make room for
+//! itself and start oscillating.
+//!
+//! [`Toolbar::overflow_after`] still exists and still wins, for the caller who
+//! knows the answer and does not want to spend a frame arriving at it.
+//!
+//! Either way the bar guarantees the part that matters: an item past the cut
+//! is **moved**, never dropped. It becomes a row in the overflow [`Menu`],
 //! keeping its identity, its label, and its refusal, and the trigger publishes
 //! how many items went there. With no menu to move them into, every item is
 //! drawn inline, because losing an action is never the better failure.
@@ -27,6 +36,7 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Space, Surface, Theme}
 
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{Ident, Sizable, StyledExt};
+use crate::layout::measure;
 use crate::overlay::{Menu, MenuItem};
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -180,8 +190,7 @@ impl Toolbar {
     }
 
     /// Keeps the first `count` items in the bar and moves the rest into the
-    /// overflow menu. See the module documentation for why the cut is declared
-    /// rather than measured.
+    /// overflow menu, instead of the measured cut.
     pub fn overflow_after(mut self, count: usize) -> Self {
         self.overflow_after = Some(count);
         self
@@ -206,13 +215,119 @@ impl Toolbar {
             .sum()
     }
 
+    /// Every item id in bar order, which is the order the cut walks.
+    fn item_ids(&self) -> Vec<SharedString> {
+        self.slots
+            .iter()
+            .filter_map(|slot| match slot {
+                Slot::Group { items, .. } => Some(items.iter().map(|item| item.id.clone())),
+                Slot::Spacer => None,
+            })
+            .flatten()
+            .collect()
+    }
+
     /// Where the cut falls, which is nowhere when there is no menu to move
     /// anything into.
-    fn cut(&self) -> usize {
-        match (self.overflow_after, self.overflow_menu.is_some()) {
-            (Some(cut), true) => cut,
-            _ => usize::MAX,
+    fn cut(&self, theme: &Theme, cx: &mut App) -> usize {
+        if self.overflow_menu.is_none() {
+            return usize::MAX;
         }
+        if let Some(declared) = self.overflow_after {
+            return declared;
+        }
+        self.measured_cut(theme, cx).unwrap_or(usize::MAX)
+    }
+
+    /// The largest number of items whose remembered widths fit the remembered
+    /// width of the bar, or `None` while anything it needs is still unknown.
+    fn measured_cut(&self, theme: &Theme, cx: &mut App) -> Option<usize> {
+        let bar = f32::from(
+            measure::cell(&self.ident.semantic_id(), cx)
+                .get()
+                .size
+                .width,
+        );
+        if bar <= 0.0 {
+            return None;
+        }
+
+        let ids = self.item_ids();
+        let mut widths = Vec::with_capacity(ids.len());
+        for id in &ids {
+            let width = f32::from(
+                measure::cell(&self.ident.child(id.as_ref()).semantic_id(), cx)
+                    .get()
+                    .size
+                    .width,
+            );
+            // An item nobody has drawn yet has no width, and a cut computed
+            // without it would hide the item that would have supplied it.
+            if width <= 0.0 {
+                return None;
+            }
+            widths.push(width);
+        }
+
+        let trigger = f32::from(
+            measure::cell(&self.ident.child("overflow").semantic_id(), cx)
+                .get()
+                .size
+                .width,
+        );
+        // Before the trigger has ever been drawn, reserve a control's worth of
+        // room for it. Overestimating the reservation cuts one item early for
+        // one frame; underestimating it draws a bar that does not fit.
+        let trigger = if trigger > 0.0 {
+            trigger
+        } else {
+            theme.control.get(self.size).height
+        };
+
+        let gap = theme.space(Space::Sm);
+        let inner_gap = theme.space(Space::Xs);
+        // The measured row already sits inside the bar's padding.
+        let available = bar;
+
+        let group_sizes = self.group_sizes();
+        let mut taken = 0.0;
+        let mut drawn = 0usize;
+        let mut index = 0usize;
+        for (group, count) in group_sizes.iter().copied().enumerate() {
+            for position in 0..count {
+                let width = widths[index];
+                let leading = if index == 0 {
+                    0.0
+                } else if position == 0 {
+                    // A new group brings the rule before it and the gap on
+                    // either side of it.
+                    2.0 * gap + theme.borders.hairline
+                } else {
+                    inner_gap
+                };
+                let rest = index + 1 < widths.len();
+                let reserved = if rest { gap + trigger } else { 0.0 };
+                if taken + leading + width + reserved > available {
+                    return Some(drawn);
+                }
+                taken += leading + width;
+                drawn += 1;
+                index += 1;
+            }
+            let _ = group;
+        }
+        Some(drawn)
+    }
+
+    /// How many items each group holds, in bar order.
+    fn group_sizes(&self) -> Vec<usize> {
+        self.slots
+            .iter()
+            .filter_map(|slot| match slot {
+                Slot::Group { items, .. } => Some(items.len()),
+                Slot::Spacer => None,
+            })
+            .collect()
     }
 }
 
@@ -228,8 +343,10 @@ impl RenderOnce for Toolbar {
         let theme = cx.theme().clone();
         let direction = cx.layout_direction();
         let total = self.item_count();
-        let cut = self.cut();
+        let cut = self.cut(&theme, cx);
         let ident = self.ident.clone();
+        let bar_extent = measure::cell(&ident.semantic_id(), cx);
+        let trigger_extent = measure::cell(&ident.child("overflow").semantic_id(), cx);
 
         let mut drawn: Vec<AnyElement> = Vec::new();
         let mut overflowed: Vec<MenuItem> = Vec::new();
@@ -249,7 +366,23 @@ impl RenderOnce for Toolbar {
                         if index >= cut {
                             overflowed.push(item.menu_row());
                         } else {
-                            inline.push(item.content);
+                            // Each item records its own width under its
+                            // business id, which is what the next frame's cut
+                            // is computed from.
+                            let extent =
+                                measure::cell(&ident.child(item.id.as_ref()).semantic_id(), cx);
+                            inline.push(
+                                div()
+                                    .flex()
+                                    .flex_none()
+                                    .on_children_prepainted(move |bounds, window, _| {
+                                        if let Some(first) = bounds.first() {
+                                            measure::record(&extent, *first, window);
+                                        }
+                                    })
+                                    .child(item.content)
+                                    .into_any_element(),
+                            );
                         }
                         index += 1;
                     }
@@ -287,20 +420,25 @@ impl RenderOnce for Toolbar {
         });
         let overflow_ident = ident.child("overflow");
 
-        div()
-            .id(ident.element_id())
+        // The row is a full-width child of the bar rather than the bar itself,
+        // so what gets measured is the room the items were given. Reading the
+        // items' own union instead would report what they took, which is the
+        // number that is already too large when they do not fit.
+        let row = div()
             .row_reading(direction)
             .items_center()
             .w_full()
             .gap(px(theme.space(Space::Sm)))
-            .px(px(theme.space(Space::Sm)))
-            .py(px(theme.space(Space::Xs)))
-            .frame(&theme, Surface::Panel, Elevation::Raised)
             .children(drawn)
             .children(overflow.map(|menu| {
                 div()
                     .flex()
                     .flex_none()
+                    .on_children_prepainted(move |bounds, window, _| {
+                        if let Some(first) = bounds.first() {
+                            measure::record(&trigger_extent, *first, window);
+                        }
+                    })
                     .child(menu)
                     // The trigger says how many actions moved here, so a
                     // snapshot shows that they were relocated and not lost.
@@ -311,7 +449,20 @@ impl RenderOnce for Toolbar {
                             .text(cx.strings().text(StringKey::MoreActions))
                             .value(hidden.to_string()),
                     )
-            }))
+            }));
+
+        div()
+            .on_children_prepainted(move |bounds, window, _| {
+                if let Some(first) = bounds.first() {
+                    measure::record(&bar_extent, *first, window);
+                }
+            })
+            .id(ident.element_id())
+            .w_full()
+            .px(px(theme.space(Space::Sm)))
+            .py(px(theme.space(Space::Xs)))
+            .frame(&theme, Surface::Panel, Elevation::Raised)
+            .child(row)
             .semantic_in(cx, {
                 let mut spec =
                     NodeSpec::new(ident.semantic_id(), Role::Toolbar).value(total.to_string());

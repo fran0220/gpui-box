@@ -687,32 +687,153 @@ fn identity_tint(theme: &Theme, path: &str) -> gpui::Hsla {
     theme.palette_color(path).unwrap_or(theme.colors.accent)
 }
 
+/// Every region, variant and state a card can hold, at the sizes a caller
+/// actually builds them: a titled list, the three variants side by side, a
+/// card that is one action, and a card holding prose.
 fn card(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
+    let label = |content: &'static str| {
+        div()
+            .flex_1()
+            .min_w_0()
+            .child(crate::foundation::text(&theme, TypeScale::Label, content))
+    };
+    let caption = |content: &'static str| {
+        crate::foundation::text(&theme, TypeScale::Caption, content)
+            .text_tone(&theme, TextTone::Muted)
+    };
+    let column = |card: Card| div().flex_1().min_w_0().child(card);
+
     stack(&theme)
         .child(
             Card::new()
                 .id("scene.card")
+                .header(
+                    CardHeader::new("Workspace services")
+                        .subtitle("Four checked a moment ago")
+                        .action(|_window, _cx| {
+                            Button::new("scene.card.refresh")
+                                .label("Refresh")
+                                .secondary()
+                                .small()
+                                .into_any_element()
+                        }),
+                )
+                .divided(true)
                 .child(
                     ListRow::new()
                         .id("scene.card.runtime")
-                        .child(div().flex_1().child(crate::foundation::text(
-                            &theme,
-                            TypeScale::Label,
-                            "Native runtime",
-                        )))
-                        .child(Badge::new("Ready").success()),
+                        .leading(StatusDot::new(Tone::Success))
+                        .child(label("Native runtime"))
+                        .trailing(Badge::new("Ready").success()),
                 )
                 .child(
                     ListRow::new()
                         .id("scene.card.catalog")
-                        .child(div().flex_1().child(crate::foundation::text(
+                        .leading(StatusDot::new(Tone::Warning))
+                        .child(label("Model catalog"))
+                        .trailing(Badge::new("Stale").warning()),
+                )
+                .child(
+                    ListRow::new()
+                        .id("scene.card.index")
+                        .selected(true)
+                        .leading(StatusDot::new(Tone::Success))
+                        .child(label("Search index"))
+                        .trailing(Badge::new("Ready").success()),
+                )
+                .child(
+                    ListRow::new()
+                        .id("scene.card.telemetry")
+                        .disabled(true)
+                        .leading(StatusDot::new(Tone::Neutral))
+                        .child(label("Telemetry export"))
+                        .trailing(Badge::new("Off")),
+                )
+                .footer(|_window, cx| {
+                    let theme = cx.theme().clone();
+                    div()
+                        .row()
+                        .w_full()
+                        .gap(px(theme.spacing.sm))
+                        .child(
+                            Button::new("scene.card.restart")
+                                .label("Restart all")
+                                .secondary()
+                                .small(),
+                        )
+                        .child(div().flex_1())
+                        .child(
+                            crate::foundation::text(&theme, TypeScale::Caption, "4 services")
+                                .text_tone(&theme, TextTone::Faint),
+                        )
+                        .into_any_element()
+                }),
+        )
+        .child(
+            row(&theme)
+                .items_start()
+                .child(column(
+                    Card::new()
+                        .id("scene.card.elevated")
+                        .variant(CardVariant::Elevated)
+                        .padding(Space::Lg)
+                        .child(crate::foundation::text(
                             &theme,
-                            TypeScale::Label,
-                            "Model catalog",
-                        )))
-                        .child(Badge::new("Stale").warning()),
-                ),
+                            TypeScale::Strong,
+                            "Elevated",
+                        ))
+                        .child(caption("A shadow. One card on a page.")),
+                ))
+                .child(column(
+                    Card::new()
+                        .id("scene.card.outlined")
+                        .variant(CardVariant::Outlined)
+                        .padding(Space::Lg)
+                        .child(crate::foundation::text(
+                            &theme,
+                            TypeScale::Strong,
+                            "Outlined",
+                        ))
+                        .child(caption("A hairline. A grid of them.")),
+                ))
+                .child(column(
+                    Card::new()
+                        .id("scene.card.ghost")
+                        .variant(CardVariant::Ghost)
+                        .padding(Space::Lg)
+                        .child(crate::foundation::text(&theme, TypeScale::Strong, "Ghost"))
+                        .child(caption("Neither. Structure without a plane.")),
+                )),
+        )
+        .child(
+            row(&theme)
+                .items_start()
+                .child(column(
+                    Card::new()
+                        .id("scene.card.actionable")
+                        .padding(Space::Lg)
+                        .on_click(|_window, _cx| {})
+                        .header(CardHeader::new("Open the run").subtitle("The whole card acts"))
+                        .child(caption("Enter and space reach it from the keyboard.")),
+                ))
+                .child(column(
+                    Card::new()
+                        .id("scene.card.chosen")
+                        .padding(Space::Lg)
+                        .selected(true)
+                        .header(CardHeader::new("Selected").subtitle("An inset ring"))
+                        .child(caption("The ring is inset, so choosing moves nothing.")),
+                ))
+                .child(column(
+                    Card::new()
+                        .id("scene.card.unavailable")
+                        .padding(Space::Lg)
+                        .disabled(true)
+                        .on_click(|_window, _cx| {})
+                        .header(CardHeader::new("Unavailable").subtitle("Says so, and stays read"))
+                        .child(caption("A disabled card installs no handler at all.")),
+                )),
         )
         .into_any_element()
 }
@@ -2767,7 +2888,9 @@ fn cascader(window: &mut Window, cx: &mut App) -> AnyElement {
             &theme,
             "caller-owned hierarchy and value; the open path belongs only to the view",
         ))
-        .child(cascader)
+        // The trigger is given the width its own popup has, so the scene does
+        // not show a control that disagrees with the surface it opens.
+        .child(div().w(px(380.0)).child(cascader))
         .into_any_element()
 }
 
@@ -5612,7 +5735,7 @@ fn ide_shell(_window: &mut Window, cx: &mut App) -> AnyElement {
     div()
         .column()
         .w(px(900.0))
-        .h(px(560.0))
+        .h(px(940.0))
         .bg(theme.colors.canvas)
         .text_color(theme.colors.text)
         .font_family(theme.typography.sans.clone())
@@ -5657,12 +5780,14 @@ fn ide_shell(_window: &mut Window, cx: &mut App) -> AnyElement {
                     )
                     .panel(
                         DockRegion::Bottom,
+                        // No badge: a panel that cannot list problems cannot
+                        // count them either, and one unavailable reason is the
+                        // whole claim. Gluing "there is nothing here" onto it
+                        // would report Empty and Unavailable at once.
                         DockPanel::new("problems", "Problems")
                             .icon(Icon::Danger)
-                            .badge("3")
                             .unavailable(
-                                "The language server is not running, so problems cannot be \
-                                 listed. Nothing here is out of date; there is nothing here.",
+                                "The language server is not running, so problems cannot be listed.",
                             ),
                     )
                     // The refused panel is the one on top, because a refusal

@@ -1477,3 +1477,110 @@ fn a_row_wave_is_capped_however_long_the_list_is(_cx: &mut TestAppContext) {
         );
     }
 }
+
+/// A box that is a row in one state and a card in the other.
+fn shape_scene(cx: &mut TestAppContext, opened: Rc<Cell<bool>>) -> Harness {
+    Harness::new(cx, gpui_kit::install, move |window, cx| {
+        let theme = cx.theme().clone();
+        let handle = flip("detail", cx);
+        let target = if opened.get() {
+            Shape::surface(theme.colors.panel).radius(12.0)
+        } else {
+            Shape::surface(theme.colors.canvas).radius(0.0)
+        };
+        let shape = handle.shape(target, window, cx);
+        div()
+            .w(px(200.0))
+            .h(px(40.0))
+            .shaped(shape)
+            .semantic_in(cx, NodeSpec::new("detail", Role::Group))
+            .flip(&handle, window, cx)
+            .into_any_element()
+    })
+}
+
+#[gpui::test]
+fn a_shape_change_is_travelled_rather_than_cut(cx: &mut TestAppContext) {
+    let opened = Rc::new(Cell::new(false));
+    let mut harness = shape_scene(cx, opened.clone());
+
+    let closed = harness
+        .update(|_, cx| flip("detail", cx).drawn_shape())
+        .expect("a shape was asked for");
+    assert_eq!(closed.radius, px(0.0));
+
+    harness.update({
+        let opened = opened.clone();
+        move |_, cx| {
+            opened.set(true);
+            cx.refresh_windows();
+        }
+    });
+    harness.frame();
+    harness.advance(Duration::from_millis(16));
+    harness.frame();
+
+    let travelling = harness
+        .update(|_, cx| flip("detail", cx).drawn_shape())
+        .expect("a shape in flight");
+    assert!(
+        travelling.radius > px(0.0) && travelling.radius < px(12.0),
+        "the radius is between the two forms, not at one of them: {:?}",
+        travelling.radius
+    );
+
+    harness.advance(Duration::from_millis(2000));
+    harness.frame();
+    harness.frame();
+    let settled = harness
+        .update(|_, cx| flip("detail", cx).drawn_shape())
+        .expect("a settled shape");
+    assert!(
+        (f32::from(settled.radius) - 12.0).abs() < 0.5,
+        "the shape arrives at the one that was asked for: {:?}",
+        settled.radius
+    );
+}
+
+#[gpui::test]
+fn reduced_motion_is_at_the_new_shape_from_the_first_frame(cx: &mut TestAppContext) {
+    let opened = Rc::new(Cell::new(false));
+    let mut harness = Harness::new(cx, gpui_kit::install, {
+        let opened = opened.clone();
+        move |window, cx| {
+            cx.set_reduce_motion(true);
+            let theme = cx.theme().clone();
+            let handle = flip("detail", cx);
+            let target = if opened.get() {
+                Shape::surface(theme.colors.panel).radius(12.0)
+            } else {
+                Shape::surface(theme.colors.canvas).radius(0.0)
+            };
+            let shape = handle.shape(target, window, cx);
+            div()
+                .w(px(200.0))
+                .h(px(40.0))
+                .shaped(shape)
+                .semantic_in(cx, NodeSpec::new("detail", Role::Group))
+                .into_any_element()
+        }
+    });
+
+    harness.update({
+        let opened = opened.clone();
+        move |_, cx| {
+            opened.set(true);
+            cx.refresh_windows();
+        }
+    });
+    harness.frame();
+
+    let shape = harness
+        .update(|_, cx| flip("detail", cx).drawn_shape())
+        .expect("a shape");
+    assert_eq!(
+        shape.radius,
+        px(12.0),
+        "reduced motion never draws an intermediate form"
+    );
+}

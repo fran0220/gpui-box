@@ -60,6 +60,7 @@ use crate::controls::input::{Cancel, Submit, TextInput};
 use crate::data::table::{Align, Cell, ColumnWidth, SortDirection};
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
 use crate::interaction::dnd::{
     self, DragItem, DropAxis, DropIntent, DropPosition, RowTarget, SurfaceDrag,
@@ -424,6 +425,7 @@ pub struct DataGrid {
     loading: bool,
     failure: Option<SharedString>,
     empty: Option<EmptyState>,
+    slots: Slots,
     on_sort: Option<SortHandler>,
     on_select: Option<SelectHandler>,
     on_resize: Option<ResizeHandler>,
@@ -483,6 +485,7 @@ impl DataGrid {
             loading: false,
             failure: None,
             empty: None,
+            slots: Slots::default(),
             on_sort: None,
             on_select: None,
             on_resize: None,
@@ -597,6 +600,10 @@ impl DataGrid {
     }
 
     /// What to show when the query succeeded and returned nothing.
+    ///
+    /// This is the typed form of the [`slot::EMPTY`] slot, kept because an
+    /// [`EmptyState`] says which of empty, unstarted, unavailable and failed
+    /// holds and an arbitrary element does not. A filled slot wins over it.
     pub fn empty(mut self, empty: EmptyState) -> Self {
         self.empty = Some(empty);
         self
@@ -824,6 +831,7 @@ impl RenderOnce for DataGrid {
             &drawn,
             editor.clone(),
             vacancy,
+            window,
             cx,
         );
 
@@ -1498,10 +1506,11 @@ impl DataGrid {
         drawn: &Drawn,
         editor: Option<Entity<TextInput>>,
         vacancy: Option<EmptyState>,
+        window: &mut Window,
         cx: &mut App,
     ) -> AnyElement {
         if self.count == 0 {
-            return self.vacant(theme, row_height, vacancy, cx);
+            return self.vacant(theme, row_height, vacancy, window, cx);
         }
 
         let ident = self.ident.clone();
@@ -1578,8 +1587,17 @@ impl DataGrid {
         theme: &Theme,
         row_height: f32,
         vacancy: Option<EmptyState>,
+        window: &mut Window,
         cx: &mut App,
     ) -> AnyElement {
+        if let Some(replacement) = self
+            .slots
+            .render(slot::LOADING, window, cx)
+            .filter(|_| self.loading)
+        {
+            return replacement;
+        }
+
         if self.loading {
             let ident = self.ident.child("loading");
             return div()
@@ -1613,6 +1631,9 @@ impl DataGrid {
         }
 
         if let Some(failure) = self.failure.clone() {
+            if let Some(replacement) = self.slots.render(slot::FAILED, window, cx) {
+                return replacement;
+            }
             return EmptyState::new(
                 self.ident.child("empty"),
                 cx.strings().text(StringKey::GridLoadFailed),
@@ -1620,6 +1641,10 @@ impl DataGrid {
             .kind(EmptyKind::Failed)
             .detail(failure)
             .into_any_element();
+        }
+
+        if let Some(replacement) = self.slots.render(slot::EMPTY, window, cx) {
+            return replacement;
         }
 
         match vacancy {
@@ -2402,6 +2427,14 @@ impl RenderOnce for BulkBar {
                 .value(self.count.to_string()),
         )
         .into_any_element()
+    }
+}
+
+impl Slotted for DataGrid {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
     }
 }
 

@@ -13,15 +13,15 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{
-    ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TextTone, TypeScale,
-};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TextTone, TypeScale};
 
 use crate::agent::server_list::{Offering, OfferingKind};
 use crate::display::badge::{Badge, Tone};
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::status::StatusDot;
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
+use crate::foundation::{
+    CardVariant, Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text,
+};
 use crate::strings::{ActiveStrings, StringKey};
 
 type ActivateHandler = Rc<dyn Fn(OfferingIdentity, &mut Window, &mut App)>;
@@ -246,8 +246,7 @@ impl RenderOnce for OfferingCatalog {
             .w_full()
             .gap_token(&theme, Space::Sm)
             .p_token(&theme, Space::Sm)
-            .radius(&theme, Radius::Card)
-            .frame(&theme, Surface::Panel, Elevation::Raised)
+            .card_surface(&theme, CardVariant::Elevated)
             .children(statuses)
             .child(body)
             .semantic_in(
