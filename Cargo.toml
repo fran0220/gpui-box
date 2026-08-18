@@ -76,7 +76,7 @@ accesskit = { version = "0.24.0", features = ["enumn"] }
 # state only: it opens no pty, spawns nothing, and reads no environment.
 alacritty_terminal = { version = "0.26", default-features = false }
 accesskit_macos = "0.26.0"
-accesskit_unix = "0.21.0"
+accesskit_unix = "0.22.1"
 accesskit_windows = "0.33.1"
 anyhow = "1.0.86"
 ashpd = { version = "0.13", default-features = false, features = [
