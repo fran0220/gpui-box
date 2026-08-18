@@ -1,7 +1,7 @@
 //! Documents, code, and streams a reader reads.
 
 use super::support::*;
-#[cfg(feature = "terminal")]
+#[cfg(all(feature = "terminal", not(target_family = "wasm")))]
 use crate::content::{CellSide, Emulator, GridSnapshot, SelectionKind, Terminal, TerminalState};
 
 /// The complete shell contract: every state remains visibly distinct, and
@@ -561,7 +561,7 @@ pub(super) fn transport(_window: &mut Window, cx: &mut App) -> AnyElement {
 ///
 /// The emulator is rebuilt from a fixed byte script each frame, so the picture
 /// is a function of the bytes and the measured grid and of nothing else.
-#[cfg(feature = "terminal")]
+#[cfg(all(feature = "terminal", not(target_family = "wasm")))]
 pub(super) fn terminal(_window: &mut Window, cx: &mut App) -> AnyElement {
     /// A session's worth of output, chosen so every branch of the painter has
     /// something to paint.

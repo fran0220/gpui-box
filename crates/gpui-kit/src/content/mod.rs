@@ -26,7 +26,7 @@ pub mod image_viewer;
 pub mod log_stream;
 pub mod markdown;
 pub mod message_list;
-#[cfg(feature = "terminal")]
+#[cfg(all(feature = "terminal", not(target_family = "wasm")))]
 pub mod terminal;
 pub mod transport;
 
@@ -48,7 +48,7 @@ pub use markdown::{
 pub use message_list::{
     Attachment, DeliveryState, Message, MessageBody, MessageList, Reaction, streaming_since,
 };
-#[cfg(feature = "terminal")]
+#[cfg(all(feature = "terminal", not(target_family = "wasm")))]
 pub use terminal::{
     CellHit, CellSide, CellSnapshot, CursorSnapshot, Emulator, GridGeometry, GridPoint, GridSize,
     GridSnapshot, SelectionKind, Terminal, TerminalEvent, TerminalState,

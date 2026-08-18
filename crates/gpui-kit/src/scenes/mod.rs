@@ -48,7 +48,7 @@ use agent::{
 };
 use canvas::node_graph;
 use compositions::{motion_flip, motion_state, reading_direction};
-#[cfg(feature = "terminal")]
+#[cfg(all(feature = "terminal", not(target_family = "wasm")))]
 use content::terminal;
 use content::{
     agent_document, browser_panel, code_view, conversation, diff_view, image_viewer, log_stream,
@@ -771,7 +771,7 @@ pub fn catalog() -> Vec<Scene> {
             shows: Shows::Subjects(&["DiagnosticsList"]),
         },
     ];
-    #[cfg(feature = "terminal")]
+    #[cfg(all(feature = "terminal", not(target_family = "wasm")))]
     scenes.push(Scene {
         name: "terminal",
         build: terminal,
