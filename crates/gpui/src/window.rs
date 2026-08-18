@@ -4373,7 +4373,7 @@ impl Window {
     /// unblurred backdrop. Callers should keep a translucent fill over it.
     /// Content painted AFTER this call composites on top of the blur.
     ///
-    /// This is [`Window::paint_backdrop_glass`] with [`GlassMaterial::FROSTED`]
+    /// This is [`Window::paint_backdrop_glass`] with [`GlassMaterial::frosted`]
     /// and no lobes: the backdrop is blurred and nothing about it is bent,
     /// split or lit.
     pub fn paint_backdrop_blur(

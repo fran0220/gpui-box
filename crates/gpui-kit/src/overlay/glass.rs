@@ -10,7 +10,7 @@
 //! # One layer, in one order
 //!
 //! The whole subtree paints inside a single scene layer, which is the reason
-//! [`BackdropLayer`] is an element and not a styled `div`. Paint order is
+//! `BackdropLayer` is an element and not a styled `div`. Paint order is
 //! per-primitive otherwise, so a repaint elsewhere in the frame can reorder
 //! the surface's own quads underneath the blur — a divider or a border is then
 //! snapshotted and blurred away, intermittently, in a way no test reproduces.

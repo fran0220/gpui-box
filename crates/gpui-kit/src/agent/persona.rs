@@ -7,7 +7,7 @@
 //! composition, motion, accessibility fallbacks, and semantic targets.
 //!
 //! Voice input is deliberately a bounded scalar snapshot, never a microphone
-//! or recognizer. Dialogue reuses [`Markdown`](crate::content::Markdown), so it
+//! or recognizer. Dialogue reuses [`Markdown`], so it
 //! executes no HTML, opens no link, and fetches no image.
 
 use std::fmt;

@@ -230,7 +230,7 @@ pub enum SchemaKind {
     /// Two days, edited with [`crate::datetime::RangePicker`] when a date
     /// adapter is present.
     DateRange,
-    /// Paths the host already holds, collected through [`crate::controls::Dropzone`].
+    /// Paths the host already holds, collected through [`Dropzone`].
     Files {
         max: Option<usize>,
     },

@@ -72,7 +72,7 @@ impl SidebarItem {
         self
     }
 
-    /// A resource path or URI the asset source can resolve, same as [`Avatar::image`].
+    /// A resource path or URI the asset source can resolve, same as [`Avatar::image`](crate::display::avatar::Avatar::image).
     pub fn image(mut self, path: impl Into<SharedString>) -> Self {
         self.leading = Some(SidebarLeading::Image(path.into()));
         self

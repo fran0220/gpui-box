@@ -1,6 +1,6 @@
 //! A surface that shows what is behind it, out of focus.
 //!
-//! [`Frost`] is [`Glass`](super::Glass) with [`GlassPreset::Frosted`]: the
+//! [`Frost`] is [`Glass`] with [`GlassPreset::Frosted`]: the
 //! pixels underneath are blurred and the surface colour is laid over the blur
 //! at `effect.glassAlpha`, and nothing about the backdrop is bent, split into
 //! colour or lit. It is the material to reach for when a surface must look the
