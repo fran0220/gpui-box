@@ -64,7 +64,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "agent-roster"
+        "agent-avatar"
       ]
     },
     {
@@ -86,7 +86,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "agent-roster"
+        "agent-avatar"
       ]
     },
     {
@@ -226,7 +226,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "agent-run-canvas"
+        "agent-run-issues"
       ]
     },
     {
@@ -373,7 +373,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "content"
+        "avatar"
       ]
     },
     {
@@ -1172,7 +1172,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "content"
+        "divider"
       ]
     },
     {
@@ -1308,7 +1308,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "content"
+        "empty-state"
       ]
     },
     {
@@ -2501,7 +2501,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "content"
+        "progress-bar"
       ]
     },
     {
@@ -3278,7 +3278,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "content"
+        "tag"
       ]
     },
     {
@@ -10406,24 +10406,64 @@
       "example": "fn actions(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_actions(window, cx);\n    let split = cx.global::<SceneActions>().split.clone();\n    let theme = cx.theme().clone();\n\n    stack(&theme)\n        .w(px(560.0))\n        .h(px(360.0))\n        .child(\n            row(&theme)\n                .child(\n                    IconButton::new(\"scene.actions.copy\", Icon::Copy, \"Copy run id\")\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    IconButton::new(\"scene.actions.rename\", Icon::Pen, \"Rename run\")\n                        .secondary()\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    IconButton::new(\"scene.actions.refresh\", Icon::Refresh, \"Refresh\")\n                        .secondary()\n                        .loading(true)\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    IconButton::new(\"scene.actions.delete\", Icon::Trash, \"Delete run\")\n                        .danger()\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    IconButton::new(\"scene.actions.archive\", Icon::Archive, \"Archive run\")\n                        .secondary()\n                        .disabled(true)\n                        .on_click(|_, _| {}),\n                ),\n        )\n        .child(\n            row(&theme).child(\n                ButtonGroup::new(\"scene.actions.range\")\n                    .children([\n                        Button::new(\"scene.actions.range.day\")\n                            .label(\"Day\")\n                            .secondary()\n                            .on_click(|_, _| {}),\n                        Button::new(\"scene.actions.range.week\")\n                            .label(\"Week\")\n                            .secondary()\n                            .selected(true)\n                            .on_click(|_, _| {}),\n                        Button::new(\"scene.actions.range.month\")\n                            .label(\"Month\")\n                            .secondary()\n                            .on_click(|_, _| {}),\n                    ])\n                    .small(),\n            ),\n        )\n        .child(row(&theme).child(split))\n        .into_any_element()\n}"
     },
     {
-      "name": "content",
-      "capture": "cargo run -p xtask -- headless capture content",
+      "name": "progress-bar",
+      "capture": "cargo run -p xtask -- headless capture progress-bar",
       "kind": "exhibit",
       "subjects": [
-        "Avatar",
-        "Divider",
-        "EmptyState",
-        "ProgressBar",
+        "ProgressBar"
+      ],
+      "uses": [
+        "ProgressBar"
+      ],
+      "example": "fn progress_bar(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(420.0))\n        .child(caption(&theme, \"A count the host reported\"))\n        .child(\n            ProgressBar::new(\"scene.progress-bar.counted\")\n                .label(\"Indexing workspace\")\n                .count(3, 12),\n        )\n        .child(\n            ProgressBar::new(\"scene.progress-bar.nearly\")\n                .label(\"Uploading\")\n                .count(11, 12),\n        )\n        .child(caption(\n            &theme,\n            \"No count yet. The bar says it is working, and does not invent a fraction\",\n        ))\n        .child(ProgressBar::new(\"scene.progress-bar.unknown\").label(\"Contacting host\"))\n        .into_any_element()\n}"
+    },
+    {
+      "name": "divider",
+      "capture": "cargo run -p xtask -- headless capture divider",
+      "kind": "exhibit",
+      "subjects": [
+        "Divider"
+      ],
+      "uses": [
+        "Divider"
+      ],
+      "example": "fn divider(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(420.0))\n        .child(caption(&theme, \"Plain\"))\n        .child(Divider::new().id(\"scene.divider.plain\"))\n        .child(caption(&theme, \"Labelled, which names the group below it\"))\n        .child(Divider::new().id(\"scene.divider.labelled\").label(\"Filters\"))\n        .child(Divider::new().id(\"scene.divider.archive\").label(\"Archive\"))\n        .into_any_element()\n}"
+    },
+    {
+      "name": "tag",
+      "capture": "cargo run -p xtask -- headless capture tag",
+      "kind": "exhibit",
+      "subjects": [
         "Tag"
       ],
       "uses": [
-        "Avatar",
-        "Divider",
-        "EmptyState",
-        "ProgressBar",
         "Tag"
       ],
-      "example": "fn content(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    div()\n        .flex()\n        .flex_col()\n        .gap(px(theme.space(Space::Lg)))\n        .p(px(theme.space(Space::Lg)))\n        .w(px(420.0))\n        .child(\n            ProgressBar::new(\"scene.content.upload\")\n                .label(\"Indexing workspace\")\n                .count(3, 12),\n        )\n        .child(ProgressBar::new(\"scene.content.unknown\").label(\"Contacting host\"))\n        .child(Divider::new().id(\"scene.content.rule\").label(\"Filters\"))\n        .child(\n            div()\n                .flex()\n                .flex_row()\n                .flex_wrap()\n                .gap(px(theme.space(Space::Xs)))\n                .child(Tag::new(\"scene.content.tag.rust\", \"rust\").on_remove(|_, _| {}))\n                .child(\n                    Tag::new(\"scene.content.tag.failing\", \"failing\")\n                        .tone(Tone::Danger)\n                        .on_remove(|_, _| {}),\n                )\n                .child(\n                    Tag::new(\"scene.content.tag.ada\", \"Ada\")\n                        .tint(identity_tint(&theme, \"loader.pink\"))\n                        .on_remove(|_, _| {}),\n                )\n                .child(Tag::new(\"scene.content.tag.pinned\", \"pinned\").disabled(true)),\n        )\n        .child(\n            div()\n                .flex()\n                .flex_row()\n                .items_center()\n                .gap(px(theme.space(Space::Sm)))\n                .child(Avatar::new(\"Ada Lovelace\").id(\"scene.content.avatar\"))\n                .child(Avatar::new(\"\").size(24.0))\n                .child(\n                    Avatar::new(\"Grace Hopper\")\n                        .tint(identity_tint(&theme, \"loader.orange\"))\n                        .id(\"scene.content.avatar.tinted\"),\n                ),\n        )\n        .child(\n            EmptyState::new(\"scene.content.empty\", \"No runs yet\")\n                .kind(EmptyKind::Unstarted)\n                .detail(\"A run appears here once one has been started.\"),\n        )\n        .child(\n            EmptyState::new(\"scene.content.refused\", \"The host refused the request\")\n                .kind(EmptyKind::Unavailable)\n                .detail(\"Approval is required for this workspace.\")\n                .action(\n                    Button::new(\"scene.content.retry\")\n                        .label(\"Try again\")\n                        .secondary()\n                        .on_click(|_, _| {}),\n                ),\n        )\n        .into_any_element()\n}"
+      "example": "fn tag(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(caption(&theme, \"Tones, which report rather than decorate\"))\n        .child(\n            row(&theme)\n                .child(Tag::new(\"scene.tag.rust\", \"rust\").on_remove(|_, _| {}))\n                .child(\n                    Tag::new(\"scene.tag.failing\", \"failing\")\n                        .tone(Tone::Danger)\n                        .on_remove(|_, _| {}),\n                )\n                .child(\n                    Tag::new(\"scene.tag.passing\", \"passing\")\n                        .tone(Tone::Success)\n                        .on_remove(|_, _| {}),\n                )\n                .child(\n                    Tag::new(\"scene.tag.review\", \"needs review\")\n                        .tone(Tone::Warning)\n                        .on_remove(|_, _| {}),\n                ),\n        )\n        .child(caption(\n            &theme,\n            \"An identity tint, which is a fact about who and not about severity\",\n        ))\n        .child(\n            row(&theme)\n                .child(\n                    Tag::new(\"scene.tag.ada\", \"Ada\")\n                        .tint(identity_tint(&theme, \"loader.pink\"))\n                        .on_remove(|_, _| {}),\n                )\n                .child(\n                    Tag::new(\"scene.tag.grace\", \"Grace\")\n                        .tint(identity_tint(&theme, \"loader.orange\"))\n                        .on_remove(|_, _| {}),\n                ),\n        )\n        .child(caption(\n            &theme,\n            \"Not removable, and disabled. Neither installs a handler\",\n        ))\n        .child(\n            row(&theme)\n                .child(Tag::new(\"scene.tag.plain\", \"read-only\"))\n                .child(Tag::new(\"scene.tag.pinned\", \"pinned\").disabled(true)),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "avatar",
+      "capture": "cargo run -p xtask -- headless capture avatar",
+      "kind": "exhibit",
+      "subjects": [
+        "Avatar"
+      ],
+      "uses": [
+        "Avatar"
+      ],
+      "example": "fn avatar(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(caption(&theme, \"Derived from the name it was given\"))\n        .child(\n            row(&theme)\n                .child(Avatar::new(\"Ada Lovelace\").id(\"scene.avatar.ada\"))\n                .child(Avatar::new(\"Grace Hopper\").id(\"scene.avatar.grace\"))\n                .child(Avatar::new(\"Katherine Johnson\").id(\"scene.avatar.katherine\")),\n        )\n        .child(caption(\n            &theme,\n            \"An identity tint the caller owns, and no name at all\",\n        ))\n        .child(\n            row(&theme)\n                .child(\n                    Avatar::new(\"Grace Hopper\")\n                        .tint(identity_tint(&theme, \"loader.orange\"))\n                        .id(\"scene.avatar.tinted\"),\n                )\n                .child(Avatar::new(\"\").id(\"scene.avatar.anonymous\")),\n        )\n        .child(caption(&theme, \"Sizes\"))\n        .child(\n            row(&theme)\n                .items_center()\n                .child(\n                    Avatar::new(\"Ada Lovelace\")\n                        .size(24.0)\n                        .id(\"scene.avatar.small\"),\n                )\n                .child(Avatar::new(\"Ada Lovelace\").id(\"scene.avatar.default\"))\n                .child(\n                    Avatar::new(\"Ada Lovelace\")\n                        .size(48.0)\n                        .id(\"scene.avatar.large\"),\n                ),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "empty-state",
+      "capture": "cargo run -p xtask -- headless capture empty-state",
+      "kind": "exhibit",
+      "subjects": [
+        "EmptyState"
+      ],
+      "uses": [
+        "EmptyState"
+      ],
+      "example": "fn empty_state(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(560.0))\n        .child(caption(&theme, \"Nothing has been started yet\"))\n        .child(\n            EmptyState::new(\"scene.empty-state.unstarted\", \"No runs yet\")\n                .kind(EmptyKind::Unstarted)\n                .detail(\"A run appears here once one has been started.\"),\n        )\n        .child(caption(&theme, \"The host refused, and says so\"))\n        .child(\n            EmptyState::new(\n                \"scene.empty-state.unavailable\",\n                \"The host refused the request\",\n            )\n            .kind(EmptyKind::Unavailable)\n            .detail(\"Approval is required for this workspace.\")\n            .action(\n                Button::new(\"scene.empty-state.retry\")\n                    .label(\"Try again\")\n                    .secondary()\n                    .on_click(|_, _| {}),\n            ),\n        )\n        .child(caption(&theme, \"A collection that really is empty\"))\n        .child(\n            EmptyState::new(\"scene.empty-state.empty\", \"No runs match “failing”\")\n                .kind(EmptyKind::Empty)\n                .detail(\"Clear the filter to see every run.\"),\n        )\n        .child(caption(&theme, \"It was tried, and it failed\"))\n        .child(\n            EmptyState::new(\"scene.empty-state.failed\", \"The run could not be read\")\n                .kind(EmptyKind::Failed)\n                .detail(\"The snapshot on disk is from a newer version of the format.\")\n                .action(\n                    Button::new(\"scene.empty-state.reload\")\n                        .label(\"Reload\")\n                        .secondary()\n                        .on_click(|_, _| {}),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "kbd",
@@ -11008,16 +11048,12 @@
       "capture": "cargo run -p xtask -- headless capture agent-roster",
       "kind": "exhibit",
       "subjects": [
-        "AgentActivityLine",
-        "AgentAvatar",
         "AgentCard",
         "AgentGroup",
         "AgentRoster",
         "SubagentTree"
       ],
       "uses": [
-        "AgentActivityLine",
-        "AgentAvatar",
         "AgentCard",
         "AgentGroup",
         "AgentRoster",
@@ -11064,14 +11100,38 @@
       "capture": "cargo run -p xtask -- headless capture agent-run-canvas",
       "kind": "exhibit",
       "subjects": [
-        "AgentRunCanvas",
+        "AgentRunCanvas"
+      ],
+      "uses": [
+        "AgentRunCanvas"
+      ],
+      "example": "fn agent_run_canvas(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let run = AgentRunSnapshot::new(\"release-topology\", \"orchestrator\")\n        .execution(AgentExecutionState::Active(AgentActivity::Aggregating))\n        .agents([\n            AgentSnapshot::new(\n                AgentDescriptor::new(\"orchestrator\", \"Atlas\").role(\"Run coordinator\"),\n            )\n            .execution(AgentExecutionState::Active(AgentActivity::Aggregating)),\n            AgentSnapshot::new(\n                AgentDescriptor::new(\"researcher\", \"Nova\").role(\"Repository research\"),\n            )\n            .execution(AgentExecutionState::Active(AgentActivity::UsingTool(\n                \"repository search\".into(),\n            ))),\n            AgentSnapshot::new(AgentDescriptor::new(\"reviewer\", \"Sage\").role(\"Independent review\"))\n                .execution(AgentExecutionState::Waiting(WaitReason::Approval)),\n        ])\n        .tasks([\n            AgentTaskSnapshot::new(\"evidence\", \"Evidence bundle\")\n                .execution(AgentExecutionState::Completed(AgentOutcome::Succeeded)),\n            AgentTaskSnapshot::new(\"synthesis\", \"Release synthesis\").execution(\n                AgentExecutionState::Completed(AgentOutcome::Partial(\"awaiting approval\".into())),\n            ),\n        ])\n        .links([\n            RunLink::new(\n                \"spawn-researcher\",\n                RunSubjectId::Agent(\"orchestrator\".into()),\n                RunSubjectId::Agent(\"researcher\".into()),\n                RunLinkKind::Spawn,\n            ),\n            RunLink::new(\n                \"delegate-evidence\",\n                RunSubjectId::Agent(\"orchestrator\".into()),\n                RunSubjectId::Task(\"evidence\".into()),\n                RunLinkKind::Delegation,\n            ),\n            RunLink::new(\n                \"evidence-before-synthesis\",\n                RunSubjectId::Task(\"evidence\".into()),\n                RunSubjectId::Task(\"synthesis\".into()),\n                RunLinkKind::Dependency,\n            ),\n            RunLink::new(\n                \"handoff-review\",\n                RunSubjectId::Agent(\"researcher\".into()),\n                RunSubjectId::Agent(\"reviewer\".into()),\n                RunLinkKind::Handoff,\n            ),\n            RunLink::new(\n                \"search-report\",\n                RunSubjectId::Invocation(\"search-42\".into()),\n                RunSubjectId::Agent(\"researcher\".into()),\n                RunLinkKind::Report,\n            ),\n            RunLink::new(\n                \"aggregate-review\",\n                RunSubjectId::Agent(\"reviewer\".into()),\n                RunSubjectId::Task(\"synthesis\".into()),\n                RunLinkKind::Aggregation,\n            ),\n            RunLink::new(\n                \"retry-search\",\n                RunSubjectId::Agent(\"reviewer\".into()),\n                RunSubjectId::Agent(\"researcher\".into()),\n                RunLinkKind::Retry,\n            )\n            .label(\"bounded attempt 2\"),\n        ])\n        .aggregation(AggregationSnapshot::new(3, 2).conflicts(1));\n\n    stack(&theme)\n        .w(px(860.0))\n        .child(\n            div()\n                .w_full()\n                .h(px(500.0))\n                .surface(&theme, Surface::Panel)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(\n                    AgentRunCanvas::new(\"scene.agent-run-canvas\", run)\n                        .selected([RunSubjectId::Agent(\"researcher\".into())])\n                        .viewport(GraphViewport::new(gpui::point(0.0, 0.0), 0.56))\n                        .on_event(|_, _, _| {}),\n                ),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "agent-run-issues",
+      "capture": "cargo run -p xtask -- headless capture agent-run-issues",
+      "kind": "exhibit",
+      "subjects": [
         "AgentRunIssues"
       ],
       "uses": [
-        "AgentRunCanvas",
         "AgentRunIssues"
       ],
-      "example": "fn agent_run_canvas(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let run = AgentRunSnapshot::new(\"release-topology\", \"orchestrator\")\n        .execution(AgentExecutionState::Active(AgentActivity::Aggregating))\n        .agents([\n            AgentSnapshot::new(\n                AgentDescriptor::new(\"orchestrator\", \"Atlas\").role(\"Run coordinator\"),\n            )\n            .execution(AgentExecutionState::Active(AgentActivity::Aggregating)),\n            AgentSnapshot::new(\n                AgentDescriptor::new(\"researcher\", \"Nova\").role(\"Repository research\"),\n            )\n            .execution(AgentExecutionState::Active(AgentActivity::UsingTool(\n                \"repository search\".into(),\n            ))),\n            AgentSnapshot::new(AgentDescriptor::new(\"reviewer\", \"Sage\").role(\"Independent review\"))\n                .execution(AgentExecutionState::Waiting(WaitReason::Approval)),\n        ])\n        .tasks([\n            AgentTaskSnapshot::new(\"evidence\", \"Evidence bundle\")\n                .execution(AgentExecutionState::Completed(AgentOutcome::Succeeded)),\n            AgentTaskSnapshot::new(\"synthesis\", \"Release synthesis\").execution(\n                AgentExecutionState::Completed(AgentOutcome::Partial(\"awaiting approval\".into())),\n            ),\n        ])\n        .links([\n            RunLink::new(\n                \"spawn-researcher\",\n                RunSubjectId::Agent(\"orchestrator\".into()),\n                RunSubjectId::Agent(\"researcher\".into()),\n                RunLinkKind::Spawn,\n            ),\n            RunLink::new(\n                \"delegate-evidence\",\n                RunSubjectId::Agent(\"orchestrator\".into()),\n                RunSubjectId::Task(\"evidence\".into()),\n                RunLinkKind::Delegation,\n            ),\n            RunLink::new(\n                \"evidence-before-synthesis\",\n                RunSubjectId::Task(\"evidence\".into()),\n                RunSubjectId::Task(\"synthesis\".into()),\n                RunLinkKind::Dependency,\n            ),\n            RunLink::new(\n                \"handoff-review\",\n                RunSubjectId::Agent(\"researcher\".into()),\n                RunSubjectId::Agent(\"reviewer\".into()),\n                RunLinkKind::Handoff,\n            ),\n            RunLink::new(\n                \"search-report\",\n                RunSubjectId::Invocation(\"search-42\".into()),\n                RunSubjectId::Agent(\"researcher\".into()),\n                RunLinkKind::Report,\n            ),\n            RunLink::new(\n                \"aggregate-review\",\n                RunSubjectId::Agent(\"reviewer\".into()),\n                RunSubjectId::Task(\"synthesis\".into()),\n                RunLinkKind::Aggregation,\n            ),\n            RunLink::new(\n                \"retry-search\",\n                RunSubjectId::Agent(\"reviewer\".into()),\n                RunSubjectId::Agent(\"researcher\".into()),\n                RunLinkKind::Retry,\n            )\n            .label(\"bounded attempt 2\"),\n        ])\n        .aggregation(AggregationSnapshot::new(3, 2).conflicts(1));\n\n    stack(&theme)\n        .w(px(860.0))\n        .child(\n            div()\n                .w_full()\n                .h(px(500.0))\n                .surface(&theme, Surface::Panel)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(\n                    AgentRunCanvas::new(\"scene.agent-run-canvas\", run)\n                        .selected([RunSubjectId::Agent(\"researcher\".into())])\n                        .viewport(GraphViewport::new(gpui::point(0.0, 0.0), 0.56))\n                        .on_event(|_, _, _| {}),\n                ),\n        )\n        .into_any_element()\n}"
+      "example": "fn agent_run_issues(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    // Deliberately broken: the root names an agent that is not in the list,\n    // one agent is listed twice, a task is owned by nobody, and a link ends\n    // at an agent that does not exist.\n    let malformed = AgentRunSnapshot::new(\"release-review\", \"missing-coordinator\")\n        .execution(AgentExecutionState::Active(AgentActivity::Aggregating))\n        .agents([\n            AgentSnapshot::new(AgentDescriptor::new(\"researcher\", \"Nova\"))\n                .presence(AgentPresence::Online),\n            AgentSnapshot::new(AgentDescriptor::new(\"researcher\", \"Nova\"))\n                .presence(AgentPresence::Online),\n        ])\n        .tasks([AgentTaskSnapshot::new(\"review\", \"Review\").owner(\"reviewer\")])\n        .links([RunLink::new(\n            \"spawn-verifier\",\n            RunSubjectId::Agent(\"researcher\".into()),\n            RunSubjectId::Agent(\"verifier\".into()),\n            RunLinkKind::Spawn,\n        )]);\n\n    stack(&theme)\n        .w(px(560.0))\n        .child(caption(\n            &theme,\n            \"A snapshot the host sent that does not describe a run\",\n        ))\n        .child(AgentRunIssues::from_run(\n            \"scene.agent-run-issues.notice\",\n            &malformed,\n        ))\n        .child(caption(\n            &theme,\n            \"A well-formed snapshot, where the component draws nothing at all\",\n        ))\n        .child(AgentRunIssues::from_run(\n            \"scene.agent-run-issues.silent\",\n            &scene_agent_run(),\n        ))\n        .into_any_element()\n}"
+    },
+    {
+      "name": "agent-avatar",
+      "capture": "cargo run -p xtask -- headless capture agent-avatar",
+      "kind": "exhibit",
+      "subjects": [
+        "AgentActivityLine",
+        "AgentAvatar"
+      ],
+      "uses": [
+        "AgentActivityLine",
+        "AgentAvatar"
+      ],
+      "example": "fn agent_avatar(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let identity = |id: &'static str, name: &'static str, presence: AgentPresence| {\n        AgentSnapshot::new(AgentDescriptor::new(id, name).role(\"Repository research\"))\n            .presence(presence)\n    };\n    let executions = [\n        (\n            \"active\",\n            AgentExecutionState::Active(AgentActivity::UsingTool(\"repository search\".into())),\n        ),\n        (\n            \"waiting\",\n            AgentExecutionState::Waiting(WaitReason::Approval),\n        ),\n        (\n            \"succeeded\",\n            AgentExecutionState::Completed(AgentOutcome::Succeeded),\n        ),\n        (\n            \"failed\",\n            AgentExecutionState::Completed(AgentOutcome::Failed(\n                \"the verifier could not reach the test host\".into(),\n            )),\n        ),\n        (\n            \"refused\",\n            AgentExecutionState::Completed(AgentOutcome::Refused(\n                \"this workspace requires approval\".into(),\n            )),\n        ),\n    ];\n\n    stack(&theme)\n        .child(caption(\n            &theme,\n            \"Presence is a separate mark, so it does not compete with the identity tint\",\n        ))\n        .child(\n            row(&theme)\n                .items_center()\n                .gap_token(&theme, Space::Md)\n                .child(AgentAvatar::new(\n                    \"scene.agent-avatar.online\",\n                    identity(\"nova\", \"Nova\", AgentPresence::Online),\n                ))\n                .child(AgentAvatar::new(\n                    \"scene.agent-avatar.away\",\n                    identity(\"sage\", \"Sage\", AgentPresence::Away),\n                ))\n                .child(AgentAvatar::new(\n                    \"scene.agent-avatar.offline\",\n                    identity(\"bolt\", \"Bolt\", AgentPresence::Offline),\n                ))\n                .child(\n                    AgentAvatar::new(\n                        \"scene.agent-avatar.tinted\",\n                        identity(\"atlas\", \"Atlas\", AgentPresence::Online),\n                    )\n                    .tint(identity_tint(&theme, \"loader.pink\")),\n                ),\n        )\n        .child(caption(&theme, \"Sizes\"))\n        .child(\n            row(&theme)\n                .items_center()\n                .gap_token(&theme, Space::Md)\n                .child(\n                    AgentAvatar::new(\n                        \"scene.agent-avatar.small\",\n                        identity(\"nova\", \"Nova\", AgentPresence::Online),\n                    )\n                    .size(20.0),\n                )\n                .child(AgentAvatar::new(\n                    \"scene.agent-avatar.default\",\n                    identity(\"nova\", \"Nova\", AgentPresence::Online),\n                ))\n                .child(\n                    AgentAvatar::new(\n                        \"scene.agent-avatar.large\",\n                        identity(\"nova\", \"Nova\", AgentPresence::Online),\n                    )\n                    .size(44.0),\n                ),\n        )\n        .child(caption(\n            &theme,\n            \"The execution sentence, which carries a non-colour mark because \\\n             colour alone is not a report\",\n        ))\n        .child(\n            div()\n                .column()\n                .gap_token(&theme, Space::Sm)\n                .children(executions.map(|(id, execution)| {\n                    AgentActivityLine::new(format!(\"scene.agent-avatar.line.{id}\"), execution)\n                        .into_any_element()\n                })),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "conversation",
@@ -11566,7 +11626,7 @@
       "uses": [
         "AnchorList"
       ],
-      "example": "fn anchor_navigation(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneAnchorList>() {\n        let label = cx.strings().text(StringKey::AnchorMoreSections);\n        let overflow = cx.new(|cx| Menu::new(\"scene.anchor-list.menu\", window, cx).trigger(label));\n        cx.set_global(SceneAnchorList { overflow });\n    }\n    let theme = cx.theme().clone();\n    let overflow = cx.global::<SceneAnchorList>().overflow.clone();\n    stack(&theme)\n        .w(px(700.0))\n        .child(caption(\n            &theme,\n            \"section intents only; the declared overflow moves anchors into a menu\",\n        ))\n        .child(\n            AnchorList::new(\"scene.anchor-list\")\n                .anchors([\n                    Anchor::new(\"summary\", \"Summary\"),\n                    Anchor::new(\"inputs\", \"Inputs\"),\n                    Anchor::new(\"constraints\", \"Constraints\"),\n                    Anchor::new(\"verification\", \"Verification\"),\n                    Anchor::new(\"history\", \"History\").disabled(true),\n                ])\n                .active(\"inputs\")\n                .overflow_after(3)\n                .overflow_menu(overflow)\n                .on_navigate(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
+      "example": "fn anchor_list(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneAnchorList>() {\n        let label = cx.strings().text(StringKey::AnchorMoreSections);\n        let overflow = cx.new(|cx| Menu::new(\"scene.anchor-list.menu\", window, cx).trigger(label));\n        cx.set_global(SceneAnchorList { overflow });\n    }\n    let theme = cx.theme().clone();\n    let overflow = cx.global::<SceneAnchorList>().overflow.clone();\n    stack(&theme)\n        .w(px(700.0))\n        .child(caption(\n            &theme,\n            \"section intents only; the declared overflow moves anchors into a menu\",\n        ))\n        .child(\n            AnchorList::new(\"scene.anchor-list\")\n                .anchors([\n                    Anchor::new(\"summary\", \"Summary\"),\n                    Anchor::new(\"inputs\", \"Inputs\"),\n                    Anchor::new(\"constraints\", \"Constraints\"),\n                    Anchor::new(\"verification\", \"Verification\"),\n                    Anchor::new(\"history\", \"History\").disabled(true),\n                ])\n                .active(\"inputs\")\n                .overflow_after(3)\n                .overflow_menu(overflow)\n                .on_navigate(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "diagnostics-list",
@@ -11578,7 +11638,7 @@
       "uses": [
         "DiagnosticsList"
       ],
-      "example": "fn diagnostics_surface(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let diagnostics = [\n        Diagnostic::new(\n            \"fixture-error\",\n            DiagnosticSeverity::Error,\n            DiagnosticLocation::new(\"fixture.rs:18\"),\n            \"Fixture diagnostic: incompatible value\",\n        )\n        .action(DiagnosticAction::new(\"inspect\", \"Inspect fixture\")),\n        Diagnostic::new(\n            \"fixture-warning\",\n            DiagnosticSeverity::Warning,\n            DiagnosticLocation::new(\"fixture.rs:31\"),\n            \"Fixture diagnostic: unused declaration\",\n        ),\n        Diagnostic::new(\n            \"fixture-information\",\n            DiagnosticSeverity::Information,\n            DiagnosticLocation::new(\"fixture.rs:47\"),\n            \"Fixture diagnostic: a simpler form is available\",\n        ),\n        Diagnostic::new(\n            \"fixture-hint\",\n            DiagnosticSeverity::Hint,\n            DiagnosticLocation::new(\"fixture.rs:64\"),\n            \"Fixture diagnostic: consider a descriptive name\",\n        ),\n    ];\n    stack(&theme)\n        .w(px(760.0))\n        .child(caption(\n            &theme,\n            \"synthetic diagnostics; filters, selection, and actions are caller-owned intents\",\n        ))\n        .child(\n            DiagnosticsList::new(\"scene.diagnostics\", Loadable::Ready(diagnostics.to_vec()))\n                .selected(\"fixture-warning\")\n                .visible_rows(5)\n                .on_filter(|_, _, _| {})\n                .on_select(|_, _, _| {})\n                .on_action(|_, _, _, _| {}),\n        )\n        .into_any_element()\n}"
+      "example": "fn diagnostics_list(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let diagnostics = [\n        Diagnostic::new(\n            \"fixture-error\",\n            DiagnosticSeverity::Error,\n            DiagnosticLocation::new(\"fixture.rs:18\"),\n            \"Fixture diagnostic: incompatible value\",\n        )\n        .action(DiagnosticAction::new(\"inspect\", \"Inspect fixture\")),\n        Diagnostic::new(\n            \"fixture-warning\",\n            DiagnosticSeverity::Warning,\n            DiagnosticLocation::new(\"fixture.rs:31\"),\n            \"Fixture diagnostic: unused declaration\",\n        ),\n        Diagnostic::new(\n            \"fixture-information\",\n            DiagnosticSeverity::Information,\n            DiagnosticLocation::new(\"fixture.rs:47\"),\n            \"Fixture diagnostic: a simpler form is available\",\n        ),\n        Diagnostic::new(\n            \"fixture-hint\",\n            DiagnosticSeverity::Hint,\n            DiagnosticLocation::new(\"fixture.rs:64\"),\n            \"Fixture diagnostic: consider a descriptive name\",\n        ),\n    ];\n    stack(&theme)\n        .w(px(760.0))\n        .child(caption(\n            &theme,\n            \"synthetic diagnostics; filters, selection, and actions are caller-owned intents\",\n        ))\n        .child(\n            DiagnosticsList::new(\"scene.diagnostics\", Loadable::Ready(diagnostics.to_vec()))\n                .selected(\"fixture-warning\")\n                .visible_rows(5)\n                .on_filter(|_, _, _| {})\n                .on_select(|_, _, _| {})\n                .on_action(|_, _, _, _| {}),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "calendar",

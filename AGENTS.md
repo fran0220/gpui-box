@@ -115,11 +115,20 @@ declaration is checked:
   one, kept because components interact in ways none of them shows alone. It
   is nobody's coverage.
 
-`api check` fails when a public component has no exhibit, and fails when a
-declaration names something the rendering cannot reach. So a new component
-needs a scene that declares it, in the family file next to the components it
-sits with — not a mention inside a shell, which is recognition rather than
-review.
+Three things fail `api check`:
+
+1. a public component with no exhibit anywhere;
+2. an exhibit whose own source never builds a component it claims to review —
+   a component drawn inside another component has been recognised, not
+   reviewed, and the picture that would fail when its states change belongs to
+   whatever mounted it;
+3. a declaration naming something the rendering cannot reach at all.
+
+A scene and the function that builds it are one thing, so `api check` also
+requires the function to be named after the scene.
+
+So a new component needs a scene that builds it, in the family file next to
+the components it sits with — not a mention inside a shell.
 
 `docs/llms.txt` is the entry point for a program reading this repository, and
 `tools/mcp` serves the same catalog as MCP tools, including one that renders a

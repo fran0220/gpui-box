@@ -165,7 +165,7 @@ function search(index, query, kind) {
       if ((kind === "builder" || kind === "view") && entry.kind !== kind) continue;
       if (!matchesQuery(entry, words)) continue;
       lines.push(
-        `${entry.name} (${entry.kind}) — ${entry.summary || "(no summary)"}\n  path: ${entry.path}\n  scenes: ${(entry.scenes || []).join(", ")}`,
+        `${entry.name} (${entry.kind}) — ${entry.summary || "(no summary)"}\n  path: ${entry.path}\n  reviewed in: ${(entry.scenes || []).join(", ")}`,
       );
     }
   }
@@ -202,7 +202,7 @@ function component(index, name) {
     out += section("queries", found.queries);
     out += section("reports", found.reports);
     if (found.scenes && found.scenes.length) {
-      out += `\nscenes that render it: ${found.scenes.join(", ")}\nCall scene(name) for verified example code, or render_scene(name) to look at it.\n`;
+      out += `\nreviewed in: ${found.scenes.join(", ")}\nThat scene is the review of this component: it lays out its states so they can be compared. Call scene(name) for verified example code, or render_scene(name) to look at it.\n`;
     }
     return out;
   }
@@ -239,7 +239,13 @@ function scene(index, name) {
       `no scene named ${JSON.stringify(name)}. A component's scenes are listed by component(name).`,
     );
   }
-  return `scene ${found.name}\nuses: ${found.uses.join(", ")}\n\n${found.example}\n`;
+  // An exhibit is the review of what it declares; a composition arranges
+  // components that are reviewed elsewhere.
+  const heading =
+    found.kind === "composition"
+      ? `scene ${found.name} (a composition: it arranges these rather than reviewing them, and each is reviewed in its own scene)\ndraws: ${found.uses.join(", ")}`
+      : `scene ${found.name} (an exhibit: this is where these are reviewed)\nshows: ${(found.subjects || []).join(", ")}`;
+  return `${heading}\n\n${found.example}\n`;
 }
 
 async function image(env, name, theme) {

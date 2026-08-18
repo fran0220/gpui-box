@@ -1,5 +1,6 @@
 //! What an agent proposes, spends, and is permitted to do.
 
+use super::display::identity_tint;
 use super::support::*;
 
 pub(super) fn scene_agent_run() -> AgentRunSnapshot {
@@ -55,6 +56,163 @@ pub(super) fn scene_agent_run() -> AgentRunSnapshot {
                 RunLinkKind::Spawn,
             ),
         ])
+}
+
+/// One agent's identity and one agent's sentence, in the states they report.
+///
+/// Both were only ever drawn inside `AgentCard` inside `agent-roster`, so
+/// nobody had seen a presence mark next to the other presence marks, and a
+/// change to either moved a picture of a roster.
+pub(super) fn agent_avatar(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let identity = |id: &'static str, name: &'static str, presence: AgentPresence| {
+        AgentSnapshot::new(AgentDescriptor::new(id, name).role("Repository research"))
+            .presence(presence)
+    };
+    let executions = [
+        (
+            "active",
+            AgentExecutionState::Active(AgentActivity::UsingTool("repository search".into())),
+        ),
+        (
+            "waiting",
+            AgentExecutionState::Waiting(WaitReason::Approval),
+        ),
+        (
+            "succeeded",
+            AgentExecutionState::Completed(AgentOutcome::Succeeded),
+        ),
+        (
+            "failed",
+            AgentExecutionState::Completed(AgentOutcome::Failed(
+                "the verifier could not reach the test host".into(),
+            )),
+        ),
+        (
+            "refused",
+            AgentExecutionState::Completed(AgentOutcome::Refused(
+                "this workspace requires approval".into(),
+            )),
+        ),
+    ];
+
+    stack(&theme)
+        .child(caption(
+            &theme,
+            "Presence is a separate mark, so it does not compete with the identity tint",
+        ))
+        .child(
+            row(&theme)
+                .items_center()
+                .gap_token(&theme, Space::Md)
+                .child(AgentAvatar::new(
+                    "scene.agent-avatar.online",
+                    identity("nova", "Nova", AgentPresence::Online),
+                ))
+                .child(AgentAvatar::new(
+                    "scene.agent-avatar.away",
+                    identity("sage", "Sage", AgentPresence::Away),
+                ))
+                .child(AgentAvatar::new(
+                    "scene.agent-avatar.offline",
+                    identity("bolt", "Bolt", AgentPresence::Offline),
+                ))
+                .child(
+                    AgentAvatar::new(
+                        "scene.agent-avatar.tinted",
+                        identity("atlas", "Atlas", AgentPresence::Online),
+                    )
+                    .tint(identity_tint(&theme, "loader.pink")),
+                ),
+        )
+        .child(caption(&theme, "Sizes"))
+        .child(
+            row(&theme)
+                .items_center()
+                .gap_token(&theme, Space::Md)
+                .child(
+                    AgentAvatar::new(
+                        "scene.agent-avatar.small",
+                        identity("nova", "Nova", AgentPresence::Online),
+                    )
+                    .size(20.0),
+                )
+                .child(AgentAvatar::new(
+                    "scene.agent-avatar.default",
+                    identity("nova", "Nova", AgentPresence::Online),
+                ))
+                .child(
+                    AgentAvatar::new(
+                        "scene.agent-avatar.large",
+                        identity("nova", "Nova", AgentPresence::Online),
+                    )
+                    .size(44.0),
+                ),
+        )
+        .child(caption(
+            &theme,
+            "The execution sentence, which carries a non-colour mark because \
+             colour alone is not a report",
+        ))
+        .child(
+            div()
+                .column()
+                .gap_token(&theme, Space::Sm)
+                .children(executions.map(|(id, execution)| {
+                    AgentActivityLine::new(format!("scene.agent-avatar.line.{id}"), execution)
+                        .into_any_element()
+                })),
+        )
+        .into_any_element()
+}
+
+/// What a malformed run snapshot looks like when it is reported instead of
+/// drawn over.
+///
+/// This component renders nothing at all when the snapshot is well formed,
+/// which is why it needs a scene of its own: it was declared against
+/// `agent-run-canvas`, where the fixture is valid and no pixel of it ever
+/// appeared. A picture of a component that draws nothing is not a review.
+pub(super) fn agent_run_issues(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    // Deliberately broken: the root names an agent that is not in the list,
+    // one agent is listed twice, a task is owned by nobody, and a link ends
+    // at an agent that does not exist.
+    let malformed = AgentRunSnapshot::new("release-review", "missing-coordinator")
+        .execution(AgentExecutionState::Active(AgentActivity::Aggregating))
+        .agents([
+            AgentSnapshot::new(AgentDescriptor::new("researcher", "Nova"))
+                .presence(AgentPresence::Online),
+            AgentSnapshot::new(AgentDescriptor::new("researcher", "Nova"))
+                .presence(AgentPresence::Online),
+        ])
+        .tasks([AgentTaskSnapshot::new("review", "Review").owner("reviewer")])
+        .links([RunLink::new(
+            "spawn-verifier",
+            RunSubjectId::Agent("researcher".into()),
+            RunSubjectId::Agent("verifier".into()),
+            RunLinkKind::Spawn,
+        )]);
+
+    stack(&theme)
+        .w(px(560.0))
+        .child(caption(
+            &theme,
+            "A snapshot the host sent that does not describe a run",
+        ))
+        .child(AgentRunIssues::from_run(
+            "scene.agent-run-issues.notice",
+            &malformed,
+        ))
+        .child(caption(
+            &theme,
+            "A well-formed snapshot, where the component draws nothing at all",
+        ))
+        .child(AgentRunIssues::from_run(
+            "scene.agent-run-issues.silent",
+            &scene_agent_run(),
+        ))
+        .into_any_element()
 }
 
 pub(super) fn agent_roster(_window: &mut Window, cx: &mut App) -> AnyElement {

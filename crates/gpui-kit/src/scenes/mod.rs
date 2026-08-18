@@ -43,8 +43,8 @@ use gpui::{AnyElement, App, Window};
 use crate::foundation::direction::LayoutDirection;
 
 use agent::{
-    agent_roster, agent_run_canvas, approval, cost_meter, offering_catalog, permission_matrix,
-    persona, server_list, step_list, thinking, tool_call,
+    agent_avatar, agent_roster, agent_run_canvas, agent_run_issues, approval, cost_meter,
+    offering_catalog, permission_matrix, persona, server_list, step_list, thinking, tool_call,
 };
 use canvas::node_graph;
 use compositions::{motion_flip, motion_state, reading_direction};
@@ -58,14 +58,14 @@ use controls::{
     settings, textarea, toggle, upload_list,
 };
 use data::{
-    data_grid, data_grid_editing, diagnostics_surface, drag_list, drag_tree, list, table, tree,
+    data_grid, data_grid_editing, diagnostics_list, drag_list, drag_tree, list, table, tree,
     tree_grid,
 };
 #[cfg(feature = "fixtures")]
 use datetime::{calendar, date_range, date_time};
 use display::{
-    animated_number, badge, card, chart, content, detail, failure_panel, icon, loading,
-    progress_circle, sparkline, status,
+    animated_number, avatar, badge, card, chart, detail, divider, empty_state, failure_panel, icon,
+    loading, progress_bar, progress_circle, sparkline, status, tag,
 };
 use effects::{cinematic_effects, visual_effects};
 use game::game_ui;
@@ -75,8 +75,8 @@ use layout::{
 };
 use media::{audio_player, model_viewer, video_player};
 use navigation::{
-    accordion, anchor_navigation, breadcrumb, collapsible, document_tabs, pagination, sidebar,
-    tabs, undo_history, wizard,
+    accordion, anchor_list, breadcrumb, collapsible, document_tabs, pagination, sidebar, tabs,
+    undo_history, wizard,
 };
 use overlay::{
     command_palette, context_menu, dialog, drawer, frost, glass, hover_card, kbd, menu, menubar,
@@ -228,9 +228,29 @@ pub fn catalog() -> Vec<Scene> {
             shows: Shows::Subjects(&["ButtonGroup", "IconButton", "SplitButton"]),
         },
         Scene {
-            name: "content",
-            build: content,
-            shows: Shows::Subjects(&["Avatar", "Divider", "EmptyState", "ProgressBar", "Tag"]),
+            name: "progress-bar",
+            build: progress_bar,
+            shows: Shows::Subjects(&["ProgressBar"]),
+        },
+        Scene {
+            name: "divider",
+            build: divider,
+            shows: Shows::Subjects(&["Divider"]),
+        },
+        Scene {
+            name: "tag",
+            build: tag,
+            shows: Shows::Subjects(&["Tag"]),
+        },
+        Scene {
+            name: "avatar",
+            build: avatar,
+            shows: Shows::Subjects(&["Avatar"]),
+        },
+        Scene {
+            name: "empty-state",
+            build: empty_state,
+            shows: Shows::Subjects(&["EmptyState"]),
         },
         Scene {
             name: "kbd",
@@ -479,14 +499,7 @@ pub fn catalog() -> Vec<Scene> {
         Scene {
             name: "agent-roster",
             build: agent_roster,
-            shows: Shows::Subjects(&[
-                "AgentActivityLine",
-                "AgentAvatar",
-                "AgentCard",
-                "AgentGroup",
-                "AgentRoster",
-                "SubagentTree",
-            ]),
+            shows: Shows::Subjects(&["AgentCard", "AgentGroup", "AgentRoster", "SubagentTree"]),
         },
         Scene {
             name: "persona",
@@ -506,7 +519,17 @@ pub fn catalog() -> Vec<Scene> {
         Scene {
             name: "agent-run-canvas",
             build: agent_run_canvas,
-            shows: Shows::Subjects(&["AgentRunCanvas", "AgentRunIssues"]),
+            shows: Shows::Subjects(&["AgentRunCanvas"]),
+        },
+        Scene {
+            name: "agent-run-issues",
+            build: agent_run_issues,
+            shows: Shows::Subjects(&["AgentRunIssues"]),
+        },
+        Scene {
+            name: "agent-avatar",
+            build: agent_avatar,
+            shows: Shows::Subjects(&["AgentActivityLine", "AgentAvatar"]),
         },
         Scene {
             name: "conversation",
@@ -714,12 +737,12 @@ pub fn catalog() -> Vec<Scene> {
         },
         Scene {
             name: "anchor-list",
-            build: anchor_navigation,
+            build: anchor_list,
             shows: Shows::Subjects(&["AnchorList"]),
         },
         Scene {
             name: "diagnostics-list",
-            build: diagnostics_surface,
+            build: diagnostics_list,
             shows: Shows::Subjects(&["DiagnosticsList"]),
         },
     ];

@@ -413,66 +413,183 @@ pub(super) fn sparkline(_window: &mut Window, cx: &mut App) -> AnyElement {
         .into_any_element()
 }
 
-pub(super) fn content(_window: &mut Window, cx: &mut App) -> AnyElement {
+/// Progress that is counted, and progress that is not.
+pub(super) fn progress_bar(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
-    div()
-        .flex()
-        .flex_col()
-        .gap(px(theme.space(Space::Lg)))
-        .p(px(theme.space(Space::Lg)))
+    stack(&theme)
         .w(px(420.0))
+        .child(caption(&theme, "A count the host reported"))
         .child(
-            ProgressBar::new("scene.content.upload")
+            ProgressBar::new("scene.progress-bar.counted")
                 .label("Indexing workspace")
                 .count(3, 12),
         )
-        .child(ProgressBar::new("scene.content.unknown").label("Contacting host"))
-        .child(Divider::new().id("scene.content.rule").label("Filters"))
         .child(
-            div()
-                .flex()
-                .flex_row()
-                .flex_wrap()
-                .gap(px(theme.space(Space::Xs)))
-                .child(Tag::new("scene.content.tag.rust", "rust").on_remove(|_, _| {}))
+            ProgressBar::new("scene.progress-bar.nearly")
+                .label("Uploading")
+                .count(11, 12),
+        )
+        .child(caption(
+            &theme,
+            "No count yet. The bar says it is working, and does not invent a fraction",
+        ))
+        .child(ProgressBar::new("scene.progress-bar.unknown").label("Contacting host"))
+        .into_any_element()
+}
+
+/// A rule between groups, with and without a name for what it separates.
+pub(super) fn divider(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(420.0))
+        .child(caption(&theme, "Plain"))
+        .child(Divider::new().id("scene.divider.plain"))
+        .child(caption(&theme, "Labelled, which names the group below it"))
+        .child(Divider::new().id("scene.divider.labelled").label("Filters"))
+        .child(Divider::new().id("scene.divider.archive").label("Archive"))
+        .into_any_element()
+}
+
+/// A removable token, in every tone a caller can give one.
+pub(super) fn tag(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .child(caption(&theme, "Tones, which report rather than decorate"))
+        .child(
+            row(&theme)
+                .child(Tag::new("scene.tag.rust", "rust").on_remove(|_, _| {}))
                 .child(
-                    Tag::new("scene.content.tag.failing", "failing")
+                    Tag::new("scene.tag.failing", "failing")
                         .tone(Tone::Danger)
                         .on_remove(|_, _| {}),
                 )
                 .child(
-                    Tag::new("scene.content.tag.ada", "Ada")
+                    Tag::new("scene.tag.passing", "passing")
+                        .tone(Tone::Success)
+                        .on_remove(|_, _| {}),
+                )
+                .child(
+                    Tag::new("scene.tag.review", "needs review")
+                        .tone(Tone::Warning)
+                        .on_remove(|_, _| {}),
+                ),
+        )
+        .child(caption(
+            &theme,
+            "An identity tint, which is a fact about who and not about severity",
+        ))
+        .child(
+            row(&theme)
+                .child(
+                    Tag::new("scene.tag.ada", "Ada")
                         .tint(identity_tint(&theme, "loader.pink"))
                         .on_remove(|_, _| {}),
                 )
-                .child(Tag::new("scene.content.tag.pinned", "pinned").disabled(true)),
+                .child(
+                    Tag::new("scene.tag.grace", "Grace")
+                        .tint(identity_tint(&theme, "loader.orange"))
+                        .on_remove(|_, _| {}),
+                ),
         )
+        .child(caption(
+            &theme,
+            "Not removable, and disabled. Neither installs a handler",
+        ))
         .child(
-            div()
-                .flex()
-                .flex_row()
-                .items_center()
-                .gap(px(theme.space(Space::Sm)))
-                .child(Avatar::new("Ada Lovelace").id("scene.content.avatar"))
-                .child(Avatar::new("").size(24.0))
+            row(&theme)
+                .child(Tag::new("scene.tag.plain", "read-only"))
+                .child(Tag::new("scene.tag.pinned", "pinned").disabled(true)),
+        )
+        .into_any_element()
+}
+
+/// An identity, with a name to derive from and without one.
+pub(super) fn avatar(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .child(caption(&theme, "Derived from the name it was given"))
+        .child(
+            row(&theme)
+                .child(Avatar::new("Ada Lovelace").id("scene.avatar.ada"))
+                .child(Avatar::new("Grace Hopper").id("scene.avatar.grace"))
+                .child(Avatar::new("Katherine Johnson").id("scene.avatar.katherine")),
+        )
+        .child(caption(
+            &theme,
+            "An identity tint the caller owns, and no name at all",
+        ))
+        .child(
+            row(&theme)
                 .child(
                     Avatar::new("Grace Hopper")
                         .tint(identity_tint(&theme, "loader.orange"))
-                        .id("scene.content.avatar.tinted"),
+                        .id("scene.avatar.tinted"),
+                )
+                .child(Avatar::new("").id("scene.avatar.anonymous")),
+        )
+        .child(caption(&theme, "Sizes"))
+        .child(
+            row(&theme)
+                .items_center()
+                .child(
+                    Avatar::new("Ada Lovelace")
+                        .size(24.0)
+                        .id("scene.avatar.small"),
+                )
+                .child(Avatar::new("Ada Lovelace").id("scene.avatar.default"))
+                .child(
+                    Avatar::new("Ada Lovelace")
+                        .size(48.0)
+                        .id("scene.avatar.large"),
                 ),
         )
+        .into_any_element()
+}
+
+/// Nothing to show, and the four different reasons for it.
+///
+/// These are separate states because they are separate facts. A host that
+/// refused is not a collection that is empty, and neither is a query that
+/// matched nothing; collapsing them is how a refusal gets shown as an absence.
+pub(super) fn empty_state(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(560.0))
+        .child(caption(&theme, "Nothing has been started yet"))
         .child(
-            EmptyState::new("scene.content.empty", "No runs yet")
+            EmptyState::new("scene.empty-state.unstarted", "No runs yet")
                 .kind(EmptyKind::Unstarted)
                 .detail("A run appears here once one has been started."),
         )
+        .child(caption(&theme, "The host refused, and says so"))
         .child(
-            EmptyState::new("scene.content.refused", "The host refused the request")
-                .kind(EmptyKind::Unavailable)
-                .detail("Approval is required for this workspace.")
+            EmptyState::new(
+                "scene.empty-state.unavailable",
+                "The host refused the request",
+            )
+            .kind(EmptyKind::Unavailable)
+            .detail("Approval is required for this workspace.")
+            .action(
+                Button::new("scene.empty-state.retry")
+                    .label("Try again")
+                    .secondary()
+                    .on_click(|_, _| {}),
+            ),
+        )
+        .child(caption(&theme, "A collection that really is empty"))
+        .child(
+            EmptyState::new("scene.empty-state.empty", "No runs match “failing”")
+                .kind(EmptyKind::Empty)
+                .detail("Clear the filter to see every run."),
+        )
+        .child(caption(&theme, "It was tried, and it failed"))
+        .child(
+            EmptyState::new("scene.empty-state.failed", "The run could not be read")
+                .kind(EmptyKind::Failed)
+                .detail("The snapshot on disk is from a newer version of the format.")
                 .action(
-                    Button::new("scene.content.retry")
-                        .label("Try again")
+                    Button::new("scene.empty-state.reload")
+                        .label("Reload")
                         .secondary()
                         .on_click(|_, _| {}),
                 ),

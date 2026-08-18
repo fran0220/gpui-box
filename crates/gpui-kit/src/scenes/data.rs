@@ -2,7 +2,7 @@
 
 use super::support::*;
 
-pub(super) fn diagnostics_surface(_window: &mut Window, cx: &mut App) -> AnyElement {
+pub(super) fn diagnostics_list(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     let diagnostics = [
         Diagnostic::new(

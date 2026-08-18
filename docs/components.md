@@ -1134,7 +1134,9 @@ Almost every rendering is an **exhibit**: it is about one component, it lives
 in `crates/gpui-kit/src/scenes/<family>.rs` next to the other renderings of
 that family, and it is where a reader is sent to review that component's
 states. `xtask api check` fails when a public component has no exhibit, so a
-component cannot be added and left unseen.
+component cannot be added and left unseen, and it fails when an exhibit claims
+a component its own source never builds, so a component cannot be covered by a
+picture of something else that happens to mount it.
 
 The remaining three are **compositions** — `motion-flip`, `motion-state`, and
 `reading-direction` — built the way a product would build them, because

@@ -668,6 +668,17 @@ fn read_scenes(
                 scene.name
             )
         })?;
+        // The function and the scene are the same thing under two names, and
+        // two names drift. `diagnostics_surface` built `diagnostics-list` for
+        // long enough that grepping for either missed the other.
+        if *function != scene.name.replace('-', "_") {
+            bail!(
+                "scene `{}` is built by `{function}`. A scene and the function that \
+builds it are one thing, so name it `{}`.",
+                scene.name,
+                scene.name.replace('-', "_")
+            );
+        }
         let example = body(&lines, function)
             .map(|text| text.trim_start_matches("pub(super) ").to_string())
             .with_context(|| {
@@ -685,8 +696,29 @@ fn read_scenes(
             .iter()
             .map(|name| (*name).to_string())
             .collect();
+        let subjects: Vec<String> = scene
+            .shows
+            .subjects()
+            .iter()
+            .map(|name| (*name).to_string())
+            .collect();
         for name in &declared {
-            if !can_reach(name, reachable_slice, items, root) {
+            // A subject is what the scene is the review of, so the scene's own
+            // source has to build it. Anything else may be reached through one
+            // component the scene builds — a tooltip's view, a drag ghost —
+            // because that is a thing a picture shows and no source names.
+            let direct = reachable_slice.iter().any(|found| found == name);
+            if subjects.contains(name) && !direct {
+                bail!(
+                    "scene `{}` says it is the review of `{name}`, but its own source \
+never builds one. A component drawn inside another component has been recognised, \
+not reviewed: nobody laid out its states, and the picture that would fail when they \
+change belongs to whatever mounted it. Build it in the scene, or move the name into \
+a scene that does.",
+                    scene.name
+                );
+            }
+            if !direct && !can_reach(name, reachable_slice, items, root) {
                 bail!(
                     "scene `{}` declares `{name}`, which nothing it renders can reach. \
 A scene may name a component it builds, or one that a component it builds mounts; \

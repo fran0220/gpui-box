@@ -614,20 +614,7 @@ fn component_page(
         }
         None => String::new(),
     };
-    let used_in = array(component, "scenes");
-    let scenes_line = if used_in.is_empty() {
-        String::new()
-    } else {
-        format!(
-            r#"<p class="note">Rendered by {}.</p>"#,
-            used_in
-                .iter()
-                .map(as_string)
-                .map(|scene| format!(r#"<a href="/compose/?scene={scene}">{scene}</a>"#))
-                .collect::<Vec<_>>()
-                .join(" ")
-        )
-    };
+    let scenes_line = review_line(component, scenes);
     let examples = first
         .filter(|scene| !string(scene, "example").is_empty())
         .map(|scene| {
@@ -806,6 +793,50 @@ fn fold(id: &str, title: &str, note: &str, inner: &str) -> String {
   {note}{inner}
 </details>"#
     )
+}
+
+/// Where a component is reviewed, and separately where it merely appears.
+///
+/// The catalog draws the distinction and this is the reader who needs it. An
+/// exhibit lays out a component's states and is the answer to "where do I go
+/// to look at this". A composition draws it beside a dozen other things to
+/// show how they behave together, which is worth linking to and is not a
+/// review of anything.
+fn review_line(component: &Value, scenes: &[Value]) -> String {
+    let name = string(component, "name");
+    let exhibits: Vec<String> = array(component, "scenes")
+        .iter()
+        .map(as_string)
+        .map(|scene| format!(r#"<a href="/compose/?scene={scene}">{scene}</a>"#))
+        .collect();
+    let compositions: Vec<String> = scenes
+        .iter()
+        .filter(|scene| string(scene, "kind") == "composition")
+        .filter(|scene| {
+            array(scene, "uses")
+                .iter()
+                .any(|used| as_string(used) == name)
+        })
+        .map(|scene| {
+            let scene = string(scene, "name");
+            format!(r#"<a href="/compose/?scene={scene}">{scene}</a>"#)
+        })
+        .collect();
+
+    let mut lines = String::new();
+    if !exhibits.is_empty() {
+        lines.push_str(&format!(
+            r#"<p class="note">Reviewed in {}.</p>"#,
+            exhibits.join(" ")
+        ));
+    }
+    if !compositions.is_empty() {
+        lines.push_str(&format!(
+            r#"<p class="note">Also drawn by {}, which arranges components rather than reviewing them.</p>"#,
+            compositions.join(" ")
+        ));
+    }
+    lines
 }
 
 fn scene_options(scenes: &[Value]) -> String {

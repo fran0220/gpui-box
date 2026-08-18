@@ -98,7 +98,36 @@ following every helper a scene called, so `hover-card`, `menubar`, and
 fixture. `api check` now holds each declaration to what the source can reach
 and fails when a public component has no exhibit.
 
+**A component is reviewed where it is built, not where it is glimpsed.**
+An exhibit's own source must now build every component it says it reviews.
+Reaching one through a component it mounts still counts for a `Shows`
+declaration — that is how a tooltip's view is nameable — but no longer counts
+as a review. Two components were relying on it: `AgentAvatar` was a picture of
+an avatar inside a card inside a roster, and `AgentRunIssues` draws nothing at
+all unless a snapshot is malformed, so the scene that claimed to cover it had
+never rendered a pixel of it. `api check` also requires a scene's build
+function to carry the scene's name; `anchor_navigation` and
+`diagnostics_surface` are now `anchor_list` and `diagnostics_list`.
+
+**A component page and the MCP catalog distinguish review from appearance.**
+`/components/<Name>` says "Reviewed in" and separately lists the compositions
+that draw the component without reviewing it. `component(name)` says the same
+over MCP, and `scene(name)` reports whether the scene is an exhibit or a
+composition instead of an undifferentiated `uses` list.
+
 ### Added
+
+**Five exhibits where `content` used to be.**
+`progress-bar`, `divider`, `tag`, `avatar`, and `empty-state`. One scene named
+after nothing was reviewing five unrelated components, so a change to `Tag`
+moved the image that also stood for `Avatar`. Each now shows more states than
+the slice it replaced: every `EmptyKind`, every `Tag` tone, `Avatar` at three
+sizes and with no name at all.
+
+**`agent-avatar` and `agent-run-issues`.**
+The presence marks side by side, the execution sentence in all five outcomes,
+and a deliberately malformed run snapshot beside a well-formed one — which is
+the only way to see that `AgentRunIssues` draws nothing when nothing is wrong.
 
 **A scene for `Icon` and one for `Responsive`.**
 Both existed only inside other components' scenes, so the whole glyph catalog,

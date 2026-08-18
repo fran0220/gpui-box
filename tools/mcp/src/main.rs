@@ -194,7 +194,7 @@ fn search(root: &Path, query: &str, kind: &str) -> Result<String> {
                 continue;
             }
             lines.push(format!(
-                "{} ({}) — {}\n  path: {}\n  scenes: {}",
+                "{} ({}) — {}\n  path: {}\n  reviewed in: {}",
                 component["name"].as_str().unwrap_or_default(),
                 component["kind"].as_str().unwrap_or_default(),
                 component["summary"].as_str().unwrap_or("(no summary)"),
@@ -317,7 +317,8 @@ fn format_mountable(component: &Value) -> String {
     let scenes = names(&component["scenes"]);
     if !scenes.is_empty() {
         out.push_str(&format!(
-            "\nscenes that render it: {scenes}\nCall scene(name) for verified example code, \
+            "\nreviewed in: {scenes}\nThat scene is the review of this component: it lays out \
+             its states so they can be compared. Call scene(name) for verified example code, \
              or render_scene(name) to look at it.\n"
         ));
     }
@@ -351,10 +352,24 @@ fn scene(root: &Path, name: &str) -> Result<String> {
     let Some(scene) = found else {
         bail!("no scene named {name:?}. A component's scenes are listed by component(name).");
     };
+    // An exhibit is the review of what it declares; a composition arranges
+    // components that are reviewed elsewhere. Reporting both as `uses` was
+    // how the catalog used to claim a component had been looked at because a
+    // shell happened to draw it.
+    let heading = if scene["kind"].as_str() == Some("composition") {
+        format!(
+            "scene {name} (a composition: it arranges these rather than reviewing \
+             them, and each is reviewed in its own scene)\ndraws: {}",
+            names(&scene["uses"])
+        )
+    } else {
+        format!(
+            "scene {name} (an exhibit: this is where these are reviewed)\nshows: {}",
+            names(&scene["subjects"])
+        )
+    };
     Ok(format!(
-        "scene {}\nuses: {}\n\n{}\n",
-        name,
-        names(&scene["uses"]),
+        "{heading}\n\n{}\n",
         scene["example"].as_str().unwrap_or_default()
     ))
 }

@@ -98,7 +98,7 @@ pub(super) struct SceneAnchorList {
 
 impl Global for SceneAnchorList {}
 
-pub(super) fn anchor_navigation(window: &mut Window, cx: &mut App) -> AnyElement {
+pub(super) fn anchor_list(window: &mut Window, cx: &mut App) -> AnyElement {
     if !cx.has_global::<SceneAnchorList>() {
         let label = cx.strings().text(StringKey::AnchorMoreSections);
         let overflow = cx.new(|cx| Menu::new("scene.anchor-list.menu", window, cx).trigger(label));
