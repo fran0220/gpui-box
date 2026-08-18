@@ -3,6 +3,8 @@
 //! Tests assert against the semantic snapshot and simulate real input, never
 //! against source text or private component state.
 
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::time::Duration;
 
 use gpui::{
@@ -15,13 +17,13 @@ use gpui_kit_semantics::{Node, SemanticRegistry, Snapshot};
 type Build = Box<dyn Fn(&mut Window, &mut App) -> AnyElement>;
 
 struct Scene {
-    build: Build,
+    build: Rc<RefCell<Build>>,
 }
 
 impl Render for Scene {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         SemanticRegistry::global(cx).begin_frame();
-        let content = (self.build)(window, cx);
+        let content = (self.build.borrow())(window, cx);
         div().size_full().child(content)
     }
 }
@@ -30,6 +32,7 @@ impl Render for Scene {
 pub struct Harness {
     cx: VisualTestContext,
     window: AnyWindowHandle,
+    build: Rc<RefCell<Build>>,
     /// Where the simulated pointer is, so a drag can be driven one step at a
     /// time without a test having to carry the position itself.
     pointer: Point<Pixels>,
@@ -52,8 +55,10 @@ impl Harness {
         build: impl Fn(&mut Window, &mut App) -> AnyElement + 'static,
     ) -> Self {
         cx.update(install);
-        let handle = cx.add_window(|_, _| Scene {
-            build: Box::new(build),
+        let build = Rc::new(RefCell::new(Box::new(build) as Build));
+        let handle = cx.add_window({
+            let build = Rc::clone(&build);
+            move |_, _| Scene { build }
         });
         cx.activate_accessibility(handle.into());
         let visual = VisualTestContext::from_window(handle.into(), cx);
@@ -61,8 +66,18 @@ impl Harness {
         Self {
             window: handle.into(),
             cx: visual,
+            build,
             pointer: Point::default(),
         }
+    }
+
+    /// Replaces the tree this window is rendering, without opening another one.
+    ///
+    /// Catalog audits walk every scene on one `TestAppContext`. Opening a
+    /// window per scene repeats install work the first `new` already did.
+    pub fn remount(&mut self, build: impl Fn(&mut Window, &mut App) -> AnyElement + 'static) {
+        *self.build.borrow_mut() = Box::new(build);
+        self.frame();
     }
 
     pub fn window(&self) -> AnyWindowHandle {

@@ -1,6 +1,8 @@
 //! Documents, code, and streams a reader reads.
 
 use super::support::*;
+#[cfg(feature = "terminal")]
+use crate::content::{CellSide, Emulator, GridSnapshot, SelectionKind, Terminal, TerminalState};
 
 /// The complete shell contract: every state remains visibly distinct, and
 /// the narrow panels prove long addresses and page content stay clipped to
@@ -99,6 +101,10 @@ pub(super) fn log_stream(_window: &mut Window, cx: &mut App) -> AnyElement {
             .timestamp("09:41:04")
             .level("WARN", Tone::Warning)
             .source("cache"),
+        LogEntry::new("ansi", "\u{1b}[31mfailed\u{1b}[0m after retry")
+            .timestamp("09:41:04")
+            .level("ERR", Tone::Danger)
+            .source("worker"),
         LogEntry::new("retry", "Fixture request completed after one retry")
             .timestamp("09:41:05")
             .level("INFO", Tone::Info)
@@ -117,6 +123,7 @@ pub(super) fn log_stream(_window: &mut Window, cx: &mut App) -> AnyElement {
         ))
         .child(
             LogStream::new("scene.log", entries)
+                .ansi(true)
                 .state(LogStreamState::Stale(
                     "The latest refresh did not complete; verified entries remain.".into(),
                 ))
@@ -145,7 +152,17 @@ pub(super) fn scene_diff() -> Vec<DiffFile> {
                     }]),
                 DiffLine::paired("cache", "    old_cache.read()", "    verified_cache.read()")
                     .old_number(41)
-                    .new_number(41),
+                    .new_number(41)
+                    .old_spans({
+                        let (old, _) =
+                            word_spans("    old_cache.read()", "    verified_cache.read()");
+                        old
+                    })
+                    .new_spans({
+                        let (_, new) =
+                            word_spans("    old_cache.read()", "    verified_cache.read()");
+                        new
+                    }),
                 DiffLine::added("audit", "    audit.record()").new_number(42),
                 DiffLine::new("close", "}").old_number(42).new_number(43),
             ],
@@ -524,6 +541,97 @@ pub(super) fn transport(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .volume(0.7)
                 .muted(true)
                 .on_event(|_, _, _| {}),
+        )
+        .into_any_element()
+}
+
+/// Every state a session can be in, and a grid drawing the output a screenshot
+/// can actually check: the sixteen ANSI slots against their own background, an
+/// explicit cell background, bold and dim and underline and inverse, a
+/// selection wash over sixteen hues at once, and both colours a program picks
+/// by number.
+///
+/// The script is ASCII throughout, which is a property of the harness rather
+/// than of the component: the headless text system shapes from one bundled
+/// font with no fallback, so a box-drawing character or a CJK glyph captures
+/// as a missing-glyph box and the baseline would record the font's gap as the
+/// terminal's. Wide characters and the column pinning that carries them are
+/// held by the emulator's own tests, where the assertion is on cells rather
+/// than on pixels.
+///
+/// The emulator is rebuilt from a fixed byte script each frame, so the picture
+/// is a function of the bytes and the measured grid and of nothing else.
+#[cfg(feature = "terminal")]
+pub(super) fn terminal(_window: &mut Window, cx: &mut App) -> AnyElement {
+    /// A session's worth of output, chosen so every branch of the painter has
+    /// something to paint.
+    const SESSION: &[u8] = concat!(
+        "\x1b[32m>\x1b[0m cargo run -p xtask -- gate\r\n",
+        "\x1b[1mCompiling\x1b[0m gpui-box-kit v0.1.2\r\n",
+        "\x1b[2m    dim text stays legible and stays dim\x1b[0m\r\n",
+        "\x1b[4munderlined\x1b[0m \x1b[7minverse\x1b[0m \x1b[44;97m on a background \x1b[0m\r\n",
+        "\x1b[30m0\x1b[31m1\x1b[32m2\x1b[33m3\x1b[34m4\x1b[35m5\x1b[36m6\x1b[37m7",
+        "\x1b[90m8\x1b[91m9\x1b[92ma\x1b[93mb\x1b[94mc\x1b[95md\x1b[96me\x1b[97mf\x1b[0m\r\n",
+        "\x1b[38;5;208m256-colour cube\x1b[0m and \x1b[38;2;120;200;255mtruecolour\x1b[0m\r\n",
+        "\x1b[32m>\x1b[0m ",
+    )
+    .as_bytes();
+
+    let theme = cx.theme().clone();
+    let panel = |ident: &'static str, state: TerminalState| {
+        div()
+            .w(px(400.0))
+            .h(px(180.0))
+            .child(Terminal::new(ident).state(state))
+    };
+
+    stack(&theme)
+        .child(
+            div().w(px(400.0)).h(px(180.0)).child(
+                Terminal::new("scene.terminal.ready")
+                    .focused(true)
+                    .grid(|geometry, _| {
+                        let mut emulator = Emulator::new(geometry.cols, geometry.rows);
+                        emulator.feed(SESSION);
+                        // A selection over the middle of a coloured row, so the
+                        // achromatic wash is reviewable against sixteen hues at
+                        // once rather than against one.
+                        emulator.start_selection(
+                            SelectionKind::Drag,
+                            emulator.grid_point(4, 0),
+                            CellSide::Left,
+                        );
+                        emulator.update_selection(emulator.grid_point(4, 15), CellSide::Right);
+                        Some(GridSnapshot {
+                            lines: emulator.lines(),
+                            cursor: emulator.cursor(),
+                        })
+                    })
+                    .on_event(|_, _, _| {}),
+            ),
+        )
+        .child(
+            row(&theme)
+                .items_start()
+                .child(panel("scene.terminal.starting", TerminalState::Loading))
+                .child(panel(
+                    "scene.terminal.unavailable",
+                    TerminalState::Unavailable("No shell is configured for this workspace.".into()),
+                )),
+        )
+        .child(
+            div().w(px(400.0)).h(px(180.0)).child(
+                Terminal::new("scene.terminal.ended")
+                    .state(TerminalState::Error("The process exited with status 130.".into()))
+                    .grid(|geometry, _| {
+                        let mut emulator = Emulator::new(geometry.cols, geometry.rows);
+                        emulator.feed(b"\x1b[32m>\x1b[0m tail -f build.log\r\n\x1b[31merror\x1b[0m: interrupted\r\n");
+                        Some(GridSnapshot {
+                            lines: emulator.lines(),
+                            cursor: emulator.cursor(),
+                        })
+                    }),
+            ),
         )
         .into_any_element()
 }

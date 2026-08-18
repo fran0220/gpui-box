@@ -82,6 +82,13 @@ pub struct Colors {
     pub success: Hsla,
     pub info: Hsla,
     pub loader_gradient: [Hsla; 3],
+    /// The plane a terminal grid paints on, and the achromatic wash over its
+    /// selected cells. See `gpui_kit_tokens::TerminalColors`.
+    pub terminal_background: Hsla,
+    pub terminal_selection: Hsla,
+    /// ANSI slots 0-7 normal, 8-15 bright. Anything above 15 is the 6x6x6
+    /// cube and the grey ramp, which are arithmetic rather than tokens.
+    pub terminal_ansi: [Hsla; 16],
 }
 
 #[derive(Debug, Clone)]
@@ -331,6 +338,9 @@ impl Theme {
                 success: color(tokens.semantic(SemanticColor::Success)),
                 info: color(tokens.semantic(SemanticColor::Info)),
                 loader_gradient: tokens.loader_gradient().map(color),
+                terminal_background: color(tokens.terminal_background()),
+                terminal_selection: color(tokens.terminal_selection()),
+                terminal_ansi: tokens.terminal_ansi().map(color),
             },
             typography: Typography {
                 sans: tokens.typography.sans.family.clone().into(),

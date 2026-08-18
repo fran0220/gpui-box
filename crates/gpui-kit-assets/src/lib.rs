@@ -5,7 +5,11 @@
 use std::borrow::Cow;
 use std::sync::OnceLock;
 
-use gpui::{App, AssetSource, FontFallbacks, Result, SharedString, Styled as _, Svg, svg};
+use gpui::{App, AssetSource, FontFallbacks, Global, Result, SharedString, Styled as _, Svg, svg};
+
+struct EmbeddedFonts;
+
+impl Global for EmbeddedFonts {}
 
 /// Whether a glyph's meaning is carried by the direction it reads in.
 ///
@@ -179,11 +183,15 @@ pub fn text_fallbacks() -> FontFallbacks {
         .clone()
 }
 
-pub fn register_fonts(cx: &App) {
+pub fn register_fonts(cx: &mut App) {
+    if cx.has_global::<EmbeddedFonts>() {
+        return;
+    }
     let fonts = font_bytes().into_iter().map(Cow::Borrowed).collect();
     if let Err(error) = cx.text_system().add_fonts(fonts) {
         tracing::warn!(%error, "GPUI Box could not register embedded fonts");
     }
+    cx.set_global(EmbeddedFonts);
 }
 
 #[cfg(test)]

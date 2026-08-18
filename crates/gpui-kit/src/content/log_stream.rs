@@ -28,11 +28,12 @@ use std::rc::Rc;
 
 use gpui::{
     AnyElement, App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
-    Styled, Window, div, px,
+    Styled, StyledText, Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TypeScale};
 
+use crate::content::ansi::{ansi_highlights, strip_ansi};
 use crate::controls::button::Button;
 use crate::data::{List, ListItem, scroll_to_row};
 use crate::display::badge::{Badge, Tone};
@@ -40,6 +41,7 @@ use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::highlight::HighlightedText;
 use crate::display::loading::PulseLoader;
 use crate::display::status::StatusDot;
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
 use crate::motion::keyed;
 use crate::strings::{ActiveStrings, StringKey};
@@ -57,6 +59,7 @@ pub struct LogEntry {
     pub tone: Tone,
     pub search_hits: Vec<Range<usize>>,
     pub current_hit: Option<usize>,
+    compiled: Option<(SharedString, Vec<crate::content::ansi::AnsiRun>)>,
 }
 
 impl LogEntry {
@@ -70,7 +73,15 @@ impl LogEntry {
             tone: Tone::Neutral,
             search_hits: Vec::new(),
             current_hit: None,
+            compiled: None,
         }
+    }
+
+    /// Strips ANSI once so a virtualized row does not parse the same line
+    /// again on every scroll.
+    pub fn prepare_ansi(mut self) -> Self {
+        self.compiled = Some(strip_ansi(self.message.as_ref()));
+        self
     }
 
     /// A timestamp the caller already formatted.
@@ -146,6 +157,8 @@ pub struct LogStream {
     selected: Option<SharedString>,
     on_select: Option<EntryHandler>,
     on_copy: Option<EntryHandler>,
+    ansi: bool,
+    slots: Slots,
 }
 
 impl std::fmt::Debug for LogStream {
@@ -171,6 +184,8 @@ impl LogStream {
             selected: None,
             on_select: None,
             on_copy: None,
+            ansi: false,
+            slots: Slots::default(),
         }
     }
 
@@ -209,6 +224,21 @@ impl LogStream {
         self.on_copy = Some(Rc::new(handler));
         self
     }
+
+    /// Treats each message as ANSI-coloured text. Search hits still win.
+    pub fn ansi(mut self, ansi: bool) -> Self {
+        self.ansi = ansi;
+        self
+    }
+}
+
+impl Slotted for LogStream {
+    const SLOTS: &'static [&'static str] =
+        &[slot::EMPTY, slot::FAILED, slot::LOADING, slot::HEADER_EXTRA];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
 }
 
 #[derive(Debug, Default)]
@@ -220,9 +250,22 @@ struct FollowState {
 }
 
 impl RenderOnce for LogStream {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let entries = Rc::new(self.entries);
+        let entries = Rc::new(if self.ansi {
+            self.entries
+                .into_iter()
+                .map(|entry| {
+                    if entry.compiled.is_some() {
+                        entry
+                    } else {
+                        entry.prepare_ansi()
+                    }
+                })
+                .collect()
+        } else {
+            self.entries
+        });
         let count = entries.len();
         let shows_entries = self.state.shows_entries();
         let list_ident = self.ident.child("entries");
@@ -246,6 +289,7 @@ impl RenderOnce for LogStream {
             scroll_to_row(&list_ident, count - 1, cx);
         }
 
+        let extra = self.slots.render(slot::HEADER_EXTRA, window, cx);
         let body = if shows_entries {
             entries_body(
                 Rc::clone(&entries),
@@ -254,9 +298,10 @@ impl RenderOnce for LogStream {
                 self.visible_rows,
                 self.selected.clone(),
                 self.on_select.clone(),
+                self.ansi,
             )
         } else {
-            state_body(&self.ident, &self.state, cx)
+            state_body(&self.ident, &self.state, &self.slots, window, cx)
         };
 
         let toolbar = shows_entries.then(|| {
@@ -386,6 +431,7 @@ impl RenderOnce for LogStream {
             .p_token(&theme, Space::Sm)
             .radius(&theme, Radius::Card)
             .frame(&theme, Surface::Raised, Elevation::Raised)
+            .children(extra)
             .children(toolbar)
             .children(stale)
             .child(body)
@@ -400,16 +446,20 @@ fn entries_body(
     visible_rows: usize,
     selected: Option<SharedString>,
     on_select: Option<EntryHandler>,
+    ansi: bool,
 ) -> AnyElement {
     let rows = Rc::clone(&entries);
     let parent = list_ident.clone();
     let row_theme = theme.clone();
     let mut list = List::new(list_ident.clone(), entries.len(), move |index, _, cx| {
         let entry = &rows[index];
-        ListItem::new(entry.id.clone(), entry_row(&parent, entry, &row_theme, cx))
-            // Log payloads stay out of diagnostic snapshots. The caller's
-            // level is enough to name the row without publishing the message.
-            .text(entry.level.clone())
+        ListItem::new(
+            entry.id.clone(),
+            entry_row(&parent, entry, &row_theme, ansi, cx),
+        )
+        // Log payloads stay out of diagnostic snapshots. The caller's
+        // level is enough to name the row without publishing the message.
+        .text(entry.level.clone())
     })
     .row_height(theme.control.get(ControlSize::Sm).height)
     .visible_rows(visible_rows);
@@ -426,35 +476,51 @@ fn entry_row(
     parent: &Ident,
     entry: &LogEntry,
     theme: &gpui_kit_theme::Theme,
+    ansi: bool,
     cx: &App,
 ) -> AnyElement {
     let entry_ident = parent.child(entry.id.as_ref());
-    let mut message = HighlightedText::new(entry.message.clone())
-        .selectable(entry_ident.child("message"))
-        .hits(entry.search_hits.clone())
-        .monospace(true);
-    if let Some(current) = entry.current_hit {
-        message = message.current(current);
-    }
-    let drawn = message.published_hits();
-    let message = div()
-        .flex_1()
-        .min_w_0()
-        .h_full()
-        .overflow_hidden()
-        .whitespace_nowrap()
-        .child(message);
-    let message = if drawn > 0 {
-        message
-            .semantic_in(
-                cx,
-                NodeSpec::new(entry_ident.child("hits").semantic_id(), Role::Status)
-                    .parent(entry_ident.semantic_id())
-                    .value(drawn.to_string()),
-            )
+    let message_element = if ansi && entry.search_hits.is_empty() {
+        let (plain, runs) = entry
+            .compiled
+            .clone()
+            .unwrap_or_else(|| strip_ansi(entry.message.as_ref()));
+        div()
+            .flex_1()
+            .min_w_0()
+            .h_full()
+            .overflow_hidden()
+            .whitespace_nowrap()
+            .child(StyledText::new(plain).with_highlights(ansi_highlights(&runs, theme)))
             .into_any_element()
     } else {
-        message.into_any_element()
+        let mut message = HighlightedText::new(entry.message.clone())
+            .selectable(entry_ident.child("message"))
+            .hits(entry.search_hits.clone())
+            .monospace(true);
+        if let Some(current) = entry.current_hit {
+            message = message.current(current);
+        }
+        let drawn = message.published_hits();
+        let message = div()
+            .flex_1()
+            .min_w_0()
+            .h_full()
+            .overflow_hidden()
+            .whitespace_nowrap()
+            .child(message);
+        if drawn > 0 {
+            message
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(entry_ident.child("hits").semantic_id(), Role::Status)
+                        .parent(entry_ident.semantic_id())
+                        .value(drawn.to_string()),
+                )
+                .into_any_element()
+        } else {
+            message.into_any_element()
+        }
     };
 
     div()
@@ -489,26 +555,37 @@ fn entry_row(
                 .text_color(theme.colors.text_muted)
                 .child(entry.source.clone()),
         )
-        .child(message)
+        .child(message_element)
         .into_any_element()
 }
 
-fn state_body(ident: &Ident, state: &LogStreamState, cx: &App) -> AnyElement {
+fn state_body(
+    ident: &Ident,
+    state: &LogStreamState,
+    slots: &Slots,
+    window: &mut Window,
+    cx: &mut App,
+) -> AnyElement {
     let strings = cx.strings();
     match state {
-        LogStreamState::Loading => div()
-            .flex()
-            .items_center()
-            .justify_center()
-            .w_full()
-            .p(px(24.0))
-            .child(PulseLoader::new(ident.child("loading")).label(strings.text(StringKey::Loading)))
-            .into_any_element(),
-        LogStreamState::Empty => {
-            EmptyState::new(ident.child("empty"), strings.text(StringKey::LogEmpty))
+        LogStreamState::Loading => slots.or_else(slot::LOADING, window, cx, |_, cx| {
+            div()
+                .flex()
+                .items_center()
+                .justify_center()
+                .w_full()
+                .p(px(24.0))
+                .child(
+                    PulseLoader::new(ident.child("loading"))
+                        .label(cx.strings().text(StringKey::Loading)),
+                )
+                .into_any_element()
+        }),
+        LogStreamState::Empty => slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+            EmptyState::new(ident.child("empty"), cx.strings().text(StringKey::LogEmpty))
                 .kind(EmptyKind::Empty)
                 .into_any_element()
-        }
+        }),
         LogStreamState::Unavailable(reason) => EmptyState::new(
             ident.child("unavailable"),
             strings.text(StringKey::LogUnavailable),
@@ -516,12 +593,12 @@ fn state_body(ident: &Ident, state: &LogStreamState, cx: &App) -> AnyElement {
         .kind(EmptyKind::Unavailable)
         .detail(reason.clone())
         .into_any_element(),
-        LogStreamState::Error(reason) => {
-            EmptyState::new(ident.child("error"), strings.text(StringKey::LogError))
+        LogStreamState::Error(reason) => slots.or_else(slot::FAILED, window, cx, |_, cx| {
+            EmptyState::new(ident.child("error"), cx.strings().text(StringKey::LogError))
                 .kind(EmptyKind::Failed)
                 .detail(reason.clone())
                 .into_any_element()
-        }
+        }),
         LogStreamState::Ready | LogStreamState::Stale(_) => div().into_any_element(),
     }
 }

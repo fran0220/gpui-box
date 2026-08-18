@@ -40,11 +40,11 @@ pub use diagnostics_list::{
     DiagnosticsList,
 };
 pub use grid::{
-    BulkBar, DataGrid, EditIntent, EditOutcome, EditingCell, Expanded, GridColumn, GridLines,
-    GridRow, SelectionChange, SelectionMode,
+    BulkBar, CellRange, ColumnGroup, DataGrid, EditIntent, EditOutcome, EditingCell, Expanded,
+    GridColumn, GridLines, GridRow, SelectionChange, SelectionMode,
 };
 pub use list::{List, ListItem};
 pub use table::{Align, Cell, Column, ColumnWidth, Row, SortDirection, Table};
-pub use tree::{Tree, TreeNode};
+pub use tree::{BranchState, Tree, TreeNode};
 pub use tree_grid::{TreeGrid, TreeGridRow};
 pub use viewport::{reveal_row, scroll_to_row};

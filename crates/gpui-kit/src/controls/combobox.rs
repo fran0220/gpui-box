@@ -266,7 +266,7 @@ impl Combobox {
             .iter()
             .map(|option| option.label.as_ref())
             .collect();
-        popover::filter_indices(self.filter(cx).as_ref(), &labels)
+        popover::filter_indices_for(cx, self.filter(cx).as_ref(), &labels)
     }
 
     /// The option the highlight sits on: the one the typist put it on while
@@ -497,11 +497,19 @@ impl Combobox {
                 .into_any_element(),
             ]
         } else {
-            matches
-                .iter()
-                .enumerate()
-                .map(|(position, index)| self.row(*index, highlighted, position, matches.len(), cx))
-                .collect()
+            let mut rows = Vec::new();
+            let mut last_group: Option<SharedString> = None;
+            for (position, index) in matches.iter().enumerate() {
+                let option = &self.options[*index];
+                if option.group != last_group {
+                    if let Some(group) = option.group.clone() {
+                        rows.push(self.group_heading(&group, cx));
+                    }
+                    last_group = option.group.clone();
+                }
+                rows.push(self.row(*index, highlighted, position, matches.len(), cx));
+            }
+            rows
         };
 
         if self.menu_geometry != Some(geometry) {
@@ -541,6 +549,22 @@ impl Combobox {
             geometry.placement,
             list,
         )
+    }
+
+    fn group_heading(&self, label: &SharedString, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        let ident = self.ident.child("group").child(label.as_ref());
+        foundation_text(&theme, TypeScale::Caption, label.clone())
+            .px(px(theme.space(Space::Sm)))
+            .py(px(theme.space(Space::Xs)))
+            .text_color(theme.colors.text_faint)
+            .semantic_in(
+                cx,
+                NodeSpec::new(ident.semantic_id(), Role::Text)
+                    .parent(self.ident.child("menu").semantic_id())
+                    .text(label.clone()),
+            )
+            .into_any_element()
     }
 
     fn row(

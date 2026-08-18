@@ -22,6 +22,7 @@
 //! suitable for a large already-materialized diff, not for lazy diff loading.
 
 use std::collections::HashMap;
+use std::ops::Range;
 use std::rc::Rc;
 
 use gpui::{
@@ -245,6 +246,9 @@ pub struct DiffHunk {
     pub id: SharedString,
     pub header: SharedString,
     pub lines: Vec<DiffLine>,
+    /// When true the hunk header stays and the lines do not, so a host can
+    /// offer more context without this view inventing it.
+    pub collapsed: bool,
 }
 
 impl DiffHunk {
@@ -257,7 +261,13 @@ impl DiffHunk {
             id: id.into(),
             header: header.into(),
             lines: lines.into_iter().collect(),
+            collapsed: false,
         }
+    }
+
+    pub fn collapsed(mut self, collapsed: bool) -> Self {
+        self.collapsed = collapsed;
+        self
     }
 }
 
@@ -297,6 +307,11 @@ pub enum DiffViewEvent {
         file_id: SharedString,
         hunk_id: SharedString,
         line_id: SharedString,
+    },
+    /// The host should disclose more context around this hunk.
+    ExpandHunk {
+        file_id: SharedString,
+        hunk_id: SharedString,
     },
 }
 
@@ -368,6 +383,7 @@ struct FlatRow {
 enum FlatKind {
     File(SharedString),
     Hunk(SharedString),
+    Expand,
     Unified {
         side: DiffSide,
         old_number: Option<usize>,
@@ -384,6 +400,7 @@ impl FlatKind {
         match self {
             Self::File(_) => StringKey::DiffFile,
             Self::Hunk(_) => StringKey::DiffHunk,
+            Self::Expand => StringKey::DiffExpandHunk,
             Self::Unified { side, .. } => side.mark.key(),
             Self::Split { old, new } => match (old, new) {
                 (Some(old), Some(new))
@@ -417,13 +434,17 @@ impl RenderOnce for DiffView {
         } else {
             let rendered = Rc::clone(&rows);
             let row_theme = theme.clone();
+            let expand_label = cx.strings().text(StringKey::DiffExpandHunk);
             let mut list = List::new(list_ident.clone(), count, move |index, _, cx| {
                 let row = &rendered[index];
                 let label = cx.strings().text(row.kind.label_key());
-                ListItem::new(row.id.clone(), diff_row(&row.id, &row.kind, &row_theme))
-                    // Source and paths stay out of diagnostic snapshots. Stable
-                    // business ids and the row kind remain addressable.
-                    .text(label)
+                ListItem::new(
+                    row.id.clone(),
+                    diff_row(&row.id, &row.kind, &row_theme, &expand_label),
+                )
+                // Source and paths stay out of diagnostic snapshots. Stable
+                // business ids and the row kind remain addressable.
+                .text(label)
             })
             .row_height(theme.control.get(ControlSize::Sm).height)
             .visible_rows(self.visible_rows);
@@ -484,6 +505,17 @@ fn flatten(files: Vec<DiffFile>, presentation: DiffPresentation) -> Vec<FlatRow>
                 },
                 kind: FlatKind::Hunk(hunk.header),
             });
+            if hunk.collapsed {
+                rows.push(FlatRow {
+                    id: hunk_path.child("expand").semantic_id(),
+                    event: DiffViewEvent::ExpandHunk {
+                        file_id: file.id.clone(),
+                        hunk_id: hunk.id.clone(),
+                    },
+                    kind: FlatKind::Expand,
+                });
+                continue;
+            }
             for line in hunk.lines {
                 let line_path = hunk_path.child("line").child(line.id.as_ref());
                 let event = DiffViewEvent::LineActivated {
@@ -492,14 +524,14 @@ fn flatten(files: Vec<DiffFile>, presentation: DiffPresentation) -> Vec<FlatRow>
                     line_id: line.id.clone(),
                 };
                 match presentation {
-                    DiffPresentation::Split => rows.push(FlatRow {
-                        id: line_path.semantic_id(),
-                        event,
-                        kind: FlatKind::Split {
-                            old: line.old,
-                            new: line.new,
-                        },
-                    }),
+                    DiffPresentation::Split => {
+                        let (old, new) = fill_word_spans(line.old, line.new);
+                        rows.push(FlatRow {
+                            id: line_path.semantic_id(),
+                            event,
+                            kind: FlatKind::Split { old, new },
+                        });
+                    }
                     DiffPresentation::Unified => match (line.old, line.new) {
                         (Some(old), Some(new))
                             if old.text == new.text
@@ -518,6 +550,9 @@ fn flatten(files: Vec<DiffFile>, presentation: DiffPresentation) -> Vec<FlatRow>
                             });
                         }
                         (Some(old), Some(new)) => {
+                            let (old, new) = fill_word_spans(Some(old), Some(new));
+                            let old = old.expect("paired old");
+                            let new = new.expect("paired new");
                             rows.push(FlatRow {
                                 id: line_path.child("old").semantic_id(),
                                 event: event.clone(),
@@ -564,7 +599,12 @@ fn flatten(files: Vec<DiffFile>, presentation: DiffPresentation) -> Vec<FlatRow>
     rows
 }
 
-fn diff_row(id: &SharedString, kind: &FlatKind, theme: &Theme) -> AnyElement {
+fn diff_row(
+    id: &SharedString,
+    kind: &FlatKind,
+    theme: &Theme,
+    expand: &SharedString,
+) -> AnyElement {
     match kind {
         FlatKind::File(label) => div()
             .row()
@@ -576,6 +616,16 @@ fn diff_row(id: &SharedString, kind: &FlatKind, theme: &Theme) -> AnyElement {
             .text_color(theme.colors.text)
             .bg(theme.colors.raised)
             .child(label.clone())
+            .into_any_element(),
+        FlatKind::Expand => div()
+            .row()
+            .items_center()
+            .w_full()
+            .h_full()
+            .px_token(theme, Space::Sm)
+            .type_scale(theme, TypeScale::Caption)
+            .text_color(theme.colors.accent)
+            .child(expand.clone())
             .into_any_element(),
         FlatKind::Hunk(header) => div()
             .row()
@@ -721,6 +771,86 @@ fn number(number: Option<usize>, theme: &Theme) -> AnyElement {
         .into_any_element()
 }
 
+fn fill_word_spans(
+    old: Option<DiffSide>,
+    new: Option<DiffSide>,
+) -> (Option<DiffSide>, Option<DiffSide>) {
+    match (old, new) {
+        (Some(mut old), Some(mut new))
+            if old.spans.is_empty() && new.spans.is_empty() && old.text != new.text =>
+        {
+            let (left, right) = word_spans(old.text.as_ref(), new.text.as_ref());
+            old.spans = left;
+            new.spans = right;
+            (Some(old), Some(new))
+        }
+        (old, new) => (old, new),
+    }
+}
+
+/// Highlights tokens that do not appear in the other side.
+///
+/// This is not a diff: both strings are complete, and the spans name the
+/// tokens that have no counterpart. A host that already computed a real
+/// intra-line diff should pass its own [`CodeSpan`]s instead.
+pub fn word_spans(old: &str, new: &str) -> (Vec<CodeSpan>, Vec<CodeSpan>) {
+    let left = tokens(old);
+    let right = tokens(new);
+    let keep_left = lcs_keep(&left, &right);
+    let keep_right = lcs_keep(&right, &left);
+    (
+        unmatched_spans(&left, &keep_left, Tone::Danger),
+        unmatched_spans(&right, &keep_right, Tone::Success),
+    )
+}
+
+fn tokens(text: &str) -> Vec<(Range<usize>, String)> {
+    let mut out = Vec::new();
+    let mut start = 0usize;
+    let mut chars = text.char_indices().peekable();
+    while let Some((index, ch)) = chars.next() {
+        let word = ch.is_alphanumeric() || ch == '_';
+        let end = chars.peek().map(|(next, _)| *next).unwrap_or(text.len());
+        let next_word = chars
+            .peek()
+            .map(|(_, next)| next.is_alphanumeric() || *next == '_')
+            .unwrap_or(!word);
+        if word != next_word || chars.peek().is_none() {
+            let slice = &text[start..end];
+            if !slice.chars().all(char::is_whitespace) {
+                out.push((start..end, slice.to_string()));
+            }
+            start = end;
+        }
+        let _ = index;
+    }
+    out
+}
+
+fn lcs_keep(side: &[(Range<usize>, String)], other: &[(Range<usize>, String)]) -> Vec<bool> {
+    let mut keep = vec![false; side.len()];
+    let mut cursor = 0usize;
+    for (index, (_, token)) in side.iter().enumerate() {
+        if let Some(found) = other[cursor..].iter().position(|(_, held)| held == token) {
+            keep[index] = true;
+            cursor += found + 1;
+        }
+    }
+    keep
+}
+
+fn unmatched_spans(tokens: &[(Range<usize>, String)], keep: &[bool], tone: Tone) -> Vec<CodeSpan> {
+    tokens
+        .iter()
+        .zip(keep)
+        .filter(|(_, keep)| !**keep)
+        .map(|((range, _), _)| CodeSpan {
+            range: range.clone(),
+            tone,
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -830,6 +960,17 @@ mod tests {
         assert_eq!(unified.len(), 3);
         assert_eq!(split[2].event, line_event("context"));
         assert_eq!(unified[2].event, line_event("context"));
+    }
+
+    #[test]
+    fn word_spans_mark_tokens_that_have_no_counterpart() {
+        let (old, new) = word_spans("old_cache.read()", "verified_cache.read()");
+        assert!(old.iter().any(|span| span.tone == Tone::Danger));
+        assert!(new.iter().any(|span| span.tone == Tone::Success));
+        assert!(
+            old.iter()
+                .all(|span| span.range.end <= "old_cache.read()".len())
+        );
     }
 
     fn line_event(id: &str) -> DiffViewEvent {

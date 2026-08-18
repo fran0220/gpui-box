@@ -217,6 +217,25 @@ impl RenderOnce for ScrollArea {
                     gpui::linear_color_stop(cast.opacity(0.0), 1.0),
                 ))
         });
+        let remaining = (f32::from(max.y) + f32::from(offset.y)).max(0.0);
+        let bottom_shade = self
+            .axis
+            .has_vertical()
+            .then(|| ScrollLink::over(px(theme.effects.edge_fade_band)).progress(px(remaining)));
+        let bottom_shadow = bottom_shade.filter(|shade| *shade > 0.0).map(|shade| {
+            let cast = theme.colors.backdrop;
+            div()
+                .absolute()
+                .bottom_0()
+                .left_0()
+                .right_0()
+                .h(px(theme.effects.edge_fade_band * 0.6))
+                .bg(gpui::linear_gradient(
+                    0.0,
+                    gpui::linear_color_stop(cast.opacity(0.28 * shade), 0.0),
+                    gpui::linear_color_stop(cast.opacity(0.0), 1.0),
+                ))
+        });
 
         let viewport_frame = div()
             .relative()
@@ -235,7 +254,8 @@ impl RenderOnce for ScrollArea {
             // whichever child comes first, and it is the viewport that decides
             // whether a scrollbar is needed.
             .child(viewport_element)
-            .children(top_shadow);
+            .children(top_shadow)
+            .children(bottom_shadow);
 
         let vertical = self.axis.has_vertical().then(|| {
             bar(

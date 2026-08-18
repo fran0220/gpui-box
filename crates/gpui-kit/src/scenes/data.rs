@@ -294,6 +294,8 @@ pub(super) fn data_grid(_window: &mut Window, cx: &mut App) -> AnyElement {
             )
             .total(FIXTURE_JOBS_TOTAL)
             .columns(grid_columns())
+            .group(ColumnGroup::new("job", "Job").columns(["name", "state"]))
+            .footer_cell("duration", "4.2s")
             .sorted_by("duration", SortDirection::Descending)
             .selection_mode(SelectionMode::Multiple)
             .selected(["job-0001", "job-0003"])
@@ -308,7 +310,12 @@ pub(super) fn data_grid(_window: &mut Window, cx: &mut App) -> AnyElement {
             .on_reorder(|_, _, _| {})
             .on_expand(|_, _, _, _| {})
             .on_edit_request(|_, _, _, _| {})
-            .on_edit(|_, _, _| {}),
+            .on_edit(|_, _, _| {})
+            .range(Some(CellRange::new(
+                "job-0001", "name", "job-0003", "state",
+            )))
+            .on_range_change(|_, _, _| {})
+            .on_copy(|_, _, _| {}),
         )
         .child(
             crate::foundation::text(
@@ -405,7 +412,6 @@ pub(super) fn tree(_window: &mut Window, cx: &mut App) -> AnyElement {
         .w(px(360.0))
         .child(
             Tree::new("scene.tree.workspace")
-                .expanded_ids(&["workspace", "crates"])
                 .selected("tokens")
                 .nodes([
                     TreeNode::new("workspace", "workspace")
@@ -426,7 +432,11 @@ pub(super) fn tree(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .icon(Icon::Archive)
                         .disabled(true)
                         .children([TreeNode::new("debug", "debug").icon(Icon::Folder)]),
+                    TreeNode::new("remote", "remote")
+                        .icon(Icon::Folder)
+                        .branch(BranchState::Loading),
                 ])
+                .expanded_ids(&["workspace", "crates", "remote"])
                 .on_toggle(|_, _, _, _| {})
                 .on_select(|_, _, _| {}),
         )

@@ -257,6 +257,20 @@ where
     })
 }
 
+/// How a surface arrives when it replaces a loading or empty stand-in.
+///
+/// Opacity only. A rise would move the first line of real content after a
+/// skeleton, and the whole point of this swap is that the settled box was
+/// already reserved. Under reduced motion the animation finishes immediately.
+pub fn surface_in<E>(id: impl Into<ElementId>, theme: &Theme, element: E) -> AnimationElement<E>
+where
+    E: Styled + IntoElement + 'static,
+{
+    element.with_animation(id, state_change(theme).animation(), |element, progress| {
+        element.opacity(progress)
+    })
+}
+
 /// The sweep a loading placeholder's highlight travels on, as a fraction of
 /// the placeholder's own width.
 ///

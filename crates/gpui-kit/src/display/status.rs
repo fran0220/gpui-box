@@ -13,9 +13,12 @@ use crate::motion;
 pub struct StatusDot {
     tone: Tone,
     tint: Option<Hsla>,
-    /// The identity a breathing dot animates under, when it is reporting
+    /// The identity a busy dot animates under, when it is reporting
     /// work that is still going.
     busy: Option<Ident>,
+    /// Which claim the motion makes. A circle cannot turn, so working and
+    /// deliberating both breathe; advancing sweeps a band across the mark.
+    activity: motion::Activity,
 }
 
 impl StatusDot {
@@ -24,6 +27,7 @@ impl StatusDot {
             tone,
             tint: None,
             busy: None,
+            activity: motion::Activity::Deliberating,
         }
     }
 
@@ -47,18 +51,40 @@ impl StatusDot {
         self.busy = Some(ident.into());
         self
     }
+
+    /// Which of the three busy claims the motion makes.
+    ///
+    /// Without [`StatusDot::busy`] this is ignored: a settled dot does not
+    /// move, whatever activity was named.
+    pub fn activity(mut self, activity: motion::Activity) -> Self {
+        self.activity = activity;
+        self
+    }
 }
 
 impl RenderOnce for StatusDot {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let dot = div()
-            .flex_none()
-            .size(px(7.0))
-            .rounded_full()
-            .bg(self.tone.mark_color(self.tint, &theme));
+        let color = self.tone.mark_color(self.tint, &theme);
+        let dot = div().flex_none().size(px(7.0)).rounded_full().bg(color);
         match self.busy {
-            Some(ident) => motion::breathe(dot, ident.element_id(), &theme, cx),
+            Some(ident) if self.activity == motion::Activity::Advancing => {
+                let mark = div()
+                    .relative()
+                    .flex_none()
+                    .size(px(7.0))
+                    .rounded_full()
+                    .overflow_hidden()
+                    .bg(color)
+                    .children(motion::sweep(
+                        ident.element_id(),
+                        &theme,
+                        theme.colors.text,
+                        cx,
+                    ));
+                mark.into_any_element()
+            }
+            Some(ident) => motion::breathe_as(dot, ident.element_id(), self.activity, &theme, cx),
             None => dot.into_any_element(),
         }
     }
@@ -72,6 +98,7 @@ pub struct StatusLine {
     tone: Tone,
     tint: Option<Hsla>,
     busy: Option<Ident>,
+    activity: motion::Activity,
 }
 
 impl StatusLine {
@@ -82,6 +109,7 @@ impl StatusLine {
             tone,
             tint: None,
             busy: None,
+            activity: motion::Activity::Deliberating,
         }
     }
 
@@ -106,6 +134,12 @@ impl StatusLine {
         self.busy = Some(ident.into());
         self
     }
+
+    /// Which of the three busy claims the motion makes. See [`StatusDot::activity`].
+    pub fn activity(mut self, activity: motion::Activity) -> Self {
+        self.activity = activity;
+        self
+    }
 }
 
 impl RenderOnce for StatusLine {
@@ -116,7 +150,7 @@ impl RenderOnce for StatusLine {
             dot = dot.tint(tint);
         }
         if let Some(busy) = self.busy.clone() {
-            dot = dot.busy(busy);
+            dot = dot.busy(busy).activity(self.activity);
         }
         let element = div()
             .row()

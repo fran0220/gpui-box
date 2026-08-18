@@ -48,14 +48,16 @@ use agent::{
 };
 use canvas::node_graph;
 use compositions::{motion_flip, motion_state, reading_direction};
+#[cfg(feature = "terminal")]
+use content::terminal;
 use content::{
     agent_document, browser_panel, code_view, conversation, diff_view, image_viewer, log_stream,
     markdown, transport,
 };
 use controls::{
-    actions, auth_sign_in, auth_verification, button, cascader, choice, copy_button, dropzone,
-    filter_bar, find_replace, form, inline_edit, input, keybinding, keymap_editor, search_field,
-    settings, textarea, toggle, upload_list,
+    actions, auth_sign_in, auth_verification, button, cascader, choice, color_picker, copy_button,
+    dropzone, filter_bar, find_replace, form, inline_edit, input, keybinding, keymap_editor,
+    search_field, settings, textarea, toggle, upload_list,
 };
 use data::{
     data_grid, data_grid_editing, diagnostics_list, drag_list, drag_tree, list, table, tree,
@@ -64,8 +66,8 @@ use data::{
 #[cfg(feature = "fixtures")]
 use datetime::{calendar, date_range, date_time};
 use display::{
-    animated_number, avatar, badge, card, chart, detail, divider, empty_state, failure_panel, icon,
-    loading, progress_bar, progress_circle, sparkline, status, tag,
+    animated_number, avatar, badge, card, chart, detail, divider, empty_state, failure_panel,
+    heatmap, icon, loading, progress_bar, progress_circle, sparkline, status, tag, trace,
 };
 use effects::{cinematic_effects, visual_effects};
 use game::game_ui;
@@ -718,7 +720,30 @@ pub fn catalog() -> Vec<Scene> {
         Scene {
             name: "chart",
             build: chart,
-            shows: Shows::Subjects(&["BarChart", "LineChart"]),
+            shows: Shows::Subjects(&[
+                "AreaChart",
+                "BarChart",
+                "ChartLegend",
+                "LineChart",
+                "PieChart",
+                "ScatterChart",
+                "StackedBarChart",
+            ]),
+        },
+        Scene {
+            name: "trace",
+            build: trace,
+            shows: Shows::Subjects(&["SpanTimeline", "TraceView"]),
+        },
+        Scene {
+            name: "heatmap",
+            build: heatmap,
+            shows: Shows::Subjects(&["Heatmap"]),
+        },
+        Scene {
+            name: "color-picker",
+            build: color_picker,
+            shows: Shows::Subjects(&["ColorPicker", "ColorSwatch"]),
         },
         Scene {
             name: "code-view",
@@ -746,6 +771,12 @@ pub fn catalog() -> Vec<Scene> {
             shows: Shows::Subjects(&["DiagnosticsList"]),
         },
     ];
+    #[cfg(feature = "terminal")]
+    scenes.push(Scene {
+        name: "terminal",
+        build: terminal,
+        shows: Shows::Subjects(&["Terminal"]),
+    });
     #[cfg(feature = "fixtures")]
     scenes.extend([
         Scene {

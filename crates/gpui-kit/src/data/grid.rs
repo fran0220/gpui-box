@@ -40,7 +40,7 @@
 //! answer properly.
 
 use std::cell::{Cell as StdCell, RefCell};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::ops::Range;
 use std::rc::Rc;
 
@@ -92,6 +92,39 @@ type ReorderHandler = Rc<dyn Fn(&DropIntent, &mut Window, &mut App)>;
 type ExpandHandler = Rc<dyn Fn(SharedString, bool, &mut Window, &mut App)>;
 type EditRequestHandler = Rc<dyn Fn(SharedString, SharedString, &mut Window, &mut App)>;
 type EditHandler = Rc<dyn Fn(&EditIntent, &mut Window, &mut App)>;
+type RangeHandler = Rc<dyn Fn(&CellRange, &mut Window, &mut App)>;
+type CopyHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
+type RangeCover = (
+    CellRange,
+    usize,
+    HashSet<SharedString>,
+    HashSet<SharedString>,
+);
+
+/// A caller-owned rectangle of cells, named by row and column identity.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CellRange {
+    pub start_row: SharedString,
+    pub start_column: SharedString,
+    pub end_row: SharedString,
+    pub end_column: SharedString,
+}
+
+impl CellRange {
+    pub fn new(
+        start_row: impl Into<SharedString>,
+        start_column: impl Into<SharedString>,
+        end_row: impl Into<SharedString>,
+        end_column: impl Into<SharedString>,
+    ) -> Self {
+        Self {
+            start_row: start_row.into(),
+            start_column: start_column.into(),
+            end_row: end_row.into(),
+            end_column: end_column.into(),
+        }
+    }
+}
 
 /// One column of a grid.
 ///
@@ -192,6 +225,29 @@ impl GridColumn {
     }
 }
 
+/// A header that names several columns at once.
+#[derive(Debug, Clone)]
+pub struct ColumnGroup {
+    id: SharedString,
+    label: SharedString,
+    keys: Vec<SharedString>,
+}
+
+impl ColumnGroup {
+    pub fn new(id: impl Into<SharedString>, label: impl Into<SharedString>) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            keys: Vec::new(),
+        }
+    }
+
+    pub fn columns(mut self, keys: impl IntoIterator<Item = impl Into<SharedString>>) -> Self {
+        self.keys = keys.into_iter().map(Into::into).collect();
+        self
+    }
+}
+
 /// One row, built on demand, keyed by the identity the row already has.
 pub struct GridRow {
     id: SharedString,
@@ -260,6 +316,14 @@ impl GridRow {
     fn take(&mut self, key: &SharedString) -> Option<Cell> {
         let position = self.cells.iter().position(|(name, _)| name == key)?;
         Some(self.cells.remove(position).1)
+    }
+
+    fn cell_text(&self, key: &SharedString) -> SharedString {
+        self.cells
+            .iter()
+            .find(|(name, _)| name == key)
+            .and_then(|(_, cell)| cell.text.clone())
+            .unwrap_or_default()
     }
 }
 
@@ -414,6 +478,8 @@ pub struct DataGrid {
     render_row: RenderRow,
     render_detail: Option<RenderDetail>,
     columns: Vec<GridColumn>,
+    groups: Vec<ColumnGroup>,
+    footer: Vec<(SharedString, SharedString)>,
     lines: GridLines,
     sort: Option<(SharedString, SortDirection)>,
     selection_mode: SelectionMode,
@@ -437,6 +503,9 @@ pub struct DataGrid {
     on_expand: Option<ExpandHandler>,
     on_edit_request: Option<EditRequestHandler>,
     on_edit: Option<EditHandler>,
+    range: Option<CellRange>,
+    on_range_change: Option<RangeHandler>,
+    on_copy: Option<CopyHandler>,
     hierarchy: bool,
 }
 
@@ -474,6 +543,8 @@ impl DataGrid {
             render_row: Rc::new(render_row),
             render_detail: None,
             columns: Vec::new(),
+            groups: Vec::new(),
+            footer: Vec::new(),
             lines: GridLines::default(),
             sort: None,
             selection_mode: SelectionMode::None,
@@ -497,6 +568,9 @@ impl DataGrid {
             on_expand: None,
             on_edit_request: None,
             on_edit: None,
+            range: None,
+            on_range_change: None,
+            on_copy: None,
             hierarchy: false,
         }
     }
@@ -515,6 +589,27 @@ impl DataGrid {
 
     pub fn columns(mut self, columns: impl IntoIterator<Item = GridColumn>) -> Self {
         self.columns.extend(columns);
+        self
+    }
+
+    /// A second header row that names groups of columns.
+    pub fn group(mut self, group: ColumnGroup) -> Self {
+        self.groups.push(group);
+        self
+    }
+
+    pub fn groups(mut self, groups: impl IntoIterator<Item = ColumnGroup>) -> Self {
+        self.groups.extend(groups);
+        self
+    }
+
+    /// Caller-owned summary cells, keyed by column identity.
+    pub fn footer_cell(
+        mut self,
+        key: impl Into<SharedString>,
+        value: impl Into<SharedString>,
+    ) -> Self {
+        self.footer.push((key.into(), value.into()));
         self
     }
 
@@ -657,6 +752,31 @@ impl DataGrid {
     }
 
     /// Reports the disclosure state a row should take.
+    /// The cell rectangle the caller says is selected. The grid highlights
+    /// those cells and reports a new rectangle when the pointer names one.
+    pub fn range(mut self, range: Option<CellRange>) -> Self {
+        self.range = range;
+        self
+    }
+
+    pub fn on_range_change(
+        mut self,
+        handler: impl Fn(&CellRange, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_range_change = Some(Rc::new(handler));
+        self
+    }
+
+    /// Reports the current range as TSV. The grid writes nothing; a host that
+    /// wants the clipboard uses the same verified path [`CopyButton`] does.
+    pub fn on_copy(
+        mut self,
+        handler: impl Fn(SharedString, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_copy = Some(Rc::new(handler));
+        self
+    }
+
     pub fn on_expand(
         mut self,
         handler: impl Fn(SharedString, bool, &mut Window, &mut App) + 'static,
@@ -787,6 +907,10 @@ struct Memory {
     /// Whether the bulk bar has been shown before, so a bar that exists on the
     /// first frame is already there rather than arriving.
     bulk: RefCell<Option<Presence>>,
+    /// The cell a range drag started on.
+    range_drag: RefCell<Option<(SharedString, SharedString)>>,
+    /// Cached identities covered by the last resolved range.
+    range_cover: RefCell<Option<RangeCover>>,
 }
 
 #[derive(Default)]
@@ -822,7 +946,9 @@ impl RenderOnce for DataGrid {
         let reorder = self.reorder(window, cx);
         let editor = self.editor(&state, window, cx);
 
+        let extra = self.slots.render(slot::HEADER_EXTRA, window, cx);
         let header = self.header(&theme, row_height, &columns, reorder.as_ref(), window, cx);
+        let footer = self.footer_row(&theme, row_height, &columns, cx);
         let vacancy = self.empty.take();
         let body = self.body(
             &theme,
@@ -846,11 +972,13 @@ impl RenderOnce for DataGrid {
             .frame(&theme, Surface::Panel, Elevation::Raised)
             .overflow_hidden()
             .children(self.banner(&theme, cx))
+            .children(extra)
             .child(header)
-            .child(body);
+            .child(body)
+            .children(footer);
 
         frame = self.wire_resize_drag(frame, &state, &columns, cx);
-        frame = self.wire_keyboard(frame, &state, &drawn, &expanded);
+        frame = self.wire_keyboard(frame, &state, &drawn, &expanded, &columns);
 
         frame.semantic_in(
             cx,
@@ -993,6 +1121,11 @@ impl DataGrid {
         window: &mut Window,
         cx: &mut App,
     ) -> AnyElement {
+        let groups = if self.groups.is_empty() {
+            None
+        } else {
+            Some(self.group_row(theme, height, columns, cx))
+        };
         let mut header = div()
             .row()
             .w_full()
@@ -1024,7 +1157,143 @@ impl DataGrid {
             }
         }
 
-        header.into_any_element()
+        match groups {
+            Some(group_row) => div()
+                .column()
+                .w_full()
+                .flex_none()
+                .child(group_row)
+                .child(header)
+                .into_any_element(),
+            None => header.into_any_element(),
+        }
+    }
+
+    fn group_row(
+        &self,
+        theme: &Theme,
+        height: f32,
+        columns: &[GridColumn],
+        cx: &mut App,
+    ) -> AnyElement {
+        let mut row = div()
+            .row()
+            .w_full()
+            .h(px(height))
+            .flex_none()
+            .px_token(theme, Space::Sm)
+            .gap_token(theme, Space::Sm)
+            .border_b(px(theme.borders.hairline))
+            .border_color(theme.colors.divider);
+        if self.selection_mode == SelectionMode::Multiple {
+            row = row.child(div().w(px(GUTTER)).flex_none());
+        }
+        if self.on_expand.is_some() {
+            row = row.child(div().w(px(GUTTER)).flex_none());
+        }
+        let mut consumed = 0usize;
+        while consumed < columns.len() {
+            let key = &columns[consumed].key;
+            if let Some(group) = self
+                .groups
+                .iter()
+                .find(|group| group.keys.first() == Some(key))
+            {
+                let span = group
+                    .keys
+                    .iter()
+                    .take_while(|held| {
+                        columns
+                            .get(consumed)
+                            .is_some_and(|column| &column.key == *held)
+                    })
+                    .count()
+                    .max(1);
+                let covered = &columns[consumed..consumed + span];
+                let ident = self.ident.child("group").child(group.id.as_ref());
+                row = row.child(
+                    group_frame(div().id(ident.element_id()), covered, theme)
+                        .child(
+                            text(theme, TypeScale::Caption, group.label.clone())
+                                .text_tone(theme, TextTone::Faint),
+                        )
+                        .semantic_in(
+                            cx,
+                            NodeSpec::new(ident.semantic_id(), Role::Cell)
+                                .parent(self.ident.semantic_id())
+                                .text(group.label.clone())
+                                .value(group.id.clone()),
+                        ),
+                );
+                consumed += span;
+            } else {
+                row = row.child(column_frame(div(), &columns[consumed], theme));
+                consumed += 1;
+            }
+        }
+        row.into_any_element()
+    }
+
+    fn footer_row(
+        &self,
+        theme: &Theme,
+        height: f32,
+        columns: &[GridColumn],
+        cx: &mut App,
+    ) -> Option<AnyElement> {
+        if self.footer.is_empty() {
+            return None;
+        }
+        let ident = self.ident.child("summary");
+        let mut row = div()
+            .id(ident.element_id())
+            .row()
+            .w_full()
+            .h(px(height))
+            .flex_none()
+            .px_token(theme, Space::Sm)
+            .gap_token(theme, Space::Sm)
+            .border_t(px(theme.borders.hairline))
+            .border_color(theme.colors.divider);
+        if self.selection_mode == SelectionMode::Multiple {
+            row = row.child(div().w(px(GUTTER)).flex_none());
+        }
+        if self.on_expand.is_some() {
+            row = row.child(div().w(px(GUTTER)).flex_none());
+        }
+        for column in columns {
+            let value = self
+                .footer
+                .iter()
+                .find(|(key, _)| key == &column.key)
+                .map(|(_, value)| value.clone())
+                .unwrap_or_default();
+            let cell = self.ident.child("summary").child(column.key.as_ref());
+            row = row.child(
+                column_frame(div().id(cell.element_id()), column, theme)
+                    .child(
+                        text(theme, TypeScale::Caption, value.clone())
+                            .text_tone(theme, TextTone::Muted),
+                    )
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(cell.semantic_id(), Role::Cell)
+                            .parent(ident.semantic_id())
+                            .text(value)
+                            .value(column.key.clone()),
+                    ),
+            );
+        }
+        Some(
+            row.semantic_in(
+                cx,
+                NodeSpec::new(ident.semantic_id(), Role::Row)
+                    .parent(self.ident.semantic_id())
+                    .text(cx.strings().text(StringKey::GridSummary))
+                    .value("summary"),
+            )
+            .into_any_element(),
+        )
     }
 
     /// The box that speaks for the rows the host has loaded, and says so.
@@ -1389,6 +1658,7 @@ impl DataGrid {
         let released = Rc::clone(state);
         frame.on_mouse_up(MouseButton::Left, move |_, _, _| {
             *released.resizing.borrow_mut() = None;
+            *released.range_drag.borrow_mut() = None;
         })
     }
 
@@ -1400,7 +1670,13 @@ impl DataGrid {
         state: &Rc<Memory>,
         drawn: &Drawn,
         expanded: &[usize],
+        columns: &[GridColumn],
     ) -> gpui::Stateful<gpui::Div> {
+        let copy = self.on_copy.clone().filter(|_| !self.disabled);
+        let range = self.range.clone();
+        let copy_rows = Rc::clone(&self.render_row);
+        let copy_columns = columns.to_vec();
+        let copy_count = self.count;
         let Some(handler) = self
             .on_select
             .clone()
@@ -1408,7 +1684,27 @@ impl DataGrid {
             .filter(|_| self.selection_mode != SelectionMode::None)
             .filter(|_| self.count > 0)
         else {
-            return frame;
+            return if let Some(handler) = copy {
+                frame.on_key_down(move |event, window, cx| {
+                    let chord = event.keystroke.key.as_str() == "c"
+                        && (event.keystroke.modifiers.platform
+                            || event.keystroke.modifiers.control);
+                    if !chord {
+                        return;
+                    }
+                    let Some(range) = range.as_ref() else {
+                        return;
+                    };
+                    handler(
+                        range_tsv(&copy_rows, &copy_columns, range, copy_count, window, cx),
+                        window,
+                        cx,
+                    );
+                    cx.stop_propagation();
+                })
+            } else {
+                frame
+            };
         };
         let render_row = Rc::clone(&self.render_row);
         let drawn = Rc::clone(drawn);
@@ -1421,6 +1717,18 @@ impl DataGrid {
         let hierarchy = self.hierarchy;
         let on_expand = self.on_expand.clone();
         frame.on_key_down(move |event, window, cx| {
+            if event.keystroke.key.as_str() == "c"
+                && (event.keystroke.modifiers.platform || event.keystroke.modifiers.control)
+                && let (Some(handler), Some(range)) = (copy.as_ref(), range.as_ref())
+            {
+                handler(
+                    range_tsv(&copy_rows, &copy_columns, range, copy_count, window, cx),
+                    window,
+                    cx,
+                );
+                cx.stop_propagation();
+                return;
+            }
             // The anchor is read now rather than when the frame was built: a
             // click sets it without the caller having to redraw, and the move
             // that follows should start from the row that was clicked.
@@ -1528,6 +1836,15 @@ impl DataGrid {
         let render_detail = self.render_detail.clone();
         let drawn = Rc::clone(drawn);
         let opened: Vec<SharedString> = self.expanded.iter().map(|row| row.id.clone()).collect();
+        let (range_rows, range_cols) = resolve_range(
+            state,
+            self.range.as_ref(),
+            self.count,
+            &self.render_row,
+            &columns,
+            window,
+            cx,
+        );
         let context = Rc::new(RowContext {
             lines: self.lines,
             selected: self.selected.clone(),
@@ -1541,6 +1858,9 @@ impl DataGrid {
             editor,
             state: Rc::clone(state),
             hierarchy: self.hierarchy,
+            range_rows,
+            range_cols,
+            on_range_change: self.on_range_change.clone(),
         });
 
         let list = uniform_list(
@@ -1679,6 +1999,9 @@ struct RowContext {
     editor: Option<Entity<TextInput>>,
     state: Rc<Memory>,
     hierarchy: bool,
+    range_rows: HashSet<SharedString>,
+    range_cols: HashSet<SharedString>,
+    on_range_change: Option<RangeHandler>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2022,9 +2345,18 @@ fn cell_element(
         content = Some(leading.into_any_element());
     }
 
-    if !published {
+    let in_range = context.range_rows.contains(&row.id) && context.range_cols.contains(&column.key);
+    let ranged = context.on_range_change.is_some() && !context.disabled && !row.disabled;
+
+    if !published && !ranged {
         return column_frame(div(), column, theme)
             .overflow_hidden()
+            .when(in_range, |element| {
+                element.bg(theme
+                    .colors
+                    .accent
+                    .opacity(theme.effects.selected_ring_alpha))
+            })
             .children(content)
             .into_any_element();
     }
@@ -2042,9 +2374,18 @@ fn cell_element(
     if let Some(text) = text {
         spec = spec.text(text);
     }
+    if in_range {
+        spec = spec.selected(true);
+    }
 
     let mut frame = column_frame(div().id(cell_ident.element_id()), column, theme)
         .overflow_hidden()
+        .when(in_range, |element| {
+            element.bg(theme
+                .colors
+                .accent
+                .opacity(theme.effects.selected_ring_alpha))
+        })
         .children(content);
 
     if let (true, Some(request)) = (editable, context.on_edit_request.clone()) {
@@ -2069,6 +2410,43 @@ fn cell_element(
                     key_request(key_row.clone(), key_key.clone(), window, cx);
                     cx.stop_propagation();
                 }
+            });
+    }
+
+    if let Some(handler) = context.on_range_change.clone().filter(|_| ranged) {
+        let row_id = row.id.clone();
+        let column_id = column.key.clone();
+        let state = Rc::clone(&context.state);
+        let down_row = row_id.clone();
+        let down_col = column_id.clone();
+        let down_handler = Rc::clone(&handler);
+        let down_state = Rc::clone(&state);
+        frame = frame
+            .on_mouse_down(MouseButton::Left, move |_, window, cx| {
+                *down_state.range_drag.borrow_mut() = Some((down_row.clone(), down_col.clone()));
+                down_handler(
+                    &CellRange::new(
+                        down_row.clone(),
+                        down_col.clone(),
+                        down_row.clone(),
+                        down_col.clone(),
+                    ),
+                    window,
+                    cx,
+                );
+            })
+            .on_mouse_move(move |event, window, cx| {
+                if event.pressed_button != Some(MouseButton::Left) {
+                    return;
+                }
+                let Some((start_row, start_column)) = state.range_drag.borrow().clone() else {
+                    return;
+                };
+                handler(
+                    &CellRange::new(start_row, start_column, row_id.clone(), column_id.clone()),
+                    window,
+                    cx,
+                );
             });
     }
 
@@ -2178,6 +2556,37 @@ fn editor_cell(
         .capture_key_down(advance)
         .child(field)
         .into_any_element()
+}
+
+fn group_frame<E: Styled>(element: E, columns: &[GridColumn], theme: &Theme) -> E {
+    let mut flex = 0.0;
+    let mut fixed = 0.0;
+    let mut has_flex = false;
+    let mut min_width = 0.0;
+    for column in columns {
+        match column.width {
+            ColumnWidth::Fixed(width) => fixed += width,
+            ColumnWidth::Flex(share) => {
+                flex += share;
+                has_flex = true;
+                min_width += column.min_width;
+            }
+        }
+    }
+    let element = if has_flex {
+        element
+            .flex_grow(flex)
+            .flex_shrink(1.0)
+            .flex_basis(px(0.0))
+            .min_w(px(min_width.max(fixed)))
+    } else {
+        element.w(px(fixed)).flex_none()
+    };
+    element
+        .row()
+        .h_full()
+        .items_center()
+        .gap(px(theme.space(Space::Xs)))
 }
 
 fn column_frame<E: Styled>(element: E, column: &GridColumn, theme: &Theme) -> E {
@@ -2450,11 +2859,118 @@ impl RenderOnce for BulkBar {
 }
 
 impl Slotted for DataGrid {
-    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+    const SLOTS: &'static [&'static str] =
+        &[slot::EMPTY, slot::FAILED, slot::LOADING, slot::HEADER_EXTRA];
 
     fn slots_mut(&mut self) -> &mut Slots {
         &mut self.slots
     }
+}
+
+fn resolve_range(
+    state: &Memory,
+    range: Option<&CellRange>,
+    count: usize,
+    render_row: &RenderRow,
+    columns: &[GridColumn],
+    window: &mut Window,
+    cx: &mut App,
+) -> (HashSet<SharedString>, HashSet<SharedString>) {
+    let Some(range) = range else {
+        *state.range_cover.borrow_mut() = None;
+        return (HashSet::new(), HashSet::new());
+    };
+    if let Some((cached, cached_count, rows, cols)) = state.range_cover.borrow().as_ref()
+        && cached == range
+        && *cached_count == count
+    {
+        return (rows.clone(), cols.clone());
+    }
+    let mut start_i = None;
+    let mut end_i = None;
+    let mut ids = Vec::with_capacity(count);
+    for index in 0..count {
+        let id = render_row(index, window, cx).id().clone();
+        if id == range.start_row {
+            start_i = Some(index);
+        }
+        if id == range.end_row {
+            end_i = Some(index);
+        }
+        ids.push(id);
+    }
+    let rows = match (start_i, end_i) {
+        (Some(first), Some(last)) => ids[first.min(last)..=first.max(last)]
+            .iter()
+            .cloned()
+            .collect(),
+        _ => HashSet::new(),
+    };
+    let start_c = columns
+        .iter()
+        .position(|column| column.key() == &range.start_column);
+    let end_c = columns
+        .iter()
+        .position(|column| column.key() == &range.end_column);
+    let cols = match (start_c, end_c) {
+        (Some(first), Some(last)) => columns[first.min(last)..=first.max(last)]
+            .iter()
+            .map(|column| column.key().clone())
+            .collect(),
+        _ => HashSet::new(),
+    };
+    *state.range_cover.borrow_mut() = Some((range.clone(), count, rows.clone(), cols.clone()));
+    (rows, cols)
+}
+
+fn range_tsv(
+    render_row: &RenderRow,
+    columns: &[GridColumn],
+    range: &CellRange,
+    count: usize,
+    window: &mut Window,
+    cx: &mut App,
+) -> SharedString {
+    let mut start_i = None;
+    let mut end_i = None;
+    let mut rows = Vec::with_capacity(count);
+    for index in 0..count {
+        let row = render_row(index, window, cx);
+        if row.id() == &range.start_row {
+            start_i = Some(index);
+        }
+        if row.id() == &range.end_row {
+            end_i = Some(index);
+        }
+        rows.push(row);
+    }
+    let (first, last) = match (start_i, end_i) {
+        (Some(first), Some(last)) => (first.min(last), first.max(last)),
+        _ => return SharedString::default(),
+    };
+    let start_c = columns
+        .iter()
+        .position(|column| column.key() == &range.start_column);
+    let end_c = columns
+        .iter()
+        .position(|column| column.key() == &range.end_column);
+    let (left, right) = match (start_c, end_c) {
+        (Some(first), Some(last)) => (first.min(last), first.max(last)),
+        _ => return SharedString::default(),
+    };
+    let mut lines = Vec::new();
+    for row in &rows[first..=last] {
+        let cells: Vec<String> = columns[left..=right]
+            .iter()
+            .map(|column| tsv_escape(row.cell_text(column.key()).as_ref()))
+            .collect();
+        lines.push(cells.join("\t"));
+    }
+    SharedString::from(lines.join("\n"))
+}
+
+fn tsv_escape(value: &str) -> String {
+    value.replace(['\t', '\n', '\r'], " ")
 }
 
 #[cfg(test)]
@@ -2492,6 +3008,13 @@ mod tests {
         assert_eq!(slot_at(5, &expanded, 1), Slot::Detail);
         assert_eq!(slot_at(6, &expanded, 1), Slot::Row(4));
         assert_eq!(slot_of(4, &expanded, 1), 6);
+    }
+
+    #[test]
+    fn a_cell_range_keeps_the_identities_it_was_given() {
+        let range = CellRange::new("job-0001", "name", "job-0003", "state");
+        assert_eq!(range.start_row.as_ref(), "job-0001");
+        assert_eq!(range.end_column.as_ref(), "state");
     }
 
     #[test]

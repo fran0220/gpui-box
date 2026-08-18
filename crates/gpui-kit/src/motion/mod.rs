@@ -50,10 +50,12 @@ mod stagger;
 mod transition;
 
 pub use animated::{Animated, Entrance};
-pub use busy::{Activity, breathe, breathing_dot, spin, sweep};
+pub use busy::{Activity, breathe, breathe_as, breathing_dot, spin, sweep};
 pub use easing::{CubicBezier, Easing};
 pub use flip::{Flip, Flipped, Flipping, Shape, Shaping, flip, shared_flip, tracked_ids};
-pub use gesture::{Flick, VELOCITY_WINDOW, Velocity, VelocityTracker, flick, rubber_band};
+pub use gesture::{
+    Flick, VELOCITY_WINDOW, Velocity, VelocityTracker, flick, overscroll, rubber_band,
+};
 pub use interpolate::Interpolate;
 pub use keyframes::{Keyframe, Keyframes};
 pub use presence::{Phase, Presence};
@@ -61,7 +63,7 @@ pub use scroll_link::ScrollLink;
 pub use sequence::Sequence;
 pub use spec::{
     MotionSpec, content_in, dialog, dialog_arrival, dialog_in, entrance, fade_in, gradient_opacity,
-    menu, menu_in, pulse_wave, resize, row_in, shimmer_offset, state_change, tracking,
+    menu, menu_in, pulse_wave, resize, row_in, shimmer_offset, state_change, surface_in, tracking,
 };
 pub use spring::Spring;
 pub use stagger::{ROW_STAGGER_CAP, Stagger, staggered_phase};

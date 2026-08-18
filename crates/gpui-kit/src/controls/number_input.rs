@@ -19,7 +19,7 @@ use crate::controls::button::IconButton;
 use crate::controls::field::{FieldState, field_shell};
 use crate::controls::input::{TextInput, TextInputEvent};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text as foundation_text};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// How much larger a page step is than a single step.
 const PAGE_FACTOR: f64 = 10.0;
@@ -54,6 +54,7 @@ pub struct NumberInput {
     page_step: Option<f64>,
     precision: usize,
     unit: Option<SharedString>,
+    prefix: Option<SharedString>,
     size: ControlSize,
     disabled: bool,
     required: bool,
@@ -107,6 +108,7 @@ impl NumberInput {
             page_step: None,
             precision: 0,
             unit: None,
+            prefix: None,
             size: ControlSize::Md,
             disabled: false,
             required: false,
@@ -174,6 +176,13 @@ impl NumberInput {
     /// carried in the published value.
     pub fn unit(mut self, unit: impl Into<SharedString>) -> Self {
         self.unit = Some(unit.into());
+        self
+    }
+
+    /// What stands in front of the number, such as `"$"`. Shown before the
+    /// field and carried in the published value.
+    pub fn prefix(mut self, prefix: impl Into<SharedString>) -> Self {
+        self.prefix = Some(prefix.into());
         self
     }
 
@@ -280,9 +289,18 @@ impl NumberInput {
     /// What the control publishes as its value: the number and what it counts.
     fn display(&self, cx: &App) -> SharedString {
         let number = self.field.read(cx).value().clone();
-        match &self.unit {
-            Some(unit) if !number.is_empty() => SharedString::from(format!("{number} {unit}")),
-            _ => number,
+        if number.is_empty() {
+            return number;
+        }
+        let number = match self.value {
+            Some(value) => cx.numbers().decimal(value, self.precision),
+            None => number,
+        };
+        match (&self.prefix, &self.unit) {
+            (Some(prefix), Some(unit)) => SharedString::from(format!("{prefix}{number} {unit}")),
+            (Some(prefix), None) => SharedString::from(format!("{prefix}{number}")),
+            (None, Some(unit)) => SharedString::from(format!("{number} {unit}")),
+            (None, None) => number,
         }
     }
 
@@ -482,6 +500,13 @@ impl Render for NumberInput {
                         .invalid(invalid)
                         .disabled(self.disabled),
                 )
+                .when_some(self.prefix.clone(), |element, prefix| {
+                    element.child(
+                        foundation_text(&theme, TypeScale::Label, prefix)
+                            .flex_none()
+                            .text_tone(&theme, gpui_kit_theme::TextTone::Muted),
+                    )
+                })
                 .child(div().flex_1().child(self.field.clone()))
                 .when_some(self.unit.clone(), |element, unit| {
                     element.child(

@@ -30,10 +30,11 @@
 //!
 //! # What is not here
 //!
-//! Numbers, dates, and quantities are not translated here. Counts go through
-//! [`crate::strings::NumberAdapter`] the same way dates go through
-//! [`crate::datetime::DateAdapter`]: the component asks, it never formats. The
-//! English adapter compiled in is a fallback, not a locale.
+//! Numbers, dates, quantities, and search ranking are not translated here.
+//! Counts go through [`crate::strings::NumberAdapter`] the same way dates go
+//! through [`crate::datetime::DateAdapter`] and filters go through
+//! [`crate::strings::SearchMatcher`]: the component asks, it never formats
+//! or tokenises. The English adapters compiled in are fallbacks, not a locale.
 
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -161,6 +162,8 @@ string_keys! {
     ImageViewerContain => "image-viewer.contain", "Contain";
     ImageViewerCover => "image-viewer.cover", "Cover";
     ImageViewerSizeUnknown => "image-viewer.size-unknown", "Size unknown";
+    ImageViewerMeasurement => "image-viewer.measurement", "{0} × {1} · {2}";
+    ImageViewerDimensions => "image-viewer.dimensions", "{0} × {1}";
     ImageViewerEmpty => "image-viewer.empty", "No images";
 
     // Markdown.
@@ -240,6 +243,7 @@ string_keys! {
 
     // Combobox and select.
     SelectPlaceholder => "select.placeholder", "Select";
+    SelectClear => "select.clear", "Clear selection";
     ComboboxNoMatch => "combobox.no-match", "Nothing here answers “{0}”";
     ComboboxCreateHint => "combobox.create-hint", "Press enter to add it as a new value.";
     ComboboxClosedHint => "combobox.closed-hint", "This field only accepts one of the options offered.";
@@ -272,6 +276,7 @@ string_keys! {
     FilterBarClear => "filter-bar.clear", "Clear all";
     FilterBarCounting => "filter-bar.counting", "Counting…";
     FilterBarResultsNoun => "filter-bar.results-noun", "results";
+    FilterBarResults => "filter-bar.results", "{0} {1}";
 
     // Inline edit and keybinding recorder.
     InlineEditPlaceholder => "inline-edit.placeholder", "Empty";
@@ -440,6 +445,26 @@ string_keys! {
     SchemaNeedsAdapter => "schema.needs-adapter", "This field needs a date adapter from the host.";
     SchemaNeedsHost => "schema.needs-host", "This field needs a host policy before it can be filled in.";
     ChartEmpty => "chart.empty", "No series to plot";
+    ChartLegend => "chart.legend", "Legend";
+    ChartHideSeries => "chart.hide-series", "Hide {0}";
+    ChartShowSeries => "chart.show-series", "Show {0}";
+    TagInputOverflow => "tag-input.overflow", "+{0}";
+    GridSummary => "grid.summary", "Summary";
+    GridCopy => "grid.copy", "Copy selection";
+    TraceEmpty => "trace.empty", "No spans to show";
+    TracePending => "trace.pending", "Waiting";
+    TraceRunning => "trace.running", "Running";
+    TraceSucceeded => "trace.succeeded", "Succeeded";
+    TraceFailed => "trace.failed", "Failed";
+    HeatmapEmpty => "heatmap.empty", "No activity";
+    HeatmapUnavailable => "heatmap.unavailable", "Activity is unavailable";
+    ColorHue => "color.hue", "Hue";
+    ColorSaturation => "color.saturation", "Saturation and brightness";
+    ColorAlpha => "color.alpha", "Opacity";
+    ColorHex => "color.hex", "Hex";
+    ColorPresets => "color.presets", "Presets";
+    ColorRecent => "color.recent", "Recent";
+    GraphMinimap => "graph.minimap", "Overview";
     SchemaRequiredMissing => "schema.required-missing", "This field is required.";
     SchemaUnrenderableOne => "schema.unrenderable-one", "1 field cannot be shown here.";
     SchemaUnrenderableMany => "schema.unrenderable-many", "{0} fields cannot be shown here.";
@@ -589,11 +614,23 @@ string_keys! {
     LogEmpty => "log.empty", "No log entries";
     LogUnavailable => "log.unavailable", "Log unavailable";
     LogError => "log.error", "Could not load log";
+    // A terminal grid. The output, and any title the program sets, are the
+    // program's own text and never appear here.
+    TerminalStarting => "terminal.starting", "Starting session";
+    TerminalUnavailable => "terminal.unavailable", "Terminal unavailable";
+    TerminalError => "terminal.error", "Session ended";
+    TerminalGrid => "terminal.grid", "Terminal output";
     DiffFile => "diff.file", "File";
     DiffHunk => "diff.hunk", "Hunk";
     DiffContextLine => "diff.context-line", "Context line";
     DiffChangedLine => "diff.changed-line", "Changed line";
     DiffEmpty => "diff.empty", "No differences";
+    DiffExpandHunk => "diff.expand-hunk", "Show more context";
+    TreeLoadingChildren => "tree.loading-children", "Loading";
+    TreeChildrenUnavailable => "tree.children-unavailable", "Could not load this branch";
+    TreeEmpty => "tree.empty", "No items";
+    TextAreaCount => "textarea.count", "{0} of {1}";
+    DrawerResize => "drawer.resize", "Resize drawer";
     SparklineEmpty => "sparkline.empty", "No readings";
     SparklineUnavailable => "sparkline.unavailable", "Reading unavailable";
     SparklineError => "sparkline.error", "Could not load reading";
@@ -776,6 +813,11 @@ pub trait NumberAdapter {
 
     /// A percentage the host has already decided how to mark.
     fn percent(&self, value: f32) -> SharedString;
+
+    /// A quantity with a fractional part, already grouped the way the host
+    /// writes it. The component supplies the value and the decimal count;
+    /// the adapter supplies the digits, the grouping, and the separator.
+    fn decimal(&self, value: f64, precision: usize) -> SharedString;
 }
 
 /// The adapter as the components hold it.
@@ -806,6 +848,38 @@ impl NumberAdapter for EnglishNumbers {
         let rounded = (value * 100.0).round() as i32;
         SharedString::from(format!("{rounded}%"))
     }
+
+    fn decimal(&self, value: f64, precision: usize) -> SharedString {
+        SharedString::from(english_decimal(value, precision))
+    }
+}
+
+fn english_decimal(value: f64, precision: usize) -> String {
+    if !value.is_finite() {
+        return value.to_string();
+    }
+    let negative = value.is_sign_negative() && value != 0.0;
+    let abs = value.abs();
+    let integer = abs.trunc() as u64;
+    let digits = integer.to_string();
+    let mut grouped = String::with_capacity(digits.len() + digits.len() / 3 + precision + 2);
+    for (index, digit) in digits.chars().enumerate() {
+        if index > 0 && (digits.len() - index).is_multiple_of(3) {
+            grouped.push(',');
+        }
+        grouped.push(digit);
+    }
+    if precision > 0 {
+        let factor = 10f64.powi(precision as i32);
+        let scaled = (abs.fract() * factor).round() as u64;
+        grouped.push('.');
+        grouped.push_str(&format!("{scaled:0width$}", width = precision));
+    }
+    if negative {
+        format!("-{grouped}")
+    } else {
+        grouped
+    }
 }
 
 struct InstalledNumbers(SharedNumberAdapter);
@@ -835,6 +909,97 @@ pub fn set_numbers(adapter: impl NumberAdapter + 'static, cx: &mut App) {
 pub fn reset_numbers(cx: &mut App) {
     if cx.has_global::<InstalledNumbers>() {
         cx.remove_global::<InstalledNumbers>();
+        cx.refresh_windows();
+    }
+}
+
+/// How well a label answers a query. The default is English prefix, word, and
+/// subsequence ranking. A host that needs pinyin initials or another
+/// tokenizer installs its own matcher; this crate does not take that
+/// dependency.
+pub trait SearchMatcher {
+    /// Lower is a better answer. `None` means the label does not answer the
+    /// query at all.
+    fn rank(&self, query: &str, label: &str) -> Option<usize>;
+}
+
+/// The matcher as the components hold it.
+pub type SharedSearchMatcher = Rc<dyn SearchMatcher>;
+
+/// English prefix, word-start, containment, then subsequence.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct EnglishSearch;
+
+impl SearchMatcher for EnglishSearch {
+    fn rank(&self, query: &str, label: &str) -> Option<usize> {
+        english_search_rank(query, label)
+    }
+}
+
+/// How well `label` answers `query` in English, lower being better.
+pub fn english_search_rank(query: &str, label: &str) -> Option<usize> {
+    let query = query.trim().to_lowercase();
+    if query.is_empty() {
+        return Some(1);
+    }
+    let label = label.to_lowercase();
+    if label.starts_with(&query) {
+        Some(0)
+    } else if english_word_starts(&label).any(|start| label[start..].starts_with(&query)) {
+        Some(1)
+    } else if label.contains(&query) {
+        Some(2)
+    } else if is_subsequence(&query, &label) {
+        Some(3)
+    } else {
+        None
+    }
+}
+
+fn english_word_starts(label: &str) -> impl Iterator<Item = usize> + '_ {
+    label.char_indices().filter_map(move |(index, character)| {
+        if index == 0 || !character.is_alphanumeric() {
+            return None;
+        }
+        let previous = label[..index].chars().next_back()?;
+        (!previous.is_alphanumeric()).then_some(index)
+    })
+}
+
+fn is_subsequence(query: &str, label: &str) -> bool {
+    let mut characters = label.chars();
+    query
+        .chars()
+        .all(|wanted| characters.any(|character| character == wanted))
+}
+
+struct InstalledSearch(SharedSearchMatcher);
+
+impl Global for InstalledSearch {}
+
+/// Reads the installed search matcher, falling back to English.
+pub trait ActiveSearch {
+    fn search(&self) -> SharedSearchMatcher;
+}
+
+impl ActiveSearch for App {
+    fn search(&self) -> SharedSearchMatcher {
+        self.try_global::<InstalledSearch>()
+            .map(|installed| Rc::clone(&installed.0))
+            .unwrap_or_else(|| Rc::new(EnglishSearch))
+    }
+}
+
+/// Installs a host search matcher. Replaces any previous one and repaints.
+pub fn set_search(adapter: impl SearchMatcher + 'static, cx: &mut App) {
+    cx.set_global(InstalledSearch(Rc::new(adapter)));
+    cx.refresh_windows();
+}
+
+/// Restores the English fallback and repaints.
+pub fn reset_search(cx: &mut App) {
+    if cx.has_global::<InstalledSearch>() {
+        cx.remove_global::<InstalledSearch>();
         cx.refresh_windows();
     }
 }
@@ -879,6 +1044,9 @@ mod tests {
         assert_eq!(numbers.count(12).as_ref(), "12");
         assert_eq!(numbers.count_of_total(3, 12).as_ref(), "3 of 12");
         assert_eq!(numbers.percent(0.25).as_ref(), "25%");
+        assert_eq!(numbers.decimal(1204.0, 0).as_ref(), "1,204");
+        assert_eq!(numbers.decimal(12.5, 2).as_ref(), "12.50");
+        assert_eq!(numbers.decimal(-4200.25, 2).as_ref(), "-4,200.25");
     }
 
     #[test]
@@ -932,6 +1100,14 @@ mod tests {
             strings.format(StringKey::RangeComplete, &["Monday"]),
             "Monday to {1}."
         );
+    }
+
+    #[test]
+    fn english_search_ranks_prefixes_ahead_of_a_subsequence() {
+        assert_eq!(english_search_rank("com", "Command palette"), Some(0));
+        assert_eq!(english_search_rank("pal", "Command palette"), Some(1));
+        assert_eq!(english_search_rank("cmp", "Command palette"), Some(3));
+        assert_eq!(english_search_rank("zz", "Command palette"), None);
     }
 
     #[test]

@@ -40,10 +40,11 @@ use gpui::{
     accesskit::ActionData, actions, div, point, prelude::FluentBuilder as _, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, TypeScale};
 
 use crate::controls::text_edit;
-use crate::foundation::{ActiveDirection, Disableable, Ident, Sizable, StyledExt};
+use crate::foundation::{ActiveDirection, Disableable, Ident, Sizable, StyledExt, text};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 use element::TextAreaElement;
 use layout::Layout;
 
@@ -97,7 +98,15 @@ const DEFAULT_ROWS: usize = 3;
 ///
 /// Called by [`crate::install`]. Bindings are scoped to the text area key
 /// context, so they never shadow a host's global shortcuts.
+struct TextAreaBindings;
+
+impl gpui::Global for TextAreaBindings {}
+
 pub(crate) fn install(cx: &mut App) {
+    if cx.has_global::<TextAreaBindings>() {
+        return;
+    }
+    cx.set_global(TextAreaBindings);
     let primary = if cfg!(target_os = "macos") {
         "cmd"
     } else {
@@ -1020,7 +1029,7 @@ impl Render for TextArea {
             gpui::accesskit::TextDirection::LeftToRight
         };
 
-        div()
+        let field = div()
             .id(self.ident.element_id())
             .key_context(KEY_CONTEXT)
             .when(!self.disabled, |element| {
@@ -1163,6 +1172,43 @@ impl Render for TextArea {
                 theme.colors.text
             })
             .child(TextAreaElement::new(cx.entity()))
-            .semantic_in(cx, spec)
+            .semantic_in(cx, spec);
+        match self.max_length {
+            Some(max) => {
+                let used = self.content.chars().count();
+                let count = cx.strings().format(
+                    StringKey::TextAreaCount,
+                    &[
+                        cx.numbers().count(used).as_ref(),
+                        cx.numbers().count(max).as_ref(),
+                    ],
+                );
+                div()
+                    .column()
+                    .w_full()
+                    .child(field)
+                    .child(
+                        text(&theme, TypeScale::Caption, count.clone())
+                            .mt(px(theme.spacing.xs))
+                            .text_color(if used >= max {
+                                theme.colors.danger
+                            } else {
+                                theme.colors.text_faint
+                            })
+                            .semantic_in(
+                                cx,
+                                NodeSpec::new(
+                                    self.ident.child("count").semantic_id(),
+                                    Role::Status,
+                                )
+                                .parent(self.ident.semantic_id())
+                                .text(count)
+                                .value(format!("{used}/{max}")),
+                            ),
+                    )
+                    .into_any_element()
+            }
+            None => field.into_any_element(),
+        }
     }
 }

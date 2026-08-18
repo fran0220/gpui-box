@@ -151,3 +151,25 @@ License: SIL Open Font License 1.1
 Scope: framework test and fallback fonts under crates/gpui/assets/fonts,
 crates/gpui_web/assets/fonts, and crates/gpui_wgpu/assets/fonts. Each directory
 carries SOURCES.md and the applicable license text beside the font files.
+
+bezel
+--------------------------------------------------------------------------------
+Source: https://github.com/crabtalk/bezel
+Revision: 86b8997c0601ebcd416632ebde33d78f82b05917
+License: MIT
+Copyright (c) 2026 clearloop
+Copyright (c) 2026 Wing (portions extracted from zeronsh/comet)
+Scope: source-level port of the terminal emulator, its input encoding and its
+grid painter into crates/gpui-kit/src/content/terminal, and of the editable
+markdown document model into crates/gpui-kit/src/content/markdown/doc. Not a
+Cargo dependency; see PROVENANCE.md P10 for what was adapted.
+License text: licenses/BEZEL-MIT.txt
+
+alacritty_terminal
+--------------------------------------------------------------------------------
+Source: https://github.com/alacritty/alacritty
+Version: 0.26.0 (crates.io)
+License: Apache-2.0
+Copyright 2016 Joe Wilm and the Alacritty Project Contributors
+Scope: the escape-sequence state machine and grid behind
+content::terminal::Emulator, behind the `terminal` feature of gpui-box-kit.

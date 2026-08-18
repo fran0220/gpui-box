@@ -19,6 +19,7 @@ use crate::foundation::{Ident, StyledExt};
 use crate::overlay::focus::FocusTrap;
 use crate::overlay::layer::{Overlay, surface};
 use crate::overlay::panel::{self, Body};
+use crate::overlay::stack;
 
 /// What the dialog reports. The owner decides what any of it means.
 ///
@@ -154,6 +155,7 @@ impl Dialog {
         }
         self.open = true;
         self.pending_focus = true;
+        stack::push(self.ident.semantic_id(), cx);
         self.trap.engage(window, cx);
         cx.emit(DialogEvent::Opened);
         cx.notify();
@@ -167,6 +169,7 @@ impl Dialog {
         }
         self.open = false;
         self.pending_focus = false;
+        stack::pop(&self.ident.semantic_id(), cx);
         self.trap.release(window, cx);
         cx.emit(DialogEvent::Closed);
         cx.notify();
@@ -239,6 +242,9 @@ impl Dialog {
         cx: &mut Context<Self>,
     ) {
         if !self.open || event.keystroke.key.as_str() != "escape" {
+            return;
+        }
+        if !stack::is_top(&self.ident.semantic_id(), cx) {
             return;
         }
         self.dismiss(window, cx);
@@ -357,8 +363,10 @@ impl Render for Dialog {
             .children(actions)
             .semantic_in(cx, spec);
 
-        let mut overlay = Overlay::modal(self.ident.child("overlay")).child(card);
-        if self.dismissable {
+        let mut overlay = Overlay::modal(self.ident.child("overlay"))
+            .stack(stack::depth(&self.ident.semantic_id(), cx))
+            .child(card);
+        if self.dismissable && stack::is_top(&self.ident.semantic_id(), cx) {
             let dialog = cx.entity().downgrade();
             overlay = overlay.on_dismiss(move |window, cx| {
                 dialog

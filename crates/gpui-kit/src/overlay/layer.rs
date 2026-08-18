@@ -61,6 +61,9 @@ pub enum Placement {
 pub struct Overlay {
     ident: Ident,
     layer: Layer,
+    /// How many modal surfaces sit under this one. Added to the token layer
+    /// so a nested dialog paints above the one that opened it.
+    stack: usize,
     placement: Placement,
     window_snap_margin: Option<Pixels>,
     scrim: bool,
@@ -87,6 +90,7 @@ impl Overlay {
         Self {
             ident: ident.into(),
             layer: Layer::Popover,
+            stack: 0,
             placement: Placement::Below,
             window_snap_margin: None,
             scrim: false,
@@ -114,6 +118,12 @@ impl Overlay {
 
     pub fn layer(mut self, layer: Layer) -> Self {
         self.layer = layer;
+        self
+    }
+
+    /// Paints this surface `depth` steps above others on the same token layer.
+    pub fn stack(mut self, depth: usize) -> Self {
+        self.stack = depth;
         self
     }
 
@@ -225,7 +235,7 @@ impl RenderOnce for Overlay {
         // stacking context; the token layer decides the order among overlays.
         pinned(
             gpui::deferred(placed)
-                .priority(priority(&theme, self.layer))
+                .priority(priority(&theme, self.layer).saturating_add(self.stack))
                 .into_any_element(),
         )
     }

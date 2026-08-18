@@ -467,6 +467,47 @@ impl TokenDocument {
         ]
     }
 
+    /// The plane a terminal grid is painted on.
+    ///
+    /// Its own value rather than a surface role, because the two appearances
+    /// want opposite ends of the ramp: a terminal is near-black on dark and
+    /// near-white on light, and no single surface step is both.
+    pub fn terminal_background(&self) -> Color {
+        self.resolved(
+            "color.terminal.background",
+            self.color.terminal.background.as_str(),
+        )
+    }
+
+    /// The wash over selected cells.
+    ///
+    /// Achromatic by contract, which is where it differs from
+    /// `color.interactive.selected`: a tinted veil drags all sixteen ANSI
+    /// hues toward itself, so red under a blue selection reads purple. Only
+    /// lightness may change, so the program's colours survive being selected.
+    pub fn terminal_selection(&self) -> Color {
+        self.resolved(
+            "color.terminal.selection",
+            self.color.terminal.selection.as_str(),
+        )
+    }
+
+    /// The sixteen ANSI slots: 0-7 normal, 8-15 bright.
+    ///
+    /// These are *named* slots ("red", "bright blue"), not literal values, so
+    /// every theme retints them — which is why they are tokens and the 6x6x6
+    /// colour cube above them is arithmetic. See
+    /// `crate::contrast::report` for the floors each slot has to clear on its
+    /// own terminal background.
+    pub fn terminal_ansi(&self) -> [Color; 16] {
+        std::array::from_fn(|index| {
+            self.resolved(
+                &format!("color.terminal.ansi.{index}"),
+                &self.color.terminal.ansi[index],
+            )
+        })
+    }
+
     fn resolved(&self, path: &str, value: &str) -> Color {
         Color::resolve(path, value, &self.color.palette)
             .expect("the embedded token document is validated before release")
@@ -1053,6 +1094,7 @@ pub struct ColorTokens {
     pub interactive: InteractiveColors,
     pub semantic: SemanticColors,
     pub loader: LoaderColors,
+    pub terminal: TerminalColors,
 }
 
 impl ColorTokens {
@@ -1149,6 +1191,21 @@ pub struct SemanticColors {
 #[serde(deny_unknown_fields)]
 pub struct LoaderColors {
     pub gradient: [String; 3],
+}
+
+/// The vocabulary a terminal grid paints in.
+///
+/// It lives in the token document rather than beside the component because
+/// every one of these values changes with the theme, and a component that
+/// branched on the appearance itself would be a second theme system with one
+/// customer.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TerminalColors {
+    pub background: String,
+    pub selection: String,
+    /// Slots 0-7 normal, 8-15 bright.
+    pub ansi: [String; 16],
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

@@ -13,6 +13,22 @@ Appearance: `Dark`.
 | Token | Value |
 |---|---|
 | `color.palette.amber.500` | `#ffb900` |
+| `color.palette.ansi.0` | `#242424` |
+| `color.palette.ansi.1` | `#f87171` |
+| `color.palette.ansi.10` | `#86efac` |
+| `color.palette.ansi.11` | `#fde047` |
+| `color.palette.ansi.12` | `#93c5fd` |
+| `color.palette.ansi.13` | `#d8b4fe` |
+| `color.palette.ansi.14` | `#67e8f9` |
+| `color.palette.ansi.15` | `#fafafa` |
+| `color.palette.ansi.2` | `#4ade80` |
+| `color.palette.ansi.3` | `#facc15` |
+| `color.palette.ansi.4` | `#60a5fa` |
+| `color.palette.ansi.5` | `#c084fc` |
+| `color.palette.ansi.6` | `#22d3ee` |
+| `color.palette.ansi.7` | `#d4d4d8` |
+| `color.palette.ansi.8` | `#52525b` |
+| `color.palette.ansi.9` | `#fca5a5` |
 | `color.palette.cyan.400` | `#7fb3cf` |
 | `color.palette.green.500` | `#57c47f` |
 | `color.palette.indigo.400` | `#7c86ff` |
@@ -36,6 +52,8 @@ Appearance: `Dark`.
 | `color.palette.neutral.900` | `#ffffff` |
 | `color.palette.neutral.ink` | `#0e0e0e` |
 | `color.palette.red.400` | `#ff6467` |
+| `color.palette.terminal.background` | `#0a0a0a` |
+| `color.palette.terminal.wash` | `#ffffff` |
 
 ### Semantic color
 
@@ -70,6 +88,24 @@ Appearance: `Dark`.
 | `color.loader.gradient.0` | `{loader.blue}` | `#b6d3ef` |
 | `color.loader.gradient.1` | `{loader.orange}` | `#edb185` |
 | `color.loader.gradient.2` | `{loader.pink}` | `#f888a0` |
+| `color.terminal.background` | `{terminal.background}` | `#0a0a0a` |
+| `color.terminal.selection` | `{terminal.wash}/38` | `#ffffff38` |
+| `color.terminal.ansi.0` | `{ansi.0}` | `#242424` |
+| `color.terminal.ansi.1` | `{ansi.1}` | `#f87171` |
+| `color.terminal.ansi.2` | `{ansi.2}` | `#4ade80` |
+| `color.terminal.ansi.3` | `{ansi.3}` | `#facc15` |
+| `color.terminal.ansi.4` | `{ansi.4}` | `#60a5fa` |
+| `color.terminal.ansi.5` | `{ansi.5}` | `#c084fc` |
+| `color.terminal.ansi.6` | `{ansi.6}` | `#22d3ee` |
+| `color.terminal.ansi.7` | `{ansi.7}` | `#d4d4d8` |
+| `color.terminal.ansi.8` | `{ansi.8}` | `#52525b` |
+| `color.terminal.ansi.9` | `{ansi.9}` | `#fca5a5` |
+| `color.terminal.ansi.10` | `{ansi.10}` | `#86efac` |
+| `color.terminal.ansi.11` | `{ansi.11}` | `#fde047` |
+| `color.terminal.ansi.12` | `{ansi.12}` | `#93c5fd` |
+| `color.terminal.ansi.13` | `{ansi.13}` | `#d8b4fe` |
+| `color.terminal.ansi.14` | `{ansi.14}` | `#67e8f9` |
+| `color.terminal.ansi.15` | `{ansi.15}` | `#fafafa` |
 
 ### Spacing
 
@@ -294,6 +330,22 @@ Appearance: `Dark`.
 | `color.loader.gradient.0` | `color.surface.overlay` | 10.02 | 3.0 |
 | `color.loader.gradient.1` | `color.surface.overlay` | 8.30 | 3.0 |
 | `color.loader.gradient.2` | `color.surface.overlay` | 6.67 | 3.0 |
+| `color.terminal.ansi.0` | `color.terminal.background` | 1.28 | 1.2 |
+| `color.terminal.ansi.1` | `color.terminal.background` | 7.16 | 3.0 |
+| `color.terminal.ansi.2` | `color.terminal.background` | 11.36 | 3.0 |
+| `color.terminal.ansi.3` | `color.terminal.background` | 12.93 | 3.0 |
+| `color.terminal.ansi.4` | `color.terminal.background` | 7.79 | 3.0 |
+| `color.terminal.ansi.5` | `color.terminal.background` | 7.49 | 3.0 |
+| `color.terminal.ansi.6` | `color.terminal.background` | 10.96 | 3.0 |
+| `color.terminal.ansi.7` | `color.terminal.background` | 13.40 | 3.0 |
+| `color.terminal.ansi.8` | `color.terminal.background` | 2.56 | 1.2 |
+| `color.terminal.ansi.9` | `color.terminal.background` | 10.43 | 3.0 |
+| `color.terminal.ansi.10` | `color.terminal.background` | 14.10 | 3.0 |
+| `color.terminal.ansi.11` | `color.terminal.background` | 15.02 | 3.0 |
+| `color.terminal.ansi.12` | `color.terminal.background` | 10.98 | 3.0 |
+| `color.terminal.ansi.13` | `color.terminal.background` | 11.20 | 3.0 |
+| `color.terminal.ansi.14` | `color.terminal.background` | 13.66 | 3.0 |
+| `color.terminal.ansi.15` | `color.terminal.background` | 18.97 | 3.0 |
 | `color.text.onAccent` | `color.semantic.accent` | 6.17 | 4.5 |
 
 ### Surface separation
@@ -330,6 +382,22 @@ Appearance: `Light`.
 | Token | Value |
 |---|---|
 | `color.palette.amber.500` | `#a76a00` |
+| `color.palette.ansi.0` | `#1f1f1f` |
+| `color.palette.ansi.1` | `#dc2626` |
+| `color.palette.ansi.10` | `#15803d` |
+| `color.palette.ansi.11` | `#92400e` |
+| `color.palette.ansi.12` | `#1d4ed8` |
+| `color.palette.ansi.13` | `#7e22ce` |
+| `color.palette.ansi.14` | `#155e75` |
+| `color.palette.ansi.15` | `#18181b` |
+| `color.palette.ansi.2` | `#16a34a` |
+| `color.palette.ansi.3` | `#b45309` |
+| `color.palette.ansi.4` | `#2563eb` |
+| `color.palette.ansi.5` | `#9333ea` |
+| `color.palette.ansi.6` | `#0e7490` |
+| `color.palette.ansi.7` | `#3f3f46` |
+| `color.palette.ansi.8` | `#71717a` |
+| `color.palette.ansi.9` | `#b91c1c` |
 | `color.palette.cyan.400` | `#2a6f8f` |
 | `color.palette.green.500` | `#237a48` |
 | `color.palette.indigo.400` | `#4952c9` |
@@ -353,6 +421,8 @@ Appearance: `Light`.
 | `color.palette.neutral.900` | `#ffffff` |
 | `color.palette.neutral.ink` | `#ffffff` |
 | `color.palette.red.400` | `#d5322f` |
+| `color.palette.terminal.background` | `#fafafa` |
+| `color.palette.terminal.wash` | `#000000` |
 
 ### Semantic color
 
@@ -387,6 +457,24 @@ Appearance: `Light`.
 | `color.loader.gradient.0` | `{loader.blue}` | `#4776b5` |
 | `color.loader.gradient.1` | `{loader.orange}` | `#ad5c20` |
 | `color.loader.gradient.2` | `{loader.pink}` | `#bc3a60` |
+| `color.terminal.background` | `{terminal.background}` | `#fafafa` |
+| `color.terminal.selection` | `{terminal.wash}/29` | `#00000029` |
+| `color.terminal.ansi.0` | `{ansi.0}` | `#1f1f1f` |
+| `color.terminal.ansi.1` | `{ansi.1}` | `#dc2626` |
+| `color.terminal.ansi.2` | `{ansi.2}` | `#16a34a` |
+| `color.terminal.ansi.3` | `{ansi.3}` | `#b45309` |
+| `color.terminal.ansi.4` | `{ansi.4}` | `#2563eb` |
+| `color.terminal.ansi.5` | `{ansi.5}` | `#9333ea` |
+| `color.terminal.ansi.6` | `{ansi.6}` | `#0e7490` |
+| `color.terminal.ansi.7` | `{ansi.7}` | `#3f3f46` |
+| `color.terminal.ansi.8` | `{ansi.8}` | `#71717a` |
+| `color.terminal.ansi.9` | `{ansi.9}` | `#b91c1c` |
+| `color.terminal.ansi.10` | `{ansi.10}` | `#15803d` |
+| `color.terminal.ansi.11` | `{ansi.11}` | `#92400e` |
+| `color.terminal.ansi.12` | `{ansi.12}` | `#1d4ed8` |
+| `color.terminal.ansi.13` | `{ansi.13}` | `#7e22ce` |
+| `color.terminal.ansi.14` | `{ansi.14}` | `#155e75` |
+| `color.terminal.ansi.15` | `{ansi.15}` | `#18181b` |
 
 ### Spacing
 
@@ -611,6 +699,22 @@ Appearance: `Light`.
 | `color.loader.gradient.0` | `color.surface.overlay` | 4.64 | 3.0 |
 | `color.loader.gradient.1` | `color.surface.overlay` | 4.85 | 3.0 |
 | `color.loader.gradient.2` | `color.surface.overlay` | 5.37 | 3.0 |
+| `color.terminal.ansi.0` | `color.terminal.background` | 15.79 | 1.2 |
+| `color.terminal.ansi.1` | `color.terminal.background` | 4.63 | 3.0 |
+| `color.terminal.ansi.2` | `color.terminal.background` | 3.16 | 3.0 |
+| `color.terminal.ansi.3` | `color.terminal.background` | 4.81 | 3.0 |
+| `color.terminal.ansi.4` | `color.terminal.background` | 4.95 | 3.0 |
+| `color.terminal.ansi.5` | `color.terminal.background` | 5.16 | 3.0 |
+| `color.terminal.ansi.6` | `color.terminal.background` | 5.13 | 3.0 |
+| `color.terminal.ansi.7` | `color.terminal.background` | 10.01 | 3.0 |
+| `color.terminal.ansi.8` | `color.terminal.background` | 4.63 | 1.2 |
+| `color.terminal.ansi.9` | `color.terminal.background` | 6.20 | 3.0 |
+| `color.terminal.ansi.10` | `color.terminal.background` | 4.81 | 3.0 |
+| `color.terminal.ansi.11` | `color.terminal.background` | 6.79 | 3.0 |
+| `color.terminal.ansi.12` | `color.terminal.background` | 6.42 | 3.0 |
+| `color.terminal.ansi.13` | `color.terminal.background` | 6.69 | 3.0 |
+| `color.terminal.ansi.14` | `color.terminal.background` | 6.96 | 3.0 |
+| `color.terminal.ansi.15` | `color.terminal.background` | 16.97 | 3.0 |
 | `color.text.onAccent` | `color.semantic.accent` | 6.30 | 4.5 |
 
 ### Surface separation

@@ -37,6 +37,8 @@ pub struct SelectOption {
     pub label: SharedString,
     pub description: Option<SharedString>,
     pub disabled: bool,
+    /// Options that share a group label are drawn under one heading.
+    pub group: Option<SharedString>,
 }
 
 impl SelectOption {
@@ -46,6 +48,7 @@ impl SelectOption {
             label: label.into(),
             description: None,
             disabled: false,
+            group: None,
         }
     }
 
@@ -58,6 +61,12 @@ impl SelectOption {
         self.disabled = disabled;
         self
     }
+
+    /// Places the option under a section heading in the menu.
+    pub fn group(mut self, group: impl Into<SharedString>) -> Self {
+        self.group = Some(group.into());
+        self
+    }
 }
 
 /// What a [`Select`] reports. The owner decides what any of it means.
@@ -65,6 +74,8 @@ impl SelectOption {
 pub enum SelectEvent {
     /// The typist picked this option. The owner decides whether it holds.
     Selected(SharedString),
+    /// The typist cleared the answer. The owner decides whether it holds.
+    Cleared,
     Opened,
     Closed,
 }
@@ -87,6 +98,7 @@ pub struct Select {
     disabled: bool,
     invalid: bool,
     open: bool,
+    clearable: bool,
     /// Which row the keyboard is on, which is not a choice until it is taken.
     active: Option<usize>,
     scroll: ScrollHandle,
@@ -121,6 +133,7 @@ impl Select {
             disabled: false,
             invalid: false,
             open: false,
+            clearable: false,
             active: None,
             scroll: ScrollHandle::new(),
             trigger_bounds: Rc::default(),
@@ -165,6 +178,24 @@ impl Select {
     pub fn invalid(mut self, invalid: bool) -> Self {
         self.invalid = invalid;
         self
+    }
+
+    /// Offers a control that reports [`SelectEvent::Cleared`]. Disabled
+    /// options stay offered; an empty answer is a different fact.
+    pub fn clearable(mut self, clearable: bool) -> Self {
+        self.clearable = clearable;
+        self
+    }
+
+    fn clear(&mut self, cx: &mut Context<Self>) {
+        if self.disabled || !self.clearable || self.selected.is_none() {
+            return;
+        }
+        self.open = false;
+        self.active = None;
+        cx.emit(SelectEvent::Cleared);
+        cx.emit(SelectEvent::Closed);
+        cx.notify();
     }
 
     /// Replaces the options from the host side, keeping a selection that is
@@ -369,12 +400,17 @@ impl Select {
             }
             self.reveal_active = false;
         }
-        let rows = self
-            .options
-            .iter()
-            .enumerate()
-            .map(|(index, option)| self.row(index, option, self.options.len(), cx))
-            .collect::<Vec<_>>();
+        let mut rows = Vec::new();
+        let mut last_group: Option<SharedString> = None;
+        for (index, option) in self.options.iter().enumerate() {
+            if option.group != last_group {
+                if let Some(group) = option.group.clone() {
+                    rows.push(self.group_heading(&group, cx));
+                }
+                last_group = option.group.clone();
+            }
+            rows.push(self.row(index, option, self.options.len(), cx));
+        }
 
         let viewport = div()
             .p(px(theme.space(Space::Xs)))
@@ -402,6 +438,22 @@ impl Select {
             geometry.placement,
             list,
         )
+    }
+
+    fn group_heading(&self, label: &SharedString, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        let ident = self.ident.child("group").child(label.as_ref());
+        foundation_text(&theme, TypeScale::Caption, label.clone())
+            .px(px(theme.space(Space::Sm)))
+            .py(px(theme.space(Space::Xs)))
+            .text_color(theme.colors.text_faint)
+            .semantic_in(
+                cx,
+                NodeSpec::new(ident.semantic_id(), Role::Text)
+                    .parent(self.ident.child("menu").semantic_id())
+                    .text(label.clone()),
+            )
+            .into_any_element()
     }
 
     fn row(
@@ -576,6 +628,33 @@ impl Render for Select {
                         theme.colors.text
                     }),
             )
+            .when(self.clearable && has_choice && !self.disabled, |element| {
+                let clear = self.ident.child("clear");
+                element.child(
+                    div()
+                        .id(clear.element_id())
+                        .flex_none()
+                        .cursor_pointer()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(|select, _, _, cx| {
+                                select.clear(cx);
+                                cx.stop_propagation();
+                            }),
+                        )
+                        .child(
+                            icon(Icon::Close)
+                                .size(px(metrics.icon_size * 0.8))
+                                .text_color(theme.colors.text_muted),
+                        )
+                        .semantic_in(
+                            cx,
+                            NodeSpec::new(clear.semantic_id(), Role::Button)
+                                .parent(self.ident.semantic_id())
+                                .text(cx.strings().text(StringKey::SelectClear)),
+                        ),
+                )
+            })
             .child(
                 // One glyph in both states: the menu itself shows whether the
                 // control is open, and a flipped arrow would say it twice.

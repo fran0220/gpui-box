@@ -18,7 +18,7 @@ use crate::controls::button::Button;
 use crate::display::badge::Tone;
 use crate::display::tag::Tag;
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text as foundation_text};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type RemoveHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 type ClearHandler = Rc<dyn Fn(&mut Window, &mut App)>;
@@ -98,7 +98,10 @@ impl ResultCount {
         match self {
             Self::Unknown => None,
             Self::Counting => Some(cx.strings().text(StringKey::FilterBarCounting)),
-            Self::Known(count) => Some(SharedString::from(format!("{count} {noun}"))),
+            Self::Known(count) => Some(cx.strings().format(
+                StringKey::FilterBarResults,
+                &[cx.numbers().count(*count).as_ref(), noun.as_ref()],
+            )),
             Self::Unavailable(reason) => Some(reason.clone()),
         }
     }

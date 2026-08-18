@@ -26,6 +26,7 @@ pub mod notification_center;
 mod palette;
 pub mod panel;
 pub mod popover;
+pub(crate) mod stack;
 pub mod toast;
 pub mod tooltip;
 

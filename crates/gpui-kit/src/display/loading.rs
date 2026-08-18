@@ -166,6 +166,10 @@ pub struct Skeleton {
     ident: Ident,
     rows: usize,
     row_height: f32,
+    /// How wide each row is, as a fraction of the frame. A list that is
+    /// still loading rarely has every row the same length; the pattern is
+    /// the claim, not a measurement of content that does not exist yet.
+    widths: Vec<f32>,
     label: Option<gpui::SharedString>,
 }
 
@@ -175,6 +179,7 @@ impl Skeleton {
             ident: ident.into(),
             rows: 3,
             row_height: 28.0,
+            widths: Vec::new(),
             label: None,
         }
     }
@@ -193,6 +198,18 @@ impl Skeleton {
         self.row_height = row_height;
         self
     }
+
+    /// The width of each placeholder row, as a fraction of the frame.
+    ///
+    /// Missing entries reuse the last supplied width; an empty list leaves
+    /// every row full-width. Values are clamped to `(0, 1]`.
+    pub fn widths(mut self, widths: impl IntoIterator<Item = f32>) -> Self {
+        self.widths = widths
+            .into_iter()
+            .map(|width| width.clamp(0.16, 1.0))
+            .collect();
+        self
+    }
 }
 
 impl RenderOnce for Skeleton {
@@ -207,14 +224,22 @@ impl RenderOnce for Skeleton {
         );
         let ident = self.ident.clone();
         let spec = busy_spec(&self.ident, self.label.clone());
+        let widths = self.widths;
+        let rows = self.rows;
         div()
             .flex()
             .flex_col()
             .gap(px(6.0))
             .semantic_in(cx, spec)
-            .children((0..self.rows).map(move |index| {
+            .children((0..rows).map(move |index| {
+                let width = widths
+                    .get(index)
+                    .copied()
+                    .or_else(|| widths.last().copied())
+                    .unwrap_or(1.0);
                 div()
                     .h(px(row_height))
+                    .w(relative(width))
                     .rounded(px(radius))
                     .bg(color)
                     .relative()

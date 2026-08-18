@@ -22,6 +22,7 @@
 //! publishes the fence's info string exactly as it was written. Colour comes
 //! from host-supplied [`CodeSpan`]s or from nowhere.
 
+pub mod doc;
 pub mod parse;
 
 use std::collections::{HashMap, HashSet};

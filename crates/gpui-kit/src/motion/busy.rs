@@ -115,10 +115,27 @@ pub fn breathe<E>(element: E, id: impl Into<ElementId>, theme: &Theme, cx: &App)
 where
     E: Styled + IntoElement + 'static,
 {
+    breathe_as(element, id, Activity::Deliberating, theme, cx)
+}
+
+/// Breathes on the period of `activity`, for a mark that can only fade.
+///
+/// A circle has nothing for a rotation to read against, so both a working
+/// and a deliberating dot use a breath. The period still tells them apart:
+/// working is the faster of the two, because it is the stronger claim.
+pub fn breathe_as<E>(
+    element: E,
+    id: impl Into<ElementId>,
+    activity: Activity,
+    theme: &Theme,
+    cx: &App,
+) -> AnyElement
+where
+    E: Styled + IntoElement + 'static,
+{
     if reduce_motion(cx) {
         return element.into_any_element();
     }
-    let activity = Activity::Deliberating;
     element
         .with_animation(
             id.into(),

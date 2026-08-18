@@ -303,6 +303,29 @@
       ]
     },
     {
+      "name": "AreaChart",
+      "kind": "builder",
+      "path": "gpui_kit::display::AreaChart",
+      "source": "crates/gpui-kit/src/display/chart.rs",
+      "summary": "A filled area chart over one or more host-owned series.",
+      "construct": [
+        "new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: ChartState) -> Self"
+      ],
+      "options": [
+        "axes(axes: ChartAxes) -> Self",
+        "polyline() -> Self",
+        "crosshair() -> Self",
+        "current(series_id: impl Into<SharedString>, point_id: impl Into<SharedString>) -> Self",
+        "on_current(handler: impl Fn(ChartSelection, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "chart"
+      ]
+    },
+    {
       "name": "AspectRatio",
       "kind": "builder",
       "path": "gpui_kit::layout::AspectRatio",
@@ -678,6 +701,26 @@
       ]
     },
     {
+      "name": "ChartLegend",
+      "kind": "builder",
+      "path": "gpui_kit::display::ChartLegend",
+      "source": "crates/gpui-kit/src/display/chart.rs",
+      "summary": "A standalone legend that reports series hide and show.",
+      "construct": [
+        "new(ident: impl Into<Ident>, series: impl IntoIterator<Item = ChartSeries>) -> Self"
+      ],
+      "options": [
+        "hidden(ids: impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
+        "on_toggle(handler: impl Fn(SharedString, bool, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "chart"
+      ]
+    },
+    {
       "name": "Checkbox",
       "kind": "builder",
       "path": "gpui_kit::controls::Checkbox",
@@ -769,6 +812,48 @@
       "reports": [],
       "scenes": [
         "collapsible"
+      ]
+    },
+    {
+      "name": "ColorPicker",
+      "kind": "builder",
+      "path": "gpui_kit::controls::ColorPicker",
+      "source": "crates/gpui-kit/src/controls/color_picker.rs",
+      "summary": "Hue, saturation-brightness, optional opacity, and host-owned swatches.",
+      "construct": [
+        "new(ident: impl Into<Ident>, value: Hsla) -> Self"
+      ],
+      "options": [
+        "alpha(alpha: bool) -> Self",
+        "presets(colors: impl IntoIterator<Item = Hsla>) -> Self",
+        "recent(colors: impl IntoIterator<Item = Hsla>) -> Self",
+        "on_change(handler: impl Fn(Hsla, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "color-picker"
+      ]
+    },
+    {
+      "name": "ColorSwatch",
+      "kind": "builder",
+      "path": "gpui_kit::controls::ColorSwatch",
+      "source": "crates/gpui-kit/src/controls/color_picker.rs",
+      "summary": "A clickable colour chip. Reports the colour it was given; applies nothing.",
+      "construct": [
+        "new(ident: impl Into<Ident>, color: Hsla) -> Self"
+      ],
+      "options": [
+        "selected(selected: bool) -> Self",
+        "on_click(handler: impl Fn(Hsla, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "color-picker"
       ]
     },
     {
@@ -969,6 +1054,9 @@
         "total(total: usize) -> Self",
         "column(column: GridColumn) -> Self",
         "columns(columns: impl IntoIterator<Item = GridColumn>) -> Self",
+        "group(group: ColumnGroup) -> Self",
+        "groups(groups: impl IntoIterator<Item = ColumnGroup>) -> Self",
+        "footer_cell(key: impl Into<SharedString>, value: impl Into<SharedString>) -> Self",
         "lines(lines: GridLines) -> Self",
         "sort(sort: Option<(SharedString, SortDirection)>) -> Self",
         "sorted_by(key: impl Into<SharedString>, direction: SortDirection) -> Self",
@@ -988,6 +1076,9 @@
         "on_resize(handler: impl Fn(SharedString, f32, &mut Window, &mut App) + 'static) -> Self",
         "on_fit(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self",
         "on_reorder(handler: impl Fn(&DropIntent, &mut Window, &mut App) + 'static) -> Self",
+        "range(range: Option<CellRange>) -> Self",
+        "on_range_change(handler: impl Fn(&CellRange, &mut Window, &mut App) + 'static) -> Self",
+        "on_copy(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self",
         "on_expand(handler: impl Fn(SharedString, bool, &mut Window, &mut App) + 'static) -> Self",
         "on_edit_request(handler: impl Fn(SharedString, SharedString, &mut Window, &mut App) + 'static) -> Self",
         "on_edit(handler: impl Fn(&EditIntent, &mut Window, &mut App) + 'static) -> Self"
@@ -1149,7 +1240,8 @@
       "reports": [
         "FileActivated",
         "HunkActivated",
-        "LineActivated"
+        "LineActivated",
+        "ExpandHunk"
       ],
       "scenes": [
         "diff-view"
@@ -1222,9 +1314,11 @@
         "content(body: impl Fn(&mut Window, &mut App) -> AnyElement + 'static) -> Self",
         "footer(footer: impl Fn(&mut Window, &mut App) -> AnyElement + 'static) -> Self",
         "dismissable(dismissable: bool) -> Self",
+        "resizable(resizable: bool) -> Self",
         "focus_stops(stops: impl IntoIterator<Item = FocusHandle>) -> Self"
       ],
       "commands": [
+        "set_size(size: f32, cx: &mut Context<Self>)",
         "set_focus_stops(stops: impl IntoIterator<Item = FocusHandle>, cx: &mut Context<Self>)",
         "set_title(title: impl Into<SharedString>, cx: &mut Context<Self>)",
         "open(window: &mut Window, cx: &mut Context<Self>)",
@@ -1240,7 +1334,8 @@
       "reports": [
         "Opened",
         "Dismissed",
-        "Closed"
+        "Closed",
+        "ResizeRequested"
       ],
       "scenes": [
         "drawer"
@@ -1517,6 +1612,28 @@
       "reports": [],
       "scenes": [
         "node-graph"
+      ]
+    },
+    {
+      "name": "Heatmap",
+      "kind": "builder",
+      "path": "gpui_kit::display::Heatmap",
+      "source": "crates/gpui-kit/src/display/heatmap.rs",
+      "summary": "A labelled grid of intensity cells.",
+      "construct": [
+        "new(ident: impl Into<Ident>, label: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "rows(rows: impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
+        "columns(columns: impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
+        "cells(cells: impl IntoIterator<Item = HeatCell>) -> Self",
+        "state(state: HeatmapState) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "heatmap"
       ]
     },
     {
@@ -1824,6 +1941,7 @@
       "options": [
         "axes(axes: ChartAxes) -> Self",
         "area() -> Self",
+        "smooth() -> Self",
         "crosshair() -> Self",
         "current(series_id: impl Into<SharedString>, point_id: impl Into<SharedString>) -> Self",
         "on_current(handler: impl Fn(ChartSelection, &mut Window, &mut App) + 'static) -> Self"
@@ -1897,7 +2015,8 @@
         "visible_rows(rows: usize) -> Self",
         "selected(id: impl Into<SharedString>) -> Self",
         "on_select(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self",
-        "on_copy(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self"
+        "on_copy(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self",
+        "ansi(ansi: bool) -> Self"
       ],
       "commands": [],
       "queries": [],
@@ -2080,7 +2199,8 @@
         "zoom(zoom: f32) -> Self",
         "zoom_range(min: f32, max: f32) -> Self",
         "interaction(interaction: GraphInteraction) -> Self",
-        "on_event(handler: impl Fn(&NodeGraphEvent, &mut Window, &mut App) + 'static) -> Self"
+        "on_event(handler: impl Fn(&NodeGraphEvent, &mut Window, &mut App) + 'static) -> Self",
+        "minimap(show: bool) -> Self"
       ],
       "commands": [],
       "queries": [],
@@ -2152,6 +2272,7 @@
         "page_step(page_step: f64) -> Self",
         "precision(precision: usize) -> Self",
         "unit(unit: impl Into<SharedString>) -> Self",
+        "prefix(prefix: impl Into<SharedString>) -> Self",
         "required(required: bool) -> Self"
       ],
       "commands": [
@@ -2272,6 +2393,7 @@
       ],
       "options": [
         "layer(layer: Layer) -> Self",
+        "stack(depth: usize) -> Self",
         "placement(placement: Placement) -> Self",
         "scrim(scrim: bool) -> Self",
         "child(content: impl IntoElement) -> Self",
@@ -2445,6 +2567,25 @@
       "reports": [],
       "scenes": [
         "persona"
+      ]
+    },
+    {
+      "name": "PieChart",
+      "kind": "builder",
+      "path": "gpui_kit::display::PieChart",
+      "source": "crates/gpui-kit/src/display/chart.rs",
+      "summary": "A pie or donut over one host-owned series of shares.",
+      "construct": [
+        "new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: ChartState) -> Self"
+      ],
+      "options": [
+        "donut() -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "chart"
       ]
     },
     {
@@ -2641,6 +2782,28 @@
       ]
     },
     {
+      "name": "ScatterChart",
+      "kind": "builder",
+      "path": "gpui_kit::display::ScatterChart",
+      "source": "crates/gpui-kit/src/display/chart.rs",
+      "summary": "Scatter or bubble marks over one or more host-owned series.",
+      "construct": [
+        "new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: ChartState) -> Self"
+      ],
+      "options": [
+        "axes(axes: ChartAxes) -> Self",
+        "crosshair() -> Self",
+        "current(series_id: impl Into<SharedString>, point_id: impl Into<SharedString>) -> Self",
+        "on_current(handler: impl Fn(ChartSelection, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "chart"
+      ]
+    },
+    {
       "name": "SchemaForm",
       "kind": "view",
       "path": "gpui_kit::structured::SchemaForm",
@@ -2801,7 +2964,8 @@
         "selected(id: impl Into<SharedString>) -> Self",
         "name(name: impl Into<SharedString>) -> Self",
         "placeholder(placeholder: impl Into<SharedString>) -> Self",
-        "invalid(invalid: bool) -> Self"
+        "invalid(invalid: bool) -> Self",
+        "clearable(clearable: bool) -> Self"
       ],
       "commands": [
         "set_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
@@ -2816,6 +2980,7 @@
       ],
       "reports": [
         "Selected",
+        "Cleared",
         "Opened",
         "Closed"
       ],
@@ -2932,7 +3097,8 @@
       "options": [
         "label(label: impl Into<gpui::SharedString>) -> Self",
         "rows(rows: usize) -> Self",
-        "row_height(row_height: f32) -> Self"
+        "row_height(row_height: f32) -> Self",
+        "widths(widths: impl IntoIterator<Item = f32>) -> Self"
       ],
       "commands": [],
       "queries": [],
@@ -2956,13 +3122,39 @@
         "value(value: f32) -> Self",
         "step(step: f32) -> Self",
         "display(display: impl Into<SharedString>) -> Self",
-        "on_change(handler: impl Fn(f32, &mut Window, &mut App) + 'static) -> Self"
+        "on_change(handler: impl Fn(f32, &mut Window, &mut App) + 'static) -> Self",
+        "high(high: f32) -> Self",
+        "values(low: f32, high: f32) -> Self",
+        "marks(marks: impl IntoIterator<Item = f32>) -> Self",
+        "on_range_change(handler: impl Fn(f32, f32, &mut Window, &mut App) + 'static) -> Self"
       ],
       "commands": [],
       "queries": [],
       "reports": [],
       "scenes": [
         "choice"
+      ]
+    },
+    {
+      "name": "SpanTimeline",
+      "kind": "builder",
+      "path": "gpui_kit::display::SpanTimeline",
+      "source": "crates/gpui-kit/src/display/trace.rs",
+      "summary": "The waterfall alone: bars and a time axis, without the label column.",
+      "construct": [
+        "new(ident: impl Into<Ident>, label: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "spans(spans: impl IntoIterator<Item = TraceSpan>) -> Self",
+        "axis(start: impl Into<SharedString>, end: impl Into<SharedString>) -> Self",
+        "current(id: impl Into<SharedString>) -> Self",
+        "on_select(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "trace"
       ]
     },
     {
@@ -3067,6 +3259,25 @@
       ]
     },
     {
+      "name": "StackedBarChart",
+      "kind": "builder",
+      "path": "gpui_kit::display::StackedBarChart",
+      "source": "crates/gpui-kit/src/display/chart.rs",
+      "summary": "Bars stacked from the same category identity across series.",
+      "construct": [
+        "new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: ChartState) -> Self"
+      ],
+      "options": [
+        "axes(axes: ChartAxes) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "chart"
+      ]
+    },
+    {
       "name": "StatusBar",
       "kind": "builder",
       "path": "gpui_kit::layout::StatusBar",
@@ -3101,7 +3312,8 @@
       ],
       "options": [
         "tint(tint: Hsla) -> Self",
-        "busy(ident: impl Into<Ident>) -> Self"
+        "busy(ident: impl Into<Ident>) -> Self",
+        "activity(activity: motion::Activity) -> Self"
       ],
       "commands": [],
       "queries": [],
@@ -3122,7 +3334,8 @@
       "options": [
         "id(ident: impl Into<Ident>) -> Self",
         "tint(tint: Hsla) -> Self",
-        "busy(ident: impl Into<Ident>) -> Self"
+        "busy(ident: impl Into<Ident>) -> Self",
+        "activity(activity: motion::Activity) -> Self"
       ],
       "commands": [],
       "queries": [],
@@ -3294,7 +3507,9 @@
         "tags(tags: impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
         "placeholder(placeholder: impl Into<SharedString>) -> Self",
         "max(max: usize) -> Self",
-        "invalid(invalid: bool) -> Self"
+        "invalid(invalid: bool) -> Self",
+        "reorderable(reorderable: bool) -> Self",
+        "collapse_at(visible: usize) -> Self"
       ],
       "commands": [
         "set_tags(tags: Vec<SharedString>, cx: &mut Context<Self>)",
@@ -3310,10 +3525,40 @@
         "Added",
         "Removed",
         "Duplicate",
-        "Refused"
+        "Refused",
+        "Moved",
+        "EditRequested"
       ],
       "scenes": [
         "form"
+      ]
+    },
+    {
+      "name": "Terminal",
+      "kind": "builder",
+      "path": "gpui_kit::content::Terminal",
+      "source": "crates/gpui-kit/src/content/terminal/view.rs",
+      "summary": "A terminal grid.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "state(state: TerminalState) -> Self",
+        "grid(grid: impl Fn(GridGeometry, &mut App) -> Option<GridSnapshot> + 'static) -> Self",
+        "focused(focused: bool) -> Self",
+        "scrollback(scrollback: bool) -> Self",
+        "on_event(handler: impl Fn(TerminalEvent, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [
+        "SelectionStarted",
+        "SelectionUpdated",
+        "SelectionCleared",
+        "Scrolled"
+      ],
+      "scenes": [
+        "terminal"
       ]
     },
     {
@@ -3421,6 +3666,7 @@
       "options": [
         "expanded(expanded: bool) -> Self",
         "thinking(thinking: bool) -> Self",
+        "elapsed(elapsed: impl Into<SharedString>) -> Self",
         "on_toggle(handler: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self"
       ],
       "commands": [],
@@ -3576,6 +3822,7 @@
         "arguments(arguments: impl Into<ToolBody>) -> Self",
         "state(state: ToolCallState) -> Self",
         "elapsed(elapsed: impl Into<Elapsed>) -> Self",
+        "diff(diff: impl IntoElement) -> Self",
         "on_retry(handler: impl Fn(&mut Window, &mut App) + 'static) -> Self"
       ],
       "commands": [],
@@ -3631,6 +3878,28 @@
       ]
     },
     {
+      "name": "TraceView",
+      "kind": "builder",
+      "path": "gpui_kit::display::TraceView",
+      "source": "crates/gpui-kit/src/display/trace.rs",
+      "summary": "Hierarchical labels beside a waterfall of caller-owned spans.",
+      "construct": [
+        "new(ident: impl Into<Ident>, label: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "spans(spans: impl IntoIterator<Item = TraceSpan>) -> Self",
+        "axis(start: impl Into<SharedString>, end: impl Into<SharedString>) -> Self",
+        "current(id: impl Into<SharedString>) -> Self",
+        "on_select(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "trace"
+      ]
+    },
+    {
       "name": "TransportBar",
       "kind": "builder",
       "path": "gpui_kit::content::TransportBar",
@@ -3683,7 +3952,10 @@
         "on_select(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self",
         "reorderable(reorderable: bool) -> Self",
         "accepts(predicate: impl Fn(&DragItem, &DropPosition) -> bool + 'static) -> Self",
-        "on_move(handler: impl Fn(&DropIntent, &mut Window, &mut App) + 'static) -> Self"
+        "on_move(handler: impl Fn(&DropIntent, &mut Window, &mut App) + 'static) -> Self",
+        "loading(loading: bool) -> Self",
+        "failure(failure: impl Into<SharedString>) -> Self",
+        "empty(empty: EmptyState) -> Self"
       ],
       "commands": [],
       "queries": [],
@@ -4433,6 +4705,16 @@
       ]
     },
     {
+      "name": "AnsiRun",
+      "path": "gpui_kit::content::AnsiRun",
+      "summary": "One coloured run of the stripped text.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "ApprovalDecision",
       "path": "gpui_kit::agent::ApprovalDecision",
       "summary": "How far an approval reaches.",
@@ -4571,12 +4853,37 @@
         "Table",
         "Html"
       ],
-      "construct": [],
+      "construct": [
+        "new(kind: BlockKind) -> Self",
+        "at(kind: BlockKind, indent: u8) -> Self"
+      ],
       "options": [],
       "commands": [],
       "queries": [
+        "text() -> Option<&Text>",
         "lines() -> usize"
       ]
+    },
+    {
+      "name": "BlockKind",
+      "path": "gpui_kit::content::BlockKind",
+      "summary": "The block vocabulary. Closed by design — it is exactly what a block editor's insert menu offers, and a consumer that needs a block of its own is a reason to widen this enum rather than to grow an extension system.",
+      "variants": [
+        "Paragraph",
+        "Heading",
+        "Bullet",
+        "Ordered",
+        "Task",
+        "Quote",
+        "Code",
+        "Image",
+        "Table",
+        "Rule"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "BlockedDay",
@@ -4602,6 +4909,22 @@
       "options": [],
       "commands": [],
       "queries": []
+    },
+    {
+      "name": "BranchState",
+      "path": "gpui_kit::data::BranchState",
+      "summary": "What is known about the children under a node.",
+      "variants": [
+        "Ready",
+        "Loading",
+        "Unavailable"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "name() -> &'static str"
+      ]
     },
     {
       "name": "BufferedRange",
@@ -4770,6 +5093,68 @@
       "queries": []
     },
     {
+      "name": "CellColor",
+      "path": "gpui_kit::content::CellColor",
+      "summary": "What a cell says its colour is, before a theme decides what that means.",
+      "variants": [
+        "Foreground",
+        "Background",
+        "Indexed",
+        "Rgb"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "CellHit",
+      "path": "gpui_kit::content::CellHit",
+      "summary": "Which cell a pointer landed on, and which edge of it an anchor takes.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "CellRange",
+      "path": "gpui_kit::data::CellRange",
+      "summary": "A caller-owned rectangle of cells, named by row and column identity.",
+      "variants": [],
+      "construct": [
+        "new(start_row: impl Into<SharedString>, start_column: impl Into<SharedString>, end_row: impl Into<SharedString>, end_column: impl Into<SharedString>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "CellSide",
+      "path": "gpui_kit::content::CellSide",
+      "summary": "Which edge of a cell an anchor sits on.",
+      "variants": [
+        "Left",
+        "Right"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "CellSnapshot",
+      "path": "gpui_kit::content::CellSnapshot",
+      "summary": "One cell as it stands: the character, its colours, and the attributes that change how it is painted.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "display_colors() -> (CellColor, CellColor)"
+      ]
+    },
+    {
       "name": "ChartAxes",
       "path": "gpui_kit::display::ChartAxes",
       "summary": "Host-supplied wording for the two axes. Empty labels are omitted, not replaced with a guessed scale.",
@@ -4792,7 +5177,9 @@
       "construct": [
         "new(id: impl Into<SharedString>, x: f32, y: f32, label: impl Into<SharedString>, value: impl Into<SharedString>) -> Self"
       ],
-      "options": [],
+      "options": [
+        "weight(weight: f32) -> Self"
+      ],
       "commands": [],
       "queries": [
         "is_bounded() -> bool"
@@ -4926,6 +5313,20 @@
         "flex(share: f32) -> Self",
         "align(align: Align) -> Self",
         "sortable(sortable: bool) -> Self"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "ColumnGroup",
+      "path": "gpui_kit::data::ColumnGroup",
+      "summary": "A header that names several columns at once.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, label: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "columns(keys: impl IntoIterator<Item = impl Into<SharedString>>) -> Self"
       ],
       "commands": [],
       "queries": []
@@ -5095,6 +5496,36 @@
       "options": [
         "eval(input: f32) -> f32"
       ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "Cursor",
+      "path": "gpui_kit::content::Cursor",
+      "summary": "A caret: which block, and how far into its text.",
+      "variants": [],
+      "construct": [
+        "new(block: usize, offset: usize) -> Self"
+      ],
+      "options": [
+        "clamp(doc: &Doc) -> Self",
+        "left(doc: &Doc) -> Self",
+        "right(doc: &Doc) -> Self",
+        "up(doc: &Doc) -> Self",
+        "down(doc: &Doc) -> Self",
+        "home() -> Self",
+        "end(doc: &Doc) -> Self"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "CursorSnapshot",
+      "path": "gpui_kit::content::CursorSnapshot",
+      "summary": "Where the cursor is, in viewport rows (row 0 is the top of what is visible).",
+      "variants": [],
+      "construct": [],
+      "options": [],
       "commands": [],
       "queries": []
     },
@@ -5405,7 +5836,9 @@
       "construct": [
         "new(id: impl Into<SharedString>, header: impl Into<SharedString>, lines: impl IntoIterator<Item = DiffLine>) -> Self"
       ],
-      "options": [],
+      "options": [
+        "collapsed(collapsed: bool) -> Self"
+      ],
       "commands": [],
       "queries": []
     },
@@ -5452,8 +5885,19 @@
       "variants": [
         "FileActivated",
         "HunkActivated",
-        "LineActivated"
+        "LineActivated",
+        "ExpandHunk"
       ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "Doc",
+      "path": "gpui_kit::content::Doc",
+      "summary": "A markdown document: blocks in document order.",
+      "variants": [],
       "construct": [],
       "options": [],
       "commands": [],
@@ -5716,7 +6160,8 @@
       "variants": [
         "Opened",
         "Dismissed",
-        "Closed"
+        "Closed",
+        "ResizeRequested"
       ],
       "construct": [],
       "options": [],
@@ -6063,9 +6508,55 @@
       "queries": []
     },
     {
+      "name": "Emulator",
+      "path": "gpui_kit::content::Emulator",
+      "summary": "A terminal's state: a pure fold of output bytes into a grid.",
+      "variants": [],
+      "construct": [
+        "new(cols: u16, rows: u16) -> Self"
+      ],
+      "options": [],
+      "commands": [
+        "feed(bytes: &[u8]) -> Vec<u8>",
+        "resize(cols: u16, rows: u16)",
+        "take_bell() -> bool",
+        "scroll(delta: i32)",
+        "scroll_to_bottom()",
+        "start_selection(kind: SelectionKind, point: GridPoint, side: CellSide)",
+        "update_selection(point: GridPoint, side: CellSide)",
+        "clear_selection()"
+      ],
+      "queries": [
+        "cols() -> usize",
+        "rows() -> usize",
+        "title() -> Option<&str>",
+        "app_cursor_mode() -> bool",
+        "bracketed_paste_mode() -> bool",
+        "display_offset() -> usize",
+        "history_lines() -> usize",
+        "grid_point(viewport_row: usize, col: usize) -> GridPoint",
+        "selection_text() -> Option<String>",
+        "has_selection() -> bool",
+        "line(viewport_row: usize) -> Vec<CellSnapshot>",
+        "lines() -> Vec<Vec<CellSnapshot>>",
+        "cursor() -> Option<CursorSnapshot>",
+        "row_text(viewport_row: usize) -> String"
+      ]
+    },
+    {
       "name": "EnglishNumbers",
       "path": "gpui_kit::strings::EnglishNumbers",
       "summary": "English digits and English plurals. Installed when a host supplies none.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "EnglishSearch",
+      "path": "gpui_kit::strings::EnglishSearch",
+      "summary": "English prefix, word-start, containment, then subsequence.",
       "variants": [],
       "construct": [],
       "options": [],
@@ -6502,6 +6993,16 @@
       ]
     },
     {
+      "name": "GridGeometry",
+      "path": "gpui_kit::content::GridGeometry",
+      "summary": "The grid the element measured, in the coordinates a pointer arrives in.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "GridLines",
       "path": "gpui_kit::data::GridLines",
       "summary": "Whether a table or grid draws rules between its rows.",
@@ -6510,6 +7011,18 @@
         "Rows"
       ],
       "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "GridPoint",
+      "path": "gpui_kit::content::GridPoint",
+      "summary": "A place on the grid, in the coordinates a selection anchors to.",
+      "variants": [],
+      "construct": [
+        "new(line: i32, column: usize) -> Self"
+      ],
       "options": [],
       "commands": [],
       "queries": []
@@ -6531,6 +7044,59 @@
       "queries": [
         "id() -> &SharedString"
       ]
+    },
+    {
+      "name": "GridSize",
+      "path": "gpui_kit::content::GridSize",
+      "summary": "The viewport, in cells.",
+      "variants": [],
+      "construct": [
+        "new(cols: u16, rows: u16) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "GridSnapshot",
+      "path": "gpui_kit::content::GridSnapshot",
+      "summary": "What the host hands back to be painted.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "HeatCell",
+      "path": "gpui_kit::display::HeatCell",
+      "summary": "One observation in the matrix, or the absence of one.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, row: impl Into<SharedString>, column: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "level(level: u8) -> Self",
+        "empty() -> Self",
+        "label(label: impl Into<SharedString>) -> Self",
+        "value(value: impl Into<SharedString>) -> Self"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "HeatmapState",
+      "path": "gpui_kit::display::HeatmapState",
+      "summary": "How the matrix was asked for.",
+      "variants": [
+        "Ready",
+        "Empty",
+        "Unavailable"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "HistoryEntry",
@@ -6732,6 +7298,21 @@
       "options": [],
       "commands": [],
       "queries": []
+    },
+    {
+      "name": "InputCoalescer",
+      "path": "gpui_kit::content::InputCoalescer",
+      "summary": "Holds keyboard bytes between flushes.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [
+        "push(bytes: &[u8]) -> bool",
+        "take() -> Vec<u8>"
+      ],
+      "queries": [
+        "is_empty() -> bool"
+      ]
     },
     {
       "name": "InvocationId",
@@ -7025,6 +7606,7 @@
         "new(id: impl Into<SharedString>, message: impl Into<SharedString>) -> Self"
       ],
       "options": [
+        "prepare_ansi() -> Self",
         "timestamp(timestamp: impl Into<SharedString>) -> Self",
         "level(level: impl Into<SharedString>, tone: Tone) -> Self",
         "source(source: impl Into<SharedString>) -> Self",
@@ -7072,6 +7654,33 @@
       "name": "MakeWay",
       "path": "gpui_kit::interaction::MakeWay",
       "summary": "An element painted beside where layout put it.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "Mark",
+      "path": "gpui_kit::content::Mark",
+      "summary": "",
+      "variants": [
+        "Bold",
+        "Italic",
+        "Strike",
+        "Code",
+        "Link",
+        "Image"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "MarkSpan",
+      "path": "gpui_kit::content::MarkSpan",
+      "summary": "",
       "variants": [],
       "construct": [],
       "options": [],
@@ -8817,6 +9426,7 @@
       "summary": "What a Select reports. The owner decides what any of it means.",
       "variants": [
         "Selected",
+        "Cleared",
         "Opened",
         "Closed"
       ],
@@ -8835,7 +9445,8 @@
       ],
       "options": [
         "description(description: impl Into<SharedString>) -> Self",
-        "disabled(disabled: bool) -> Self"
+        "disabled(disabled: bool) -> Self",
+        "group(group: impl Into<SharedString>) -> Self"
       ],
       "commands": [],
       "queries": []
@@ -8876,6 +9487,20 @@
       "queries": [
         "as_str() -> &'static str"
       ]
+    },
+    {
+      "name": "SelectionKind",
+      "path": "gpui_kit::content::SelectionKind",
+      "summary": "How much a selection takes per gesture: a drag, a double-click word, a triple-click row.",
+      "variants": [
+        "Drag",
+        "Word",
+        "Line"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "SelectionMode",
@@ -8966,6 +9591,26 @@
       "queries": []
     },
     {
+      "name": "Shortcut",
+      "path": "gpui_kit::content::Shortcut",
+      "summary": "A markdown prefix typed at the start of a block, and what it turns it into.",
+      "variants": [
+        "Heading",
+        "Bullet",
+        "Ordered",
+        "Task",
+        "Quote",
+        "Code",
+        "Rule"
+      ],
+      "construct": [],
+      "options": [
+        "apply(text: Text) -> BlockKind"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "SidebarItem",
       "path": "gpui_kit::navigation::SidebarItem",
       "summary": "One place in the rail.",
@@ -9030,6 +9675,23 @@
       "options": [
         "reversed() -> Self",
         "as_str() -> &'static str"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "SpanState",
+      "path": "gpui_kit::display::SpanState",
+      "summary": "What a span is doing, as the host already knows it.",
+      "variants": [
+        "Pending",
+        "Running",
+        "Succeeded",
+        "Failed"
+      ],
+      "construct": [],
+      "options": [
+        "name() -> &'static str"
       ],
       "commands": [],
       "queries": []
@@ -9440,7 +10102,9 @@
         "Added",
         "Removed",
         "Duplicate",
-        "Refused"
+        "Refused",
+        "Moved",
+        "EditRequested"
       ],
       "construct": [],
       "options": [],
@@ -9459,6 +10123,50 @@
       "commands": [],
       "queries": [
         "as_str() -> &str"
+      ]
+    },
+    {
+      "name": "TerminalEvent",
+      "path": "gpui_kit::content::TerminalEvent",
+      "summary": "What the grid reports. Every variant is the host's to act on.",
+      "variants": [
+        "SelectionStarted",
+        "SelectionUpdated",
+        "SelectionCleared",
+        "Scrolled"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "TerminalState",
+      "path": "gpui_kit::content::TerminalState",
+      "summary": "What is known about the session behind the grid.",
+      "variants": [
+        "Loading",
+        "Unavailable",
+        "Error",
+        "Ready"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "Text",
+      "path": "gpui_kit::content::Text",
+      "summary": "Inline content: a string, plus marks over byte ranges of it.",
+      "variants": [],
+      "construct": [
+        "plain(text: impl Into<String>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "is_empty() -> bool"
       ]
     },
     {
@@ -9758,6 +10466,22 @@
       ]
     },
     {
+      "name": "TraceSpan",
+      "path": "gpui_kit::display::TraceSpan",
+      "summary": "One already-timed interval on a unit axis.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, label: impl Into<SharedString>, start: f32, end: f32) -> Self"
+      ],
+      "options": [
+        "depth(depth: u32) -> Self",
+        "state(state: SpanState) -> Self",
+        "detail(detail: impl Into<SharedString>) -> Self"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "TrackStep",
       "path": "gpui_kit::content::TrackStep",
       "summary": "Which way a previous or next control steps.",
@@ -9877,7 +10601,8 @@
         "child(child: TreeNode) -> Self",
         "children(children: impl IntoIterator<Item = TreeNode>) -> Self",
         "icon(icon: Icon) -> Self",
-        "disabled(disabled: bool) -> Self"
+        "disabled(disabled: bool) -> Self",
+        "branch(branch: BranchState) -> Self"
       ],
       "commands": [],
       "queries": []
@@ -10259,7 +10984,7 @@
         "StatusDot",
         "StatusLine"
       ],
-      "example": "fn status(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(\n            row(&theme)\n                .child(StatusDot::new(Tone::Success))\n                .child(StatusDot::new(Tone::Warning))\n                .child(StatusDot::new(Tone::Danger))\n                .child(StatusDot::new(Tone::Neutral))\n                // The same dot wearing an identity colour: a state the six\n                // severities cannot name, still reporting the severity it\n                // claims through the surface around it.\n                .child(StatusDot::new(Tone::Neutral).tint(identity_tint(&theme, \"loader.pink\"))),\n        )\n        .child(\n            StatusLine::new(\"Connected\", Tone::Success).id(\"scene.status.line\"),\n        )\n        .child(\n            StatusLine::new(\"Ada · reviewing\", Tone::Neutral)\n                .tint(identity_tint(&theme, \"loader.pink\"))\n                .busy(\"scene.status.tinted\")\n                .id(\"scene.status.tinted\"),\n        )\n        .child(\n            Callout::new(\n                \"The host refused this action. The refusal is shown, not converted to an empty state.\",\n                Tone::Danger,\n            )\n            .id(\"scene.status.refusal\"),\n        )\n        .child(\n            Callout::new(\"Refreshing failed. The last verified value remains visible.\", Tone::Warning)\n                .id(\"scene.status.stale\"),\n        )\n        .into_any_element()\n}"
+      "example": "fn status(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(\n            row(&theme)\n                .child(StatusDot::new(Tone::Success))\n                .child(StatusDot::new(Tone::Warning))\n                .child(StatusDot::new(Tone::Danger))\n                .child(StatusDot::new(Tone::Neutral))\n                // The same dot wearing an identity colour: a state the six\n                // severities cannot name, still reporting the severity it\n                // claims through the surface around it.\n                .child(StatusDot::new(Tone::Neutral).tint(identity_tint(&theme, \"loader.pink\"))),\n        )\n        .child(\n            row(&theme)\n                .child(\n                    StatusDot::new(Tone::Accent)\n                        .busy(\"scene.status.deliberating\")\n                        .activity(crate::motion::Activity::Deliberating),\n                )\n                .child(\n                    StatusDot::new(Tone::Info)\n                        .busy(\"scene.status.working\")\n                        .activity(crate::motion::Activity::Working),\n                )\n                .child(\n                    StatusDot::new(Tone::Success)\n                        .busy(\"scene.status.advancing\")\n                        .activity(crate::motion::Activity::Advancing),\n                ),\n        )\n        .child(\n            StatusLine::new(\"Connected\", Tone::Success).id(\"scene.status.line\"),\n        )\n        .child(\n            StatusLine::new(\"Ada · reviewing\", Tone::Neutral)\n                .tint(identity_tint(&theme, \"loader.pink\"))\n                .busy(\"scene.status.tinted\")\n                .id(\"scene.status.tinted\"),\n        )\n        .child(\n            Callout::new(\n                \"The host refused this action. The refusal is shown, not converted to an empty state.\",\n                Tone::Danger,\n            )\n            .id(\"scene.status.refusal\"),\n        )\n        .child(\n            Callout::new(\"Refreshing failed. The last verified value remains visible.\", Tone::Warning)\n                .id(\"scene.status.stale\"),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "loading",
@@ -10317,7 +11042,7 @@
         "Slider",
         "Switch"
       ],
-      "example": "fn choice(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    div()\n        .flex()\n        .flex_col()\n        .gap(px(theme.space(Space::Md)))\n        .p(px(theme.space(Space::Lg)))\n        .w(px(360.0))\n        .child(\n            Checkbox::new(\"scene.choice.telemetry\")\n                .label(\"Send anonymous usage data\")\n                .description(\"Counts only, never file contents\")\n                .checked(true)\n                .on_change(|_, _, _| {}),\n        )\n        .child(\n            Checkbox::new(\"scene.choice.partial\")\n                .label(\"Some providers enabled\")\n                .mixed()\n                .on_change(|_, _, _| {}),\n        )\n        .child(\n            Checkbox::new(\"scene.choice.locked\")\n                .label(\"Managed by policy\")\n                .checked(true)\n                .disabled(true),\n        )\n        .child(\n            Radio::new(\"scene.choice.ask\")\n                .label(\"Ask before every action\")\n                .selected(true)\n                .on_select(|_, _| {}),\n        )\n        .child(\n            Radio::new(\"scene.choice.auto\")\n                .label(\"Run without asking\")\n                .description(\"Consequential actions still require approval\")\n                .on_select(|_, _| {}),\n        )\n        .child(\n            Switch::new(\"scene.choice.preview\")\n                .label(\"Preview releases\")\n                .on(true)\n                .on_change(|_, _, _| {}),\n        )\n        .child(\n            Slider::new(\"scene.choice.temperature\")\n                .label(\"Temperature\")\n                .range(0.0, 2.0)\n                .step(0.1)\n                .value(0.7)\n                .display(\"0.7\")\n                .on_change(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
+      "example": "fn choice(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    div()\n        .flex()\n        .flex_col()\n        .gap(px(theme.space(Space::Md)))\n        .p(px(theme.space(Space::Lg)))\n        .w(px(360.0))\n        .child(\n            Checkbox::new(\"scene.choice.telemetry\")\n                .label(\"Send anonymous usage data\")\n                .description(\"Counts only, never file contents\")\n                .checked(true)\n                .on_change(|_, _, _| {}),\n        )\n        .child(\n            Checkbox::new(\"scene.choice.partial\")\n                .label(\"Some providers enabled\")\n                .mixed()\n                .on_change(|_, _, _| {}),\n        )\n        .child(\n            Checkbox::new(\"scene.choice.locked\")\n                .label(\"Managed by policy\")\n                .checked(true)\n                .disabled(true),\n        )\n        .child(\n            Radio::new(\"scene.choice.ask\")\n                .label(\"Ask before every action\")\n                .selected(true)\n                .on_select(|_, _| {}),\n        )\n        .child(\n            Radio::new(\"scene.choice.auto\")\n                .label(\"Run without asking\")\n                .description(\"Consequential actions still require approval\")\n                .on_select(|_, _| {}),\n        )\n        .child(\n            Switch::new(\"scene.choice.preview\")\n                .label(\"Preview releases\")\n                .on(true)\n                .on_change(|_, _, _| {}),\n        )\n        .child(\n            Slider::new(\"scene.choice.temperature\")\n                .label(\"Temperature\")\n                .range(0.0, 2.0)\n                .step(0.1)\n                .value(0.7)\n                .display(\"0.7\")\n                .on_change(|_, _, _| {}),\n        )\n        .child(\n            Slider::new(\"scene.choice.window\")\n                .label(\"Window\")\n                .range(0.0, 1.0)\n                .values(0.2, 0.8)\n                .marks([0.0, 0.25, 0.5, 0.75, 1.0])\n                .display(\"0.2 – 0.8\")\n                .on_range_change(|_, _, _, _| {}),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "input",
@@ -10645,7 +11370,7 @@
         "BulkBar",
         "DataGrid"
       ],
-      "example": "fn data_grid(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let detail_theme = theme.clone();\n    stack(&theme)\n        .w(px(760.0))\n        .child(\n            BulkBar::new(\"scene.data-grid.bulk\", 2)\n                .total(FIXTURE_JOBS_TOTAL)\n                .action(\n                    Button::new(\"scene.data-grid.bulk.retry\")\n                        .label(\"Retry\")\n                        .secondary()\n                        .small()\n                        .on_click(|_, _| {}),\n                )\n                .action(\n                    Button::new(\"scene.data-grid.bulk.archive\")\n                        .label(\"Archive\")\n                        .secondary()\n                        .small()\n                        .on_click(|_, _| {}),\n                )\n                .on_select_all(|_, _| {})\n                .on_dismiss(|_, _| {}),\n        )\n        .child(\n            DataGrid::new(\n                \"scene.data-grid.jobs\",\n                FIXTURE_JOBS_LOADED,\n                |index, _, _| grid_row(index),\n            )\n            .total(FIXTURE_JOBS_TOTAL)\n            .columns(grid_columns())\n            .sorted_by(\"duration\", SortDirection::Descending)\n            .selection_mode(SelectionMode::Multiple)\n            .selected([\"job-0001\", \"job-0003\"])\n            .expanded([Expanded::new(\"job-0002\", 2)])\n            .detail_rows(2)\n            .detail(move |id, _, _| grid_detail(&detail_theme, id))\n            .visible_rows(9)\n            .on_sort(|_, _, _, _| {})\n            .on_select(|_, _, _| {})\n            .on_resize(|_, _, _, _| {})\n            .on_fit(|_, _, _| {})\n            .on_reorder(|_, _, _| {})\n            .on_expand(|_, _, _, _| {})\n            .on_edit_request(|_, _, _, _| {})\n            .on_edit(|_, _, _| {}),\n        )\n        .child(\n            crate::foundation::text(\n                &theme,\n                TypeScale::Caption,\n                SharedString::from(format!(\n                    \"{FIXTURE_JOBS_LOADED} rows loaded of {FIXTURE_JOBS_TOTAL}; only the drawn \\\n                     ones publish\"\n                )),\n            )\n            .text_tone(&theme, TextTone::Muted),\n        )\n        .into_any_element()\n}"
+      "example": "fn data_grid(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let detail_theme = theme.clone();\n    stack(&theme)\n        .w(px(760.0))\n        .child(\n            BulkBar::new(\"scene.data-grid.bulk\", 2)\n                .total(FIXTURE_JOBS_TOTAL)\n                .action(\n                    Button::new(\"scene.data-grid.bulk.retry\")\n                        .label(\"Retry\")\n                        .secondary()\n                        .small()\n                        .on_click(|_, _| {}),\n                )\n                .action(\n                    Button::new(\"scene.data-grid.bulk.archive\")\n                        .label(\"Archive\")\n                        .secondary()\n                        .small()\n                        .on_click(|_, _| {}),\n                )\n                .on_select_all(|_, _| {})\n                .on_dismiss(|_, _| {}),\n        )\n        .child(\n            DataGrid::new(\n                \"scene.data-grid.jobs\",\n                FIXTURE_JOBS_LOADED,\n                |index, _, _| grid_row(index),\n            )\n            .total(FIXTURE_JOBS_TOTAL)\n            .columns(grid_columns())\n            .group(ColumnGroup::new(\"job\", \"Job\").columns([\"name\", \"state\"]))\n            .footer_cell(\"duration\", \"4.2s\")\n            .sorted_by(\"duration\", SortDirection::Descending)\n            .selection_mode(SelectionMode::Multiple)\n            .selected([\"job-0001\", \"job-0003\"])\n            .expanded([Expanded::new(\"job-0002\", 2)])\n            .detail_rows(2)\n            .detail(move |id, _, _| grid_detail(&detail_theme, id))\n            .visible_rows(9)\n            .on_sort(|_, _, _, _| {})\n            .on_select(|_, _, _| {})\n            .on_resize(|_, _, _, _| {})\n            .on_fit(|_, _, _| {})\n            .on_reorder(|_, _, _| {})\n            .on_expand(|_, _, _, _| {})\n            .on_edit_request(|_, _, _, _| {})\n            .on_edit(|_, _, _| {})\n            .range(Some(CellRange::new(\n                \"job-0001\", \"name\", \"job-0003\", \"state\",\n            )))\n            .on_range_change(|_, _, _| {})\n            .on_copy(|_, _, _| {}),\n        )\n        .child(\n            crate::foundation::text(\n                &theme,\n                TypeScale::Caption,\n                SharedString::from(format!(\n                    \"{FIXTURE_JOBS_LOADED} rows loaded of {FIXTURE_JOBS_TOTAL}; only the drawn \\\n                     ones publish\"\n                )),\n            )\n            .text_tone(&theme, TextTone::Muted),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "data-grid-editing",
@@ -10681,7 +11406,7 @@
       "uses": [
         "Tree"
       ],
-      "example": "fn tree(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(360.0))\n        .child(\n            Tree::new(\"scene.tree.workspace\")\n                .expanded_ids(&[\"workspace\", \"crates\"])\n                .selected(\"tokens\")\n                .nodes([\n                    TreeNode::new(\"workspace\", \"workspace\")\n                        .icon(Icon::Folder)\n                        .children([\n                            TreeNode::new(\"crates\", \"crates\")\n                                .icon(Icon::Folder)\n                                .children([\n                                    TreeNode::new(\"kit\", \"gpui-kit\").icon(Icon::Document),\n                                    TreeNode::new(\"tokens\", \"gpui-kit-tokens\").icon(Icon::Document),\n                                ]),\n                            TreeNode::new(\"docs\", \"docs\")\n                                .icon(Icon::Folder)\n                                .children([TreeNode::new(\"components\", \"components.md\")\n                                    .icon(Icon::Document)]),\n                        ]),\n                    TreeNode::new(\"target\", \"target\")\n                        .icon(Icon::Archive)\n                        .disabled(true)\n                        .children([TreeNode::new(\"debug\", \"debug\").icon(Icon::Folder)]),\n                ])\n                .on_toggle(|_, _, _, _| {})\n                .on_select(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
+      "example": "fn tree(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(360.0))\n        .child(\n            Tree::new(\"scene.tree.workspace\")\n                .selected(\"tokens\")\n                .nodes([\n                    TreeNode::new(\"workspace\", \"workspace\")\n                        .icon(Icon::Folder)\n                        .children([\n                            TreeNode::new(\"crates\", \"crates\")\n                                .icon(Icon::Folder)\n                                .children([\n                                    TreeNode::new(\"kit\", \"gpui-kit\").icon(Icon::Document),\n                                    TreeNode::new(\"tokens\", \"gpui-kit-tokens\").icon(Icon::Document),\n                                ]),\n                            TreeNode::new(\"docs\", \"docs\")\n                                .icon(Icon::Folder)\n                                .children([TreeNode::new(\"components\", \"components.md\")\n                                    .icon(Icon::Document)]),\n                        ]),\n                    TreeNode::new(\"target\", \"target\")\n                        .icon(Icon::Archive)\n                        .disabled(true)\n                        .children([TreeNode::new(\"debug\", \"debug\").icon(Icon::Folder)]),\n                    TreeNode::new(\"remote\", \"remote\")\n                        .icon(Icon::Folder)\n                        .branch(BranchState::Loading),\n                ])\n                .expanded_ids(&[\"workspace\", \"crates\", \"remote\"])\n                .on_toggle(|_, _, _, _| {})\n                .on_select(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "split-pane",
@@ -10801,7 +11526,7 @@
       "uses": [
         "Drawer"
       ],
-      "example": "fn drawer(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneDrawer>() {\n        let filters = cx.new(|cx| {\n            Drawer::new(\"scene.drawer.filters\", window, cx)\n                .edge(Edge::Right)\n                .size(320.0)\n                .title(\"Filter runs\")\n                .description(\"The drawer reports what was chosen. The host applies it.\")\n                .content(|_, cx| {\n                    let theme = cx.theme().clone();\n                    div()\n                        .flex()\n                        .flex_col()\n                        .gap(px(theme.space(Space::Sm)))\n                        .child(\n                            Checkbox::new(\"scene.drawer.failed\")\n                                .label(\"Failed runs only\")\n                                .checked(true)\n                                .on_change(|_, _, _| {}),\n                        )\n                        .child(\n                            Checkbox::new(\"scene.drawer.mine\")\n                                .label(\"Started by me\")\n                                .on_change(|_, _, _| {}),\n                        )\n                        .into_any_element()\n                })\n                .footer(|_, _| {\n                    Button::new(\"scene.drawer.apply\")\n                        .label(\"Apply\")\n                        .primary()\n                        .full_width(true)\n                        .on_click(|_, _| {})\n                        .into_any_element()\n                })\n        });\n        filters.update(cx, |drawer, cx| {\n            drawer.open(window, cx);\n            drawer.settle(cx);\n        });\n        cx.set_global(SceneDrawer { filters });\n    }\n    let filters = cx.global::<SceneDrawer>().filters.clone();\n    let theme = cx.theme().clone();\n\n    stack(&theme)\n        .w(px(620.0))\n        .h(px(400.0))\n        .child(crate::foundation::text(\n            &theme,\n            TypeScale::Body,\n            \"Content behind the drawer\",\n        ))\n        .child(filters)\n        .into_any_element()\n}"
+      "example": "fn drawer(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneDrawer>() {\n        let filters = cx.new(|cx| {\n            Drawer::new(\"scene.drawer.filters\", window, cx)\n                .edge(Edge::Right)\n                .size(320.0)\n                .resizable(true)\n                .title(\"Filter runs\")\n                .description(\"The drawer reports what was chosen. The host applies it.\")\n                .content(|_, cx| {\n                    let theme = cx.theme().clone();\n                    div()\n                        .flex()\n                        .flex_col()\n                        .gap(px(theme.space(Space::Sm)))\n                        .child(\n                            Checkbox::new(\"scene.drawer.failed\")\n                                .label(\"Failed runs only\")\n                                .checked(true)\n                                .on_change(|_, _, _| {}),\n                        )\n                        .child(\n                            Checkbox::new(\"scene.drawer.mine\")\n                                .label(\"Started by me\")\n                                .on_change(|_, _, _| {}),\n                        )\n                        .into_any_element()\n                })\n                .footer(|_, _| {\n                    Button::new(\"scene.drawer.apply\")\n                        .label(\"Apply\")\n                        .primary()\n                        .full_width(true)\n                        .on_click(|_, _| {})\n                        .into_any_element()\n                })\n        });\n        filters.update(cx, |drawer, cx| {\n            drawer.open(window, cx);\n            drawer.settle(cx);\n        });\n        cx.set_global(SceneDrawer { filters });\n    }\n    let filters = cx.global::<SceneDrawer>().filters.clone();\n    let theme = cx.theme().clone();\n\n    stack(&theme)\n        .w(px(620.0))\n        .h(px(400.0))\n        .child(crate::foundation::text(\n            &theme,\n            TypeScale::Body,\n            \"Content behind the drawer\",\n        ))\n        .child(filters)\n        .into_any_element()\n}"
     },
     {
       "name": "motion-flip",
@@ -11279,7 +12004,7 @@
         "GraphNode",
         "NodeGraph"
       ],
-      "example": "fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneGraph>() {\n        cx.set_global(SceneGraph {\n            viewport: GraphViewport::default(),\n            ingest: gpui::point(24.0, 200.0),\n            validate: gpui::point(244.0, 56.0),\n            persist: gpui::point(500.0, 56.0),\n            observe: gpui::point(464.0, 330.0),\n            publish: gpui::point(684.0, 200.0),\n            selected: vec![\"scene.graph.validate\".into()],\n            deleted: Vec::new(),\n            edges: vec![\n                GraphEdge::new(\"scene.graph.ingest\", \"scene.graph.validate\")\n                    .id(\"scene.graph.edge.rows\")\n                    .ports(\"rows\", \"records\")\n                    .label(\"12.4k rows\")\n                    .active(true),\n                GraphEdge::new(\"scene.graph.validate\", \"scene.graph.persist\")\n                    .id(\"scene.graph.edge.valid\")\n                    .ports(\"valid\", \"records\")\n                    .active(true),\n                GraphEdge::new(\"scene.graph.validate\", \"scene.graph.observe\")\n                    .id(\"scene.graph.edge.telemetry\")\n                    .ports(\"telemetry\", \"events\")\n                    .label(\"telemetry\")\n                    .lane(-1),\n                GraphEdge::new(\"scene.graph.persist\", \"scene.graph.publish\")\n                    .id(\"scene.graph.edge.commit\")\n                    .ports(\"commit\", \"artifact\")\n                    .label(\"commit 8f72\")\n                    .active(true),\n                GraphEdge::new(\"scene.graph.observe\", \"scene.graph.validate\")\n                    .id(\"scene.graph.edge.retry\")\n                    .ports(\"retry\", \"retry\")\n                    .label(\"retry policy\")\n                    .lane(1)\n                    .feedback(),\n            ],\n        });\n    }\n    let scene = cx.global::<SceneGraph>();\n    let viewport = scene.viewport;\n    let ingest = scene.ingest;\n    let validate = scene.validate;\n    let persist = scene.persist;\n    let observe = scene.observe;\n    let publish = scene.publish;\n    let selected = scene.selected.clone();\n    let deleted = scene.deleted.clone();\n    let edges = scene.edges.clone();\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(\n            div().w(px(860.0)).h(px(500.0)).child(\n                NodeGraph::new(\"scene.graph\")\n                    .viewport(viewport)\n                    .zoom_range(0.55, 1.8)\n                    .when(\n                        !deleted.iter().any(|id| id == \"scene.graph.ingest\"),\n                        |graph| {\n                            graph.node(\n                                GraphNode::new(\"scene.graph.ingest\", \"Stream ingest\")\n                                    .width(176.0)\n                                    .state(NodeState::Succeeded)\n                                    .thumbnail(scene_picture(\"Input preview\", cx))\n                                    .action(\"orders.v2 · partition 18\")\n                                    .metric(\"rate\", \"3.2k/s\")\n                                    .port(GraphPort::input(\"source\", \"Source\").side(PortSide::Top))\n                                    .port(GraphPort::output(\"rows\", \"Rows\"))\n                                    .port(GraphPort::output(\"errors\", \"Errors\"))\n                                    .selected(selected.iter().any(|id| id == \"scene.graph.ingest\")),\n                                ingest.x,\n                                ingest.y,\n                            )\n                        },\n                    )\n                    .when(\n                        !deleted.iter().any(|id| id == \"scene.graph.validate\"),\n                        |graph| {\n                            graph.node(\n                                GraphNode::new(\"scene.graph.validate\", \"Validate & enrich\")\n                                    .width(176.0)\n                                    .state(NodeState::Running)\n                                    .action(\"schema + fraud signals\")\n                                    .metric(\"p95\", \"18 ms\")\n                                    .port(GraphPort::input(\"records\", \"Records\"))\n                                    .port(GraphPort::input(\"retry\", \"Retry\").side(PortSide::Bottom))\n                                    .port(GraphPort::output(\"valid\", \"Valid\"))\n                                    .port(\n                                        GraphPort::output(\"telemetry\", \"Events\")\n                                            .side(PortSide::Bottom),\n                                    )\n                                    .selected(\n                                        selected.iter().any(|id| id == \"scene.graph.validate\"),\n                                    ),\n                                validate.x,\n                                validate.y,\n                            )\n                        },\n                    )\n                    .when(\n                        !deleted.iter().any(|id| id == \"scene.graph.persist\"),\n                        |graph| {\n                            graph.node(\n                                GraphNode::new(\"scene.graph.persist\", \"Persist batch\")\n                                    .width(176.0)\n                                    .state(NodeState::Succeeded)\n                                    .action(\"warehouse / orders\")\n                                    .metric(\"written\", \"12.3k\")\n                                    .port(GraphPort::input(\"records\", \"Records\"))\n                                    .port(GraphPort::output(\"commit\", \"Commit\"))\n                                    .selected(\n                                        selected.iter().any(|id| id == \"scene.graph.persist\"),\n                                    ),\n                                persist.x,\n                                persist.y,\n                            )\n                        },\n                    )\n                    .when(\n                        !deleted.iter().any(|id| id == \"scene.graph.observe\"),\n                        |graph| {\n                            graph.node(\n                                GraphNode::new(\"scene.graph.observe\", \"Observe quality\")\n                                    .width(176.0)\n                                    .state(NodeState::Failed)\n                                    .action(\"drift threshold exceeded\")\n                                    .metric(\"rejected\", \"94\")\n                                    .port(GraphPort::input(\"events\", \"Events\").side(PortSide::Top))\n                                    .port(GraphPort::output(\"retry\", \"Retry\").side(PortSide::Top))\n                                    .selected(\n                                        selected.iter().any(|id| id == \"scene.graph.observe\"),\n                                    ),\n                                observe.x,\n                                observe.y,\n                            )\n                        },\n                    )\n                    .when(\n                        !deleted.iter().any(|id| id == \"scene.graph.publish\"),\n                        |graph| {\n                            graph.node(\n                                GraphNode::new(\"scene.graph.publish\", \"Publish artifact\")\n                                    .width(176.0)\n                                    .state(NodeState::Pending)\n                                    .action(\"waiting for commit\")\n                                    .port(\n                                        GraphPort::input(\"artifact\", \"Artifact\")\n                                            .side(PortSide::Top),\n                                    )\n                                    .port(\n                                        GraphPort::output(\"release\", \"Release\")\n                                            .side(PortSide::Bottom),\n                                    )\n                                    .selected(\n                                        selected.iter().any(|id| id == \"scene.graph.publish\"),\n                                    ),\n                                publish.x,\n                                publish.y,\n                            )\n                        },\n                    )\n                    .edges(edges)\n                    .on_event(|event, _, cx| {\n                        cx.update_global::<SceneGraph, ()>(|scene, _| match event {\n                            NodeGraphEvent::ViewportChanged(viewport) => {\n                                scene.viewport = *viewport;\n                            }\n                            NodeGraphEvent::SelectionChanged { ids } => {\n                                scene.selected = ids.clone();\n                            }\n                            NodeGraphEvent::NodeMoved { id, position } => match id.as_ref() {\n                                \"scene.graph.ingest\" => scene.ingest = *position,\n                                \"scene.graph.validate\" => scene.validate = *position,\n                                \"scene.graph.persist\" => scene.persist = *position,\n                                \"scene.graph.observe\" => scene.observe = *position,\n                                \"scene.graph.publish\" => scene.publish = *position,\n                                _ => {}\n                            },\n                            NodeGraphEvent::NodeDeleted { id } => {\n                                scene.deleted.push(id.clone());\n                                scene.selected.retain(|selected| selected != id);\n                                scene\n                                    .edges\n                                    .retain(|edge| edge.from() != id && edge.to() != id);\n                            }\n                            NodeGraphEvent::ConnectionRequested { from, to } => {\n                                let id = format!(\n                                    \"scene.graph.edge.user.{}.{}.{}.{}\",\n                                    from.node, from.port, to.node, to.port\n                                );\n                                if !scene\n                                    .edges\n                                    .iter()\n                                    .any(|edge| edge.from() == &from.node && edge.to() == &to.node)\n                                {\n                                    scene.edges.push(\n                                        GraphEdge::new(from.node.clone(), to.node.clone())\n                                            .id(id)\n                                            .ports(from.port.clone(), to.port.clone())\n                                            .label(\"new connection\"),\n                                    );\n                                }\n                            }\n                            NodeGraphEvent::DisconnectRequested { id } => {\n                                scene.edges.retain(|edge| edge.edge_id() != *id);\n                            }\n                        });\n                        cx.refresh_windows();\n                    }),\n            ),\n        )\n        .into_any_element()\n}"
+      "example": "fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneGraph>() {\n        cx.set_global(SceneGraph {\n            viewport: GraphViewport::default(),\n            ingest: gpui::point(24.0, 200.0),\n            validate: gpui::point(244.0, 56.0),\n            persist: gpui::point(500.0, 56.0),\n            observe: gpui::point(464.0, 330.0),\n            publish: gpui::point(684.0, 200.0),\n            selected: vec![\"scene.graph.validate\".into()],\n            deleted: Vec::new(),\n            edges: vec![\n                GraphEdge::new(\"scene.graph.ingest\", \"scene.graph.validate\")\n                    .id(\"scene.graph.edge.rows\")\n                    .ports(\"rows\", \"records\")\n                    .label(\"12.4k rows\")\n                    .active(true),\n                GraphEdge::new(\"scene.graph.validate\", \"scene.graph.persist\")\n                    .id(\"scene.graph.edge.valid\")\n                    .ports(\"valid\", \"records\")\n                    .active(true),\n                GraphEdge::new(\"scene.graph.validate\", \"scene.graph.observe\")\n                    .id(\"scene.graph.edge.telemetry\")\n                    .ports(\"telemetry\", \"events\")\n                    .label(\"telemetry\")\n                    .lane(-1),\n                GraphEdge::new(\"scene.graph.persist\", \"scene.graph.publish\")\n                    .id(\"scene.graph.edge.commit\")\n                    .ports(\"commit\", \"artifact\")\n                    .label(\"commit 8f72\")\n                    .active(true),\n                GraphEdge::new(\"scene.graph.observe\", \"scene.graph.validate\")\n                    .id(\"scene.graph.edge.retry\")\n                    .ports(\"retry\", \"retry\")\n                    .label(\"retry policy\")\n                    .lane(1)\n                    .feedback(),\n            ],\n        });\n    }\n    let scene = cx.global::<SceneGraph>();\n    let viewport = scene.viewport;\n    let ingest = scene.ingest;\n    let validate = scene.validate;\n    let persist = scene.persist;\n    let observe = scene.observe;\n    let publish = scene.publish;\n    let selected = scene.selected.clone();\n    let deleted = scene.deleted.clone();\n    let edges = scene.edges.clone();\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(\n            div().w(px(860.0)).h(px(500.0)).child(\n                NodeGraph::new(\"scene.graph\")\n                    .viewport(viewport)\n                    .zoom_range(0.55, 1.8)\n                    .minimap(true)\n                    .when(\n                        !deleted.iter().any(|id| id == \"scene.graph.ingest\"),\n                        |graph| {\n                            graph.node(\n                                GraphNode::new(\"scene.graph.ingest\", \"Stream ingest\")\n                                    .width(176.0)\n                                    .state(NodeState::Succeeded)\n                                    .thumbnail(scene_picture(\"Input preview\", cx))\n                                    .action(\"orders.v2 · partition 18\")\n                                    .metric(\"rate\", \"3.2k/s\")\n                                    .port(GraphPort::input(\"source\", \"Source\").side(PortSide::Top))\n                                    .port(GraphPort::output(\"rows\", \"Rows\"))\n                                    .port(GraphPort::output(\"errors\", \"Errors\"))\n                                    .selected(selected.iter().any(|id| id == \"scene.graph.ingest\")),\n                                ingest.x,\n                                ingest.y,\n                            )\n                        },\n                    )\n                    .when(\n                        !deleted.iter().any(|id| id == \"scene.graph.validate\"),\n                        |graph| {\n                            graph.node(\n                                GraphNode::new(\"scene.graph.validate\", \"Validate & enrich\")\n                                    .width(176.0)\n                                    .state(NodeState::Running)\n                                    .action(\"schema + fraud signals\")\n                                    .metric(\"p95\", \"18 ms\")\n                                    .port(GraphPort::input(\"records\", \"Records\"))\n                                    .port(GraphPort::input(\"retry\", \"Retry\").side(PortSide::Bottom))\n                                    .port(GraphPort::output(\"valid\", \"Valid\"))\n                                    .port(\n                                        GraphPort::output(\"telemetry\", \"Events\")\n                                            .side(PortSide::Bottom),\n                                    )\n                                    .selected(\n                                        selected.iter().any(|id| id == \"scene.graph.validate\"),\n                                    ),\n                                validate.x,\n                                validate.y,\n                            )\n                        },\n                    )\n                    .when(\n                        !deleted.iter().any(|id| id == \"scene.graph.persist\"),\n                        |graph| {\n                            graph.node(\n                                GraphNode::new(\"scene.graph.persist\", \"Persist batch\")\n                                    .width(176.0)\n                                    .state(NodeState::Succeeded)\n                                    .action(\"warehouse / orders\")\n                                    .metric(\"written\", \"12.3k\")\n                                    .port(GraphPort::input(\"records\", \"Records\"))\n                                    .port(GraphPort::output(\"commit\", \"Commit\"))\n                                    .selected(\n                                        selected.iter().any(|id| id == \"scene.graph.persist\"),\n                                    ),\n                                persist.x,\n                                persist.y,\n                            )\n                        },\n                    )\n                    .when(\n                        !deleted.iter().any(|id| id == \"scene.graph.observe\"),\n                        |graph| {\n                            graph.node(\n                                GraphNode::new(\"scene.graph.observe\", \"Observe quality\")\n                                    .width(176.0)\n                                    .state(NodeState::Failed)\n                                    .action(\"drift threshold exceeded\")\n                                    .metric(\"rejected\", \"94\")\n                                    .port(GraphPort::input(\"events\", \"Events\").side(PortSide::Top))\n                                    .port(GraphPort::output(\"retry\", \"Retry\").side(PortSide::Top))\n                                    .selected(\n                                        selected.iter().any(|id| id == \"scene.graph.observe\"),\n                                    ),\n                                observe.x,\n                                observe.y,\n                            )\n                        },\n                    )\n                    .when(\n                        !deleted.iter().any(|id| id == \"scene.graph.publish\"),\n                        |graph| {\n                            graph.node(\n                                GraphNode::new(\"scene.graph.publish\", \"Publish artifact\")\n                                    .width(176.0)\n                                    .state(NodeState::Pending)\n                                    .action(\"waiting for commit\")\n                                    .port(\n                                        GraphPort::input(\"artifact\", \"Artifact\")\n                                            .side(PortSide::Top),\n                                    )\n                                    .port(\n                                        GraphPort::output(\"release\", \"Release\")\n                                            .side(PortSide::Bottom),\n                                    )\n                                    .selected(\n                                        selected.iter().any(|id| id == \"scene.graph.publish\"),\n                                    ),\n                                publish.x,\n                                publish.y,\n                            )\n                        },\n                    )\n                    .edges(edges)\n                    .on_event(|event, _, cx| {\n                        cx.update_global::<SceneGraph, ()>(|scene, _| match event {\n                            NodeGraphEvent::ViewportChanged(viewport) => {\n                                scene.viewport = *viewport;\n                            }\n                            NodeGraphEvent::SelectionChanged { ids } => {\n                                scene.selected = ids.clone();\n                            }\n                            NodeGraphEvent::NodeMoved { id, position } => match id.as_ref() {\n                                \"scene.graph.ingest\" => scene.ingest = *position,\n                                \"scene.graph.validate\" => scene.validate = *position,\n                                \"scene.graph.persist\" => scene.persist = *position,\n                                \"scene.graph.observe\" => scene.observe = *position,\n                                \"scene.graph.publish\" => scene.publish = *position,\n                                _ => {}\n                            },\n                            NodeGraphEvent::NodeDeleted { id } => {\n                                scene.deleted.push(id.clone());\n                                scene.selected.retain(|selected| selected != id);\n                                scene\n                                    .edges\n                                    .retain(|edge| edge.from() != id && edge.to() != id);\n                            }\n                            NodeGraphEvent::ConnectionRequested { from, to } => {\n                                let id = format!(\n                                    \"scene.graph.edge.user.{}.{}.{}.{}\",\n                                    from.node, from.port, to.node, to.port\n                                );\n                                if !scene\n                                    .edges\n                                    .iter()\n                                    .any(|edge| edge.from() == &from.node && edge.to() == &to.node)\n                                {\n                                    scene.edges.push(\n                                        GraphEdge::new(from.node.clone(), to.node.clone())\n                                            .id(id)\n                                            .ports(from.port.clone(), to.port.clone())\n                                            .label(\"new connection\"),\n                                    );\n                                }\n                            }\n                            NodeGraphEvent::DisconnectRequested { id } => {\n                                scene.edges.retain(|edge| edge.edge_id() != *id);\n                            }\n                        });\n                        cx.refresh_windows();\n                    }),\n            ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "browser-panel",
@@ -11303,7 +12028,7 @@
       "uses": [
         "ThinkingBlock"
       ],
-      "example": "fn thinking(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(ThinkingBlock::new(\n            \"scene.thinking.collapsed\",\n            Reasoning::present(\"The brief asks for two files, so read both before answering.\"),\n        ))\n        // Reasoning that has finished and reasoning still arriving are the\n        // same words in the same place, so the difference has to be shown.\n        .child(\n            ThinkingBlock::new(\n                \"scene.thinking.working\",\n                Reasoning::present(\"Reading the second file before answering.\"),\n            )\n            .thinking(true),\n        )\n        .child(\n            ThinkingBlock::new(\n                \"scene.thinking.open\",\n                Reasoning::present(\n                    \"The brief asks for two files.\\nRead both before answering.\\nThen summarise.\",\n                ),\n            )\n            .expanded(true)\n            .on_toggle(|_, _, _| {}),\n        )\n        // Withheld and absent are two different facts, and neither is the\n        // collapsed block above.\n        .child(ThinkingBlock::new(\n            \"scene.thinking.withheld\",\n            Reasoning::withheld(\"This connection does not hand over reasoning.\"),\n        ))\n        .child(ThinkingBlock::new(\n            \"scene.thinking.absent\",\n            Reasoning::Absent,\n        ))\n        .into_any_element()\n}"
+      "example": "fn thinking(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(ThinkingBlock::new(\n            \"scene.thinking.collapsed\",\n            Reasoning::present(\"The brief asks for two files, so read both before answering.\"),\n        ))\n        // Reasoning that has finished and reasoning still arriving are the\n        // same words in the same place, so the difference has to be shown.\n        .child(\n            ThinkingBlock::new(\n                \"scene.thinking.working\",\n                Reasoning::present(\"Reading the second file before answering.\"),\n            )\n            .thinking(true)\n            .elapsed(\"12s\"),\n        )\n        .child(\n            ThinkingBlock::new(\n                \"scene.thinking.open\",\n                Reasoning::present(\n                    \"The brief asks for two files.\\nRead both before answering.\\nThen summarise.\",\n                ),\n            )\n            .expanded(true)\n            .on_toggle(|_, _, _| {}),\n        )\n        // Withheld and absent are two different facts, and neither is the\n        // collapsed block above.\n        .child(ThinkingBlock::new(\n            \"scene.thinking.withheld\",\n            Reasoning::withheld(\"This connection does not hand over reasoning.\"),\n        ))\n        .child(ThinkingBlock::new(\n            \"scene.thinking.absent\",\n            Reasoning::Absent,\n        ))\n        .into_any_element()\n}"
     },
     {
       "name": "json-view",
@@ -11540,7 +12265,7 @@
       "uses": [
         "LogStream"
       ],
-      "example": "fn log_stream(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let entries = [\n        LogEntry::new(\"boot\", \"Fixture worker entered the queue\")\n            .timestamp(\"09:41:02\")\n            .level(\"INFO\", Tone::Info)\n            .source(\"scheduler\"),\n        LogEntry::new(\"claim\", \"Fixture worker claimed run demo-42\")\n            .timestamp(\"09:41:03\")\n            .level(\"INFO\", Tone::Info)\n            .source(\"worker\")\n            .search_hits(std::iter::once(23..26))\n            .current_hit(0),\n        LogEntry::new(\"cache\", \"Fixture cache was not warm\")\n            .timestamp(\"09:41:04\")\n            .level(\"WARN\", Tone::Warning)\n            .source(\"cache\"),\n        LogEntry::new(\"retry\", \"Fixture request completed after one retry\")\n            .timestamp(\"09:41:05\")\n            .level(\"INFO\", Tone::Info)\n            .source(\"worker\"),\n        LogEntry::new(\"finish\", \"Fixture run demo-42 completed\")\n            .timestamp(\"09:41:06\")\n            .level(\"DONE\", Tone::Success)\n            .source(\"scheduler\")\n            .search_hits(std::iter::once(12..19)),\n    ];\n    stack(&theme)\n        .w(px(780.0))\n        .child(caption(\n            &theme,\n            \"fixed virtual rows; metadata and search ranges are caller inputs\",\n        ))\n        .child(\n            LogStream::new(\"scene.log\", entries)\n                .state(LogStreamState::Stale(\n                    \"The latest refresh did not complete; verified entries remain.\".into(),\n                ))\n                .visible_rows(5)\n                .selected(\"retry\")\n                .on_select(|_, _, _| {})\n                .on_copy(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
+      "example": "fn log_stream(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let entries = [\n        LogEntry::new(\"boot\", \"Fixture worker entered the queue\")\n            .timestamp(\"09:41:02\")\n            .level(\"INFO\", Tone::Info)\n            .source(\"scheduler\"),\n        LogEntry::new(\"claim\", \"Fixture worker claimed run demo-42\")\n            .timestamp(\"09:41:03\")\n            .level(\"INFO\", Tone::Info)\n            .source(\"worker\")\n            .search_hits(std::iter::once(23..26))\n            .current_hit(0),\n        LogEntry::new(\"cache\", \"Fixture cache was not warm\")\n            .timestamp(\"09:41:04\")\n            .level(\"WARN\", Tone::Warning)\n            .source(\"cache\"),\n        LogEntry::new(\"ansi\", \"\\u{1b}[31mfailed\\u{1b}[0m after retry\")\n            .timestamp(\"09:41:04\")\n            .level(\"ERR\", Tone::Danger)\n            .source(\"worker\"),\n        LogEntry::new(\"retry\", \"Fixture request completed after one retry\")\n            .timestamp(\"09:41:05\")\n            .level(\"INFO\", Tone::Info)\n            .source(\"worker\"),\n        LogEntry::new(\"finish\", \"Fixture run demo-42 completed\")\n            .timestamp(\"09:41:06\")\n            .level(\"DONE\", Tone::Success)\n            .source(\"scheduler\")\n            .search_hits(std::iter::once(12..19)),\n    ];\n    stack(&theme)\n        .w(px(780.0))\n        .child(caption(\n            &theme,\n            \"fixed virtual rows; metadata and search ranges are caller inputs\",\n        ))\n        .child(\n            LogStream::new(\"scene.log\", entries)\n                .ansi(true)\n                .state(LogStreamState::Stale(\n                    \"The latest refresh did not complete; verified entries remain.\".into(),\n                ))\n                .visible_rows(5)\n                .selected(\"retry\")\n                .on_select(|_, _, _| {})\n                .on_copy(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "diff-view",
@@ -11571,14 +12296,64 @@
       "capture": "cargo run -p xtask -- headless capture chart",
       "kind": "exhibit",
       "subjects": [
+        "AreaChart",
         "BarChart",
-        "LineChart"
+        "ChartLegend",
+        "LineChart",
+        "PieChart",
+        "ScatterChart",
+        "StackedBarChart"
       ],
       "uses": [
+        "AreaChart",
         "BarChart",
-        "LineChart"
+        "ChartLegend",
+        "LineChart",
+        "PieChart",
+        "ScatterChart",
+        "StackedBarChart"
       ],
-      "example": "fn chart(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let cpu = [\n        ChartPoint::new(\"00:00\", 0.0, 0.20, \"00:00\", \"20%\"),\n        ChartPoint::new(\"00:15\", 0.25, 0.45, \"00:15\", \"45%\"),\n        ChartPoint::new(\"00:30\", 0.5, 0.38, \"00:30\", \"38%\"),\n        ChartPoint::new(\"00:45\", 0.75, 0.70, \"00:45\", \"70%\"),\n        ChartPoint::new(\"01:00\", 1.0, 0.62, \"01:00\", \"62%\"),\n    ];\n    let memory = [\n        ChartPoint::new(\"00:00\", 0.0, 0.40, \"00:00\", \"40%\"),\n        ChartPoint::new(\"00:15\", 0.25, 0.42, \"00:15\", \"42%\"),\n        ChartPoint::new(\"00:30\", 0.5, 0.55, \"00:30\", \"55%\"),\n        ChartPoint::new(\"00:45\", 0.75, 0.58, \"00:45\", \"58%\"),\n        ChartPoint::new(\"01:00\", 1.0, 0.61, \"01:00\", \"61%\"),\n    ];\n    stack(&theme)\n        .w(px(520.0))\n        .child(caption(\n            &theme,\n            \"host-owned series, host-owned axis wording, no invented scale\",\n        ))\n        .child(\n            LineChart::new(\n                \"scene.chart.ready\",\n                \"Fixture load\",\n                ChartState::Stale {\n                    series: vec![\n                        ChartSeries::new(\"cpu\", \"CPU\")\n                            .points(cpu)\n                            .tint(identity_tint(&theme, \"loader.blue\")),\n                        ChartSeries::new(\"memory\", \"Memory\")\n                            .points(memory)\n                            .tint(identity_tint(&theme, \"loader.orange\")),\n                    ],\n                    reason: \"Refresh failed; showing last verified sample\".into(),\n                },\n            )\n            .area()\n            .crosshair()\n            .current(\"cpu\", \"00:45\")\n            .on_current(|_, _, _| {})\n            .axes(\n                ChartAxes::default()\n                    .x_label(\"Time\")\n                    .y_label(\"Utilization\")\n                    .x_ends(\"00:00\", \"01:00\")\n                    .y_ends(\"0%\", \"100%\"),\n            ),\n        )\n        .child(LineChart::new(\n            \"scene.chart.empty\",\n            \"Fixture load\",\n            ChartState::Empty,\n        ))\n        .child(\n            BarChart::new(\n                \"scene.chart.bars\",\n                \"Fixture share\",\n                ChartState::Ready(vec![ChartSeries::new(\"share\", \"Share\").points([\n                    ChartPoint::new(\"alpha\", 0.0, 0.35, \"Alpha\", \"35 jobs\"),\n                    ChartPoint::new(\"beta\", 0.33, 0.70, \"Beta\", \"70 jobs\"),\n                    ChartPoint::new(\"gamma\", 0.66, 0.45, \"Gamma\", \"45 jobs\"),\n                    ChartPoint::new(\"delta\", 1.0, 0.90, \"Delta\", \"90 jobs\"),\n                ])]),\n            )\n            .axes(ChartAxes::default().y_ends(\"0\", \"max\")),\n        )\n        .into_any_element()\n}"
+      "example": "fn chart(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let cpu = [\n        ChartPoint::new(\"00:00\", 0.0, 0.20, \"00:00\", \"20%\"),\n        ChartPoint::new(\"00:15\", 0.25, 0.45, \"00:15\", \"45%\"),\n        ChartPoint::new(\"00:30\", 0.5, 0.38, \"00:30\", \"38%\"),\n        ChartPoint::new(\"00:45\", 0.75, 0.70, \"00:45\", \"70%\"),\n        ChartPoint::new(\"01:00\", 1.0, 0.62, \"01:00\", \"62%\"),\n    ];\n    let memory = [\n        ChartPoint::new(\"00:00\", 0.0, 0.40, \"00:00\", \"40%\"),\n        ChartPoint::new(\"00:15\", 0.25, 0.42, \"00:15\", \"42%\"),\n        ChartPoint::new(\"00:30\", 0.5, 0.55, \"00:30\", \"55%\"),\n        ChartPoint::new(\"00:45\", 0.75, 0.58, \"00:45\", \"58%\"),\n        ChartPoint::new(\"01:00\", 1.0, 0.61, \"01:00\", \"61%\"),\n    ];\n    stack(&theme)\n        .w(px(520.0))\n        .child(caption(\n            &theme,\n            \"host-owned series, host-owned axis wording, no invented scale\",\n        ))\n        .child(\n            LineChart::new(\n                \"scene.chart.ready\",\n                \"Fixture load\",\n                ChartState::Stale {\n                    series: vec![\n                        ChartSeries::new(\"cpu\", \"CPU\")\n                            .points(cpu)\n                            .tint(identity_tint(&theme, \"loader.blue\")),\n                        ChartSeries::new(\"memory\", \"Memory\")\n                            .points(memory)\n                            .tint(identity_tint(&theme, \"loader.orange\")),\n                    ],\n                    reason: \"Refresh failed; showing last verified sample\".into(),\n                },\n            )\n            .area()\n            .crosshair()\n            .current(\"cpu\", \"00:45\")\n            .on_current(|_, _, _| {})\n            .axes(\n                ChartAxes::default()\n                    .x_label(\"Time\")\n                    .y_label(\"Utilization\")\n                    .x_ends(\"00:00\", \"01:00\")\n                    .y_ends(\"0%\", \"100%\"),\n            ),\n        )\n        .child(LineChart::new(\n            \"scene.chart.empty\",\n            \"Fixture load\",\n            ChartState::Empty,\n        ))\n        .child(\n            BarChart::new(\n                \"scene.chart.bars\",\n                \"Fixture share\",\n                ChartState::Ready(vec![ChartSeries::new(\"share\", \"Share\").points([\n                    ChartPoint::new(\"alpha\", 0.0, 0.35, \"Alpha\", \"35 jobs\"),\n                    ChartPoint::new(\"beta\", 0.33, 0.70, \"Beta\", \"70 jobs\"),\n                    ChartPoint::new(\"gamma\", 0.66, 0.45, \"Gamma\", \"45 jobs\"),\n                    ChartPoint::new(\"delta\", 1.0, 0.90, \"Delta\", \"90 jobs\"),\n                ])]),\n            )\n            .axes(ChartAxes::default().y_ends(\"0\", \"max\")),\n        )\n        .child(\n            PieChart::new(\n                \"scene.chart.pie\",\n                \"Fixture share\",\n                ChartState::Ready(vec![ChartSeries::new(\"share\", \"Share\").points([\n                    ChartPoint::new(\"alpha\", 0.0, 0.25, \"Alpha\", \"25%\"),\n                    ChartPoint::new(\"beta\", 0.25, 0.35, \"Beta\", \"35%\"),\n                    ChartPoint::new(\"gamma\", 0.60, 0.20, \"Gamma\", \"20%\"),\n                    ChartPoint::new(\"delta\", 0.80, 0.20, \"Delta\", \"20%\"),\n                ])]),\n            )\n            .donut(),\n        )\n        .child(\n            StackedBarChart::new(\n                \"scene.chart.stacked\",\n                \"Fixture mix\",\n                ChartState::Ready(vec![\n                    ChartSeries::new(\"cpu\", \"CPU\")\n                        .points([\n                            ChartPoint::new(\"alpha\", 0.0, 0.30, \"Alpha\", \"30%\"),\n                            ChartPoint::new(\"beta\", 0.5, 0.20, \"Beta\", \"20%\"),\n                        ])\n                        .tint(identity_tint(&theme, \"loader.blue\")),\n                    ChartSeries::new(\"memory\", \"Memory\")\n                        .points([\n                            ChartPoint::new(\"alpha\", 0.0, 0.25, \"Alpha\", \"25%\"),\n                            ChartPoint::new(\"beta\", 0.5, 0.40, \"Beta\", \"40%\"),\n                        ])\n                        .tint(identity_tint(&theme, \"loader.orange\")),\n                ]),\n            )\n            .axes(ChartAxes::default().y_ends(\"0\", \"max\")),\n        )\n        .child(\n            ChartLegend::new(\n                \"scene.chart.legend\",\n                [\n                    ChartSeries::new(\"cpu\", \"CPU\").tint(identity_tint(&theme, \"loader.blue\")),\n                    ChartSeries::new(\"memory\", \"Memory\")\n                        .tint(identity_tint(&theme, \"loader.orange\")),\n                ],\n            )\n            .on_toggle(|_, _, _, _| {}),\n        )\n        .child(\n            AreaChart::new(\n                \"scene.chart.area\",\n                \"Fixture tokens\",\n                ChartState::Ready(vec![\n                    ChartSeries::new(\"tokens\", \"Tokens\")\n                        .points([\n                            ChartPoint::new(\"00:00\", 0.0, 0.20, \"00:00\", \"20%\"),\n                            ChartPoint::new(\"00:15\", 0.25, 0.45, \"00:15\", \"45%\"),\n                            ChartPoint::new(\"00:30\", 0.5, 0.38, \"00:30\", \"38%\"),\n                            ChartPoint::new(\"00:45\", 0.75, 0.70, \"00:45\", \"70%\"),\n                            ChartPoint::new(\"01:00\", 1.0, 0.62, \"01:00\", \"62%\"),\n                        ])\n                        .tint(identity_tint(&theme, \"loader.blue\")),\n                ]),\n            )\n            .axes(ChartAxes::default().y_ends(\"0\", \"max\"))\n            .crosshair(),\n        )\n        .child(\n            ScatterChart::new(\n                \"scene.chart.scatter\",\n                \"Fixture samples\",\n                ChartState::Ready(vec![ChartSeries::new(\"samples\", \"Samples\").points([\n                    ChartPoint::new(\"a\", 0.15, 0.30, \"A\", \"30\").weight(0.2),\n                    ChartPoint::new(\"b\", 0.40, 0.62, \"B\", \"62\").weight(0.6),\n                    ChartPoint::new(\"c\", 0.72, 0.48, \"C\", \"48\").weight(0.35),\n                    ChartPoint::new(\"d\", 0.88, 0.80, \"D\", \"80\").weight(0.9),\n                ])]),\n            )\n            .crosshair()\n            .current(\"samples\", \"b\")\n            .on_current(|_, _, _| {})\n            .axes(ChartAxes::default().y_ends(\"0\", \"max\")),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "trace",
+      "capture": "cargo run -p xtask -- headless capture trace",
+      "kind": "exhibit",
+      "subjects": [
+        "SpanTimeline",
+        "TraceView"
+      ],
+      "uses": [
+        "SpanTimeline",
+        "TraceView"
+      ],
+      "example": "fn trace(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let spans = [\n        TraceSpan::new(\"plan\", \"Plan\", 0.00, 0.18)\n            .state(SpanState::Succeeded)\n            .detail(\"planner.finish\"),\n        TraceSpan::new(\"generate\", \"Generate\", 0.18, 0.62)\n            .depth(1)\n            .state(SpanState::Running)\n            .detail(\"model.reply\"),\n        TraceSpan::new(\"tool\", \"Search\", 0.40, 0.55)\n            .depth(2)\n            .state(SpanState::Succeeded),\n        TraceSpan::new(\"wait\", \"Review\", 0.62, 0.80)\n            .depth(1)\n            .state(SpanState::Pending),\n        TraceSpan::new(\"fail\", \"Publish\", 0.80, 1.00).state(SpanState::Failed),\n    ];\n    stack(&theme)\n        .w(px(640.0))\n        .child(caption(\n            &theme,\n            \"normalized intervals, host-owned labels, a refusal stays a failure\",\n        ))\n        .child(\n            TraceView::new(\"scene.trace.view\", \"Fixture run\")\n                .spans(spans.clone())\n                .axis(\"0 ms\", \"1.2 s\")\n                .current(\"generate\")\n                .on_select(|_, _, _| {}),\n        )\n        .child(\n            SpanTimeline::new(\"scene.trace.timeline\", \"Fixture waterfall\")\n                .spans(spans)\n                .axis(\"0 ms\", \"1.2 s\")\n                .current(\"generate\")\n                .on_select(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "heatmap",
+      "capture": "cargo run -p xtask -- headless capture heatmap",
+      "kind": "exhibit",
+      "subjects": [
+        "Heatmap"
+      ],
+      "uses": [
+        "Heatmap"
+      ],
+      "example": "fn heatmap(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let days = [\"Mon\", \"Tue\", \"Wed\", \"Thu\", \"Fri\"];\n    let weeks = [\"W1\", \"W2\", \"W3\", \"W4\"];\n    let levels = [\n        [Some(0), Some(1), Some(2), None],\n        [Some(1), Some(3), Some(2), Some(1)],\n        [Some(4), Some(2), Some(0), Some(3)],\n        [None, Some(1), Some(4), Some(2)],\n        [Some(2), None, Some(1), Some(0)],\n    ];\n    let mut cells = Vec::new();\n    for (row, day) in days.iter().enumerate() {\n        for (column, week) in weeks.iter().enumerate() {\n            let mut cell =\n                HeatCell::new(format!(\"{day}-{week}\"), *day, *week).label(format!(\"{day} {week}\"));\n            if let Some(level) = levels[row][column] {\n                cell = cell.level(level).value(format!(\"{level}\"));\n            }\n            cells.push(cell);\n        }\n    }\n    stack(&theme)\n        .w(px(420.0))\n        .child(caption(\n            &theme,\n            \"five intensity steps; a missing cell is not a measured zero\",\n        ))\n        .child(\n            Heatmap::new(\"scene.heatmap.ready\", \"Fixture activity\")\n                .rows(days)\n                .columns(weeks)\n                .cells(cells),\n        )\n        .child(Heatmap::new(\"scene.heatmap.empty\", \"Fixture activity\").state(HeatmapState::Empty))\n        .into_any_element()\n}"
+    },
+    {
+      "name": "color-picker",
+      "capture": "cargo run -p xtask -- headless capture color-picker",
+      "kind": "exhibit",
+      "subjects": [
+        "ColorPicker",
+        "ColorSwatch"
+      ],
+      "uses": [
+        "ColorPicker",
+        "ColorSwatch"
+      ],
+      "example": "fn color_picker(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let current = theme.colors.info;\n    stack(&theme)\n        .child(caption(\n            &theme,\n            \"the value is caller-owned; presets and recents are host lists\",\n        ))\n        .child(\n            ColorPicker::new(\"scene.color.picker\", current)\n                .alpha(true)\n                .presets([\n                    theme.colors.danger,\n                    theme.colors.warning,\n                    theme.colors.info,\n                    theme.colors.success,\n                    theme.colors.accent,\n                ])\n                .recent([theme.colors.accent, current])\n                .on_change(|_, _, _| {}),\n        )\n        .child(caption(&theme, \"a swatch reports the colour it was given\"))\n        .child(\n            row(&theme)\n                .child(ColorSwatch::new(\n                    \"scene.color.swatch.accent\",\n                    theme.colors.accent,\n                ))\n                .child(\n                    ColorSwatch::new(\"scene.color.swatch.selected\", current)\n                        .selected(true)\n                        .on_click(|_, _, _| {}),\n                )\n                .child(\n                    ColorSwatch::new(\"scene.color.swatch.disabled\", theme.colors.danger)\n                        .disabled(true),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "code-view",
@@ -11639,6 +12414,18 @@
         "DiagnosticsList"
       ],
       "example": "fn diagnostics_list(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let diagnostics = [\n        Diagnostic::new(\n            \"fixture-error\",\n            DiagnosticSeverity::Error,\n            DiagnosticLocation::new(\"fixture.rs:18\"),\n            \"Fixture diagnostic: incompatible value\",\n        )\n        .action(DiagnosticAction::new(\"inspect\", \"Inspect fixture\")),\n        Diagnostic::new(\n            \"fixture-warning\",\n            DiagnosticSeverity::Warning,\n            DiagnosticLocation::new(\"fixture.rs:31\"),\n            \"Fixture diagnostic: unused declaration\",\n        ),\n        Diagnostic::new(\n            \"fixture-information\",\n            DiagnosticSeverity::Information,\n            DiagnosticLocation::new(\"fixture.rs:47\"),\n            \"Fixture diagnostic: a simpler form is available\",\n        ),\n        Diagnostic::new(\n            \"fixture-hint\",\n            DiagnosticSeverity::Hint,\n            DiagnosticLocation::new(\"fixture.rs:64\"),\n            \"Fixture diagnostic: consider a descriptive name\",\n        ),\n    ];\n    stack(&theme)\n        .w(px(760.0))\n        .child(caption(\n            &theme,\n            \"synthetic diagnostics; filters, selection, and actions are caller-owned intents\",\n        ))\n        .child(\n            DiagnosticsList::new(\"scene.diagnostics\", Loadable::Ready(diagnostics.to_vec()))\n                .selected(\"fixture-warning\")\n                .visible_rows(5)\n                .on_filter(|_, _, _| {})\n                .on_select(|_, _, _| {})\n                .on_action(|_, _, _, _| {}),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "terminal",
+      "capture": "cargo run -p xtask -- headless capture terminal",
+      "kind": "exhibit",
+      "subjects": [
+        "Terminal"
+      ],
+      "uses": [
+        "Terminal"
+      ],
+      "example": "fn terminal(_window: &mut Window, cx: &mut App) -> AnyElement {\n    /// A session's worth of output, chosen so every branch of the painter has\n    /// something to paint.\n    const SESSION: &[u8] = concat!(\n        \"\\x1b[32m>\\x1b[0m cargo run -p xtask -- gate\\r\\n\",\n        \"\\x1b[1mCompiling\\x1b[0m gpui-box-kit v0.1.2\\r\\n\",\n        \"\\x1b[2m    dim text stays legible and stays dim\\x1b[0m\\r\\n\",\n        \"\\x1b[4munderlined\\x1b[0m \\x1b[7minverse\\x1b[0m \\x1b[44;97m on a background \\x1b[0m\\r\\n\",\n        \"\\x1b[30m0\\x1b[31m1\\x1b[32m2\\x1b[33m3\\x1b[34m4\\x1b[35m5\\x1b[36m6\\x1b[37m7\",\n        \"\\x1b[90m8\\x1b[91m9\\x1b[92ma\\x1b[93mb\\x1b[94mc\\x1b[95md\\x1b[96me\\x1b[97mf\\x1b[0m\\r\\n\",\n        \"\\x1b[38;5;208m256-colour cube\\x1b[0m and \\x1b[38;2;120;200;255mtruecolour\\x1b[0m\\r\\n\",\n        \"\\x1b[32m>\\x1b[0m \",\n    )\n    .as_bytes();\n\n    let theme = cx.theme().clone();\n    let panel = |ident: &'static str, state: TerminalState| {\n        div()\n            .w(px(400.0))\n            .h(px(180.0))\n            .child(Terminal::new(ident).state(state))\n    };\n\n    stack(&theme)\n        .child(\n            div().w(px(400.0)).h(px(180.0)).child(\n                Terminal::new(\"scene.terminal.ready\")\n                    .focused(true)\n                    .grid(|geometry, _| {\n                        let mut emulator = Emulator::new(geometry.cols, geometry.rows);\n                        emulator.feed(SESSION);\n                        // A selection over the middle of a coloured row, so the\n                        // achromatic wash is reviewable against sixteen hues at\n                        // once rather than against one.\n                        emulator.start_selection(\n                            SelectionKind::Drag,\n                            emulator.grid_point(4, 0),\n                            CellSide::Left,\n                        );\n                        emulator.update_selection(emulator.grid_point(4, 15), CellSide::Right);\n                        Some(GridSnapshot {\n                            lines: emulator.lines(),\n                            cursor: emulator.cursor(),\n                        })\n                    })\n                    .on_event(|_, _, _| {}),\n            ),\n        )\n        .child(\n            row(&theme)\n                .items_start()\n                .child(panel(\"scene.terminal.starting\", TerminalState::Loading))\n                .child(panel(\n                    \"scene.terminal.unavailable\",\n                    TerminalState::Unavailable(\"No shell is configured for this workspace.\".into()),\n                )),\n        )\n        .child(\n            div().w(px(400.0)).h(px(180.0)).child(\n                Terminal::new(\"scene.terminal.ended\")\n                    .state(TerminalState::Error(\"The process exited with status 130.\".into()))\n                    .grid(|geometry, _| {\n                        let mut emulator = Emulator::new(geometry.cols, geometry.rows);\n                        emulator.feed(b\"\\x1b[32m>\\x1b[0m tail -f build.log\\r\\n\\x1b[31merror\\x1b[0m: interrupted\\r\\n\");\n                        Some(GridSnapshot {\n                            lines: emulator.lines(),\n                            cursor: emulator.cursor(),\n                        })\n                    }),\n            ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "calendar",

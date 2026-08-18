@@ -127,16 +127,16 @@ pub mod prelude {
     pub use crate::canvas::{
         Diff, EdgeKind, GraphEdge, GraphEndpoint, GraphInteraction, GraphNode, GraphPort,
         GraphState, GraphViewport, NodeGraph, NodeGraphEvent, NodeMetric, NodeState, Placed,
-        PortDirection, PortSide,
+        PortDirection, PortSide, layered_layout,
     };
     pub use crate::content::{
         AgentBlockKind, AgentDocument, AgentDocumentBlock, AgentDocumentEvent, AgentDocumentState,
-        Attachment, BrowserPanel, BufferedRange, CodeBlock, CodeLine, CodeSpan, CodeView,
+        AnsiRun, Attachment, BrowserPanel, BufferedRange, CodeBlock, CodeLine, CodeSpan, CodeView,
         DeliveryState, DiffFile, DiffHunk, DiffLine, DiffPresentation, DiffView, DiffViewEvent,
         FitMode, ImageFrame, ImageRequest, ImageSize, ImageState, ImageViewer, ImageViewerEvent,
         LineMark, LogEntry, LogStream, LogStreamState, Markdown, MarkdownEvent, Message,
         MessageBody, MessageList, Reaction, TrackStep, TransportBar, TransportDuration,
-        TransportEvent, TransportState, ViewportState,
+        TransportEvent, TransportState, ViewportState, strip_ansi, word_spans,
     };
     pub use crate::controls::auth::{
         OneTimeCodeInput, OneTimeCodeInputEvent, PasswordInput, PasswordInputEvent,
@@ -145,6 +145,7 @@ pub mod prelude {
         Button, ButtonGroup, ButtonJoin, ButtonVariant, IconButton, IconPosition,
     };
     pub use crate::controls::cascader::{Cascader, CascaderEvent, CascaderOption};
+    pub use crate::controls::color_picker::{ColorPicker, ColorSwatch};
     pub use crate::controls::combobox::{Combobox, ComboboxEvent};
     pub use crate::controls::copy_button::{CopyButton, CopyEvent, CopyState};
     pub use crate::controls::dropzone::{Dropzone, DropzoneState};
@@ -172,11 +173,11 @@ pub mod prelude {
     pub use crate::controls::toggle_button::{Toggle, ToggleGroup, ToggleItem, ToggleSelection};
     pub use crate::controls::upload_list::{OverallProgress, Upload, UploadList, UploadState};
     pub use crate::data::{
-        Align, BulkBar, Cell, Column, ColumnWidth, DataGrid, Diagnostic, DiagnosticAction,
-        DiagnosticFilter, DiagnosticLocation, DiagnosticSeverity, DiagnosticsList, EditIntent,
-        EditOutcome, EditingCell, Expanded, GridColumn, GridLines, GridRow, List, ListItem, Row,
-        SelectionChange, SelectionMode, SortDirection, Table, Tree, TreeGrid, TreeGridRow,
-        TreeNode,
+        Align, BranchState, BulkBar, Cell, CellRange, Column, ColumnGroup, ColumnWidth, DataGrid,
+        Diagnostic, DiagnosticAction, DiagnosticFilter, DiagnosticLocation, DiagnosticSeverity,
+        DiagnosticsList, EditIntent, EditOutcome, EditingCell, Expanded, GridColumn, GridLines,
+        GridRow, List, ListItem, Row, SelectionChange, SelectionMode, SortDirection, Table, Tree,
+        TreeGrid, TreeGridRow, TreeNode,
     };
     pub use crate::datetime::{
         BlockedDay, BlockedReport, Calendar, CalendarEvent, Clock, DateAdapter, DateInput,
@@ -189,13 +190,15 @@ pub mod prelude {
     pub use crate::display::badge::{Badge, Tone};
     pub use crate::display::card::{Card, CardHeader, CardVariant, ListRow};
     pub use crate::display::chart::{
-        BarChart, ChartAxes, ChartPoint, ChartSelection, ChartSeries, ChartState, LineChart,
+        AreaChart, BarChart, ChartAxes, ChartLegend, ChartPoint, ChartSelection, ChartSeries,
+        ChartState, LineChart, PieChart, ScatterChart, StackedBarChart,
     };
     pub use crate::display::description_list::{
         DescriptionItem, DescriptionList, DescriptionValue,
     };
     pub use crate::display::empty::{Divider, EmptyKind, EmptyState};
     pub use crate::display::failure_panel::FailurePanel;
+    pub use crate::display::heatmap::{HeatCell, Heatmap, HeatmapState};
     pub use crate::display::highlight::HighlightedText;
     pub use crate::display::icon::{Icon, IconTone};
     pub use crate::display::loading::{GradientSpinner, PulseLoader, Skeleton};
@@ -207,6 +210,7 @@ pub mod prelude {
     pub use crate::display::status::{Callout, StatusDot, StatusLine};
     pub use crate::display::tag::Tag;
     pub use crate::display::timeline::{EntryTime, Timeline, TimelineEntry, TimelineGroup};
+    pub use crate::display::trace::{SpanState, SpanTimeline, TraceSpan, TraceView};
     #[cfg(feature = "dotlottie")]
     pub use crate::effects::RasterDotLottieAdapter;
     pub use crate::effects::{
@@ -271,8 +275,9 @@ pub mod prelude {
     };
     pub use crate::state::{AsyncStatus, AsyncValue, Loadable};
     pub use crate::strings::{
-        ActiveNumbers, ActiveStrings, EnglishNumbers, NumberAdapter, Plural, SharedNumberAdapter,
-        StringKey, Strings, reset_numbers, reset_strings, set_numbers, set_strings,
+        ActiveNumbers, ActiveSearch, ActiveStrings, EnglishNumbers, EnglishSearch, NumberAdapter,
+        Plural, SearchMatcher, SharedNumberAdapter, SharedSearchMatcher, StringKey, Strings,
+        reset_numbers, reset_search, reset_strings, set_numbers, set_search, set_strings,
     };
     pub use crate::structured::{
         DefaultSchemaFilePolicy, FieldValue, JsonValue, JsonView, NumberBounds, Schema,

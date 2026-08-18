@@ -1583,6 +1583,24 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
             .enumerate()
             .map(|(index, value)| (format!("color.loader.gradient.{index}"), value.as_str())),
     )
+    .chain([
+        (
+            "color.terminal.background".into(),
+            color.terminal.background.as_str(),
+        ),
+        (
+            "color.terminal.selection".into(),
+            color.terminal.selection.as_str(),
+        ),
+    ])
+    .chain(
+        color
+            .terminal
+            .ansi
+            .iter()
+            .enumerate()
+            .map(|(index, value)| (format!("color.terminal.ansi.{index}"), value.as_str())),
+    )
     .collect();
 
     for (path, source) in sources {

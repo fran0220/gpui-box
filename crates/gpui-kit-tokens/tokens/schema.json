@@ -35,7 +35,15 @@
     "color": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["palette", "surface", "text", "interactive", "semantic", "loader"],
+      "required": [
+        "palette",
+        "surface",
+        "text",
+        "interactive",
+        "semantic",
+        "loader",
+        "terminal"
+      ],
       "properties": {
         "palette": { "$ref": "#/$defs/palette" },
         "surface": { "$ref": "#/$defs/surfaceColors" },
@@ -54,7 +62,8 @@
               "items": { "$ref": "#/$defs/color" }
             }
           }
-        }
+        },
+        "terminal": { "$ref": "#/$defs/terminalColors" }
       }
     },
     "space": { "$ref": "#/$defs/spacing" },
@@ -150,6 +159,21 @@
         "warning": { "$ref": "#/$defs/color" },
         "success": { "$ref": "#/$defs/color" },
         "info": { "$ref": "#/$defs/color" }
+      }
+    },
+    "terminalColors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["background", "selection", "ansi"],
+      "properties": {
+        "background": { "$ref": "#/$defs/color" },
+        "selection": { "$ref": "#/$defs/color" },
+        "ansi": {
+          "type": "array",
+          "minItems": 16,
+          "maxItems": 16,
+          "items": { "$ref": "#/$defs/color" }
+        }
       }
     },
     "spacing": {

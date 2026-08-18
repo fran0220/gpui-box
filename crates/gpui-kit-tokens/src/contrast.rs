@@ -30,6 +30,15 @@ impl ContrastCheck {
 
 const TEXT_MINIMUM: f32 = 4.5;
 const NON_TEXT_MINIMUM: f32 = 3.0;
+/// The floor under the two ANSI greys, which are structure rather than text.
+/// Low enough that a palette can still put "black" near the terminal's own
+/// background, high enough that it cannot vanish into it.
+const GREY_MINIMUM: f32 = 1.25;
+
+/// The ANSI slot whose job is to sit at the dark end of the scale rather than
+/// to be read. Slot 8, "bright black", is the same slot one octave up and is
+/// the dim-text grey every terminal palette uses.
+const ANSI_BLACK: usize = 0;
 
 /// Evaluates every required pair for one theme.
 pub fn report(tokens: &TokenDocument) -> Vec<ContrastCheck> {
@@ -130,6 +139,33 @@ pub fn report(tokens: &TokenDocument) -> Vec<ContrastCheck> {
                 NON_TEXT_MINIMUM,
             ));
         }
+    }
+
+    // Every ANSI slot has to be legible on the terminal background *of its own
+    // theme*. The regression this catches is the obvious one: a palette tuned
+    // by eye against near-black, reused unchanged on near-white, where the
+    // bright half is the invisible half.
+    //
+    // Two floors, because the table holds two kinds of thing. The twelve
+    // chromatic slots carry program output and are held to the non-text
+    // minimum. The black/bright-black pair are structural greys — box drawing
+    // and dim hints — whose job is to sit at the quiet end of the scale rather
+    // than to be read, so they only have to separate from the background at
+    // all.
+    let terminal_background = tokens.terminal_background();
+    for (index, color) in tokens.terminal_ansi().into_iter().enumerate() {
+        let minimum = if index % 8 == ANSI_BLACK {
+            GREY_MINIMUM
+        } else {
+            NON_TEXT_MINIMUM
+        };
+        checks.push(check(
+            &format!("color.terminal.ansi.{index}"),
+            color,
+            "color.terminal.background",
+            terminal_background,
+            minimum,
+        ));
     }
 
     // `accent` is the only accent that carries text. `accentStrong` is an
@@ -441,7 +477,9 @@ mod tests {
     #[test]
     fn the_report_covers_every_surface_and_tone() {
         let checks = report(crate::studio_dark());
-        assert_eq!(checks.len(), 6 * 18 + 1);
+        // Eighteen tones against each of six surfaces, the sixteen ANSI slots
+        // against the terminal background, and `onAccent` against `accent`.
+        assert_eq!(checks.len(), 6 * 18 + 16 + 1);
     }
 
     #[test]

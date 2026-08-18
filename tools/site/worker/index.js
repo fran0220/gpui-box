@@ -123,6 +123,16 @@ async function call({ name, arguments: args = {} }, env) {
       return text(await asset(env, "/llms.txt"));
     case "render_scene":
       return image(env, args.name ?? "", args.theme ?? "studio-dark");
+    case "session_open":
+    case "session_snapshot":
+    case "session_act":
+    case "session_advance":
+    case "session_screenshot":
+    case "session_audit":
+    case "session_close":
+      throw new Error(
+        `${name} needs the stdio server in a working copy; this hosted endpoint has no GPUI runtime`,
+      );
     default:
       throw new Error(`unknown tool: ${name}`);
   }

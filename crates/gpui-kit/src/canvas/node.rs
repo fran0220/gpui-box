@@ -311,6 +311,7 @@ pub struct GraphNode {
     display_zoom: f32,
     declared_height: Option<f32>,
     pointer_click: bool,
+    compact: bool,
     on_click: Option<ClickHandler>,
     on_delete: Option<ClickHandler>,
 }
@@ -345,6 +346,7 @@ impl GraphNode {
             display_zoom: 1.0,
             declared_height: None,
             pointer_click: true,
+            compact: false,
             on_click: None,
             on_delete: None,
         }
@@ -474,6 +476,12 @@ impl GraphNode {
     /// arbitrates pointer click versus drag on its stable outer surface.
     pub(crate) fn pointer_click(mut self, enabled: bool) -> Self {
         self.pointer_click = enabled;
+        self
+    }
+
+    /// Drops ports-adjacent detail so a far-away card stays a title.
+    pub(crate) fn compact(mut self, compact: bool) -> Self {
+        self.compact = compact;
         self
     }
 
@@ -658,9 +666,9 @@ impl RenderOnce for GraphNode {
                 }])
             })
             .child(header)
-            .children(thumbnail)
-            .children(action)
-            .children(strip);
+            .when(!self.compact, |card| {
+                card.children(thumbnail).children(action).children(strip)
+            });
 
         // A node that takes a click is a button and a node that does not is a
         // group, so the role is decided before the spec is built rather than

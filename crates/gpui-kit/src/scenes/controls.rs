@@ -326,6 +326,15 @@ pub(super) fn choice(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .display("0.7")
                 .on_change(|_, _, _| {}),
         )
+        .child(
+            Slider::new("scene.choice.window")
+                .label("Window")
+                .range(0.0, 1.0)
+                .values(0.2, 0.8)
+                .marks([0.0, 0.25, 0.5, 0.75, 1.0])
+                .display("0.2 – 0.8")
+                .on_range_change(|_, _, _, _| {}),
+        )
         .into_any_element()
 }
 
@@ -361,6 +370,7 @@ pub(super) fn ensure_form(window: &mut Window, cx: &mut App) {
             .value(90.0)
             .range(1.0, 60.0)
             .step(5.0)
+            .prefix("~")
             .unit("days")
             .required(true)
     });
@@ -388,6 +398,8 @@ pub(super) fn ensure_form(window: &mut Window, cx: &mut App) {
             .tags(["indexing", "nightly", "verified"])
             .placeholder("Add a label")
             .max(5)
+            .reorderable(true)
+            .collapse_at(5)
     });
     region.update(cx, |combobox, cx| {
         combobox.set_query("Unknown model", cx);
@@ -762,11 +774,16 @@ pub(super) fn ensure_inputs(window: &mut Window, cx: &mut App) {
                 Select::new("scene.input.provider", window, cx)
                     .name("Provider")
                     .options([
-                        SelectOption::new("anthropic", "Anthropic"),
-                        SelectOption::new("openai", "OpenAI").description("Requires a key"),
-                        SelectOption::new("local", "Local runtime").disabled(true),
+                        SelectOption::new("anthropic", "Anthropic").group("Hosted"),
+                        SelectOption::new("openai", "OpenAI")
+                            .description("Requires a key")
+                            .group("Hosted"),
+                        SelectOption::new("local", "Local runtime")
+                            .disabled(true)
+                            .group("On this machine"),
                     ])
                     .selected("anthropic")
+                    .clearable(true)
                     .placeholder("Choose a provider")
             }),
             notes: cx.new(|cx| {
@@ -777,6 +794,7 @@ pub(super) fn ensure_inputs(window: &mut Window, cx: &mut App) {
                     )
                     .rows(3)
                     .max_rows(6)
+                    .max_length(240)
             }),
             review: cx.new(|cx| {
                 TextArea::new("scene.textarea.review", window, cx)
@@ -1216,5 +1234,46 @@ pub(super) fn copy_button(window: &mut Window, cx: &mut App) -> AnyElement {
         .child(copied)
         .child(caption(&theme, "It did not go through, and says so"))
         .child(refused)
+        .into_any_element()
+}
+
+pub(super) fn color_picker(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let current = theme.colors.info;
+    stack(&theme)
+        .child(caption(
+            &theme,
+            "the value is caller-owned; presets and recents are host lists",
+        ))
+        .child(
+            ColorPicker::new("scene.color.picker", current)
+                .alpha(true)
+                .presets([
+                    theme.colors.danger,
+                    theme.colors.warning,
+                    theme.colors.info,
+                    theme.colors.success,
+                    theme.colors.accent,
+                ])
+                .recent([theme.colors.accent, current])
+                .on_change(|_, _, _| {}),
+        )
+        .child(caption(&theme, "a swatch reports the colour it was given"))
+        .child(
+            row(&theme)
+                .child(ColorSwatch::new(
+                    "scene.color.swatch.accent",
+                    theme.colors.accent,
+                ))
+                .child(
+                    ColorSwatch::new("scene.color.swatch.selected", current)
+                        .selected(true)
+                        .on_click(|_, _, _| {}),
+                )
+                .child(
+                    ColorSwatch::new("scene.color.swatch.disabled", theme.colors.danger)
+                        .disabled(true),
+                ),
+        )
         .into_any_element()
 }

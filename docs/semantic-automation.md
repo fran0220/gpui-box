@@ -69,10 +69,13 @@ container holds, the name of a state, or the reason a row was refused. The
 cases are spelled out in `docs/components.md`; a component that publishes
 `value` for anything else is a bug in that component, not a new case.
 
-The deterministic tree does not define a network server and is not itself the
-screen-reader transport. Applications may serialize the snapshot through a
-debug-only transport, read it in-process, or use it directly in unit tests.
-GPUI's AccessKit adapter owns the separate platform tree.
+The deterministic tree is not itself a network server and is not the
+screen-reader transport. In this repository, `headless-visual serve` is the
+debug-only session host: it serializes the snapshot, injects input by
+semantic id, and captures the same offscreen frames the visual gate uses.
+The stdio MCP `session_*` tools are a thin proxy over that host. GPUI's
+AccessKit adapter owns the separate platform tree. Applications may also
+read the snapshot in-process or in unit tests.
 
 ## Security
 

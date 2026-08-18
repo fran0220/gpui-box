@@ -864,7 +864,8 @@ pub(super) fn thinking(_window: &mut Window, cx: &mut App) -> AnyElement {
                 "scene.thinking.working",
                 Reasoning::present("Reading the second file before answering."),
             )
-            .thinking(true),
+            .thinking(true)
+            .elapsed("12s"),
         )
         .child(
             ThinkingBlock::new(

@@ -22,7 +22,7 @@ use crate::motion;
 use crate::overlay::kbd::Kbd;
 use crate::overlay::layer::surface;
 use crate::overlay::popover::{self, MenuKey};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveSearch, ActiveStrings, SearchMatcher, StringKey};
 
 /// How wide the palette is. The value occurs once, so it stays here rather
 /// than in the token document.
@@ -107,12 +107,23 @@ impl EventEmitter<CommandPaletteEvent> for CommandPalette {}
 ///
 /// A section sits where its best match does, so the closest answer is still
 /// the first row while the grouping stays readable.
+#[allow(dead_code)]
 fn order_matches(commands: &[Command], query: &str) -> Vec<usize> {
+    order_matches_with(commands, query, &crate::strings::EnglishSearch)
+}
+
+fn order_matches_with(
+    commands: &[Command],
+    query: &str,
+    matcher: &dyn SearchMatcher,
+) -> Vec<usize> {
     let ranked: Vec<(usize, usize)> = commands
         .iter()
         .enumerate()
         .filter_map(|(index, command)| {
-            popover::match_rank(query, command.label.as_ref()).map(|rank| (rank, index))
+            matcher
+                .rank(query, command.label.as_ref())
+                .map(|rank| (rank, index))
         })
         .collect();
 
@@ -236,7 +247,11 @@ impl CommandPalette {
     }
 
     fn ordered(&self, cx: &App) -> Vec<usize> {
-        order_matches(&self.commands, self.query.read(cx).value().as_ref())
+        order_matches_with(
+            &self.commands,
+            self.query.read(cx).value().as_ref(),
+            cx.search().as_ref(),
+        )
     }
 
     /// The command the highlight sits on: the one the typist put it on while

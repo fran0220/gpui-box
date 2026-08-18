@@ -12,8 +12,8 @@
 
 use gpui::{
     AnyElement, App, Context, EventEmitter, FocusHandle, Focusable, InteractiveElement,
-    IntoElement, KeyDownEvent, ParentElement, Render, SharedString, Styled, Window, div,
-    prelude::FluentBuilder, px,
+    IntoElement, KeyDownEvent, MouseButton, ParentElement, Render, SharedString, Styled, Window,
+    div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Elevation, Space, Theme};
@@ -23,6 +23,8 @@ use crate::motion::{self, Easing, MotionSpec, Phase, Presence};
 use crate::overlay::focus::FocusTrap;
 use crate::overlay::layer::{Edge, Overlay, surface};
 use crate::overlay::panel::{self, Body};
+use crate::overlay::stack;
+use crate::strings::{ActiveStrings, StringKey};
 
 /// How wide a left or right drawer is, and how tall a top or bottom one is,
 /// before the caller says otherwise. Neither value repeats elsewhere.
@@ -33,12 +35,14 @@ const DEFAULT_SIZE: f32 = 360.0;
 /// [`DrawerEvent::Closed`] arrives when the panel has finished sliding out,
 /// not when closing was asked for, so a subscriber that tears down state on
 /// close does not tear it down mid-animation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum DrawerEvent {
     Opened,
     /// The drawer was waved away, by escape or by the scrim.
     Dismissed,
     Closed,
+    /// The free edge was dragged to this size. The drawer does not apply it.
+    ResizeRequested(f32),
 }
 
 impl EventEmitter<DrawerEvent> for Drawer {}
@@ -54,6 +58,11 @@ pub struct Drawer {
     body: Option<Body>,
     footer: Option<Body>,
     dismissable: bool,
+    resizable: bool,
+    /// A size the pointer is holding, which is transient visual state until
+    /// the host applies [`DrawerEvent::ResizeRequested`].
+    preview: Option<f32>,
+    drag: Option<(f32, f32)>,
     open: bool,
     /// Set by `open`, cleared by the first frame that can act on it.
     pending_focus: bool,
@@ -90,6 +99,9 @@ impl Drawer {
             body: None,
             footer: None,
             dismissable: true,
+            resizable: false,
+            preview: None,
+            drag: None,
             open: false,
             pending_focus: false,
             presence: None,
@@ -144,6 +156,19 @@ impl Drawer {
         self
     }
 
+    /// Puts a grab handle on the free edge. A drag reports
+    /// [`DrawerEvent::ResizeRequested`] and applies nothing.
+    pub fn resizable(mut self, resizable: bool) -> Self {
+        self.resizable = resizable;
+        self
+    }
+
+    pub fn set_size(&mut self, size: f32, cx: &mut Context<Self>) {
+        self.size = size.max(0.0);
+        self.preview = None;
+        cx.notify();
+    }
+
     /// The controls tab walks between while the drawer is open.
     ///
     /// The body is the caller's, so the caller is the only one that knows
@@ -194,6 +219,7 @@ impl Drawer {
             .presence
             .get_or_insert_with(|| Presence::hidden(enter_spec(&theme), exit_spec(&theme)));
         presence.show();
+        stack::push(self.ident.semantic_id(), cx);
         self.trap.engage(window, cx);
         cx.emit(DrawerEvent::Opened);
         cx.notify();
@@ -206,6 +232,7 @@ impl Drawer {
         }
         self.open = false;
         self.pending_focus = false;
+        stack::pop(&self.ident.semantic_id(), cx);
         if let Some(presence) = self.presence.as_mut() {
             presence.hide();
         }
@@ -241,6 +268,9 @@ impl Drawer {
         if !self.open || event.keystroke.key.as_str() != "escape" {
             return;
         }
+        if !stack::is_top(&self.ident.semantic_id(), cx) {
+            return;
+        }
         self.dismiss(window, cx);
         cx.stop_propagation();
     }
@@ -264,7 +294,102 @@ impl Drawer {
 
     /// How far the panel still has to travel, in pixels along its edge.
     fn travel(&self) -> f32 {
-        self.size * (1.0 - self.progress)
+        self.shown_size() * (1.0 - self.progress)
+    }
+
+    fn shown_size(&self) -> f32 {
+        self.preview.unwrap_or(self.size)
+    }
+
+    fn resize_handle(&self, theme: &Theme, cx: &mut Context<Self>) -> Option<AnyElement> {
+        if !self.resizable || !self.open {
+            return None;
+        }
+        let ident = self.ident.child("resize");
+        let label = cx.strings().text(StringKey::DrawerResize);
+        let horizontal = self.edge.is_horizontal();
+        let drawer = cx.entity().downgrade();
+        let start_size = self.shown_size();
+        let edge = self.edge;
+        let min_size = theme.space(Space::Xl) * 4.0;
+        let handle = div()
+            .id(ident.element_id())
+            .absolute()
+            .when(horizontal, |element| element.w(px(6.0)).h_full().top_0())
+            .when(!horizontal, |element| element.h(px(6.0)).w_full().left_0())
+            .when(matches!(edge, Edge::Left), |element| element.right_0())
+            .when(matches!(edge, Edge::Right), |element| element.left_0())
+            .when(matches!(edge, Edge::Top), |element| element.bottom_0())
+            .when(matches!(edge, Edge::Bottom), |element| element.top_0())
+            .cursor_pointer()
+            .bg(theme.colors.hairline)
+            .on_mouse_down(MouseButton::Left, {
+                let drawer = drawer.clone();
+                move |event, _, cx| {
+                    let at = if horizontal {
+                        f32::from(event.position.x)
+                    } else {
+                        f32::from(event.position.y)
+                    };
+                    drawer
+                        .update(cx, |drawer, _| {
+                            drawer.drag = Some((start_size, at));
+                        })
+                        .ok();
+                    cx.stop_propagation();
+                }
+            })
+            .on_mouse_move({
+                let drawer = drawer.clone();
+                move |event, window, cx| {
+                    if event.pressed_button != Some(MouseButton::Left) {
+                        return;
+                    }
+                    drawer
+                        .update(cx, |drawer, cx| {
+                            let Some((from, at)) = drawer.drag else {
+                                return;
+                            };
+                            let now = if horizontal {
+                                f32::from(event.position.x)
+                            } else {
+                                f32::from(event.position.y)
+                            };
+                            let delta = match edge {
+                                Edge::Left | Edge::Top => now - at,
+                                Edge::Right | Edge::Bottom => at - now,
+                            };
+                            let next = (from + delta).max(min_size);
+                            drawer.preview = Some(next);
+                            cx.emit(DrawerEvent::ResizeRequested(next));
+                            cx.notify();
+                        })
+                        .ok();
+                    window.refresh();
+                }
+            })
+            .on_mouse_up(MouseButton::Left, {
+                let drawer = drawer.clone();
+                move |_, _, cx| {
+                    drawer
+                        .update(cx, |drawer, cx| {
+                            drawer.drag = None;
+                            cx.notify();
+                        })
+                        .ok();
+                }
+            });
+        Some(
+            handle
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(ident.semantic_id(), Role::Button)
+                        .parent(self.ident.semantic_id())
+                        .text(label)
+                        .value(self.shown_size().to_string()),
+                )
+                .into_any_element(),
+        )
     }
 }
 
@@ -342,10 +467,12 @@ impl Render for Drawer {
         let description =
             description.map(|description| panel::description(&self.ident, &theme, description, cx));
 
+        let shown = self.shown_size();
+        let handle = self.resize_handle(&theme, cx);
         let mut card = surface(&theme, Elevation::Modal)
             .relative()
-            .when(horizontal, |element| element.w(px(self.size)).h_full())
-            .when(!horizontal, |element| element.h(px(self.size)).w_full())
+            .when(horizontal, |element| element.w(px(shown)).h_full())
+            .when(!horizontal, |element| element.h(px(shown)).w_full())
             .p_token(&theme, Space::Lg)
             .gap_token(&theme, Space::Sm)
             .track_focus(&self.focus_handle)
@@ -364,10 +491,13 @@ impl Render for Drawer {
             .children(description)
             .children(body.map(|body| div().flex_1().overflow_hidden().child(body)))
             .children(footer)
+            .children(handle)
             .semantic_in(cx, spec);
 
-        let mut overlay = Overlay::edge(self.ident.child("overlay"), self.edge).child(card);
-        if self.dismissable && self.open {
+        let mut overlay = Overlay::edge(self.ident.child("overlay"), self.edge)
+            .stack(stack::depth(&self.ident.semantic_id(), cx))
+            .child(card);
+        if self.dismissable && self.open && stack::is_top(&self.ident.semantic_id(), cx) {
             let drawer = cx.entity().downgrade();
             overlay = overlay.on_dismiss(move |window, cx| {
                 drawer

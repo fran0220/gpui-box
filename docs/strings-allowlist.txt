@@ -15,6 +15,7 @@
  
 %2E
 *
+- [x] 
 /
 :
 AbilityBar
@@ -45,9 +46,12 @@ CardHeader
 Cascader
 Cell
 Change
+ChartLegend
 Checkbox
 CodeView
 Collapsible
+ColorPicker
+ColorSwatch
 Combobox
 CommandPalette
 ContextMenu
@@ -65,6 +69,7 @@ Drawer
 Dropzone
 Element(..)
 EmptyState
+Emulator
 FailurePanel
 FilterBar
 FindReplace
@@ -184,6 +189,7 @@ an actionable row has one
 array
 camelCase
 checked above
+empty
 empty array
 empty object
 end before start
@@ -201,10 +207,13 @@ not applicable
 not fetched
 null
 object
+paired new
+paired old
 pane `{id}` has children
 plain text
 platform
 policy-owned particle recipes must remain valid
+ready
 records the root does not reach
 redacted, {shape}
 series is nonempty
@@ -212,10 +221,12 @@ soft break
 split `{id}` has {found} children, not 2
 stale
 stateMachines
+status rows are not nodes
 supplied
 the built-in particle atlas has exact RGBA8 dimensions
 time unknown
 true
+unavailable
 unknown
 unknown-limit
 unrenderable, required
@@ -223,12 +234,32 @@ unrendered html
 visible series are drawn by the caller
 voice {field} {reason}
 withheld
+x1bOA
+x1bOB
+x1bOC
+x1bOD
+x1bOF
+x1bOH
+x1bOP
+x1bOQ
+x1bOR
+x1bOS
+x1b[A
+x1b[B
+x1b[C
+x1b[D
+x1b[F
+x1b[H
+x1b[Z
+{:02X}{:02X}{:02X}
 {chosen} of {loaded} loaded, {total} total
-{count} of {max}
-{count} {noun}
 {lines} lines
 {name} is not a slot this component names; it offers {:?}
 {number} {unit}
+{number}. 
+{pad}> 
+{pad}{hashes} 
+{prefix}{number} {unit}
 {scrolled:.0} of {max:.0}
 {title} — {href}
 {}

@@ -224,6 +224,20 @@ pub fn flick(travel: Point<Pixels>, velocity: Velocity, theme: &Theme) -> Option
 ///
 /// This is a function of the pull and nothing else — no clock, no state, no
 /// frame — because the band is where the hand is holding it.
+/// How far a pull past a scroll boundary should paint, using the theme band.
+///
+/// The scroll itself still stops at the edge: GPUI's viewport does not travel
+/// past its content. This is the visual remainder of that pull, so a host
+/// that measures an attempted overscroll can show resistance rather than a
+/// hard stop with no evidence.
+pub fn overscroll(pull: Pixels, theme: &Theme) -> Pixels {
+    rubber_band(
+        pull,
+        px(theme.effects.edge_fade_band),
+        theme.motion.rubber_band_tension,
+    )
+}
+
 pub fn rubber_band(overscroll: Pixels, extent: Pixels, tension: f32) -> Pixels {
     let extent = f32::from(extent);
     let tension = tension.max(f32::EPSILON);
@@ -380,5 +394,14 @@ mod tests {
     #[test]
     fn a_boundary_with_no_room_behind_it_does_not_stretch() {
         assert_eq!(rubber_band(px(50.0), px(0.0), 0.55), px(0.0));
+    }
+
+    #[test]
+    fn an_overscroll_paint_uses_the_theme_band_and_never_reaches_it() {
+        let theme = theme();
+        let painted = overscroll(px(80.0), &theme);
+        assert!(painted > px(0.0));
+        assert!(painted < px(theme.effects.edge_fade_band));
+        assert_eq!(overscroll(px(0.0), &theme), px(0.0));
     }
 }

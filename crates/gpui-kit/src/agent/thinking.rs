@@ -108,6 +108,8 @@ pub struct ThinkingBlock {
     /// itself, because text that has stopped growing and text that is still
     /// growing look identical and mean different things.
     thinking: bool,
+    /// How long the host says this turn has been thinking, already formatted.
+    elapsed: Option<SharedString>,
     on_toggle: Option<ToggleHandler>,
 }
 
@@ -132,6 +134,7 @@ impl ThinkingBlock {
             reasoning,
             expanded: false,
             thinking: false,
+            elapsed: None,
             on_toggle: None,
         }
     }
@@ -151,6 +154,12 @@ impl ThinkingBlock {
     /// working one see the same picture.
     pub fn thinking(mut self, thinking: bool) -> Self {
         self.thinking = thinking;
+        self
+    }
+
+    /// A host-formatted duration shown while the block is thinking.
+    pub fn elapsed(mut self, elapsed: impl Into<SharedString>) -> Self {
+        self.elapsed = Some(elapsed.into());
         self
     }
 
@@ -226,6 +235,18 @@ impl RenderOnce for ThinkingBlock {
                         _ => theme.colors.text_faint,
                     }),
             )
+            .children(self.elapsed.clone().map(|elapsed| {
+                text(&theme, TypeScale::Caption, elapsed.clone())
+                    .flex_none()
+                    .text_color(theme.colors.text_faint)
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(ident.child("elapsed").semantic_id(), Role::Status)
+                            .parent(ident.semantic_id())
+                            .text(elapsed)
+                            .value("elapsed"),
+                    )
+            }))
             .when(actionable, |element| {
                 element
                     .cursor_pointer()
@@ -310,6 +331,11 @@ impl RenderOnce for ThinkingBlock {
             .column()
             .card_surface(&theme, CardVariant::Elevated)
             .overflow_hidden()
+            .when(self.thinking, |element| {
+                element
+                    .border(px(theme.borders.hairline))
+                    .border_color(theme.colors.accent)
+            })
             .child(header)
             .children(body)
     }

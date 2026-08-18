@@ -54,10 +54,12 @@ commands own them.
 
 The checkout-backed `gpui-box-mcp` (`tools/mcp/run.sh`) reads `GPUI_BOX_ROOT`
 or discovers upward from cwd and is the catalog for this working copy.
-`render_scene` requires the complete checkout. The hosted endpoint at
+`render_scene` and `session_*` require the complete checkout and drive
+`headless-visual serve`. The hosted endpoint at
 <https://gpui-box.origingame.dev> deploys the same repository catalog; it is
-not a crates.io install. crates.io `gpui-box-mcp` without a git revision is
-still the last published cohort (`0.1.1`).
+not a crates.io install, and it refuses session tools because it has no
+runtime. crates.io `gpui-box-mcp` without a git revision is still the last
+published cohort (`0.1.1`).
 
 References: `docs/components.md`, `docs/component-contracts.md`,
 `docs/coverage.md`, `docs/truthful-ui.md`, `docs/token-model.md`,

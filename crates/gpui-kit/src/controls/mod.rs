@@ -3,6 +3,7 @@
 pub mod auth;
 pub mod button;
 pub mod cascader;
+pub mod color_picker;
 pub mod combobox;
 pub mod copy_button;
 pub mod dropzone;

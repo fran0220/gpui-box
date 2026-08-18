@@ -83,7 +83,15 @@ pub const KEY_CONTEXT: &str = "TextInput";
 ///
 /// Called by [`crate::install`]. Bindings are scoped to the input key context,
 /// so they never shadow a host's global shortcuts.
+struct InputBindings;
+
+impl gpui::Global for InputBindings {}
+
 pub(crate) fn install(cx: &mut App) {
+    if cx.has_global::<InputBindings>() {
+        return;
+    }
+    cx.set_global(InputBindings);
     let primary = if cfg!(target_os = "macos") {
         "cmd"
     } else {

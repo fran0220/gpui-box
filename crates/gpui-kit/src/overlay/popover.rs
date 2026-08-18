@@ -23,6 +23,7 @@ use crate::overlay::focus::FocusTrap;
 use crate::overlay::layer::{Overlay, Placement, surface};
 
 use crate::motion;
+use crate::strings::{ActiveSearch, EnglishSearch, SearchMatcher};
 
 /// What a keystroke means to a menu-like surface, once the platform's
 /// modifier conventions have been applied.
@@ -125,51 +126,37 @@ pub fn step(active: Option<usize>, count: usize, delta: isize) -> Option<usize> 
 /// prefix outranks the start of a later word, which outranks a match in the
 /// middle of one, which outranks letters merely occurring in order.
 pub fn match_rank(query: &str, label: &str) -> Option<usize> {
-    let query = query.trim().to_lowercase();
-    if query.is_empty() {
-        return Some(1);
-    }
-    let label = label.to_lowercase();
-    if label.starts_with(&query) {
-        Some(0)
-    } else if word_starts(&label).any(|start| label[start..].starts_with(&query)) {
-        Some(1)
-    } else if label.contains(&query) {
-        Some(2)
-    } else if is_subsequence(&query, &label) {
-        Some(3)
-    } else {
-        None
-    }
+    EnglishSearch.rank(query, label)
 }
 
-/// Byte offsets of every character that begins a word.
-fn word_starts(label: &str) -> impl Iterator<Item = usize> + '_ {
-    label.char_indices().filter_map(move |(index, character)| {
-        if index == 0 || !character.is_alphanumeric() {
-            return None;
-        }
-        let previous = label[..index].chars().next_back()?;
-        (!previous.is_alphanumeric()).then_some(index)
-    })
-}
-
-fn is_subsequence(query: &str, label: &str) -> bool {
-    let mut characters = label.chars();
-    query
-        .chars()
-        .all(|wanted| characters.any(|character| character == wanted))
-}
-
-/// The indices of the labels `query` answers, best answer first.
+/// The indices of the labels `query` answers, best answer first, using the
+/// English matcher compiled into this crate.
 pub fn filter_indices<S: AsRef<str>>(query: &str, labels: &[S]) -> Vec<usize> {
+    filter_indices_with(query, labels, &EnglishSearch)
+}
+
+/// The same ranking through a caller-supplied matcher.
+pub fn filter_indices_with<S: AsRef<str>>(
+    query: &str,
+    labels: &[S],
+    matcher: &dyn SearchMatcher,
+) -> Vec<usize> {
     let mut ranked: Vec<_> = labels
         .iter()
         .enumerate()
-        .filter_map(|(index, label)| match_rank(query, label.as_ref()).map(|rank| (rank, index)))
+        .filter_map(|(index, label)| {
+            matcher
+                .rank(query, label.as_ref())
+                .map(|rank| (rank, index))
+        })
         .collect();
     ranked.sort_by_key(|&(rank, index)| (rank, index));
     ranked.into_iter().map(|(_, index)| index).collect()
+}
+
+/// The installed host matcher, or English when the host supplied none.
+pub fn filter_indices_for<S: AsRef<str>>(cx: &App, query: &str, labels: &[S]) -> Vec<usize> {
+    filter_indices_with(query, labels, cx.search().as_ref())
 }
 
 /// The elevated surface every anchored overlay draws.

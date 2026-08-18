@@ -9,6 +9,7 @@ use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlMetrics, ControlSize, Radius, Theme, TypeScale};
 
+use crate::display::icon::{Icon as IconView, IconTone};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
 use crate::foundation::{
     Disableable, FocusRing, Ident, Pressable, Selectable, Sizable, StyledExt,
@@ -283,7 +284,22 @@ impl RenderOnce for Button {
         };
 
         let mut content: Vec<AnyElement> = Vec::new();
-        let glyph = self.glyph.map(|glyph| {
+        if self.loading {
+            let tone = match self.variant {
+                ButtonVariant::Primary => IconTone::OnAccent,
+                ButtonVariant::Danger => IconTone::Danger,
+                ButtonVariant::Link => IconTone::Accent,
+                _ => IconTone::Muted,
+            };
+            content.push(
+                IconView::new(Icon::Refresh)
+                    .control_size(self.size)
+                    .tone(tone)
+                    .spinning(self.ident.child("busy"))
+                    .into_any_element(),
+            );
+        }
+        let glyph = self.glyph.filter(|_| !self.loading).map(|glyph| {
             // SVG paint does not inherit the frame's text color, so the icon
             // has to name the variant foreground itself.
             icon(glyph)

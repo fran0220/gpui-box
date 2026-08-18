@@ -11,7 +11,8 @@ use std::{cell::Cell, collections::HashMap, rc::Rc};
 
 use gpui::{
     AnyElement, App, Bounds, InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels,
-    Point, RenderOnce, ScrollDelta, SharedString, Styled, Window, canvas, div, point, px, size,
+    Point, RenderOnce, ScrollDelta, SharedString, Styled, Window, canvas, div, point, px, relative,
+    size,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -28,11 +29,15 @@ use super::edge::{
     Anchor, Axis, GraphEdge, GraphEndpoint, OrthogonalRoute, PortSide, RouteTransform, paint_route,
     paint_route_stroke, route_orthogonal, route_preview,
 };
-use super::node::{GraphNode, GraphPort, PortDirection};
+use super::node::{GraphNode, GraphPort, NODE_WIDTH, PortDirection};
 
 /// The spacing of the dot grid behind the canvas, in pixels.
 const GRID_STEP: f32 = 24.0;
 const GRID_DOT: f32 = 1.0;
+/// Below this zoom a node draws only its title, and ports stay off.
+const LOD_ZOOM: f32 = 0.4;
+/// Extra world space kept around the viewport so a node entering does not pop.
+const CULL_PAD: f32 = 80.0;
 
 /// Caller-owned pan and zoom values for a [`NodeGraph`].
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -117,11 +122,16 @@ enum Gesture {
         at: Point<Pixels>,
         id: SharedString,
         position: Point<f32>,
+        peers: Vec<(SharedString, Point<f32>)>,
         moved: bool,
         extend_selection: bool,
     },
     Connect {
         from: GraphEndpoint,
+    },
+    Marquee {
+        origin: Point<Pixels>,
+        current: Point<Pixels>,
     },
 }
 
@@ -152,6 +162,42 @@ fn zoom_at(viewport: GraphViewport, screen: Point<f32>, zoom: f32) -> GraphViewp
     }
 }
 
+fn world_view(viewport: GraphViewport, screen: Bounds<Pixels>) -> Bounds<f32> {
+    let width = f32::from(screen.size.width);
+    let height = f32::from(screen.size.height);
+    let origin = screen_to_world(point(0.0, 0.0), viewport);
+    let far = screen_to_world(point(width, height), viewport);
+    Bounds::new(
+        point(origin.x.min(far.x), origin.y.min(far.y)),
+        size((far.x - origin.x).abs(), (far.y - origin.y).abs()),
+    )
+}
+
+fn bounds_overlap(left: Bounds<f32>, right: Bounds<f32>, pad: f32) -> bool {
+    left.left() - pad < right.right()
+        && left.right() + pad > right.left()
+        && left.top() - pad < right.bottom()
+        && left.bottom() + pad > right.top()
+}
+
+fn route_signature(nodes: &[NodeGeometry], edges: &[GraphEdge]) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    for node in nodes {
+        node.id.hash(&mut hasher);
+        f32::to_bits(node.bounds.origin.x).hash(&mut hasher);
+        f32::to_bits(node.bounds.origin.y).hash(&mut hasher);
+        f32::to_bits(node.bounds.size.width).hash(&mut hasher);
+        f32::to_bits(node.bounds.size.height).hash(&mut hasher);
+    }
+    for edge in edges {
+        edge.edge_id().hash(&mut hasher);
+        edge.from().hash(&mut hasher);
+        edge.to().hash(&mut hasher);
+    }
+    hasher.finish()
+}
+
 fn viewport_value(state: &str, viewport: GraphViewport) -> String {
     format!(
         "state:{state};offset:{:.3},{:.3};zoom:{:.3}",
@@ -168,6 +214,65 @@ fn composite_id(prefix: &str, parts: &[&str]) -> SharedString {
         id.push_str(part);
     }
     id.into()
+}
+
+/// Places nodes in layers along the reading direction from a caller-owned
+/// edge list. The graph still draws whatever positions it is handed; this
+/// is a helper a host may apply before that.
+pub fn layered_layout<'a>(
+    ids: impl IntoIterator<Item = impl Into<SharedString>>,
+    edges: impl IntoIterator<Item = &'a GraphEdge>,
+    column_gap: f32,
+    row_gap: f32,
+) -> Vec<(SharedString, Point<f32>)> {
+    let ids: Vec<SharedString> = ids.into_iter().map(Into::into).collect();
+    let mut incoming: HashMap<SharedString, usize> =
+        ids.iter().cloned().map(|id| (id, 0)).collect();
+    let mut outgoing: HashMap<SharedString, Vec<SharedString>> = HashMap::new();
+    for edge in edges {
+        if incoming.contains_key(edge.from()) && incoming.contains_key(edge.to()) {
+            *incoming.entry(edge.to().clone()).or_insert(0) += 1;
+            outgoing
+                .entry(edge.from().clone())
+                .or_default()
+                .push(edge.to().clone());
+        }
+    }
+    let mut layers: Vec<Vec<SharedString>> = Vec::new();
+    let mut remaining = incoming;
+    while !remaining.is_empty() {
+        let ready: Vec<SharedString> = remaining
+            .iter()
+            .filter(|(_, count)| **count == 0)
+            .map(|(id, _)| id.clone())
+            .collect();
+        let ready = if ready.is_empty() {
+            remaining.keys().take(1).cloned().collect()
+        } else {
+            ready
+        };
+        for id in &ready {
+            remaining.remove(id);
+            if let Some(next) = outgoing.get(id) {
+                for child in next {
+                    if let Some(count) = remaining.get_mut(child) {
+                        *count = count.saturating_sub(1);
+                    }
+                }
+            }
+        }
+        layers.push(ready);
+    }
+    let mut placed = Vec::new();
+    for (column, layer) in layers.iter().enumerate() {
+        for (row, id) in layer.iter().enumerate() {
+            placed.push((
+                id.clone(),
+                point(column as f32 * column_gap, row as f32 * row_gap),
+            ));
+        }
+    }
+    placed
 }
 
 fn selection_after(
@@ -207,6 +312,12 @@ struct NodeGeometry {
 struct RoutedEdge {
     edge: GraphEdge,
     route: OrthogonalRoute,
+}
+
+#[derive(Default)]
+struct RouteCache {
+    signature: u64,
+    routes: Vec<RoutedEdge>,
 }
 
 #[derive(Debug, Clone)]
@@ -294,6 +405,7 @@ pub struct NodeGraph {
     zoom_range: (f32, f32),
     interaction: GraphInteraction,
     on_event: Option<EventHandler>,
+    minimap: bool,
 }
 
 impl std::fmt::Debug for NodeGraph {
@@ -321,6 +433,7 @@ impl NodeGraph {
             zoom_range: (0.5, 2.0),
             interaction: GraphInteraction::default(),
             on_event: None,
+            minimap: false,
         }
     }
 
@@ -405,6 +518,12 @@ impl NodeGraph {
         handler: impl Fn(&NodeGraphEvent, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_event = Some(Rc::new(handler));
+        self
+    }
+
+    /// Draws a small overview of the placed nodes in the corner.
+    pub fn minimap(mut self, show: bool) -> Self {
+        self.minimap = show;
         self
     }
 
@@ -645,11 +764,18 @@ impl RenderOnce for NodeGraph {
             let down = Rc::clone(&gesture);
             frame =
                 frame.on_mouse_down_with_pointer_capture(MouseButton::Left, move |event, _, cx| {
-                    down.borrow_mut().gesture = Some(Gesture::Pan {
-                        at: event.position,
-                        viewport,
-                        moved: false,
-                    });
+                    down.borrow_mut().gesture = if event.modifiers.shift {
+                        Some(Gesture::Marquee {
+                            origin: event.position,
+                            current: event.position,
+                        })
+                    } else {
+                        Some(Gesture::Pan {
+                            at: event.position,
+                            viewport,
+                            moved: false,
+                        })
+                    };
                     cx.stop_propagation();
                 });
             let moving = Rc::clone(&gesture);
@@ -680,18 +806,67 @@ impl RenderOnce for NodeGraph {
                         window,
                         cx,
                     );
+                } else if let Some(Gesture::Marquee { current, .. }) = state.gesture.as_mut() {
+                    if event.pressed_button != Some(MouseButton::Left) {
+                        state.gesture = None;
+                        return;
+                    }
+                    *current = event.position;
+                    window.refresh();
                 }
             });
             let up = Rc::clone(&gesture);
             let up_report = Rc::clone(&report);
+            let up_bounds = Rc::clone(&measured);
+            let up_nodes = self
+                .nodes
+                .iter()
+                .map(|placed| (placed.node.ident().semantic_id(), placed.x, placed.y))
+                .collect::<Vec<_>>();
             frame = frame.on_mouse_up(MouseButton::Left, move |_, window, cx| {
                 let gesture = up.borrow_mut().gesture.take();
-                if matches!(gesture, Some(Gesture::Pan { moved: false, .. })) {
-                    up_report(
-                        &NodeGraphEvent::SelectionChanged { ids: Vec::new() },
-                        window,
-                        cx,
-                    );
+                match gesture {
+                    Some(Gesture::Pan { moved: false, .. }) => {
+                        up_report(
+                            &NodeGraphEvent::SelectionChanged { ids: Vec::new() },
+                            window,
+                            cx,
+                        );
+                    }
+                    Some(Gesture::Marquee { origin, current }) => {
+                        let frame = up_bounds.get();
+                        let a = screen_to_world(
+                            point(
+                                f32::from(origin.x - frame.origin.x),
+                                f32::from(origin.y - frame.origin.y),
+                            ),
+                            viewport,
+                        );
+                        let b = screen_to_world(
+                            point(
+                                f32::from(current.x - frame.origin.x),
+                                f32::from(current.y - frame.origin.y),
+                            ),
+                            viewport,
+                        );
+                        let box_bounds = Bounds::new(
+                            point(a.x.min(b.x), a.y.min(b.y)),
+                            size((a.x - b.x).abs(), (a.y - b.y).abs()),
+                        );
+                        let ids = up_nodes
+                            .iter()
+                            .filter(|(_, x, y)| {
+                                bounds_overlap(
+                                    Bounds::new(point(*x, *y), size(NODE_WIDTH, 48.0)),
+                                    box_bounds,
+                                    0.0,
+                                )
+                            })
+                            .map(|(id, _, _)| id.clone())
+                            .collect();
+                        up_report(&NodeGraphEvent::SelectionChanged { ids }, window, cx);
+                    }
+                    _ => {}
                 }
             });
             let wheel_report = Rc::clone(&report);
@@ -802,7 +977,51 @@ impl RenderOnce for NodeGraph {
             })
             .collect();
         let geometry = self.geometry_with_heights(&theme, &measured_heights);
-        let routes = self.routable_geometry(&geometry);
+        let route_cell = keyed::slot::<RouteCache>(&self.ident.child("routes").semantic_id(), cx);
+        let signature = route_signature(&geometry, &self.edges);
+        let routes = {
+            let mut cache = route_cell.borrow_mut();
+            if cache.signature == signature && !cache.routes.is_empty() {
+                cache.routes.clone()
+            } else {
+                let routes = self.routable_geometry(&geometry);
+                cache.signature = signature;
+                cache.routes = routes.clone();
+                routes
+            }
+        };
+        let compact = viewport.zoom < LOD_ZOOM;
+        let view = {
+            let bounds = measured.get();
+            (f32::from(bounds.size.width) > 1.0).then(|| world_view(viewport, bounds))
+        };
+        let visible_ids: std::collections::HashSet<SharedString> = geometry
+            .iter()
+            .filter(|node| {
+                view.map(|view| bounds_overlap(node.bounds, view, CULL_PAD))
+                    .unwrap_or(true)
+            })
+            .map(|node| node.id.clone())
+            .collect();
+        let routes: Vec<RoutedEdge> = routes
+            .into_iter()
+            .filter(|routed| {
+                let Some(view) = view else {
+                    return true;
+                };
+                let from = geometry.iter().find(|node| node.id == *routed.edge.from());
+                let to = geometry.iter().find(|node| node.id == *routed.edge.to());
+                match (from, to) {
+                    (Some(from), Some(to)) => {
+                        visible_ids.contains(&from.id)
+                            || visible_ids.contains(&to.id)
+                            || bounds_overlap(from.bounds, view, CULL_PAD)
+                            || bounds_overlap(to.bounds, view, CULL_PAD)
+                    }
+                    _ => false,
+                }
+            })
+            .collect();
         let preview = {
             let state = gesture.borrow();
             match (&state.gesture, state.pointer) {
@@ -1059,7 +1278,7 @@ impl RenderOnce for NodeGraph {
             .collect();
 
         let mut ports = Vec::new();
-        for node in &geometry {
+        for node in geometry.iter().filter(|_| !compact) {
             let Some(placed) = self
                 .nodes
                 .iter()
@@ -1258,6 +1477,11 @@ impl RenderOnce for NodeGraph {
 
         let report = self.on_event.clone();
         let interaction = self.interaction;
+        let starts: HashMap<SharedString, Point<f32>> = self
+            .nodes
+            .iter()
+            .map(|placed| (placed.node.ident().semantic_id(), point(placed.x, placed.y)))
+            .collect();
         let selected: Vec<SharedString> = self
             .nodes
             .iter()
@@ -1268,9 +1492,8 @@ impl RenderOnce for NodeGraph {
             .nodes
             .into_iter()
             .filter(|placed| {
-                geometry
-                    .iter()
-                    .any(|node| node.id == placed.node.ident().semantic_id())
+                let id = placed.node.ident().semantic_id();
+                visible_ids.contains(&id) && geometry.iter().any(|node| node.id == id)
             })
             .map(|placed| {
                 let screen = world_to_screen(point(placed.x, placed.y), viewport);
@@ -1320,6 +1543,7 @@ impl RenderOnce for NodeGraph {
                     .w(px(node.node_width() * viewport.zoom))
                     .child(
                         node.display_at(viewport.zoom, height)
+                            .compact(compact)
                             .pointer_click(pointer_click),
                     );
                 if let Some(measurement) = measurement {
@@ -1342,6 +1566,20 @@ impl RenderOnce for NodeGraph {
                     let down = Rc::clone(&gesture);
                     let start = point(placed.x, placed.y);
                     let drag_id = id.clone();
+                    let peers = if selected.contains(&drag_id) {
+                        selected
+                            .iter()
+                            .filter(|peer| *peer != &drag_id)
+                            .filter_map(|peer| {
+                                starts
+                                    .get(peer)
+                                    .copied()
+                                    .map(|position| (peer.clone(), position))
+                            })
+                            .collect()
+                    } else {
+                        Vec::new()
+                    };
                     card = card.on_mouse_down_with_pointer_capture(
                         MouseButton::Left,
                         move |event, _, cx| {
@@ -1349,6 +1587,7 @@ impl RenderOnce for NodeGraph {
                                 at: event.position,
                                 id: drag_id.clone(),
                                 position: start,
+                                peers: peers.clone(),
                                 moved: false,
                                 extend_selection: event.modifiers.shift
                                     || event.modifiers.secondary(),
@@ -1365,11 +1604,12 @@ impl RenderOnce for NodeGraph {
                             state.gesture = None;
                             return;
                         }
-                        let (id, position) = match state.gesture.as_mut() {
+                        let moves = match state.gesture.as_mut() {
                             Some(Gesture::Node {
                                 at,
                                 id,
                                 position,
+                                peers,
                                 moved,
                                 ..
                             }) => {
@@ -1378,19 +1618,33 @@ impl RenderOnce for NodeGraph {
                                     f32::from(event.position.y - at.y),
                                 );
                                 *moved |= screen_delta.x.abs().max(screen_delta.y.abs()) >= 4.0;
-                                (
+                                let delta = point(
+                                    screen_delta.x / viewport.zoom,
+                                    screen_delta.y / viewport.zoom,
+                                );
+                                let mut moves = vec![(
                                     id.clone(),
-                                    point(
-                                        position.x + screen_delta.x / viewport.zoom,
-                                        position.y + screen_delta.y / viewport.zoom,
-                                    ),
-                                )
+                                    point(position.x + delta.x, position.y + delta.y),
+                                )];
+                                for (peer, start) in peers {
+                                    moves.push((
+                                        peer.clone(),
+                                        point(start.x + delta.x, start.y + delta.y),
+                                    ));
+                                }
+                                moves
                             }
                             _ => return,
                         };
                         drop(state);
                         if moves_nodes {
-                            move_report(&NodeGraphEvent::NodeMoved { id, position }, window, cx);
+                            for (id, position) in moves {
+                                move_report(
+                                    &NodeGraphEvent::NodeMoved { id, position },
+                                    window,
+                                    cx,
+                                );
+                            }
                         }
                         cx.stop_propagation();
                     });
@@ -1423,16 +1677,156 @@ impl RenderOnce for NodeGraph {
             })
             .collect();
 
+        let overview = self
+            .minimap
+            .then(|| graph_minimap(&self.ident, &geometry, viewport, &theme, cx));
+        let group = selected
+            .len()
+            .gt(&1)
+            .then(|| {
+                let members: Vec<_> = geometry
+                    .iter()
+                    .filter(|node| selected.iter().any(|id| id == &node.id))
+                    .collect();
+                let (min, max) =
+                    members
+                        .iter()
+                        .fold(None, |acc: Option<(Point<f32>, Point<f32>)>, node| {
+                            let origin = world_to_screen(node.bounds.origin, viewport);
+                            let far = world_to_screen(
+                                point(
+                                    node.bounds.origin.x + node.bounds.size.width,
+                                    node.bounds.origin.y + node.bounds.size.height,
+                                ),
+                                viewport,
+                            );
+                            Some(match acc {
+                                None => (origin, far),
+                                Some((left, right)) => (
+                                    point(left.x.min(origin.x), left.y.min(origin.y)),
+                                    point(right.x.max(far.x), right.y.max(far.y)),
+                                ),
+                            })
+                        })?;
+                Some(
+                    div()
+                        .absolute()
+                        .left(px(min.x - 8.0))
+                        .top(px(min.y - 8.0))
+                        .w(px((max.x - min.x) + 16.0))
+                        .h(px((max.y - min.y) + 16.0))
+                        .rounded(px(theme.radius(Radius::Card)))
+                        .border_1()
+                        .border_color(theme.colors.accent.opacity(0.55))
+                        .into_any_element(),
+                )
+            })
+            .flatten();
+        let marquee = {
+            let state = gesture.borrow();
+            match &state.gesture {
+                Some(Gesture::Marquee { origin, current }) => {
+                    let frame = measured.get();
+                    let left = f32::from(origin.x.min(current.x) - frame.origin.x);
+                    let top = f32::from(origin.y.min(current.y) - frame.origin.y);
+                    let width = f32::from((origin.x - current.x).abs());
+                    let height = f32::from((origin.y - current.y).abs());
+                    Some(
+                        div()
+                            .absolute()
+                            .left(px(left))
+                            .top(px(top))
+                            .w(px(width))
+                            .h(px(height))
+                            .border_1()
+                            .border_color(theme.colors.accent.opacity(0.7))
+                            .bg(theme.colors.accent.opacity(0.08))
+                            .into_any_element(),
+                    )
+                }
+                _ => None,
+            }
+        };
         frame
             .child(beneath)
             .children(shockwaves)
-            .children(edge_labels)
+            .children(if compact { Vec::new() } else { edge_labels })
+            .children(group)
             .children(cards)
             .children(ports)
             .children(edge_nodes)
+            .children(marquee)
+            .children(overview)
             .semantic_in(cx, spec.value(viewport_value("ready", viewport)))
             .into_any_element()
     }
+}
+
+fn graph_minimap(
+    ident: &Ident,
+    geometry: &[NodeGeometry],
+    viewport: GraphViewport,
+    theme: &gpui_kit_theme::Theme,
+    cx: &mut App,
+) -> AnyElement {
+    let ident = ident.child("minimap");
+    let world: Option<(Point<f32>, Point<f32>)> = geometry.iter().fold(None, |acc, node| {
+        let min = node.bounds.origin;
+        let max = point(
+            node.bounds.origin.x + node.bounds.size.width,
+            node.bounds.origin.y + node.bounds.size.height,
+        );
+        Some(match acc {
+            None => (min, max),
+            Some((left, right)) => (
+                point(left.x.min(min.x), left.y.min(min.y)),
+                point(right.x.max(max.x), right.y.max(max.y)),
+            ),
+        })
+    });
+    let marks = world
+        .map(|(min, max)| {
+            let width = (max.x - min.x).max(1.0);
+            let height = (max.y - min.y).max(1.0);
+            geometry
+                .iter()
+                .map(|node| {
+                    let x = (node.bounds.origin.x - min.x) / width;
+                    let y = (node.bounds.origin.y - min.y) / height;
+                    let w = node.bounds.size.width / width;
+                    let h = node.bounds.size.height / height;
+                    div()
+                        .absolute()
+                        .left(relative(x))
+                        .top(relative(y))
+                        .w(relative(w.max(0.04)))
+                        .h(relative(h.max(0.04)))
+                        .bg(theme.colors.accent.opacity(0.7))
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let _ = viewport;
+    div()
+        .id(ident.element_id())
+        .absolute()
+        .right(px(theme.space(Space::Sm)))
+        .bottom(px(theme.space(Space::Sm)))
+        .w(px(140.0))
+        .h(px(88.0))
+        .radius(theme, Radius::Small)
+        .surface(theme, Surface::Overlay)
+        .border(px(theme.borders.hairline))
+        .border_color(theme.colors.divider)
+        .overflow_hidden()
+        .children(marks)
+        .semantic_in(
+            cx,
+            NodeSpec::new(ident.semantic_id(), Role::Status)
+                .text(cx.strings().text(StringKey::GraphMinimap))
+                .value("minimap"),
+        )
+        .into_any_element()
 }
 
 /// Paints the dot grid the canvas sits on.
@@ -1600,6 +1994,25 @@ mod tests {
     }
 
     #[test]
+    fn layered_layout_puts_dependents_in_later_columns() {
+        let plan = SharedString::from("plan");
+        let apply = SharedString::from("apply");
+        let edge = GraphEdge::new("plan", "apply");
+        let placed = layered_layout([plan.clone(), apply.clone()], [&edge], 280.0, 96.0);
+        let plan_at = placed
+            .iter()
+            .find(|(id, _)| id == &plan)
+            .expect("plan is placed")
+            .1;
+        let apply_at = placed
+            .iter()
+            .find(|(id, _)| id == &apply)
+            .expect("apply is placed")
+            .1;
+        assert!(apply_at.x > plan_at.x);
+    }
+
+    #[test]
     fn a_new_graph_is_ready_and_carries_its_grid() {
         let graph = NodeGraph::new("run");
         assert_eq!(graph.state, GraphState::Ready);
@@ -1609,6 +2022,51 @@ mod tests {
 
     /// The four not-ready states are separate answers and none of them may
     /// collapse into another.
+    #[test]
+    fn a_viewport_names_the_world_it_can_see() {
+        let viewport = GraphViewport::new(point(0.0, 0.0), 1.0);
+        let screen = Bounds::new(point(px(0.0), px(0.0)), size(px(200.0), px(100.0)));
+        let view = world_view(viewport, screen);
+        assert!((view.size.width - 200.0).abs() < 0.01);
+        assert!((view.size.height - 100.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn bounds_that_do_not_overlap_are_culled() {
+        let left = Bounds::new(point(0.0, 0.0), size(10.0, 10.0));
+        let right = Bounds::new(point(100.0, 100.0), size(10.0, 10.0));
+        assert!(!bounds_overlap(left, right, 0.0));
+        assert!(bounds_overlap(left, right, 200.0));
+    }
+
+    #[test]
+    fn a_route_signature_changes_when_a_node_moves() {
+        let theme = gpui_kit_theme::Theme::studio_dark();
+        let placed = Placed::new(GraphNode::new("a", "A"), 0.0, 0.0);
+        let geometry = [NodeGeometry {
+            id: SharedString::from("a"),
+            bounds: placed.bounds(&theme, None),
+            ports: Vec::new(),
+        }];
+        let first = route_signature(&geometry, &[]);
+        let moved = Placed::new(GraphNode::new("a", "A"), 40.0, 0.0);
+        let shifted = [NodeGeometry {
+            id: SharedString::from("a"),
+            bounds: moved.bounds(&theme, None),
+            ports: Vec::new(),
+        }];
+        assert_ne!(first, route_signature(&shifted, &[]));
+        assert_eq!(first, route_signature(&geometry, &[]));
+    }
+
+    #[test]
+    fn compact_lod_begins_below_the_threshold() {
+        let compact = GraphViewport::new(point(0.0, 0.0), LOD_ZOOM - 0.01);
+        let full = GraphViewport::new(point(0.0, 0.0), LOD_ZOOM);
+        assert!(compact.zoom < LOD_ZOOM);
+        assert!(full.zoom >= LOD_ZOOM);
+    }
+
     #[test]
     fn the_canvas_states_stay_distinct() {
         assert_ne!(

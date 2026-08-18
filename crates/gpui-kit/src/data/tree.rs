@@ -15,9 +15,9 @@
 //! ten thousand disclosed rows lays out a viewport's worth. Without it the
 //! tree sizes itself to its content and every disclosed row is laid out.
 //!
-//! Flattening still walks the whole hierarchy each frame, because the caller
-//! hands the tree the nodes rather than a way to ask for one. That is data,
-//! not elements: a [`TreeNode`] holds two strings, an element holds a layout.
+//! Flattening walks the hierarchy when the nodes or the open set change, and
+//! reuses the last walk otherwise. That is still data rather than elements:
+//! a [`TreeNode`] holds two strings, an element holds a layout.
 //!
 //! The tree's semantic node carries the number of disclosed rows in `value`,
 //! which is what keeps three different absences apart: a node under a shut
@@ -34,23 +34,28 @@ use std::ops::Range;
 use std::rc::Rc;
 
 use gpui::{
-    App, InteractiveElement, IntoElement, ListSizingBehavior, ParentElement, RenderOnce,
-    ScrollStrategy, SharedString, StatefulInteractiveElement, Styled, Transformation, Window, div,
-    point, prelude::FluentBuilder, px, radians, uniform_list,
+    AnyElement, App, InteractiveElement, IntoElement, ListSizingBehavior, ParentElement,
+    RenderOnce, ScrollStrategy, SharedString, StatefulInteractiveElement, Styled, Transformation,
+    Window, div, point, prelude::FluentBuilder, px, radians, uniform_list,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Theme, TypeScale};
 
 use crate::data::viewport::scroll_handle;
+use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::icon::flips;
+use crate::display::loading::PulseLoader;
 use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{
     Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedRow, Sizable, StyledExt, text,
 };
 use crate::interaction::dnd::{
     self, DragItem, DropAxis, DropIntent, DropPosition, MakingWay, RowTarget, SurfaceDrag,
 };
+use crate::motion::{self, keyed};
+use crate::strings::{ActiveStrings, StringKey};
 
 type ToggleHandler = Rc<dyn Fn(SharedString, bool, &mut Window, &mut App)>;
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
@@ -66,6 +71,7 @@ pub struct TreeNode {
     icon: Option<Icon>,
     disabled: bool,
     children: Vec<TreeNode>,
+    branch: BranchState,
 }
 
 impl TreeNode {
@@ -76,6 +82,7 @@ impl TreeNode {
             icon: None,
             disabled: false,
             children: Vec::new(),
+            branch: BranchState::Ready,
         }
     }
 
@@ -98,6 +105,38 @@ impl TreeNode {
         self.disabled = disabled;
         self
     }
+
+    /// What is known about this node's children.
+    ///
+    /// [`BranchState::Ready`] with no children is a leaf. Loading or
+    /// unavailable still offers a disclosure, because the host has said there
+    /// is a branch even when it cannot list it yet.
+    pub fn branch(mut self, branch: BranchState) -> Self {
+        self.branch = branch;
+        self
+    }
+}
+
+/// What is known about the children under a node.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum BranchState {
+    /// The children that were handed over are the complete set.
+    #[default]
+    Ready,
+    /// The host is still listing this branch.
+    Loading,
+    /// The host could not list this branch, in its own words.
+    Unavailable(SharedString),
+}
+
+impl BranchState {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Ready => "ready",
+            Self::Loading => "loading",
+            Self::Unavailable(_) => "unavailable",
+        }
+    }
 }
 
 /// A disclosure hierarchy.
@@ -110,6 +149,10 @@ pub struct Tree {
     visible_rows: Option<usize>,
     size: ControlSize,
     disabled: bool,
+    loading: bool,
+    failure: Option<SharedString>,
+    empty: Option<EmptyState>,
+    slots: Slots,
     on_toggle: Option<ToggleHandler>,
     on_select: Option<SelectHandler>,
     reorderable: bool,
@@ -140,6 +183,10 @@ impl Tree {
             visible_rows: None,
             size: ControlSize::Md,
             disabled: false,
+            loading: false,
+            failure: None,
+            empty: None,
+            slots: Slots::default(),
             on_toggle: None,
             on_select: None,
             reorderable: false,
@@ -231,6 +278,33 @@ impl Tree {
         self.on_move = Some(Rc::new(handler));
         self
     }
+
+    /// A first load with nothing to show yet.
+    pub fn loading(mut self, loading: bool) -> Self {
+        self.loading = loading;
+        self
+    }
+
+    /// A refresh that failed. Nodes that are still true stay on screen.
+    pub fn failure(mut self, failure: impl Into<SharedString>) -> Self {
+        self.failure = Some(failure.into());
+        self
+    }
+
+    /// What to show when the query succeeded and returned nothing.
+    pub fn empty(mut self, empty: EmptyState) -> Self {
+        self.empty = Some(empty);
+        self
+    }
+}
+
+impl Slotted for Tree {
+    const SLOTS: &'static [&'static str] =
+        &[slot::EMPTY, slot::FAILED, slot::LOADING, slot::HEADER_EXTRA];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
 }
 
 impl Disableable for Tree {
@@ -260,12 +334,48 @@ struct Visible {
     has_children: bool,
     parent: Option<SharedString>,
     first_child: Option<SharedString>,
+    kind: VisibleKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum VisibleKind {
+    Node,
+    Loading,
+    Unavailable,
 }
 
 /// The nodes a frame shows, in the order the keyboard walks them.
 ///
 /// A collapsed branch contributes only itself, which is why a move never lands
 /// on something the typist cannot see.
+#[derive(Default)]
+struct FlattenCache {
+    fingerprint: u64,
+    rows: Vec<Visible>,
+}
+
+fn fingerprint_tree(nodes: &[TreeNode], expanded: &[SharedString]) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    fn walk(nodes: &[TreeNode], hasher: &mut std::collections::hash_map::DefaultHasher) {
+        for node in nodes {
+            node.id.hash(hasher);
+            node.label.hash(hasher);
+            node.disabled.hash(hasher);
+            node.branch.name().hash(hasher);
+            if let BranchState::Unavailable(reason) = &node.branch {
+                reason.hash(hasher);
+            }
+            walk(&node.children, hasher);
+        }
+    }
+    walk(nodes, &mut hasher);
+    for id in expanded {
+        id.hash(&mut hasher);
+    }
+    hasher.finish()
+}
+
 fn flatten(
     nodes: &[TreeNode],
     expanded: &[SharedString],
@@ -275,7 +385,7 @@ fn flatten(
 ) {
     for node in nodes {
         let open = expanded.contains(&node.id);
-        let has_children = !node.children.is_empty();
+        let has_children = !node.children.is_empty() || !matches!(node.branch, BranchState::Ready);
         out.push(Visible {
             id: node.id.clone(),
             label: node.label.clone(),
@@ -286,9 +396,40 @@ fn flatten(
             has_children,
             parent: parent.cloned(),
             first_child: node.children.first().map(|child| child.id.clone()),
+            kind: VisibleKind::Node,
         });
         if open && has_children {
-            flatten(&node.children, expanded, level + 1, Some(&node.id), out);
+            match &node.branch {
+                BranchState::Loading if node.children.is_empty() => {
+                    out.push(Visible {
+                        id: SharedString::from(format!("{}.loading", node.id)),
+                        label: SharedString::default(),
+                        icon: None,
+                        disabled: true,
+                        level: level + 1,
+                        open: false,
+                        has_children: false,
+                        parent: Some(node.id.clone()),
+                        first_child: None,
+                        kind: VisibleKind::Loading,
+                    });
+                }
+                BranchState::Unavailable(reason) if node.children.is_empty() => {
+                    out.push(Visible {
+                        id: SharedString::from(format!("{}.unavailable", node.id)),
+                        label: reason.clone(),
+                        icon: None,
+                        disabled: true,
+                        level: level + 1,
+                        open: false,
+                        has_children: false,
+                        parent: Some(node.id.clone()),
+                        first_child: None,
+                        kind: VisibleKind::Unavailable,
+                    });
+                }
+                _ => flatten(&node.children, expanded, level + 1, Some(&node.id), out),
+            }
         }
     }
 }
@@ -438,17 +579,89 @@ impl Tree {
             on_drop,
         })
     }
+
+    fn vacant(&mut self, window: &mut Window, cx: &mut App) -> AnyElement {
+        if let Some(replacement) = self
+            .slots
+            .render(slot::LOADING, window, cx)
+            .filter(|_| self.loading)
+        {
+            return replacement;
+        }
+        if self.loading {
+            return PulseLoader::new(self.ident.child("loading"))
+                .label(cx.strings().text(StringKey::TreeLoadingChildren))
+                .into_any_element();
+        }
+        if let Some(failure) = self.failure.clone() {
+            if let Some(replacement) = self.slots.render(slot::FAILED, window, cx) {
+                return replacement;
+            }
+            return EmptyState::new(
+                self.ident.child("empty"),
+                cx.strings().text(StringKey::TreeChildrenUnavailable),
+            )
+            .kind(EmptyKind::Failed)
+            .detail(failure)
+            .into_any_element();
+        }
+        if let Some(replacement) = self.slots.render(slot::EMPTY, window, cx) {
+            return replacement;
+        }
+        match self.empty.take() {
+            Some(empty) => empty.into_any_element(),
+            None => EmptyState::new(
+                self.ident.child("empty"),
+                cx.strings().text(StringKey::TreeEmpty),
+            )
+            .kind(EmptyKind::Empty)
+            .into_any_element(),
+        }
+    }
 }
 
 impl RenderOnce for Tree {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let metrics = theme.control.get(self.size);
+        let extra = self.slots.render(slot::HEADER_EXTRA, window, cx);
+        if self.nodes.is_empty() {
+            let vacant = self.vacant(window, cx);
+            return div()
+                .id(self.ident.element_id())
+                .column()
+                .w_full()
+                .children(extra)
+                .child(vacant)
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(self.ident.semantic_id(), Role::Tree)
+                        .value("0")
+                        .busy(self.loading),
+                )
+                .into_any_element();
+        }
         let reorder = self.reorder(window, cx);
-        let mut visible = Vec::new();
-        flatten(&self.nodes, &self.expanded, 1, None, &mut visible);
+        let cache = keyed::slot::<FlattenCache>(&self.ident.child("flatten").semantic_id(), cx);
+        let fingerprint = fingerprint_tree(&self.nodes, &self.expanded);
+        let visible = {
+            let mut cache = cache.borrow_mut();
+            if cache.fingerprint == fingerprint && !cache.rows.is_empty() {
+                cache.rows.clone()
+            } else {
+                let mut visible = Vec::new();
+                flatten(&self.nodes, &self.expanded, 1, None, &mut visible);
+                cache.fingerprint = fingerprint;
+                cache.rows = visible.clone();
+                visible
+            }
+        };
 
-        let mut stack = div().id(self.ident.element_id()).column().w_full();
+        let mut stack = div()
+            .id(self.ident.element_id())
+            .column()
+            .w_full()
+            .children(extra);
 
         // A tree that draws only its viewport can still be walked end to end,
         // because the keyboard moves over the flattened rows rather than over
@@ -559,10 +772,12 @@ impl RenderOnce for Tree {
             }
         }
 
-        stack.semantic_in(
-            cx,
-            NodeSpec::new(self.ident.semantic_id(), Role::Tree).value(count.to_string()),
-        )
+        stack
+            .semantic_in(
+                cx,
+                NodeSpec::new(self.ident.semantic_id(), Role::Tree).value(count.to_string()),
+            )
+            .into_any_element()
     }
 }
 
@@ -593,6 +808,9 @@ impl Rows {
         window: &mut Window,
         cx: &mut App,
     ) -> gpui::AnyElement {
+        if node.kind != VisibleKind::Node {
+            return self.status_row(node, theme, icon_size, cx);
+        }
         let ident = self.ident.child(node.id.as_ref());
         let selected = self.selected.as_ref() == Some(&node.id);
         let disabled = self.disabled || node.disabled;
@@ -779,6 +997,72 @@ impl Rows {
             None => row.into_any_element(),
         }
     }
+
+    fn status_row(
+        &self,
+        node: &Visible,
+        theme: &Theme,
+        icon_size: f32,
+        cx: &mut App,
+    ) -> AnyElement {
+        let ident = self.ident.child(node.id.as_ref());
+        let (label, value, busy) = match node.kind {
+            VisibleKind::Loading => (
+                cx.strings().text(StringKey::TreeLoadingChildren),
+                "loading",
+                true,
+            ),
+            VisibleKind::Unavailable => (
+                if node.label.is_empty() {
+                    cx.strings().text(StringKey::TreeChildrenUnavailable)
+                } else {
+                    node.label.clone()
+                },
+                "unavailable",
+                false,
+            ),
+            VisibleKind::Node => unreachable!("status rows are not nodes"),
+        };
+        let color = theme.colors.text_faint;
+        motion::surface_in(
+            ident.element_id(),
+            theme,
+            div()
+                .id(ident.element_id())
+                .row()
+                .w_full()
+                .h(px(theme.control.get(self.size).height))
+                .ps(
+                    cx.layout_direction(),
+                    px(theme.space(Space::Sm)
+                        + node.level.saturating_sub(1) as f32 * theme.space(Space::Md)),
+                )
+                .gap(px(theme.space(Space::Xs)))
+                .opacity(theme.opacity.muted)
+                .child(div().flex_none().size(px(icon_size)))
+                .child(
+                    text(theme, TypeScale::Caption, label.clone())
+                        .flex_1()
+                        .text_color(color),
+                )
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(ident.semantic_id(), Role::Status)
+                        .parent(
+                            node.parent
+                                .as_ref()
+                                .map_or(self.ident.semantic_id(), |parent| {
+                                    self.ident.child(parent.as_ref()).semantic_id()
+                                }),
+                        )
+                        .text(label)
+                        .value(value)
+                        .busy(busy)
+                        .level(node.level),
+                ),
+        )
+        .into_any_element()
+    }
 }
 
 #[cfg(test)]
@@ -803,6 +1087,16 @@ mod tests {
         let mut out = Vec::new();
         flatten(&sample(), &expanded, 1, None, &mut out);
         out
+    }
+
+    #[test]
+    fn a_tree_fingerprint_changes_only_when_the_nodes_or_open_set_do() {
+        let nodes = sample();
+        let first = fingerprint_tree(&nodes, &[]);
+        let again = fingerprint_tree(&nodes, &[]);
+        let opened = fingerprint_tree(&nodes, &[SharedString::from("workspace")]);
+        assert_eq!(first, again);
+        assert_ne!(first, opened);
     }
 
     #[test]
@@ -858,6 +1152,28 @@ mod tests {
             Some(Move::Select(id)) => assert_eq!(id.as_ref(), "src"),
             _ => panic!("right must descend into an open branch"),
         }
+    }
+
+    #[test]
+    fn a_loading_branch_keeps_a_disclosure_and_a_status_row() {
+        let nodes = [TreeNode::new("src", "src").branch(BranchState::Loading)];
+        let expanded = [SharedString::from("src")];
+        let mut out = Vec::new();
+        flatten(&nodes, &expanded, 1, None, &mut out);
+        assert!(out[0].has_children);
+        assert_eq!(out[1].kind, VisibleKind::Loading);
+        assert_eq!(out[1].parent.as_deref(), Some("src"));
+    }
+
+    #[test]
+    fn an_unavailable_branch_publishes_the_refusal() {
+        let nodes =
+            [TreeNode::new("src", "src").branch(BranchState::Unavailable("host refused".into()))];
+        let expanded = [SharedString::from("src")];
+        let mut out = Vec::new();
+        flatten(&nodes, &expanded, 1, None, &mut out);
+        assert_eq!(out[1].kind, VisibleKind::Unavailable);
+        assert_eq!(out[1].label.as_ref(), "host refused");
     }
 
     #[test]

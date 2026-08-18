@@ -1,0 +1,259 @@
+//! An **editable** markdown document.
+//!
+//! This is the model behind a markdown document a user can change and save
+//! back out again: text goes in, blocks split and merge, and the result is
+//! written to markdown that reads back as the same document. Its sibling
+//! [`super::parse`] is a different thing entirely — a read-only render tree,
+//! built to be drawn and never written.
+//!
+//! The two are deliberately separate, and neither can do the other's job. A
+//! render tree is nested CommonMark: a list inside a quote inside a list is a
+//! structure, which is exactly what a renderer needs to lay out and exactly
+//! what makes every edit a restructure. This model is a **flat** list of
+//! [`Block`]s carrying an indent level, so Enter splits, Backspace merges, and
+//! Tab indents — all list operations, all local. Collapsing them into one type
+//! would cost the renderer its nesting or the editor its flatness.
+//!
+//! The trade is that arbitrarily nested CommonMark does not survive a round
+//! trip here: a list inside a quote inside a list flattens. What is guaranteed
+//! is [`write`]'s fixed point — parse, serialize, parse again, and the
+//! document is unchanged — so an edit/save cycle never drifts.
+//!
+//! Ported from the MIT-licensed `crabtalk/bezel` markdown crate; the import is
+//! recorded in `PROVENANCE.md`.
+
+pub mod edit;
+pub mod read;
+pub mod write;
+
+pub use edit::{Cursor, Shortcut, shortcut};
+pub use read::parse;
+pub use write::serialize;
+
+use std::ops::Range;
+
+/// A markdown document: blocks in document order.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Doc {
+    pub blocks: Vec<Block>,
+}
+
+impl Doc {
+    /// Make each run of ordered items consecutive.
+    ///
+    /// Markdown honours only the *first* number in a list — `1.` followed by `9.`
+    /// renders as 1, 2. Two source lists that used different delimiters (`1.` then
+    /// `9)`) are separate lists, but a flat document has no list identity to
+    /// preserve, so they serialize as one and the second item's number would move
+    /// on the next read. Deciding it here means the document already holds what the
+    /// next parse would produce.
+    pub(crate) fn renumber(&mut self) {
+        // The number owed to the next ordered item at each indent level. A run
+        // survives blocks nested under it and ends at anything else.
+        let mut expected: Vec<Option<u64>> = Vec::new();
+        for block in &mut self.blocks {
+            let indent = block.indent as usize;
+            expected.truncate(indent + 1);
+            expected.resize(indent + 1, None);
+
+            if let BlockKind::Ordered { number, .. } = &mut block.kind {
+                if let Some(next) = expected[indent] {
+                    *number = next;
+                }
+                expected[indent] = Some(number.saturating_add(1));
+            } else {
+                expected[indent] = None;
+            }
+        }
+    }
+}
+
+/// One block, and how deeply it is nested.
+///
+/// `indent` obeys one invariant, established by the parser and relied on by
+/// the serializer: the first block is at 0, and no block is more than one
+/// level deeper than the block before it. A document that satisfies it always
+/// serializes to markdown that parses back to the same indents.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Block {
+    pub kind: BlockKind,
+    pub indent: u8,
+}
+
+impl Block {
+    pub fn new(kind: BlockKind) -> Self {
+        Self { kind, indent: 0 }
+    }
+
+    pub fn at(kind: BlockKind, indent: u8) -> Self {
+        Self { kind, indent }
+    }
+
+    /// The block's editable inline content, if it has any. `None` for the
+    /// blocks an editor treats as atomic (code, images, rules) and for tables,
+    /// whose cells are edited individually.
+    pub fn text(&self) -> Option<&Text> {
+        match &self.kind {
+            BlockKind::Paragraph(text)
+            | BlockKind::Heading { text, .. }
+            | BlockKind::Bullet(text)
+            | BlockKind::Ordered { text, .. }
+            | BlockKind::Task { text, .. }
+            | BlockKind::Quote(text) => Some(text),
+            BlockKind::Code { .. }
+            | BlockKind::Image { .. }
+            | BlockKind::Table { .. }
+            | BlockKind::Rule => None,
+        }
+    }
+}
+
+/// The block vocabulary. Closed by design — it is exactly what a block
+/// editor's insert menu offers, and a consumer that needs a block of its own is
+/// a reason to widen this enum rather than to grow an extension system.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BlockKind {
+    Paragraph(Text),
+    Heading {
+        /// 1–6.
+        level: u8,
+        text: Text,
+    },
+    Bullet(Text),
+    Ordered {
+        /// The rendered number. Stored rather than derived so a list starting
+        /// at 3 survives the round trip.
+        number: u64,
+        text: Text,
+    },
+    Task {
+        checked: bool,
+        text: Text,
+    },
+    Quote(Text),
+    Code {
+        language: Option<String>,
+        code: String,
+    },
+    Image {
+        url: String,
+        alt: String,
+    },
+    Table {
+        align: Vec<Align>,
+        header: Vec<Text>,
+        rows: Vec<Vec<Text>>,
+    },
+    Rule,
+}
+
+/// GFM column alignment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Align {
+    #[default]
+    Left,
+    Center,
+    Right,
+}
+
+/// Inline content: a string, plus marks over byte ranges of it.
+///
+/// Marks are a separate list rather than flags on a run because an editor has
+/// to *map* them through insertions and deletions, and because run flags lose
+/// nesting order — under flags `**_x_**` and `_**x**_` are the same value.
+/// Here they differ by the order of the two spans, and both survive a round
+/// trip.
+///
+/// A newline in `text` is a line break within the block (markdown's soft or
+/// hard break, which this model does not distinguish). Whether it paints as a
+/// break or a space is a rendering decision.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Text {
+    pub text: String,
+    /// Outermost first. Ranges may overlap and may be identical.
+    pub marks: Vec<MarkSpan>,
+}
+
+impl Text {
+    /// Unmarked text.
+    pub fn plain(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            marks: Vec::new(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.text.is_empty()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MarkSpan {
+    pub range: Range<usize>,
+    pub mark: Mark,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Mark {
+    Bold,
+    Italic,
+    Strike,
+    Code,
+    Link(String),
+    /// An image among text. [`BlockKind::Image`] is the shape an editor offers;
+    /// this is what keeps `see ![x](u) here` from silently becoming a link when
+    /// the document is saved.
+    Image(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn text_accessor_covers_every_kind() {
+        // The match in `Block::text` is exhaustive; this pins which side each
+        // kind falls on, so adding a variant is a deliberate choice.
+        let with_text = [
+            BlockKind::Paragraph(Text::plain("a")),
+            BlockKind::Heading {
+                level: 1,
+                text: Text::plain("a"),
+            },
+            BlockKind::Bullet(Text::plain("a")),
+            BlockKind::Ordered {
+                number: 1,
+                text: Text::plain("a"),
+            },
+            BlockKind::Task {
+                checked: false,
+                text: Text::plain("a"),
+            },
+            BlockKind::Quote(Text::plain("a")),
+        ];
+        for kind in with_text {
+            assert!(Block::new(kind).text().is_some());
+        }
+
+        let atomic = [
+            BlockKind::Code {
+                language: None,
+                code: String::new(),
+            },
+            BlockKind::Image {
+                url: String::new(),
+                alt: String::new(),
+            },
+            BlockKind::Table {
+                align: Vec::new(),
+                header: Vec::new(),
+                rows: Vec::new(),
+            },
+            BlockKind::Rule,
+        ];
+        for kind in atomic {
+            assert!(Block::new(kind).text().is_none());
+        }
+    }
+}

@@ -40,5 +40,7 @@ mod graph;
 mod node;
 
 pub use edge::{EdgeKind, GraphEdge, GraphEndpoint, PortSide};
-pub use graph::{GraphInteraction, GraphState, GraphViewport, NodeGraph, NodeGraphEvent, Placed};
+pub use graph::{
+    GraphInteraction, GraphState, GraphViewport, NodeGraph, NodeGraphEvent, Placed, layered_layout,
+};
 pub use node::{Diff, GraphNode, GraphPort, NODE_WIDTH, NodeMetric, NodeState, PortDirection};

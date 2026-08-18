@@ -776,6 +776,37 @@ mod tests {
     use gpui::{FontRun, GlyphId, PlatformTextSystem, font, px};
 
     #[test]
+    fn rasterize_glyph_produces_coverage_at_every_dilation() {
+        use gpui::{Point, RenderGlyphParams};
+        let fonts = MacTextSystem::new();
+        let font_id = fonts
+            .font_id(&font("Helvetica"))
+            .expect("required framework invariant must hold");
+        for dilation in [0u8, 2, 4] {
+            let params = RenderGlyphParams {
+                font_id,
+                glyph_id: GlyphId(68), // 'a'
+                font_size: px(16.),
+                subpixel_variant: Point::default(),
+                scale_factor: 2.0,
+                is_emoji: false,
+                subpixel_rendering: false,
+                dilation,
+            };
+            let bounds = fonts
+                .glyph_raster_bounds(&params)
+                .expect("raster bounds should exist");
+            let (_, bytes) = fonts
+                .rasterize_glyph(&params, bounds)
+                .expect("rasterization should succeed");
+            assert!(
+                bytes.iter().any(|byte| *byte != 0),
+                "dilation {dilation}: all-zero glyph bitmap"
+            );
+        }
+    }
+
+    #[test]
     fn test_layout_line_bom_char() {
         let fonts = MacTextSystem::new();
         let font_id = fonts

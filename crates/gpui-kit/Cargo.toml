@@ -11,7 +11,7 @@ rust-version.workspace = true
 name = "gpui_kit"
 
 [features]
-default = ["native-media"]
+default = ["native-media", "terminal"]
 # The reference calendar the datetime scenes and tests run on. Off by default,
 # so a host cannot reach a fixture calendar from the component path.
 fixtures = []
@@ -21,9 +21,16 @@ native-media = ["media/native-playback"]
 # Deterministic, pure-Rust `.lottie` decoding and raster sampling. The public
 # effects contracts and particle/poster fallbacks remain available without it.
 dotlottie = ["dep:base64", "dep:image", "dep:rasterlottie", "dep:zip"]
+# The terminal grid, and the `alacritty_terminal` escape-sequence state machine
+# under it. On by default so the gate, the gallery and the visual baselines all
+# cover it; a host that wants none of it turns default features off. The
+# dependency parses bytes and holds grid state — it opens no pty and spawns no
+# process, which stays the host's job.
+terminal = ["dep:alacritty_terminal"]
 
 [dependencies]
 unicode-segmentation.workspace = true
+alacritty_terminal = { workspace = true, optional = true }
 base64 = { workspace = true, optional = true }
 gpui.workspace = true
 gpui-kit-assets.workspace = true

@@ -77,6 +77,7 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                 NodeGraph::new("scene.graph")
                     .viewport(viewport)
                     .zoom_range(0.55, 1.8)
+                    .minimap(true)
                     .when(
                         !deleted.iter().any(|id| id == "scene.graph.ingest"),
                         |graph| {

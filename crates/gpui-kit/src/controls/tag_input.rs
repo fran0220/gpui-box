@@ -6,10 +6,12 @@
 //! it refuses out loud: a keystroke that vanishes without a word is
 //! indistinguishable from a broken field.
 
+use std::rc::Rc;
+
 use gpui::{
     App, AppContext as _, Context, Entity, EventEmitter, FocusHandle, Focusable,
-    InteractiveElement, IntoElement, ParentElement, Render, SharedString, Styled, Subscription,
-    Window, div, prelude::FluentBuilder, px,
+    InteractiveElement, IntoElement, ParentElement, Render, SharedString,
+    StatefulInteractiveElement, Styled, Subscription, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TypeScale};
@@ -20,7 +22,8 @@ use crate::display::tag::Tag;
 use crate::foundation::{
     Disableable, Ident, Selectable, Sizable, StyledExt, text as foundation_text,
 };
-use crate::strings::{ActiveStrings, StringKey};
+use crate::interaction::dnd::{self, DragItem, DropAxis, DropIntent, DropPosition, RowTarget};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// What a tag field reports. The owner decides what any of it means.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,6 +37,10 @@ pub enum TagInputEvent {
     Duplicate(SharedString),
     /// The set is already as large as it was allowed to be.
     Refused(SharedString),
+    /// A tag should move from `from` to `to`. The field does not move it.
+    Moved { from: usize, to: usize },
+    /// The typist asked to edit this tag in place.
+    EditRequested(SharedString),
 }
 
 impl EventEmitter<TagInputEvent> for TagInput {}
@@ -57,6 +64,8 @@ pub struct TagInput {
     targeted: Option<SharedString>,
     /// What the control last refused, in the words it will show.
     refusal: Option<SharedString>,
+    reorderable: bool,
+    collapse_at: Option<usize>,
     /// Held so the field subscription lives as long as the control does.
     _subscriptions: Vec<Subscription>,
 }
@@ -98,6 +107,8 @@ impl TagInput {
             invalid: false,
             targeted: None,
             refusal: None,
+            reorderable: false,
+            collapse_at: None,
             _subscriptions: vec![subscription],
         }
     }
@@ -121,6 +132,18 @@ impl TagInput {
 
     pub fn invalid(mut self, invalid: bool) -> Self {
         self.invalid = invalid;
+        self
+    }
+
+    /// Lets a tag be picked up and put somewhere else in the set.
+    pub fn reorderable(mut self, reorderable: bool) -> Self {
+        self.reorderable = reorderable;
+        self
+    }
+
+    /// How many tags stay visible before the rest collapse into a count.
+    pub fn collapse_at(mut self, visible: usize) -> Self {
+        self.collapse_at = Some(visible.max(1));
         self
     }
 
@@ -293,23 +316,104 @@ impl Render for TagInput {
         let full = self.is_full();
 
         let control = cx.entity().downgrade();
-        let tags = self
-            .tags
+        let (visible, hidden) = match self.collapse_at {
+            Some(max) if self.tags.len() > max => (&self.tags[..max], self.tags.len() - max),
+            _ => (self.tags.as_slice(), 0),
+        };
+        let surface = self.ident.semantic_id();
+        let tags = visible
             .iter()
-            .map(|tag_value| {
+            .enumerate()
+            .map(|(index, tag_value)| {
                 let ident = self.ident.child(tag_value.as_ref());
                 let removing = tag_value.clone();
                 let control = control.clone();
-                Tag::new(ident, tag_value.clone())
+                let tag = Tag::new(ident.clone(), tag_value.clone())
                     .selected(self.targeted.as_ref() == Some(tag_value))
                     .disabled(self.disabled)
-                    .on_remove(move |_window, cx| {
-                        control
-                            .update(cx, |tags, cx| tags.remove(removing.clone(), cx))
-                            .ok();
-                    })
+                    .on_remove({
+                        let control = control.clone();
+                        move |_window, cx| {
+                            control
+                                .update(cx, |tags, cx| tags.remove(removing.clone(), cx))
+                                .ok();
+                        }
+                    });
+                let editing = tag_value.clone();
+                let mut chip = div()
+                    .id(ident.child("chip").element_id())
+                    .child(tag)
+                    .on_click({
+                        let control = control.clone();
+                        move |event, _, cx| {
+                            if event.click_count() == 2 {
+                                control
+                                    .update(cx, |_, cx| {
+                                        cx.emit(TagInputEvent::EditRequested(editing.clone()));
+                                    })
+                                    .ok();
+                                cx.stop_propagation();
+                            }
+                        }
+                    });
+                if !self.disabled && self.reorderable {
+                    let item = DragItem::new(surface.clone(), tag_value.clone(), tag_value.clone());
+                    chip = dnd::draggable(chip, item);
+                    let accepts = {
+                        let own = surface.clone();
+                        Rc::new(move |item: &DragItem, _: &DropPosition| item.source == own)
+                    };
+                    let on_drop = {
+                        let control = control.clone();
+                        let tags = self.tags.clone();
+                        Rc::new(
+                            move |intent: &DropIntent, _window: &mut Window, cx: &mut App| {
+                                let from = tags.iter().position(|tag| tag == &intent.item.id);
+                                let to = match &intent.position {
+                                    DropPosition::Before(id) => {
+                                        tags.iter().position(|tag| tag == id)
+                                    }
+                                    DropPosition::After(id) => {
+                                        tags.iter().position(|tag| tag == id).map(|at| at + 1)
+                                    }
+                                    DropPosition::Into(_) => None,
+                                };
+                                if let (Some(from), Some(to)) = (from, to) {
+                                    control
+                                        .update(cx, |_, cx| {
+                                            cx.emit(TagInputEvent::Moved { from, to });
+                                        })
+                                        .ok();
+                                }
+                            },
+                        )
+                    };
+                    chip = dnd::drop_target(
+                        chip,
+                        RowTarget {
+                            surface: surface.clone(),
+                            id: tag_value.clone(),
+                            index,
+                            allow_into: false,
+                            axis: DropAxis::Horizontal,
+                            accepts,
+                            on_drop,
+                        },
+                    );
+                }
+                chip
             })
             .collect::<Vec<_>>();
+        let overflow = (hidden > 0).then(|| {
+            Tag::new(
+                self.ident.child("overflow"),
+                cx.strings().format(
+                    StringKey::TagInputOverflow,
+                    &[cx.numbers().count(hidden).as_ref()],
+                ),
+            )
+            .disabled(true)
+        });
 
         let count = self.tags.len();
         let mut spec = NodeSpec::new(self.ident.semantic_id(), Role::Group)
@@ -317,8 +421,8 @@ impl Render for TagInput {
             .invalid(invalid)
             .focus(&self.field.read(cx).focus_handle(cx))
             .value(SharedString::from(match self.max {
-                Some(max) => format!("{count} of {max}"),
-                None => count.to_string(),
+                Some(max) => cx.numbers().count_of_total(count, max).to_string(),
+                None => cx.numbers().count(count).to_string(),
             }));
         if let Some(refusal) = self.refusal.clone() {
             spec = spec.text(refusal);
@@ -343,6 +447,7 @@ impl Render for TagInput {
                 .py(px(theme.space(Space::Xs)))
                 .gap(px(theme.space(Space::Xs)))
                 .children(tags)
+                .children(overflow)
                 .child(div().flex_1().min_w(px(80.0)).child(self.field.clone())),
             )
             .children(self.refusal.clone().map(|refusal| {
@@ -364,8 +469,8 @@ impl Render for TagInput {
                         cx.strings().format(
                             StringKey::TagInputUsed,
                             &[
-                                &count.to_string(),
-                                &self.max.unwrap_or_default().to_string(),
+                                cx.numbers().count(count).as_ref(),
+                                cx.numbers().count(self.max.unwrap_or_default()).as_ref(),
                             ],
                         ),
                     )

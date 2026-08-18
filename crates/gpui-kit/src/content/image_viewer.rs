@@ -732,16 +732,23 @@ impl RenderOnce for ImageViewer {
 
         // Every number here is one the host stated. A source nobody measured
         // says so, rather than reporting the box it was drawn in.
+        let numbers = cx.numbers();
         let measurement = match (frame.natural, geometry) {
-            (Some(natural), Some(geometry)) => SharedString::from(format!(
-                "{} × {} · {}%",
-                natural.width,
-                natural.height,
-                (geometry.scale * 100.0).round() as i64
-            )),
-            (Some(natural), None) => {
-                SharedString::from(format!("{} × {}", natural.width, natural.height))
-            }
+            (Some(natural), Some(geometry)) => strings.format(
+                StringKey::ImageViewerMeasurement,
+                &[
+                    numbers.count(natural.width as usize).as_ref(),
+                    numbers.count(natural.height as usize).as_ref(),
+                    numbers.percent(geometry.scale).as_ref(),
+                ],
+            ),
+            (Some(natural), None) => strings.format(
+                StringKey::ImageViewerDimensions,
+                &[
+                    numbers.count(natural.width as usize).as_ref(),
+                    numbers.count(natural.height as usize).as_ref(),
+                ],
+            ),
             _ => strings.text(StringKey::ImageViewerSizeUnknown),
         };
 

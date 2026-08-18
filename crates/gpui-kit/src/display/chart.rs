@@ -19,8 +19,8 @@ use std::rc::Rc;
 
 use gpui::{
     AnyElement, App, Bounds, CursorStyle, Hsla, InteractiveElement, IntoElement, ParentElement,
-    PathBuilder, Pixels, Point, RenderOnce, SharedString, Styled, Window, canvas, div,
-    linear_color_stop, linear_gradient_stops, point, px, relative,
+    PathBuilder, Pixels, Point, RenderOnce, SharedString, StatefulInteractiveElement, Styled,
+    Window, canvas, div, linear_color_stop, linear_gradient_stops, point, px, relative,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
@@ -46,6 +46,7 @@ pub struct ChartPoint {
     pub position: SparklinePoint,
     pub label: SharedString,
     pub value: SharedString,
+    pub weight: Option<f32>,
 }
 
 impl ChartPoint {
@@ -61,7 +62,15 @@ impl ChartPoint {
             position: SparklinePoint::new(x, y),
             label: label.into(),
             value: value.into(),
+            weight: None,
         }
+    }
+
+    /// Normalized bubble radius for a scatter reading. The host already
+    /// decided the mapping; this is only how large the mark is drawn.
+    pub fn weight(mut self, weight: f32) -> Self {
+        self.weight = Some(weight.clamp(0.0, 1.0));
+        self
     }
 
     pub fn is_bounded(&self) -> bool {
@@ -364,6 +373,7 @@ pub struct LineChart {
     axes: ChartAxes,
     state: ChartState,
     area: bool,
+    smooth: bool,
     crosshair: bool,
     current: Option<ChartSelection>,
     on_current: Option<CurrentHandler>,
@@ -377,6 +387,7 @@ impl LineChart {
             axes: ChartAxes::default(),
             state,
             area: false,
+            smooth: false,
             crosshair: false,
             current: None,
             on_current: None,
@@ -392,6 +403,13 @@ impl LineChart {
     /// gradient derived from that series' caller-owned colour.
     pub fn area(mut self) -> Self {
         self.area = true;
+        self
+    }
+
+    /// Interpolates each series with a Catmull-Rom spline instead of
+    /// polyline segments.
+    pub fn smooth(mut self) -> Self {
+        self.smooth = true;
         self
     }
 
@@ -441,6 +459,8 @@ impl RenderOnce for LineChart {
                         active,
                         stale.cloned(),
                         self.area,
+                        self.smooth,
+                        false,
                         self.crosshair,
                         self.current,
                         self.on_current,
@@ -454,6 +474,205 @@ impl RenderOnce for LineChart {
             None => line_like_state(&self.ident, &self.label, &self.state, cx),
         };
 
+        div()
+            .w_full()
+            .font_fallbacks(gpui_kit_assets::text_fallbacks())
+            .child(body)
+            .semantic_in(cx, spec)
+    }
+}
+
+/// A filled area chart over one or more host-owned series.
+///
+/// Geometry is the same unit interval [`LineChart`] uses. The fill and the
+/// optional Catmull-Rom stroke are presentation; they invent no domain.
+#[derive(IntoElement)]
+pub struct AreaChart {
+    ident: Ident,
+    label: SharedString,
+    axes: ChartAxes,
+    state: ChartState,
+    smooth: bool,
+    crosshair: bool,
+    current: Option<ChartSelection>,
+    on_current: Option<CurrentHandler>,
+}
+
+impl AreaChart {
+    pub fn new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: ChartState) -> Self {
+        Self {
+            ident: ident.into(),
+            label: label.into(),
+            axes: ChartAxes::default(),
+            state,
+            smooth: true,
+            crosshair: false,
+            current: None,
+            on_current: None,
+        }
+    }
+
+    pub fn axes(mut self, axes: ChartAxes) -> Self {
+        self.axes = axes;
+        self
+    }
+
+    pub fn polyline(mut self) -> Self {
+        self.smooth = false;
+        self
+    }
+
+    pub fn crosshair(mut self) -> Self {
+        self.crosshair = true;
+        self
+    }
+
+    pub fn current(
+        mut self,
+        series_id: impl Into<SharedString>,
+        point_id: impl Into<SharedString>,
+    ) -> Self {
+        self.current = Some(ChartSelection::new(series_id, point_id));
+        self.crosshair = true;
+        self
+    }
+
+    pub fn on_current(
+        mut self,
+        handler: impl Fn(ChartSelection, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_current = Some(Rc::new(handler));
+        self.crosshair = true;
+        self
+    }
+}
+
+impl RenderOnce for AreaChart {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let theme = cx.theme().clone();
+        let (body, spec): (AnyElement, NodeSpec) = match self.state.visible_series() {
+            Some((series, stale)) => {
+                let active = active_points(series, &theme);
+                let count = active.len();
+                (
+                    ready_chart(
+                        &self.ident,
+                        &self.label,
+                        &self.axes,
+                        series,
+                        active,
+                        stale.cloned(),
+                        true,
+                        self.smooth,
+                        false,
+                        self.crosshair,
+                        self.current,
+                        self.on_current,
+                        &theme,
+                        window,
+                        cx,
+                    ),
+                    chart_spec(&self.ident, &self.label, &self.state, count, stale),
+                )
+            }
+            None => line_like_state(&self.ident, &self.label, &self.state, cx),
+        };
+        div()
+            .w_full()
+            .font_fallbacks(gpui_kit_assets::text_fallbacks())
+            .child(body)
+            .semantic_in(cx, spec)
+    }
+}
+
+/// Scatter or bubble marks over one or more host-owned series.
+///
+/// Each point's optional [`ChartPoint::weight`] is a normalized radius. The
+/// host already mapped the quantity; this only sizes the mark.
+#[derive(IntoElement)]
+pub struct ScatterChart {
+    ident: Ident,
+    label: SharedString,
+    axes: ChartAxes,
+    state: ChartState,
+    crosshair: bool,
+    current: Option<ChartSelection>,
+    on_current: Option<CurrentHandler>,
+}
+
+impl ScatterChart {
+    pub fn new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: ChartState) -> Self {
+        Self {
+            ident: ident.into(),
+            label: label.into(),
+            axes: ChartAxes::default(),
+            state,
+            crosshair: false,
+            current: None,
+            on_current: None,
+        }
+    }
+
+    pub fn axes(mut self, axes: ChartAxes) -> Self {
+        self.axes = axes;
+        self
+    }
+
+    pub fn crosshair(mut self) -> Self {
+        self.crosshair = true;
+        self
+    }
+
+    pub fn current(
+        mut self,
+        series_id: impl Into<SharedString>,
+        point_id: impl Into<SharedString>,
+    ) -> Self {
+        self.current = Some(ChartSelection::new(series_id, point_id));
+        self.crosshair = true;
+        self
+    }
+
+    pub fn on_current(
+        mut self,
+        handler: impl Fn(ChartSelection, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_current = Some(Rc::new(handler));
+        self.crosshair = true;
+        self
+    }
+}
+
+impl RenderOnce for ScatterChart {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let theme = cx.theme().clone();
+        let (body, spec): (AnyElement, NodeSpec) = match self.state.visible_series() {
+            Some((series, stale)) => {
+                let active = active_points(series, &theme);
+                let count = active.len();
+                (
+                    ready_chart(
+                        &self.ident,
+                        &self.label,
+                        &self.axes,
+                        series,
+                        active,
+                        stale.cloned(),
+                        false,
+                        false,
+                        true,
+                        self.crosshair,
+                        self.current,
+                        self.on_current,
+                        &theme,
+                        window,
+                        cx,
+                    ),
+                    chart_spec(&self.ident, &self.label, &self.state, count, stale),
+                )
+            }
+            None => line_like_state(&self.ident, &self.label, &self.state, cx),
+        };
         div()
             .w_full()
             .font_fallbacks(gpui_kit_assets::text_fallbacks())
@@ -750,6 +969,8 @@ fn ready_chart(
     active: Vec<ActivePoint>,
     stale: Option<SharedString>,
     area: bool,
+    smooth: bool,
+    scatter: bool,
     crosshair: bool,
     declared: Option<ChartSelection>,
     report: Option<CurrentHandler>,
@@ -805,13 +1026,35 @@ fn ready_chart(
             .read_only(true)
     };
 
-    let chart_canvas = line_canvas(
-        painted,
-        stroke,
-        area,
-        crosshair_position,
-        theme.colors.hairline_strong,
-    );
+    let weights: HashMap<ChartSelection, f32> = active
+        .iter()
+        .filter_map(|point| {
+            point
+                .point
+                .weight
+                .map(|weight| (point.selection.clone(), weight))
+        })
+        .collect();
+    let chart_canvas = if scatter {
+        scatter_canvas(
+            painted,
+            weights,
+            stroke,
+            crosshair_position,
+            theme.colors.hairline_strong,
+        )
+        .into_any_element()
+    } else {
+        line_canvas(
+            painted,
+            stroke,
+            area,
+            smooth,
+            crosshair_position,
+            theme.colors.hairline_strong,
+        )
+        .into_any_element()
+    };
     let current_tip = current.as_ref().map(|current| {
         current_tooltip(
             ident,
@@ -1188,10 +1431,111 @@ fn ready_bars(
         .into_any_element()
 }
 
+fn trace_series(
+    builder: &mut PathBuilder,
+    samples: &[Point<f32>],
+    smooth: bool,
+    at: &impl Fn(Point<f32>) -> Point<Pixels>,
+) {
+    if samples.is_empty() {
+        return;
+    }
+    builder.line_to(at(samples[0]));
+    if !smooth || samples.len() < 3 {
+        for sample in samples.iter().skip(1) {
+            builder.line_to(at(*sample));
+        }
+        return;
+    }
+    for index in 0..samples.len() - 1 {
+        let first = samples[index.saturating_sub(1)];
+        let second = samples[index];
+        let third = samples[index + 1];
+        let fourth = samples[usize::min(index + 2, samples.len() - 1)];
+        let control_a = point(
+            second.x + (third.x - first.x) / 6.0,
+            second.y + (third.y - first.y) / 6.0,
+        );
+        let control_b = point(
+            third.x - (fourth.x - second.x) / 6.0,
+            third.y - (fourth.y - second.y) / 6.0,
+        );
+        builder.cubic_bezier_to(at(third), at(control_a), at(control_b));
+    }
+}
+
+fn scatter_canvas(
+    points: Vec<PaintPoint>,
+    weights: HashMap<ChartSelection, f32>,
+    stroke: f32,
+    crosshair: Option<Point<f32>>,
+    crosshair_color: Hsla,
+) -> impl IntoElement {
+    canvas(
+        |_, _, _| {},
+        move |bounds, _, window, _| {
+            let inset = stroke / 2.0;
+            let width = (f32::from(bounds.size.width) - stroke).max(0.0);
+            let height = (f32::from(bounds.size.height) - stroke).max(0.0);
+            if width <= 0.0 || height <= 0.0 {
+                return;
+            }
+            let at = |sample: Point<f32>| {
+                point(
+                    bounds.origin.x + px(inset + sample.x * width),
+                    bounds.origin.y + px(inset + (1.0 - sample.y) * height),
+                )
+            };
+            for sample in &points {
+                let centre = at(sample.position);
+                let radius = 3.0 + weights.get(&sample.selection).copied().unwrap_or(0.0) * 8.0;
+                let mut builder = PathBuilder::fill();
+                builder.move_to(point(centre.x + px(radius), centre.y));
+                builder.arc_to(
+                    point(px(radius), px(radius)),
+                    px(0.0),
+                    false,
+                    true,
+                    point(centre.x - px(radius), centre.y),
+                );
+                builder.arc_to(
+                    point(px(radius), px(radius)),
+                    px(0.0),
+                    false,
+                    true,
+                    point(centre.x + px(radius), centre.y),
+                );
+                builder.close();
+                if let Ok(path) = builder.build() {
+                    window.paint_path(path, sample.color.opacity(sample.opacity));
+                }
+            }
+            if let Some(crosshair) = crosshair {
+                let target = at(crosshair);
+                let mut vertical = PathBuilder::stroke(px(1.0));
+                vertical.move_to(point(target.x, bounds.top()));
+                vertical.line_to(point(target.x, bounds.bottom()));
+                if let Ok(path) = vertical.build() {
+                    window.paint_path(path, crosshair_color.opacity(0.72));
+                }
+                let mut horizontal = PathBuilder::stroke(px(1.0));
+                horizontal.move_to(point(bounds.left(), target.y));
+                horizontal.line_to(point(bounds.right(), target.y));
+                if let Ok(path) = horizontal.build() {
+                    window.paint_path(path, crosshair_color.opacity(0.46));
+                }
+            }
+        },
+    )
+    .w_full()
+    .h_full()
+}
+
 fn line_canvas(
     points: Vec<PaintPoint>,
     stroke: f32,
     area: bool,
+    smooth: bool,
     crosshair: Option<Point<f32>>,
     crosshair_color: Hsla,
 ) -> impl IntoElement {
@@ -1228,13 +1572,13 @@ fn line_canvas(
                     let opacity =
                         series.iter().map(|point| point.opacity).sum::<f32>() / series.len() as f32;
                     let color = series[0].color;
+                    let samples: Vec<Point<f32>> =
+                        series.iter().map(|sample| sample.position).collect();
                     let mut builder = PathBuilder::fill();
-                    builder.move_to(at(point(series[0].position.x, 0.0)));
-                    for sample in series {
-                        builder.line_to(at(sample.position));
-                    }
+                    builder.move_to(at(point(samples[0].x, 0.0)));
+                    trace_series(&mut builder, &samples, smooth, &at);
                     builder.line_to(at(point(
-                        series.last().expect("series is nonempty").position.x,
+                        samples.last().expect("series is nonempty").x,
                         0.0,
                     )));
                     builder.close();
@@ -1260,11 +1604,11 @@ fn line_canvas(
                 }
                 let opacity =
                     series.iter().map(|point| point.opacity).sum::<f32>() / series.len() as f32;
+                let samples: Vec<Point<f32>> =
+                    series.iter().map(|sample| sample.position).collect();
                 let mut builder = PathBuilder::stroke(px(stroke));
-                builder.move_to(at(series[0].position));
-                for sample in series.iter().skip(1) {
-                    builder.line_to(at(sample.position));
-                }
+                builder.move_to(at(samples[0]));
+                trace_series(&mut builder, &samples, smooth, &at);
                 if let Ok(path) = builder.build() {
                     window.paint_path(path, series[0].color.opacity(opacity));
                 }
@@ -1289,6 +1633,443 @@ fn line_canvas(
     )
     .w_full()
     .h_full()
+}
+
+/// A pie or donut over one host-owned series of shares.
+///
+/// Each point's `y` is the share of the circle the host already computed.
+/// Shares are not renormalised here.
+#[derive(Debug, IntoElement)]
+pub struct PieChart {
+    ident: Ident,
+    label: SharedString,
+    state: ChartState,
+    donut: bool,
+}
+
+impl PieChart {
+    pub fn new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: ChartState) -> Self {
+        Self {
+            ident: ident.into(),
+            label: label.into(),
+            state,
+            donut: false,
+        }
+    }
+
+    pub fn donut(mut self) -> Self {
+        self.donut = true;
+        self
+    }
+}
+
+impl RenderOnce for PieChart {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let theme = cx.theme().clone();
+        let (body, spec): (AnyElement, NodeSpec) = match self.state.visible_series() {
+            Some((series, stale)) => {
+                let active = active_points(series, &theme)
+                    .into_iter()
+                    .filter(|point| point.series_order == 0)
+                    .collect::<Vec<_>>();
+                let count = active.len();
+                (
+                    ready_pie(
+                        &self.ident,
+                        &self.label,
+                        active,
+                        stale.cloned(),
+                        self.donut,
+                        &theme,
+                        window,
+                        cx,
+                    ),
+                    chart_spec(&self.ident, &self.label, &self.state, count, stale),
+                )
+            }
+            None => line_like_state(&self.ident, &self.label, &self.state, cx),
+        };
+        div()
+            .w_full()
+            .font_fallbacks(gpui_kit_assets::text_fallbacks())
+            .child(body)
+            .semantic_in(cx, spec)
+    }
+}
+
+/// Bars stacked from the same category identity across series.
+#[derive(Debug, IntoElement)]
+pub struct StackedBarChart {
+    ident: Ident,
+    label: SharedString,
+    axes: ChartAxes,
+    state: ChartState,
+}
+
+impl StackedBarChart {
+    pub fn new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: ChartState) -> Self {
+        Self {
+            ident: ident.into(),
+            label: label.into(),
+            axes: ChartAxes::default(),
+            state,
+        }
+    }
+
+    pub fn axes(mut self, axes: ChartAxes) -> Self {
+        self.axes = axes;
+        self
+    }
+}
+
+impl RenderOnce for StackedBarChart {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let theme = cx.theme().clone();
+        let (body, spec): (AnyElement, NodeSpec) = match self.state.visible_series() {
+            Some((series, stale)) => {
+                let active = active_points(series, &theme);
+                let count = active.len();
+                (
+                    ready_stacked(
+                        &self.ident,
+                        &self.label,
+                        &self.axes,
+                        series,
+                        &active,
+                        stale.cloned(),
+                        &theme,
+                        window,
+                        cx,
+                    ),
+                    chart_spec(&self.ident, &self.label, &self.state, count, stale),
+                )
+            }
+            None => line_like_state(&self.ident, &self.label, &self.state, cx),
+        };
+        div()
+            .w_full()
+            .font_fallbacks(gpui_kit_assets::text_fallbacks())
+            .child(body)
+            .semantic_in(cx, spec)
+    }
+}
+
+type LegendToggle = Rc<dyn Fn(SharedString, bool, &mut Window, &mut App)>;
+
+/// A standalone legend that reports series hide and show.
+#[derive(IntoElement)]
+pub struct ChartLegend {
+    ident: Ident,
+    series: Vec<ChartSeries>,
+    hidden: Vec<SharedString>,
+    on_toggle: Option<LegendToggle>,
+}
+
+impl std::fmt::Debug for ChartLegend {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("ChartLegend")
+            .field("ident", &self.ident)
+            .field("series", &self.series.len())
+            .field("hidden", &self.hidden)
+            .finish()
+    }
+}
+
+impl ChartLegend {
+    pub fn new(ident: impl Into<Ident>, series: impl IntoIterator<Item = ChartSeries>) -> Self {
+        Self {
+            ident: ident.into(),
+            series: series.into_iter().collect(),
+            hidden: Vec::new(),
+            on_toggle: None,
+        }
+    }
+
+    pub fn hidden(mut self, ids: impl IntoIterator<Item = impl Into<SharedString>>) -> Self {
+        self.hidden = ids.into_iter().map(Into::into).collect();
+        self
+    }
+
+    pub fn on_toggle(
+        mut self,
+        handler: impl Fn(SharedString, bool, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_toggle = Some(Rc::new(handler));
+        self
+    }
+}
+
+impl RenderOnce for ChartLegend {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let theme = cx.theme().clone();
+        let label = cx.strings().text(StringKey::ChartLegend);
+        let mut ids = HashSet::new();
+        div()
+            .id(self.ident.element_id())
+            .row()
+            .flex_wrap()
+            .gap_token(&theme, Space::Sm)
+            .children(self.series.iter().filter_map(|series| {
+                if !ids.insert(series.id.clone()) {
+                    return None;
+                }
+                let hidden = self.hidden.iter().any(|id| id == &series.id);
+                let color = series.color.unwrap_or(theme.colors.accent);
+                let ident = self.ident.child(series.id.as_ref());
+                let mut row = div()
+                    .id(ident.element_id())
+                    .row()
+                    .items_center()
+                    .gap_token(&theme, Space::Xs)
+                    .opacity(if hidden { theme.opacity.muted } else { 1.0 })
+                    .child(div().size(px(8.0)).rounded_full().bg(color))
+                    .child(
+                        div()
+                            .type_scale(&theme, TypeScale::Caption)
+                            .text_color(theme.colors.text_muted)
+                            .child(series.label.clone()),
+                    );
+                if let Some(handler) = self.on_toggle.clone() {
+                    let id = series.id.clone();
+                    let next = hidden;
+                    row = row.cursor_pointer().on_click(move |_, window, cx| {
+                        handler(id.clone(), next, window, cx);
+                    });
+                }
+                Some(
+                    row.semantic_in(
+                        cx,
+                        NodeSpec::new(ident.semantic_id(), Role::Button)
+                            .parent(self.ident.semantic_id())
+                            .text(series.label.clone())
+                            .value(if hidden { "hidden" } else { "shown" })
+                            .selected(!hidden),
+                    ),
+                )
+            }))
+            .semantic_in(
+                cx,
+                NodeSpec::new(self.ident.semantic_id(), Role::Group).text(label),
+            )
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn ready_pie(
+    ident: &Ident,
+    label: &SharedString,
+    active: Vec<ActivePoint>,
+    stale: Option<SharedString>,
+    donut: bool,
+    theme: &gpui_kit_theme::Theme,
+    window: &mut Window,
+    cx: &mut App,
+) -> AnyElement {
+    let painted = sync_motion(ident, &active, theme, window, cx);
+    let slices = painted
+        .iter()
+        .map(|point| (point.color, point.position.y.clamp(0.0, 1.0), point.opacity))
+        .collect::<Vec<_>>();
+    div()
+        .column()
+        .w_full()
+        .gap_token(theme, Space::Xs)
+        .child(chart_heading(label, None, theme))
+        .children(stale.map(|reason| stale_warning(ident, reason, theme, cx)))
+        .child(div().w_full().h(px(180.0)).child(pie_canvas(slices, donut)))
+        .child(series_legend(
+            ident,
+            &series_from_active(&active),
+            theme,
+            cx,
+        ))
+        .into_any_element()
+}
+
+fn series_from_active(active: &[ActivePoint]) -> Vec<ChartSeries> {
+    let mut seen = HashSet::new();
+    let mut series = Vec::new();
+    for point in active {
+        if seen.insert(point.selection.series_id.clone()) {
+            series.push(ChartSeries {
+                id: point.selection.series_id.clone(),
+                label: point.series_label.clone(),
+                points: Vec::new(),
+                color: Some(point.color),
+            });
+        }
+    }
+    series
+}
+
+fn pie_canvas(slices: Vec<(Hsla, f32, f32)>, donut: bool) -> impl IntoElement {
+    canvas(
+        |_, _, _| {},
+        move |bounds, _, window, _| {
+            let width = f32::from(bounds.size.width);
+            let height = f32::from(bounds.size.height);
+            let radius = width.min(height) / 2.0 - 2.0;
+            if radius <= 0.0 {
+                return;
+            }
+            let center = bounds.center();
+            let inner = if donut { radius * 0.55 } else { 0.0 };
+            let mut angle = -std::f32::consts::FRAC_PI_2;
+            for (color, share, opacity) in &slices {
+                let span = *share * std::f32::consts::TAU;
+                let a0 = angle;
+                let a1 = angle + span;
+                let mut builder = PathBuilder::fill();
+                let steps = 28;
+                for step in 0..=steps {
+                    let t = a0 + (a1 - a0) * (step as f32 / steps as f32);
+                    let at = point(
+                        center.x + px(radius * t.cos()),
+                        center.y + px(radius * t.sin()),
+                    );
+                    if step == 0 {
+                        if inner <= 0.0 {
+                            builder.move_to(center);
+                            builder.line_to(at);
+                        } else {
+                            builder.move_to(at);
+                        }
+                    } else {
+                        builder.line_to(at);
+                    }
+                }
+                if inner > 0.0 {
+                    for step in (0..=steps).rev() {
+                        let t = a0 + (a1 - a0) * (step as f32 / steps as f32);
+                        builder.line_to(point(
+                            center.x + px(inner * t.cos()),
+                            center.y + px(inner * t.sin()),
+                        ));
+                    }
+                }
+                builder.close();
+                if let Ok(path) = builder.build() {
+                    window.paint_path(path, color.opacity(*opacity));
+                }
+                angle = a1;
+            }
+        },
+    )
+    .w_full()
+    .h_full()
+}
+
+#[allow(clippy::too_many_arguments)]
+fn ready_stacked(
+    ident: &Ident,
+    label: &SharedString,
+    axes: &ChartAxes,
+    series: &[ChartSeries],
+    active: &[ActivePoint],
+    stale: Option<SharedString>,
+    theme: &gpui_kit_theme::Theme,
+    _window: &mut Window,
+    cx: &mut App,
+) -> AnyElement {
+    let mut categories: Vec<SharedString> = Vec::new();
+    for point in series.iter().flat_map(|series| series.points.iter()) {
+        if !categories.iter().any(|id| id == &point.id) {
+            categories.push(point.id.clone());
+        }
+    }
+    let offset = axis_offset(axes, theme);
+    let columns = categories
+        .iter()
+        .map(|category| {
+            let mut stack = div()
+                .flex_1()
+                .h_full()
+                .column()
+                .justify_end()
+                .overflow_hidden();
+            let mut used = 0.0;
+            for (order, series) in series.iter().enumerate() {
+                let Some(point) = series.points.iter().find(|point| &point.id == category) else {
+                    continue;
+                };
+                let share = point.position.y.clamp(0.0, 1.0 - used);
+                if share <= 0.0 {
+                    continue;
+                }
+                used += share;
+                let color = series.color.unwrap_or(theme.colors.accent);
+                stack = stack.child(
+                    div().w_full().h(relative(share)).bg(color).semantic_in(
+                        cx,
+                        NodeSpec::new(
+                            ident
+                                .child("series")
+                                .child(series.id.as_ref())
+                                .child("point")
+                                .child(point.id.as_ref())
+                                .semantic_id(),
+                            Role::Status,
+                        )
+                        .parent(ident.semantic_id())
+                        .text(point.label.clone())
+                        .value(point.value.clone()),
+                    ),
+                );
+                let _ = (order, active);
+            }
+            stack
+        })
+        .collect::<Vec<_>>();
+    div()
+        .column()
+        .w_full()
+        .gap_token(theme, Space::Xs)
+        .child(chart_heading(label, axes.y_label.clone(), theme))
+        .children(stale.map(|reason| stale_warning(ident, reason, theme, cx)))
+        .child(
+            div()
+                .row()
+                .items_end()
+                .w_full()
+                .gap_token(theme, Space::Xs)
+                .children(y_axis(axes, theme))
+                .child(
+                    div()
+                        .row()
+                        .items_end()
+                        .flex_1()
+                        .min_w_0()
+                        .gap(px(6.0))
+                        .h(px(160.0))
+                        .children(columns),
+                ),
+        )
+        .child(
+            div()
+                .row()
+                .ml(px(offset))
+                .gap(px(6.0))
+                .children(categories.iter().map(|category| {
+                    let label = series
+                        .iter()
+                        .flat_map(|series| series.points.iter())
+                        .find(|point| &point.id == category)
+                        .map(|point| point.label.clone())
+                        .unwrap_or_else(|| category.clone());
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .truncate()
+                        .type_scale(theme, TypeScale::Caption)
+                        .text_align(gpui::TextAlign::Center)
+                        .text_color(theme.colors.text_faint)
+                        .child(label)
+                })),
+        )
+        .child(x_axis(axes, offset > 0.0, theme))
+        .child(series_legend(ident, series, theme, cx))
+        .into_any_element()
 }
 
 #[cfg(test)]

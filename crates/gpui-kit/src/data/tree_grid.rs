@@ -2,8 +2,10 @@
 //!
 //! `TreeGrid` does not discover topology, flatten nodes, or own expansion and
 //! selection. The caller supplies visible rows in reading order and receives
-//! selection and expansion intents. Only materialized viewport rows publish
-//! the ARIA hierarchy `TreeGrid > Row > GridCell`.
+//! selection and expansion intents. The flatten cache lives on [`crate::data::Tree`];
+//! this surface virtualizes whatever the host already flattened. Only
+//! materialized viewport rows publish the ARIA hierarchy
+//! `TreeGrid > Row > GridCell`.
 //!
 //! Columns are fixed or flexible within the available width. There is no
 //! horizontal scrolling or frozen-column behavior.

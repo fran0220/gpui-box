@@ -225,6 +225,46 @@ that embeds them carries `assets/fonts/SOURCES.md` and the applicable license
 text beside the font files, so its `.crate` archive is independently
 redistributable.
 
+## P10: bezel terminal and markdown document model
+
+- Source: <https://github.com/crabtalk/bezel>
+- Revision: `86b8997c0601ebcd416632ebde33d78f82b05917`
+- License: MIT
+- Copyright: Copyright (c) 2026 clearloop
+- Source locations: `crates/terminal/src/{emulator.rs,view.rs}` and
+  `crates/markdown/src/{doc.rs,parse.rs,serialize.rs,edit.rs}`, with the
+  matching `tests/`
+- Destinations: `crates/gpui-kit/src/content/terminal/` and
+  `crates/gpui-kit/src/content/markdown/doc/`
+
+A source-level port, not a dependency: bezel pins `gpui` to a Zed Git
+revision, and this repository is the sole authority for its own GPUI
+packages. License text is `licenses/BEZEL-MIT.txt`.
+
+The port is not a transplant. The terminal's per-appearance ANSI tables became
+`color.terminal.*` in the token documents, because a palette compiled into a
+component is the second colour authority the token rule exists to prevent, and
+the contrast report now covers all sixteen slots against the terminal
+background. The emulator's public API was rewritten so no `alacritty_terminal`
+type appears in it. The markdown document model arrived with its round-trip
+fixed-point tests, which are the property the model is worth having for.
+
+### `alacritty_terminal`
+
+- Source: <https://github.com/alacritty/alacritty>
+- Version: 0.26.0 (crates.io)
+- License: Apache-2.0
+- Scope: the escape-sequence state machine and grid behind
+  `content::terminal::Emulator`
+
+Behind the `terminal` feature, which is on by default so the gate, the gallery
+and the visual baselines all cover the component. Only `Term`, the ANSI
+`Processor`, `Selection` and the grid types are used. The crate's `tty` and
+`event_loop` modules compile and are never referenced: they have no feature to
+turn off upstream, and this repository opens no pty and spawns no process,
+which stays the host's job. Recorded here rather than left implicit, because a
+UI crate that links a process spawner should have to say so.
+
 ## P07: Hash Function Prospector `lowbias32`
 
 - Source: <https://github.com/skeeto/hash-prospector>

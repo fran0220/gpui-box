@@ -27,7 +27,9 @@
 
 use std::rc::Rc;
 
-use gpui::{App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div, px};
+use gpui::{
+    AnyElement, App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div, px,
+};
 use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TextTone, Theme, TypeScale};
@@ -313,6 +315,7 @@ pub struct ToolCallCard {
     arguments: Option<ToolBody>,
     state: ToolCallState,
     elapsed: Elapsed,
+    diff: Option<AnyElement>,
     on_retry: Option<RetryHandler>,
 }
 
@@ -340,6 +343,7 @@ impl ToolCallCard {
             arguments: None,
             state: ToolCallState::PendingApproval,
             elapsed: Elapsed::Unknown,
+            diff: None,
             on_retry: None,
         }
     }
@@ -357,6 +361,12 @@ impl ToolCallCard {
 
     pub fn elapsed(mut self, elapsed: impl Into<Elapsed>) -> Self {
         self.elapsed = elapsed.into();
+        self
+    }
+
+    /// A caller-built intra-change view, typically a small [`DiffView`].
+    pub fn diff(mut self, diff: impl IntoElement) -> Self {
+        self.diff = Some(diff.into_any_element());
         self
     }
 
@@ -499,6 +509,7 @@ impl RenderOnce for ToolCallCard {
             .card_surface(&theme, CardVariant::Elevated)
             .child(header)
             .children(arguments)
+            .children(self.diff)
             .children(outcome)
             .children(retry.map(|retry| div().row().child(retry)))
             .semantic_in(

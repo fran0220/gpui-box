@@ -38,11 +38,20 @@ fn main() -> Result<()> {
     match command.as_deref() {
         Some("capture") => imp::capture(&scenes, shard),
         Some("check") => imp::check(&scenes, shard),
+        Some("serve") => {
+            anyhow::ensure!(
+                scenes.is_empty() && shard.is_none(),
+                "serve reads line-delimited JSON from stdin and takes no scene arguments"
+            );
+            serve::run()
+        }
         _ => anyhow::bail!(
-            "usage: headless-visual <capture|check> [--shard INDEX/COUNT] [scene...]"
+            "usage: headless-visual <capture|check|serve> [--shard INDEX/COUNT] [scene...]"
         ),
     }
 }
+
+mod serve;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct Shard {
@@ -299,7 +308,11 @@ mod imp {
                 accept(&name, &frame)?;
                 count += 1;
             }
-            println!("rendered scene `{}` in {:.2?}", scene.name, scene_started.elapsed());
+            println!(
+                "rendered scene `{}` in {:.2?}",
+                scene.name,
+                scene_started.elapsed()
+            );
         }
         println!(
             "rendered and compared {count} images in {:.2?}",
@@ -374,10 +387,7 @@ mod tests {
 
         for scene in 0..gpui_kit::scenes::catalog().len() {
             assert_eq!(
-                shards
-                    .iter()
-                    .filter(|shard| shard.includes(scene))
-                    .count(),
+                shards.iter().filter(|shard| shard.includes(scene)).count(),
                 1
             );
         }

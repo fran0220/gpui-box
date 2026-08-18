@@ -687,6 +687,7 @@ impl RenderOnce for Table {
         let metrics = theme.control.get(self.size);
         let height = self.row_height.unwrap_or(metrics.height);
         let count = self.count();
+        let extra = self.slots.render(slot::HEADER_EXTRA, window, cx);
         let header = self.header(&theme, height, cx);
         let banner = self.banner(&theme, cx);
         let vacancy = self.empty.take();
@@ -754,6 +755,7 @@ impl RenderOnce for Table {
             .frame(&theme, Surface::Panel, Elevation::Raised)
             .overflow_hidden()
             .children(banner)
+            .children(extra)
             .child(header)
             .child(body)
             .semantic_in(
@@ -879,7 +881,8 @@ impl Table {
 }
 
 impl Slotted for Table {
-    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+    const SLOTS: &'static [&'static str] =
+        &[slot::EMPTY, slot::FAILED, slot::LOADING, slot::HEADER_EXTRA];
 
     fn slots_mut(&mut self) -> &mut Slots {
         &mut self.slots

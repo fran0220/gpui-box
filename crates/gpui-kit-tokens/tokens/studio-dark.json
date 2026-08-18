@@ -44,6 +44,28 @@
         "blue": "#b6d3ef",
         "orange": "#edb185",
         "pink": "#f888a0"
+      },
+      "terminal": {
+        "background": "#0a0a0a",
+        "wash": "#ffffff"
+      },
+      "ansi": {
+        "0": "#242424",
+        "1": "#f87171",
+        "2": "#4ade80",
+        "3": "#facc15",
+        "4": "#60a5fa",
+        "5": "#c084fc",
+        "6": "#22d3ee",
+        "7": "#d4d4d8",
+        "8": "#52525b",
+        "9": "#fca5a5",
+        "10": "#86efac",
+        "11": "#fde047",
+        "12": "#93c5fd",
+        "13": "#d8b4fe",
+        "14": "#67e8f9",
+        "15": "#fafafa"
       }
     },
     "surface": {
@@ -82,6 +104,28 @@
     },
     "loader": {
       "gradient": ["{loader.blue}", "{loader.orange}", "{loader.pink}"]
+    },
+    "terminal": {
+      "background": "{terminal.background}",
+      "selection": "{terminal.wash}/38",
+      "ansi": [
+        "{ansi.0}",
+        "{ansi.1}",
+        "{ansi.2}",
+        "{ansi.3}",
+        "{ansi.4}",
+        "{ansi.5}",
+        "{ansi.6}",
+        "{ansi.7}",
+        "{ansi.8}",
+        "{ansi.9}",
+        "{ansi.10}",
+        "{ansi.11}",
+        "{ansi.12}",
+        "{ansi.13}",
+        "{ansi.14}",
+        "{ansi.15}"
+      ]
     }
   },
   "space": {

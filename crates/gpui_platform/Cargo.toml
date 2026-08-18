@@ -17,8 +17,12 @@ name = "gpui_platform"
 path = "src/gpui_platform.rs"
 
 [features]
-default = ["native-platform"]
-font-kit = ["gpui_macos/font-kit"]
+# `font-kit` is a default because a native window without it silently renders
+# no text at all: `MacPlatform` falls back to `NoopTextSystem`. Deterministic
+# harnesses that want the CosmicText path opt out with
+# `default-features = false`, as `tools/headless-visual` does.
+default = ["native-platform", "font-kit"]
+font-kit = ["gpui_macos?/font-kit"]
 native-platform = ["dep:gpui_linux", "dep:gpui_macos", "dep:gpui_web", "dep:gpui_windows"]
 web-multithreaded = ["gpui_web/multithreaded"]
 test-support = [

@@ -750,6 +750,7 @@ pub(super) fn drawer(window: &mut Window, cx: &mut App) -> AnyElement {
             Drawer::new("scene.drawer.filters", window, cx)
                 .edge(Edge::Right)
                 .size(320.0)
+                .resizable(true)
                 .title("Filter runs")
                 .description("The drawer reports what was chosen. The host applies it.")
                 .content(|_, cx| {

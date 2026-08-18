@@ -206,6 +206,24 @@ pub(super) fn status(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .child(StatusDot::new(Tone::Neutral).tint(identity_tint(&theme, "loader.pink"))),
         )
         .child(
+            row(&theme)
+                .child(
+                    StatusDot::new(Tone::Accent)
+                        .busy("scene.status.deliberating")
+                        .activity(crate::motion::Activity::Deliberating),
+                )
+                .child(
+                    StatusDot::new(Tone::Info)
+                        .busy("scene.status.working")
+                        .activity(crate::motion::Activity::Working),
+                )
+                .child(
+                    StatusDot::new(Tone::Success)
+                        .busy("scene.status.advancing")
+                        .activity(crate::motion::Activity::Advancing),
+                ),
+        )
+        .child(
             StatusLine::new("Connected", Tone::Success).id("scene.status.line"),
         )
         .child(
@@ -374,6 +392,165 @@ pub(super) fn chart(_window: &mut Window, cx: &mut App) -> AnyElement {
             )
             .axes(ChartAxes::default().y_ends("0", "max")),
         )
+        .child(
+            PieChart::new(
+                "scene.chart.pie",
+                "Fixture share",
+                ChartState::Ready(vec![ChartSeries::new("share", "Share").points([
+                    ChartPoint::new("alpha", 0.0, 0.25, "Alpha", "25%"),
+                    ChartPoint::new("beta", 0.25, 0.35, "Beta", "35%"),
+                    ChartPoint::new("gamma", 0.60, 0.20, "Gamma", "20%"),
+                    ChartPoint::new("delta", 0.80, 0.20, "Delta", "20%"),
+                ])]),
+            )
+            .donut(),
+        )
+        .child(
+            StackedBarChart::new(
+                "scene.chart.stacked",
+                "Fixture mix",
+                ChartState::Ready(vec![
+                    ChartSeries::new("cpu", "CPU")
+                        .points([
+                            ChartPoint::new("alpha", 0.0, 0.30, "Alpha", "30%"),
+                            ChartPoint::new("beta", 0.5, 0.20, "Beta", "20%"),
+                        ])
+                        .tint(identity_tint(&theme, "loader.blue")),
+                    ChartSeries::new("memory", "Memory")
+                        .points([
+                            ChartPoint::new("alpha", 0.0, 0.25, "Alpha", "25%"),
+                            ChartPoint::new("beta", 0.5, 0.40, "Beta", "40%"),
+                        ])
+                        .tint(identity_tint(&theme, "loader.orange")),
+                ]),
+            )
+            .axes(ChartAxes::default().y_ends("0", "max")),
+        )
+        .child(
+            ChartLegend::new(
+                "scene.chart.legend",
+                [
+                    ChartSeries::new("cpu", "CPU").tint(identity_tint(&theme, "loader.blue")),
+                    ChartSeries::new("memory", "Memory")
+                        .tint(identity_tint(&theme, "loader.orange")),
+                ],
+            )
+            .on_toggle(|_, _, _, _| {}),
+        )
+        .child(
+            AreaChart::new(
+                "scene.chart.area",
+                "Fixture tokens",
+                ChartState::Ready(vec![
+                    ChartSeries::new("tokens", "Tokens")
+                        .points([
+                            ChartPoint::new("00:00", 0.0, 0.20, "00:00", "20%"),
+                            ChartPoint::new("00:15", 0.25, 0.45, "00:15", "45%"),
+                            ChartPoint::new("00:30", 0.5, 0.38, "00:30", "38%"),
+                            ChartPoint::new("00:45", 0.75, 0.70, "00:45", "70%"),
+                            ChartPoint::new("01:00", 1.0, 0.62, "01:00", "62%"),
+                        ])
+                        .tint(identity_tint(&theme, "loader.blue")),
+                ]),
+            )
+            .axes(ChartAxes::default().y_ends("0", "max"))
+            .crosshair(),
+        )
+        .child(
+            ScatterChart::new(
+                "scene.chart.scatter",
+                "Fixture samples",
+                ChartState::Ready(vec![ChartSeries::new("samples", "Samples").points([
+                    ChartPoint::new("a", 0.15, 0.30, "A", "30").weight(0.2),
+                    ChartPoint::new("b", 0.40, 0.62, "B", "62").weight(0.6),
+                    ChartPoint::new("c", 0.72, 0.48, "C", "48").weight(0.35),
+                    ChartPoint::new("d", 0.88, 0.80, "D", "80").weight(0.9),
+                ])]),
+            )
+            .crosshair()
+            .current("samples", "b")
+            .on_current(|_, _, _| {})
+            .axes(ChartAxes::default().y_ends("0", "max")),
+        )
+        .into_any_element()
+}
+
+pub(super) fn trace(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let spans = [
+        TraceSpan::new("plan", "Plan", 0.00, 0.18)
+            .state(SpanState::Succeeded)
+            .detail("planner.finish"),
+        TraceSpan::new("generate", "Generate", 0.18, 0.62)
+            .depth(1)
+            .state(SpanState::Running)
+            .detail("model.reply"),
+        TraceSpan::new("tool", "Search", 0.40, 0.55)
+            .depth(2)
+            .state(SpanState::Succeeded),
+        TraceSpan::new("wait", "Review", 0.62, 0.80)
+            .depth(1)
+            .state(SpanState::Pending),
+        TraceSpan::new("fail", "Publish", 0.80, 1.00).state(SpanState::Failed),
+    ];
+    stack(&theme)
+        .w(px(640.0))
+        .child(caption(
+            &theme,
+            "normalized intervals, host-owned labels, a refusal stays a failure",
+        ))
+        .child(
+            TraceView::new("scene.trace.view", "Fixture run")
+                .spans(spans.clone())
+                .axis("0 ms", "1.2 s")
+                .current("generate")
+                .on_select(|_, _, _| {}),
+        )
+        .child(
+            SpanTimeline::new("scene.trace.timeline", "Fixture waterfall")
+                .spans(spans)
+                .axis("0 ms", "1.2 s")
+                .current("generate")
+                .on_select(|_, _, _| {}),
+        )
+        .into_any_element()
+}
+
+pub(super) fn heatmap(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let days = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+    let weeks = ["W1", "W2", "W3", "W4"];
+    let levels = [
+        [Some(0), Some(1), Some(2), None],
+        [Some(1), Some(3), Some(2), Some(1)],
+        [Some(4), Some(2), Some(0), Some(3)],
+        [None, Some(1), Some(4), Some(2)],
+        [Some(2), None, Some(1), Some(0)],
+    ];
+    let mut cells = Vec::new();
+    for (row, day) in days.iter().enumerate() {
+        for (column, week) in weeks.iter().enumerate() {
+            let mut cell =
+                HeatCell::new(format!("{day}-{week}"), *day, *week).label(format!("{day} {week}"));
+            if let Some(level) = levels[row][column] {
+                cell = cell.level(level).value(format!("{level}"));
+            }
+            cells.push(cell);
+        }
+    }
+    stack(&theme)
+        .w(px(420.0))
+        .child(caption(
+            &theme,
+            "five intensity steps; a missing cell is not a measured zero",
+        ))
+        .child(
+            Heatmap::new("scene.heatmap.ready", "Fixture activity")
+                .rows(days)
+                .columns(weeks)
+                .cells(cells),
+        )
+        .child(Heatmap::new("scene.heatmap.empty", "Fixture activity").state(HeatmapState::Empty))
         .into_any_element()
 }
 

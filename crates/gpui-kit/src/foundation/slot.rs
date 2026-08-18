@@ -152,3 +152,7 @@ pub const FAILED: &str = "failed";
 
 /// The slot for the node a component shows while it is loading.
 pub const LOADING: &str = "loading";
+
+/// The slot for extra controls a host hangs off a header, next to the
+/// component's own.
+pub const HEADER_EXTRA: &str = "header_extra";

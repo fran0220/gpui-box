@@ -26,6 +26,7 @@ use crate::motion::{self, keyed};
 struct PointerDriven(bool);
 
 type ChangeHandler = Rc<dyn Fn(f32, &mut Window, &mut App)>;
+type RangeHandler = Rc<dyn Fn(f32, f32, &mut Window, &mut App)>;
 
 /// A horizontal track with one handle.
 ///
@@ -44,7 +45,12 @@ pub struct Slider {
     disabled: bool,
     /// Rendered next to the label, for a unit the number alone does not carry.
     display: Option<SharedString>,
+    /// The high end of a range slider. `None` is a single handle.
+    high: Option<f32>,
+    /// Tick marks on the track, as values on the same range as the handle.
+    marks: Vec<f32>,
     on_change: Option<ChangeHandler>,
+    on_range_change: Option<RangeHandler>,
 }
 
 impl std::fmt::Debug for Slider {
@@ -56,6 +62,7 @@ impl std::fmt::Debug for Slider {
             .field("value", &self.value)
             .field("disabled", &self.disabled)
             .field("has_handler", &self.on_change.is_some())
+            .field("high", &self.high)
             .finish()
     }
 }
@@ -72,7 +79,10 @@ impl Slider {
             size: ControlSize::Md,
             disabled: false,
             display: None,
+            high: None,
+            marks: Vec::new(),
             on_change: None,
+            on_range_change: None,
         }
     }
 
@@ -116,12 +126,49 @@ impl Slider {
         self
     }
 
+    /// A second handle. The fill then sits between the two values rather than
+    /// from the start of the track, and [`Slider::on_range_change`] reports
+    /// both ends.
+    pub fn high(mut self, high: f32) -> Self {
+        self.high = Some(high);
+        self
+    }
+
+    pub fn values(self, low: f32, high: f32) -> Self {
+        self.value(low).high(high)
+    }
+
+    /// Tick marks on the track. Values outside the range are skipped rather
+    /// than drawn off the ends.
+    pub fn marks(mut self, marks: impl IntoIterator<Item = f32>) -> Self {
+        self.marks = marks.into_iter().collect();
+        self
+    }
+
+    /// Reports both ends of a range slider. A single-handle slider ignores it.
+    pub fn on_range_change(
+        mut self,
+        handler: impl Fn(f32, f32, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_range_change = Some(Rc::new(handler));
+        self
+    }
+
     fn clamped(&self) -> f32 {
         self.value.clamp(self.min, self.max)
     }
 
     fn fraction(&self) -> f32 {
         (self.clamped() - self.min) / (self.max - self.min)
+    }
+
+    fn clamped_high(&self) -> Option<f32> {
+        self.high.map(|high| high.clamp(self.clamped(), self.max))
+    }
+
+    fn high_fraction(&self) -> Option<f32> {
+        self.clamped_high()
+            .map(|high| (high - self.min) / (self.max - self.min))
     }
 }
 
@@ -144,7 +191,8 @@ impl RenderOnce for Slider {
         let theme = cx.theme().clone();
         let direction = cx.layout_direction();
         let metrics = theme.control.get(self.size);
-        let actionable = !self.disabled && self.on_change.is_some();
+        let actionable =
+            !self.disabled && (self.on_change.is_some() || self.on_range_change.is_some());
         let dragging = keyed::slot::<PointerDriven>(&self.ident.semantic_id(), cx);
         let snap = std::mem::take(&mut dragging.borrow_mut().0);
         let fraction = motion::tracked_or_snap(
@@ -155,7 +203,18 @@ impl RenderOnce for Slider {
             window,
             cx,
         );
+        let high_fraction = self.high_fraction().map(|high| {
+            motion::tracked_or_snap(
+                &self.ident.child("high").semantic_id(),
+                high,
+                motion::tracking(&theme),
+                snap,
+                window,
+                cx,
+            )
+        });
         let physical_fraction = directed_fraction(fraction, direction);
+        let physical_high = high_fraction.map(|high| directed_fraction(high, direction));
         let track_height = px(4.0);
         // The handle is the control's only tappable part, so it is sized from
         // the same scale step the other controls take their glyphs from.
@@ -184,33 +243,64 @@ impl RenderOnce for Slider {
                     .rounded_full()
                     .bg(theme.colors.track),
             )
-            .child(
+            .children(self.marks.iter().filter_map(|mark| {
+                if *mark < self.min || *mark > self.max {
+                    return None;
+                }
+                let at = directed_fraction((*mark - self.min) / (self.max - self.min), direction);
+                Some(
+                    div()
+                        .absolute()
+                        .left(gpui::relative(at))
+                        .ml(px(-1.0))
+                        .w(px(2.0))
+                        .h(px(8.0))
+                        .rounded_full()
+                        .bg(theme.colors.hairline_strong),
+                )
+            }))
+            .child(if let Some(high) = physical_high {
+                let start = physical_fraction.min(high);
+                let span = (physical_fraction - high).abs();
+                div()
+                    .absolute()
+                    .left(gpui::relative(start))
+                    .w(gpui::relative(span))
+                    .h(track_height)
+                    .rounded_full()
+                    .bg(theme.colors.accent)
+            } else {
                 div()
                     .absolute()
                     .left_0()
                     .w(gpui::relative(physical_fraction))
                     .h(track_height)
                     .rounded_full()
-                    .bg(theme.colors.accent),
-            )
-            .child(
-                div()
-                    .absolute()
-                    // The knob is centred on the value, so its own width is
-                    // taken out of the offset rather than pushing the handle
-                    // past the end of the track.
-                    .left(gpui::relative(physical_fraction))
-                    .ml(-(knob / 2.0))
-                    .size(knob)
-                    .rounded_full()
-                    .bg(theme.colors.text)
-                    .border(px(theme.borders.hairline))
-                    .border_color(theme.colors.hairline_strong),
-            );
+                    .bg(theme.colors.accent)
+            })
+            .child(knob_at(physical_fraction, knob, &theme))
+            .children(physical_high.map(|high| knob_at(high, knob, &theme)));
 
-        if actionable && let Some(handler) = self.on_change.clone() {
+        if actionable {
             let (min, max, step) = (self.min, self.max, self.step);
-            let down = Rc::clone(&handler);
+            let low = self.clamped();
+            let high = self.clamped_high();
+            let on_change = self.on_change.clone();
+            let on_range = self.on_range_change.clone();
+            let report: ChangeHandler = Rc::new(move |value, window, cx| {
+                if let (Some(high), Some(range)) = (high, on_range.clone()) {
+                    let toward_high = (value - high).abs() < (value - low).abs();
+                    let (next_low, next_high) = if toward_high {
+                        (low, value.max(low))
+                    } else {
+                        (value.min(high), high)
+                    };
+                    range(next_low, next_high, window, cx);
+                } else if let Some(handler) = on_change.clone() {
+                    handler(value, window, cx);
+                }
+            });
+            let down = Rc::clone(&report);
             let down_bounds = Rc::clone(&measured);
             let down_dragging = Rc::clone(&dragging);
             track = track.on_mouse_down(MouseButton::Left, move |event, window, cx| {
@@ -231,10 +321,7 @@ impl RenderOnce for Slider {
                 );
             });
 
-            let drag = Rc::clone(&handler);
-            // Dragging is tracked as movement with the button held over the
-            // track, which is what a mouse reports without a captured drag
-            // payload. Leaving the track ends the drag.
+            let drag = Rc::clone(&report);
             let move_bounds = Rc::clone(&measured);
             let move_dragging = Rc::clone(&dragging);
             track = track.on_mouse_move(move |event, window, cx| {
@@ -338,6 +425,18 @@ impl RenderOnce for Slider {
 
         frame
     }
+}
+
+fn knob_at(fraction: f32, knob: gpui::Pixels, theme: &gpui_kit_theme::Theme) -> gpui::Div {
+    div()
+        .absolute()
+        .left(gpui::relative(fraction))
+        .ml(-(knob / 2.0))
+        .size(knob)
+        .rounded_full()
+        .bg(theme.colors.text)
+        .border(px(theme.borders.hairline))
+        .border_color(theme.colors.hairline_strong)
 }
 
 /// Converts between a logical fraction and a physical left-origin fraction.

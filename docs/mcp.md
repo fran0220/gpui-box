@@ -6,8 +6,8 @@ index from this tree:
 
 | Surface | What it serves |
 |---|---|
-| Stdio `gpui-box-mcp` / `tools/mcp/run.sh` | This checkout. `render_scene` compiles the gallery now. |
-| Hosted `https://gpui-box.origingame.dev/mcp` | The last **deploy** of this repository. `render_scene` returns committed captures. |
+| Stdio `gpui-box-mcp` / `tools/mcp/run.sh` | This checkout. `render_scene` and `session_*` drive `headless-visual serve`. |
+| Hosted `https://gpui-box.origingame.dev/mcp` | The last **deploy** of this repository. `render_scene` returns committed captures. `session_*` is refused: there is no GPUI runtime. |
 
 Neither surface reads a crates.io install. `cargo install gpui-box-mcp`
 without a git revision still installs `0.1.1`. Do not pass `--version 0.1.2`:
@@ -39,13 +39,20 @@ binary.
 | `search_components` | Matches catalog names, summaries, and modules. A non-empty query also matches supporting types (`CardHeader`, `CardVariant`, `AsyncValue`). `kind=type` lists only those. |
 | `component` | Exact constructors, options, commands, queries, reports, and variants |
 | `scene` | Canonical compiling scene source |
-| `render_scene` | PNG from this checkout's gallery (stdio) or the committed capture (hosted) |
+| `render_scene` | PNG from the headless session host (stdio) or the committed capture (hosted). `real_window=true` still opens the gallery, which is how a text caret is reviewed. |
+| `session_open` | Start a headless scene an agent can drive. Hosted refuses. |
+| `session_snapshot` | Redacted semantic tree and generation |
+| `session_act` | Click, type, keystroke, or scroll by semantic id |
+| `session_advance` | Push the simulated clock and deliver one animation frame |
+| `session_screenshot` | PNG of the current session frame |
+| `session_audit` | Semantic audit findings for the current tree |
+| `session_close` | Release the session |
 | `rules` | This checkout's `docs/llms.txt` |
 
-`render_scene` on stdio shells out to the gallery and therefore requires a
-**complete checkout**, Rust toolchain, dependencies, platform renderer, and
-build time. A crate installation alone cannot render. The server reads and
-renders but does not edit files; it does not replace
+Stdio session tools start `headless-visual serve` once and reuse it. That
+requires a **complete checkout**, Rust toolchain, dependencies, and the
+platform headless renderer. A crate installation alone cannot render. The
+server reads and renders but does not edit files; it does not replace
 `cargo run -p xtask -- gate`.
 
 The hosted endpoint deploys with [`tools/site/deploy.sh`](deploying.md). A
