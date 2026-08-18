@@ -1143,12 +1143,45 @@ fn web_build() -> Result<()> {
     if !status.success() {
         bail!("wasm-bindgen failed");
     }
+    shrink_browser_wasm(&output)?;
     fs::copy(
         root().join("examples/browser-gallery/web/index.html"),
         output.join("index.html"),
     )
     .context("copy the browser gallery host page")?;
     println!("browser gallery built in {}", output.display());
+    Ok(())
+}
+
+/// Cloudflare Workers rejects a static asset above 25 MiB. The release
+/// wasm-bindgen output now sits just over that; Binaryen's `-Oz` brings it
+/// back under without changing the surface the compose page loads.
+fn shrink_browser_wasm(output: &Path) -> Result<()> {
+    let wasm = output.join("gpui_kit_browser_gallery_bg.wasm");
+    let tmp = output.join("gpui_kit_browser_gallery_bg.opt.wasm");
+    let status = Command::new("wasm-opt")
+        .args([
+            "-Oz",
+            "--enable-bulk-memory",
+            "--enable-nontrapping-float-to-int",
+            "--enable-sign-ext",
+            "--enable-mutable-globals",
+            "--enable-reference-types",
+            "-o",
+        ])
+        .arg(&tmp)
+        .arg(&wasm)
+        .current_dir(root())
+        .status()
+        .context(
+            "wasm-opt is required to keep the compose WASM under the Workers 25 MiB asset limit; \
+             install Binaryen (`brew install binaryen`)",
+        )?;
+    if !status.success() {
+        let _ = fs::remove_file(&tmp);
+        bail!("wasm-opt failed");
+    }
+    fs::rename(&tmp, &wasm).with_context(|| format!("replace {}", wasm.display()))?;
     Ok(())
 }
 
