@@ -375,11 +375,7 @@ pub fn menu_row(theme: &Theme, selected: bool, highlighted: bool) -> gpui::Div {
         .px(px(theme.spacing.sm))
         .py(px(6.0))
         .rounded(px(theme.radii.control))
-        .when(selected, |element| {
-            element
-                .bg(theme.colors.selected)
-                .shadow(theme.selected_ring())
-        })
+        .when(selected, |element| element.bg(theme.colors.selected))
         .when(!selected && highlighted, |element| {
             element.bg(theme.colors.hover)
         })
@@ -409,9 +405,15 @@ pub(crate) fn menu_label_state(
     hover_group: SharedString,
 ) -> gpui::Div {
     text(theme, TypeScale::Label, label)
+        // Selection is the accent; highlight is only where the pointer is.
+        // The wash behind them is nearly the same weight, so the foreground is
+        // what keeps "this is the current answer" from reading as "this is
+        // under the cursor".
         .text_color(if disabled {
             theme.colors.text_disabled
-        } else if selected || highlighted {
+        } else if selected {
+            theme.colors.accent
+        } else if highlighted {
             theme.colors.text
         } else {
             theme.colors.text_muted
@@ -437,13 +439,13 @@ pub fn heading(theme: &Theme, label: &str) -> gpui::Div {
         )
 }
 
-/// The hairline between two groups of menu rows.
+/// The rule between two groups of menu rows.
 pub fn separator(theme: &Theme) -> gpui::Div {
     div()
-        .h(px(1.0))
+        .h(px(theme.borders.hairline))
         .mx(px(-theme.spacing.xs))
         .my(px(theme.spacing.xs))
-        .bg(theme.colors.hairline)
+        .bg(theme.colors.divider)
 }
 
 /// The shortcut cap a menu row carries on its trailing edge.
@@ -455,7 +457,7 @@ pub fn key_cap(theme: &Theme, label: impl Into<SharedString>) -> gpui::Div {
         .flex()
         .items_center()
         .justify_center()
-        .bg(theme.colors.hover.opacity(0.38))
+        .bg(theme.colors.hover)
         .child(text(theme, TypeScale::Code, label.into()).text_tone(theme, TextTone::Muted))
 }
 

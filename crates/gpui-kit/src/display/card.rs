@@ -9,7 +9,8 @@ use gpui_kit_theme::{ActiveTheme, Space, TextTone, TypeScale};
 
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{
-    Disableable, FocusRing, HoverLift, Ident, Pressable, Selectable, StyledExt, text,
+    Disableable, FocusRing, HoverLift, Hoverable, Ident, Pressable, Selectable, SelectedRow,
+    StyledExt, text,
 };
 
 type ClickHandler = Rc<dyn Fn(&mut Window, &mut App)>;
@@ -241,13 +242,7 @@ impl RenderOnce for Card {
             .clone()
             .or_else(|| self.header.as_ref().map(|header| header.title.clone()));
 
-        let rule = || {
-            div()
-                .w_full()
-                .h(px(theme.borders.hairline))
-                .flex_none()
-                .bg(theme.colors.divider)
-        };
+        let rule = || crate::foundation::rule(&theme);
 
         // A card that is one action renders no second target inside itself.
         let header = self.header.map(|header| {
@@ -344,7 +339,9 @@ impl RenderOnce for Card {
             .column()
             .card_surface(&theme, self.variant);
         if self.selected {
-            frame = frame.shadow(theme.selected_ring());
+            frame = frame.relative().bg(theme.colors.selected).child(
+                crate::foundation::selection_rail(&theme, cx.layout_direction()),
+            );
         }
         for (index, region) in regions.into_iter().enumerate() {
             if divided && index > 0 {
@@ -501,10 +498,8 @@ impl RenderOnce for ListRow {
             .w_full()
             .px(px(theme.spacing.lg + theme.spacing.xs))
             .py(px(theme.spacing.md + 2.0))
-            .when(selected, |element| element.bg(theme.colors.selected))
-            .when(!selected && !disabled, |element| {
-                element.hover(|style| style.bg(theme.colors.hover.opacity(0.3)))
-            })
+            .selected_row(&theme, direction, selected)
+            .when(!selected && !disabled, |element| element.hover_row(&theme))
             // A disabled row states that it is unavailable and stays legible
             // doing it: the text tone changes and the content does not fade
             // out from under the reader.

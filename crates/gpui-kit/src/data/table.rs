@@ -73,8 +73,11 @@ use gpui_kit_theme::{
 use crate::data::grid::GridLines;
 use crate::data::viewport::scroll_handle;
 use crate::display::empty::{EmptyKind, EmptyState};
+use crate::foundation::direction::ActiveDirection;
 use crate::foundation::slot::{self, Slots, Slotted};
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
+use crate::foundation::{
+    Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedRow, Sizable, StyledExt, text,
+};
 use crate::strings::{ActiveStrings, StringKey};
 
 type SortHandler = Rc<dyn Fn(SharedString, SortDirection, &mut Window, &mut App)>;
@@ -368,7 +371,7 @@ impl Table {
             visible_rows: None,
             size: ControlSize::Md,
             disabled: false,
-            lines: GridLines::Rows,
+            lines: GridLines::default(),
             loading: false,
             failure: None,
             empty: None,
@@ -445,7 +448,7 @@ impl Table {
         self
     }
 
-    /// Row rules. The default is [`GridLines::Rows`].
+    /// Row rules. The default is [`GridLines::None`].
     pub fn lines(mut self, lines: GridLines) -> Self {
         self.lines = lines;
         self
@@ -492,13 +495,17 @@ impl Table {
     }
 
     fn header(&self, theme: &Theme, height: f32, cx: &mut App) -> AnyElement {
+        // The header carries no fill of its own. What separates it from the
+        // body is that its labels are a smaller, dimmer step and a single
+        // rule runs under it — a filled bar across the top of every table is
+        // a second surface the ramp never granted, and it is what made a
+        // six-row table read as a spreadsheet.
         let mut header = div()
             .row()
             .w_full()
             .h(px(height))
             .px(px(theme.space(Space::Sm)))
             .gap(px(theme.space(Space::Sm)))
-            .surface(theme, Surface::Raised)
             .border_b(px(theme.borders.hairline))
             .border_color(theme.colors.divider);
 
@@ -516,8 +523,8 @@ impl Table {
                 .row()
                 .gap(px(theme.space(Space::Xs)))
                 .child(
-                    text(theme, TypeScale::Label, column.header.clone())
-                        .text_tone(theme, TextTone::Muted)
+                    text(theme, TypeScale::Caption, column.header.clone())
+                        .text_tone(theme, TextTone::Faint)
                         .when(actionable, |element| {
                             element.group_hover(hover_group.clone(), |style| {
                                 style.text_color(theme.colors.text)
@@ -527,12 +534,13 @@ impl Table {
                 .children(direction.map(|direction| {
                     text(
                         theme,
-                        TypeScale::Label,
+                        TypeScale::Caption,
                         SharedString::from(match direction {
                             SortDirection::Ascending => "↑",
                             SortDirection::Descending => "↓",
                         }),
                     )
+                    .text_color(theme.colors.accent)
                 }));
 
             let mut cell = cell_frame(div().id(ident.element_id()), column, theme)
@@ -611,15 +619,13 @@ impl Body {
                     .border_b(px(theme.borders.hairline))
                     .border_color(theme.colors.divider)
             })
-            .when(selected, |element| element.bg(theme.colors.selected))
+            .selected_row(theme, cx.layout_direction(), selected)
             .when(actionable, |element| {
                 element
                     .cursor_pointer()
                     .tab_index(0)
                     .pressable(cx)
-                    .when(!selected, |element| {
-                        element.hover(|style| style.bg(theme.colors.hover))
-                    })
+                    .when(!selected, |element| element.hover_row(theme))
                     .focus_ring(theme)
             });
 

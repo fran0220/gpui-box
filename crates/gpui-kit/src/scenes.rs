@@ -12,7 +12,7 @@ use gpui::{
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{Radius, Space, TextTone, Theme, TypeScale};
+use gpui_kit_theme::{Radius, Space, Surface, TextTone, Theme, TypeScale};
 use std::rc::Rc;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
@@ -822,8 +822,8 @@ fn card(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .id("scene.card.chosen")
                         .padding(Space::Lg)
                         .selected(true)
-                        .header(CardHeader::new("Selected").subtitle("An inset ring"))
-                        .child(caption("The ring is inset, so choosing moves nothing.")),
+                        .header(CardHeader::new("Selected").subtitle("A wash and a rail"))
+                        .child(caption("Both are drawn inside, so choosing moves nothing.")),
                 ))
                 .child(column(
                     Card::new()
@@ -2097,7 +2097,7 @@ fn ensure_menus(window: &mut Window, cx: &mut App) {
                 div()
                     .w(px(320.0))
                     .p(px(theme.spacing.md))
-                    .hairline(&theme)
+                    .surface(&theme, Surface::Panel)
                     .radius(&theme, Radius::Card)
                     .child(crate::foundation::text(
                         &theme,
@@ -3077,7 +3077,7 @@ fn list(_window: &mut Window, cx: &mut App) -> AnyElement {
         )
         .child(
             div()
-                .hairline(&theme)
+                .surface(&theme, Surface::Panel)
                 .radius(&theme, Radius::Card)
                 .overflow_hidden()
                 .child(
@@ -4251,7 +4251,7 @@ fn split_pane(_window: &mut Window, cx: &mut App) -> AnyElement {
         .child(
             div()
                 .h(px(320.0))
-                .hairline(&theme)
+                .surface(&theme, Surface::Panel)
                 .radius(&theme, Radius::Card)
                 .overflow_hidden()
                 .child(
@@ -4279,7 +4279,7 @@ fn scroll_shadow(_window: &mut Window, cx: &mut App) -> AnyElement {
         .w(px(480.0))
         .child(
             div()
-                .hairline(&theme)
+                .surface(&theme, Surface::Panel)
                 .radius(&theme, Radius::Card)
                 .overflow_hidden()
                 .child(
@@ -4299,7 +4299,7 @@ fn scroll_area(_window: &mut Window, cx: &mut App) -> AnyElement {
         .w(px(480.0))
         .child(
             div()
-                .hairline(&theme)
+                .surface(&theme, Surface::Panel)
                 .radius(&theme, Radius::Card)
                 .overflow_hidden()
                 .child(
@@ -4313,7 +4313,7 @@ fn scroll_area(_window: &mut Window, cx: &mut App) -> AnyElement {
         // Nothing overflows here, so no scrollbar is drawn or published.
         .child(
             div()
-                .hairline(&theme)
+                .surface(&theme, Surface::Panel)
                 .radius(&theme, Radius::Card)
                 .overflow_hidden()
                 .child(
@@ -4338,7 +4338,7 @@ fn scroll_fade(_window: &mut Window, cx: &mut App) -> AnyElement {
         .child(caption(&theme, "Scrolled: content runs past both ends"))
         .child(
             div()
-                .hairline(&theme)
+                .surface(&theme, Surface::Panel)
                 .radius(&theme, Radius::Card)
                 .overflow_hidden()
                 .child(
@@ -4358,7 +4358,7 @@ fn scroll_fade(_window: &mut Window, cx: &mut App) -> AnyElement {
         .child(caption(&theme, "Nothing hidden: no edge fades"))
         .child(
             div()
-                .hairline(&theme)
+                .surface(&theme, Surface::Panel)
                 .radius(&theme, Radius::Card)
                 .overflow_hidden()
                 .child(
@@ -4418,7 +4418,7 @@ fn frost(_window: &mut Window, cx: &mut App) -> AnyElement {
             div()
                 .relative()
                 .h(px(200.0))
-                .hairline(&theme)
+                .surface(&theme, Surface::Panel)
                 .radius(&theme, Radius::Card)
                 .overflow_hidden()
                 .child(stripes())
@@ -4444,7 +4444,7 @@ fn frost(_window: &mut Window, cx: &mut App) -> AnyElement {
             div()
                 .relative()
                 .h(px(160.0))
-                .hairline(&theme)
+                .surface(&theme, Surface::Panel)
                 .radius(&theme, Radius::Card)
                 .overflow_hidden()
                 .child(stripes())
@@ -4525,7 +4525,7 @@ fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .relative()
                 .h(px(150.0))
                 .w(px(460.0))
-                .hairline(&theme)
+                .surface(&theme, Surface::Panel)
                 .radius(&theme, Radius::Card)
                 .overflow_hidden()
                 .child(checkerboard(460.0, 150.0))
@@ -4588,7 +4588,7 @@ fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
                                 .relative()
                                 .h(px(150.0))
                                 .w(px(440.0))
-                                .hairline(&theme)
+                                .surface(&theme, Surface::Panel)
                                 .radius(&theme, Radius::Card)
                                 .overflow_hidden()
                                 .child(checkerboard(440.0, 150.0))
@@ -4620,7 +4620,7 @@ fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
                                 .relative()
                                 .h(px(150.0))
                                 .w(px(440.0))
-                                .hairline(&theme)
+                                .surface(&theme, Surface::Panel)
                                 .radius(&theme, Radius::Card)
                                 .overflow_hidden()
                                 .child(
@@ -5220,7 +5220,7 @@ fn drag_list(_window: &mut Window, cx: &mut App) -> AnyElement {
         .child(
             div()
                 .relative()
-                .hairline(&theme)
+                .surface(&theme, Surface::Panel)
                 .radius(&theme, Radius::Card)
                 .overflow_hidden()
                 .child(
@@ -5359,7 +5359,7 @@ fn wizard(_window: &mut Window, cx: &mut App) -> AnyElement {
                     div()
                         .p(px(theme.spacing.md))
                         .radius(&theme, Radius::Card)
-                        .hairline(&theme)
+                        .surface(&theme, Surface::Panel)
                         .child(crate::foundation::text(
                             &theme,
                             TypeScale::Body,
@@ -5718,7 +5718,7 @@ fn split_tree(_window: &mut Window, cx: &mut App) -> AnyElement {
         .child(
             div()
                 .h(px(340.0))
-                .hairline(&theme)
+                .surface(&theme, Surface::Panel)
                 .radius(&theme, Radius::Card)
                 .overflow_hidden()
                 .child(
@@ -6835,7 +6835,7 @@ fn agent_run_canvas(_window: &mut Window, cx: &mut App) -> AnyElement {
             div()
                 .w_full()
                 .h(px(500.0))
-                .hairline(&theme)
+                .surface(&theme, Surface::Panel)
                 .radius(&theme, Radius::Card)
                 .overflow_hidden()
                 .child(

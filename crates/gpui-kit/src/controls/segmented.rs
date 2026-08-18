@@ -192,10 +192,14 @@ impl RenderOnce for SegmentedControl {
                 let ident = self.ident.child(segment.id.as_ref());
                 let hover_group = ident.child("hover").semantic_id();
                 let id = segment.id.clone();
+                // The raised pill says which segment the strip is on; the
+                // accent says the same thing in the one colour the rest of
+                // the library reserves for "this is the current answer", so a
+                // strip and a toggle group agree without being drawn alike.
                 let label_color = if refused {
                     theme.colors.text_faint
                 } else if selected {
-                    theme.colors.text
+                    theme.colors.accent
                 } else {
                     theme.colors.text_muted
                 };
@@ -234,11 +238,7 @@ impl RenderOnce for SegmentedControl {
                     .children(segment.icon.map(|glyph| {
                         icon(glyph)
                             .size(px(metrics.icon_size * 0.9))
-                            .text_color(if selected {
-                                theme.colors.text
-                            } else {
-                                theme.colors.text_muted
-                            })
+                            .text_color(label_color)
                     }))
                     .child(
                         foundation_text(&theme, TypeScale::Label, segment.label.clone())

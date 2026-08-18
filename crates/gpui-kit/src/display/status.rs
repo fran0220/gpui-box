@@ -143,7 +143,7 @@ impl RenderOnce for StatusLine {
     }
 }
 
-/// A bordered message block.
+/// A tinted message block.
 ///
 /// Callouts carry host refusals and stale-data warnings verbatim; they never
 /// summarize an error into a friendlier but less true sentence. They take a

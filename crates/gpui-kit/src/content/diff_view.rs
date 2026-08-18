@@ -665,7 +665,7 @@ fn split_line(
                 .flex_none()
                 .w(px(theme.borders.hairline))
                 .h_full()
-                .bg(theme.colors.hairline_strong),
+                .bg(theme.colors.divider),
         )
         .child(code_side(id, "new", new, theme))
         .into_any_element()

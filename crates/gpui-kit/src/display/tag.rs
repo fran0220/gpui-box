@@ -144,9 +144,6 @@ impl RenderOnce for Tag {
             // outline drawn round it, so the two states differ by more than a
             // line a reader has to look for.
             .bg(color.opacity(if self.selected { 0.34 } else { 0.14 }))
-            .when(self.selected, |element| {
-                element.shadow(theme.selected_ring())
-            })
             .when(self.disabled, |element| {
                 element.opacity(theme.opacity.disabled)
             })

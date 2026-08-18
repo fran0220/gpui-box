@@ -61,7 +61,9 @@ use crate::data::table::{Align, Cell, ColumnWidth, SortDirection};
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::slot::{self, Slots, Slotted};
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
+use crate::foundation::{
+    Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedRow, Sizable, StyledExt, text,
+};
 use crate::interaction::dnd::{
     self, DragItem, DropAxis, DropIntent, DropPosition, RowTarget, SurfaceDrag,
 };
@@ -390,10 +392,12 @@ impl EditingCell {
 
 /// Whether a table or grid draws rules between its rows.
 ///
-/// [`crate::data::Table`] defaults to [`GridLines::Rows`]: a short glanceable
-/// table needs the eye to stay on a record. [`DataGrid`] defaults to
-/// [`GridLines::None`]: its row height and selection wash are usually enough,
-/// and a caller who has a dense log turns the rules on.
+/// Both [`crate::data::Table`] and [`DataGrid`] default to
+/// [`GridLines::None`]. Row height, the hover wash and the selection rail
+/// already say where one record ends and the next begins, and a rule per row
+/// on top of that is what turns a six-row summary into a spreadsheet. A
+/// caller with a dense log, where rows are short and the eye has to stay on
+/// one, turns the rules on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum GridLines {
     #[default]
@@ -996,7 +1000,8 @@ impl DataGrid {
             .flex_none()
             .px_token(theme, Space::Sm)
             .gap_token(theme, Space::Sm)
-            .surface(theme, Surface::Raised)
+            // No fill: the header is named by its type step and by the one
+            // rule under it, the same way `Table`'s is.
             .border_b(px(theme.borders.hairline))
             .border_color(theme.colors.divider)
             .when(self.hierarchy, |header| {
@@ -1710,15 +1715,13 @@ fn row_element(
                 .border_b(px(theme.borders.hairline))
                 .border_color(theme.colors.divider)
         })
-        .when(selected, |element| element.bg(theme.colors.selected))
+        .selected_row(theme, cx.layout_direction(), selected)
         .when(selectable, |element| {
             element
                 .cursor_pointer()
                 .tab_index(0)
                 .pressable(cx)
-                .when(!selected, |element| {
-                    element.hover(|style| style.bg(theme.colors.hover))
-                })
+                .when(!selected, |element| element.hover_row(theme))
                 .focus_ring(theme)
         })
         .when(context.hierarchy, |element| {
@@ -1842,13 +1845,31 @@ fn row_element(
     element.into_any_element()
 }
 
-/// The line that says where the pinned group ends.
+/// Where the pinned group ends.
+///
+/// A cast rather than a rule. The pinned columns do not end because somebody
+/// drew a line there, they end because they are held still while the rest
+/// slides under them, and a short shadow falling away from the edge is what
+/// that actually looks like. A solid rule said the opposite: that the grid
+/// was two tables that happened to be adjacent.
 fn pinned_edge(theme: &Theme) -> gpui::Div {
+    let cast = theme.colors.backdrop;
     div()
-        .w(px(theme.borders.hairline))
+        .w(px(theme.space(Space::Sm)))
         .h_full()
         .flex_none()
-        .bg(theme.colors.hairline_strong)
+        .child(
+            div()
+                .w(px(theme.borders.hairline))
+                .h_full()
+                .bg(theme.colors.divider),
+        )
+        .child(div().flex_1().h_full().bg(gpui::linear_gradient(
+            90.0,
+            gpui::linear_color_stop(cast.opacity(0.22), 0.0),
+            gpui::linear_color_stop(cast.opacity(0.0), 1.0),
+        )))
+        .flex()
 }
 
 /// The mark that says a row is in the selection. It is not a control: the row

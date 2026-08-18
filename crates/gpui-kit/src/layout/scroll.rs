@@ -198,14 +198,24 @@ impl RenderOnce for ScrollArea {
         let shade = self.axis.has_vertical().then(|| {
             ScrollLink::over(px(theme.effects.edge_fade_band)).progress(px(-f32::from(offset.y)))
         });
+        // It is a band that falls away rather than a line, because a line at
+        // the top of a scrolled region is indistinguishable from a border
+        // somebody drew around the region, and the two say opposite things:
+        // one is "there is content above this", the other is "this is where
+        // the region ends".
         let top_shadow = shade.filter(|shade| *shade > 0.0).map(|shade| {
+            let cast = theme.colors.backdrop;
             div()
                 .absolute()
                 .top_0()
                 .left_0()
                 .right_0()
-                .h(px(theme.borders.hairline))
-                .bg(theme.colors.hairline_strong.opacity(shade))
+                .h(px(theme.effects.edge_fade_band * 0.6))
+                .bg(gpui::linear_gradient(
+                    180.0,
+                    gpui::linear_color_stop(cast.opacity(0.28 * shade), 0.0),
+                    gpui::linear_color_stop(cast.opacity(0.0), 1.0),
+                ))
         });
 
         let viewport_frame = div()
@@ -324,11 +334,18 @@ fn bar(
         0.0
     };
 
+    // The thumb rests at part strength and comes up to full while the pointer
+    // is anywhere in the region, which is how it stays legible without being
+    // the loudest thing in a panel that is mostly text.
+    let hover_group = bar_ident.child("hover").semantic_id();
     let thumb = overflowing.then(|| {
+        let resting = theme.colors.track.opacity(0.55);
+        let active = theme.colors.track;
         div()
             .absolute()
             .rounded_full()
-            .bg(theme.colors.hairline_strong)
+            .bg(resting)
+            .group_hover(hover_group.clone(), move |style| style.bg(active))
             .when(vertical, |element| {
                 element
                     .w(px(THUMB))
@@ -347,11 +364,13 @@ fn bar(
             })
     });
 
+    // The gutter paints nothing. A reserved lane that carried a surface
+    // colour drew a stripe down the side of every scrolling region whether or
+    // not there was anything to scroll, which is a border by another name.
     let mut gutter = div()
         .id(bar_ident.element_id())
         .relative()
         .size_full()
-        .bg(theme.colors.panel)
         .children(thumb);
 
     if overflowing {
@@ -417,6 +436,7 @@ fn bar(
             }
         })
         .flex_none()
+        .group(hover_group)
         .when(vertical, |element| element.w(px(TRACK)).h_full())
         .when(!vertical, |element| element.h(px(TRACK)).w_full())
         .child(gutter)

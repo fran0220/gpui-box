@@ -247,10 +247,14 @@ impl Sidebar {
         let active = self.active.as_ref() == Some(&item.id);
         let disabled = self.disabled || item.disabled;
         let actionable = !disabled && self.on_select.is_some();
+        // The wash says the row is the one being read; the accent says it is
+        // the one that is current. A collapsed rail has only the glyph left
+        // to say it with, which is why the colour and not the fill carries
+        // the statement.
         let color = if disabled {
             theme.colors.text_faint
         } else if active {
-            theme.colors.text
+            theme.colors.accent
         } else {
             theme.colors.text_muted
         };

@@ -185,7 +185,7 @@ impl RenderOnce for Divider {
             div()
                 .h(px(theme.borders.hairline))
                 .flex_1()
-                .bg(theme.colors.hairline)
+                .bg(theme.colors.divider)
         };
         let spec = self.ident.as_ref().map(|ident| {
             let mut spec = NodeSpec::new(ident.semantic_id(), Role::Separator);

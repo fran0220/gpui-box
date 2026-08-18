@@ -527,7 +527,7 @@ impl RenderOnce for ContextGauge {
                     .h(px(4.0))
                     .rounded_full()
                     .overflow_hidden()
-                    .bg(theme.colors.hairline_strong)
+                    .bg(theme.colors.track)
                     // Only a known proportion is drawn. An unknown limit gets
                     // the empty track and the note beneath it, not a sweep:
                     // a sweep would say the number is being worked out.

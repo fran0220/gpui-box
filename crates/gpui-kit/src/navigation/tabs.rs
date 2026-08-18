@@ -552,12 +552,19 @@ impl Tabs {
             .child(
                 div()
                     .relative()
-                    .h(px(theme.borders.thick))
+                    .h(px(theme.effects.selection_rail_width))
                     .children(selected.then(|| {
                         let indicator = flip(self.ident.child("indicator").semantic_id(), cx);
+                        // Inset from the tab's own padding and rounded at the
+                        // top, so the mark sits under the label rather than
+                        // under the gap between two labels.
                         div()
                             .absolute()
-                            .inset_0()
+                            .top_0()
+                            .bottom_0()
+                            .left(px(metrics.padding_x * 0.5))
+                            .right(px(metrics.padding_x * 0.5))
+                            .rounded_t(px(theme.effects.selection_rail_width / 2.0))
                             .bg(theme.colors.accent)
                             .flip(&indicator, window, cx)
                     })),

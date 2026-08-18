@@ -643,8 +643,19 @@ impl RenderOnce for GraphNode {
             .when(self.state.is_notable(), |element| {
                 element.glow(&theme, color)
             })
+            // A node floats on the canvas rather than sitting in a column, so
+            // it is the one place selection cannot be a rail at a reading
+            // edge. It gets the accent all the way round instead, outward, so
+            // it reads as the node being picked up rather than as a border the
+            // node has always had.
             .when(self.selected, |element| {
-                element.shadow(theme.selected_ring())
+                element.shadow(vec![gpui::BoxShadow {
+                    color: theme.colors.accent,
+                    offset: gpui::point(px(0.0), px(0.0)),
+                    blur_radius: px(0.0),
+                    spread_radius: px(theme.effects.selection_rail_width * 0.6),
+                    inset: false,
+                }])
             })
             .child(header)
             .children(thumbnail)

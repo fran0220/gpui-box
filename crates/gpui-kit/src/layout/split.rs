@@ -259,24 +259,59 @@ impl RenderOnce for SplitPane {
             .justify_center()
             .when(horizontal, |element| element.w(px(HANDLE)).h_full())
             .when(!horizontal, |element| element.h(px(HANDLE)).w_full())
-            .bg(theme.colors.panel)
+            // The lane itself paints no surface. A handle that carried a fill
+            // drew a bar between every pair of panes whether or not it could
+            // be moved, which is the one thing a borderless layout cannot
+            // afford to spend on a gap. What it does carry is the rule that
+            // says where one pane ends, and over that a short grip that says
+            // the rule can be moved — two different statements, so two marks
+            // rather than one bar doing both jobs badly.
+            .relative()
+            .group(divider_ident.child("hover").semantic_id())
             .child(
                 div()
-                    .rounded_full()
-                    .bg(theme.colors.divider)
-                    .when(horizontal, |grip| {
-                        grip.w(px(theme.borders.hairline)).h(px(GRIP))
-                    })
-                    .when(!horizontal, |grip| {
-                        grip.h(px(theme.borders.hairline)).w(px(GRIP))
-                    }),
+                    .absolute()
+                    .inset_0()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child(
+                        div()
+                            .bg(theme.colors.divider)
+                            .when(horizontal, |rule| {
+                                rule.w(px(theme.borders.hairline)).h_full()
+                            })
+                            .when(!horizontal, |rule| {
+                                rule.h(px(theme.borders.hairline)).w_full()
+                            }),
+                    ),
             )
             .when(actionable, |element| {
-                element
-                    .cursor_pointer()
-                    .tab_index(0)
-                    .hover(|style| style.bg(theme.colors.hover))
-                    .focus_ring(&theme)
+                element.child(
+                    div()
+                        .absolute()
+                        .inset_0()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .child(
+                            div()
+                                .rounded_full()
+                                .bg(theme.colors.hairline_strong)
+                                .group_hover(divider_ident.child("hover").semantic_id(), |style| {
+                                    style.bg(theme.colors.accent)
+                                })
+                                .when(horizontal, |grip| {
+                                    grip.w(px(theme.effects.selection_rail_width)).h(px(GRIP))
+                                })
+                                .when(!horizontal, |grip| {
+                                    grip.h(px(theme.effects.selection_rail_width)).w(px(GRIP))
+                                }),
+                        ),
+                )
+            })
+            .when(actionable, |element| {
+                element.cursor_pointer().tab_index(0).focus_ring(&theme)
             });
 
         // A drag has to be followed across the whole split, not just the few

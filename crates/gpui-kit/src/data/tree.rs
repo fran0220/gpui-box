@@ -45,7 +45,9 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Theme, TypeScale};
 use crate::data::viewport::scroll_handle;
 use crate::display::icon::flips;
 use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
+use crate::foundation::{
+    Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedRow, Sizable, StyledExt, text,
+};
 use crate::interaction::dnd::{
     self, DragItem, DropAxis, DropIntent, DropPosition, MakingWay, RowTarget, SurfaceDrag,
 };
@@ -685,7 +687,7 @@ impl Rows {
             )
             .gap(px(theme.space(Space::Xs)))
             .text_color(color)
-            .when(selected, |element| element.bg(theme.colors.selected))
+            .selected_row(theme, direction, selected)
             .when(disabled, |element| element.opacity(theme.opacity.disabled))
             .when(carried, |element| element.opacity(theme.opacity.muted))
             .when(selectable, |element| {
@@ -693,9 +695,7 @@ impl Rows {
                     .cursor_pointer()
                     .tab_index(0)
                     .pressable(cx)
-                    .when(!selected, |element| {
-                        element.hover(|style| style.bg(theme.colors.hover.opacity(0.3)))
-                    })
+                    .when(!selected, |element| element.hover_row(theme))
                     .focus_ring(theme)
             })
             .children(chevron)

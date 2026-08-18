@@ -271,6 +271,16 @@ impl RenderOnce for Button {
         let direction = cx.layout_direction();
         let actionable = self.actionable();
         let hover_group = self.ident.child("hover").semantic_id();
+        // A chosen button is marked in accent rather than washed in grey. A
+        // neutral wash over a raised fill reads as *pressed and inactive*,
+        // which is the opposite of what being the current answer means, and
+        // it is what made the middle segment of every toggle group look
+        // disabled beside the two that were not chosen.
+        let paint = if self.selected {
+            theme.colors.accent
+        } else {
+            foreground(&theme, self.variant)
+        };
 
         let mut content: Vec<AnyElement> = Vec::new();
         let glyph = self.glyph.map(|glyph| {
@@ -279,7 +289,7 @@ impl RenderOnce for Button {
             icon(glyph)
                 .size(px(metrics.icon_size))
                 .flex_none()
-                .text_color(foreground(&theme, self.variant))
+                .text_color(paint)
                 .when(!inert && self.variant == ButtonVariant::Ghost, |element| {
                     element.group_hover(hover_group.clone(), |style| {
                         style.text_color(theme.colors.text)
@@ -301,7 +311,7 @@ impl RenderOnce for Button {
         if let Some(label) = self.label.clone() {
             let label = foundation_text(&theme, TypeScale::Label, label)
                 .text_size(px(metrics.font_size))
-                .text_color(foreground(&theme, self.variant))
+                .text_color(paint)
                 .when(!inert && self.variant == ButtonVariant::Ghost, |element| {
                     element.group_hover(hover_group.clone(), |style| {
                         style.text_color(theme.colors.text)
@@ -327,9 +337,7 @@ impl RenderOnce for Button {
             })
             .map(|element| joined(element, &theme, self.join, direction))
             .when(self.selected, |element| {
-                element
-                    .bg(theme.colors.selected)
-                    .border_color(theme.colors.hairline_strong)
+                element.bg(theme.colors.accent.opacity(0.14))
             })
             .id(self.ident.element_id())
             .when_some(self.focus_handle.clone(), |element, handle| {
@@ -385,11 +393,20 @@ impl RenderOnce for Button {
     }
 }
 
-/// Flattens the edges a joined button shares with its neighbour, and pulls it
-/// onto that neighbour's border so the run carries one hairline, not two.
+/// Flattens the edges a joined button shares with its neighbour, and draws the
+/// one line the run needs on the seam between them.
+///
+/// The buttons abut rather than overlap. Nothing in a run carries an outline
+/// now, so there is no second hairline to pull onto; what the run needs is a
+/// single rule where two tonal fills meet, and it belongs to the seam rather
+/// than to either button.
 fn joined(element: Div, theme: &Theme, join: ButtonJoin, direction: LayoutDirection) -> Div {
     let flat = px(0.0);
-    let overlap = px(-theme.borders.hairline);
+    let seam = |element: Div| {
+        element
+            .border_s(direction, px(theme.borders.hairline))
+            .border_color(theme.colors.divider)
+    };
     // Leading and trailing name places in a run, and a run is read rather
     // than measured: the first button keeps the corners on the side reading
     // starts at and gives up the ones it shares with the next.
@@ -410,8 +427,8 @@ fn joined(element: Div, theme: &Theme, join: ButtonJoin, direction: LayoutDirect
     match join {
         ButtonJoin::Alone => element,
         ButtonJoin::Leading => end_flat(element),
-        ButtonJoin::Middle => end_flat(start_flat(element.ms(direction, overlap))),
-        ButtonJoin::Trailing => start_flat(element.ms(direction, overlap)),
+        ButtonJoin::Middle => seam(end_flat(start_flat(element))),
+        ButtonJoin::Trailing => seam(start_flat(element)),
     }
 }
 
@@ -420,7 +437,7 @@ fn foreground(theme: &Theme, variant: ButtonVariant) -> Hsla {
         ButtonVariant::Primary => theme.colors.text_on_accent,
         ButtonVariant::Secondary => theme.colors.text,
         ButtonVariant::Ghost => theme.colors.text_muted,
-        ButtonVariant::Danger => gpui::white(),
+        ButtonVariant::Danger => theme.colors.danger,
         ButtonVariant::Link => theme.colors.accent,
     }
 }
@@ -443,26 +460,33 @@ fn frame(
         .gap(px(metrics.gap))
         .px(px(metrics.padding_x))
         .radius(theme, Radius::Control)
-        .border(px(theme.borders.hairline))
-        .border_color(gpui::transparent_black())
+        // No variant carries an outline any more, so none of them needs a
+        // transparent one to keep the run of heights even.
         .when(inert, |element| element.opacity(theme.opacity.disabled));
 
     match variant {
         ButtonVariant::Primary => base
             .bg(theme.colors.text)
             .when(!inert, |element| element.hover(|style| style.opacity(0.9))),
-        ButtonVariant::Secondary => base
-            .bg(theme.colors.raised)
-            .border_color(theme.colors.hairline)
-            .when(!inert, |element| {
-                element.hover(|style| style.bg(theme.colors.hover))
-            }),
+        // A tonal fill and no outline. A secondary action is the second
+        // strongest thing in its area, which a surface step says on its own;
+        // the outline it used to carry made it the most drawn-around thing on
+        // the page and put a box beside every primary button.
+        ButtonVariant::Secondary => base.bg(theme.colors.raised).when(!inert, |element| {
+            element.hover(|style| style.bg(theme.colors.active))
+        }),
         ButtonVariant::Ghost => base.when(!inert, |element| {
             element.hover(|style| style.bg(theme.colors.hover))
         }),
+        // Danger is a tint rather than a block of red. A solid red control is
+        // the loudest object on any surface it lands on, and this variant is
+        // reserved for irreversible intent, which is a thing a reader has to
+        // *find* rather than a thing that has to shout across the window.
         ButtonVariant::Danger => base
-            .bg(theme.colors.danger.opacity(0.8))
-            .when(!inert, |element| element.hover(|style| style.opacity(0.9))),
+            .bg(theme.colors.danger.opacity(0.16))
+            .when(!inert, |element| {
+                element.hover(|style| style.bg(theme.colors.danger.opacity(0.26)))
+            }),
         ButtonVariant::Link => base.px(px(0.0)),
     }
 }

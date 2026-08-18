@@ -137,16 +137,21 @@ impl RenderOnce for Badge {
         // which is what lets the outline go: an outline around a shape that
         // is already a colour was only ever compensating for a tint too weak
         // to see.
+        // The wash is carried far enough to read and no further. A badge is a
+        // word, and a word sitting in a saturated pill is a word that has to
+        // be read through its own background; what identifies it is the
+        // colour of the text, with just enough behind it to bound the shape.
+        let wash = 0.12;
         let (foreground, background) = match (self.tint, self.tone) {
             // A tint is a colour the caller chose on purpose, so it takes the
             // coloured treatment even at Neutral: the tone says nothing about
             // severity there, which is exactly the case an identity colour is
             // for.
-            (Some(tint), _) => (tint, tint.opacity(0.18)),
-            (None, Tone::Neutral) => (theme.colors.text_muted, theme.colors.raised),
+            (Some(tint), _) => (tint, tint.opacity(wash)),
+            (None, Tone::Neutral) => (theme.colors.text_muted, theme.colors.hover),
             (None, tone) => {
                 let color = tone.color(&theme);
-                (color, color.opacity(0.18))
+                (color, color.opacity(wash))
             }
         };
 
@@ -157,6 +162,7 @@ impl RenderOnce for Badge {
             .rounded_full()
             .bg(background)
             .type_scale(&theme, TypeScale::Caption)
+            .font_weight(gpui::FontWeight(500.0))
             .text_color(foreground)
             .child(self.label.clone());
         match self.ident {

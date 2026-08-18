@@ -63,7 +63,7 @@ use gpui::{
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, SpringPreset};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, SpringPreset, Surface};
 use web_time::Instant;
 
 use crate::display::icon::Icon as IconView;
@@ -776,30 +776,32 @@ impl Render for DragGhost {
 fn ghost_element(item: &DragItem, landing: Option<&Landing>, cx: &mut App) -> gpui::Div {
     let theme = cx.theme().clone();
     let refused = landing.is_some_and(|landing| !landing.accepted);
-    let border = if refused {
-        theme.colors.danger
-    } else {
-        theme.colors.accent
-    };
     let where_to = match landing {
         Some(landing) => format!("{} {}", item.id, landing.position),
         None => format!("{} none", item.id),
     };
 
+    // What is in the hand is a thing lifted off the surface, so it says so
+    // the way every other lifted surface in this library does: an overlay
+    // colour and an overlay shadow. A refusal is the one case that draws a
+    // line, because refusal is exactly what a line is reserved for here, and
+    // it is the danger colour so it cannot be read as ordinary chrome.
     let ghost = div()
         .row()
         .flex_none()
         .gap_token(&theme, Space::Xs)
         .px_token(&theme, Space::Sm)
         .py_token(&theme, Space::Xs)
-        .bg(theme.colors.raised)
+        .frame(&theme, Surface::Overlay, Elevation::Overlay)
         .border(px(theme.borders.hairline))
-        .border_color(border)
+        .border_color(if refused {
+            theme.colors.danger
+        } else {
+            gpui::transparent_black()
+        })
         .radius(&theme, Radius::Control)
-        .elevation(&theme, Elevation::Overlay)
         .text_color(theme.colors.text)
         .type_scale(&theme, gpui_kit_theme::TypeScale::Body)
-        .opacity(theme.opacity.muted)
         // The same glyph, the same token step, the same role: this is what
         // hand-drawing an icon was already spelling out.
         .children(item.icon.map(|glyph| IconView::new(glyph).medium().muted()))
@@ -833,26 +835,40 @@ pub(crate) fn indicator(
         theme.colors.danger
     };
     let thickness = px(theme.borders.thick);
-    let line = div().absolute().bg(color);
+    // The line is inset from the ends and rounded, so it reads as a mark
+    // placed between two rows rather than as a rule that has divided the
+    // whole surface. It is the same shape a text caret is, for the same
+    // reason: it points at a position, it does not partition anything.
+    let inset = px(theme.space(Space::Sm));
+    let line = div().absolute().bg(color).rounded(thickness / 2.0);
     match (position, axis) {
+        // A drop *into* a row is the row itself becoming the target, so it is
+        // a wash and a soft ring rather than an outline: an outlined row in a
+        // list of rows is a second border language competing with the one the
+        // list already speaks.
         (DropPosition::Into(_), _) => div()
             .absolute()
             .inset_0()
-            .border(px(theme.borders.thick))
-            .border_color(color)
             .rounded(px(theme.radii.small))
-            .bg(color.opacity(theme.effects.selected_ring_alpha)),
+            .bg(color.opacity(theme.effects.selected_ring_alpha))
+            .shadow(vec![gpui::BoxShadow {
+                color: color.opacity(0.5),
+                offset: gpui::point(px(0.0), px(0.0)),
+                blur_radius: px(0.0),
+                spread_radius: px(theme.borders.hairline),
+                inset: true,
+            }]),
         (DropPosition::Before(_), DropAxis::Vertical) => {
-            line.left_0().right_0().top_0().h(thickness)
+            line.left(inset).right(inset).top_0().h(thickness)
         }
         (DropPosition::After(_), DropAxis::Vertical) => {
-            line.left_0().right_0().bottom_0().h(thickness)
+            line.left(inset).right(inset).bottom_0().h(thickness)
         }
         (DropPosition::Before(_), DropAxis::Horizontal) => {
-            line.top_0().bottom_0().left_0().w(thickness)
+            line.top(inset).bottom(inset).left_0().w(thickness)
         }
         (DropPosition::After(_), DropAxis::Horizontal) => {
-            line.top_0().bottom_0().right_0().w(thickness)
+            line.top(inset).bottom(inset).right_0().w(thickness)
         }
     }
 }

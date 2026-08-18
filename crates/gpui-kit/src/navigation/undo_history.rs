@@ -256,7 +256,7 @@ fn entry_element(
                     .w(px(theme.borders.hairline))
                     .flex_1()
                     .min_h(px(theme.space(Space::Lg)))
-                    .bg(theme.colors.hairline),
+                    .bg(theme.colors.divider),
             )
         });
 
