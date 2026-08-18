@@ -10,6 +10,56 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ### Changed
 
+**A decorative line is no longer held to a control boundary's contrast.**
+`interactive.hairline` and `interactive.divider` leave the 3:1 non-text gate
+and enter a separation floor of 1.5 L\* against each of the six surfaces:
+nobody aims a pointer at a rule between two menu groups, so the question it
+has to answer is whether it can be seen, not whether it can be hit.
+`interactive.track` and `interactive.hairlineStrong` — slider rails, switch
+edges, scrollbar gutters, resize seams — keep 3:1, because those are aimed
+at. `TokenError::Line` reports a line that composites back into its own
+surface, and `contrast::line_report` returns the whole table. Holding all
+four to 3:1 was what forced both Studio themes to 35–55% alphas, which drew
+an outline around every card, table, menu, and toolbar in the catalog; both
+themes are retuned to match, so every scene image moves.
+
+**A table and a data grid draw no row rules by default.**
+`GridLines::default()` is now `None` for both `Table` and `DataGrid`, which
+were `Rows`. Row height, hover, selection, and the optional zebra striping
+separate rows; a rule between every pair of them is a grid drawn over data
+that already has a shape. Callers who want the old appearance ask for it:
+`.lines(GridLines::Rows)`. This is a breaking change to the rendered default,
+not to the API.
+
+**Selection is one statement everywhere: a neutral wash and an accent rail.**
+Collections use `SelectedRow::selected_row`, which pairs
+`interactive.selected` with an accent bar `effect.selectionRailWidth` wide at
+the reading edge. Neither consumes layout, so arriving on a row still moves
+nothing. The inset neutral ring that `Card`, `Tag`, menu rows, and canvas
+nodes drew is gone: it read as a border the thing had always had. Where a row
+is not a row, selection is the accent in the foreground — a menu row's label,
+a segment's label, a sidebar place's glyph — or, for a node floating on a
+canvas, the accent all the way round it.
+
+**A button variant no longer carries an outline it does not need.**
+`Secondary` is a tonal fill, `Danger` is a danger-coloured tint with
+danger-coloured text rather than a solid red block with white text, and the
+transparent placeholder border every variant carried is gone. `ButtonGroup`
+abuts its children with a seam rule instead of overlapping their borders with
+a negative margin. A selected button is an accent tint with accent text; it
+previously took a neutral wash over a raised fill, which read as disabled.
+
+**A split handle draws a rule and a grip rather than a filled lane.**
+The lane painted `panel` between every pair of panes whether or not it could
+be moved. It now carries a `divider` rule along its length, and, only when the
+split is actionable, a short grip that turns accent under the pointer.
+
+**A scrollbar has no gutter and a scroll shadow has no line.**
+The bar's track paints nothing until the pointer is over the region, and the
+thumb rises from 55% to full. The 1px `hairlineStrong` line under a scrolled
+edge is a gradient band of `backdrop`: content continuing past an edge is a
+soft fact, and a hard rule there reads as a boundary that has been reached.
+
 **An elevation step is now an ordered set of layers.**
 `elevation.flat`, `raised`, `overlay` and `modal` are arrays. `flat` is
 empty rather than a transparent layer. The theme adapter already handed
@@ -27,6 +77,19 @@ serves the current deploy of this tree rather than a published crate.
 names current Kit types instead of gallery-only helpers.
 
 ### Added
+
+**One recipe for each visual statement the library repeats.**
+`foundation::rule` and `rule_vertical` are the line that divides content
+sharing a surface — child elements rather than borders, so they can be inset
+and so a component spending its border on focus can still draw one.
+`foundation::selection_rail` and the `SelectedRow` and `Hoverable` traits are
+how a collection says which row it is on and which row the pointer is over. A
+statement drawn a dozen ways is a dozen different statements wearing one name,
+which is what these exist to stop.
+
+**`effect.selectionRailWidth`.**
+The width of the accent bar at the reading edge of a selected row, in both
+bundled themes and required by the schema. It must be positive.
 
 **A backdrop surface below the page.**
 `Surface::Backdrop` is the substrate a card can sit on, darker than

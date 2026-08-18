@@ -58,7 +58,7 @@ Components combine semantic roles:
 
 ```text
 popover.background = surface.overlay
-popover.border = interactive.hairlineStrong
+popover.separator = interactive.divider
 popover.radius = radius.card
 ```
 
@@ -84,6 +84,39 @@ colors, which never carry required instructions on their own.
 `semantic.accentStrong` is an emphasis, border and hover color rather than a
 text-bearing fill, so it is held to the non-text minimum. `cargo run -p xtask --
 tokens check` applies the same contract to the bundled documents.
+
+### Lines a pointer acts on, and lines that only divide
+
+The 3:1 non-text floor asks whether a reader can find a boundary they have to
+aim at. It is the right question for `interactive.track` and
+`interactive.hairlineStrong` — a slider rail, a switch edge, a scrollbar gutter,
+a resize seam — and those two are checked against every surface.
+
+It is the wrong question for `interactive.hairline` and `interactive.divider`.
+Nobody aims at a rule between two menu groups; it only has to be seen without
+being noticed. Holding them to 3:1 against the darkest and the lightest surface
+in the theme forces alphas in the 35–55% range, and a line that strong drawn
+around every card, table header, menu, and toolbar is exactly the boxed-in look
+a borderless library exists to avoid. That was not theoretical either: it is
+what `studio-dark` and `studio-light` shipped, at `hairline` 35% and `divider`
+40%, and every scene in the catalog wore a grid.
+
+So the two roles carry a different gate. Each is composited over each of the six
+surfaces, and the result must stand at least **1.5 L\*** away from the surface it
+was drawn on:
+
+| Role | Gate | Question it answers |
+|---|---|---|
+| `track`, `hairlineStrong` | 3:1 contrast ratio | can a reader aim at it? |
+| `hairline`, `divider` | 1.5 L\* separation | can a reader see it at all? |
+
+The floor is a floor, not a target. A line that clears 3:1 passes it too, which
+is why the library's own test asserts the reverse direction as well: the bundled
+themes must keep their decorative lines *below* the control-boundary minimum.
+
+`TokenError::Line` reports a violation, naming the role, the surface it
+disappeared against, and its measured separation. `contrast::line_report`
+returns the full table.
 
 ### Surface separation
 
@@ -209,11 +242,16 @@ provides no backdrop blur the tinted fill is drawn on its own — GPUI Box Kit d
 not fake a blur with a gradient, because the colour behind a translucent window
 is not a colour anything can paint.
 
-The two rings live here too. `effect.selectedRingAlpha` draws the inset ring on
-the current answer; `effect.focusRingWidth` and `effect.focusRingAlpha` draw the
-outset ring, in `color.interactive.focus`, on whatever holds the keyboard. They
-are separate tokens because they answer separate questions, and a theme that
-collapsed them would leave a reader unable to tell selection from focus.
+Selection and focus live here too, and they are drawn differently on purpose:
+selection says which answer is current, focus says where the next keystroke
+goes, and a reader who cannot tell them apart cannot tell what pressing a key
+would do. `effect.focusRingWidth` and `effect.focusRingAlpha` draw an outset
+ring in `color.interactive.focus` around whatever holds the keyboard.
+`effect.selectionRailWidth` is the accent bar a collection puts at the reading
+edge of the row it is on, over a wash of `color.interactive.selected`.
+`effect.selectedRingAlpha` remains the weight of a state tint — a changed line
+in a diff, a matched range in a search, a drop target — rather than a ring drawn
+around a chosen thing.
 
 ## Validation
 
@@ -228,8 +266,10 @@ collapsed them would leave a reader unable to tell selection from focus.
 - negative elevation blur, or elevation steps whose reach (`y + blur` of
   the farthest layer) is not strictly increasing;
 - z-index layers that are not strictly increasing;
-- density factors outside 0.5–1.5, or a `comfortable` axis that is not 1.
-- required foreground/background pairs below their contrast floor.
+- density factors outside 0.5–1.5, or a `comfortable` axis that is not 1;
+- a non-positive selection rail width;
+- required foreground/background pairs below their contrast floor;
+- a decorative line that composites into a surface it is drawn on.
 
 Run:
 

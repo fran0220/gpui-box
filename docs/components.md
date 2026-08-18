@@ -97,7 +97,7 @@ actions. They define no account, provider, network, or credential policy.
 A card is a surface that groups content, so it owns the whole vocabulary of
 one: a `media` band flush to its edges, a `CardHeader` with a title, an
 optional subtitle and an optional control, body content, a `footer`, and
-`divided` to put a hairline between adjacent regions and between body rows.
+`divided` to put a rule between adjacent regions and between body rows.
 A caller reaching for a card gets all of it or none of it, and never a
 rectangle it has to finish by hand.
 
@@ -125,7 +125,8 @@ for what they alone can say — focus, invalidity, a drop target — and `divide
 is the deliberate exception, because it draws a line *between two pieces of
 content on one surface* rather than around the surface.
 
-`selected` is an inset ring, so choosing a card moves nothing around it.
+`selected` is a wash and a rail at the reading edge, both painted inside, so
+choosing a card moves nothing around it.
 `disabled` publishes the refusal, changes the text tone, and installs no
 handler at all; it does not fade the card out from under the reader, because
 unavailable is a fact to be read and not a thing to be hidden. A card that is
@@ -286,7 +287,7 @@ page would be a number nobody counted.
 |---|---|---|---|
 | `SplitPane` | builder | the ratio a drag or a keystroke asked for, and the side a double-click would collapse | Minimum sizes become a travel range published on the divider, and a drag past a minimum reports the minimum rather than a value the caller would have to clamp. A pane at ratio 0 or 1 drops its content instead of drawing it at zero size |
 | `AspectRatio` | builder | — | A frame that keeps a ratio. `AspectFit` names which dimension the parent decides and the ratio computes the other; when the parent constrains both, `fit` still wins and the overflow is visible rather than silently switched to a contain box |
-| `ScrollArea` | builder | — | Scroll position is transient view state, held per identity like `List`. A gutter is reserved for every enabled axis whether or not a thumb is drawn, so turning a scrollbar on never reflows the content that decided it was needed. A hairline shadow fades in at the top once the content is off the top, read straight off the offset rather than animated |
+| `ScrollArea` | builder | — | Scroll position is transient view state, held per identity like `List`. A gutter is reserved for every enabled axis whether or not a thumb is drawn, so turning a scrollbar on never reflows the content that decided it was needed. The gutter paints nothing and the thumb rises to full weight under the pointer. A soft band fades in at the top once the content is off the top, read straight off the offset rather than animated |
 | `ScrollFade` | builder | which edges fade, or `none` | Content fades towards the edges it is scrolled past, per painted primitive rather than under a gradient overlay, which is the only way to say "there is more" over a translucent or frosted surface. The edges are the caller's statement about overflow: a region that hides nothing fades at neither edge and publishes `none` |
 | `Toolbar` | builder | — | Groups separated by rules, a spacer, and an overflow menu. Every action inside still reports itself |
 | `SplitTree` | builder | the ratio a divider asked for, and the pane a double-click would collapse | However many nested splits the caller declares, as a `SplitLayout` the caller owns. Minimums propagate up the tree, so a divider stops where a leaf far below it would run out of room, and a collapsed leaf is drawn at its rail with no divider beside it |
@@ -1089,8 +1090,9 @@ does not.
 ring, from `effect.focusRingWidth` and `effect.focusRingAlpha` in the focus
 colour, applied through `FocusRing::focus_ring`. The ring is a shadow rather
 than a border, so focus never reflows what is around it, and it is a different
-treatment from the selected ring on purpose: focus says where the next
-keystroke goes, selection says which answer is current.
+treatment from selection on purpose: focus says where the next keystroke goes,
+selection says which answer is current. Selection is a neutral wash and an
+accent rail at the reading edge, so the two never wear one appearance.
 
 ## What a node's `value` means
 

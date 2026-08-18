@@ -8,11 +8,52 @@ information remains scannable, and vertical rhythm favors work over spectacle.
 ## Surfaces establish hierarchy
 
 Use backdrop, canvas, panel, raised, and overlay surfaces before adding outlines.
-Hairlines separate adjacent planes. Cards may use both a raised surface and a
-low-alpha hairline when the boundary must remain legible.
+A card, a popover, a dialog, and a menu are told apart from what is behind them
+by a colour step and an elevation, not by a line drawn around them.
 
 “Borderless” does not mean “no hierarchy.” It means hierarchy should first come
 from surface, spacing, grouping, and elevation.
+
+## A line says something a surface cannot
+
+Every line in the library is one of three things, and a component that draws a
+fourth is drawing decoration:
+
+- a **rule**, which divides content sharing one surface. It is
+  [`foundation::rule`](../crates/gpui-kit/src/foundation/styled_ext.rs), a child
+  element rather than a border, so it can be inset and so a component that
+  spends its border on focus can still draw one. It is painted in
+  `interactive.divider`;
+- a **boundary a pointer acts on** — a slider rail, a switch edge, a scrollbar
+  gutter, a resize seam. These are `interactive.track` and
+  `interactive.hairlineStrong`, and they carry the 3:1 non-text contrast the
+  guidelines ask of a control boundary;
+- a **report** — focus, invalidity, a drop target, a refusal. These are borders,
+  in the colour of the thing being reported, and they are the reason a resting
+  control keeps a transparent border of the same width: becoming invalid must
+  not reflow the row.
+
+A rule and a divider are decorative and deliberately do **not** carry 3:1. A
+theme whose hairline clears 3:1 against every surface has drawn an outline
+around every card, table, and menu in the library. They instead carry a
+documented floor: composited over each surface, a line must move it by at least
+1.5 L\*, which is what `contrast::line_report` checks and the token gate
+enforces.
+
+## Selection is a wash and a rail
+
+Every collection in the library says which row it is on the same way: a neutral
+wash from `interactive.selected` carries the row, and an accent rail
+`effect.selectionRailWidth` wide sits at the reading edge. Neither consumes
+layout, so arriving on a row moves nothing. The recipes are
+`SelectedRow::selected_row` and `selected_column`.
+
+The wash alone cannot be pushed hard enough in a light theme to read as *chosen*
+without also reading as *inactive*, and a whole row of accent would spend on one
+line the area this library reserves for the decision a surface is asking for.
+Where a row is not a row — a node on a canvas, a chip, a segment of a strip —
+selection is the accent in the foreground or all the way round the object, never
+a neutral outline a reader has to hunt for.
 
 ## Accent has limited area
 
@@ -51,7 +92,10 @@ Frost and edge fades are structural paint effects:
 
 - frost paints blur before the complete floating subtree in one layer;
 - edge fade applies to primitives by distance to the scroll boundary;
-- selected rings are inset shadows and consume no layout space;
+- a scroll shadow is a gradient band of `backdrop`, not a line: content that
+  continues past an edge is a soft fact, and a hard rule there reads as a
+  boundary that has been reached;
+- selection washes and rails are painted inside and consume no layout space;
 - non-macOS platforms use an opaque fallback instead of exposing the desktop
   through unsupported transparency.
 
