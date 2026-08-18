@@ -22,8 +22,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use gpui_kit_tokens::{
-    Color, Elevation, InteractiveColor, Radius, SemanticColor, Space, Surface, TextTone,
-    TokenDocument, bundled,
+    Color, Elevation, InteractiveColor, Radius, ResolvedElevation, SemanticColor, Space, Surface,
+    TextTone, TokenDocument, bundled,
 };
 use pulldown_cmark::{Options, Parser, html};
 use serde_json::Value;
@@ -884,6 +884,7 @@ fn site_style() -> String {
 fn theme_css(selector: &str, tokens: &TokenDocument) -> String {
     let mut css = format!("{selector} {{\n");
     for (name, color) in [
+        ("backdrop", tokens.surface(Surface::Backdrop)),
         ("canvas", tokens.surface(Surface::Canvas)),
         ("sunken", tokens.surface(Surface::Sunken)),
         ("panel", tokens.surface(Surface::Panel)),
@@ -920,13 +921,9 @@ fn theme_css(selector: &str, tokens: &TokenDocument) -> String {
         color_css(with_alpha(tokens.semantic(SemanticColor::Accent), 0.16)),
         color_css(with_alpha(tokens.semantic(SemanticColor::Success), 0.16)),
     ));
-    let overlay = tokens.elevation(Elevation::Overlay);
     css.push_str(&format!(
-        "  --shadow-overlay: 0 {}px {}px {}px {};\n",
-        overlay.y,
-        overlay.blur,
-        overlay.spread,
-        color_css(overlay.color),
+        "  --shadow-overlay: {};\n",
+        css_shadow(&tokens.elevation(Elevation::Overlay)),
     ));
     for (name, step) in [
         ("xs", Space::Xs),
@@ -977,6 +974,25 @@ fn font_css(tokens: &gpui_kit_tokens::FontTokens, generic: &str) -> String {
     .chain([generic.to_string()])
     .collect::<Vec<_>>()
     .join(", ")
+}
+
+fn css_shadow(step: &ResolvedElevation) -> String {
+    if step.layers.is_empty() {
+        return "none".into();
+    }
+    step.layers
+        .iter()
+        .map(|layer| {
+            format!(
+                "0 {}px {}px {}px {}",
+                layer.y,
+                layer.blur,
+                layer.spread,
+                color_css(layer.color)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn color_css(color: Color) -> String {

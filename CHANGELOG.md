@@ -10,6 +10,14 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ### Changed
 
+**An elevation step is now an ordered set of layers.**
+`elevation.flat`, `raised`, `overlay` and `modal` are arrays. `flat` is
+empty rather than a transparent layer. The theme adapter already handed
+components a `Vec<BoxShadow>`, so a document that names two layers at
+`raised` reaches the renderer without a component change. Steps must
+strictly increase in reach (`y + blur` of the farthest layer). This is a
+breaking change to the portable schema and to `ElevationTokens`.
+
 **The catalog tools follow this repository, not the crates.io cohort.**
 `search_components` and `component` now answer supporting types from
 `docs/api-index.json` (`CardHeader`, `CardVariant`, `AsyncValue`, and the
@@ -19,6 +27,14 @@ serves the current deploy of this tree rather than a published crate.
 names current Kit types instead of gallery-only helpers.
 
 ### Added
+
+**A backdrop surface below the page.**
+`Surface::Backdrop` is the substrate a card can sit on, darker than
+`canvas`. It is compared to `canvas` and `panel` at the same 3 L\* floor as
+the rest of the ramp, and not to `sunken`: a well never sits on the
+substrate. Both Studio themes ship one (`#050505` / `#dcdce2`) that the
+existing five surfaces already clear, so the gallery and the headless
+baselines do not move.
 
 **A sidebar place can carry a caller-owned image in the glyph slot.**
 `SidebarItem::image(path)` takes the same asset-source path `Avatar::image`

@@ -101,8 +101,9 @@ behind it:
 
 | Surface | Behind |
 |---|---|
+| `canvas` | above `backdrop` |
+| `panel` | above `backdrop`, and above `canvas` |
 | `sunken` | below `canvas`, and below `panel` |
-| `panel` | above `canvas` |
 | `raised` | above `panel` |
 | `overlay` | above `panel`, and above `canvas` |
 
@@ -111,8 +112,13 @@ what holds it, a panel is above the page, and a block inside a panel is above
 the panel. A light theme therefore does not paint the page white and leave
 nothing above it. The page is tinted, and white is what the ramp climbs to,
 which is how a native window already separates its background from its
-content. `overlay` is checked against what it opens over rather than against
-`raised`, because a popover and a code block never touch.
+content. `backdrop` is the substrate behind the page, the plane a card can
+sit on when the page itself is not dark enough to carry the shadow. It is
+checked against `canvas` and `panel` and not against `sunken`: a well never
+sits on the substrate, it sits in a panel or on the page, and requiring
+three L\* between those two would collapse the dark ramp. `overlay` is
+checked against what it opens over rather than against `raised`, because a
+popover and a code block never touch.
 
 This rule exists because its absence was not theoretical. `studio-light` gave
 `panel`, `raised` and `overlay` the same `#ffffff`: a card, the code block
@@ -161,11 +167,17 @@ distance and its minimum.
 
 ## Elevation, layers, and density
 
-`elevation` describes the shadow each surface casts, `zIndex` fixes the paint
-order of floating surfaces, and `density` scales spacing, control geometry and
-type independently. Density is applied when a `Theme` is built, and
-`gpui_kit::set_density` rebuilds the active theme and repaints every window.
-Colors and radii never change with density.
+`elevation` describes the shadow each surface casts. A step is an ordered
+set of layers, not a single offset: `flat` is empty, and `raised`,
+`overlay` and `modal` may each carry more than one downward cast. There is
+no horizontal offset; a close contact shadow is `y` plus `blur`. Steps are
+ordered by reach — the farthest `y + blur` in the set — and
+`TokenDocument::validate` requires that reach to increase strictly from
+`flat` to `modal`. `zIndex` fixes the paint order of floating surfaces, and
+`density` scales spacing, control geometry and type independently. Density
+is applied when a `Theme` is built, and `gpui_kit::set_density` rebuilds the
+active theme and repaints every window. Colors and radii never change with
+density.
 
 ## Themes at runtime
 
@@ -213,7 +225,8 @@ collapsed them would leave a reader unable to tell selection from focus.
 - negative geometry and non-increasing spacing or control heights;
 - invalid type size, line-height, or weight;
 - effect and opacity alpha outside 0–1, or a non-positive focus ring width;
-- negative elevation blur;
+- negative elevation blur, or elevation steps whose reach (`y + blur` of
+  the farthest layer) is not strictly increasing;
 - z-index layers that are not strictly increasing;
 - density factors outside 0.5–1.5, or a `comfortable` axis that is not 1.
 - required foreground/background pairs below their contrast floor.

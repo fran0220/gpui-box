@@ -21,6 +21,7 @@ Appearance: `Dark`.
 | `color.palette.loader.orange` | `#edb185` |
 | `color.palette.loader.pink` | `#f888a0` |
 | `color.palette.neutral.0` | `#000000` |
+| `color.palette.neutral.10` | `#050505` |
 | `color.palette.neutral.100` | `#1b1b1b` |
 | `color.palette.neutral.150` | `#242424` |
 | `color.palette.neutral.200` | `#282828` |
@@ -40,6 +41,7 @@ Appearance: `Dark`.
 
 | Token | Source | Resolved |
 |---|---|---|
+| `color.surface.backdrop` | `{neutral.10}` | `#050505` |
 | `color.surface.canvas` | `{neutral.50}` | `#131313` |
 | `color.surface.sunken` | `{neutral.25}` | `#0a0a0a` |
 | `color.surface.panel` | `{neutral.100}` | `#1b1b1b` |
@@ -109,12 +111,12 @@ Appearance: `Dark`.
 
 ### Elevation
 
-| Step | Y | Blur | Spread | Color |
-|---|---:|---:|---:|---|
-| `flat` | 0 | 0 | 0 | `#00000000` |
-| `raised` | 2 | 6 | -1 | `#00000059` |
-| `overlay` | 8 | 24 | -4 | `#00000066` |
-| `modal` | 16 | 48 | -8 | `#0000008c` |
+| Step | Layer | Y | Blur | Spread | Color |
+|---|---:|---:|---:|---:|---|
+| `flat` | | | | | |
+| `raised` | 0 | 2 | 6 | -1 | `#00000059` |
+| `overlay` | 0 | 8 | 24 | -4 | `#00000066` |
+| `modal` | 0 | 16 | 48 | -8 | `#0000008c` |
 
 ### Layers
 
@@ -184,6 +186,26 @@ Appearance: `Dark`.
 
 | Foreground | Background | Ratio | Minimum |
 |---|---|---:|---:|
+| `color.text.primary` | `color.surface.backdrop` | 16.79 | 4.5 |
+| `color.text.muted` | `color.surface.backdrop` | 7.89 | 4.5 |
+| `color.text.faint` | `color.surface.backdrop` | 6.30 | 3.0 |
+| `color.text.placeholder` | `color.surface.backdrop` | 5.60 | 3.0 |
+| `color.text.disabled` | `color.surface.backdrop` | 4.95 | 3.0 |
+| `color.semantic.accent` | `color.surface.backdrop` | 6.51 | 3.0 |
+| `color.semantic.accentStrong` | `color.surface.backdrop` | 4.42 | 3.0 |
+| `color.semantic.danger` | `color.surface.backdrop` | 7.06 | 3.0 |
+| `color.semantic.warning` | `color.surface.backdrop` | 11.83 | 3.0 |
+| `color.semantic.success` | `color.surface.backdrop` | 9.32 | 3.0 |
+| `color.semantic.info` | `color.surface.backdrop` | 8.98 | 3.0 |
+| `color.interactive.hairline` | `color.surface.backdrop` | 3.06 | 3.0 |
+| `color.interactive.hairlineStrong` | `color.surface.backdrop` | 3.71 | 3.0 |
+| `color.interactive.track` | `color.surface.backdrop` | 3.71 | 3.0 |
+| `color.interactive.divider` | `color.surface.backdrop` | 3.71 | 3.0 |
+| `color.interactive.focus @ effect.focusRingAlpha` | `color.surface.backdrop` | 3.61 | 3.0 |
+| `color.text.primary @ opacity.disabled` | `color.surface.backdrop` | 6.58 | 3.0 |
+| `color.loader.gradient.0` | `color.surface.backdrop` | 13.15 | 3.0 |
+| `color.loader.gradient.1` | `color.surface.backdrop` | 10.90 | 3.0 |
+| `color.loader.gradient.2` | `color.surface.backdrop` | 8.75 | 3.0 |
 | `color.text.primary` | `color.surface.canvas` | 15.30 | 4.5 |
 | `color.text.muted` | `color.surface.canvas` | 7.19 | 4.5 |
 | `color.text.faint` | `color.surface.canvas` | 5.75 | 3.0 |
@@ -292,6 +314,8 @@ How far each surface reads from the one behind it, in CIE L\*. The WCAG ratio ca
 
 | Surface | Behind | Distance | Minimum |
 |---|---|---:|---:|
+| `color.surface.canvas` | `color.surface.backdrop` | 4.5 | 3.0 |
+| `color.surface.panel` | `color.surface.backdrop` | 8.4 | 3.0 |
 | `color.surface.canvas` | `color.surface.sunken` | 3.1 | 3.0 |
 | `color.surface.panel` | `color.surface.canvas` | 3.9 | 3.0 |
 | `color.surface.panel` | `color.surface.sunken` | 7.0 | 3.0 |
@@ -326,6 +350,7 @@ Appearance: `Light`.
 | `color.palette.loader.orange` | `#ad5c20` |
 | `color.palette.loader.pink` | `#bc3a60` |
 | `color.palette.neutral.0` | `#000000` |
+| `color.palette.neutral.10` | `#dcdce2` |
 | `color.palette.neutral.100` | `#f5f5f8` |
 | `color.palette.neutral.150` | `#ffffff` |
 | `color.palette.neutral.200` | `#ffffff` |
@@ -345,6 +370,7 @@ Appearance: `Light`.
 
 | Token | Source | Resolved |
 |---|---|---|
+| `color.surface.backdrop` | `{neutral.10}` | `#dcdce2` |
 | `color.surface.canvas` | `{neutral.50}` | `#ebebef` |
 | `color.surface.sunken` | `{neutral.25}` | `#e0e0e5` |
 | `color.surface.panel` | `{neutral.100}` | `#f5f5f8` |
@@ -414,12 +440,12 @@ Appearance: `Light`.
 
 ### Elevation
 
-| Step | Y | Blur | Spread | Color |
-|---|---:|---:|---:|---|
-| `flat` | 0 | 0 | 0 | `#00000000` |
-| `raised` | 2 | 6 | -1 | `#0000001f` |
-| `overlay` | 8 | 24 | -4 | `#0000001f` |
-| `modal` | 16 | 48 | -8 | `#00000029` |
+| Step | Layer | Y | Blur | Spread | Color |
+|---|---:|---:|---:|---:|---|
+| `flat` | | | | | |
+| `raised` | 0 | 2 | 6 | -1 | `#0000001f` |
+| `overlay` | 0 | 8 | 24 | -4 | `#0000001f` |
+| `modal` | 0 | 16 | 48 | -8 | `#00000029` |
 
 ### Layers
 
@@ -489,6 +515,26 @@ Appearance: `Light`.
 
 | Foreground | Background | Ratio | Minimum |
 |---|---|---:|---:|
+| `color.text.primary` | `color.surface.backdrop` | 13.10 | 4.5 |
+| `color.text.muted` | `color.surface.backdrop` | 5.41 | 4.5 |
+| `color.text.faint` | `color.surface.backdrop` | 4.30 | 3.0 |
+| `color.text.placeholder` | `color.surface.backdrop` | 3.65 | 3.0 |
+| `color.text.disabled` | `color.surface.backdrop` | 3.12 | 3.0 |
+| `color.semantic.accent` | `color.surface.backdrop` | 4.61 | 3.0 |
+| `color.semantic.accentStrong` | `color.surface.backdrop` | 6.32 | 3.0 |
+| `color.semantic.danger` | `color.surface.backdrop` | 3.55 | 3.0 |
+| `color.semantic.warning` | `color.surface.backdrop` | 3.27 | 3.0 |
+| `color.semantic.success` | `color.surface.backdrop` | 3.89 | 3.0 |
+| `color.semantic.info` | `color.surface.backdrop` | 4.08 | 3.0 |
+| `color.interactive.hairline` | `color.surface.backdrop` | 3.48 | 3.0 |
+| `color.interactive.hairlineStrong` | `color.surface.backdrop` | 4.02 | 3.0 |
+| `color.interactive.track` | `color.surface.backdrop` | 4.02 | 3.0 |
+| `color.interactive.divider` | `color.surface.backdrop` | 4.02 | 3.0 |
+| `color.interactive.focus @ effect.focusRingAlpha` | `color.surface.backdrop` | 3.29 | 3.0 |
+| `color.text.primary @ opacity.disabled` | `color.surface.backdrop` | 3.15 | 3.0 |
+| `color.loader.gradient.0` | `color.surface.backdrop` | 3.40 | 3.0 |
+| `color.loader.gradient.1` | `color.surface.backdrop` | 3.55 | 3.0 |
+| `color.loader.gradient.2` | `color.surface.backdrop` | 3.93 | 3.0 |
 | `color.text.primary` | `color.surface.canvas` | 15.05 | 4.5 |
 | `color.text.muted` | `color.surface.canvas` | 6.22 | 4.5 |
 | `color.text.faint` | `color.surface.canvas` | 4.94 | 3.0 |
@@ -597,6 +643,8 @@ How far each surface reads from the one behind it, in CIE L\*. The WCAG ratio ca
 
 | Surface | Behind | Distance | Minimum |
 |---|---|---:|---:|
+| `color.surface.canvas` | `color.surface.backdrop` | 5.2 | 3.0 |
+| `color.surface.panel` | `color.surface.backdrop` | 8.7 | 3.0 |
 | `color.surface.canvas` | `color.surface.sunken` | 3.8 | 3.0 |
 | `color.surface.panel` | `color.surface.canvas` | 3.5 | 3.0 |
 | `color.surface.panel` | `color.surface.sunken` | 7.3 | 3.0 |

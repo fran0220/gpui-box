@@ -9,6 +9,7 @@
     "palette": {
       "neutral": {
         "0": "#000000",
+        "10": "#050505",
         "25": "#0a0a0a",
         "50": "#131313",
         "100": "#1b1b1b",
@@ -46,6 +47,7 @@
       }
     },
     "surface": {
+      "backdrop": "{neutral.10}",
       "canvas": "{neutral.50}",
       "sunken": "{neutral.25}",
       "panel": "{neutral.100}",
@@ -114,10 +116,10 @@
     "scrim": 0.6
   },
   "elevation": {
-    "flat": { "y": 0, "blur": 0, "spread": 0, "color": "{neutral.0}/00" },
-    "raised": { "y": 2, "blur": 6, "spread": -1, "color": "{neutral.0}/59" },
-    "overlay": { "y": 8, "blur": 24, "spread": -4, "color": "{neutral.0}/66" },
-    "modal": { "y": 16, "blur": 48, "spread": -8, "color": "{neutral.0}/8c" }
+    "flat": [],
+    "raised": [{ "y": 2, "blur": 6, "spread": -1, "color": "{neutral.0}/59" }],
+    "overlay": [{ "y": 8, "blur": 24, "spread": -4, "color": "{neutral.0}/66" }],
+    "modal": [{ "y": 16, "blur": 48, "spread": -8, "color": "{neutral.0}/8c" }]
   },
   "zIndex": {
     "content": 0,

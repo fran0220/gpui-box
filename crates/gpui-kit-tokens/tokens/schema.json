@@ -92,8 +92,9 @@
     "surfaceColors": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["canvas", "sunken", "panel", "raised", "overlay"],
+      "required": ["backdrop", "canvas", "sunken", "panel", "raised", "overlay"],
       "properties": {
+        "backdrop": { "$ref": "#/$defs/color" },
         "canvas": { "$ref": "#/$defs/color" },
         "sunken": { "$ref": "#/$defs/color" },
         "panel": { "$ref": "#/$defs/color" },
@@ -219,7 +220,7 @@
         "scrim": { "type": "number", "minimum": 0, "maximum": 1 }
       }
     },
-    "elevationStep": {
+    "elevationLayer": {
       "type": "object",
       "additionalProperties": false,
       "required": ["y", "blur", "spread", "color"],
@@ -235,10 +236,22 @@
       "additionalProperties": false,
       "required": ["flat", "raised", "overlay", "modal"],
       "properties": {
-        "flat": { "$ref": "#/$defs/elevationStep" },
-        "raised": { "$ref": "#/$defs/elevationStep" },
-        "overlay": { "$ref": "#/$defs/elevationStep" },
-        "modal": { "$ref": "#/$defs/elevationStep" }
+        "flat": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/elevationLayer" }
+        },
+        "raised": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/elevationLayer" }
+        },
+        "overlay": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/elevationLayer" }
+        },
+        "modal": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/elevationLayer" }
+        }
       }
     },
     "zIndex": {

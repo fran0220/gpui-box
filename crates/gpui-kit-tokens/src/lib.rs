@@ -87,11 +87,30 @@ impl TokenDocument {
         for (path, value) in self.color.entries() {
             Color::resolve(path, value, &self.color.palette)?;
         }
-        for (path, level) in self.elevation.entries() {
-            Color::resolve(&format!("{path}.color"), &level.color, &self.color.palette)?;
-            if level.blur < 0.0 {
-                return invalid(path, "blur must not be negative");
+        for (path, layers) in self.elevation.levels() {
+            for (index, layer) in layers.iter().enumerate() {
+                Color::resolve(
+                    &format!("{path}.{index}.color"),
+                    &layer.color,
+                    &self.color.palette,
+                )?;
+                if layer.blur < 0.0 {
+                    return invalid(&format!("{path}.{index}"), "blur must not be negative");
+                }
             }
+        }
+
+        let reaches = [
+            step_reach(&self.elevation.flat),
+            step_reach(&self.elevation.raised),
+            step_reach(&self.elevation.overlay),
+            step_reach(&self.elevation.modal),
+        ];
+        if reaches.windows(2).any(|window| window[0] >= window[1]) {
+            return invalid(
+                "elevation",
+                "steps must strictly increase in reach (y + blur of the farthest layer)",
+            );
         }
 
         let layers = self.z_index.ordered();
@@ -331,6 +350,10 @@ impl TokenDocument {
 
     pub fn surface(&self, role: Surface) -> Color {
         let (path, value) = match role {
+            Surface::Backdrop => (
+                "color.surface.backdrop",
+                self.color.surface.backdrop.as_str(),
+            ),
             Surface::Canvas => ("color.surface.canvas", self.color.surface.canvas.as_str()),
             Surface::Sunken => ("color.surface.sunken", self.color.surface.sunken.as_str()),
             Surface::Panel => ("color.surface.panel", self.color.surface.panel.as_str()),
@@ -450,17 +473,23 @@ impl TokenDocument {
     }
 
     pub fn elevation(&self, level: Elevation) -> ResolvedElevation {
-        let (path, step) = match level {
+        let (path, layers) = match level {
             Elevation::Flat => ("elevation.flat", &self.elevation.flat),
             Elevation::Raised => ("elevation.raised", &self.elevation.raised),
             Elevation::Overlay => ("elevation.overlay", &self.elevation.overlay),
             Elevation::Modal => ("elevation.modal", &self.elevation.modal),
         };
         ResolvedElevation {
-            y: step.y,
-            blur: step.blur,
-            spread: step.spread,
-            color: self.resolved(&format!("{path}.color"), &step.color),
+            layers: layers
+                .iter()
+                .enumerate()
+                .map(|(index, layer)| ResolvedElevationLayer {
+                    y: layer.y,
+                    blur: layer.blur,
+                    spread: layer.spread,
+                    color: self.resolved(&format!("{path}.{index}.color"), &layer.color),
+                })
+                .collect(),
         }
     }
 
@@ -623,6 +652,8 @@ pub fn bundled_json() -> [&'static str; 2] {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Surface {
+    /// The substrate behind the page. A card can sit on it; a well cannot.
+    Backdrop,
     Canvas,
     /// Recessed below whatever carries it: the well an editable value sits in.
     Sunken,
@@ -762,11 +793,30 @@ impl SpringPreset {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct ResolvedElevation {
+pub struct ResolvedElevationLayer {
     pub y: f32,
     pub blur: f32,
     pub spread: f32,
     pub color: Color,
+}
+
+/// The resolved shadows one elevation step casts.
+///
+/// An empty set is a flat surface: it allocates no shadow work. `reach` is
+/// the farthest any layer extends (`y + blur`), and is how the four steps
+/// are ordered.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResolvedElevation {
+    pub layers: Vec<ResolvedElevationLayer>,
+}
+
+impl ResolvedElevation {
+    pub fn reach(&self) -> f32 {
+        self.layers
+            .iter()
+            .map(|layer| layer.y + layer.blur)
+            .fold(0.0, f32::max)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -868,14 +918,14 @@ pub struct Metadata {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ElevationTokens {
-    pub flat: ElevationStep,
-    pub raised: ElevationStep,
-    pub overlay: ElevationStep,
-    pub modal: ElevationStep,
+    pub flat: Vec<ElevationLayer>,
+    pub raised: Vec<ElevationLayer>,
+    pub overlay: Vec<ElevationLayer>,
+    pub modal: Vec<ElevationLayer>,
 }
 
 impl ElevationTokens {
-    fn entries(&self) -> [(&'static str, &ElevationStep); 4] {
+    fn levels(&self) -> [(&'static str, &[ElevationLayer]); 4] {
         [
             ("elevation.flat", &self.flat),
             ("elevation.raised", &self.raised),
@@ -885,13 +935,24 @@ impl ElevationTokens {
     }
 }
 
+/// One shadow in an elevation step.
+///
+/// There is no horizontal offset: a layer is a downward cast, and a close
+/// contact shadow is `y` plus `blur`, not a sideways smear.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct ElevationStep {
+pub struct ElevationLayer {
     pub y: f32,
     pub blur: f32,
     pub spread: f32,
     pub color: String,
+}
+
+fn step_reach(layers: &[ElevationLayer]) -> f32 {
+    layers
+        .iter()
+        .map(|layer| layer.y + layer.blur)
+        .fold(0.0, f32::max)
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
@@ -973,8 +1034,9 @@ pub struct ColorTokens {
 }
 
 impl ColorTokens {
-    fn entries(&self) -> [(&'static str, &str); 28] {
+    fn entries(&self) -> [(&'static str, &str); 29] {
         [
+            ("color.surface.backdrop", &self.surface.backdrop),
             ("color.surface.canvas", &self.surface.canvas),
             ("color.surface.sunken", &self.surface.sunken),
             ("color.surface.panel", &self.surface.panel),
@@ -1013,6 +1075,9 @@ impl ColorTokens {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SurfaceColors {
+    /// The substrate behind the page. A card can sit on it; a well cannot,
+    /// which is why it is not compared to `sunken`.
+    pub backdrop: String,
     pub canvas: String,
     /// The well an editable value sits in, recessed below the surface that
     /// carries it. It is what a text field is made of once the field has no
@@ -1327,6 +1392,10 @@ mod tests {
     fn palette_references_preserve_the_literal_values_they_replaced() {
         let tokens = studio_dark();
         assert_eq!(
+            tokens.surface(Surface::Backdrop),
+            Color::parse("literal", "#050505").expect("literal")
+        );
+        assert_eq!(
             tokens.surface(Surface::Canvas),
             Color::parse("literal", "#131313").expect("literal")
         );
@@ -1399,9 +1468,36 @@ mod tests {
     #[test]
     fn elevation_grows_with_the_layer_it_serves() {
         let tokens = studio_dark();
-        assert_eq!(tokens.elevation(Elevation::Flat).blur, 0.0);
-        assert_eq!(tokens.elevation(Elevation::Flat).color.alpha, 0.0);
-        assert!(tokens.elevation(Elevation::Modal).blur > tokens.elevation(Elevation::Raised).blur);
+        assert!(tokens.elevation(Elevation::Flat).layers.is_empty());
+        assert_eq!(tokens.elevation(Elevation::Flat).reach(), 0.0);
+        assert!(
+            tokens.elevation(Elevation::Modal).reach()
+                > tokens.elevation(Elevation::Raised).reach()
+        );
+    }
+
+    #[test]
+    fn a_theme_without_backdrop_is_rejected() {
+        let mut value: serde_json::Value =
+            serde_json::from_str(studio_dark_json()).expect("bundled JSON");
+        value["color"]["surface"]
+            .as_object_mut()
+            .expect("surface object")
+            .remove("backdrop");
+        let error = TokenDocument::parse(&value.to_string()).expect_err("missing backdrop");
+        assert!(error.to_string().contains("backdrop"));
+    }
+
+    #[test]
+    fn elevation_reach_that_does_not_increase_is_rejected() {
+        let mut value: serde_json::Value =
+            serde_json::from_str(studio_dark_json()).expect("bundled JSON");
+        value["elevation"]["overlay"] = serde_json::json!([
+            { "y": 1, "blur": 2, "spread": 0, "color": "{neutral.0}/66" }
+        ]);
+        let error = TokenDocument::parse(&value.to_string()).expect_err("unordered reach");
+        assert!(error.to_string().contains("elevation"));
+        assert!(error.to_string().contains("reach"));
     }
 
     #[test]

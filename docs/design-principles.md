@@ -7,7 +7,7 @@ information remains scannable, and vertical rhythm favors work over spectacle.
 
 ## Surfaces establish hierarchy
 
-Use canvas, panel, raised, and overlay surfaces before adding outlines.
+Use backdrop, canvas, panel, raised, and overlay surfaces before adding outlines.
 Hairlines separate adjacent planes. Cards may use both a raised surface and a
 low-alpha hairline when the boundary must remain legible.
 

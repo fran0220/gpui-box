@@ -1499,6 +1499,10 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
     output.push_str("\n### Semantic color\n\n| Token | Source | Resolved |\n|---|---|---|\n");
     let color = &tokens.color;
     let sources: Vec<(String, &str)> = vec![
+        (
+            "color.surface.backdrop".into(),
+            color.surface.backdrop.as_str(),
+        ),
         ("color.surface.canvas".into(), color.surface.canvas.as_str()),
         ("color.surface.sunken".into(), color.surface.sunken.as_str()),
         ("color.surface.panel".into(), color.surface.panel.as_str()),
@@ -1644,7 +1648,7 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
     }
 
     output.push_str(
-        "\n### Elevation\n\n| Step | Y | Blur | Spread | Color |\n|---|---:|---:|---:|---|\n",
+        "\n### Elevation\n\n| Step | Layer | Y | Blur | Spread | Color |\n|---|---:|---:|---:|---:|---|\n",
     );
     for (name, level) in [
         ("flat", Elevation::Flat),
@@ -1653,14 +1657,20 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
         ("modal", Elevation::Modal),
     ] {
         let step = tokens.elevation(level);
-        writeln!(
-            output,
-            "| `{name}` | {} | {} | {} | `{}` |",
-            step.y,
-            step.blur,
-            step.spread,
-            format_color(step.color)
-        )?;
+        if step.layers.is_empty() {
+            writeln!(output, "| `{name}` | | | | | |")?;
+            continue;
+        }
+        for (index, layer) in step.layers.iter().enumerate() {
+            writeln!(
+                output,
+                "| `{name}` | {index} | {} | {} | {} | `{}` |",
+                layer.y,
+                layer.blur,
+                layer.spread,
+                format_color(layer.color)
+            )?;
+        }
     }
 
     output.push_str("\n### Layers\n\n| Layer | Z index |\n|---|---:|\n");

@@ -224,6 +224,25 @@ the opposite: things a general-purpose library is expected to have that this
 one does not have yet. They are recorded here so that the difference between a
 decision and a debt stays visible.
 
+### A product backdrop that the bundled ramp still cannot 1:1, 2026-08-18
+
+`Surface::Backdrop` and multi-layer elevation close the two kit-side holes a
+downstream prototype hit: there is now a plane darker than `canvas` for a
+card to sit on, and an elevation step can carry both a contact shadow and a
+wide one. The bundled Studio themes take the new roles without retuning the
+five existing surfaces, so the gallery does not move.
+
+What is still not 1:1 is the light appearance. The prototype paints the page
+`#c9c9d1`, the well `#dcdce2`, and the card `#ffffff`. A white `panel`
+leaves `raised` nowhere to go — it would need L\* ≥ 103, which is outside
+the colour space — and dropping the page to `#c9c9d1` forces `sunken`
+darker still, at which point the light text and semantic rungs (tuned for a
+shallow well) fail the contrast floor in eleven pairs. Retuning that light
+foreground and semantic scale is a separate change; this one does not do
+it. The library still groups with colour rather than with a line, and a
+card still does not draw a border: lines stay reserved for focus, invalid,
+and drop.
+
 ### Typography and visual polish audit, 2026-08-11
 
 Before changing typography, eight independent reviewers inspected all 98 Linux

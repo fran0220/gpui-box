@@ -33,6 +33,7 @@ const NON_TEXT_MINIMUM: f32 = 3.0;
 pub fn report(tokens: &TokenDocument) -> Vec<ContrastCheck> {
     let mut checks = Vec::new();
     let surfaces = [
+        ("color.surface.backdrop", Surface::Backdrop),
         ("color.surface.canvas", Surface::Canvas),
         ("color.surface.sunken", Surface::Sunken),
         ("color.surface.panel", Surface::Panel),
@@ -183,10 +184,18 @@ pub const SEPARATION_MINIMUM: f32 = 3.0;
 /// the ramp climbs to, which is also how a native window separates its
 /// background from its content.
 ///
+/// `backdrop` is the substrate behind the page. It is checked against
+/// `canvas` and `panel` because those are the surfaces that can sit on it.
+/// It is not checked against `sunken`: a well never sits on the substrate,
+/// it sits in a panel or on the page, and requiring three L* between those
+/// two would collapse the dark ramp.
+///
 /// `overlay` is checked against what it can open over rather than against
 /// `raised`: a popover and a code block never touch, so a theme is free to
 /// give them the same value.
-const NESTINGS: [(Surface, Surface); 6] = [
+const NESTINGS: [(Surface, Surface); 8] = [
+    (Surface::Canvas, Surface::Backdrop),
+    (Surface::Panel, Surface::Backdrop),
     (Surface::Canvas, Surface::Sunken),
     (Surface::Panel, Surface::Canvas),
     (Surface::Panel, Surface::Sunken),
@@ -307,6 +316,7 @@ fn tone_path(tone: TextTone) -> &'static str {
 
 fn surface_path(surface: Surface) -> &'static str {
     match surface {
+        Surface::Backdrop => "color.surface.backdrop",
         Surface::Canvas => "color.surface.canvas",
         Surface::Sunken => "color.surface.sunken",
         Surface::Panel => "color.surface.panel",
@@ -350,7 +360,7 @@ mod tests {
     #[test]
     fn the_report_covers_every_surface_and_tone() {
         let checks = report(crate::studio_dark());
-        assert_eq!(checks.len(), 5 * 20 + 1);
+        assert_eq!(checks.len(), 6 * 20 + 1);
     }
 
     #[test]
@@ -417,14 +427,15 @@ mod tests {
     fn the_ramp_climbs_away_from_the_page_in_every_theme() {
         for tokens in crate::bundled() {
             let lightness = |surface| tokens.surface(surface).lightness();
+            let backdrop = lightness(Surface::Backdrop);
             let sunken = lightness(Surface::Sunken);
             let canvas = lightness(Surface::Canvas);
             let panel = lightness(Surface::Panel);
             let raised = lightness(Surface::Raised);
             assert!(
-                sunken < canvas && canvas < panel && panel < raised,
-                "{} does not order sunken < canvas < panel < raised: {sunken}, {canvas}, \
-                 {panel}, {raised}",
+                backdrop < sunken && sunken < canvas && canvas < panel && panel < raised,
+                "{} does not order backdrop < sunken < canvas < panel < raised: {backdrop}, \
+                 {sunken}, {canvas}, {panel}, {raised}",
                 tokens.meta.id
             );
         }

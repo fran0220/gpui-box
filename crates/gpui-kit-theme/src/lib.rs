@@ -55,6 +55,7 @@ pub struct Theme {
 
 #[derive(Debug, Clone)]
 pub struct Colors {
+    pub backdrop: Hsla,
     pub canvas: Hsla,
     pub sunken: Hsla,
     pub panel: Hsla,
@@ -302,6 +303,7 @@ impl Theme {
             appearance: tokens.meta.appearance,
             density,
             colors: Colors {
+                backdrop: color(tokens.surface(Surface::Backdrop)),
                 canvas: color(tokens.surface(Surface::Canvas)),
                 sunken: color(tokens.surface(Surface::Sunken)),
                 panel: color(tokens.surface(Surface::Panel)),
@@ -486,6 +488,7 @@ impl Theme {
 
     pub fn surface(&self, surface: Surface) -> Hsla {
         match surface {
+            Surface::Backdrop => self.colors.backdrop,
             Surface::Canvas => self.colors.canvas,
             Surface::Sunken => self.colors.sunken,
             Surface::Panel => self.colors.panel,
@@ -796,17 +799,19 @@ fn scale_font(value: f32, scale: DensityScale) -> f32 {
 }
 
 fn shadow(tokens: &TokenDocument, level: Elevation) -> Vec<BoxShadow> {
-    let step = tokens.elevation(level);
-    if step.color.alpha == 0.0 {
-        return Vec::new();
-    }
-    vec![BoxShadow {
-        color: color(step.color),
-        offset: point(px(0.0), px(step.y)),
-        blur_radius: px(step.blur),
-        spread_radius: px(step.spread),
-        inset: false,
-    }]
+    tokens
+        .elevation(level)
+        .layers
+        .into_iter()
+        .filter(|layer| layer.color.alpha != 0.0)
+        .map(|layer| BoxShadow {
+            color: color(layer.color),
+            offset: point(px(0.0), px(layer.y)),
+            blur_radius: px(layer.blur),
+            spread_radius: px(layer.spread),
+            inset: false,
+        })
+        .collect()
 }
 
 fn millis(tokens: &gpui_kit_tokens::TokenDocument, step: MotionDuration) -> u64 {
@@ -837,6 +842,11 @@ mod tests {
     fn a_surface_step_is_visible_without_a_border_to_help_it() {
         for theme in [Theme::studio_dark(), Theme::studio_light()] {
             let steps = [
+                (
+                    "backdrop to canvas",
+                    theme.colors.backdrop,
+                    theme.colors.canvas,
+                ),
                 ("sunken to panel", theme.colors.sunken, theme.colors.panel),
                 ("canvas to panel", theme.colors.canvas, theme.colors.panel),
             ];
@@ -856,6 +866,7 @@ mod tests {
     #[test]
     fn every_theme_separates_surfaces_and_text_emphasis() {
         for theme in [Theme::studio_dark(), Theme::studio_light()] {
+            assert!(theme.colors.backdrop.l < theme.colors.canvas.l);
             assert!(theme.colors.sunken.l < theme.colors.panel.l);
             assert!(theme.colors.canvas.l < theme.colors.panel.l);
             assert!(theme.colors.panel.l <= theme.colors.raised.l);
@@ -950,6 +961,33 @@ mod tests {
                 > theme.shadow(Elevation::Raised)[0].blur_radius
         );
         assert!(theme.layer(Layer::Toast) > theme.layer(Layer::Popover));
+    }
+
+    #[test]
+    fn backdrop_is_the_substrate_below_the_page() {
+        let theme = Theme::studio_dark();
+        assert_eq!(theme.surface(Surface::Backdrop), theme.colors.backdrop);
+        assert_ne!(theme.colors.backdrop, theme.colors.canvas);
+    }
+
+    #[test]
+    fn a_step_with_two_layers_keeps_their_order() {
+        let mut value: serde_json::Value =
+            serde_json::from_str(gpui_kit_tokens::studio_dark_json()).expect("bundled JSON");
+        value["elevation"]["raised"] = serde_json::json!([
+            { "y": 1, "blur": 2, "spread": 0, "color": "{neutral.0}/3d" },
+            { "y": 2, "blur": 6, "spread": -1, "color": "{neutral.0}/59" }
+        ]);
+        let tokens = TokenDocument::parse(&value.to_string()).expect("two-layer raised");
+        let theme = Theme::from_tokens(&tokens, Density::default());
+        let shadows = theme.shadow(Elevation::Raised);
+        assert_eq!(shadows.len(), 2);
+        assert_eq!(shadows[0].offset.y, px(1.0));
+        assert_eq!(shadows[0].blur_radius, px(2.0));
+        assert_eq!(shadows[0].spread_radius, px(0.0));
+        assert_eq!(shadows[1].offset.y, px(2.0));
+        assert_eq!(shadows[1].blur_radius, px(6.0));
+        assert_eq!(shadows[1].spread_radius, px(-1.0));
     }
 
     #[test]
