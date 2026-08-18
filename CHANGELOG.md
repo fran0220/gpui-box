@@ -10,6 +10,14 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ### Changed
 
+**The public site is three destinations, not one catalog dump.** `/` is the
+Box: thesis, a live specimen in both themes, the six surfaces the library
+actually is, and selected plates. `/components/` groups the catalog by kit
+module and each component has its own page, with signatures and scene
+examples folded closed. `/docs/` groups the contracts and puts MCP first;
+`POST /mcp` is unchanged. Old `/#components`, `/?component=`, `/?scene=`,
+and `/scenes/` addresses redirect.
+
 **A decorative line is no longer held to a control boundary's contrast.**
 `interactive.hairline` and `interactive.divider` leave the 3:1 non-text gate
 and enter a separation floor of 1.5 L\* against each of the six surfaces:

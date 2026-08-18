@@ -17,6 +17,7 @@
 //! a component library whose site invents its own colours is showing you
 //! something other than the thing you are about to use.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -65,50 +66,37 @@ pub fn generate(root: &Path, out: Option<&str>, browser_gallery: &Path) -> Resul
         &fs::read_to_string(root.join("docs/api-index.json"))?,
     )?;
 
+    let pages = doc_pages(root)?;
     write(
         &out.join("index.html"),
         &home(&components, &scenes, &image_root),
     )?;
     write(
         &out.join("mcp/index.html"),
-        &mcp_page(root, &components, &scenes)?,
+        &mcp_page(root, &components, &scenes, &pages)?,
     )?;
 
     write(
         &out.join("components/index.html"),
-        &redirect_page("/#components"),
+        &components_index(&components, &scenes, &image_root),
     )?;
     for component in &components {
         let name = string(component, "name");
         write(
             &out.join(format!("components/{name}.html")),
-            &redirect_page(&format!("/?component={name}#components")),
+            &component_page(component, &components, &scenes, &image_root),
         )?;
     }
 
-    write(&out.join("scenes/index.html"), &redirect_page("/#scenes"))?;
+    write(&out.join("scenes/index.html"), &redirect_page("/compose/"))?;
     for scene in &scenes {
         let name = string(scene, "name");
         write(
             &out.join(format!("scenes/{name}.html")),
-            &redirect_page(&format!("/?scene={name}#compose")),
+            &redirect_page(&format!("/compose/?scene={name}")),
         )?;
     }
 
-    let mut pages = Vec::new();
-    for entry in fs::read_dir(root.join("docs"))? {
-        let path = entry?.path();
-        let file = path
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_string();
-        if OMIT.contains(&file.as_str()) || !file.ends_with(".md") {
-            continue;
-        }
-        pages.push(file.trim_end_matches(".md").to_string());
-    }
-    pages.sort();
     for page in &pages {
         let body = fs::read_to_string(root.join("docs").join(format!("{page}.md")))?;
         write(
@@ -243,24 +231,99 @@ fn image_version(root: &Path) -> Result<String> {
 // Pages
 // ---------------------------------------------------------------------------
 
-fn shell(title: &str, active: &str, body: &str) -> String {
-    let nav = [
-        ("/#compose", "Compose"),
-        ("/#scenes", "Scenes"),
-        ("/#components", "Components"),
-        ("/mcp/", "MCP"),
-        ("/docs/", "Docs"),
-    ]
-    .iter()
-    .map(|(href, label)| {
-        let current = if *href == active { " class=\"on\"" } else { "" };
-        format!("<a href=\"{href}\"{current}>{label}</a>")
-    })
-    .collect::<Vec<_>>()
-    .join("");
+const MODULE_ORDER: &[&str] = &[
+    "agent",
+    "canvas",
+    "content",
+    "controls",
+    "data",
+    "datetime",
+    "display",
+    "effects",
+    "game",
+    "interaction",
+    "layout",
+    "media",
+    "navigation",
+    "overlay",
+    "structured",
+];
+
+const DOC_GROUPS: &[(&str, &[(&str, &str)])] = &[
+    (
+        "Start",
+        &[
+            ("mcp", "MCP"),
+            ("components", "Components"),
+            ("design-principles", "Design principles"),
+            ("host-view-boundary", "Host/view boundary"),
+        ],
+    ),
+    (
+        "Contracts",
+        &[
+            ("truthful-ui", "Truthful UI"),
+            ("component-contracts", "Component contracts"),
+            ("interaction", "Interaction"),
+            ("content", "Content"),
+            ("motion", "Motion"),
+            ("datetime", "Date and time"),
+            ("accessibility", "Accessibility"),
+            ("semantic-automation", "Semantic automation"),
+        ],
+    ),
+    (
+        "System",
+        &[
+            ("token-model", "Token model"),
+            ("token-reference", "Token reference"),
+            ("coverage", "Coverage"),
+        ],
+    ),
+    (
+        "Operate",
+        &[
+            ("deploying", "Deploying"),
+            ("screenshot-testing", "Screenshot testing"),
+            ("compatibility", "Compatibility"),
+            ("migration-guide", "Migration guide"),
+            ("releasing", "Releasing"),
+            ("gpui-recipes", "GPUI recipes"),
+            ("abi-vocabulary", "ABI vocabulary"),
+        ],
+    ),
+];
+
+const FEATURED_SCENES: &[&str] = &[
+    "node-graph",
+    "ide-shell",
+    "browser-panel",
+    "data-grid",
+    "schema-form",
+    "date-time",
+    "conversation",
+    "notification-center",
+    "loading",
+    "progress-circle",
+    "thinking",
+    "upload-list",
+    "dialog",
+    "settings",
+    "failure-panel",
+];
+
+fn shell(title: &str, active: &str, layout: &str, body: &str) -> String {
+    let nav = [("/components/", "Components"), ("/docs/", "Docs")]
+        .iter()
+        .map(|(href, label)| {
+            let current = if *href == active { " class=\"on\"" } else { "" };
+            format!("<a href=\"{href}\"{current}>{label}</a>")
+        })
+        .collect::<Vec<_>>()
+        .join("");
 
     format!(
-        r#"<!doctype html>
+        r##"<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -268,11 +331,38 @@ fn shell(title: &str, active: &str, body: &str) -> String {
 <title>{title}</title>
 <meta name="description" content="A design system, component library, semantic automation layer and visual test kit for native desktop applications built with GPUI.">
 <link rel="stylesheet" href="/assets/site.css">
+<script>
+(function () {{
+  try {{
+    var theme = localStorage.getItem("gpui-box-theme");
+    if (theme === "studio-light" || theme === "studio-dark") {{
+      document.documentElement.setAttribute("data-theme", theme);
+    }}
+  }} catch (error) {{}}
+  if (location.pathname !== "/" && location.pathname !== "/index.html") return;
+  var query = new URLSearchParams(location.search);
+  var component = query.get("component");
+  if (component) {{
+    location.replace("/components/" + component + ".html");
+    return;
+  }}
+  var scene = query.get("scene");
+  var hash = location.hash;
+  if (hash === "#components") {{
+    location.replace("/components/");
+    return;
+  }}
+  if (scene || hash === "#compose" || hash === "#scenes") {{
+    location.replace(scene ? "/compose/?scene=" + encodeURIComponent(scene) : "/compose/");
+  }}
+}})();
+</script>
 </head>
-<body>
+<body class="{layout}">
 <header>
   <a class="brand" href="/">GPUI Box</a>
   <nav>{nav}</nav>
+  <button type="button" class="theme" id="theme-toggle" aria-label="Use studio-light">Theme</button>
   <a class="repo" href="https://github.com/fran0220/gpui-box">GitHub</a>
 </header>
 <main>
@@ -286,7 +376,7 @@ fn shell(title: &str, active: &str, body: &str) -> String {
 <script src="/assets/site.js"></script>
 </body>
 </html>
-"#
+"##
     )
 }
 
@@ -303,7 +393,7 @@ fn redirect_page(target: &str) -> String {
 <script>location.replace({js});</script>
 </head>
 <body>
-<p>This page now lives on the catalog home. <a href="{escaped}">Continue</a>.</p>
+<p>This page has moved. <a href="{escaped}">Continue</a>.</p>
 </body>
 </html>
 "#,
@@ -314,65 +404,55 @@ fn redirect_page(target: &str) -> String {
 fn home(components: &[Value], scenes: &[Value], image_root: &str) -> String {
     let builders = components
         .iter()
-        .filter(|c| string(c, "kind") == "builder")
+        .filter(|component| string(component, "kind") == "builder")
         .count();
     let views = components.len() - builders;
-    let featured = [
-        "node-graph",
-        "ide-shell",
-        "browser-panel",
-        "data-grid",
-        "schema-form",
-        "date-time",
-        "conversation",
-        "notification-center",
-        "loading",
-        "progress-circle",
-        "thinking",
-        "upload-list",
-        "dialog",
-        "settings",
-        "failure-panel",
-    ];
-    let featured_name = featured
+    let featured_name = featured_scene(scenes);
+    let plates = FEATURED_SCENES
         .iter()
         .copied()
-        .find(|name| scenes.iter().any(|scene| string(scene, "name") == *name))
-        .unwrap_or("button");
+        .filter(|name| scenes.iter().any(|scene| string(scene, "name") == *name))
+        .take(8)
+        .map(|name| {
+            format!(
+                r#"<a class="tile" href="/compose/?scene={name}">
+  <img loading="lazy" src="{image_root}/{name}-studio-dark.png" alt="The {name} scene in studio-dark">
+  <span>{name}</span>
+</a>"#
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
 
     let body = format!(
         r##"<section class="hero">
-  <h1>Native desktop components for GPUI.</h1>
-  <p class="lead">A design system, component library, semantic automation layer
-  and visual test kit. Surfaces group with colour rather than lines, every word
-  is replaceable, and every state is the state it claims to be.</p>
+  <p class="eyebrow">GPUI Box</p>
+  <h1>Independent GPUI, and the kit that sits on it.</h1>
+  <p class="lead">Independent GPUI framework distribution plus a product-neutral
+  component, semantic automation, and visual-test kit. Not an official Zed
+  project. Surfaces group with colour rather than lines, every word is
+  replaceable, and every state is the state it claims to be.</p>
   <p class="cta">
-    <a class="button" href="#compose">Compose a scene</a>
-    <a class="button quiet" href="#scenes">Browse {scenes_count} scenes</a>
-    <a class="button quiet" href="/mcp/">Open MCP</a>
+    <a class="button" href="/components/">Browse the catalog</a>
+    <a class="button quiet" href="/compose/?scene={featured}&amp;theme=studio-dark">Compose a scene</a>
     <a class="button quiet" href="/docs/">Read the docs</a>
   </p>
 </section>
 
-<section class="stats">
-  <div><b>{builders}</b><span>builders</span></div>
-  <div><b>{views}</b><span>views</span></div>
-  <div><b>{scenes_count}</b><span>verified scenes</span></div>
-  <div><b>{images}</b><span>gate-checked images</span></div>
-</section>
-
-<section id="compose" class="compose">
-  <h2>Compose</h2>
-  <p class="lead">The documentation stays searchable static HTML. These two
-  surfaces are the same Rust scene, live in both themes. Until a renderer is
-  ready, or if this browser cannot start one, the verified capture remains.</p>
-  <div class="compose-toolbar">
-    <label class="compose-search">
-      <span>Scene</span>
-      <input id="compose-filter" type="search" list="compose-scenes" placeholder="Filter {scenes_count} scenes" autocomplete="off">
-    </label>
-    <datalist id="compose-scenes">{scene_options}</datalist>
-    <a class="button quiet" id="compose-full" href="/compose/?scene={featured}&amp;theme=studio-dark">Open full compose</a>
+<section id="specimen" class="specimen">
+  <div class="specimen-copy">
+    <h2>Specimen</h2>
+    <p class="lead">The same Rust scene, live in both themes. Until a renderer
+    is ready, or if this browser cannot start one, the verified capture
+    remains. The documentation stays searchable static HTML.</p>
+    <div class="compose-toolbar">
+      <label class="compose-search">
+        <span>Scene</span>
+        <input id="compose-filter" type="search" list="compose-scenes" placeholder="Try {scenes_count} scenes" autocomplete="off">
+      </label>
+      <datalist id="compose-scenes">{scene_options}</datalist>
+      <a class="button quiet" id="compose-full" href="/compose/?scene={featured}&amp;theme=studio-dark">Open full compose</a>
+    </div>
   </div>
   <div class="compose-grid">
     {dark}
@@ -380,106 +460,288 @@ fn home(components: &[Value], scenes: &[Value], image_root: &str) -> String {
   </div>
 </section>
 
-<section id="scenes" class="catalog">
-  <h2>Scenes</h2>
-  <p class="lead">{scenes_count} canonical renderings, each captured in both
-  themes and compared pixel for pixel on every run. Open one to compose it live
-  and see the components it builds.</p>
-  <input id="scene-filter" type="search" placeholder="Filter scenes" autocomplete="off">
-  <div class="scene-stack">
-{scene_cards}
+<section class="features">
+  <h2>The complete Box</h2>
+  <p class="lead">Framework, kit, tokens, truthful states, a visual gate, and
+  the catalog an agent can post to.</p>
+  <div class="feature-grid">
+    <article>
+      <h3>Framework</h3>
+      <p>Cargo package <code>gpui-box</code> imports as <code>gpui</code>. It
+      is derived from GPUI source imported from Zed, but it is not an official
+      Zed project.</p>
+    </article>
+    <article>
+      <h3>Kit</h3>
+      <p>{builders} builders and {views} views. Components read caller-owned
+      data, emit caller-owned actions, and hold visual transient state only.
+      <a href="/components/">Open the catalog</a>.</p>
+    </article>
+    <article>
+      <h3>Tokens</h3>
+      <p>Colour, spacing, radius, type, motion and effect come from one token
+      document through the theme. Studio ships dark and light.
+      <a href="/docs/token-model.html">Token model</a>.</p>
+    </article>
+    <article>
+      <h3>Truthful UI</h3>
+      <p>Loading, Empty, Unavailable, Error and Ready are five things. A
+      refresh failure keeps the last verified value on screen. Anything
+      actionable carries a stable semantic id.
+      <a href="/docs/truthful-ui.html">Truthful UI</a> ·
+      <a href="/docs/semantic-automation.html">Semantics</a>.</p>
+    </article>
+    <article>
+      <h3>Visual gate</h3>
+      <p>Every signature on this site was compiled and every image was
+      rendered by the same gate that guards the library.
+      <a href="/compose/?scene={featured}&amp;theme=studio-dark">Compose</a> ·
+      <a href="/docs/screenshot-testing.html">Screenshot testing</a>.</p>
+    </article>
+    <article>
+      <h3>MCP</h3>
+      <p>The same catalog as this repository, answered for an agent — not the
+      crates.io cohort. Hosted <code>render_scene</code> returns the committed
+      capture. <a href="/mcp/">Open MCP</a>.</p>
+    </article>
   </div>
-  <p id="scenes-empty" class="empty" hidden>Nothing matches.</p>
 </section>
 
-<section id="components" class="catalog">
-  <h2>Components</h2>
-  <p class="lead">A <b>builder</b> is <code>RenderOnce</code>: construct and
-  mount it in one expression. A <b>view</b> survives a frame, so it is held in
-  an <code>Entity</code>. Both report an intent and apply nothing.</p>
-  <input id="component-filter" type="search" placeholder="Filter {count} components" autocomplete="off">
-  <div class="rows">
-{component_rows}
+<section class="start">
+  <h2>Depend on it</h2>
+  <p class="lead">Use Cargo aliases so source code keeps the conventional
+  <code>gpui</code> and <code>gpui_kit</code> imports. Do not add another GPUI
+  implementation to the same application.</p>
+  <div class="copy-block">
+    <button type="button" class="copy" data-copy>Copy</button>
+    <pre><code>[dependencies]
+gpui = {{ package = "gpui-box", version = "0.1.1" }}
+gpui_platform = {{ package = "gpui-box-platform", version = "0.1.1" }}
+gpui_kit = {{ package = "gpui-box-kit", version = "0.1.1" }}</code></pre>
   </div>
-  <p id="components-empty" class="empty" hidden>Nothing matches.</p>
+  <div class="copy-block">
+    <button type="button" class="copy" data-copy>Copy</button>
+    <pre><code>use gpui_kit::prelude::*;
+
+let app = gpui_platform::application().with_assets(gpui_kit::assets::Assets);
+app.run(|cx| gpui_kit::install(cx));</code></pre>
+  </div>
 </section>
 
-<section class="rules">
-  <h2>Four rules that fail a build</h2>
-  <p class="lead">These are not review comments. A change that breaks one does
-  not land.</p>
-  <ol>
-    <li><b>No literal a reader reads.</b> Text the library authors is named by a
-    <code>StringKey</code> and read from the installed catalogue, so a host can
-    replace any of it. Text the caller passes in is the host's, and shown
-    verbatim.</li>
-    <li><b>No hard-coded visual value.</b> Colour, spacing, radius, type, motion
-    and effect come from one token document through the theme.</li>
-    <li><b>States are distinct and truthful.</b> Loading, Empty, Unavailable,
-    Error and Ready are five things. A refresh failure keeps the last verified
-    value on screen. A host refusal is shown as a refusal, never as empty data.
-    A disabled control does not install its handler at all.</li>
-    <li><b>Anything actionable carries a stable semantic id</b>, derived from
-    business identity rather than list position.</li>
-  </ol>
+<section class="plates">
+  <h2>Selected plates</h2>
+  <p class="lead">Canonical renderings, captured in both themes and compared
+  pixel for pixel. The rest live in compose.</p>
+  <div class="gallery">
+{plates}
+  </div>
 </section>
 "##,
-        count = components.len(),
         scenes_count = scenes.len(),
-        images = scenes.len() * 2,
         featured = featured_name,
         scene_options = scene_options(scenes),
-        scene_cards = scene_cards(scenes, components, image_root),
-        component_rows = component_rows(components),
         dark = live_embed(featured_name, "studio-dark", image_root, false),
         light = live_embed(featured_name, "studio-light", image_root, false),
     );
-    shell("GPUI Box — native desktop components for GPUI", "/", &body)
+    shell(
+        "GPUI Box — independent GPUI and a product-neutral kit",
+        "/",
+        "home",
+        &body,
+    )
 }
 
-fn component_rows(components: &[Value]) -> String {
-    components
+fn components_index(components: &[Value], scenes: &[Value], image_root: &str) -> String {
+    let groups = grouped_components(components);
+    let catalog = groups
         .iter()
-        .map(|component| {
-            let name = string(component, "name");
-            let kind = string(component, "kind");
+        .map(|(module, items)| {
+            let cards = items
+                .iter()
+                .map(|component| component_card(component, scenes, image_root))
+                .collect::<Vec<_>>()
+                .join("\n");
             format!(
-                r#"<article class="row" id="component-{anchor}" data-component="{name}" data-search="{search}">
-  <div class="row-head">
-    <b>{name}</b><span class="kind {kind}">{kind}</span>
+                r#"<section class="module" id="module-{module}" data-module="{module}">
+  <h2>{module}</h2>
+  <div class="catalog-grid">
+{cards}
   </div>
-  <p class="summary">{summary}</p>
-  <p class="note">{held}</p>
-  <pre class="path"><code>use {path};</code></pre>
-  {sections}
-  <p class="source">Source: <a href="https://github.com/fran0220/gpui-box/blob/main/{source}">{source}</a></p>
-</article>"#,
-                anchor = slug(&name),
-                summary = escape(&string(component, "summary")),
-                held = if kind == "view" {
-                    "A view survives a frame. Hold it in an <code>Entity</code> with \
-                     <code>cx.new(..)</code> and reach it with <code>.update(..)</code>."
-                } else {
-                    "A builder is <code>RenderOnce</code>. Construct and mount it in one \
-                     expression."
-                },
-                path = escape(&string(component, "path")),
-                source = escape(&string(component, "source")),
-                sections = component_sections(component),
-                search = escape(&format!(
-                    "{name} {kind} {} {}",
-                    string(component, "summary"),
-                    array(component, "scenes")
-                        .iter()
-                        .map(as_string)
-                        .collect::<Vec<_>>()
-                        .join(" ")
-                ))
-                .to_lowercase(),
+</section>"#
             )
         })
         .collect::<Vec<_>>()
-        .join("\n")
+        .join("\n");
+    let body = format!(
+        r#"<div class="library">
+{rail}
+  <div class="library-main">
+    <h1>Components</h1>
+    <p class="lead">A <b>builder</b> is <code>RenderOnce</code>: construct and
+    mount it in one expression. A <b>view</b> survives a frame, so it is held
+    in an <code>Entity</code>. Both report an intent and apply nothing.</p>
+    <p id="components-empty" class="empty" hidden>Nothing matches.</p>
+{catalog}
+  </div>
+</div>"#,
+        rail = component_rail(components, None),
+    );
+    shell("Components — GPUI Box", "/components/", "library", &body)
+}
+
+fn component_page(
+    component: &Value,
+    components: &[Value],
+    scenes: &[Value],
+    image_root: &str,
+) -> String {
+    let name = string(component, "name");
+    let kind = string(component, "kind");
+    let first = first_scene(component, scenes);
+    let preview = match first {
+        Some(scene) => {
+            let scene_name = string(scene, "name");
+            format!(
+                r#"<div class="preview">
+  {}
+  <a class="tile" href="/compose/?scene={scene_name}&amp;theme=studio-light">
+    <img src="{image_root}/{scene_name}-studio-light.png" alt="The {scene_name} scene in studio-light">
+    <span>studio-light</span>
+  </a>
+</div>"#,
+                live_embed(&scene_name, "studio-dark", image_root, true)
+            )
+        }
+        None => String::new(),
+    };
+    let used_in = array(component, "scenes");
+    let scenes_line = if used_in.is_empty() {
+        String::new()
+    } else {
+        format!(
+            r#"<p class="note">Rendered by {}.</p>"#,
+            used_in
+                .iter()
+                .map(as_string)
+                .map(|scene| format!(r#"<a href="/compose/?scene={scene}">{scene}</a>"#))
+                .collect::<Vec<_>>()
+                .join(" ")
+        )
+    };
+    let examples = first
+        .filter(|scene| !string(scene, "example").is_empty())
+        .map(|scene| {
+            let scene_name = string(scene, "name");
+            fold(
+                "example",
+                &format!("Example · {scene_name}"),
+                "",
+                &format!(
+                    r#"<pre class="code"><code>{}</code></pre>"#,
+                    highlight(&string(scene, "example"))
+                ),
+            )
+        })
+        .unwrap_or_default();
+    let held = if kind == "view" {
+        "A view survives a frame. Hold it in an <code>Entity</code> with \
+         <code>cx.new(..)</code> and reach it with <code>.update(..)</code>."
+    } else {
+        "A builder is <code>RenderOnce</code>. Construct and mount it in one \
+         expression."
+    };
+    let body = format!(
+        r#"<div class="library">
+{rail}
+  <div class="library-main">
+    <p class="crumb"><a href="/components/">Components</a> / {module}</p>
+    <h1>{name} <span class="kind {kind}">{kind}</span></h1>
+    <p class="lead">{summary}</p>
+    <p class="note">{held}</p>
+    {preview}
+    <pre class="path"><code>use {path};</code></pre>
+    {scenes_line}
+    {sections}
+    {examples}
+    <p class="source">Source: <a href="https://github.com/fran0220/gpui-box/blob/main/{source}">{source}</a></p>
+  </div>
+</div>"#,
+        rail = component_rail(components, Some(&name)),
+        module = component_module(component),
+        summary = escape(&string(component, "summary")),
+        path = escape(&string(component, "path")),
+        source = escape(&string(component, "source")),
+        sections = component_sections(component),
+    );
+    shell(
+        &format!("{name} — GPUI Box"),
+        "/components/",
+        "library",
+        &body,
+    )
+}
+
+fn component_card(component: &Value, scenes: &[Value], image_root: &str) -> String {
+    let name = string(component, "name");
+    let kind = string(component, "kind");
+    let image = first_scene(component, scenes)
+        .map(|scene| {
+            let scene_name = string(scene, "name");
+            format!(
+                r#"<img loading="lazy" src="{image_root}/{scene_name}-studio-dark.png" alt="The {name} component in {scene_name}">"#
+            )
+        })
+        .unwrap_or_default();
+    format!(
+        r#"<a class="tile" href="/components/{name}.html" data-component="{name}" data-search="{search}">
+  {image}
+  <span class="tile-meta"><b>{name}</b><span class="kind {kind}">{kind}</span></span>
+  <p class="summary">{summary}</p>
+</a>"#,
+        summary = escape(&string(component, "summary")),
+        search = component_search(component),
+    )
+}
+
+fn component_rail(components: &[Value], current: Option<&str>) -> String {
+    let groups = grouped_components(components);
+    let groups = groups
+        .iter()
+        .map(|(module, items)| {
+            let links = items
+                .iter()
+                .map(|component| {
+                    let name = string(component, "name");
+                    let on = if current == Some(name.as_str()) {
+                        " class=\"on\""
+                    } else {
+                        ""
+                    };
+                    format!(
+                        r#"<a href="/components/{name}.html"{on} data-component="{name}" data-search="{search}">{name}</a>"#,
+                        search = component_search(component),
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("");
+            format!(
+                r#"<div class="rail-group" data-module="{module}">
+  <a class="rail-module" href="/components/#module-{module}">{module}</a>
+  {links}
+</div>"#
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    format!(
+        r#"<aside class="rail">
+  <label class="compose-search">
+    <span>Filter</span>
+    <input id="component-filter" type="search" placeholder="Filter components" autocomplete="off">
+  </label>
+{groups}
+</aside>"#
+    )
 }
 
 fn component_sections(component: &Value) -> String {
@@ -498,47 +760,52 @@ fn component_sections(component: &Value) -> String {
         if values.is_empty() {
             continue;
         }
-        sections.push_str(&format!(
-            "<h3>{title}</h3>{}<pre class=\"sig\"><code>{}</code></pre>",
-            if note.is_empty() {
-                String::new()
-            } else {
-                format!("<p class=\"note\">{note}</p>")
-            },
-            values
-                .iter()
-                .map(|value| escape(&as_string(value)))
-                .collect::<Vec<_>>()
-                .join("\n")
+        sections.push_str(&fold(
+            key,
+            title,
+            note,
+            &format!(
+                r#"<pre class="sig"><code>{}</code></pre>"#,
+                values
+                    .iter()
+                    .map(|value| escape(&as_string(value)))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            ),
         ));
     }
 
     let reports = array(component, "reports");
     if !reports.is_empty() {
-        sections.push_str(&format!(
-            "<h3>Reports</h3><p class=\"note\">The variants of the event it emits. \
-             It never applies the change itself.</p><ul class=\"variants\">{}</ul>",
-            reports
-                .iter()
-                .map(|value| format!("<li>{}</li>", escape(&as_string(value))))
-                .collect::<Vec<_>>()
-                .join("")
-        ));
-    }
-
-    let used_in = array(component, "scenes");
-    if !used_in.is_empty() {
-        sections.push_str(&format!(
-            "<p class=\"note\">Rendered by {}.</p>",
-            used_in
-                .iter()
-                .map(as_string)
-                .map(|scene| format!("<a href=\"/?scene={scene}#compose\">{scene}</a>"))
-                .collect::<Vec<_>>()
-                .join(" ")
+        sections.push_str(&fold(
+            "reports",
+            "Reports",
+            "The variants of the event it emits. It never applies the change itself.",
+            &format!(
+                r#"<ul class="variants">{}</ul>"#,
+                reports
+                    .iter()
+                    .map(|value| format!("<li>{}</li>", escape(&as_string(value))))
+                    .collect::<Vec<_>>()
+                    .join("")
+            ),
         ));
     }
     sections
+}
+
+fn fold(id: &str, title: &str, note: &str, inner: &str) -> String {
+    let note = if note.is_empty() {
+        String::new()
+    } else {
+        format!(r#"<p class="note">{note}</p>"#)
+    };
+    format!(
+        r#"<details class="fold" id="{id}">
+  <summary>{title}</summary>
+  {note}{inner}
+</details>"#
+    )
 }
 
 fn scene_options(scenes: &[Value]) -> String {
@@ -552,57 +819,70 @@ fn scene_options(scenes: &[Value]) -> String {
         .join("")
 }
 
-fn scene_cards(scenes: &[Value], components: &[Value], image_root: &str) -> String {
-    scenes
+fn featured_scene(scenes: &[Value]) -> &str {
+    FEATURED_SCENES
         .iter()
-        .map(|scene| {
-            let name = string(scene, "name");
-            let uses = array(scene, "uses")
+        .copied()
+        .find(|name| scenes.iter().any(|scene| string(scene, "name") == *name))
+        .unwrap_or("button")
+}
+
+fn component_module(component: &Value) -> String {
+    let path = string(component, "path");
+    let parts: Vec<&str> = path.split("::").collect();
+    if parts.len() >= 3 {
+        return parts[1].to_string();
+    }
+    let source = string(component, "source");
+    let parts: Vec<&str> = source.split('/').collect();
+    if let Some(index) = parts.iter().position(|part| *part == "src")
+        && let Some(module) = parts.get(index + 1)
+    {
+        return module.trim_end_matches(".rs").to_string();
+    }
+    "kit".to_string()
+}
+
+fn grouped_components(components: &[Value]) -> Vec<(String, Vec<&Value>)> {
+    let mut map = BTreeMap::<String, Vec<&Value>>::new();
+    for component in components {
+        map.entry(component_module(component))
+            .or_default()
+            .push(component);
+    }
+    let mut groups = Vec::new();
+    for module in MODULE_ORDER {
+        if let Some(items) = map.remove(*module) {
+            groups.push(((*module).to_string(), items));
+        }
+    }
+    groups.extend(map);
+    groups
+}
+
+fn first_scene<'a>(component: &Value, scenes: &'a [Value]) -> Option<&'a Value> {
+    array(component, "scenes").into_iter().find_map(|name| {
+        let name = as_string(&name);
+        scenes.iter().find(|scene| string(scene, "name") == name)
+    })
+}
+
+fn component_search(component: &Value) -> String {
+    escape(
+        &format!(
+            "{} {} {} {} {}",
+            string(component, "name"),
+            string(component, "kind"),
+            component_module(component),
+            string(component, "summary"),
+            array(component, "scenes")
                 .iter()
                 .map(as_string)
-                .filter(|used| components.iter().any(|component| string(component, "name") == *used))
-                .map(|used| {
-                    format!(
-                        "<a href=\"/?component={used}#component-{anchor}\">{used}</a>",
-                        anchor = slug(&used)
-                    )
-                })
-                .collect::<Vec<_>>();
-            let search = escape(&format!(
-                "{name} {}",
-                array(scene, "uses")
-                    .iter()
-                    .map(as_string)
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            ))
-            .to_lowercase();
-            format!(
-                r##"<article class="scene-card" id="scene-{name}" data-scene="{name}" data-search="{search}">
-  <a class="tile" href="/?scene={name}#compose">
-    <img loading="lazy" src="{image_root}/{name}-studio-dark.png" alt="The {name} scene in studio-dark">
-    <span>{name}</span>
-  </a>
-  <div class="scene-body">
-    <h3>{name}</h3>
-    <p class="note">Builds {uses}</p>
-    <div class="themes compact">
-      <figure><img loading="lazy" src="{image_root}/{name}-studio-dark.png" alt="{name} in the dark theme"><figcaption>studio-dark</figcaption></figure>
-      <figure><img loading="lazy" src="{image_root}/{name}-studio-light.png" alt="{name} in the light theme"><figcaption>studio-light</figcaption></figure>
-    </div>
-    <pre class="code"><code>{example}</code></pre>
-  </div>
-</article>"##,
-                uses = if uses.is_empty() {
-                    "no catalogued components".to_string()
-                } else {
-                    uses.join(" ")
-                },
-                example = highlight(&string(scene, "example")),
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
+                .collect::<Vec<_>>()
+                .join(" ")
+        )
+        .to_lowercase(),
+    )
 }
 
 fn live_embed(scene: &str, theme: &str, image_root: &str, detail: bool) -> String {
@@ -620,7 +900,30 @@ fn live_embed(scene: &str, theme: &str, image_root: &str, detail: bool) -> Strin
     )
 }
 
-fn mcp_page(root: &Path, components: &[Value], scenes: &[Value]) -> Result<String> {
+fn doc_pages(root: &Path) -> Result<Vec<String>> {
+    let mut pages = Vec::new();
+    for entry in fs::read_dir(root.join("docs"))? {
+        let path = entry?.path();
+        let file = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+        if OMIT.contains(&file.as_str()) || !file.ends_with(".md") {
+            continue;
+        }
+        pages.push(file.trim_end_matches(".md").to_string());
+    }
+    pages.sort();
+    Ok(pages)
+}
+
+fn mcp_page(
+    root: &Path,
+    components: &[Value],
+    scenes: &[Value],
+    pages: &[String],
+) -> Result<String> {
     let tools = fs::read_to_string(root.join("tools/mcp/tools.json"))
         .context("tools/mcp/tools.json is missing")?;
     let tools: Value = serde_json::from_str(&tools)?;
@@ -638,44 +941,67 @@ fn mcp_page(root: &Path, components: &[Value], scenes: &[Value]) -> Result<Strin
         .collect::<Vec<_>>()
         .join("");
     let body = format!(
-        r#"<h1>MCP</h1>
-<p class="lead">The same catalog as this repository, answered for an agent —
-not the crates.io cohort. Hosted <code>render_scene</code> returns the
-committed capture. Working-copy rendering needs the stdio server from a
-checkout.</p>
-<pre><code>{{
+        r#"<div class="library">
+{rail}
+  <div class="library-main">
+    <h1>MCP</h1>
+    <p class="lead">The same catalog as this repository, answered for an agent —
+    not the crates.io cohort. Hosted <code>render_scene</code> returns the
+    committed capture. Working-copy rendering needs the stdio server from a
+    checkout.</p>
+    <div class="copy-block">
+      <button type="button" class="copy" data-copy>Copy</button>
+      <pre><code>{{
   "mcpServers": {{
     "gpui-box": {{ "url": "https://gpui-box.origingame.dev/mcp" }}
   }}
 }}</code></pre>
-<p class="note">People read this page. Agents POST JSON-RPC to
-<code>/mcp</code>. A GET there is refused because that endpoint opens no
-stream.</p>
-<h2>Tools</h2>
-<ul class="mcp-tools">{items}</ul>
-<section class="stats">
-  <div><b>{components}</b><span>indexed components</span></div>
-  <div><b>{scenes}</b><span>verified scenes</span></div>
-</section>
-<p class="note">Also published as <a href="/llms.txt">llms.txt</a> and
-<a href="/api-index.json">api-index.json</a>.</p>
-"#,
+    </div>
+    <p class="note">People read this page. Agents POST JSON-RPC to
+    <code>/mcp</code>. A GET there is refused because that endpoint opens no
+    stream.</p>
+    <h2>Tools</h2>
+    <ul class="mcp-tools">{items}</ul>
+    <p class="note">{components} indexed components · {scenes} verified scenes.
+    Also published as <a href="/llms.txt">llms.txt</a> and
+    <a href="/api-index.json">api-index.json</a>.</p>
+  </div>
+</div>"#,
+        rail = doc_rail(pages, "mcp"),
         components = components.len(),
         scenes = scenes.len(),
     );
-    Ok(shell("MCP — GPUI Box", "/mcp/", &body))
+    Ok(shell("MCP — GPUI Box", "/docs/", "library", &body))
 }
 
 fn doc_list(pages: &[String]) -> String {
-    let items = pages
-        .iter()
-        .map(|page| format!("<li><a href=\"/docs/{page}.html\">{page}</a></li>"))
+    let sections = doc_sections(pages)
+        .into_iter()
+        .map(|(title, entries)| {
+            let items = entries
+                .into_iter()
+                .map(|(slug, label)| {
+                    format!("<li><a href=\"{}\">{label}</a></li>", doc_href(&slug))
+                })
+                .collect::<Vec<_>>()
+                .join("");
+            format!("<h2>{title}</h2><ul class=\"docs\">{items}</ul>")
+        })
         .collect::<Vec<_>>()
         .join("");
     let body = format!(
-        "<h1>Docs</h1><p class=\"lead\">The contracts, in full.</p><ul class=\"docs\">{items}</ul>"
+        r#"<div class="library">
+{rail}
+  <div class="library-main">
+    <h1>Docs</h1>
+    <p class="lead">The contracts, in full. MCP is the catalog an agent
+    posts to; the rest is what the gate enforces.</p>
+    {sections}
+  </div>
+</div>"#,
+        rail = doc_rail(pages, ""),
     );
-    shell("Docs — GPUI Box", "/docs/", &body)
+    shell("Docs — GPUI Box", "/docs/", "library", &body)
 }
 
 fn doc_page(page: &str, markdown: &str, pages: &[String]) -> String {
@@ -687,22 +1013,86 @@ fn doc_page(page: &str, markdown: &str, pages: &[String]) -> String {
     let mut rendered = String::new();
     html::push_html(&mut rendered, Parser::new_ext(markdown, options));
 
-    let side = pages
+    let body = format!(
+        r#"<div class="library">
+{rail}
+  <article class="library-main prose">{rendered}</article>
+</div>"#,
+        rail = doc_rail(pages, page),
+    );
+    shell(
+        &format!("{} — GPUI Box", doc_title(page)),
+        "/docs/",
+        "library",
+        &body,
+    )
+}
+
+fn doc_href(slug: &str) -> String {
+    if slug == "mcp" {
+        "/mcp/".to_string()
+    } else {
+        format!("/docs/{slug}.html")
+    }
+}
+
+fn doc_title(slug: &str) -> String {
+    for (_, entries) in DOC_GROUPS {
+        for (id, title) in *entries {
+            if *id == slug {
+                return (*title).to_string();
+            }
+        }
+    }
+    slug.to_string()
+}
+
+fn doc_sections(pages: &[String]) -> Vec<(String, Vec<(String, String)>)> {
+    let mut seen = std::collections::BTreeSet::new();
+    let mut sections = Vec::new();
+    for (title, entries) in DOC_GROUPS {
+        let present = entries
+            .iter()
+            .filter(|(slug, _)| *slug == "mcp" || pages.iter().any(|page| page == *slug))
+            .map(|(slug, label)| {
+                seen.insert((*slug).to_string());
+                ((*slug).to_string(), (*label).to_string())
+            })
+            .collect::<Vec<_>>();
+        if !present.is_empty() {
+            sections.push(((*title).to_string(), present));
+        }
+    }
+    let rest = pages
         .iter()
-        .map(|other| {
-            let current = if other == page { " class=\"on\"" } else { "" };
-            format!("<li><a href=\"/docs/{other}.html\"{current}>{other}</a></li>")
+        .filter(|page| !seen.contains(page.as_str()))
+        .map(|page| (page.clone(), page.clone()))
+        .collect::<Vec<_>>();
+    if !rest.is_empty() {
+        sections.push(("Other".to_string(), rest));
+    }
+    sections
+}
+
+fn doc_rail(pages: &[String], current: &str) -> String {
+    let groups = doc_sections(pages)
+        .into_iter()
+        .map(|(title, entries)| {
+            let links = entries
+                .into_iter()
+                .map(|(slug, label)| {
+                    let on = if slug == current { " class=\"on\"" } else { "" };
+                    format!("<a href=\"{}\"{on}>{label}</a>", doc_href(&slug))
+                })
+                .collect::<Vec<_>>()
+                .join("");
+            format!(
+                r#"<div class="rail-group"><span class="rail-module">{title}</span>{links}</div>"#
+            )
         })
         .collect::<Vec<_>>()
-        .join("");
-
-    let body = format!(
-        r#"<div class="doc">
-<aside><ul>{side}</ul></aside>
-<article class="prose">{rendered}</article>
-</div>"#
-    );
-    shell(&format!("{page} — GPUI Box"), "/docs/", &body)
+        .join("\n");
+    format!(r#"<aside class="rail">{groups}</aside>"#)
 }
 
 fn search(components: &[Value], scenes: &[Value]) -> String {
@@ -736,18 +1126,6 @@ fn search(components: &[Value], scenes: &[Value]) -> String {
 // ---------------------------------------------------------------------------
 // Text
 // ---------------------------------------------------------------------------
-
-fn slug(text: &str) -> String {
-    text.chars()
-        .map(|character| {
-            if character.is_ascii_alphanumeric() {
-                character.to_ascii_lowercase()
-            } else {
-                '-'
-            }
-        })
-        .collect()
-}
 
 fn escape(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
@@ -1110,11 +1488,11 @@ mod tests {
     }
 
     #[test]
-    fn home_keeps_compose_scenes_and_components_on_one_page() {
+    fn home_is_the_box_not_the_catalog() {
         let component = serde_json::json!({
             "name": "Button",
             "kind": "builder",
-            "path": "gpui_kit::Button",
+            "path": "gpui_kit::controls::Button",
             "source": "crates/gpui-kit/src/controls/button.rs",
             "summary": "A labeled action.",
             "construct": ["new(ident: impl Into<Ident>) -> Self"],
@@ -1129,33 +1507,93 @@ mod tests {
             "uses": ["Button"],
             "example": "fn button() {}"
         });
-        let html = home(&[component], &[scene], "/images/revision");
-        assert!(html.contains("href=\"/#compose\">Compose</a>"), "{html}");
-        assert!(html.contains("href=\"/#scenes\">Scenes</a>"), "{html}");
+        let html = home(
+            std::slice::from_ref(&component),
+            std::slice::from_ref(&scene),
+            "/images/revision",
+        );
         assert!(
-            html.contains("href=\"/#components\">Components</a>"),
+            html.contains("href=\"/components/\">Components</a>"),
             "{html}"
         );
-        assert!(html.contains("href=\"/mcp/\">MCP</a>"), "{html}");
         assert!(html.contains("href=\"/docs/\">Docs</a>"), "{html}");
+        assert!(!html.contains("href=\"/#compose\">Compose</a>"), "{html}");
+        assert!(!html.contains("href=\"/#scenes\">Scenes</a>"), "{html}");
         assert!(!html.contains("Playground"), "{html}");
-        assert!(html.contains("id=\"compose\""), "{html}");
+        assert!(!html.contains("id=\"component-button\""), "{html}");
+        assert!(!html.contains("id=\"scene-button\""), "{html}");
+        assert!(html.contains("id=\"specimen\""), "{html}");
+        assert!(html.contains("The complete Box"), "{html}");
         assert!(html.contains("data-live-theme=\"studio-dark\""), "{html}");
         assert!(html.contains("data-live-theme=\"studio-light\""), "{html}");
-        assert!(html.contains("id=\"scene-button\""), "{html}");
-        assert!(html.contains("id=\"component-button\""), "{html}");
-        assert!(
-            html.contains("href=\"/?component=Button#component-button\">Button</a>"),
-            "{html}"
-        );
+        assert!(html.contains("gpui = { package = \"gpui-box\""), "{html}");
         assert!(STYLE.contains("color: var(--text);"), "{STYLE}");
+
+        let catalog = components_index(
+            std::slice::from_ref(&component),
+            std::slice::from_ref(&scene),
+            "/images/revision",
+        );
+        assert!(catalog.contains("id=\"module-controls\""), "{catalog}");
+        assert!(
+            catalog.contains("href=\"/components/Button.html\""),
+            "{catalog}"
+        );
+
+        let detail = component_page(
+            &component,
+            std::slice::from_ref(&component),
+            std::slice::from_ref(&scene),
+            "/images/revision",
+        );
+        assert!(detail.contains("<h1>Button"), "{detail}");
+        assert!(
+            detail.contains("<details class=\"fold\" id=\"construct\">"),
+            "{detail}"
+        );
+        assert!(
+            !detail.contains("<details class=\"fold\" id=\"construct\" open"),
+            "{detail}"
+        );
+        assert!(
+            detail.contains("href=\"/compose/?scene=button\""),
+            "{detail}"
+        );
     }
 
     #[test]
-    fn old_catalog_paths_redirect_onto_the_home_or_compose() {
-        let home = redirect_page("/#scenes");
-        assert!(home.contains("url=/#scenes"), "{home}");
-        let compose = redirect_page("/compose/");
-        assert!(compose.contains("url=/compose/"), "{compose}");
+    fn docs_put_mcp_first_and_group_the_rest() {
+        let pages = vec![
+            "abi-vocabulary".to_string(),
+            "components".to_string(),
+            "mcp".to_string(),
+            "token-model".to_string(),
+        ];
+        let html = doc_list(&pages);
+        let mcp = html.find("href=\"/mcp/\">MCP</a>").expect("mcp");
+        let components = html
+            .find("href=\"/docs/components.html\">Components</a>")
+            .expect("components");
+        let tokens = html
+            .find("href=\"/docs/token-model.html\">Token model</a>")
+            .expect("tokens");
+        let abi = html
+            .find("href=\"/docs/abi-vocabulary.html\">ABI vocabulary</a>")
+            .expect("abi");
+        assert!(mcp < components, "{html}");
+        assert!(components < tokens, "{html}");
+        assert!(tokens < abi, "{html}");
+        assert!(html.contains("<h2>Start</h2>"), "{html}");
+        assert!(html.contains("<h2>System</h2>"), "{html}");
+        assert!(html.contains("<h2>Operate</h2>"), "{html}");
+    }
+
+    #[test]
+    fn old_catalog_paths_redirect_onto_compose() {
+        let scenes = redirect_page("/compose/");
+        assert!(scenes.contains("url=/compose/"), "{scenes}");
+        let scene = redirect_page("/compose/?scene=button");
+        assert!(scene.contains("url=/compose/?scene=button"), "{scene}");
+        assert!(scene.contains("This page has moved."), "{scene}");
     }
 }

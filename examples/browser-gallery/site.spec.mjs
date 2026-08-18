@@ -17,12 +17,10 @@ async function liveFrame(page, scene, theme = "studio-dark") {
 test("static catalog pages retain their content while GPUI enhances them", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveTitle(/GPUI Box/);
-  await expect(page.getByRole("heading", { name: "Native desktop components for GPUI." }))
+  await expect(page.getByRole("heading", { name: "Independent GPUI, and the kit that sits on it." }))
     .toBeVisible();
-  await expect(page.getByRole("link", { name: "Compose", exact: true }))
-    .toHaveAttribute("href", "/#compose");
-  await expect(page.getByRole("link", { name: "MCP", exact: true }))
-    .toHaveAttribute("href", "/mcp/");
+  await expect(page.getByRole("link", { name: "Components", exact: true }))
+    .toHaveAttribute("href", "/components/");
   await expect(page.getByRole("link", { name: "Docs", exact: true }))
     .toHaveAttribute("href", "/docs/");
   await expect(page.locator('[data-live-scene="node-graph"][data-live-theme="studio-dark"] .live-fallback img'))
@@ -41,12 +39,16 @@ test("static catalog pages retain their content while GPUI enhances them", async
 
   await page.setViewportSize({ width: 1280, height: 1000 });
   await page.goto("/?scene=button#compose");
-  await expect(page.locator("#scene-button")).toBeVisible();
-  await expect(page.locator("#scene-button .themes img")).toHaveCount(2);
-  await expect(page.locator("#scene-button pre.code")).toContainText("Button");
-  const sceneFrame = await liveFrame(page, "button");
-  await expect.poll(() => sceneFrame.evaluate(() => JSON.parse(window.gpuiBoxSelection).scene))
-    .toBe("button");
+  await expect(page).toHaveURL(/\/compose\/\?scene=button/);
+
+  await page.goto("/components/Button.html");
+  await expect(page.getByRole("heading", { name: /Button/ })).toBeVisible();
+  await expect(page.locator("details#construct")).not.toHaveAttribute("open");
+  await expect(page.locator("details#construct")).toContainText("new(ident");
+
+  await page.goto("/docs/");
+  await expect(page.locator(".rail a").first()).toHaveText("MCP");
+  await expect(page.locator(".rail a").first()).toHaveAttribute("href", "/mcp/");
 
   await page.goto("/compose/?backend=webgl");
   await page.waitForFunction(() => window.gpuiKitGalleryReady === true);

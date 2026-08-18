@@ -1,45 +1,48 @@
-// Filtering the home catalog. Every card already carries what it matches on,
-// so this needs no index and no network, and it keeps working if the search
-// payload never loads.
+// Filtering the catalog. Every card and rail link already carries what it
+// matches on, so this needs no index and no network.
 (function () {
-  function bindFilter(inputId, selector, emptyId) {
-    var filter = document.getElementById(inputId);
-    if (!filter) return;
-    var rows = Array.prototype.slice.call(document.querySelectorAll(selector));
-    var empty = document.getElementById(emptyId);
+  function bindCatalogFilter() {
+    var filter = document.getElementById("component-filter");
+    if (!filter) return filter;
+    var items = Array.prototype.slice.call(document.querySelectorAll("[data-component]"));
+    var modules = Array.prototype.slice.call(document.querySelectorAll("[data-module]"));
+    var empty = document.getElementById("components-empty");
 
     function apply() {
       var words = filter.value.toLowerCase().split(/\s+/).filter(Boolean);
       var shown = 0;
-      rows.forEach(function (row) {
-        var haystack = row.getAttribute("data-search") || "";
+      items.forEach(function (item) {
+        var haystack = item.getAttribute("data-search") || item.textContent.toLowerCase();
         var match = words.every(function (word) {
           return haystack.indexOf(word) !== -1;
         });
-        row.hidden = !match;
-        if (match) shown++;
+        item.hidden = !match;
+        if (match && item.classList.contains("tile")) shown++;
       });
-      if (empty) empty.hidden = shown !== 0;
+      modules.forEach(function (module) {
+        module.hidden = module.querySelectorAll("[data-component]:not([hidden])").length === 0;
+      });
+      if (empty) empty.hidden = shown !== 0 || items.every(function (item) {
+        return !item.classList.contains("tile");
+      });
     }
 
     filter.addEventListener("input", apply);
     return filter;
   }
 
-  var sceneFilter = bindFilter("scene-filter", "[data-scene]", "scenes-empty");
-  var componentFilter = bindFilter("component-filter", "[data-component]", "components-empty");
-  bindFilter("filter", ".row", "empty");
+  var catalogFilter = bindCatalogFilter();
+  var composeFilter = document.getElementById("compose-filter");
 
   document.addEventListener("keydown", function (event) {
     var target = document.activeElement;
-    var filters = [sceneFilter, componentFilter].filter(Boolean);
-    if (event.key === "/" && filters.indexOf(target) === -1) {
+    var filters = [catalogFilter, composeFilter].filter(Boolean);
+    if (event.key === "/" && filters.indexOf(target) === -1 && !event.metaKey && !event.ctrlKey) {
+      var next = catalogFilter || composeFilter;
+      if (!next) return;
       event.preventDefault();
-      var next = sceneFilter || componentFilter;
-      if (next) {
-        next.focus();
-        next.select();
-      }
+      next.focus();
+      next.select();
     }
     if (event.key === "Escape" && filters.indexOf(target) !== -1) {
       target.value = "";
@@ -49,15 +52,17 @@
   });
 })();
 
-// Compose keeps both themes of one scene on the home page. Changing the
-// selected scene rewrites the two live embeds and the full-size link; the
-// verified captures stay visible until each iframe reports its first frame.
+// The home specimen keeps both themes of one scene. Changing the selected
+// scene rewrites the two live embeds and the full-size link; the verified
+// captures stay visible until each iframe reports its first frame. The
+// query string is left alone so an old `?scene=` link can still redirect
+// to compose.
 (function () {
   var dark = document.querySelector('[data-live-theme="studio-dark"]');
   var light = document.querySelector('[data-live-theme="studio-light"]');
   var filter = document.getElementById("compose-filter");
   var full = document.getElementById("compose-full");
-  if (!dark || !light) return;
+  if (!dark || !light || !filter) return;
 
   function setEmbed(host, scene, theme) {
     var fallback = host.querySelector(".live-fallback");
@@ -84,32 +89,18 @@
     setEmbed(dark, scene, "studio-dark");
     setEmbed(light, scene, "studio-light");
     if (full) full.setAttribute("href", "/compose/?scene=" + encodeURIComponent(scene) + "&theme=studio-dark");
-    if (filter && filter.value !== scene) filter.value = scene;
-    var url = new URL(location.href);
-    url.searchParams.set("scene", scene);
-    history.replaceState(null, "", url);
+    if (filter.value !== scene) filter.value = scene;
   }
 
-  if (filter) {
-    filter.addEventListener("change", function () {
+  filter.addEventListener("change", function () {
+    selectScene(filter.value.trim());
+  });
+  filter.addEventListener("keydown", function (event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
       selectScene(filter.value.trim());
-    });
-    filter.addEventListener("keydown", function (event) {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        selectScene(filter.value.trim());
-      }
-    });
-  }
-
-  var requested = new URLSearchParams(location.search);
-  var scene = requested.get("scene");
-  var component = requested.get("component");
-  if (scene) selectScene(scene);
-  if (component) {
-    var target = document.getElementById("component-" + component.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
-    if (target) target.scrollIntoView();
-  }
+    }
+  });
 })();
 
 // A live scene is an enhancement over its committed capture. Keep the static
@@ -129,6 +120,62 @@
     if (!event.data || event.data.type !== "gpui-box-ready") return;
     Array.prototype.forEach.call(document.querySelectorAll(".live-frame"), function (frame) {
       if (frame.contentWindow === event.source) markReady(frame);
+    });
+  });
+})();
+
+(function () {
+  var key = "gpui-box-theme";
+  var button = document.getElementById("theme-toggle");
+
+  function current() {
+    return document.documentElement.getAttribute("data-theme") || "studio-dark";
+  }
+
+  function apply(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+    try {
+      localStorage.setItem(key, theme);
+    } catch (error) {}
+    if (button) {
+      var next = theme === "studio-light" ? "studio-dark" : "studio-light";
+      button.setAttribute("aria-label", "Use " + next);
+      button.textContent = theme === "studio-light" ? "Dark" : "Light";
+    }
+  }
+
+  if (button) {
+    button.addEventListener("click", function () {
+      apply(current() === "studio-light" ? "studio-dark" : "studio-light");
+    });
+    apply(current());
+  }
+})();
+
+(function () {
+  function openHash() {
+    var id = location.hash.replace(/^#/, "");
+    if (!id) return;
+    var target = document.getElementById(id);
+    if (target && target.tagName === "DETAILS") target.open = true;
+  }
+
+  openHash();
+  window.addEventListener("hashchange", openHash);
+})();
+
+(function () {
+  Array.prototype.forEach.call(document.querySelectorAll("[data-copy]"), function (button) {
+    button.addEventListener("click", function () {
+      var block = button.closest(".copy-block");
+      var code = block && block.querySelector("pre");
+      if (!code || !navigator.clipboard) return;
+      navigator.clipboard.writeText(code.innerText).then(function () {
+        button.textContent = "Copied";
+        window.setTimeout(function () {
+          button.textContent = "Copy";
+        }, 1200);
+      });
     });
   });
 })();

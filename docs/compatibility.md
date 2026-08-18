@@ -142,12 +142,13 @@ cargo run -p xtask -- web smoke
 cargo run -p xtask -- web visual check button input dialog node-graph
 ```
 
-The browser host is not a DOM rewrite. The catalog home remains selectable,
-indexable HTML and retains committed captures as fallbacks; the live GPUI scene
-is a lazy enhancement shown in both themes, while `/compose/` is the complete
-interactive surface. The pinned Playwright smoke covers forced WebGL2, forced
-WebGPU, automatic fallback, catalog embedding, static deep links, and the
-compose route. Its AccessKit adapter mirrors roles, focus, actions, values, and
+The browser host is not a DOM rewrite. The marketing home, the component
+catalog, and the docs remain selectable, indexable HTML and retain committed
+captures as fallbacks; the live GPUI scene is a lazy enhancement shown in both
+themes on the home specimen, while `/compose/` is the complete interactive
+surface. The pinned Playwright smoke covers forced WebGL2, forced WebGPU,
+automatic fallback, catalog embedding, static deep links, and the compose
+route. Its AccessKit adapter mirrors roles, focus, actions, values, and
 canvas-scaled bounds into semantic DOM, but the JSON semantic snapshot is only
 a testing/debug surface.
 
