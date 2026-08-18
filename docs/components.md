@@ -1128,3 +1128,17 @@ renders offscreen in every bundled theme and
 `crates/gpui-kit/tests/scenes.rs` audits headlessly. Behaviour is asserted
 through simulated key and mouse input against the published semantic tree, in
 `crates/gpui-kit/tests/`.
+
+The catalog is in two tiers, and the difference is what "appears in" means.
+Almost every rendering is an **exhibit**: it is about one component, it lives
+in `crates/gpui-kit/src/scenes/<family>.rs` next to the other renderings of
+that family, and it is where a reader is sent to review that component's
+states. `xtask api check` fails when a public component has no exhibit, so a
+component cannot be added and left unseen.
+
+The remaining three are **compositions** — `motion-flip`, `motion-state`, and
+`reading-direction` — built the way a product would build them, because
+components interact in ways none of them shows alone. A composition is nobody's
+coverage: `Shows::Composition` says so, and the `scenes` list on a component in
+`docs/api-index.json` therefore names only the exhibits, which is the honest
+answer to "where do I go to look at this".

@@ -30,11 +30,13 @@
 //! - every other `pub struct` or `pub enum` in a component source is a
 //!   supporting type, listed separately because a signature mentions it.
 //!
-//! Scenes are read out of `scenes.rs`: each one names the types it builds, so
-//! a component carries the scenes that exercise it and each scene carries its
-//! own body as an example. That example is worth more than a written one
-//! because `gate` compiles it and `headless check` renders it, so an example
-//! here cannot be stale without a gate going red.
+//! Scenes come from the registry in `gpui_kit::scenes::catalog()`, which
+//! declares what each rendering is for, and their bodies are read out of
+//! `crates/gpui-kit/src/scenes/`. A component therefore carries the scenes
+//! that are the review of it, and each scene carries its own body as an
+//! example. That example is worth more than a written one because `gate`
+//! compiles it and `headless check` renders it, so an example here cannot be
+//! stale without a gate going red.
 //!
 //! # What it gets wrong
 //!
@@ -51,11 +53,14 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use pulldown_cmark::{Event, Options, Parser};
 
 /// Sources that declare no component.
-const SKIP: &[&str] = &["scenes.rs", "lib.rs"];
+const SKIP: &[&str] = &["lib.rs"];
+
+/// The scene catalog, which renders components rather than declaring them.
+const SCENES: &str = "crates/gpui-kit/src/scenes/";
 
 pub fn generate(root: &Path) -> Result<()> {
     let index = build(root)?;
@@ -135,6 +140,12 @@ impl Kind {
 #[derive(Debug)]
 struct SceneRecord {
     name: String,
+    /// `"exhibit"` when the scene is the review of its components,
+    /// `"composition"` when it arranges components reviewed elsewhere.
+    kind: &'static str,
+    /// The components the scene is *about*, empty for a composition.
+    subjects: Vec<String>,
+    /// Every component the scene names, whichever kind it is.
     uses: Vec<String>,
     example: String,
 }
@@ -154,7 +165,7 @@ fn build(root: &Path) -> Result<String> {
             .unwrap_or(file)
             .to_string_lossy()
             .replace('\\', "/");
-        if SKIP.iter().any(|skip| relative.ends_with(skip)) {
+        if SKIP.iter().any(|skip| relative.ends_with(skip)) || relative.starts_with(SCENES) {
             continue;
         }
         let module = module_of(&relative);
@@ -162,16 +173,55 @@ fn build(root: &Path) -> Result<String> {
         read_source(&source, &module, &relative, &mut items, &mut events);
     }
 
-    let scenes = read_scenes(&fs::read_to_string(source_root.join("scenes.rs"))?, &items);
+    let scenes = read_scenes(&scene_source(&source_root)?, &items, root)?;
 
+    // `scenes` on a component answers "where do I go to look at this", so it
+    // lists the scenes the component is the subject of. A composition draws it
+    // beside a dozen other things and is nobody's review, which is why being
+    // in one is not being covered by one.
     let mut used: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
     for scene in &scenes {
-        for name in &scene.uses {
+        for name in &scene.subjects {
             used.entry(name.as_str()).or_default().push(&scene.name);
         }
     }
 
+    let uncovered: Vec<&str> = items
+        .values()
+        .filter(|item| item.kind != Kind::Type && !item.name.is_empty())
+        .map(|item| item.name.as_str())
+        .filter(|name| !used.contains_key(name))
+        .collect();
+    if !uncovered.is_empty() {
+        bail!(
+            "no scene is the review of {}. A component that only ever appears \
+inside a composition has been recognised, not reviewed: nobody has seen its \
+states side by side, and no captured image will fail when they change. Give it \
+a scene that declares it in `Shows::Subjects`.",
+            uncovered.join(", ")
+        );
+    }
+
     Ok(render(&items, &events, &used, &scenes))
+}
+
+/// The scene catalog as one text.
+///
+/// The registrations live in `scenes/mod.rs` and the function that each one
+/// names lives in the file for that component's family, so following a scene
+/// to its body means reading the whole directory. Concatenating them is enough
+/// because a scene function is brace-matched from its own signature and the
+/// names were unique before the split.
+fn scene_source(source_root: &Path) -> Result<String> {
+    let mut files = Vec::new();
+    collect(&source_root.join("scenes"), &mut files)?;
+    files.sort();
+    let mut source = String::new();
+    for file in files {
+        source.push_str(&fs::read_to_string(file)?);
+        source.push('\n');
+    }
+    Ok(source)
 }
 
 fn collect(directory: &Path, into: &mut Vec<PathBuf>) -> Result<()> {
@@ -327,12 +377,23 @@ fn read_source(
         }
 
         if let Some(name) = rendered(line) {
-            let entry = items.entry(name.clone()).or_default();
-            entry.name = name;
-            entry.kind = Kind::View;
-            if entry.module.is_empty() {
-                entry.module = module.to_string();
-                entry.source = relative.to_string();
+            // `impl Render for X` says X is mounted as an entity. It says
+            // nothing about whether a caller can name X, and a view a
+            // component spawns for itself — a drag ghost, a tooltip's own
+            // view — is an implementation detail. Publishing one invites a
+            // caller to write a type that is not in scope for them, which is
+            // the single failure this index exists to prevent.
+            let reachable = items.contains_key(&name)
+                || source.contains(&format!("pub struct {name}"))
+                || source.contains(&format!("pub enum {name}"));
+            if reachable {
+                let entry = items.entry(name.clone()).or_default();
+                entry.name = name;
+                entry.kind = Kind::View;
+                if entry.module.is_empty() {
+                    entry.module = module.to_string();
+                    entry.source = relative.to_string();
+                }
             }
             docs.clear();
             derives.clear();
@@ -562,11 +623,25 @@ fn receiver(signature: &str) -> Receiver {
 // Scenes
 // ---------------------------------------------------------------------------
 
-fn read_scenes(source: &str, items: &BTreeMap<String, Item>) -> Vec<SceneRecord> {
+/// What each scene is for, taken from the registry rather than from the shape
+/// of the source that builds it.
+///
+/// The previous version of this read the answer back out of the scene source by
+/// following every helper a scene called and collecting the types it touched.
+/// That answers "what does this code path reach", which is an upper bound, not
+/// "what is this scene for": three scenes sharing one fixture helper each
+/// reported the same seven components. The registry now declares it, and the
+/// source walk is kept below as the bound the declaration is held to.
+fn read_scenes(
+    source: &str,
+    items: &BTreeMap<String, Item>,
+    root: &Path,
+) -> Result<Vec<SceneRecord>> {
     let lines: Vec<&str> = source.lines().collect();
 
-    // `Scene { name: "badge", build: badge }` pairs a catalog name with a fn.
-    let mut builders: Vec<(String, String)> = Vec::new();
+    // `Scene { name: "badge", build: badge }` pairs a catalog name with the
+    // function whose body becomes the published example.
+    let mut builders: BTreeMap<String, String> = BTreeMap::new();
     for (at, line) in lines.iter().enumerate() {
         let Some(rest) = line.trim().strip_prefix("name: \"") else {
             continue;
@@ -574,50 +649,120 @@ fn read_scenes(source: &str, items: &BTreeMap<String, Item>) -> Vec<SceneRecord>
         let Some((name, _)) = rest.split_once('"') else {
             continue;
         };
-        let function = lines
+        if let Some(function) = lines
             .get(at + 1)
             .and_then(|next| next.trim().strip_prefix("build: "))
-            .map(|value| value.trim_end_matches(',').trim().to_string());
-        if let Some(function) = function {
-            builders.push((name.to_string(), function));
+            .map(|value| value.trim_end_matches(',').trim().to_string())
+        {
+            builders.insert(name.to_string(), function);
         }
     }
 
-    // A scene that mounts a view usually prepares the entity in a helper, so
-    // the types it builds are not all in its own body. Following the helpers
-    // is what makes `uses` answer "which scene shows me" for a view.
     let bodies = local_bodies(&lines);
+    let mut records = Vec::new();
 
-    builders
-        .into_iter()
-        .filter_map(|(name, function)| {
-            let example = body(&lines, &function)?;
-            let mut reached = String::new();
-            let mut pending = vec![function];
-            let mut seen = BTreeSet::new();
-            while let Some(next) = pending.pop() {
-                if !seen.insert(next.clone()) {
-                    continue;
-                }
-                let Some(text) = bodies.get(&next) else {
-                    continue;
-                };
-                reached.push_str(text);
-                reached.push('\n');
-                for candidate in bodies.keys() {
-                    if !seen.contains(candidate) && calls(text, candidate) {
-                        pending.push(candidate.clone());
-                    }
-                }
+    for scene in gpui_kit::scenes::catalog() {
+        let function = builders.get(scene.name).with_context(|| {
+            format!(
+                "scene `{}` is registered but its build function could not be found",
+                scene.name
+            )
+        })?;
+        let example = body(&lines, function)
+            .map(|text| text.trim_start_matches("pub(super) ").to_string())
+            .with_context(|| {
+                format!(
+                    "scene `{}` has no readable body for `{function}`",
+                    scene.name
+                )
+            })?;
+
+        let reachable = mentions(&reach(function, &bodies), items);
+        let reachable_slice = reachable.as_slice();
+        let declared: Vec<String> = scene
+            .shows
+            .components()
+            .iter()
+            .map(|name| (*name).to_string())
+            .collect();
+        for name in &declared {
+            if !can_reach(name, reachable_slice, items, root) {
+                bail!(
+                    "scene `{}` declares `{name}`, which nothing it renders can reach. \
+A scene may name a component it builds, or one that a component it builds mounts; \
+it may not name a component it does not show.",
+                    scene.name
+                );
             }
-            let uses = mentions(&reached, items);
-            Some(SceneRecord {
-                name,
-                uses,
-                example,
+        }
+
+        records.push(SceneRecord {
+            name: scene.name.to_string(),
+            kind: match scene.shows {
+                gpui_kit::scenes::Shows::Subjects(_) => "exhibit",
+                gpui_kit::scenes::Shows::Composition(_) => "composition",
+            },
+            subjects: scene
+                .shows
+                .subjects()
+                .iter()
+                .map(|name| (*name).to_string())
+                .collect(),
+            uses: declared,
+            example,
+        });
+    }
+
+    Ok(records)
+}
+
+/// Every line of source a scene's build function can reach through the helpers
+/// it calls, concatenated.
+fn reach(function: &str, bodies: &BTreeMap<String, String>) -> String {
+    let mut reached = String::new();
+    let mut pending = vec![function.to_string()];
+    let mut seen = BTreeSet::new();
+    while let Some(next) = pending.pop() {
+        if !seen.insert(next.clone()) {
+            continue;
+        }
+        let Some(text) = bodies.get(&next) else {
+            continue;
+        };
+        reached.push_str(text);
+        reached.push('\n');
+        for candidate in bodies.keys() {
+            if !seen.contains(candidate) && calls(text, candidate) {
+                pending.push(candidate.clone());
+            }
+        }
+    }
+    reached
+}
+
+/// Whether a scene that reaches `reachable` can be said to show `name`.
+///
+/// Directly, when the scene builds it. Or through one component: a tooltip's
+/// view, a drag ghost, an avatar inside an agent card are all rendered by a
+/// component the scene builds rather than by the scene, so the scene's own
+/// source never names them and they would otherwise be uncoverable.
+fn can_reach(
+    name: &str,
+    reachable: &[String],
+    items: &BTreeMap<String, Item>,
+    root: &Path,
+) -> bool {
+    if reachable.iter().any(|found| found == name) {
+        return true;
+    }
+    reachable.iter().any(|host| {
+        items
+            .get(host)
+            .and_then(|item| fs::read_to_string(root.join(&item.source)).ok())
+            .is_some_and(|source| {
+                source.contains(&format!("{name}::")) || source.contains(&format!("{name} {{"))
             })
-        })
-        .collect()
+    })
 }
 
 fn calls(source: &str, function: &str) -> bool {
@@ -630,7 +775,7 @@ fn calls(source: &str, function: &str) -> bool {
     })
 }
 
-/// Every function declared in `scenes.rs`, by name, so a scene can be followed
+/// Every function declared in the scene catalog, by name, so a scene can be followed
 /// into the helpers it calls.
 fn local_bodies(lines: &[&str]) -> BTreeMap<String, String> {
     let mut bodies = BTreeMap::new();
@@ -791,6 +936,8 @@ fn render(
                 scene.name
             ))
         ));
+        out.push_str(&format!("      \"kind\": {},\n", quote(scene.kind)));
+        out.push_str(&list("subjects", &scene.subjects));
         out.push_str(&list("uses", &scene.uses));
         out.push_str(&format!("      \"example\": {}\n", quote(&scene.example)));
         out.push_str(if at + 1 == scenes.len() {
@@ -1024,8 +1171,10 @@ pub enum SelectEvent {
         assert!(!same_index("one\r\nchanged\r\n", "one\ntwo\n"));
     }
 
+    /// The types a scene builds are the bound a declaration is held to, and a
+    /// type is only a component when a caller can name it.
     #[test]
-    fn a_scene_names_the_components_it_builds() {
+    fn a_scene_reaches_the_components_it_builds_and_not_the_type_arguments() {
         let mut items = BTreeMap::new();
         items.insert(
             "Badge".to_string(),
@@ -1044,17 +1193,55 @@ pub enum SelectEvent {
             },
         );
 
-        let scenes = read_scenes(
-            "        Scene {\n            name: \"badge\",\n            build: badge,\n        },\n\
-             fn badge(_window: &mut Window, cx: &mut App) -> AnyElement {\n\
-             \x20   Badge::new(\"Neutral\").tone(Tone::Accent).into_any_element()\n}\n",
-            &items,
-        );
+        let source = "fn badge(_window: &mut Window, cx: &mut App) -> AnyElement {\n\
+             \x20   Badge::new(\"Neutral\").tone(Tone::Accent).into_any_element()\n}\n";
+        let lines: Vec<&str> = source.lines().collect();
+        let bodies = local_bodies(&lines);
 
-        assert_eq!(scenes.len(), 1);
-        assert_eq!(scenes[0].name, "badge");
-        assert_eq!(scenes[0].uses, vec!["Badge"]);
-        assert!(scenes[0].example.contains("Badge::new"));
+        assert_eq!(mentions(&reach("badge", &bodies), &items), vec!["Badge"]);
+        assert!(
+            body(&lines, "badge")
+                .expect("the body is readable")
+                .contains("Badge::new")
+        );
+    }
+
+    /// A scene may declare a component it builds, and one that a component it
+    /// builds mounts, and nothing else. Without the second case a tooltip's
+    /// own view or an avatar drawn inside an agent card could never be
+    /// declared; without the third the declaration would be a wish.
+    #[test]
+    fn a_declaration_may_not_name_something_the_scene_never_shows() {
+        let items = BTreeMap::new();
+        let root = Path::new(".");
+        let reachable = vec!["Card".to_string()];
+        assert!(can_reach("Card", &reachable, &items, root));
+        assert!(!can_reach("Table", &reachable, &items, root));
+    }
+
+    /// `impl Render for X` is how a view is found, but a view a component
+    /// spawns for itself is not something a caller can write.
+    #[test]
+    fn a_private_view_is_not_published_as_a_component() {
+        let source = strip(
+            r#"
+pub struct Tooltip { label: SharedString }
+struct TooltipView(Tooltip);
+impl Render for TooltipView {
+}
+impl Render for Tooltip {
+}
+"#,
+        );
+        let mut items = BTreeMap::new();
+        let mut events = BTreeMap::new();
+        read_source(&source, "overlay", "tooltip.rs", &mut items, &mut events);
+
+        assert!(items.contains_key("Tooltip"));
+        assert!(
+            !items.contains_key("TooltipView"),
+            "a private view is an implementation detail, not API"
+        );
     }
 
     #[test]

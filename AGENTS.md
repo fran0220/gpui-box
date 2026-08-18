@@ -91,7 +91,7 @@ Do not add product or provider trademarks to the generic asset crate.
 ## The generated API index
 
 `docs/api-index.json` carries every component, the exact signature of every
-public method, what each reports, and the scenes that render it. It is
+public method, what each reports, and the scenes that review it. It is
 generated from the source, so it is the answer when it and any prose disagree:
 
 ```bash
@@ -102,6 +102,24 @@ cargo run -p xtask -- api check     # runs inside `gate`
 A new component appears there by existing. Adding one and leaving the index
 stale fails the gate, which is the point: a reader who is told a signature that
 does not compile was failed by this file, not by the compiler.
+
+## A component is reviewed by an exhibit
+
+A rendering in `crates/gpui-kit/src/scenes/` declares what it is for, and the
+declaration is checked:
+
+- `Shows::Subjects` names the components the rendering is *about*. It lives in
+  the file for those components' family, and it is where a reader is sent to
+  review their states.
+- `Shows::Composition` is an arrangement built the way a product would build
+  one, kept because components interact in ways none of them shows alone. It
+  is nobody's coverage.
+
+`api check` fails when a public component has no exhibit, and fails when a
+declaration names something the rendering cannot reach. So a new component
+needs a scene that declares it, in the family file next to the components it
+sits with — not a mention inside a shell, which is recognition rather than
+review.
 
 `docs/llms.txt` is the entry point for a program reading this repository, and
 `tools/mcp` serves the same catalog as MCP tools, including one that renders a

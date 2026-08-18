@@ -84,7 +84,27 @@ serves the current deploy of this tree rather than a published crate.
 `tools/mcp/run.sh` starts the checkout stdio server. The product-UI skill
 names current Kit types instead of gallery-only helpers.
 
+**A scene declares what it is for, and the catalog is grouped by family.**
+`gpui_kit::scenes` was one 8,400-line file registering 108 flat scenes; it is
+now `scenes/` with one file per component family and `Shows` on every
+registration. `Shows::Subjects` names the components a rendering is the review
+of; `Shows::Composition` marks the three arrangements (`motion-flip`,
+`motion-state`, `reading-direction`) that are built the way a product would
+build them and are nobody's coverage. The `scenes` list on a component in
+`docs/api-index.json` therefore answers "where do I go to look at this"
+instead of "what code path touches this type": it used to be inferred by
+following every helper a scene called, so `hover-card`, `menubar`, and
+`copy-button` all reported the same seven components because they share one
+fixture. `api check` now holds each declaration to what the source can reach
+and fails when a public component has no exhibit.
+
 ### Added
+
+**A scene for `Icon` and one for `Responsive`.**
+Both existed only inside other components' scenes, so the whole glyph catalog,
+the nine icon tones, the direction rule, and a container that arranges itself
+from its own measured width were recognisable everywhere and reviewed nowhere.
+The coverage gate is what found them.
 
 **One recipe for each visual statement the library repeats.**
 `foundation::rule` and `rule_vertical` are the line that divides content

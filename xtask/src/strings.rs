@@ -52,11 +52,14 @@ use anyhow::{Result, bail};
 /// Sources whose literals are not component copy.
 ///
 /// - `strings.rs` is the catalogue: the English lives there by definition.
-/// - `scenes.rs` is fixture content for the gallery and the capture task.
+/// - `scenes/` is fixture content for the gallery and the capture task.
 /// - `datetime/fixture.rs` is a stand-in `DateAdapter` host. This crate owns
 ///   no calendar, so month and weekday names come from the host adapter; the
 ///   fixture is what a host would supply, not what a component says.
-const EXEMPT: &[&str] = &["strings.rs", "scenes.rs", "datetime/fixture.rs"];
+const EXEMPT: &[&str] = &["strings.rs", "datetime/fixture.rs"];
+
+/// Directories whose literals are not component copy either.
+const EXEMPT_TREES: &[&str] = &["scenes/"];
 
 /// Calls whose first argument is read by somebody.
 const SHOWN: &[&str] = &[
@@ -176,7 +179,9 @@ fn scan(directory: &Path) -> Result<Vec<Suspect>> {
             .unwrap_or(&path)
             .to_string_lossy()
             .replace('\\', "/");
-        if EXEMPT.iter().any(|exempt| relative == *exempt) {
+        if EXEMPT.iter().any(|exempt| relative == *exempt)
+            || EXEMPT_TREES.iter().any(|tree| relative.starts_with(tree))
+        {
             continue;
         }
         let source = fs::read_to_string(&path)?;

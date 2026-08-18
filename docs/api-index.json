@@ -45,9 +45,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "accordion",
-        "motion-state",
-        "reading-direction"
+        "accordion"
       ]
     },
     {
@@ -87,7 +85,9 @@
       "commands": [],
       "queries": [],
       "reports": [],
-      "scenes": []
+      "scenes": [
+        "agent-roster"
+      ]
     },
     {
       "name": "AgentCard",
@@ -225,7 +225,9 @@
       "commands": [],
       "queries": [],
       "reports": [],
-      "scenes": []
+      "scenes": [
+        "agent-run-canvas"
+      ]
     },
     {
       "name": "AnchorList",
@@ -398,17 +400,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "badge",
-        "card",
-        "cinematic-effects",
-        "table",
-        "data-grid",
-        "data-grid-editing",
-        "frost",
-        "motion-flip",
-        "hover-card",
-        "menubar",
-        "copy-button"
+        "badge"
       ]
     },
     {
@@ -450,8 +442,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "breadcrumb",
-        "reading-direction"
+        "breadcrumb"
       ]
     },
     {
@@ -535,26 +526,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "button",
-        "card",
-        "cinematic-effects",
-        "auth-sign-in",
-        "auth-verification",
-        "actions",
-        "content",
-        "overlay",
-        "tooltip",
-        "data-grid",
-        "frost",
-        "toolbar",
-        "drawer",
-        "motion-flip",
-        "motion-state",
-        "animated-number",
-        "reading-direction",
-        "hover-card",
-        "menubar",
-        "copy-button"
+        "button"
       ]
     },
     {
@@ -615,9 +587,7 @@
         "Hovered"
       ],
       "scenes": [
-        "calendar",
-        "date-range",
-        "date-time"
+        "calendar"
       ]
     },
     {
@@ -636,9 +606,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "status",
-        "auth-sign-in",
-        "auth-verification"
+        "status"
       ]
     },
     {
@@ -666,20 +634,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "card",
-        "cinematic-effects",
-        "auth-sign-in",
-        "auth-verification",
-        "frost",
-        "motion-flip",
-        "agent-document",
-        "agent-roster",
-        "tool-call",
-        "step-list",
-        "reading-direction",
-        "hover-card",
-        "menubar",
-        "copy-button"
+        "card"
       ]
     },
     {
@@ -742,13 +697,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "choice",
-        "menu",
-        "context-menu",
-        "popover",
-        "command-palette",
-        "drawer",
-        "motion-state"
+        "choice"
       ]
     },
     {
@@ -795,7 +744,6 @@
       ],
       "reports": [],
       "scenes": [
-        "agent-document",
         "code-view"
       ]
     },
@@ -895,9 +843,6 @@
         "Dismissed"
       ],
       "scenes": [
-        "menu",
-        "context-menu",
-        "popover",
         "command-palette"
       ]
     },
@@ -957,10 +902,7 @@
         "Closed"
       ],
       "scenes": [
-        "menu",
-        "context-menu",
-        "popover",
-        "command-palette"
+        "context-menu"
       ]
     },
     {
@@ -990,8 +932,6 @@
       ],
       "reports": [],
       "scenes": [
-        "hover-card",
-        "menubar",
         "copy-button"
       ]
     },
@@ -1098,8 +1038,6 @@
         "Submit"
       ],
       "scenes": [
-        "calendar",
-        "date-range",
         "date-time"
       ]
     },
@@ -1234,18 +1172,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "content",
-        "markdown",
-        "agent-document",
-        "conversation",
-        "image-viewer",
-        "transport",
-        "audio-player",
-        "video-player",
-        "model-viewer",
-        "approval",
-        "permission-matrix",
-        "cost-meter"
+        "content"
       ]
     },
     {
@@ -1277,19 +1204,6 @@
       "scenes": [
         "ide-shell"
       ]
-    },
-    {
-      "name": "DragGhost",
-      "kind": "view",
-      "path": "gpui_kit::interaction::DragGhost",
-      "source": "crates/gpui-kit/src/interaction/dnd.rs",
-      "summary": "",
-      "construct": [],
-      "options": [],
-      "commands": [],
-      "queries": [],
-      "reports": [],
-      "scenes": []
     },
     {
       "name": "Drawer",
@@ -1354,8 +1268,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "dropzone",
-        "upload-list"
+        "dropzone"
       ]
     },
     {
@@ -1477,7 +1390,6 @@
         "ReplaceAll"
       ],
       "scenes": [
-        "search-field",
         "find-replace"
       ]
     },
@@ -1503,9 +1415,7 @@
       ],
       "reports": [],
       "scenes": [
-        "form",
-        "auth-sign-in",
-        "auth-verification"
+        "form"
       ]
     },
     {
@@ -1666,9 +1576,7 @@
         "Closed"
       ],
       "scenes": [
-        "hover-card",
-        "menubar",
-        "copy-button"
+        "hover-card"
       ]
     },
     {
@@ -1703,20 +1611,7 @@
       ],
       "reports": [],
       "scenes": [
-        "auth-sign-in",
-        "actions",
-        "menu",
-        "context-menu",
-        "popover",
-        "command-palette",
-        "tabs",
-        "tree",
-        "toolbar",
-        "sidebar",
-        "drag-tree",
-        "ide-shell",
-        "reading-direction",
-        "document-tabs"
+        "icon"
       ]
     },
     {
@@ -1744,8 +1639,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "actions",
-        "toolbar"
+        "actions"
       ]
     },
     {
@@ -1827,8 +1721,7 @@
       ],
       "reports": [],
       "scenes": [
-        "json-view",
-        "reading-direction"
+        "json-view"
       ]
     },
     {
@@ -1965,15 +1858,7 @@
       "reports": [],
       "scenes": [
         "list",
-        "drag-list",
-        "detail",
-        "conversation",
-        "step-list",
-        "schema-form",
-        "server-list",
-        "upload-list",
-        "anchor-list",
-        "diagnostics-list"
+        "drag-list"
       ]
     },
     {
@@ -1995,10 +1880,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "card",
-        "cinematic-effects",
-        "frost",
-        "motion-flip"
+        "card"
       ]
     },
     {
@@ -2090,16 +1972,7 @@
         "Closed"
       ],
       "scenes": [
-        "menu",
-        "context-menu",
-        "popover",
-        "command-palette",
-        "toolbar",
-        "hover-card",
-        "menubar",
-        "copy-button",
-        "document-tabs",
-        "anchor-list"
+        "menu"
       ]
     },
     {
@@ -2129,9 +2002,7 @@
         "Closed"
       ],
       "scenes": [
-        "hover-card",
-        "menubar",
-        "copy-button"
+        "menubar"
       ]
     },
     {
@@ -2608,10 +2479,7 @@
         "Closed"
       ],
       "scenes": [
-        "menu",
-        "context-menu",
-        "popover",
-        "command-palette"
+        "popover"
       ]
     },
     {
@@ -2633,8 +2501,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "content",
-        "motion-state"
+        "content"
       ]
     },
     {
@@ -2698,8 +2565,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "choice",
-        "motion-state"
+        "choice"
       ]
     },
     {
@@ -2730,9 +2596,7 @@
         "EndPicked"
       ],
       "scenes": [
-        "calendar",
-        "date-range",
-        "date-time"
+        "date-range"
       ]
     },
     {
@@ -2748,7 +2612,9 @@
       "commands": [],
       "queries": [],
       "reports": [],
-      "scenes": []
+      "scenes": [
+        "responsive"
+      ]
     },
     {
       "name": "RewardReveal",
@@ -2833,8 +2699,7 @@
       "reports": [],
       "scenes": [
         "scroll-area",
-        "scroll-shadow",
-        "scroll-fade"
+        "scroll-shadow"
       ]
     },
     {
@@ -2897,8 +2762,7 @@
         "WholeWordToggled"
       ],
       "scenes": [
-        "search-field",
-        "find-replace"
+        "search-field"
       ]
     },
     {
@@ -2920,9 +2784,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "form",
-        "toolbar",
-        "motion-state"
+        "form"
       ]
     },
     {
@@ -2958,9 +2820,7 @@
         "Closed"
       ],
       "scenes": [
-        "input",
-        "textarea",
-        "pagination"
+        "input"
       ]
     },
     {
@@ -3009,8 +2869,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "settings",
-        "keybinding"
+        "settings"
       ]
     },
     {
@@ -3033,8 +2892,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "settings",
-        "keybinding"
+        "settings"
       ]
     },
     {
@@ -3249,10 +3107,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "card",
-        "status",
-        "cinematic-effects",
-        "frost"
+        "status"
       ]
     },
     {
@@ -3340,9 +3195,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "choice",
-        "motion-state",
-        "settings"
+        "choice"
       ]
     },
     {
@@ -3404,8 +3257,6 @@
       "reports": [],
       "scenes": [
         "tabs",
-        "motion-state",
-        "reading-direction",
         "document-tabs"
       ]
     },
@@ -3506,7 +3357,6 @@
         "Blur"
       ],
       "scenes": [
-        "input",
         "textarea"
       ]
     },
@@ -3556,9 +3406,7 @@
         "Blur"
       ],
       "scenes": [
-        "input",
-        "textarea",
-        "form"
+        "input"
       ]
     },
     {
@@ -3608,8 +3456,6 @@
         "Changed"
       ],
       "scenes": [
-        "calendar",
-        "date-range",
         "date-time"
       ]
     },
@@ -3736,9 +3582,7 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "agent-document",
-        "tool-call",
-        "step-list"
+        "tool-call"
       ]
     },
     {
@@ -3785,19 +3629,6 @@
       "scenes": [
         "tooltip"
       ]
-    },
-    {
-      "name": "TooltipView",
-      "kind": "view",
-      "path": "gpui_kit::overlay::TooltipView",
-      "source": "crates/gpui-kit/src/overlay/tooltip.rs",
-      "summary": "",
-      "construct": [],
-      "options": [],
-      "commands": [],
-      "queries": [],
-      "reports": [],
-      "scenes": []
     },
     {
       "name": "TransportBar",
@@ -3859,10 +3690,7 @@
       "reports": [],
       "scenes": [
         "tree",
-        "drag-tree",
-        "split-tree",
-        "agent-roster",
-        "reading-direction"
+        "drag-tree"
       ]
     },
     {
@@ -10382,6 +10210,10 @@
     {
       "name": "button",
       "capture": "cargo run -p xtask -- headless capture button",
+      "kind": "exhibit",
+      "subjects": [
+        "Button"
+      ],
       "uses": [
         "Button"
       ],
@@ -10390,6 +10222,10 @@
     {
       "name": "badge",
       "capture": "cargo run -p xtask -- headless capture badge",
+      "kind": "exhibit",
+      "subjects": [
+        "Badge"
+      ],
       "uses": [
         "Badge"
       ],
@@ -10398,18 +10234,26 @@
     {
       "name": "card",
       "capture": "cargo run -p xtask -- headless capture card",
-      "uses": [
-        "Badge",
-        "Button",
+      "kind": "exhibit",
+      "subjects": [
         "Card",
-        "ListRow",
-        "StatusDot"
+        "ListRow"
+      ],
+      "uses": [
+        "Card",
+        "ListRow"
       ],
       "example": "fn card(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let label = |content: &'static str| {\n        div()\n            .flex_1()\n            .min_w_0()\n            .child(crate::foundation::text(&theme, TypeScale::Label, content))\n    };\n    let caption = |content: &'static str| {\n        crate::foundation::text(&theme, TypeScale::Caption, content)\n            .text_tone(&theme, TextTone::Muted)\n    };\n    let column = |card: Card| div().flex_1().min_w_0().child(card);\n\n    stack(&theme)\n        .child(\n            Card::new()\n                .id(\"scene.card\")\n                .header(\n                    CardHeader::new(\"Workspace services\")\n                        .subtitle(\"Four checked a moment ago\")\n                        .action(|_window, _cx| {\n                            Button::new(\"scene.card.refresh\")\n                                .label(\"Refresh\")\n                                .secondary()\n                                .small()\n                                .into_any_element()\n                        }),\n                )\n                .divided(true)\n                .child(\n                    ListRow::new()\n                        .id(\"scene.card.runtime\")\n                        .leading(StatusDot::new(Tone::Success))\n                        .child(label(\"Native runtime\"))\n                        .trailing(Badge::new(\"Ready\").success()),\n                )\n                .child(\n                    ListRow::new()\n                        .id(\"scene.card.catalog\")\n                        .leading(StatusDot::new(Tone::Warning))\n                        .child(label(\"Model catalog\"))\n                        .trailing(Badge::new(\"Stale\").warning()),\n                )\n                .child(\n                    ListRow::new()\n                        .id(\"scene.card.index\")\n                        .selected(true)\n                        .leading(StatusDot::new(Tone::Success))\n                        .child(label(\"Search index\"))\n                        .trailing(Badge::new(\"Ready\").success()),\n                )\n                .child(\n                    ListRow::new()\n                        .id(\"scene.card.telemetry\")\n                        .disabled(true)\n                        .leading(StatusDot::new(Tone::Neutral))\n                        .child(label(\"Telemetry export\"))\n                        .trailing(Badge::new(\"Off\")),\n                )\n                .footer(|_window, cx| {\n                    let theme = cx.theme().clone();\n                    div()\n                        .row()\n                        .w_full()\n                        .gap(px(theme.spacing.sm))\n                        .child(\n                            Button::new(\"scene.card.restart\")\n                                .label(\"Restart all\")\n                                .secondary()\n                                .small(),\n                        )\n                        .child(div().flex_1())\n                        .child(\n                            crate::foundation::text(&theme, TypeScale::Caption, \"4 services\")\n                                .text_tone(&theme, TextTone::Faint),\n                        )\n                        .into_any_element()\n                }),\n        )\n        .child(\n            row(&theme)\n                .items_start()\n                .child(column(\n                    Card::new()\n                        .id(\"scene.card.elevated\")\n                        .variant(CardVariant::Elevated)\n                        .padding(Space::Lg)\n                        .child(crate::foundation::text(\n                            &theme,\n                            TypeScale::Strong,\n                            \"Elevated\",\n                        ))\n                        .child(caption(\"A shadow. One card on a page.\")),\n                ))\n                .child(column(\n                    Card::new()\n                        .id(\"scene.card.outlined\")\n                        .variant(CardVariant::Outlined)\n                        .padding(Space::Lg)\n                        .child(crate::foundation::text(\n                            &theme,\n                            TypeScale::Strong,\n                            \"Outlined\",\n                        ))\n                        .child(caption(\"A hairline. A grid of them.\")),\n                ))\n                .child(column(\n                    Card::new()\n                        .id(\"scene.card.ghost\")\n                        .variant(CardVariant::Ghost)\n                        .padding(Space::Lg)\n                        .child(crate::foundation::text(&theme, TypeScale::Strong, \"Ghost\"))\n                        .child(caption(\"Neither. Structure without a plane.\")),\n                )),\n        )\n        .child(\n            row(&theme)\n                .items_start()\n                .child(column(\n                    Card::new()\n                        .id(\"scene.card.actionable\")\n                        .padding(Space::Lg)\n                        .on_click(|_window, _cx| {})\n                        .header(CardHeader::new(\"Open the run\").subtitle(\"The whole card acts\"))\n                        .child(caption(\"Enter and space reach it from the keyboard.\")),\n                ))\n                .child(column(\n                    Card::new()\n                        .id(\"scene.card.chosen\")\n                        .padding(Space::Lg)\n                        .selected(true)\n                        .header(CardHeader::new(\"Selected\").subtitle(\"A wash and a rail\"))\n                        .child(caption(\"Both are drawn inside, so choosing moves nothing.\")),\n                ))\n                .child(column(\n                    Card::new()\n                        .id(\"scene.card.unavailable\")\n                        .padding(Space::Lg)\n                        .disabled(true)\n                        .on_click(|_window, _cx| {})\n                        .header(CardHeader::new(\"Unavailable\").subtitle(\"Says so, and stays read\"))\n                        .child(caption(\"A disabled card installs no handler at all.\")),\n                )),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "status",
       "capture": "cargo run -p xtask -- headless capture status",
+      "kind": "exhibit",
+      "subjects": [
+        "Callout",
+        "StatusDot",
+        "StatusLine"
+      ],
       "uses": [
         "Callout",
         "StatusDot",
@@ -10420,6 +10264,12 @@
     {
       "name": "loading",
       "capture": "cargo run -p xtask -- headless capture loading",
+      "kind": "exhibit",
+      "subjects": [
+        "GradientSpinner",
+        "PulseLoader",
+        "Skeleton"
+      ],
       "uses": [
         "GradientSpinner",
         "PulseLoader",
@@ -10430,6 +10280,10 @@
     {
       "name": "visual-effects",
       "capture": "cargo run -p xtask -- headless capture visual-effects",
+      "kind": "exhibit",
+      "subjects": [
+        "EffectParticles"
+      ],
       "uses": [
         "EffectParticles"
       ],
@@ -10438,19 +10292,25 @@
     {
       "name": "cinematic-effects",
       "capture": "cargo run -p xtask -- headless capture cinematic-effects",
+      "kind": "exhibit",
+      "subjects": [
+        "CinematicEffect"
+      ],
       "uses": [
-        "Badge",
-        "Button",
-        "Card",
-        "CinematicEffect",
-        "ListRow",
-        "StatusDot"
+        "CinematicEffect"
       ],
       "example": "fn cinematic_effects(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let clip: Rc<dyn DotLottieClip> = Rc::new(SceneCinematicClip);\n    let mut planner = EffectPlanner::new(EffectPolicy::new(EffectQuality::Cinematic));\n    let success = planner.plan(\n        EffectEvent::new(\n            \"scene-cinematic-success\",\n            \"cinematic-effects\",\n            \"success\",\n            VisualCue::Success,\n        ),\n        1,\n        false,\n    );\n    let handoff = planner.plan(\n        EffectEvent::new(\n            \"scene-cinematic-handoff\",\n            \"cinematic-effects\",\n            \"handoff\",\n            VisualCue::Handoff,\n        ),\n        1,\n        false,\n    );\n    let reward = planner.plan(\n        EffectEvent::new(\n            \"scene-cinematic-reward\",\n            \"cinematic-effects\",\n            \"reward\",\n            VisualCue::Reward,\n        ),\n        1,\n        false,\n    );\n    let mut static_planner = EffectPlanner::new(EffectPolicy::new(EffectQuality::Cinematic));\n    let static_reward = static_planner.plan(\n        EffectEvent::new(\n            \"scene-cinematic-static\",\n            \"cinematic-effects-static\",\n            \"reward\",\n            VisualCue::Reward,\n        ),\n        1,\n        true,\n    );\n\n    let card = |title: &'static str, detail: &'static str, effect: AnyElement| {\n        div()\n            .column()\n            .w(px(372.0))\n            .h(px(228.0))\n            .radius(&theme, Radius::Card)\n            .overflow_hidden()\n            .bg(theme.colors.sunken)\n            .border_1()\n            .border_color(theme.colors.hairline)\n            .child(div().relative().w_full().h(px(154.0)).child(effect))\n            .child(\n                div()\n                    .column()\n                    .gap_token(&theme, Space::Xs)\n                    .px_token(&theme, Space::Md)\n                    .py_token(&theme, Space::Sm)\n                    .child(crate::foundation::text(&theme, TypeScale::Label, title))\n                    .child(\n                        crate::foundation::text(&theme, TypeScale::Caption, detail)\n                            .text_color(theme.colors.text_muted),\n                    ),\n            )\n    };\n\n    stack(&theme)\n        .w(px(808.0))\n        .child(crate::foundation::text(\n            &theme,\n            TypeScale::Subtitle,\n            \"Semantic cinematic effects\",\n        ))\n        .child(caption(\n            &theme,\n            \"events choose recipes; hosts resolve bytes and own playback requests\",\n        ))\n        .child(\n            row(&theme)\n                .gap_token(&theme, Space::Md)\n                .child(card(\n                    \"Handoff · deterministic sample\",\n                    \"A resolved clip sampled at 575 ms; RTL mirrors its directional trail.\",\n                    CinematicEffect::new(\"scene.cinematic.handoff\", handoff)\n                        .clip(clip.clone())\n                        .sample_at(Duration::from_millis(575))\n                        .into_any_element(),\n                ))\n                .child(card(\n                    \"Success · runtime unavailable\",\n                    \"The semantic recipe falls back to the policy-owned particle burst.\",\n                    CinematicEffect::new(\"scene.cinematic.success\", success)\n                        .unavailable(DotLottieError::new(\n                            DotLottieErrorKind::RuntimeUnavailable,\n                            \"dotLottie backend is not installed\",\n                        ))\n                        .sample_at(Duration::from_millis(520))\n                        .into_any_element(),\n                )),\n        )\n        .child(\n            row(&theme)\n                .gap_token(&theme, Space::Md)\n                .child(card(\n                    \"Reward · invalid asset fallback\",\n                    \"A refused archive stays explicit while a bounded particle recipe renders.\",\n                    CinematicEffect::new(\"scene.cinematic.invalid\", reward)\n                        .unavailable(DotLottieError::new(\n                            DotLottieErrorKind::ArchiveInvalid,\n                            \"animation archive did not pass validation\",\n                        ))\n                        .sample_at(Duration::from_millis(620))\n                        .into_any_element(),\n                ))\n                .child(card(\n                    \"Reward · reduced-motion poster\",\n                    \"The same recipe becomes a deterministic poster with no frame timeline.\",\n                    CinematicEffect::new(\"scene.cinematic.poster\", static_reward)\n                        .clip(clip)\n                        .into_any_element(),\n                )),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "choice",
       "capture": "cargo run -p xtask -- headless capture choice",
+      "kind": "exhibit",
+      "subjects": [
+        "Checkbox",
+        "Radio",
+        "Slider",
+        "Switch"
+      ],
       "uses": [
         "Checkbox",
         "Radio",
@@ -10462,9 +10322,13 @@
     {
       "name": "input",
       "capture": "cargo run -p xtask -- headless capture input",
+      "kind": "exhibit",
+      "subjects": [
+        "Select",
+        "TextInput"
+      ],
       "uses": [
         "Select",
-        "TextArea",
         "TextInput"
       ],
       "example": "fn input(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_inputs(window, cx);\n    let inputs = cx.global::<SceneInputs>();\n    let (token, disabled, invalid, provider) = (\n        inputs.token.clone(),\n        inputs.disabled.clone(),\n        inputs.invalid.clone(),\n        inputs.provider.clone(),\n    );\n    let theme = cx.theme().clone();\n\n    div()\n        .flex()\n        .flex_col()\n        .gap(px(theme.space(Space::Md)))\n        .p(px(theme.space(Space::Lg)))\n        .w(px(360.0))\n        .child(token)\n        .child(disabled)\n        .child(invalid)\n        .child(provider)\n        .into_any_element()\n}"
@@ -10472,35 +10336,43 @@
     {
       "name": "textarea",
       "capture": "cargo run -p xtask -- headless capture textarea",
+      "kind": "exhibit",
+      "subjects": [
+        "TextArea"
+      ],
       "uses": [
-        "Select",
-        "TextArea",
-        "TextInput"
+        "TextArea"
       ],
       "example": "fn textarea(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_inputs(window, cx);\n    let inputs = cx.global::<SceneInputs>();\n    let (notes, review, frozen) = (\n        inputs.notes.clone(),\n        inputs.review.clone(),\n        inputs.frozen.clone(),\n    );\n    let theme = cx.theme().clone();\n\n    div()\n        .flex()\n        .flex_col()\n        .gap(px(theme.space(Space::Md)))\n        .p(px(theme.space(Space::Lg)))\n        .w(px(360.0))\n        .child(notes)\n        .child(review)\n        .child(frozen)\n        .into_any_element()\n}"
     },
     {
       "name": "form",
       "capture": "cargo run -p xtask -- headless capture form",
+      "kind": "exhibit",
+      "subjects": [
+        "Combobox",
+        "FormField",
+        "NumberInput",
+        "SegmentedControl",
+        "TagInput"
+      ],
       "uses": [
         "Combobox",
         "FormField",
         "NumberInput",
         "SegmentedControl",
-        "TagInput",
-        "TextInput"
+        "TagInput"
       ],
       "example": "fn form(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_form(window, cx);\n    let form = cx.global::<SceneForm>();\n    let (name, retention, region, labels) = (\n        form.name.clone(),\n        form.retention.clone(),\n        form.region.clone(),\n        form.labels.clone(),\n    );\n    let theme = cx.theme().clone();\n\n    stack(&theme)\n        .w(px(420.0))\n        .h(px(920.0))\n        .child(\n            FormField::new(\"scene.form.name.form-field\", \"Workspace name\")\n                .control(\"scene.form.name\")\n                .required(true)\n                // The description says what the field is for and the error\n                // says what went wrong; neither answers for the other.\n                .description(\"Shown wherever this workspace appears.\")\n                .error(\"A workspace with this name already exists.\")\n                .child(name),\n        )\n        .child(\n            FormField::new(\"scene.form.retention.form-field\", \"Retention\")\n                .control(\"scene.form.retention\")\n                .required(true)\n                .description(\"How long a finished run is kept.\")\n                .error(\"This workspace allows at most 60 days.\")\n                .child(retention),\n        )\n        .child(\n            FormField::new(\"scene.form.visibility.form-field\", \"Visibility\")\n                .control(\"scene.form.visibility\")\n                .description(\"Who can open the runs in this workspace.\")\n                .child(\n                    SegmentedControl::new(\"scene.form.visibility\")\n                        .label(\"Visibility\")\n                        .segments([\n                            Segment::new(\"private\", \"Private\"),\n                            Segment::new(\"team\", \"Team\"),\n                            Segment::new(\"public\", \"Public\").disabled(true),\n                        ])\n                        .selected(\"team\")\n                        .on_select(|_, _, _| {}),\n                ),\n        )\n        .child(\n            FormField::new(\"scene.form.labels.form-field\", \"Labels\")\n                .control(\"scene.form.labels\")\n                // The keystroke lives in the hint, so the description does not\n                // spend a second line repeating it.\n                .description(\"At most five, and each one only once.\")\n                .hint(\"enter\")\n                .child(labels),\n        )\n        .child(\n            div().mt_auto().child(\n                FormField::new(\"scene.form.region.form-field\", \"All Agent models\")\n                    .control(\"scene.form.region\")\n                    .description(\"Choose a chat-capable model for direct runs.\")\n                    .child(region),\n            ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "auth-sign-in",
       "capture": "cargo run -p xtask -- headless capture auth-sign-in",
+      "kind": "exhibit",
+      "subjects": [
+        "PasswordInput"
+      ],
       "uses": [
-        "Button",
-        "Callout",
-        "Card",
-        "FormField",
-        "Icon",
         "PasswordInput"
       ],
       "example": "fn auth_sign_in(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_auth_sign_in(window, cx);\n    let password = cx.global::<SceneAuthSignIn>().password.clone();\n    let theme = cx.theme().clone();\n    let card_id = \"scene.auth.sign-in.card\";\n    let title = crate::foundation::text(&theme, TypeScale::Title, \"Sign in\").semantic_in(\n        cx,\n        NodeSpec::new(\"scene.auth.sign-in.title\", Role::Text)\n            .parent(card_id)\n            .text(\"Sign in\"),\n    );\n\n    stack(&theme)\n        .w(px(440.0))\n        .child(\n            Card::new().id(card_id).padded(true).child(\n                div()\n                    .column()\n                    .gap_token(&theme, Space::Md)\n                    .child(title)\n                    .child(\n                        Callout::new(\"Credentials are verified by the caller.\", Tone::Neutral)\n                            .id(\"scene.auth.sign-in.boundary\"),\n                    )\n                    .child(\n                        FormField::new(\"scene.auth.sign-in.password.field\", \"Password\")\n                            .control(\"scene.auth.sign-in.password\")\n                            .required(true)\n                            .child(password),\n                    )\n                    .child(\n                        Button::new(\"scene.auth.sign-in.submit\")\n                            .label(\"Sign in\")\n                            .full_width(true)\n                            .on_click(|_, _| {}),\n                    )\n                    .child(\n                        Button::new(\"scene.auth.sign-in.passkey\")\n                            .label(\"Continue with passkey\")\n                            .icon(Icon::Key)\n                            .secondary()\n                            .full_width(true)\n                            .on_click(|_, _| {}),\n                    )\n                    .child(\n                        Button::new(\"scene.auth.sign-in.organization\")\n                            .label(\"Continue with organization sign-on\")\n                            .icon(Icon::Global)\n                            .secondary()\n                            .full_width(true)\n                            .on_click(|_, _| {}),\n                    )\n                    .child(\n                        Button::new(\"scene.auth.sign-in.recovery\")\n                            .label(\"Use a recovery option\")\n                            .link()\n                            .on_click(|_, _| {}),\n                    ),\n            ),\n        )\n        .into_any_element()\n}"
@@ -10508,11 +10380,11 @@
     {
       "name": "auth-verification",
       "capture": "cargo run -p xtask -- headless capture auth-verification",
+      "kind": "exhibit",
+      "subjects": [
+        "OneTimeCodeInput"
+      ],
       "uses": [
-        "Button",
-        "Callout",
-        "Card",
-        "FormField",
         "OneTimeCodeInput"
       ],
       "example": "fn auth_verification(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_auth_verification(window, cx);\n    let code = cx.global::<SceneAuthVerification>().code.clone();\n    let theme = cx.theme().clone();\n    let card_id = \"scene.auth.verification.card\";\n    let title = crate::foundation::text(&theme, TypeScale::Title, \"Verify sign-in\").semantic_in(\n        cx,\n        NodeSpec::new(\"scene.auth.verification.title\", Role::Text)\n            .parent(card_id)\n            .text(\"Verify sign-in\"),\n    );\n\n    stack(&theme)\n        .w(px(440.0))\n        .child(\n            Card::new().id(card_id).padded(true).child(\n                div()\n                    .column()\n                    .gap_token(&theme, Space::Md)\n                    .child(title)\n                    .child(\n                        Callout::new(\n                            \"Enter the code from your authenticator or recovery method.\",\n                            Tone::Neutral,\n                        )\n                        .id(\"scene.auth.verification.guidance\"),\n                    )\n                    .child(\n                        FormField::new(\"scene.auth.verification.code.field\", \"Verification code\")\n                            .control(\"scene.auth.verification.code\")\n                            .required(true)\n                            .child(code),\n                    )\n                    .child(\n                        Button::new(\"scene.auth.verification.submit\")\n                            .label(\"Verify\")\n                            .full_width(true)\n                            .on_click(|_, _| {}),\n                    )\n                    .child(\n                        Button::new(\"scene.auth.verification.alternative\")\n                            .label(\"Use another method\")\n                            .secondary()\n                            .full_width(true)\n                            .on_click(|_, _| {}),\n                    )\n                    .child(\n                        Button::new(\"scene.auth.verification.recovery\")\n                            .label(\"Use a recovery option\")\n                            .link()\n                            .on_click(|_, _| {}),\n                    ),\n            ),\n        )\n        .into_any_element()\n}"
@@ -10520,10 +10392,14 @@
     {
       "name": "actions",
       "capture": "cargo run -p xtask -- headless capture actions",
-      "uses": [
-        "Button",
+      "kind": "exhibit",
+      "subjects": [
         "ButtonGroup",
-        "Icon",
+        "IconButton",
+        "SplitButton"
+      ],
+      "uses": [
+        "ButtonGroup",
         "IconButton",
         "SplitButton"
       ],
@@ -10532,9 +10408,16 @@
     {
       "name": "content",
       "capture": "cargo run -p xtask -- headless capture content",
+      "kind": "exhibit",
+      "subjects": [
+        "Avatar",
+        "Divider",
+        "EmptyState",
+        "ProgressBar",
+        "Tag"
+      ],
       "uses": [
         "Avatar",
-        "Button",
         "Divider",
         "EmptyState",
         "ProgressBar",
@@ -10545,6 +10428,10 @@
     {
       "name": "kbd",
       "capture": "cargo run -p xtask -- headless capture kbd",
+      "kind": "exhibit",
+      "subjects": [
+        "Kbd"
+      ],
       "uses": [
         "Kbd"
       ],
@@ -10553,8 +10440,11 @@
     {
       "name": "overlay",
       "capture": "cargo run -p xtask -- headless capture overlay",
+      "kind": "exhibit",
+      "subjects": [
+        "Overlay"
+      ],
       "uses": [
-        "Button",
         "Overlay"
       ],
       "example": "fn overlay(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(520.0))\n        .h(px(320.0))\n        .child(crate::foundation::text(\n            &theme,\n            TypeScale::Body,\n            \"Content behind the dialog\",\n        ))\n        .child(\n            Overlay::modal(\"scene.overlay.dialog\")\n                .placement(Placement::Center)\n                .child(\n                    crate::overlay::surface(&theme, gpui_kit_theme::Elevation::Modal)\n                        .w(px(320.0))\n                        .p(px(theme.spacing.lg))\n                        .gap(px(theme.spacing.sm))\n                        .child(crate::foundation::text(\n                            &theme,\n                            TypeScale::Subtitle,\n                            \"Delete this workspace?\",\n                        ))\n                        .child(\n                            div()\n                                .row()\n                                .gap(px(theme.spacing.sm))\n                                .child(\n                                    Button::new(\"scene.overlay.cancel\")\n                                        .label(\"Cancel\")\n                                        .secondary()\n                                        .on_click(|_, _| {}),\n                                )\n                                .child(\n                                    Button::new(\"scene.overlay.confirm\")\n                                        .label(\"Delete\")\n                                        .danger()\n                                        .on_click(|_, _| {}),\n                                ),\n                        ),\n                ),\n        )\n        .into_any_element()\n}"
@@ -10562,6 +10452,10 @@
     {
       "name": "dialog",
       "capture": "cargo run -p xtask -- headless capture dialog",
+      "kind": "exhibit",
+      "subjects": [
+        "Dialog"
+      ],
       "uses": [
         "Dialog"
       ],
@@ -10570,8 +10464,11 @@
     {
       "name": "tooltip",
       "capture": "cargo run -p xtask -- headless capture tooltip",
+      "kind": "exhibit",
+      "subjects": [
+        "Tooltip"
+      ],
       "uses": [
-        "Button",
         "Tooltip"
       ],
       "example": "fn tooltip(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(\n            row(&theme).child(\n                div()\n                    .id(\"scene.tooltip.host\")\n                    .tip(\"scene.tooltip.export\", \"Writes the theme to a file on disk\")\n                    .child(\n                        Button::new(\"scene.tooltip.export\")\n                            .label(\"Export theme\")\n                            .accessible_description(\"Writes the theme to a file on disk\")\n                            .secondary()\n                            .on_click(|_, _| {}),\n                    ),\n            ),\n        )\n        // Hover help only exists while a pointer rests on the control, so the\n        // surface itself is also shown outright, where it can be reviewed.\n        .child(\n            row(&theme).child(\n                Tooltip::new(\"scene.tooltip.help\", \"Writes the theme to a file on disk\")\n                    .describes(\"scene.tooltip.export\"),\n            ),\n        )\n        .into_any_element()\n}"
@@ -10579,38 +10476,35 @@
     {
       "name": "menu",
       "capture": "cargo run -p xtask -- headless capture menu",
+      "kind": "exhibit",
+      "subjects": [
+        "Menu"
+      ],
       "uses": [
-        "Checkbox",
-        "CommandPalette",
-        "ContextMenu",
-        "Icon",
-        "Menu",
-        "Popover"
+        "Menu"
       ],
       "example": "fn menu(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_menus(window, cx);\n    let menu = cx.global::<SceneMenus>().menu.clone();\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(560.0))\n        .h(px(360.0))\n        .child(menu)\n        .into_any_element()\n}"
     },
     {
       "name": "context-menu",
       "capture": "cargo run -p xtask -- headless capture context-menu",
+      "kind": "exhibit",
+      "subjects": [
+        "ContextMenu"
+      ],
       "uses": [
-        "Checkbox",
-        "CommandPalette",
-        "ContextMenu",
-        "Icon",
-        "Menu",
-        "Popover"
+        "ContextMenu"
       ],
       "example": "fn context_menu(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_menus(window, cx);\n    let context = cx.global::<SceneMenus>().context.clone();\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(560.0))\n        .h(px(400.0))\n        // Opening a context menu reports the row that was pointed at; what is\n        // selected stays the host's answer.\n        .child(crate::foundation::text(\n            &theme,\n            TypeScale::Body,\n            \"The right-click reports the row. Nothing is selected by it.\",\n        ))\n        .child(context)\n        .into_any_element()\n}"
     },
     {
       "name": "popover",
       "capture": "cargo run -p xtask -- headless capture popover",
+      "kind": "exhibit",
+      "subjects": [
+        "Popover"
+      ],
       "uses": [
-        "Checkbox",
-        "CommandPalette",
-        "ContextMenu",
-        "Icon",
-        "Menu",
         "Popover"
       ],
       "example": "fn popover(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_menus(window, cx);\n    let popover = cx.global::<SceneMenus>().popover.clone();\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(520.0))\n        .h(px(320.0))\n        // The trigger keeps its place while the surface is open, because the\n        // surface is anchored to it rather than laid out beside it.\n        .child(crate::foundation::text(\n            &theme,\n            TypeScale::Body,\n            \"The trigger owns whether the surface is open.\",\n        ))\n        .child(popover)\n        .into_any_element()\n}"
@@ -10618,19 +10512,22 @@
     {
       "name": "command-palette",
       "capture": "cargo run -p xtask -- headless capture command-palette",
+      "kind": "exhibit",
+      "subjects": [
+        "CommandPalette"
+      ],
       "uses": [
-        "Checkbox",
-        "CommandPalette",
-        "ContextMenu",
-        "Icon",
-        "Menu",
-        "Popover"
+        "CommandPalette"
       ],
       "example": "fn command_palette(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_menus(window, cx);\n    let palette = cx.global::<SceneMenus>().palette.clone();\n    let theme = cx.theme().clone();\n    // A palette is summoned over whatever is on screen, so it sits centred\n    // near the top of the surface rather than in a corner of it.\n    stack(&theme)\n        .w_full()\n        .h(px(420.0))\n        .items_center()\n        .pt(px(theme.spacing.xxl))\n        .child(palette)\n        .into_any_element()\n}"
     },
     {
       "name": "toast",
       "capture": "cargo run -p xtask -- headless capture toast",
+      "kind": "exhibit",
+      "subjects": [
+        "ToastLayer"
+      ],
       "uses": [
         "ToastLayer"
       ],
@@ -10639,8 +10536,11 @@
     {
       "name": "tabs",
       "capture": "cargo run -p xtask -- headless capture tabs",
+      "kind": "exhibit",
+      "subjects": [
+        "Tabs"
+      ],
       "uses": [
-        "Icon",
         "Tabs"
       ],
       "example": "fn tabs(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(520.0))\n        .child(\n            Tabs::new(\"scene.tabs.workspace\")\n                .tabs([\n                    TabItem::new(\"overview\", \"Overview\").icon(Icon::Widget),\n                    TabItem::new(\"runs\", \"Runs\").badge(\"12\"),\n                    TabItem::new(\"logs\", \"Logs\"),\n                    TabItem::new(\"billing\", \"Billing\").disabled(true),\n                ])\n                .selected(\"runs\")\n                .on_select(|_, _, _| {}),\n        )\n        // The body belongs to the caller: tabs render the strip only.\n        .child(crate::foundation::text(\n            &theme,\n            TypeScale::Body,\n            \"Runs are rendered by the caller, not by the strip.\",\n        ))\n        .into_any_element()\n}"
@@ -10648,6 +10548,10 @@
     {
       "name": "accordion",
       "capture": "cargo run -p xtask -- headless capture accordion",
+      "kind": "exhibit",
+      "subjects": [
+        "Accordion"
+      ],
       "uses": [
         "Accordion"
       ],
@@ -10656,6 +10560,10 @@
     {
       "name": "breadcrumb",
       "capture": "cargo run -p xtask -- headless capture breadcrumb",
+      "kind": "exhibit",
+      "subjects": [
+        "Breadcrumb"
+      ],
       "uses": [
         "Breadcrumb"
       ],
@@ -10664,6 +10572,10 @@
     {
       "name": "list",
       "capture": "cargo run -p xtask -- headless capture list",
+      "kind": "exhibit",
+      "subjects": [
+        "List"
+      ],
       "uses": [
         "List"
       ],
@@ -10672,8 +10584,11 @@
     {
       "name": "table",
       "capture": "cargo run -p xtask -- headless capture table",
+      "kind": "exhibit",
+      "subjects": [
+        "Table"
+      ],
       "uses": [
-        "Badge",
         "Table"
       ],
       "example": "fn table(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let state = |label: &'static str, tone: Tone| {\n        Cell::new(Badge::new(label).tone(tone))\n            .text(label)\n            .published(true)\n    };\n    let columns = [\n        Column::new(\"name\", \"Run\").flex(2.0).sortable(true),\n        Column::new(\"state\", \"State\").fixed(110.0),\n        Column::new(\"duration\", \"Duration\")\n            .fixed(96.0)\n            .align(Align::End)\n            .sortable(true),\n    ];\n    stack(&theme)\n        .w(px(600.0))\n        .child(\n            Table::new(\"scene.table.runs\")\n                .columns(columns.clone())\n                .sorted_by(\"duration\", SortDirection::Descending)\n                .selected(\"run-b12\")\n                .rows([\n                    Row::new(\"run-a04\")\n                        .text(\"Indexing\")\n                        .cell(\"name\", \"Indexing\")\n                        .cell(\"state\", state(\"Ready\", Tone::Success))\n                        .cell(\"duration\", \"4m 12s\"),\n                    Row::new(\"run-b12\")\n                        .text(\"Verifying\")\n                        .cell(\"name\", \"Verifying\")\n                        .cell(\"state\", state(\"Stale\", Tone::Warning))\n                        .cell(\"duration\", \"2m 08s\"),\n                    Row::new(\"run-c31\")\n                        .text(\"Publishing\")\n                        .cell(\"name\", \"Publishing\")\n                        .cell(\"state\", state(\"Refused\", Tone::Danger))\n                        .cell(\"duration\", \"1m 44s\"),\n                    Row::new(\"run-d02\")\n                        .text(\"Archiving\")\n                        .disabled(true)\n                        .cell(\"name\", \"Archiving\")\n                        .cell(\"state\", state(\"Managed\", Tone::Neutral))\n                        .cell(\"duration\", \"0m 51s\"),\n                ])\n                .visible_rows(6)\n                .on_sort(|_, _, _, _| {})\n                .on_select(|_, _, _| {}),\n        )\n        .child(\n            Table::new(\"scene.table.stale\")\n                .columns(columns.clone())\n                .rows([Row::new(\"run-a04\")\n                    .text(\"Indexing\")\n                    .cell(\"name\", \"Indexing\")\n                    .cell(\"state\", state(\"Ready\", Tone::Success))\n                    .cell(\"duration\", \"4m 12s\")])\n                .failure(\"The host refused the refresh\")\n                .on_select(|_, _, _| {}),\n        )\n        .child(\n            Table::new(\"scene.table.empty\")\n                .columns(columns)\n                .on_select(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
@@ -10681,10 +10596,13 @@
     {
       "name": "data-grid",
       "capture": "cargo run -p xtask -- headless capture data-grid",
-      "uses": [
-        "Badge",
+      "kind": "exhibit",
+      "subjects": [
         "BulkBar",
-        "Button",
+        "DataGrid"
+      ],
+      "uses": [
+        "BulkBar",
         "DataGrid"
       ],
       "example": "fn data_grid(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let detail_theme = theme.clone();\n    stack(&theme)\n        .w(px(760.0))\n        .child(\n            BulkBar::new(\"scene.data-grid.bulk\", 2)\n                .total(FIXTURE_JOBS_TOTAL)\n                .action(\n                    Button::new(\"scene.data-grid.bulk.retry\")\n                        .label(\"Retry\")\n                        .secondary()\n                        .small()\n                        .on_click(|_, _| {}),\n                )\n                .action(\n                    Button::new(\"scene.data-grid.bulk.archive\")\n                        .label(\"Archive\")\n                        .secondary()\n                        .small()\n                        .on_click(|_, _| {}),\n                )\n                .on_select_all(|_, _| {})\n                .on_dismiss(|_, _| {}),\n        )\n        .child(\n            DataGrid::new(\n                \"scene.data-grid.jobs\",\n                FIXTURE_JOBS_LOADED,\n                |index, _, _| grid_row(index),\n            )\n            .total(FIXTURE_JOBS_TOTAL)\n            .columns(grid_columns())\n            .sorted_by(\"duration\", SortDirection::Descending)\n            .selection_mode(SelectionMode::Multiple)\n            .selected([\"job-0001\", \"job-0003\"])\n            .expanded([Expanded::new(\"job-0002\", 2)])\n            .detail_rows(2)\n            .detail(move |id, _, _| grid_detail(&detail_theme, id))\n            .visible_rows(9)\n            .on_sort(|_, _, _, _| {})\n            .on_select(|_, _, _| {})\n            .on_resize(|_, _, _, _| {})\n            .on_fit(|_, _, _| {})\n            .on_reorder(|_, _, _| {})\n            .on_expand(|_, _, _, _| {})\n            .on_edit_request(|_, _, _, _| {})\n            .on_edit(|_, _, _| {}),\n        )\n        .child(\n            crate::foundation::text(\n                &theme,\n                TypeScale::Caption,\n                SharedString::from(format!(\n                    \"{FIXTURE_JOBS_LOADED} rows loaded of {FIXTURE_JOBS_TOTAL}; only the drawn \\\n                     ones publish\"\n                )),\n            )\n            .text_tone(&theme, TextTone::Muted),\n        )\n        .into_any_element()\n}"
@@ -10692,8 +10610,11 @@
     {
       "name": "data-grid-editing",
       "capture": "cargo run -p xtask -- headless capture data-grid-editing",
+      "kind": "exhibit",
+      "subjects": [
+        "DataGrid"
+      ],
       "uses": [
-        "Badge",
         "DataGrid"
       ],
       "example": "fn data_grid_editing(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(760.0))\n        .child(\n            DataGrid::new(\"scene.data-grid-editing.jobs\", 6, |index, _, _| {\n                grid_row(index)\n            })\n            .columns(grid_columns())\n            .sorted_by(\"duration\", SortDirection::Descending)\n            .selection_mode(SelectionMode::Single)\n            .selected([\"job-0001\"])\n            .editing(Some(EditingCell::new(\"job-0001\", \"owner\", \"fixture-b\")))\n            .visible_rows(6)\n            .on_sort(|_, _, _, _| {})\n            .on_select(|_, _, _| {})\n            .on_resize(|_, _, _, _| {})\n            .on_edit_request(|_, _, _, _| {})\n            .on_edit(|_, _, _| {}),\n        )\n        .child(\n            crate::foundation::text(\n                &theme,\n                TypeScale::Caption,\n                SharedString::from(\n                    \"Escape reverts, enter commits, tab commits and moves on. The grid never \\\n                     writes the value.\",\n                ),\n            )\n            .text_tone(&theme, TextTone::Muted),\n        )\n        .into_any_element()\n}"
@@ -10701,6 +10622,10 @@
     {
       "name": "tree-grid",
       "capture": "cargo run -p xtask -- headless capture tree-grid",
+      "kind": "exhibit",
+      "subjects": [
+        "TreeGrid"
+      ],
       "uses": [
         "TreeGrid"
       ],
@@ -10709,8 +10634,11 @@
     {
       "name": "tree",
       "capture": "cargo run -p xtask -- headless capture tree",
+      "kind": "exhibit",
+      "subjects": [
+        "Tree"
+      ],
       "uses": [
-        "Icon",
         "Tree"
       ],
       "example": "fn tree(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(360.0))\n        .child(\n            Tree::new(\"scene.tree.workspace\")\n                .expanded_ids(&[\"workspace\", \"crates\"])\n                .selected(\"tokens\")\n                .nodes([\n                    TreeNode::new(\"workspace\", \"workspace\")\n                        .icon(Icon::Folder)\n                        .children([\n                            TreeNode::new(\"crates\", \"crates\")\n                                .icon(Icon::Folder)\n                                .children([\n                                    TreeNode::new(\"kit\", \"gpui-kit\").icon(Icon::Document),\n                                    TreeNode::new(\"tokens\", \"gpui-kit-tokens\").icon(Icon::Document),\n                                ]),\n                            TreeNode::new(\"docs\", \"docs\")\n                                .icon(Icon::Folder)\n                                .children([TreeNode::new(\"components\", \"components.md\")\n                                    .icon(Icon::Document)]),\n                        ]),\n                    TreeNode::new(\"target\", \"target\")\n                        .icon(Icon::Archive)\n                        .disabled(true)\n                        .children([TreeNode::new(\"debug\", \"debug\").icon(Icon::Folder)]),\n                ])\n                .on_toggle(|_, _, _, _| {})\n                .on_select(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
@@ -10718,6 +10646,10 @@
     {
       "name": "split-pane",
       "capture": "cargo run -p xtask -- headless capture split-pane",
+      "kind": "exhibit",
+      "subjects": [
+        "SplitPane"
+      ],
       "uses": [
         "SplitPane"
       ],
@@ -10726,6 +10658,10 @@
     {
       "name": "scroll-area",
       "capture": "cargo run -p xtask -- headless capture scroll-area",
+      "kind": "exhibit",
+      "subjects": [
+        "ScrollArea"
+      ],
       "uses": [
         "ScrollArea"
       ],
@@ -10734,6 +10670,10 @@
     {
       "name": "scroll-shadow",
       "capture": "cargo run -p xtask -- headless capture scroll-shadow",
+      "kind": "exhibit",
+      "subjects": [
+        "ScrollArea"
+      ],
       "uses": [
         "ScrollArea"
       ],
@@ -10742,8 +10682,11 @@
     {
       "name": "scroll-fade",
       "capture": "cargo run -p xtask -- headless capture scroll-fade",
+      "kind": "exhibit",
+      "subjects": [
+        "ScrollFade"
+      ],
       "uses": [
-        "ScrollArea",
         "ScrollFade"
       ],
       "example": "fn scroll_fade(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    crate::layout::scroll_to(\"scene.fade.output\", gpui::point(px(0.0), px(120.0)), cx);\n    stack(&theme)\n        .w(px(480.0))\n        .child(caption(&theme, \"Scrolled: content runs past both ends\"))\n        .child(\n            div()\n                .surface(&theme, Surface::Panel)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(\n                    ScrollFade::new(\"scene.fade.scrolled\")\n                        .edges(FadeEdges::vertical())\n                        .fit_height()\n                        .child(\n                            ScrollArea::new(\"scene.fade.output\")\n                                .label(\"Run output\")\n                                .vertical()\n                                .height(200.0)\n                                .child(filler(&theme, \"Output\", 20)),\n                        ),\n                ),\n        )\n        // Nothing is hidden here, so no edge fades and the caller says so.\n        .child(caption(&theme, \"Nothing hidden: no edge fades\"))\n        .child(\n            div()\n                .surface(&theme, Surface::Panel)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(\n                    ScrollFade::new(\"scene.fade.settled\").fit_height().child(\n                        ScrollArea::new(\"scene.fade.summary\")\n                            .label(\"Summary\")\n                            .vertical()\n                            .height(120.0)\n                            .child(filler(&theme, \"Summary\", 2)),\n                    ),\n                ),\n        )\n        .into_any_element()\n}"
@@ -10751,19 +10694,22 @@
     {
       "name": "frost",
       "capture": "cargo run -p xtask -- headless capture frost",
+      "kind": "exhibit",
+      "subjects": [
+        "Frost"
+      ],
       "uses": [
-        "Badge",
-        "Button",
-        "Card",
-        "Frost",
-        "ListRow",
-        "StatusDot"
+        "Frost"
       ],
       "example": "fn frost(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let card = |title: &'static str, body: &'static str| {\n        div()\n            .column()\n            .gap(px(theme.space(Space::Xs)))\n            .p(px(theme.space(Space::Md)))\n            .child(crate::foundation::text(\n                &theme,\n                TypeScale::Label,\n                SharedString::from(title),\n            ))\n            .child(caption(&theme, body))\n    };\n    let stripes = || {\n        div()\n            .absolute()\n            .top(px(56.0))\n            .left(px(100.0))\n            .w(px(330.0))\n            .h(px(64.0))\n            .flex()\n            .overflow_hidden()\n            .children((0..22).map(|index| {\n                div()\n                    .flex_none()\n                    .w(px(15.0))\n                    .h(px(64.0))\n                    .bg(if index % 2 == 0 {\n                        theme.colors.accent\n                    } else {\n                        theme.colors.canvas\n                    })\n            }))\n    };\n    stack(&theme)\n        .w(px(480.0))\n        .child(caption(&theme, \"A floating surface on glass\"))\n        .child(\n            div()\n                .relative()\n                .h(px(200.0))\n                .surface(&theme, Surface::Panel)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(stripes())\n                .child(filler(&theme, \"Document\", 8))\n                .child(\n                    div()\n                        .absolute()\n                        .top(px(48.0))\n                        .left(px(120.0))\n                        .w(px(240.0))\n                        .child(\n                            Frost::new(\"scene.frost.popover\")\n                                .radius(Radius::Card)\n                                .child(card(\n                                    \"Rename\",\n                                    \"The page behind stays visible, out of focus\",\n                                )),\n                        ),\n                ),\n        )\n        .child(caption(&theme, \"The same glass over a panel surface\"))\n        .child(\n            div()\n                .relative()\n                .h(px(160.0))\n                .surface(&theme, Surface::Panel)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(stripes())\n                .child(filler(&theme, \"Files\", 6))\n                .child(\n                    div()\n                        .absolute()\n                        .top(px(32.0))\n                        .left(px(120.0))\n                        .w(px(280.0))\n                        .child(\n                            Frost::new(\"scene.frost.rail\")\n                                .surface(gpui_kit_theme::Surface::Panel)\n                                .radius(Radius::Dialog)\n                                .blur(32.0)\n                                .child(card(\"Rail\", \"The striped backdrop stays out of focus\")),\n                        ),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "glass",
       "capture": "cargo run -p xtask -- headless capture glass",
+      "kind": "exhibit",
+      "subjects": [
+        "Glass"
+      ],
       "uses": [
         "Glass"
       ],
@@ -10772,12 +10718,11 @@
     {
       "name": "toolbar",
       "capture": "cargo run -p xtask -- headless capture toolbar",
+      "kind": "exhibit",
+      "subjects": [
+        "Toolbar"
+      ],
       "uses": [
-        "Button",
-        "Icon",
-        "IconButton",
-        "Menu",
-        "SegmentedControl",
         "Toolbar"
       ],
       "example": "fn toolbar(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneToolbar>() {\n        let overflow = cx.new(|cx| {\n            Menu::new(\"scene.toolbar.overflow\", window, cx)\n                .trigger_icon(Icon::List)\n                .trigger_name(\"More actions\")\n        });\n        cx.set_global(SceneToolbar { overflow });\n    }\n    let overflow = cx.global::<SceneToolbar>().overflow.clone();\n    let theme = cx.theme().clone();\n\n    stack(&theme)\n        .w(px(620.0))\n        .child(\n            Toolbar::new(\"scene.toolbar.editor\")\n                .label(\"Editor actions\")\n                .group(\n                    \"history\",\n                    [\n                        ToolbarItem::new(\n                            \"editor.undo\",\n                            \"Undo\",\n                            IconButton::new(\"scene.toolbar.undo\", Icon::ArrowLeft, \"Undo\")\n                                .ghost()\n                                .small()\n                                .on_click(|_, _| {}),\n                        )\n                        .icon(Icon::ArrowLeft)\n                        .shortcut(\"cmd-z\"),\n                        ToolbarItem::new(\n                            \"editor.redo\",\n                            \"Redo\",\n                            IconButton::new(\"scene.toolbar.redo\", Icon::ArrowRight, \"Redo\")\n                                .ghost()\n                                .small()\n                                .on_click(|_, _| {}),\n                        )\n                        .icon(Icon::ArrowRight),\n                    ],\n                )\n                .group(\n                    \"view\",\n                    [ToolbarItem::new(\n                        \"editor.view\",\n                        \"View\",\n                        SegmentedControl::new(\"scene.toolbar.view\")\n                            .label(\"View\")\n                            .segments([\n                                Segment::new(\"code\", \"Code\"),\n                                Segment::new(\"split\", \"Split\"),\n                                Segment::new(\"preview\", \"Preview\"),\n                            ])\n                            .selected(\"split\")\n                            .small()\n                            .on_select(|_, _, _| {}),\n                    )],\n                )\n                .spacer()\n                .group(\n                    \"publish\",\n                    [\n                        ToolbarItem::new(\n                            \"editor.share\",\n                            \"Share\",\n                            Button::new(\"scene.toolbar.share\")\n                                .label(\"Share\")\n                                .secondary()\n                                .small()\n                                .on_click(|_, _| {}),\n                        )\n                        .icon(Icon::Copy),\n                        ToolbarItem::new(\n                            \"editor.publish\",\n                            \"Publish\",\n                            Button::new(\"scene.toolbar.publish\")\n                                .label(\"Publish\")\n                                .primary()\n                                .small()\n                                .on_click(|_, _| {}),\n                        )\n                        .icon(Icon::ArchiveUp),\n                        ToolbarItem::new(\n                            \"editor.archive\",\n                            \"Archive\",\n                            Button::new(\"scene.toolbar.archive\")\n                                .label(\"Archive\")\n                                .secondary()\n                                .small()\n                                .on_click(|_, _| {}),\n                        )\n                        .icon(Icon::Archive)\n                        .disabled(true),\n                    ],\n                )\n                .overflow_after(4)\n                .overflow_menu(overflow),\n        )\n        .child(crate::foundation::text(\n            &theme,\n            TypeScale::Body,\n            \"The last two actions moved into the overflow menu.\",\n        ))\n        .into_any_element()\n}"
@@ -10785,8 +10730,11 @@
     {
       "name": "sidebar",
       "capture": "cargo run -p xtask -- headless capture sidebar",
+      "kind": "exhibit",
+      "subjects": [
+        "Sidebar"
+      ],
       "uses": [
-        "Icon",
         "Sidebar"
       ],
       "example": "fn sidebar(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let rail = |ident: &'static str, collapsed: bool| {\n        Sidebar::new(ident)\n            .sections(navigation_sections())\n            .active(\"runs.active\")\n            .collapsed(collapsed)\n            .footer(\n                crate::foundation::text(\n                    &theme,\n                    TypeScale::Caption,\n                    if collapsed {\n                        SharedString::new_static(\"v0\")\n                    } else {\n                        SharedString::new_static(\"Fixture workspace\")\n                    },\n                )\n                .text_tone(&theme, TextTone::Faint),\n            )\n            .on_select(|_, _, _| {})\n    };\n\n    stack(&theme)\n        .h(px(420.0))\n        .child(\n            div()\n                .flex()\n                .flex_row()\n                .h(px(360.0))\n                .gap(px(theme.space(Space::Lg)))\n                .child(rail(\"scene.sidebar.expanded\", false))\n                .child(rail(\"scene.sidebar.collapsed\", true)),\n        )\n        .into_any_element()\n}"
@@ -10794,18 +10742,23 @@
     {
       "name": "pagination",
       "capture": "cargo run -p xtask -- headless capture pagination",
+      "kind": "exhibit",
+      "subjects": [
+        "Pagination"
+      ],
       "uses": [
-        "Pagination",
-        "Select"
+        "Pagination"
       ],
       "example": "fn pagination(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<ScenePagination>() {\n        let page_size = cx.new(|cx| {\n            Select::new(\"scene.pagination.size\", window, cx)\n                .name(\"Rows per page\")\n                .options([\n                    SelectOption::new(\"25\", \"25 per page\"),\n                    SelectOption::new(\"50\", \"50 per page\"),\n                    SelectOption::new(\"100\", \"100 per page\"),\n                ])\n                .selected(\"50\")\n        });\n        cx.set_global(ScenePagination { page_size });\n    }\n    let page_size = cx.global::<ScenePagination>().page_size.clone();\n    let theme = cx.theme().clone();\n\n    stack(&theme)\n        .w(px(620.0))\n        .child(\n            Pagination::new(\"scene.pagination.known\")\n                .page(9)\n                .total_pages(20)\n                .page_size(page_size)\n                .on_select(|_, _, _| {}),\n        )\n        // A host that only knows there is another page says exactly that: no\n        // last-page control, no numbers, and no total.\n        .child(\n            Pagination::new(\"scene.pagination.unknown\")\n                .page(3)\n                .unknown_total(true)\n                .on_select(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "drawer",
       "capture": "cargo run -p xtask -- headless capture drawer",
+      "kind": "exhibit",
+      "subjects": [
+        "Drawer"
+      ],
       "uses": [
-        "Button",
-        "Checkbox",
         "Drawer"
       ],
       "example": "fn drawer(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneDrawer>() {\n        let filters = cx.new(|cx| {\n            Drawer::new(\"scene.drawer.filters\", window, cx)\n                .edge(Edge::Right)\n                .size(320.0)\n                .title(\"Filter runs\")\n                .description(\"The drawer reports what was chosen. The host applies it.\")\n                .content(|_, cx| {\n                    let theme = cx.theme().clone();\n                    div()\n                        .flex()\n                        .flex_col()\n                        .gap(px(theme.space(Space::Sm)))\n                        .child(\n                            Checkbox::new(\"scene.drawer.failed\")\n                                .label(\"Failed runs only\")\n                                .checked(true)\n                                .on_change(|_, _, _| {}),\n                        )\n                        .child(\n                            Checkbox::new(\"scene.drawer.mine\")\n                                .label(\"Started by me\")\n                                .on_change(|_, _, _| {}),\n                        )\n                        .into_any_element()\n                })\n                .footer(|_, _| {\n                    Button::new(\"scene.drawer.apply\")\n                        .label(\"Apply\")\n                        .primary()\n                        .full_width(true)\n                        .on_click(|_, _| {})\n                        .into_any_element()\n                })\n        });\n        filters.update(cx, |drawer, cx| {\n            drawer.open(window, cx);\n            drawer.settle(cx);\n        });\n        cx.set_global(SceneDrawer { filters });\n    }\n    let filters = cx.global::<SceneDrawer>().filters.clone();\n    let theme = cx.theme().clone();\n\n    stack(&theme)\n        .w(px(620.0))\n        .h(px(400.0))\n        .child(crate::foundation::text(\n            &theme,\n            TypeScale::Body,\n            \"Content behind the drawer\",\n        ))\n        .child(filters)\n        .into_any_element()\n}"
@@ -10813,6 +10766,8 @@
     {
       "name": "motion-flip",
       "capture": "cargo run -p xtask -- headless capture motion-flip",
+      "kind": "composition",
+      "subjects": [],
       "uses": [
         "Badge",
         "Button",
@@ -10824,6 +10779,8 @@
     {
       "name": "motion-state",
       "capture": "cargo run -p xtask -- headless capture motion-state",
+      "kind": "composition",
+      "subjects": [],
       "uses": [
         "Accordion",
         "Button",
@@ -10839,15 +10796,22 @@
     {
       "name": "animated-number",
       "capture": "cargo run -p xtask -- headless capture animated-number",
+      "kind": "exhibit",
+      "subjects": [
+        "AnimatedNumber"
+      ],
       "uses": [
-        "AnimatedNumber",
-        "Button"
+        "AnimatedNumber"
       ],
       "example": "fn animated_number(_window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneCounts>() {\n        cx.set_global(SceneCounts {\n            runs: 1204.0,\n            seconds: 18.4,\n        });\n    }\n    let counts = cx.global::<SceneCounts>();\n    let (runs, seconds) = (counts.runs, counts.seconds);\n    let theme = cx.theme().clone();\n\n    let readout = |label: &'static str, number: AnimatedNumber| {\n        div()\n            .column()\n            .gap(px(theme.spacing.xs))\n            .child(\n                crate::foundation::text(&theme, TypeScale::Caption, label)\n                    .text_tone(&theme, TextTone::Muted),\n            )\n            .child(number)\n    };\n\n    stack(&theme)\n        .child(\n            row(&theme)\n                .gap(px(theme.spacing.xl))\n                .items_start()\n                .child(readout(\n                    \"Runs this week\",\n                    AnimatedNumber::new(\"scene.number.runs\", runs).format(grouped),\n                ))\n                .child(readout(\n                    \"Median duration\",\n                    AnimatedNumber::new(\"scene.number.seconds\", seconds)\n                        .format(|value| format!(\"{value:.1}s\")),\n                )),\n        )\n        .child(\n            row(&theme).child(\n                Button::new(\"scene.number.recount\")\n                    .label(\"Recount\")\n                    .secondary()\n                    .on_click(|_, cx| {\n                        cx.update_global::<SceneCounts, ()>(|counts, _| {\n                            counts.runs += 318.0;\n                            counts.seconds += 4.7;\n                        });\n                        cx.refresh_windows();\n                    }),\n            ),\n        )\n        .child(\n            crate::foundation::text(\n                &theme,\n                TypeScale::Body,\n                \"The published value is the target, from the frame it changes.\",\n            )\n            .text_tone(&theme, TextTone::Muted),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "drag-list",
       "capture": "cargo run -p xtask -- headless capture drag-list",
+      "kind": "exhibit",
+      "subjects": [
+        "List"
+      ],
       "uses": [
         "List"
       ],
@@ -10856,8 +10820,11 @@
     {
       "name": "drag-tree",
       "capture": "cargo run -p xtask -- headless capture drag-tree",
+      "kind": "exhibit",
+      "subjects": [
+        "Tree"
+      ],
       "uses": [
-        "Icon",
         "Tree"
       ],
       "example": "fn drag_tree(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    dnd::stage(\n        StagedDrag::new(\n            DragItem::new(\"scene.drag.workspace\", \"kit\", \"gpui-kit\").icon(Icon::Document),\n        )\n        .landing(\n            \"scene.drag.workspace\",\n            DropPosition::Into(SharedString::new_static(\"docs\")),\n            None,\n            true,\n        ),\n        cx,\n    );\n\n    stack(&theme)\n        .w(px(360.0))\n        .child(caption(&theme, \"gpui-kit moving into docs\"))\n        .child(\n            div()\n                .relative()\n                .child(\n                    Tree::new(\"scene.drag.workspace\")\n                        .expanded_ids(&[\"workspace\", \"crates\", \"docs\"])\n                        .nodes([TreeNode::new(\"workspace\", \"workspace\")\n                            .icon(Icon::Folder)\n                            .children([\n                                TreeNode::new(\"crates\", \"crates\")\n                                    .icon(Icon::Folder)\n                                    .children([\n                                        TreeNode::new(\"kit\", \"gpui-kit\").icon(Icon::Document),\n                                        TreeNode::new(\"tokens\", \"gpui-kit-tokens\")\n                                            .icon(Icon::Document),\n                                    ]),\n                                TreeNode::new(\"docs\", \"docs\")\n                                    .icon(Icon::Folder)\n                                    .children([TreeNode::new(\"components\", \"components.md\")\n                                        .icon(Icon::Document)]),\n                            ])])\n                        .reorderable(true)\n                        .on_toggle(|_, _, _, _| {})\n                        .on_select(|_, _, _| {})\n                        .on_move(|_, _, _| {}),\n                )\n                .children(\n                    dnd::staged_ghost(cx)\n                        .map(|ghost| div().absolute().left(px(212.0)).top(px(116.0)).child(ghost)),\n                ),\n        )\n        .into_any_element()\n}"
@@ -10865,6 +10832,10 @@
     {
       "name": "dropzone",
       "capture": "cargo run -p xtask -- headless capture dropzone",
+      "kind": "exhibit",
+      "subjects": [
+        "Dropzone"
+      ],
       "uses": [
         "Dropzone"
       ],
@@ -10873,6 +10844,10 @@
     {
       "name": "wizard",
       "capture": "cargo run -p xtask -- headless capture wizard",
+      "kind": "exhibit",
+      "subjects": [
+        "Wizard"
+      ],
       "uses": [
         "Wizard"
       ],
@@ -10881,6 +10856,10 @@
     {
       "name": "undo-history",
       "capture": "cargo run -p xtask -- headless capture undo-history",
+      "kind": "exhibit",
+      "subjects": [
+        "UndoHistory"
+      ],
       "uses": [
         "UndoHistory"
       ],
@@ -10889,19 +10868,27 @@
     {
       "name": "settings",
       "capture": "cargo run -p xtask -- headless capture settings",
+      "kind": "exhibit",
+      "subjects": [
+        "SettingsRow",
+        "SettingsSection"
+      ],
       "uses": [
         "SettingsRow",
-        "SettingsSection",
-        "Switch"
+        "SettingsSection"
       ],
       "example": "fn settings(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(620.0))\n        .child(\n            SettingsSection::new(\"scene.settings.general\", \"General\")\n                .description(\"How this workspace behaves\")\n                .row(\n                    SettingsRow::new(\"scene.settings.general.autosave\", \"Save automatically\")\n                        .description(\"Write changes as they happen\")\n                        .control(\n                            Switch::new(\"scene.settings.general.autosave.switch\")\n                                .named(\"Save automatically\")\n                                .on(true)\n                                .on_change(|_, _, _| {}),\n                        ),\n                )\n                .row(\n                    SettingsRow::new(\"scene.settings.general.runtime\", \"Native runtime\")\n                        .description(\"Runs work on this machine instead of a host\")\n                        .badge(\"Requires restart\")\n                        .control(\n                            Switch::new(\"scene.settings.general.runtime.switch\")\n                                .named(\"Native runtime\")\n                                .on(false)\n                                .on_change(|_, _, _| {}),\n                        ),\n                )\n                .row(\n                    SettingsRow::new(\"scene.settings.general.telemetry\", \"Usage reporting\")\n                        .description(\"Nobody on this machine can change this\")\n                        .value(\"Off\")\n                        .managed(\"your administrator\"),\n                ),\n        )\n        .child(\n            SettingsSection::new(\"scene.settings.sync\", \"Synchronisation\")\n                .description(\"What travels between machines\")\n                .dimmed_by(\"This workspace is local, so nothing synchronises.\")\n                .row(\n                    SettingsRow::new(\"scene.settings.sync.settings\", \"Sync settings\")\n                        .value(\"Off\")\n                        .control(\n                            Switch::new(\"scene.settings.sync.settings.switch\")\n                                .named(\"Sync settings\")\n                                .on(false)\n                                .on_change(|_, _, _| {}),\n                        ),\n                )\n                .row(\n                    SettingsRow::new(\"scene.settings.sync.history\", \"Sync history\")\n                        .value(\"Off\")\n                        .control(\n                            Switch::new(\"scene.settings.sync.history.switch\")\n                                .named(\"Sync history\")\n                                .on(false)\n                                .on_change(|_, _, _| {}),\n                        ),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "detail",
       "capture": "cargo run -p xtask -- headless capture detail",
+      "kind": "exhibit",
+      "subjects": [
+        "DescriptionList",
+        "Timeline"
+      ],
       "uses": [
         "DescriptionList",
-        "List",
         "Timeline"
       ],
       "example": "fn detail(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(640.0))\n        .child(caption(\n            &theme,\n            \"unknown, not applicable, and redacted are three facts\",\n        ))\n        .child(\n            DescriptionList::new(\"scene.detail.facts\")\n                .columns(2)\n                .items([\n                    DescriptionItem::new(\"id\", \"Run\", \"run-4821\"),\n                    DescriptionItem::new(\"owner\", \"Owner\", \"fixture-owner\"),\n                    DescriptionItem::new(\"finished\", \"Finished\", DescriptionValue::Unknown),\n                    DescriptionItem::new(\"artifact\", \"Artifact\", DescriptionValue::NotApplicable),\n                    DescriptionItem::new(\n                        \"token\",\n                        \"Access token\",\n                        DescriptionValue::redacted(\"51 characters\"),\n                    )\n                    .copyable(true),\n                ])\n                .on_copy(|_, _, _| {}),\n        )\n        .child(caption(\n            &theme,\n            \"what happened, in the words the host chose\",\n        ))\n        .child(\n            Timeline::new(\"scene.detail.activity\")\n                .group(\n                    TimelineGroup::new(\"today\", \"Today\")\n                        .entry(\n                            TimelineEntry::new(\"queued\", \"Run queued\")\n                                .time(\"09:12\")\n                                .actor(\"fixture-owner\")\n                                .tone(Tone::Neutral),\n                        )\n                        .entry(\n                            TimelineEntry::new(\"started\", \"Indexing started\")\n                                .time(\"09:13\")\n                                .actor(\"scheduler\")\n                                .tone(Tone::Info),\n                        )\n                        .entry(\n                            TimelineEntry::new(\"failed\", \"Indexing failed\")\n                                .time(\"09:41\")\n                                .actor(\"scheduler\")\n                                .tone(Tone::Danger)\n                                .detail(crate::foundation::text(\n                                    &theme,\n                                    TypeScale::Body,\n                                    SharedString::new_static(\n                                        \"The host refused the request. The refusal is shown as it \\\n                                     arrived.\",\n                                    ),\n                                ).text_tone(&theme, TextTone::Muted)),\n                        ),\n                )\n                .group(\n                    TimelineGroup::new(\"earlier\", \"Earlier\").entry(\n                        TimelineEntry::new(\"imported\", \"Workspace imported\")\n                            .time_unknown()\n                            .actor(\"fixture-owner\")\n                            .tone(Tone::Neutral),\n                    ),\n                ),\n        )\n        .into_any_element()\n}"
@@ -10909,6 +10896,10 @@
     {
       "name": "filter-bar",
       "capture": "cargo run -p xtask -- headless capture filter-bar",
+      "kind": "exhibit",
+      "subjects": [
+        "FilterBar"
+      ],
       "uses": [
         "FilterBar"
       ],
@@ -10917,6 +10908,10 @@
     {
       "name": "inline-edit",
       "capture": "cargo run -p xtask -- headless capture inline-edit",
+      "kind": "exhibit",
+      "subjects": [
+        "InlineEdit"
+      ],
       "uses": [
         "InlineEdit"
       ],
@@ -10925,6 +10920,10 @@
     {
       "name": "progress-circle",
       "capture": "cargo run -p xtask -- headless capture progress-circle",
+      "kind": "exhibit",
+      "subjects": [
+        "ProgressCircle"
+      ],
       "uses": [
         "ProgressCircle"
       ],
@@ -10933,18 +10932,25 @@
     {
       "name": "split-tree",
       "capture": "cargo run -p xtask -- headless capture split-tree",
+      "kind": "exhibit",
+      "subjects": [
+        "SplitTree"
+      ],
       "uses": [
-        "SplitTree",
-        "Tree"
+        "SplitTree"
       ],
       "example": "fn split_tree(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let layout = SplitLayout::horizontal(\n        \"workspace\",\n        0.26,\n        SplitLayout::leaf(SplitPaneSpec::new(\"files\").min_width(140.0)),\n        SplitLayout::horizontal(\n            \"body\",\n            0.74,\n            SplitLayout::vertical(\n                \"editing\",\n                0.6,\n                SplitLayout::leaf(SplitPaneSpec::new(\"editor\").min_height(90.0)),\n                SplitLayout::leaf(SplitPaneSpec::new(\"terminal\").min_height(70.0)),\n            ),\n            // A collapsed leaf is drawn at its rail, and the divider beside it\n            // is not offered: a fixed extent has no ratio to trade.\n            SplitLayout::leaf(SplitPaneSpec::new(\"outline\").rail(40.0).collapsed(true)),\n        ),\n    );\n\n    stack(&theme)\n        .w(px(680.0))\n        .child(\n            div()\n                .h(px(340.0))\n                .surface(&theme, Surface::Panel)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(\n                    SplitTree::new(\"scene.tree.workspace\")\n                        .layout(layout)\n                        .pane(\"files\", filler(&theme, \"Files\", 6))\n                        .pane(\"editor\", filler(&theme, \"main.rs\", 6))\n                        .pane(\"terminal\", filler(&theme, \"Terminal\", 2))\n                        // The rail is narrower than any label, so the collapsed\n                        // leaf is drawn as the room it still holds.\n                        .pane(\"outline\", div())\n                        .on_change(|_, _, _| {}),\n                ),\n        )\n        .child(caption(\n            &theme,\n            \"A divider high in the tree stops where a leaf far below it would \\\n             run out of room.\",\n        ))\n        .into_any_element()\n}"
     },
     {
       "name": "ide-shell",
       "capture": "cargo run -p xtask -- headless capture ide-shell",
+      "kind": "exhibit",
+      "subjects": [
+        "Dock",
+        "StatusBar"
+      ],
       "uses": [
         "Dock",
-        "Icon",
         "StatusBar"
       ],
       "example": "fn ide_shell(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let mut branch = AsyncValue::<SharedString, String>::ready(\"main@a1b2c3\".into());\n    branch.refresh();\n    branch.fail_refresh(\"the host is unreachable\".into());\n\n    div()\n        .column()\n        .w(px(900.0))\n        .h(px(940.0))\n        .bg(theme.colors.canvas)\n        .text_color(theme.colors.text)\n        .font_family(theme.typography.sans.clone())\n        .child(\n            div().flex_1().min_h(px(0.0)).child(\n                Dock::new(\"scene.shell\")\n                    .share(DockRegion::Left, 0.24)\n                    .share(DockRegion::Bottom, 0.3)\n                    .panel(\n                        DockRegion::Left,\n                        DockPanel::new(\"files\", \"Files\")\n                            .icon(Icon::Folder)\n                            .content(filler(&theme, \"Workspace\", 8)),\n                    )\n                    .panel(\n                        DockRegion::Left,\n                        DockPanel::new(\"search\", \"Search\")\n                            .icon(Icon::Magnifier)\n                            .badge(\"12\"),\n                    )\n                    .active(DockRegion::Left, \"files\")\n                    .panel(\n                        DockRegion::Centre,\n                        DockPanel::new(\"editor\", \"main.rs\")\n                            .icon(Icon::Document)\n                            .content(filler(&theme, \"fn main()\", 12)),\n                    )\n                    .panel(\n                        DockRegion::Right,\n                        DockPanel::new(\"outline\", \"Outline\").icon(Icon::List),\n                    )\n                    .panel(\n                        DockRegion::Right,\n                        DockPanel::new(\"history\", \"History\").icon(Icon::GitBranch),\n                    )\n                    .collapsed(DockRegion::Right, true)\n                    .panel(\n                        DockRegion::Bottom,\n                        DockPanel::new(\"terminal\", \"Terminal\")\n                            .icon(Icon::Terminal)\n                            .content(filler(&theme, \"$ cargo test\", 4)),\n                    )\n                    .panel(\n                        DockRegion::Bottom,\n                        // No badge: a panel that cannot list problems cannot\n                        // count them either, and one unavailable reason is the\n                        // whole claim. Gluing \"there is nothing here\" onto it\n                        // would report Empty and Unavailable at once.\n                        DockPanel::new(\"problems\", \"Problems\")\n                            .icon(Icon::Danger)\n                            .unavailable(\n                                \"The language server is not running, so problems cannot be listed.\",\n                            ),\n                    )\n                    // The refused panel is the one on top, because a refusal\n                    // nobody can see is a refusal nobody was told about.\n                    .active(DockRegion::Bottom, \"problems\")\n                    .on_event(|_, _, _| {}),\n            ),\n        )\n        .child(\n            StatusBar::new(\"scene.shell.status\")\n                .label(\"Workspace status\")\n                .start([\n                    StatusItem::text(\"branch\", \"main\")\n                        .icon(Icon::GitBranch)\n                        .tracking(&branch),\n                    StatusItem::state(\"build\", \"Build passing\", Tone::Success),\n                ])\n                .centre([StatusItem::progress(\"index\", \"Indexing the workspace\")\n                    .count(7, 12)\n                    .state_name(\"loading\")])\n                .end([\n                    StatusItem::text(\"position\", \"Ln 42, Col 7\"),\n                    StatusItem::action(\"encoding\", \"UTF-8\").on_click(|_, _| {}),\n                ]),\n        )\n        .into_any_element()\n}"
@@ -10952,16 +10958,22 @@
     {
       "name": "keybinding",
       "capture": "cargo run -p xtask -- headless capture keybinding",
+      "kind": "exhibit",
+      "subjects": [
+        "KeybindingRecorder"
+      ],
       "uses": [
-        "KeybindingRecorder",
-        "SettingsRow",
-        "SettingsSection"
+        "KeybindingRecorder"
       ],
       "example": "fn keybinding(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneRecorders>() {\n        let idle = cx.new(|cx| {\n            KeybindingRecorder::new(\"scene.keybinding.idle\", window, cx).label(\"Open workspace\")\n        });\n        let recording = cx.new(|cx| {\n            KeybindingRecorder::new(\"scene.keybinding.recording\", window, cx)\n                .label(\"Command palette\")\n        });\n        let captured = cx.new(|cx| {\n            KeybindingRecorder::new(\"scene.keybinding.captured\", window, cx)\n                .label(\"Toggle terminal\")\n                .binding(\"ctrl-`\")\n        });\n        let conflicting = cx.new(|cx| {\n            KeybindingRecorder::new(\"scene.keybinding.conflicting\", window, cx)\n                .label(\"Split editor\")\n                .binding(\"cmd-shift-p\")\n                // The host's words, not the recorder's: it has no keymap.\n                .conflict(Some(\"Already opens the command palette\"))\n        });\n        // Recording is a state, not a gesture, so the scene puts one recorder\n        // into it by hand rather than waiting for a keystroke that a still\n        // image could not photograph anyway.\n        recording.update(cx, |recorder, cx| recorder.start(window, cx));\n        cx.set_global(SceneRecorders {\n            idle,\n            recording,\n            captured,\n            conflicting,\n        });\n    }\n    let recorders = cx.global::<SceneRecorders>().clone();\n    let theme = cx.theme().clone();\n\n    // A recorder carries its name in the tree rather than drawing one, the way\n    // every other control here does, so the scene puts it where a keymap page\n    // would: in a settings row that states what the binding is for.\n    stack(&theme)\n        .w(px(680.0))\n        .child(\n            SettingsSection::new(\"scene.keybinding.keymap\", \"Keyboard shortcuts\")\n                .description(\"Recording captures the next keystroke instead of acting on it.\")\n                .row(\n                    SettingsRow::new(\"scene.keybinding.row.open\", \"Open workspace\")\n                        .description(\"Nothing is bound yet\")\n                        .control(recorders.idle),\n                )\n                .row(\n                    SettingsRow::new(\"scene.keybinding.row.palette\", \"Command palette\")\n                        .description(\"Listening for a keystroke\")\n                        .control(recorders.recording),\n                )\n                .row(\n                    SettingsRow::new(\"scene.keybinding.row.terminal\", \"Toggle terminal\")\n                        .control(recorders.captured),\n                )\n                .row(\n                    SettingsRow::new(\"scene.keybinding.row.split\", \"Split editor\")\n                        .description(\"The host judged this one, and said so\")\n                        .control(recorders.conflicting),\n                ),\n        )\n        .child(caption(\n            &theme,\n            \"Escape ends recording without capturing, so escape cannot be bound \\\n             unless the caller turns allow_escape on.\",\n        ))\n        .into_any_element()\n}"
     },
     {
       "name": "keymap-editor",
       "capture": "cargo run -p xtask -- headless capture keymap-editor",
+      "kind": "exhibit",
+      "subjects": [
+        "KeymapEditor"
+      ],
       "uses": [
         "KeymapEditor"
       ],
@@ -10970,8 +10982,11 @@
     {
       "name": "markdown",
       "capture": "cargo run -p xtask -- headless capture markdown",
+      "kind": "exhibit",
+      "subjects": [
+        "Markdown"
+      ],
       "uses": [
-        "Divider",
         "Markdown"
       ],
       "example": "fn markdown(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(640.0))\n        .child(Markdown::new(\"scene.markdown.document\", SCENE_DOCUMENT).on_event(|_, _, _| {}))\n        .child(Divider::new().id(\"scene.markdown.rule\").label(\"Truncated\"))\n        .child(\n            Markdown::new(\"scene.markdown.short\", SCENE_DOCUMENT)\n                .max_lines(4)\n                .on_event(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
@@ -10979,32 +10994,46 @@
     {
       "name": "agent-document",
       "capture": "cargo run -p xtask -- headless capture agent-document",
+      "kind": "exhibit",
+      "subjects": [
+        "AgentDocument"
+      ],
       "uses": [
-        "AgentDocument",
-        "Card",
-        "CodeView",
-        "Divider",
-        "ToolCallCard"
+        "AgentDocument"
       ],
       "example": "fn agent_document(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(680.0))\n        .child(\n            AgentDocument::new(\"scene.agent-document\")\n                .block(\n                    AgentDocumentBlock::markdown(\n                        \"summary\",\n                        \"## Review complete\\n\\nThe run kept its **verified result** while the refresh failed.\",\n                    )\n                    .revision(3),\n                )\n                .block(\n                    AgentDocumentBlock::code(\n                        \"patch\",\n                        CodeView::from_text(\n                            \"scene.agent-document.patch\",\n                            \"pub fn bounded_retry(attempt: usize) -> bool {\\n    attempt < 3\\n}\",\n                        )\n                        .language(\"rust\"),\n                    )\n                    .label(\"Proposed code\")\n                    .revision(2),\n                )\n                .block(\n                    AgentDocumentBlock::tool_call(\n                        \"verification\",\n                        ToolCallCard::new(\"scene.agent-document.tool\", \"cargo test\")\n                            .state(ToolCallState::Succeeded {\n                                output: ToolOutput::Silent,\n                            })\n                            .elapsed(\"1.4 s\"),\n                    )\n                    .revision(1),\n                )\n                .block(AgentDocumentBlock::notice(\n                    \"refresh\",\n                    \"The last refresh failed; the result above is the last verified value.\",\n                    Tone::Warning,\n                )),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.agent-document.rule\")\n                .label(\"Document states\"),\n        )\n        .child(\n            div()\n                .row_reading(cx.layout_direction())\n                .gap_token(&theme, Space::Lg)\n                .child(\n                    div().flex_1().child(\n                        AgentDocument::new(\"scene.agent-document.empty\")\n                            .state(AgentDocumentState::Empty(\"No results were returned.\".into())),\n                    ),\n                )\n                .child(\n                    div().flex_1().child(\n                        AgentDocument::new(\"scene.agent-document.unavailable\").state(\n                            AgentDocumentState::Unavailable(\n                                \"The host refused to provide this document.\".into(),\n                            ),\n                        ),\n                    ),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "agent-roster",
       "capture": "cargo run -p xtask -- headless capture agent-roster",
-      "uses": [
+      "kind": "exhibit",
+      "subjects": [
         "AgentActivityLine",
+        "AgentAvatar",
         "AgentCard",
         "AgentGroup",
         "AgentRoster",
-        "Card",
-        "SubagentTree",
-        "Tree"
+        "SubagentTree"
+      ],
+      "uses": [
+        "AgentActivityLine",
+        "AgentAvatar",
+        "AgentCard",
+        "AgentGroup",
+        "AgentRoster",
+        "SubagentTree"
       ],
       "example": "fn agent_roster(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let direction = cx.layout_direction();\n    let run = scene_agent_run();\n    let root = run\n        .agents\n        .first()\n        .cloned()\n        .expect(\"the canonical multi-agent scene has a root agent\");\n\n    stack(&theme)\n        .w(px(720.0))\n        .child(\n            div()\n                .row_reading(direction)\n                .items_center()\n                .justify_between()\n                .child(\n                    div()\n                        .column()\n                        .gap_token(&theme, Space::Xs)\n                        .child(\n                            div()\n                                .type_scale(&theme, TypeScale::Title)\n                                .text_tone(&theme, TextTone::Primary)\n                                .child(\"Release review\"),\n                        )\n                        .child(AgentActivityLine::new(\n                            \"scene.agent-roster.run-state\",\n                            run.execution.clone(),\n                        )),\n                )\n                .child(\n                    AgentGroup::new(\"scene.agent-roster.group\", run.agents.clone()).max_visible(3),\n                ),\n        )\n        .child(\n            AgentCard::new(\"scene.agent-roster.root\", root)\n                .task_label(\"Synthesis\")\n                .selected(true)\n                .on_action(|_, _, _| {}),\n        )\n        .child(\n            div()\n                .row_reading(direction)\n                .items_start()\n                .gap_token(&theme, Space::Lg)\n                .child(\n                    div().w(px(420.0)).child(\n                        AgentRoster::from_run(\"scene.agent-roster.list\", &run)\n                            .selected(\"researcher\")\n                            .visible_rows(4)\n                            .on_action(|_, _, _| {}),\n                    ),\n                )\n                .child(\n                    div().w(px(270.0)).child(\n                        SubagentTree::new(\"scene.agent-roster.tree\", run)\n                            .expanded([\"orchestrator\".into(), \"researcher\".into()])\n                            .selected(\"researcher\")\n                            .visible_rows(4)\n                            .on_toggle(|_, _, _, _| {})\n                            .on_action(|_, _, _| {}),\n                    ),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "persona",
       "capture": "cargo run -p xtask -- headless capture persona",
+      "kind": "exhibit",
+      "subjects": [
+        "PersonaDialogue",
+        "PersonaPortrait",
+        "VoiceReactive"
+      ],
       "uses": [
         "PersonaDialogue",
         "PersonaPortrait",
@@ -11015,6 +11044,13 @@
     {
       "name": "game-ui",
       "capture": "cargo run -p xtask -- headless capture game-ui",
+      "kind": "exhibit",
+      "subjects": [
+        "AbilityBar",
+        "ObjectiveTracker",
+        "PartyRoster",
+        "RewardReveal"
+      ],
       "uses": [
         "AbilityBar",
         "ObjectiveTracker",
@@ -11026,17 +11062,25 @@
     {
       "name": "agent-run-canvas",
       "capture": "cargo run -p xtask -- headless capture agent-run-canvas",
+      "kind": "exhibit",
+      "subjects": [
+        "AgentRunCanvas",
+        "AgentRunIssues"
+      ],
       "uses": [
-        "AgentRunCanvas"
+        "AgentRunCanvas",
+        "AgentRunIssues"
       ],
       "example": "fn agent_run_canvas(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let run = AgentRunSnapshot::new(\"release-topology\", \"orchestrator\")\n        .execution(AgentExecutionState::Active(AgentActivity::Aggregating))\n        .agents([\n            AgentSnapshot::new(\n                AgentDescriptor::new(\"orchestrator\", \"Atlas\").role(\"Run coordinator\"),\n            )\n            .execution(AgentExecutionState::Active(AgentActivity::Aggregating)),\n            AgentSnapshot::new(\n                AgentDescriptor::new(\"researcher\", \"Nova\").role(\"Repository research\"),\n            )\n            .execution(AgentExecutionState::Active(AgentActivity::UsingTool(\n                \"repository search\".into(),\n            ))),\n            AgentSnapshot::new(AgentDescriptor::new(\"reviewer\", \"Sage\").role(\"Independent review\"))\n                .execution(AgentExecutionState::Waiting(WaitReason::Approval)),\n        ])\n        .tasks([\n            AgentTaskSnapshot::new(\"evidence\", \"Evidence bundle\")\n                .execution(AgentExecutionState::Completed(AgentOutcome::Succeeded)),\n            AgentTaskSnapshot::new(\"synthesis\", \"Release synthesis\").execution(\n                AgentExecutionState::Completed(AgentOutcome::Partial(\"awaiting approval\".into())),\n            ),\n        ])\n        .links([\n            RunLink::new(\n                \"spawn-researcher\",\n                RunSubjectId::Agent(\"orchestrator\".into()),\n                RunSubjectId::Agent(\"researcher\".into()),\n                RunLinkKind::Spawn,\n            ),\n            RunLink::new(\n                \"delegate-evidence\",\n                RunSubjectId::Agent(\"orchestrator\".into()),\n                RunSubjectId::Task(\"evidence\".into()),\n                RunLinkKind::Delegation,\n            ),\n            RunLink::new(\n                \"evidence-before-synthesis\",\n                RunSubjectId::Task(\"evidence\".into()),\n                RunSubjectId::Task(\"synthesis\".into()),\n                RunLinkKind::Dependency,\n            ),\n            RunLink::new(\n                \"handoff-review\",\n                RunSubjectId::Agent(\"researcher\".into()),\n                RunSubjectId::Agent(\"reviewer\".into()),\n                RunLinkKind::Handoff,\n            ),\n            RunLink::new(\n                \"search-report\",\n                RunSubjectId::Invocation(\"search-42\".into()),\n                RunSubjectId::Agent(\"researcher\".into()),\n                RunLinkKind::Report,\n            ),\n            RunLink::new(\n                \"aggregate-review\",\n                RunSubjectId::Agent(\"reviewer\".into()),\n                RunSubjectId::Task(\"synthesis\".into()),\n                RunLinkKind::Aggregation,\n            ),\n            RunLink::new(\n                \"retry-search\",\n                RunSubjectId::Agent(\"reviewer\".into()),\n                RunSubjectId::Agent(\"researcher\".into()),\n                RunLinkKind::Retry,\n            )\n            .label(\"bounded attempt 2\"),\n        ])\n        .aggregation(AggregationSnapshot::new(3, 2).conflicts(1));\n\n    stack(&theme)\n        .w(px(860.0))\n        .child(\n            div()\n                .w_full()\n                .h(px(500.0))\n                .surface(&theme, Surface::Panel)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(\n                    AgentRunCanvas::new(\"scene.agent-run-canvas\", run)\n                        .selected([RunSubjectId::Agent(\"researcher\".into())])\n                        .viewport(GraphViewport::new(gpui::point(0.0, 0.0), 0.56))\n                        .on_event(|_, _, _| {}),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "conversation",
       "capture": "cargo run -p xtask -- headless capture conversation",
+      "kind": "exhibit",
+      "subjects": [
+        "MessageList"
+      ],
       "uses": [
-        "Divider",
-        "List",
         "MessageList"
       ],
       "example": "fn conversation(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(560.0))\n        .child(\n            MessageList::new(\"scene.conversation.thread\", scene_thread())\n                .group_consecutive(true)\n                .body_lines(2)\n                .on_retry(|_, _, _| {})\n                .on_markdown(|_, _, _, _| {}),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.conversation.rule\")\n                .label(\"Scrolled away from the newest message\"),\n        )\n        .child(\n            // A viewport shorter than the thread opens at its top, so the\n            // messages below it have never been on screen and the list says\n            // how many there are rather than letting them be discovered.\n            MessageList::new(\"scene.conversation.behind\", scene_thread())\n                .visible_rows(2)\n                .body_lines(2)\n                .on_retry(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
@@ -11044,8 +11088,11 @@
     {
       "name": "image-viewer",
       "capture": "cargo run -p xtask -- headless capture image-viewer",
+      "kind": "exhibit",
+      "subjects": [
+        "ImageViewer"
+      ],
       "uses": [
-        "Divider",
         "ImageViewer"
       ],
       "example": "fn image_viewer(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(860.0))\n        .child(\n            div()\n                .row()\n                .items_start()\n                .gap(px(theme.spacing.lg))\n                .child(\n                    div().w(px(396.0)).child(\n                        ImageViewer::new(\n                            \"scene.image.ready\",\n                            [\n                                ImageFrame::new(\"graph\", \"The run graph\")\n                                    .source(\"runs/graph.png\")\n                                    .natural(1600, 900),\n                                ImageFrame::new(\"trace\", \"The failing trace\")\n                                    .source(\"runs/trace.png\")\n                                    .natural(1200, 1200),\n                            ],\n                        )\n                        .showing(\"graph\")\n                        .fit(FitMode::Contain)\n                        .height(200.0)\n                        .image(|_, _, cx| Some(scene_picture(\"Supplied by the host\", cx)))\n                        .on_event(|_, _, _| {}),\n                    ),\n                )\n                .child(\n                    div().w(px(396.0)).child(\n                        ImageViewer::new(\n                            \"scene.image.refused\",\n                            [ImageFrame::new(\"scan\", \"Page 4 of the scan\")\n                                .source(\"scans/page-4.tiff\")\n                                .natural(2480, 3508)\n                                .unavailable(\"The workspace is frozen for the release.\")],\n                        )\n                        .height(200.0)\n                        .image(|_, _, cx| Some(scene_picture(\"Supplied by the host\", cx)))\n                        .on_event(|_, _, _| {}),\n                    ),\n                ),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.image.rule.unmeasured\")\n                .label(\"A size the host never stated\"),\n        )\n        .child(\n            div().w(px(396.0)).child(\n                ImageViewer::new(\n                    \"scene.image.unmeasured\",\n                    [ImageFrame::new(\"sketch\", \"A pasted sketch\").source(\"clipboard\")],\n                )\n                .height(200.0)\n                .image(|_, _, cx| Some(scene_picture(\"Size never stated\", cx)))\n                .on_event(|_, _, _| {}),\n            ),\n        )\n        .into_any_element()\n}"
@@ -11053,8 +11100,11 @@
     {
       "name": "transport",
       "capture": "cargo run -p xtask -- headless capture transport",
+      "kind": "exhibit",
+      "subjects": [
+        "TransportBar"
+      ],
       "uses": [
-        "Divider",
         "TransportBar"
       ],
       "example": "fn transport(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(640.0))\n        .child(\n            TransportBar::new(\"scene.transport.playing\")\n                .label(\"Release walkthrough\")\n                .state(TransportState::Playing)\n                .position(72.0)\n                .duration(240.0)\n                .elapsed(\"01:12\")\n                .remaining(\"-02:48\")\n                .buffered([BufferedRange::new(0.0, 156.0)])\n                .volume(0.7)\n                .speeds([1.0, 1.5, 2.0], 1.0)\n                .step_seconds(10.0)\n                .has_next(true)\n                .on_event(|_, _, _| {}),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.transport.rule.live\")\n                .label(\"A stream nobody measured\"),\n        )\n        .child(\n            TransportBar::new(\"scene.transport.live\")\n                .label(\"Incident bridge\")\n                .state(TransportState::Playing)\n                .position(1543.0)\n                .unknown_duration()\n                .elapsed(\"25:43\")\n                .volume(0.4)\n                .on_event(|_, _, _| {}),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.transport.rule.stalled\")\n                .label(\"Playing and waiting\"),\n        )\n        .child(\n            TransportBar::new(\"scene.transport.stalled\")\n                .label(\"Release walkthrough\")\n                .state(TransportState::Buffering)\n                .position(158.0)\n                .duration(240.0)\n                .elapsed(\"02:38\")\n                .remaining(\"-01:22\")\n                .buffered([BufferedRange::new(0.0, 160.0)])\n                .volume(0.7)\n                .muted(true)\n                .on_event(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
@@ -11062,17 +11112,23 @@
     {
       "name": "audio-player",
       "capture": "cargo run -p xtask -- headless capture audio-player",
+      "kind": "exhibit",
+      "subjects": [
+        "AudioPlayer"
+      ],
       "uses": [
-        "AudioPlayer",
-        "Divider"
+        "AudioPlayer"
       ],
       "example": "fn audio_player(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(640.0))\n        .child(\n            AudioPlayer::new(\"scene.audio.ready\")\n                .title(\"Release walkthrough\")\n                .subtitle(\"Recorded 12 March\")\n                .transport(\n                    FixtureTransport::ready(240.0)\n                        .position(72.0)\n                        .state(TransportState::Playing)\n                        .volume(0.7)\n                        .buffered([BufferedRange::new(0.0, 156.0)])\n                        .shared(),\n                )\n                .elapsed(\"01:12\")\n                .remaining(\"-02:48\")\n                .peaks(scene_peaks(96))\n                .speeds([1.0, 1.5, 2.0])\n                .step_seconds(10.0)\n                .on_event(|_, _, _| {}),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.audio.rule.backend\")\n                .label(\"Nothing here can decode it\"),\n        )\n        .child(\n            AudioPlayer::new(\"scene.audio.absent\")\n                .title(\"interview.opus\")\n                .transport(\n                    FixtureTransport::new()\n                        .no_backend(\"There is no Opus decoder on this machine.\")\n                        .shared(),\n                )\n                .on_event(|_, _, _| {}),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.audio.rule.none\")\n                .label(\"No player connected at all\"),\n        )\n        .child(\n            AudioPlayer::new(\"scene.audio.none\")\n                .title(\"Standup recording\")\n                .on_event(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "video-player",
       "capture": "cargo run -p xtask -- headless capture video-player",
+      "kind": "exhibit",
+      "subjects": [
+        "VideoPlayer"
+      ],
       "uses": [
-        "Divider",
         "VideoPlayer"
       ],
       "example": "fn video_player(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(440.0))\n        .child(\n            VideoPlayer::new(\"scene.video.frame\")\n                .title(\"Screen capture\")\n                .transport(\n                    FixtureTransport::ready(96.0)\n                        .position(24.0)\n                        .state(TransportState::Playing)\n                        .volume(0.6)\n                        .shared(),\n                )\n                .frame(|_, cx| Some(scene_picture(\"Supplied frame\", cx)))\n                .elapsed(\"00:24\")\n                .remaining(\"-01:12\")\n                .on_event(|_, _, _| {}),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.video.rule.poster\")\n                .label(\"Ready, and no frames supplied\"),\n        )\n        .child(\n            VideoPlayer::new(\"scene.video.poster\")\n                .title(\"Release walkthrough\")\n                .transport(FixtureTransport::ready(240.0).shared())\n                .poster(|_, cx| Some(scene_picture(\"Poster\", cx)))\n                .elapsed(\"00:00\")\n                .remaining(\"-04:00\")\n                .on_event(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
@@ -11080,8 +11136,11 @@
     {
       "name": "model-viewer",
       "capture": "cargo run -p xtask -- headless capture model-viewer",
+      "kind": "exhibit",
+      "subjects": [
+        "ModelViewer"
+      ],
       "uses": [
-        "Divider",
         "ModelViewer"
       ],
       "example": "fn model_viewer(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let read = || ModelState::read(CUBE, ModelBounds::default());\n    stack(&theme)\n        .w(px(720.0))\n        .child(\n            div()\n                .row()\n                .items_start()\n                .gap(px(theme.spacing.lg))\n                .child(\n                    div().flex_1().min_w_0().child(\n                        ModelViewer::new(\"scene.model.flat\")\n                            .title(\"cube.gltf\")\n                            .state(read())\n                            .orbit(0.62, 0.42)\n                            .height(240.0)\n                            .on_event(|_, _, _| {}),\n                    ),\n                )\n                .child(\n                    div().flex_1().min_w_0().child(\n                        ModelViewer::new(\"scene.model.wireframe\")\n                            .title(\"cube.gltf\")\n                            .state(read())\n                            .shading(ModelShading::Wireframe)\n                            .orbit(0.62, 0.42)\n                            .height(240.0)\n                            .on_event(|_, _, _| {}),\n                    ),\n                ),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.model.rule.refused\")\n                .label(\"A document past a bound\"),\n        )\n        .child(\n            ModelViewer::new(\"scene.model.refused\")\n                .title(\"city-block.glb\")\n                .rejected(ModelError::TooLarge {\n                    limit: ModelLimit::Triangles,\n                    found: 412_930,\n                    allowed: 24_576,\n                })\n                .height(160.0)\n                .on_event(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
@@ -11089,17 +11148,23 @@
     {
       "name": "approval",
       "capture": "cargo run -p xtask -- headless capture approval",
+      "kind": "exhibit",
+      "subjects": [
+        "ApprovalPrompt"
+      ],
       "uses": [
-        "ApprovalPrompt",
-        "Divider"
+        "ApprovalPrompt"
       ],
       "example": "fn approval(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneApprovals>() {\n        let pending = cx.new(|cx| {\n            ApprovalPrompt::new(\n                \"scene.approval.pending\",\n                \"Write to /work/report/summary.md\",\n                window,\n                cx,\n            )\n            .details([\n                DescriptionItem::new(\"tool\", \"Tool\", \"write-file\"),\n                DescriptionItem::new(\"path\", \"Path\", \"/work/report/summary.md\"),\n                DescriptionItem::new(\"bytes\", \"Size\", \"4 KB\"),\n            ])\n            .always(AlwaysScope::Session)\n            .always(AlwaysScope::path(\"/work/report\"))\n            .always(AlwaysScope::tool(\"write-file\"))\n        });\n        let declined = cx.new(|cx| {\n            ApprovalPrompt::new(\n                \"scene.approval.declined\",\n                \"Delete /work/report/draft.md\",\n                window,\n                cx,\n            )\n            .status(ApprovalStatus::Declined)\n        });\n        let expired = cx.new(|cx| {\n            ApprovalPrompt::new(\n                \"scene.approval.expired\",\n                \"Open a connection to build.internal:8443\",\n                window,\n                cx,\n            )\n            .status(ApprovalStatus::Expired)\n        });\n        let superseded = cx.new(|cx| {\n            ApprovalPrompt::new(\n                \"scene.approval.superseded\",\n                \"Run the test suite in /work\",\n                window,\n                cx,\n            )\n            .status(ApprovalStatus::Superseded {\n                by: \"a later request covering the whole workspace\".into(),\n            })\n        });\n        cx.set_global(SceneApprovals {\n            pending,\n            declined,\n            expired,\n            superseded,\n        });\n    }\n    let prompts = cx.global::<SceneApprovals>();\n    let pending = prompts.pending.clone();\n    let declined = prompts.declined.clone();\n    let expired = prompts.expired.clone();\n    let superseded = prompts.superseded.clone();\n    let theme = cx.theme().clone();\n\n    stack(&theme)\n        .w(px(560.0))\n        .child(pending)\n        .child(\n            Divider::new()\n                .id(\"scene.approval.rule.resolved\")\n                .label(\"Answered, expired, and replaced are three different things\"),\n        )\n        .child(declined)\n        .child(expired)\n        .child(superseded)\n        .into_any_element()\n}"
     },
     {
       "name": "permission-matrix",
       "capture": "cargo run -p xtask -- headless capture permission-matrix",
+      "kind": "exhibit",
+      "subjects": [
+        "PermissionMatrix"
+      ],
       "uses": [
-        "Divider",
         "PermissionMatrix"
       ],
       "example": "fn permission_matrix(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let actions = [\n        PermissionAction::new(\"read\", \"Read files\"),\n        PermissionAction::new(\"write\", \"Write files\"),\n        PermissionAction::new(\"network\", \"Reach the network\"),\n    ];\n    let subjects = [\n        PermissionSubject::new(\"workspace\", \"This workspace\")\n            .cell(\"read\", PermissionEntry::new(PermissionState::Allowed))\n            .cell(\"write\", PermissionEntry::new(PermissionState::Ask))\n            .cell(\n                \"network\",\n                PermissionEntry::inherited(PermissionState::Denied, \"the organisation policy\"),\n            ),\n        PermissionSubject::new(\"scratch\", \"The scratch directory\")\n            .cell(\n                \"read\",\n                PermissionEntry::inherited(PermissionState::Allowed, \"this workspace\"),\n            )\n            .cell(\"write\", PermissionEntry::new(PermissionState::Allowed))\n            .cell(\n                \"network\",\n                PermissionEntry::inherited(PermissionState::Denied, \"the organisation policy\"),\n            ),\n        // A calculator has no files to read, which is not the same as being\n        // refused them.\n        PermissionSubject::new(\"calculator\", \"The calculator tool\")\n            .cell(\"network\", PermissionEntry::new(PermissionState::Denied)),\n    ];\n\n    stack(&theme)\n        .w(px(720.0))\n        .child(\n            PermissionMatrix::new(\"scene.permission.editable\")\n                .actions(actions.clone())\n                .subjects(subjects.clone())\n                .on_change(|_change, _window, _cx| {}),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.permission.rule.read-only\")\n                .label(\"The same permissions, shown rather than offered\"),\n        )\n        .child(\n            PermissionMatrix::new(\"scene.permission.read-only\")\n                .actions(actions)\n                .subjects(subjects),\n        )\n        .into_any_element()\n}"
@@ -11107,18 +11172,25 @@
     {
       "name": "cost-meter",
       "capture": "cargo run -p xtask -- headless capture cost-meter",
+      "kind": "exhibit",
+      "subjects": [
+        "ContextGauge",
+        "CostMeter"
+      ],
       "uses": [
         "ContextGauge",
-        "CostMeter",
-        "Divider"
+        "CostMeter"
       ],
       "example": "fn cost_meter(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(520.0))\n        .child(\n            CostMeter::new(\"scene.cost.meter\")\n                .label(\"This run\")\n                .line(CostLine::new(\n                    \"spend\",\n                    \"Spend\",\n                    Reading::measured(1.24, \"1.24 credits\"),\n                ))\n                .line(CostLine::new(\n                    \"projected\",\n                    \"Projected at this rate\",\n                    Reading::estimated(4.0, \"4.00 credits\"),\n                ))\n                .line(\n                    CostLine::new(\n                        \"account\",\n                        \"Account balance\",\n                        Reading::measured(112.0, \"112.00 credits\"),\n                    )\n                    .stale(LastVerified::at(\"09:41 today\")),\n                )\n                .line(CostLine::new(\n                    \"storage\",\n                    \"Storage\",\n                    Reading::unavailable_because(\"The billing host refused the request.\"),\n                )),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.cost.rule.gauge\")\n                .label(\"A limit that is known, and one that is not\"),\n        )\n        .child(\n            ContextGauge::new(\n                \"scene.cost.context.known\",\n                Reading::measured(48_000.0, \"48,000 tokens\"),\n            )\n            .label(\"Context used\")\n            .limit(Limit::measured(128_000.0, \"128,000 tokens\")),\n        )\n        .child(\n            ContextGauge::new(\n                \"scene.cost.context.unknown\",\n                Reading::estimated(48_000.0, \"48,000 tokens\"),\n            )\n            .label(\"Context used\"),\n        )\n        .child(\n            ContextGauge::new(\"scene.cost.context.unavailable\", Reading::unavailable())\n                .label(\"Context used\")\n                .limit(Limit::measured(128_000.0, \"128,000 tokens\")),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "tool-call",
       "capture": "cargo run -p xtask -- headless capture tool-call",
+      "kind": "exhibit",
+      "subjects": [
+        "ToolCallCard"
+      ],
       "uses": [
-        "Card",
         "ToolCallCard"
       ],
       "example": "fn tool_call(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    div()\n        .flex()\n        .gap(px(theme.spacing.lg))\n        .child(\n            stack(&theme).w(px(460.0)).child(\n            ToolCallCard::new(\"scene.tool.pending\", \"workspace.search\")\n                .arguments(scene_arguments())\n                .state(ToolCallState::PendingApproval),\n        )\n        .child(\n            ToolCallCard::new(\"scene.tool.running\", \"workspace.index\")\n                .arguments(\"{ \\\"root\\\": \\\"crates\\\" }\")\n                .state(ToolCallState::Running)\n                .elapsed(\"4.2 s\"),\n        )\n        .child(\n            ToolCallCard::new(\"scene.tool.succeeded\", \"workspace.read\")\n                .arguments(\"{ \\\"path\\\": \\\"README.md\\\" }\")\n                .state(ToolCallState::succeeded(\n                    ToolBody::new(\n                        \"# GPUI Box\\n\\nProduct-neutral components.\\n\\nEvery word is replaceable.\",\n                    )\n                    .max_lines(2),\n                ))\n                .elapsed(\"0.3 s\"),\n        )\n        .child(\n            ToolCallCard::new(\"scene.tool.silent\", \"workspace.touch\")\n                .arguments(\"{ \\\"path\\\": \\\"notes.md\\\" }\")\n                .state(ToolCallState::succeeded_silently())\n                .elapsed(\"0.1 s\"),\n        ),\n        )\n        .child(\n            stack(&theme)\n                .w(px(460.0))\n                .child(\n                    ToolCallCard::new(\"scene.tool.failed\", \"workspace.write\")\n                        .arguments(\"{ \\\"path\\\": \\\"/read-only/notes.md\\\" }\")\n                        .state(ToolCallState::failed(\n                            \"The file system reported that the path is read only.\",\n                        ))\n                        .elapsed(\"0.2 s\")\n                        .on_retry(|_, _| {}),\n                )\n                // A refusal reads as a decision: it is not the failure above\n                // it, and not the silent success in the other column.\n                .child(\n                    ToolCallCard::new(\"scene.tool.refused\", \"shell.run\")\n                        .arguments(\"{ \\\"command\\\": \\\"rm -rf build\\\" }\")\n                        .state(ToolCallState::refused(\n                            \"This workspace does not allow shell commands.\",\n                        )),\n                ),\n        )\n        .into_any_element()\n}"
@@ -11126,17 +11198,23 @@
     {
       "name": "step-list",
       "capture": "cargo run -p xtask -- headless capture step-list",
+      "kind": "exhibit",
+      "subjects": [
+        "StepList"
+      ],
       "uses": [
-        "Card",
-        "List",
-        "StepList",
-        "ToolCallCard"
+        "StepList"
       ],
       "example": "fn step_list(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(caption(&theme, \"A run somebody counted\"))\n        .child(\n            StepList::new(\"scene.steps.counted\")\n                .step(Step::new(\"read\", \"Read the brief\").state(StepState::Done))\n                .step(\n                    Step::new(\"search\", \"Search the workspace\")\n                        .state(StepState::Running)\n                        .body(\n                            ToolCallCard::new(\"scene.steps.search.call\", \"workspace.search\")\n                                .arguments(scene_arguments())\n                                .state(ToolCallState::Running)\n                                .elapsed(\"1.1 s\"),\n                        ),\n                )\n                .step(Step::new(\"summarise\", \"Summarise what was found\"))\n                .step(\n                    Step::new(\"publish\", \"Publish the summary\").state(StepState::Skipped(\n                        \"Publishing is turned off for this workspace.\".into(),\n                    )),\n                )\n                .step(\n                    // A failure, not a refusal: the skipped step above is what\n                    // a refusal looks like, and the two must not be worded\n                    // into each other.\n                    Step::new(\"notify\", \"Notify the reviewers\").state(StepState::Failed(\n                        \"The notification service did not respond.\".into(),\n                    )),\n                ),\n        )\n        .child(caption(&theme, \"A run still being decided\"))\n        .child(\n            StepList::new(\"scene.steps.open\")\n                .length(RunLength::Unknown)\n                .step(Step::new(\"read\", \"Read the brief\").state(StepState::Done))\n                .step(Step::new(\"plan\", \"Decide what to do next\").state(StepState::Running)),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "node-graph",
       "capture": "cargo run -p xtask -- headless capture node-graph",
+      "kind": "exhibit",
+      "subjects": [
+        "GraphNode",
+        "NodeGraph"
+      ],
       "uses": [
         "GraphNode",
         "NodeGraph"
@@ -11146,6 +11224,10 @@
     {
       "name": "browser-panel",
       "capture": "cargo run -p xtask -- headless capture browser-panel",
+      "kind": "exhibit",
+      "subjects": [
+        "BrowserPanel"
+      ],
       "uses": [
         "BrowserPanel"
       ],
@@ -11154,6 +11236,10 @@
     {
       "name": "thinking",
       "capture": "cargo run -p xtask -- headless capture thinking",
+      "kind": "exhibit",
+      "subjects": [
+        "ThinkingBlock"
+      ],
       "uses": [
         "ThinkingBlock"
       ],
@@ -11162,6 +11248,10 @@
     {
       "name": "json-view",
       "capture": "cargo run -p xtask -- headless capture json-view",
+      "kind": "exhibit",
+      "subjects": [
+        "JsonView"
+      ],
       "uses": [
         "JsonView"
       ],
@@ -11170,8 +11260,11 @@
     {
       "name": "schema-form",
       "capture": "cargo run -p xtask -- headless capture schema-form",
+      "kind": "exhibit",
+      "subjects": [
+        "SchemaForm"
+      ],
       "uses": [
-        "List",
         "SchemaForm"
       ],
       "example": "fn schema_form(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneSchemaForm>() {\n        set_schema_file_policy(DefaultSchemaFilePolicy, cx);\n        let form = cx.new(|cx| SchemaForm::new(\"scene.schema\", scene_schema(), window, cx));\n        form.update(cx, |form, cx| {\n            // An error the host returned rather than one the form derived:\n            // only the host knows this path is outside the workspace.\n            form.set_error(\"path\", \"That path is outside the workspace.\", cx);\n            form.set_files(\"attachments\", vec![\"/workspace/brief.md\".into()], cx)\n                .expect(\"the scene's permissive file policy accepts its fixture\");\n            form.add_list_item(\"headers\", window, cx);\n        });\n        cx.set_global(SceneSchemaForm { form });\n    }\n    let form = cx.global::<SceneSchemaForm>().form.clone();\n    let theme = cx.theme().clone();\n    stack(&theme).w(px(520.0)).child(form).into_any_element()\n}"
@@ -11179,8 +11272,11 @@
     {
       "name": "server-list",
       "capture": "cargo run -p xtask -- headless capture server-list",
+      "kind": "exhibit",
+      "subjects": [
+        "ServerList"
+      ],
       "uses": [
-        "List",
         "ServerList"
       ],
       "example": "fn server_list(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(560.0))\n        .child(\n            // Only the one with a catalogue is opened. Expanding the two empty\n            // ones as well pushed disconnected, failed, and disabled out of\n            // the captured screen, and a state no image shows is a state no\n            // image guards.\n            ServerList::new(\"scene.servers\")\n                .expanded_ids(&[\"workspace\"])\n                .selected(\"workspace\")\n                .servers([\n                    ServerEntry::new(\"workspace\", \"Workspace tools\")\n                        .detail(\"Running beside this window\")\n                        .state(ServerState::Connected)\n                        .offers([\n                            Offering::tool(\"read\", \"Read a file\")\n                                .summary(\"Returns the contents of one file\")\n                                .qualifier(\"path, max_bytes\"),\n                            Offering::tool(\"write\", \"Write a file\")\n                                .summary(\"Replaces the contents of one file\"),\n                            Offering::skill(\"review\", \"Review a change\")\n                                .summary(\"Reads a diff and reports what it finds\"),\n                            Offering::resource(\"changelog\", \"Changelog\")\n                                .qualifier(\"workspace:/CHANGELOG.md\"),\n                        ]),\n                    ServerEntry::new(\"index\", \"Search index\")\n                        .detail(\"Answered, and the answer was empty\")\n                        .state(ServerState::Connected)\n                        .offers([]),\n                    ServerEntry::new(\"archive\", \"Archive\")\n                        .detail(\"Nobody has asked it anything yet\")\n                        .state(ServerState::Connected),\n                    ServerEntry::new(\"build\", \"Build runner\")\n                        .state(ServerState::Connecting)\n                        .catalog(Catalog::Asking),\n                    ServerEntry::new(\"notes\", \"Notes\").state(ServerState::Disconnected),\n                    ServerEntry::new(\"deploy\", \"Deployment\").state(ServerState::Failed {\n                        reason: \"The connection was refused after three attempts.\".into(),\n                    }),\n                    ServerEntry::new(\"telemetry\", \"Telemetry\").state(ServerState::Disabled {\n                        reason: Some(\"You turned this one off.\".into()),\n                    }),\n                ])\n                .on_select(|_, _, _| {})\n                .on_retry(|_, _, _| {})\n                .on_toggle(|_, _, _, _| {}),\n        )\n        .into_any_element()\n}"
@@ -11188,6 +11284,10 @@
     {
       "name": "offering-catalog",
       "capture": "cargo run -p xtask -- headless capture offering-catalog",
+      "kind": "exhibit",
+      "subjects": [
+        "OfferingCatalog"
+      ],
       "uses": [
         "OfferingCatalog"
       ],
@@ -11196,6 +11296,8 @@
     {
       "name": "reading-direction",
       "capture": "cargo run -p xtask -- headless capture reading-direction",
+      "kind": "composition",
+      "subjects": [],
       "uses": [
         "Accordion",
         "Breadcrumb",
@@ -11211,6 +11313,11 @@
     {
       "name": "toggle",
       "capture": "cargo run -p xtask -- headless capture toggle",
+      "kind": "exhibit",
+      "subjects": [
+        "Toggle",
+        "ToggleGroup"
+      ],
       "uses": [
         "Toggle",
         "ToggleGroup"
@@ -11220,6 +11327,10 @@
     {
       "name": "collapsible",
       "capture": "cargo run -p xtask -- headless capture collapsible",
+      "kind": "exhibit",
+      "subjects": [
+        "Collapsible"
+      ],
       "uses": [
         "Collapsible"
       ],
@@ -11228,27 +11339,23 @@
     {
       "name": "hover-card",
       "capture": "cargo run -p xtask -- headless capture hover-card",
+      "kind": "exhibit",
+      "subjects": [
+        "HoverCard"
+      ],
       "uses": [
-        "Badge",
-        "Button",
-        "Card",
-        "CopyButton",
-        "HoverCard",
-        "Menu",
-        "Menubar"
+        "HoverCard"
       ],
       "example": "fn hover_card(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_ordinary(window, cx);\n    let card = cx.global::<SceneOrdinary>().hover_card.clone();\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(460.0))\n        .h(px(300.0))\n        .child(caption(&theme, \"A preview the pointer can travel into\"))\n        .child(\n            row(&theme)\n                .child(crate::foundation::text(\n                    &theme,\n                    TypeScale::Label,\n                    \"Reported by\",\n                ))\n                .child(card),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "menubar",
       "capture": "cargo run -p xtask -- headless capture menubar",
+      "kind": "exhibit",
+      "subjects": [
+        "Menubar"
+      ],
       "uses": [
-        "Badge",
-        "Button",
-        "Card",
-        "CopyButton",
-        "HoverCard",
-        "Menu",
         "Menubar"
       ],
       "example": "fn menubar(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_ordinary(window, cx);\n    let bar = cx.global::<SceneOrdinary>().menubar.clone();\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(560.0))\n        .h(px(360.0))\n        .child(bar)\n        .into_any_element()\n}"
@@ -11256,31 +11363,59 @@
     {
       "name": "copy-button",
       "capture": "cargo run -p xtask -- headless capture copy-button",
+      "kind": "exhibit",
+      "subjects": [
+        "CopyButton"
+      ],
       "uses": [
-        "Badge",
-        "Button",
-        "Card",
-        "CopyButton",
-        "HoverCard",
-        "Menu",
-        "Menubar"
+        "CopyButton"
       ],
       "example": "fn copy_button(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_ordinary(window, cx);\n    let scene = cx.global::<SceneOrdinary>();\n    let idle = scene.copy_idle.clone();\n    let copied = scene.copy.clone();\n    let refused = scene.copy_refused.clone();\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(caption(&theme, \"Nobody has pressed it yet\"))\n        .child(idle)\n        .child(caption(&theme, \"The clipboard took it\"))\n        .child(copied)\n        .child(caption(&theme, \"It did not go through, and says so\"))\n        .child(refused)\n        .into_any_element()\n}"
     },
     {
       "name": "aspect-ratio",
       "capture": "cargo run -p xtask -- headless capture aspect-ratio",
+      "kind": "exhibit",
+      "subjects": [
+        "AspectRatio"
+      ],
       "uses": [
         "AspectRatio"
       ],
       "example": "fn aspect_ratio(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let filled = |label: &'static str| {\n        div()\n            .size_full()\n            .flex()\n            .items_center()\n            .justify_center()\n            .bg(theme.colors.hover)\n            .child(\n                crate::foundation::text(&theme, TypeScale::Label, label)\n                    .text_tone(&theme, TextTone::Muted),\n            )\n    };\n    stack(&theme)\n        .child(caption(&theme, \"Width given, height from the ratio\"))\n        .child(\n            div().w(px(320.0)).child(\n                AspectRatio::of(\"scene.aspect.wide\", 16.0, 9.0)\n                    .width_driven()\n                    .child(filled(\"16 by 9\")),\n            ),\n        )\n        .child(caption(&theme, \"Height given, width from the ratio\"))\n        .child(\n            div().h(px(120.0)).child(\n                AspectRatio::new(\"scene.aspect.square\", 1.0)\n                    .height_driven()\n                    .child(filled(\"square\")),\n            ),\n        )\n        .into_any_element()\n}"
     },
     {
+      "name": "responsive",
+      "capture": "cargo run -p xtask -- headless capture responsive",
+      "kind": "exhibit",
+      "subjects": [
+        "Responsive"
+      ],
+      "uses": [
+        "Responsive"
+      ],
+      "example": "fn responsive(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let arrangement = move |id: &'static str| {\n        let theme = theme.clone();\n        move |size: ContainerSize, _: &mut Window, cx: &mut App| {\n            let wide = size.width().is_some_and(|measured| measured >= 480.0);\n            // The unmeasured frame is a real state and it is named rather than\n            // guessed, which is the whole argument the component makes.\n            let heading = match size.width() {\n                None => \"Not laid out yet, so neither arrangement is chosen\".to_string(),\n                Some(measured) if wide => format!(\"{measured:.0}px wide, so two columns\"),\n                Some(measured) => format!(\"{measured:.0}px wide, so one column\"),\n            };\n            let block = |label: &'static str, cx: &mut App| {\n                div()\n                    .flex_1()\n                    .p_token(&theme, Space::Md)\n                    .radius(&theme, Radius::Card)\n                    .surface(&theme, Surface::Panel)\n                    .child(\n                        crate::foundation::text(&theme, TypeScale::Label, label)\n                            .text_tone(&theme, TextTone::Muted),\n                    )\n                    .semantic_in(\n                        cx,\n                        NodeSpec::new(format!(\"{id}.{}\", label.to_lowercase()), Role::Group)\n                            .text(label),\n                    )\n            };\n            let panes = div()\n                .gap_token(&theme, Space::Sm)\n                .child(block(\"Settings\", cx))\n                .child(block(\"Detail\", cx));\n            div()\n                .column()\n                .gap_token(&theme, Space::Sm)\n                .child(\n                    crate::foundation::text(&theme, TypeScale::Caption, heading.clone())\n                        .text_tone(&theme, TextTone::Faint),\n                )\n                .child(if wide { panes.row() } else { panes.column() })\n                .semantic_in(cx, NodeSpec::new(id, Role::Group).value(heading))\n                .into_any_element()\n        }\n    };\n\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(caption(&theme, \"Wide enough for two columns\"))\n        .child(div().w(px(620.0)).child(Responsive::new(\n            \"scene.responsive.wide\",\n            arrangement(\"scene.responsive.wide.body\"),\n        )))\n        .child(caption(&theme, \"The same content, narrow\"))\n        .child(div().w(px(320.0)).child(Responsive::new(\n            \"scene.responsive.narrow\",\n            arrangement(\"scene.responsive.narrow.body\"),\n        )))\n        .into_any_element()\n}"
+    },
+    {
+      "name": "icon",
+      "capture": "cargo run -p xtask -- headless capture icon",
+      "kind": "exhibit",
+      "subjects": [
+        "Icon"
+      ],
+      "uses": [
+        "Icon"
+      ],
+      "example": "fn icon(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let tones = [\n        (\"primary\", IconTone::Primary),\n        (\"muted\", IconTone::Muted),\n        (\"faint\", IconTone::Faint),\n        (\"accent\", IconTone::Accent),\n        (\"accent strong\", IconTone::AccentStrong),\n        (\"success\", IconTone::Success),\n        (\"warning\", IconTone::Warning),\n        (\"danger\", IconTone::Danger),\n        (\"info\", IconTone::Info),\n    ];\n\n    stack(&theme)\n        .child(caption(\n            &theme,\n            \"The whole catalog, so a glyph that goes missing is visible here\",\n        ))\n        .child(\n            row(&theme)\n                .gap(px(theme.space(Space::Md)))\n                .children(Icon::ALL.iter().map(|glyph| {\n                    let name = SharedString::from(format!(\"{glyph:?}\"));\n                    IconView::named(format!(\"scene.icon.glyph.{name}\"), *glyph, name.clone())\n                        .into_any_element()\n                })),\n        )\n        .child(caption(\n            &theme,\n            \"Every tone. These are facts about what a glyph reports, not decoration\",\n        ))\n        .child(\n            row(&theme)\n                .gap(px(theme.space(Space::Lg)))\n                .children(tones.map(|(label, tone)| {\n                    div()\n                        .column()\n                        .items_center()\n                        .gap(px(theme.space(Space::Xs)))\n                        .child(\n                            IconView::named(format!(\"scene.icon.tone.{label}\"), Icon::Info, label)\n                                .tone(tone),\n                        )\n                        .child(\n                            crate::foundation::text(&theme, TypeScale::Caption, label)\n                                .text_tone(&theme, TextTone::Faint),\n                        )\n                        .into_any_element()\n                })),\n        )\n        .child(caption(\n            &theme,\n            \"A glyph that means a direction turns with the reading order; one that \\\n             means a thing does not\",\n        ))\n        .child(\n            row(&theme).gap(px(theme.space(Space::Md))).children(\n                [\n                    (Icon::ArrowRight, \"arrow-right\"),\n                    (Icon::Return, \"return\"),\n                    (Icon::Copy, \"copy\"),\n                    (Icon::Check, \"check\"),\n                    (Icon::Settings, \"settings\"),\n                ]\n                .map(|(glyph, name)| {\n                    IconView::named(format!(\"scene.icon.direction.{name}\"), glyph, name)\n                        .follow_direction(true)\n                        .into_any_element()\n                }),\n            ),\n        )\n        .into_any_element()\n}"
+    },
+    {
       "name": "document-tabs",
       "capture": "cargo run -p xtask -- headless capture document-tabs",
+      "kind": "exhibit",
+      "subjects": [
+        "Tabs"
+      ],
       "uses": [
-        "Icon",
-        "Menu",
         "Tabs"
       ],
       "example": "fn document_tabs(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneDocumentTabs>() {\n        // An icon-only trigger still has to be nameable, so it carries the\n        // strip's own word for what moved into it.\n        let name = cx.strings().text(StringKey::TabMoreTabs);\n        let overflow = cx.new(|cx| {\n            Menu::new(\"scene.document-tabs.overflow\", window, cx)\n                .trigger_icon(Icon::AltArrowDown)\n                .trigger_name(name)\n        });\n        cx.set_global(SceneDocumentTabs { overflow });\n    }\n    let overflow = cx.global::<SceneDocumentTabs>().overflow.clone();\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(620.0))\n        .child(caption(\n            &theme,\n            \"clean, unsaved, saving, save failed — three marks, and silence for the fourth\",\n        ))\n        .child(\n            Tabs::new(\"scene.document-tabs.editor\")\n                .tabs([\n                    TabItem::new(\"readme\", \"README.md\").closable(true),\n                    TabItem::new(\"main\", \"main.rs\").dirty().closable(true),\n                    TabItem::new(\"theme\", \"theme.json\").saving().closable(true),\n                    TabItem::new(\"notes\", \"notes.md\")\n                        .save_failed(\"The workspace is read-only.\")\n                        .closable(true),\n                ])\n                .selected(\"main\")\n                .on_select(|_, _, _| {})\n                .on_close(|_, _, _| {}),\n        )\n        .child(caption(\n            &theme,\n            \"past the declared limit the rest go to a menu, which stays reachable from the keyboard\",\n        ))\n        .child(\n            Tabs::new(\"scene.document-tabs.overflowing\")\n                .tabs([\n                    TabItem::new(\"one\", \"adapter.rs\").closable(true),\n                    TabItem::new(\"two\", \"catalog.rs\").dirty().closable(true),\n                    TabItem::new(\"three\", \"harness.rs\").closable(true),\n                    TabItem::new(\"four\", \"registry.rs\").closable(true),\n                    TabItem::new(\"five\", \"transport.rs\").dirty().closable(true),\n                ])\n                .selected(\"two\")\n                .overflow_after(3)\n                .overflow_menu(overflow)\n                .on_select(|_, _, _| {})\n                .on_close(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
@@ -11288,8 +11423,12 @@
     {
       "name": "search-field",
       "capture": "cargo run -p xtask -- headless capture search-field",
+      "kind": "exhibit",
+      "subjects": [
+        "HighlightedText",
+        "SearchField"
+      ],
       "uses": [
-        "FindReplace",
         "HighlightedText",
         "SearchField"
       ],
@@ -11298,15 +11437,22 @@
     {
       "name": "find-replace",
       "capture": "cargo run -p xtask -- headless capture find-replace",
+      "kind": "exhibit",
+      "subjects": [
+        "FindReplace"
+      ],
       "uses": [
-        "FindReplace",
-        "SearchField"
+        "FindReplace"
       ],
       "example": "fn find_replace(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_search(window, cx);\n    let replace = cx.global::<SceneSearch>().replace.clone();\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(620.0))\n        // Replace all says how many before it does any, so nobody agrees to a\n        // number they were never shown.\n        .child(caption(\n            &theme,\n            \"replace all names its count before it acts\",\n        ))\n        .child(replace)\n        .into_any_element()\n}"
     },
     {
       "name": "notification-center",
       "capture": "cargo run -p xtask -- headless capture notification-center",
+      "kind": "exhibit",
+      "subjects": [
+        "NotificationCenter"
+      ],
       "uses": [
         "NotificationCenter"
       ],
@@ -11315,6 +11461,10 @@
     {
       "name": "failure-panel",
       "capture": "cargo run -p xtask -- headless capture failure-panel",
+      "kind": "exhibit",
+      "subjects": [
+        "FailurePanel"
+      ],
       "uses": [
         "FailurePanel"
       ],
@@ -11323,6 +11473,10 @@
     {
       "name": "log-stream",
       "capture": "cargo run -p xtask -- headless capture log-stream",
+      "kind": "exhibit",
+      "subjects": [
+        "LogStream"
+      ],
       "uses": [
         "LogStream"
       ],
@@ -11331,6 +11485,10 @@
     {
       "name": "diff-view",
       "capture": "cargo run -p xtask -- headless capture diff-view",
+      "kind": "exhibit",
+      "subjects": [
+        "DiffView"
+      ],
       "uses": [
         "DiffView"
       ],
@@ -11339,6 +11497,10 @@
     {
       "name": "sparkline",
       "capture": "cargo run -p xtask -- headless capture sparkline",
+      "kind": "exhibit",
+      "subjects": [
+        "Sparkline"
+      ],
       "uses": [
         "Sparkline"
       ],
@@ -11347,6 +11509,11 @@
     {
       "name": "chart",
       "capture": "cargo run -p xtask -- headless capture chart",
+      "kind": "exhibit",
+      "subjects": [
+        "BarChart",
+        "LineChart"
+      ],
       "uses": [
         "BarChart",
         "LineChart"
@@ -11356,6 +11523,10 @@
     {
       "name": "code-view",
       "capture": "cargo run -p xtask -- headless capture code-view",
+      "kind": "exhibit",
+      "subjects": [
+        "CodeView"
+      ],
       "uses": [
         "CodeView"
       ],
@@ -11364,9 +11535,11 @@
     {
       "name": "upload-list",
       "capture": "cargo run -p xtask -- headless capture upload-list",
+      "kind": "exhibit",
+      "subjects": [
+        "UploadList"
+      ],
       "uses": [
-        "Dropzone",
-        "List",
         "UploadList"
       ],
       "example": "fn upload_list(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(560.0))\n        .child(caption(\n            &theme,\n            \"a refusal is not a failure, and only a failure is offered a retry\",\n        ))\n        .child(\n            UploadList::new(\"scene.uploads\")\n                .dropzone(\n                    Dropzone::new(\"scene.uploads.zone\", \"Drop files to attach\")\n                        .hint(\"PDF, PNG, or plain text\")\n                        .on_files(|_, _, _| {}),\n                )\n                .uploads([\n                    Upload::new(\"brief\", \"brief.pdf\").size(\"1.2 MB\").done(),\n                    Upload::new(\"capture\", \"capture.png\")\n                        .size(\"4.8 MB\")\n                        .uploading(0.4),\n                    Upload::new(\"notes\", \"notes.txt\").size(\"12 KB\"),\n                    Upload::new(\"archive\", \"archive.zip\")\n                        .size(\"240 MB\")\n                        .failed(\"The connection dropped.\"),\n                    Upload::new(\"installer\", \"installer.exe\")\n                        .size(\"64 MB\")\n                        .refused(\"This zone does not take programs.\"),\n                ])\n                .on_retry(|_, _, _| {})\n                .on_cancel(|_, _, _| {})\n                .on_remove(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
@@ -11374,6 +11547,10 @@
     {
       "name": "cascader",
       "capture": "cargo run -p xtask -- headless capture cascader",
+      "kind": "exhibit",
+      "subjects": [
+        "Cascader"
+      ],
       "uses": [
         "Cascader"
       ],
@@ -11382,54 +11559,64 @@
     {
       "name": "anchor-list",
       "capture": "cargo run -p xtask -- headless capture anchor-list",
+      "kind": "exhibit",
+      "subjects": [
+        "AnchorList"
+      ],
       "uses": [
-        "AnchorList",
-        "List",
-        "Menu"
+        "AnchorList"
       ],
       "example": "fn anchor_navigation(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneAnchorList>() {\n        let label = cx.strings().text(StringKey::AnchorMoreSections);\n        let overflow = cx.new(|cx| Menu::new(\"scene.anchor-list.menu\", window, cx).trigger(label));\n        cx.set_global(SceneAnchorList { overflow });\n    }\n    let theme = cx.theme().clone();\n    let overflow = cx.global::<SceneAnchorList>().overflow.clone();\n    stack(&theme)\n        .w(px(700.0))\n        .child(caption(\n            &theme,\n            \"section intents only; the declared overflow moves anchors into a menu\",\n        ))\n        .child(\n            AnchorList::new(\"scene.anchor-list\")\n                .anchors([\n                    Anchor::new(\"summary\", \"Summary\"),\n                    Anchor::new(\"inputs\", \"Inputs\"),\n                    Anchor::new(\"constraints\", \"Constraints\"),\n                    Anchor::new(\"verification\", \"Verification\"),\n                    Anchor::new(\"history\", \"History\").disabled(true),\n                ])\n                .active(\"inputs\")\n                .overflow_after(3)\n                .overflow_menu(overflow)\n                .on_navigate(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "diagnostics-list",
       "capture": "cargo run -p xtask -- headless capture diagnostics-list",
+      "kind": "exhibit",
+      "subjects": [
+        "DiagnosticsList"
+      ],
       "uses": [
-        "DiagnosticsList",
-        "List"
+        "DiagnosticsList"
       ],
       "example": "fn diagnostics_surface(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let diagnostics = [\n        Diagnostic::new(\n            \"fixture-error\",\n            DiagnosticSeverity::Error,\n            DiagnosticLocation::new(\"fixture.rs:18\"),\n            \"Fixture diagnostic: incompatible value\",\n        )\n        .action(DiagnosticAction::new(\"inspect\", \"Inspect fixture\")),\n        Diagnostic::new(\n            \"fixture-warning\",\n            DiagnosticSeverity::Warning,\n            DiagnosticLocation::new(\"fixture.rs:31\"),\n            \"Fixture diagnostic: unused declaration\",\n        ),\n        Diagnostic::new(\n            \"fixture-information\",\n            DiagnosticSeverity::Information,\n            DiagnosticLocation::new(\"fixture.rs:47\"),\n            \"Fixture diagnostic: a simpler form is available\",\n        ),\n        Diagnostic::new(\n            \"fixture-hint\",\n            DiagnosticSeverity::Hint,\n            DiagnosticLocation::new(\"fixture.rs:64\"),\n            \"Fixture diagnostic: consider a descriptive name\",\n        ),\n    ];\n    stack(&theme)\n        .w(px(760.0))\n        .child(caption(\n            &theme,\n            \"synthetic diagnostics; filters, selection, and actions are caller-owned intents\",\n        ))\n        .child(\n            DiagnosticsList::new(\"scene.diagnostics\", Loadable::Ready(diagnostics.to_vec()))\n                .selected(\"fixture-warning\")\n                .visible_rows(5)\n                .on_filter(|_, _, _| {})\n                .on_select(|_, _, _| {})\n                .on_action(|_, _, _, _| {}),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "calendar",
       "capture": "cargo run -p xtask -- headless capture calendar",
-      "uses": [
-        "Calendar",
-        "DateInput",
-        "RangePicker",
-        "TimeInput"
+      "kind": "exhibit",
+      "subjects": [
+        "Calendar"
       ],
-      "example": "    pub(super) fn calendar(window: &mut Window, cx: &mut App) -> AnyElement {\n        ensure(window, cx);\n        let theme = cx.theme().clone();\n        let dates = cx.global::<SceneDates>();\n        let (month, unknown) = (dates.month.clone(), dates.unknown.clone());\n        stack(&theme)\n            .child(\n                row(&theme)\n                    .items_start()\n                    .gap(px(theme.space(Space::Lg)))\n                    .child(month)\n                    .child(unknown),\n            )\n            .child(\n                crate::foundation::text(\n                    &theme,\n                    TypeScale::Body,\n                    \"Every weekday name, month name, and blocked reason above came from the \\\n                         host. The calendar on the right has no today, so it draws no ring and \\\n                         guesses no month.\",\n                )\n                .max_w(px(560.0))\n                .text_tone(&theme, TextTone::Muted),\n            )\n            .into_any_element()\n    }"
+      "uses": [
+        "Calendar"
+      ],
+      "example": "fn calendar(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure(window, cx);\n    let theme = cx.theme().clone();\n    let dates = cx.global::<SceneDates>();\n    let (month, unknown) = (dates.month.clone(), dates.unknown.clone());\n    stack(&theme)\n        .child(\n            row(&theme)\n                .items_start()\n                .gap(px(theme.space(Space::Lg)))\n                .child(month)\n                .child(unknown),\n        )\n        .child(\n            crate::foundation::text(\n                &theme,\n                TypeScale::Body,\n                \"Every weekday name, month name, and blocked reason above came from the \\\n                     host. The calendar on the right has no today, so it draws no ring and \\\n                     guesses no month.\",\n            )\n            .max_w(px(560.0))\n            .text_tone(&theme, TextTone::Muted),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "date-range",
       "capture": "cargo run -p xtask -- headless capture date-range",
-      "uses": [
-        "Calendar",
-        "DateInput",
-        "RangePicker",
-        "TimeInput"
+      "kind": "exhibit",
+      "subjects": [
+        "RangePicker"
       ],
-      "example": "    pub(super) fn date_range(window: &mut Window, cx: &mut App) -> AnyElement {\n        ensure(window, cx);\n        let theme = cx.theme().clone();\n        let dates = cx.global::<SceneDates>();\n        let (incomplete, preview, blocked) = (\n            dates.incomplete.clone(),\n            dates.preview.clone(),\n            dates.blocked.clone(),\n        );\n        stack(&theme)\n            .child(\n                row(&theme)\n                    .items_start()\n                    .gap(px(theme.space(Space::Lg)))\n                    .child(incomplete)\n                    .child(preview)\n                    .child(blocked),\n            )\n            .into_any_element()\n    }"
+      "uses": [
+        "RangePicker"
+      ],
+      "example": "fn date_range(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure(window, cx);\n    let theme = cx.theme().clone();\n    let dates = cx.global::<SceneDates>();\n    let (incomplete, preview, blocked) = (\n        dates.incomplete.clone(),\n        dates.preview.clone(),\n        dates.blocked.clone(),\n    );\n    stack(&theme)\n        .child(\n            row(&theme)\n                .items_start()\n                .gap(px(theme.space(Space::Lg)))\n                .child(incomplete)\n                .child(preview)\n                .child(blocked),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "date-time",
       "capture": "cargo run -p xtask -- headless capture date-time",
-      "uses": [
-        "Calendar",
+      "kind": "exhibit",
+      "subjects": [
         "DateInput",
-        "RangePicker",
         "TimeInput"
       ],
-      "example": "    pub(super) fn date_time(window: &mut Window, cx: &mut App) -> AnyElement {\n        ensure(window, cx);\n        let theme = cx.theme().clone();\n        let dates = cx.global::<SceneDates>();\n        let (field, refused, clock, twelve) = (\n            dates.field.clone(),\n            dates.refused.clone(),\n            dates.clock.clone(),\n            dates.twelve.clone(),\n        );\n        stack(&theme)\n            .child(div().w(px(280.0)).child(field))\n            .child(div().w(px(280.0)).child(refused))\n            .child(\n                row(&theme)\n                    .gap(px(theme.space(Space::Lg)))\n                    .child(clock)\n                    .child(twelve),\n            )\n            .child(\n                crate::foundation::text(\n                    &theme,\n                    TypeScale::Body,\n                    \"What the field could not read is still in it, and the refusal is the \\\n                         adapter's own sentence.\",\n                )\n                .max_w(px(560.0))\n                .text_tone(&theme, TextTone::Muted),\n            )\n            .into_any_element()\n    }"
+      "uses": [
+        "DateInput",
+        "TimeInput"
+      ],
+      "example": "fn date_time(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure(window, cx);\n    let theme = cx.theme().clone();\n    let dates = cx.global::<SceneDates>();\n    let (field, refused, clock, twelve) = (\n        dates.field.clone(),\n        dates.refused.clone(),\n        dates.clock.clone(),\n        dates.twelve.clone(),\n    );\n    stack(&theme)\n        .child(div().w(px(280.0)).child(field))\n        .child(div().w(px(280.0)).child(refused))\n        .child(\n            row(&theme)\n                .gap(px(theme.space(Space::Lg)))\n                .child(clock)\n                .child(twelve),\n        )\n        .child(\n            crate::foundation::text(\n                &theme,\n                TypeScale::Body,\n                \"What the field could not read is still in it, and the refusal is the \\\n                     adapter's own sentence.\",\n            )\n            .max_w(px(560.0))\n            .text_tone(&theme, TextTone::Muted),\n        )\n        .into_any_element()\n}"
     }
   ]
 }
