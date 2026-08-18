@@ -30,6 +30,8 @@ pub enum TokenError {
     Contrast(String),
     #[error("token surface separation is invalid:\n{0}")]
     Separation(String),
+    #[error("token decorative lines are not visible:\n{0}")]
+    Line(String),
     #[error("token tones are not distinguishable:\n{0}")]
     Distinction(String),
 }
@@ -205,6 +207,10 @@ impl TokenDocument {
             return invalid("effect.focusRingWidth", "must be positive");
         }
 
+        if self.effect.selection_rail_width <= 0.0 {
+            return invalid("effect.selectionRailWidth", "must be positive");
+        }
+
         for (path, value) in [
             ("effect.edgeFadeBand", self.effect.edge_fade_band),
             ("effect.glowBlur", self.effect.glow_blur),
@@ -323,6 +329,22 @@ impl TokenDocument {
                         format!(
                             "  {} over {} gains {:.1} L*; requires {:.1}",
                             failure.near, failure.behind, failure.distance, failure.minimum
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ));
+        }
+
+        let failures = contrast::line_failures(self);
+        if !failures.is_empty() {
+            return Err(TokenError::Line(
+                failures
+                    .iter()
+                    .map(|failure| {
+                        format!(
+                            "  {} on {} gains {:.2} L*; requires {:.2}",
+                            failure.line, failure.surface, failure.distance, failure.minimum
                         )
                     })
                     .collect::<Vec<_>>()
@@ -1318,6 +1340,15 @@ pub struct EasingTokens {
 pub struct EffectTokens {
     pub edge_fade_band: f32,
     pub selected_ring_alpha: f32,
+    /// How wide the bar marking the selected row in a collection is, in
+    /// pixels.
+    ///
+    /// A row's selection is a wash plus this rail at the reading edge. The
+    /// wash alone is a neutral tint that a light theme cannot make strong
+    /// enough to read as *chosen* without also reading as *disabled*; the
+    /// rail is what says which row the collection is on, at a colour and an
+    /// area small enough that a hundred rows do not become a field of accent.
+    pub selection_rail_width: f32,
     /// How wide the ring around the focused control is drawn, in pixels.
     pub focus_ring_width: f32,
     pub focus_ring_alpha: f32,
@@ -1401,7 +1432,7 @@ mod tests {
         );
         assert_eq!(
             tokens.interactive(InteractiveColor::Hover),
-            Color::parse("literal", "#ebebeb24").expect("literal")
+            Color::parse("literal", "#ebebeb14").expect("literal")
         );
         assert_eq!(
             tokens.semantic(SemanticColor::Accent),

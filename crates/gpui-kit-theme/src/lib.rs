@@ -255,6 +255,7 @@ impl ZIndices {
 pub struct Effects {
     pub edge_fade_band: f32,
     pub selected_ring_alpha: f32,
+    pub selection_rail_width: f32,
     pub focus_ring_width: f32,
     pub focus_ring_alpha: f32,
     pub glow_alpha: f32,
@@ -446,6 +447,7 @@ impl Theme {
             effects: Effects {
                 edge_fade_band: tokens.effect.edge_fade_band,
                 selected_ring_alpha: tokens.effect.selected_ring_alpha,
+                selection_rail_width: tokens.effect.selection_rail_width,
                 focus_ring_width: tokens.effect.focus_ring_width,
                 focus_ring_alpha: tokens.effect.focus_ring_alpha,
                 glow_alpha: tokens.effect.glow_alpha,

@@ -63,13 +63,13 @@
       "onAccent": "{neutral.ink}"
     },
     "interactive": {
-      "hover": "{neutral.850}/24",
-      "active": "{neutral.850}/29",
-      "selected": "{neutral.850}/40",
-      "hairline": "{neutral.900}/59",
+      "hover": "{neutral.850}/14",
+      "active": "{neutral.850}/24",
+      "selected": "{neutral.850}/1c",
+      "hairline": "{neutral.900}/14",
       "hairlineStrong": "{neutral.900}/66",
       "track": "{neutral.900}/66",
-      "divider": "{neutral.900}/66",
+      "divider": "{neutral.900}/10",
       "focus": "{indigo.400}"
     },
     "semantic": {
@@ -197,6 +197,7 @@
   "effect": {
     "edgeFadeBand": 20,
     "selectedRingAlpha": 0.09,
+    "selectionRailWidth": 2.5,
     "focusRingWidth": 2,
     "focusRingAlpha": 0.7,
     "glowAlpha": 0.38,

@@ -461,6 +461,7 @@
       "required": [
         "edgeFadeBand",
         "selectedRingAlpha",
+        "selectionRailWidth",
         "focusRingWidth",
         "focusRingAlpha",
         "glowAlpha",
@@ -482,6 +483,7 @@
       "properties": {
         "edgeFadeBand": { "$ref": "#/$defs/positiveNumber" },
         "selectedRingAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "selectionRailWidth": { "$ref": "#/$defs/strictlyPositiveNumber" },
         "focusRingWidth": { "$ref": "#/$defs/strictlyPositiveNumber" },
         "focusRingAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
         "glowAlpha": { "type": "number", "minimum": 0, "maximum": 1 },

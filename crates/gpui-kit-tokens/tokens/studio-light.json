@@ -64,12 +64,12 @@
     },
     "interactive": {
       "hover": "{neutral.850}/0f",
-      "active": "{neutral.850}/1a",
-      "selected": "{neutral.850}/24",
-      "hairline": "{neutral.850}/80",
+      "active": "{neutral.850}/1c",
+      "selected": "{neutral.850}/14",
+      "hairline": "{neutral.850}/1a",
       "hairlineStrong": "{neutral.850}/8c",
       "track": "{neutral.850}/8c",
-      "divider": "{neutral.850}/8c",
+      "divider": "{neutral.850}/14",
       "focus": "{indigo.400}"
     },
     "semantic": {
@@ -117,9 +117,9 @@
   },
   "elevation": {
     "flat": [],
-    "raised": [{ "y": 2, "blur": 6, "spread": -1, "color": "{neutral.0}/1f" }],
-    "overlay": [{ "y": 8, "blur": 24, "spread": -4, "color": "{neutral.0}/1f" }],
-    "modal": [{ "y": 16, "blur": 48, "spread": -8, "color": "{neutral.0}/29" }]
+    "raised": [{ "y": 2, "blur": 6, "spread": -1, "color": "{neutral.0}/14" }],
+    "overlay": [{ "y": 8, "blur": 24, "spread": -4, "color": "{neutral.0}/1a" }],
+    "modal": [{ "y": 16, "blur": 48, "spread": -8, "color": "{neutral.0}/24" }]
   },
   "zIndex": {
     "content": 0,
@@ -197,6 +197,7 @@
   "effect": {
     "edgeFadeBand": 20,
     "selectedRingAlpha": 0.12,
+    "selectionRailWidth": 2.5,
     "focusRingWidth": 2,
     "focusRingAlpha": 0.8,
     "glowAlpha": 0.22,

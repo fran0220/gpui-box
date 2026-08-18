@@ -6,7 +6,9 @@
 //! exempts inactive controls; "inactive" is not permission to disappear.
 //!
 //! Two backgrounds meeting each other is a separate rule with a separate
-//! measure; see [`separation_report`].
+//! measure; see [`separation_report`]. A decorative line drawn *between* two
+//! pieces of content on one surface is a third rule again; see
+//! [`line_report`].
 
 use crate::{
     Color, InteractiveColor, SemanticColor, Surface, TextTone, TokenDocument, contrast_ratio,
@@ -78,14 +80,21 @@ pub fn report(tokens: &TokenDocument) -> Vec<ContrastCheck> {
                 NON_TEXT_MINIMUM,
             ));
         }
+        // Only the lines that carry a *control's* boundary are held here:
+        // the rail a slider runs in, the edge of a switch, the gutter a
+        // scrollbar thumb sits in. Those are part of an interactive
+        // affordance, so a reader who cannot see them cannot see the
+        // control. `hairline` and `divider` are decoration between two
+        // pieces of content on one surface, and are held to the separate,
+        // much lower floor in `line_report` instead — holding them to 3:1
+        // is what turned every card, table and menu in this library into an
+        // outlined box.
         for (color_name, color) in [
-            ("color.interactive.hairline", InteractiveColor::Hairline),
             (
                 "color.interactive.hairlineStrong",
                 InteractiveColor::HairlineStrong,
             ),
             ("color.interactive.track", InteractiveColor::Track),
-            ("color.interactive.divider", InteractiveColor::Divider),
         ] {
             checks.push(check(
                 color_name,
@@ -231,6 +240,78 @@ pub fn separation_failures(tokens: &TokenDocument) -> Vec<SeparationCheck> {
         .collect()
 }
 
+/// One decorative line on one surface, and how far it stands from it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LineCheck {
+    pub line: String,
+    pub surface: String,
+    pub distance: f32,
+    pub minimum: f32,
+}
+
+impl LineCheck {
+    pub fn passes(&self) -> bool {
+        self.distance >= self.minimum
+    }
+}
+
+/// The perceptual lightness a decorative line must gain over its surface.
+///
+/// Deliberately far below [`SEPARATION_MINIMUM`]. A hairline separating two
+/// rows of one table is not a plane a reader has to identify, it is a hint
+/// that two rows are two rows, and the row heights and the hover wash have
+/// already said so. What this floor rules out is a line that was *typed* and
+/// never *drawn*: an alpha low enough to round away against its own surface
+/// is a line the author believes is there and no display renders.
+///
+/// The upper bound is the point of the rule. A line held to the 3:1 that
+/// [`report`] requires of control boundaries is not a hairline, it is an
+/// outline, and a library that draws one around every card, row, menu and
+/// tab has no borderless language left to speak.
+pub const LINE_MINIMUM: f32 = 1.5;
+
+/// Every decorative line, against every surface it can be drawn on.
+///
+/// The line colours are translucent by design, so each is composited onto the
+/// surface before it is measured: what the rule asks is what a reader
+/// actually sees, not what the channel says in isolation.
+pub fn line_report(tokens: &TokenDocument) -> Vec<LineCheck> {
+    let surfaces = [
+        ("color.surface.backdrop", Surface::Backdrop),
+        ("color.surface.canvas", Surface::Canvas),
+        ("color.surface.sunken", Surface::Sunken),
+        ("color.surface.panel", Surface::Panel),
+        ("color.surface.raised", Surface::Raised),
+        ("color.surface.overlay", Surface::Overlay),
+    ];
+    let lines = [
+        ("color.interactive.hairline", InteractiveColor::Hairline),
+        ("color.interactive.divider", InteractiveColor::Divider),
+    ];
+
+    let mut checks = Vec::new();
+    for (surface_name, surface) in surfaces {
+        let background = tokens.surface(surface);
+        for (line_name, line) in lines {
+            let drawn = crate::over(tokens.interactive(line), background);
+            checks.push(LineCheck {
+                line: line_name.into(),
+                surface: surface_name.into(),
+                distance: (drawn.lightness() - background.lightness()).abs(),
+                minimum: LINE_MINIMUM,
+            });
+        }
+    }
+    checks
+}
+
+pub fn line_failures(tokens: &TokenDocument) -> Vec<LineCheck> {
+    line_report(tokens)
+        .into_iter()
+        .filter(|check| !check.passes())
+        .collect()
+}
+
 /// Two text tones that mean different things, and how far apart they read.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DistinctionCheck {
@@ -360,7 +441,60 @@ mod tests {
     #[test]
     fn the_report_covers_every_surface_and_tone() {
         let checks = report(crate::studio_dark());
-        assert_eq!(checks.len(), 6 * 20 + 1);
+        assert_eq!(checks.len(), 6 * 18 + 1);
+    }
+
+    #[test]
+    fn every_bundled_theme_draws_lines_somebody_can_see() {
+        for tokens in crate::bundled() {
+            let failures = line_failures(tokens);
+            assert!(
+                failures.is_empty(),
+                "{} types a line it never draws: {:#?}",
+                tokens.meta.id,
+                failures
+            );
+        }
+    }
+
+    /// The line rule is a floor and not the 3:1 the control boundaries carry.
+    /// A theme whose hairlines clear 3:1 has drawn an outline around every
+    /// card and row in the library, which is the failure this whole gate
+    /// split exists to end.
+    #[test]
+    fn a_decorative_line_is_far_below_a_control_boundary() {
+        const { assert!(LINE_MINIMUM < SEPARATION_MINIMUM) };
+        for tokens in crate::bundled() {
+            let canvas = tokens.surface(Surface::Canvas);
+            for line in [InteractiveColor::Hairline, InteractiveColor::Divider] {
+                let ratio = contrast_ratio(tokens.interactive(line), canvas);
+                assert!(
+                    ratio < NON_TEXT_MINIMUM,
+                    "{} draws {line:?} at {ratio:.2}:1, which is an outline",
+                    tokens.meta.id
+                );
+            }
+        }
+    }
+
+    /// The regression the line rule exists to catch: an alpha so low the
+    /// line composites back into its own surface.
+    #[test]
+    fn a_line_that_rounds_away_against_its_surface_is_rejected() {
+        let mut tokens = crate::studio_dark().clone();
+        tokens.color.interactive.hairline = "{neutral.900}/01".into();
+        assert!(
+            failures(&tokens).is_empty(),
+            "the contrast report no longer looks at decorative lines"
+        );
+        let failures = line_failures(&tokens);
+        assert!(
+            failures
+                .iter()
+                .any(|check| check.line == "color.interactive.hairline"),
+            "{failures:#?}"
+        );
+        assert!(matches!(tokens.validate(), Err(crate::TokenError::Line(_))));
     }
 
     #[test]
