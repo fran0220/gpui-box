@@ -224,9 +224,10 @@ pub mod prelude {
     };
     pub use crate::foundation::slot;
     pub use crate::foundation::{
-        ActiveTheme, ControlSize, Density, Disableable, Elevation, FocusRing, HoverLift, Ident,
-        Layer, Pressable, Selectable, Sizable, SlotRender, Slots, Slotted, StyledExt, ThemeOverlay,
-        ThemeRegistry, activate_theme, set_density, text,
+        ActiveTheme, ControlSize, Density, Disableable, Elevation, FocusRing, HoverLift, Hoverable,
+        Ident, Layer, Pressable, Selectable, SelectedRow, Sizable, SlotRender, Slots, Slotted,
+        StyledExt, ThemeOverlay, ThemeRegistry, activate_theme, rule, rule_vertical,
+        selection_rail, set_density, text,
     };
     pub use crate::game::{
         Ability, AbilityBar, AbilityBarEvent, AbilityCharges, AbilityChargesError, AbilityId,

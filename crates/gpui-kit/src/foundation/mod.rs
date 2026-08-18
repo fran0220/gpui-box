@@ -20,7 +20,10 @@ pub use direction::{
 pub use ident::Ident;
 pub use interaction::{HoverLift, Pressable};
 pub use slot::{SlotRender, Slots, Slotted};
-pub use styled_ext::{CardVariant, FocusRing, StyledExt, text};
+pub use styled_ext::{
+    CardVariant, FocusRing, Hoverable, SelectedRow, StyledExt, rule, rule_vertical, selection_rail,
+    text,
+};
 pub use theme_overlay::ThemeOverlay;
 
 pub use gpui_kit_theme::{

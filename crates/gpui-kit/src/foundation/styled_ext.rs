@@ -1,6 +1,8 @@
 use gpui::{Div, FontWeight, InteractiveElement, ParentElement, SharedString, Styled, div, px};
 use gpui_kit_theme::{Elevation, Radius, Space, Surface, TextTone, Theme, TypeScale};
 
+use super::direction::LayoutDirection;
+
 /// Creates text with an explicit complete type step and primary text tone.
 ///
 /// This is the only entry point for putting a string directly into the GPUI
@@ -160,6 +162,108 @@ pub trait StyledExt: Styled + Sized {
 }
 
 impl<T: Styled + Sized> StyledExt for T {}
+
+/// The one line this library draws between two pieces of content.
+///
+/// A rule divides content that shares a surface; it is not an outline around
+/// the surface, which is what a colour step and an elevation are for. It is a
+/// child element rather than a border so it can be inset from the edges of
+/// what holds it, and so a component that already spends its border on focus
+/// or invalidity can still draw one.
+pub fn rule(theme: &Theme) -> Div {
+    div()
+        .w_full()
+        .h(px(theme.borders.hairline))
+        .flex_none()
+        .bg(theme.colors.divider)
+}
+
+/// The same rule, standing up.
+pub fn rule_vertical(theme: &Theme) -> Div {
+    div()
+        .h_full()
+        .w(px(theme.borders.hairline))
+        .flex_none()
+        .bg(theme.colors.divider)
+}
+
+/// The bar that marks the selected row of a collection.
+///
+/// Absolutely positioned, so it consumes no layout and a row does not reflow
+/// when the selection arrives on it. It is rounded on its outer end only,
+/// which is what keeps it reading as a mark against the edge rather than as a
+/// floating capsule.
+pub fn selection_rail(theme: &Theme, direction: LayoutDirection) -> Div {
+    let width = px(theme.effects.selection_rail_width);
+    let radius = width / 2.0;
+    let bar = div()
+        .absolute()
+        .top_0()
+        .bottom_0()
+        .w(width)
+        .flex_none()
+        .bg(theme.colors.accent);
+    if direction.is_rtl() {
+        bar.right_0().rounded_bl(radius).rounded_tl(radius)
+    } else {
+        bar.left_0().rounded_br(radius).rounded_tr(radius)
+    }
+}
+
+/// How every collection in this library says which row it is on.
+///
+/// One recipe, because selection that is drawn a dozen ways is a dozen
+/// different statements wearing one name. A neutral wash carries the row and
+/// an accent rail at the reading edge names it: the wash alone cannot be made
+/// strong enough in a light theme to read as *chosen* without also reading as
+/// *inactive*, and a whole row of accent would spend on one line the area
+/// this library reserves for the decision a surface is asking for.
+pub trait SelectedRow: Styled + ParentElement + Sized {
+    fn selected_row(self, theme: &Theme, direction: LayoutDirection, selected: bool) -> Self {
+        if !selected {
+            return self;
+        }
+        self.relative()
+            .bg(theme.colors.selected)
+            .child(selection_rail(theme, direction))
+    }
+
+    /// The same statement for a row that reads across, such as a tab in a
+    /// strip or a step in a wizard: the rail lies along the bottom edge.
+    fn selected_column(self, theme: &Theme, selected: bool) -> Self {
+        if !selected {
+            return self;
+        }
+        let width = px(theme.effects.selection_rail_width);
+        self.relative().child(
+            div()
+                .absolute()
+                .left_0()
+                .right_0()
+                .bottom_0()
+                .h(width)
+                .flex_none()
+                .rounded_t(width / 2.0)
+                .bg(theme.colors.accent),
+        )
+    }
+}
+
+impl<T: Styled + ParentElement + Sized> SelectedRow for T {}
+
+/// The wash a row takes while the pointer is over it.
+///
+/// Hover is already a low-alpha token, so a component that dims it again is
+/// drawing a state nobody can see. This exists so no component has to decide
+/// that a second time.
+pub trait Hoverable: gpui::InteractiveElement + Sized {
+    fn hover_row(self, theme: &Theme) -> Self {
+        let hover = theme.colors.hover;
+        self.hover(move |style| style.bg(hover))
+    }
+}
+
+impl<T: gpui::InteractiveElement + Sized> Hoverable for T {}
 
 /// The one focus treatment in the library.
 ///
