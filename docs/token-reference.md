@@ -227,6 +227,7 @@ Appearance: `Dark`.
 | `color.text.faint` | `color.surface.backdrop` | 6.30 | 3.0 |
 | `color.text.placeholder` | `color.surface.backdrop` | 5.60 | 3.0 |
 | `color.text.disabled` | `color.surface.backdrop` | 4.95 | 3.0 |
+| `color.text.primary over color.interactive.selected` | `color.surface.backdrop + selected` | 13.69 | 4.5 |
 | `color.semantic.accent` | `color.surface.backdrop` | 6.51 | 3.0 |
 | `color.semantic.accentStrong` | `color.surface.backdrop` | 4.42 | 3.0 |
 | `color.semantic.danger` | `color.surface.backdrop` | 7.06 | 3.0 |
@@ -245,6 +246,7 @@ Appearance: `Dark`.
 | `color.text.faint` | `color.surface.canvas` | 5.75 | 3.0 |
 | `color.text.placeholder` | `color.surface.canvas` | 5.10 | 3.0 |
 | `color.text.disabled` | `color.surface.canvas` | 4.51 | 3.0 |
+| `color.text.primary over color.interactive.selected` | `color.surface.canvas + selected` | 11.71 | 4.5 |
 | `color.semantic.accent` | `color.surface.canvas` | 5.94 | 3.0 |
 | `color.semantic.accentStrong` | `color.surface.canvas` | 4.03 | 3.0 |
 | `color.semantic.danger` | `color.surface.canvas` | 6.43 | 3.0 |
@@ -263,6 +265,7 @@ Appearance: `Dark`.
 | `color.text.faint` | `color.surface.sunken` | 6.12 | 3.0 |
 | `color.text.placeholder` | `color.surface.sunken` | 5.44 | 3.0 |
 | `color.text.disabled` | `color.surface.sunken` | 4.81 | 3.0 |
+| `color.text.primary over color.interactive.selected` | `color.surface.sunken + selected` | 12.99 | 4.5 |
 | `color.semantic.accent` | `color.surface.sunken` | 6.33 | 3.0 |
 | `color.semantic.accentStrong` | `color.surface.sunken` | 4.30 | 3.0 |
 | `color.semantic.danger` | `color.surface.sunken` | 6.85 | 3.0 |
@@ -281,6 +284,7 @@ Appearance: `Dark`.
 | `color.text.faint` | `color.surface.panel` | 5.33 | 3.0 |
 | `color.text.placeholder` | `color.surface.panel` | 4.73 | 3.0 |
 | `color.text.disabled` | `color.surface.panel` | 4.18 | 3.0 |
+| `color.text.primary over color.interactive.selected` | `color.surface.panel + selected` | 10.59 | 4.5 |
 | `color.semantic.accent` | `color.surface.panel` | 5.50 | 3.0 |
 | `color.semantic.accentStrong` | `color.surface.panel` | 3.74 | 3.0 |
 | `color.semantic.danger` | `color.surface.panel` | 5.96 | 3.0 |
@@ -299,6 +303,7 @@ Appearance: `Dark`.
 | `color.text.faint` | `color.surface.raised` | 4.56 | 3.0 |
 | `color.text.placeholder` | `color.surface.raised` | 4.05 | 3.0 |
 | `color.text.disabled` | `color.surface.raised` | 3.58 | 3.0 |
+| `color.text.primary over color.interactive.selected` | `color.surface.raised + selected` | 8.89 | 4.5 |
 | `color.semantic.accent` | `color.surface.raised` | 4.71 | 3.0 |
 | `color.semantic.accentStrong` | `color.surface.raised` | 3.20 | 3.0 |
 | `color.semantic.danger` | `color.surface.raised` | 5.10 | 3.0 |
@@ -317,6 +322,7 @@ Appearance: `Dark`.
 | `color.text.faint` | `color.surface.overlay` | 4.80 | 3.0 |
 | `color.text.placeholder` | `color.surface.overlay` | 4.26 | 3.0 |
 | `color.text.disabled` | `color.surface.overlay` | 3.77 | 3.0 |
+| `color.text.primary over color.interactive.selected` | `color.surface.overlay + selected` | 9.39 | 4.5 |
 | `color.semantic.accent` | `color.surface.overlay` | 4.96 | 3.0 |
 | `color.semantic.accentStrong` | `color.surface.overlay` | 3.37 | 3.0 |
 | `color.semantic.danger` | `color.surface.overlay` | 5.37 | 3.0 |
@@ -596,6 +602,7 @@ Appearance: `Light`.
 | `color.text.faint` | `color.surface.backdrop` | 4.30 | 3.0 |
 | `color.text.placeholder` | `color.surface.backdrop` | 3.65 | 3.0 |
 | `color.text.disabled` | `color.surface.backdrop` | 3.12 | 3.0 |
+| `color.text.primary over color.interactive.selected` | `color.surface.backdrop + selected` | 11.13 | 4.5 |
 | `color.semantic.accent` | `color.surface.backdrop` | 4.61 | 3.0 |
 | `color.semantic.accentStrong` | `color.surface.backdrop` | 6.32 | 3.0 |
 | `color.semantic.danger` | `color.surface.backdrop` | 3.55 | 3.0 |
@@ -614,6 +621,7 @@ Appearance: `Light`.
 | `color.text.faint` | `color.surface.canvas` | 4.94 | 3.0 |
 | `color.text.placeholder` | `color.surface.canvas` | 4.19 | 3.0 |
 | `color.text.disabled` | `color.surface.canvas` | 3.58 | 3.0 |
+| `color.text.primary over color.interactive.selected` | `color.surface.canvas + selected` | 12.75 | 4.5 |
 | `color.semantic.accent` | `color.surface.canvas` | 5.30 | 3.0 |
 | `color.semantic.accentStrong` | `color.surface.canvas` | 7.26 | 3.0 |
 | `color.semantic.danger` | `color.surface.canvas` | 4.08 | 3.0 |
@@ -632,6 +640,7 @@ Appearance: `Light`.
 | `color.text.faint` | `color.surface.sunken` | 4.46 | 3.0 |
 | `color.text.placeholder` | `color.surface.sunken` | 3.79 | 3.0 |
 | `color.text.disabled` | `color.surface.sunken` | 3.24 | 3.0 |
+| `color.text.primary over color.interactive.selected` | `color.surface.sunken + selected` | 11.55 | 4.5 |
 | `color.semantic.accent` | `color.surface.sunken` | 4.79 | 3.0 |
 | `color.semantic.accentStrong` | `color.surface.sunken` | 6.56 | 3.0 |
 | `color.semantic.danger` | `color.surface.sunken` | 3.69 | 3.0 |
@@ -650,6 +659,7 @@ Appearance: `Light`.
 | `color.text.faint` | `color.surface.panel` | 5.40 | 3.0 |
 | `color.text.placeholder` | `color.surface.panel` | 4.58 | 3.0 |
 | `color.text.disabled` | `color.surface.panel` | 3.92 | 3.0 |
+| `color.text.primary over color.interactive.selected` | `color.surface.panel + selected` | 13.91 | 4.5 |
 | `color.semantic.accent` | `color.surface.panel` | 5.79 | 3.0 |
 | `color.semantic.accentStrong` | `color.surface.panel` | 7.93 | 3.0 |
 | `color.semantic.danger` | `color.surface.panel` | 4.46 | 3.0 |
@@ -668,6 +678,7 @@ Appearance: `Light`.
 | `color.text.faint` | `color.surface.raised` | 5.87 | 3.0 |
 | `color.text.placeholder` | `color.surface.raised` | 4.99 | 3.0 |
 | `color.text.disabled` | `color.surface.raised` | 4.26 | 3.0 |
+| `color.text.primary over color.interactive.selected` | `color.surface.raised + selected` | 15.11 | 4.5 |
 | `color.semantic.accent` | `color.surface.raised` | 6.30 | 3.0 |
 | `color.semantic.accentStrong` | `color.surface.raised` | 8.63 | 3.0 |
 | `color.semantic.danger` | `color.surface.raised` | 4.85 | 3.0 |
@@ -686,6 +697,7 @@ Appearance: `Light`.
 | `color.text.faint` | `color.surface.overlay` | 5.87 | 3.0 |
 | `color.text.placeholder` | `color.surface.overlay` | 4.99 | 3.0 |
 | `color.text.disabled` | `color.surface.overlay` | 4.26 | 3.0 |
+| `color.text.primary over color.interactive.selected` | `color.surface.overlay + selected` | 15.11 | 4.5 |
 | `color.semantic.accent` | `color.surface.overlay` | 6.30 | 3.0 |
 | `color.semantic.accentStrong` | `color.surface.overlay` | 8.63 | 3.0 |
 | `color.semantic.danger` | `color.surface.overlay` | 4.85 | 3.0 |

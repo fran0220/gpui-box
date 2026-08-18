@@ -73,6 +73,14 @@ pub fn report(tokens: &TokenDocument) -> Vec<ContrastCheck> {
                 minimum,
             ));
         }
+        let selected = crate::over(tokens.interactive(InteractiveColor::Selected), background);
+        checks.push(check(
+            "color.text.primary over color.interactive.selected",
+            tokens.text(TextTone::Primary),
+            &format!("{surface_name} + selected"),
+            selected,
+            TEXT_MINIMUM,
+        ));
         for (color_name, color) in [
             ("color.semantic.accent", SemanticColor::Accent),
             ("color.semantic.accentStrong", SemanticColor::AccentStrong),
@@ -477,9 +485,9 @@ mod tests {
     #[test]
     fn the_report_covers_every_surface_and_tone() {
         let checks = report(crate::studio_dark());
-        // Eighteen tones against each of six surfaces, the sixteen ANSI slots
+        // Nineteen tones against each of six surfaces, the sixteen ANSI slots
         // against the terminal background, and `onAccent` against `accent`.
-        assert_eq!(checks.len(), 6 * 18 + 16 + 1);
+        assert_eq!(checks.len(), 6 * 19 + 16 + 1);
     }
 
     #[test]

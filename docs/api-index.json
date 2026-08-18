@@ -326,6 +326,27 @@
       ]
     },
     {
+      "name": "ArtifactPreview",
+      "kind": "builder",
+      "path": "gpui_kit::agent::ArtifactPreview",
+      "source": "crates/gpui-kit/src/agent/artifact.rs",
+      "summary": "A titled pane for a generated artifact.",
+      "construct": [
+        "new(ident: impl Into<Ident>, title: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "kind(kind: ArtifactKind) -> Self",
+        "body(body: impl Into<SharedString>) -> Self",
+        "state(state: ArtifactPreviewState) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "artifact-preview"
+      ]
+    },
+    {
       "name": "AspectRatio",
       "kind": "builder",
       "path": "gpui_kit::layout::AspectRatio",
@@ -375,6 +396,27 @@
       "reports": [],
       "scenes": [
         "audio-player"
+      ]
+    },
+    {
+      "name": "AudioWaveform",
+      "kind": "builder",
+      "path": "gpui_kit::media::AudioWaveform",
+      "source": "crates/gpui-kit/src/media/waveform.rs",
+      "summary": "A measured waveform the host already sampled.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "peaks(peaks: impl IntoIterator<Item = f32>) -> Self",
+        "playhead(fraction: f32) -> Self",
+        "state(state: AudioWaveformState) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "audio-waveform"
       ]
     },
     {
@@ -630,6 +672,28 @@
       "reports": [],
       "scenes": [
         "status"
+      ]
+    },
+    {
+      "name": "CanvasToolbar",
+      "kind": "builder",
+      "path": "gpui_kit::canvas::CanvasToolbar",
+      "source": "crates/gpui-kit/src/canvas/toolbar.rs",
+      "summary": "Compact canvas chrome: a host-formatted zoom and three intents.",
+      "construct": [
+        "new(ident: impl Into<Ident>, zoom: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "snap(snap: bool) -> Self",
+        "on_action(handler: impl Fn(CanvasToolbarAction, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [
+        "Action"
+      ],
+      "scenes": [
+        "canvas-tools"
       ]
     },
     {
@@ -1431,6 +1495,32 @@
       ]
     },
     {
+      "name": "FeedbackRating",
+      "kind": "builder",
+      "path": "gpui_kit::agent::FeedbackRating",
+      "source": "crates/gpui-kit/src/agent/feedback.rs",
+      "summary": "A helpful / not-helpful control with optional host-owned reason tags.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "vote(vote: Option<FeedbackVote>) -> Self",
+        "tags(tags: impl IntoIterator<Item = (impl Into<SharedString>, impl Into<SharedString>)>) -> Self",
+        "current_tag(tag: impl Into<SharedString>) -> Self",
+        "on_vote(handler: impl Fn(FeedbackVote, &mut Window, &mut App) + 'static) -> Self",
+        "on_tag(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [
+        "Voted",
+        "Tagged"
+      ],
+      "scenes": [
+        "feedback-rating"
+      ]
+    },
+    {
       "name": "FilterBar",
       "kind": "builder",
       "path": "gpui_kit::controls::FilterBar",
@@ -1533,6 +1623,23 @@
       "reports": [],
       "scenes": [
         "frost"
+      ]
+    },
+    {
+      "name": "GaugeChart",
+      "kind": "builder",
+      "path": "gpui_kit::display::GaugeChart",
+      "source": "crates/gpui-kit/src/display/chart.rs",
+      "summary": "A single already-normalized reading on a semicircle.",
+      "construct": [
+        "new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: ChartState) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "chart"
       ]
     },
     {
@@ -1842,6 +1949,30 @@
       ]
     },
     {
+      "name": "KanbanBoard",
+      "kind": "builder",
+      "path": "gpui_kit::data::KanbanBoard",
+      "source": "crates/gpui-kit/src/data/kanban.rs",
+      "summary": "A board of host-owned columns and cards.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "held(card: impl Into<SharedString>) -> Self",
+        "columns(columns: impl IntoIterator<Item = KanbanColumn>) -> Self",
+        "cards(cards: impl IntoIterator<Item = KanbanCard>) -> Self",
+        "state(state: KanbanState) -> Self",
+        "on_card(handler: impl Fn(&KanbanCard, &mut Window, &mut App) + 'static) -> Self",
+        "on_move(handler: impl Fn(&KanbanCard, SharedString, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "kanban"
+      ]
+    },
+    {
       "name": "Kbd",
       "kind": "builder",
       "path": "gpui_kit::overlay::Kbd",
@@ -2148,6 +2279,63 @@
       ]
     },
     {
+      "name": "MetricCard",
+      "kind": "builder",
+      "path": "gpui_kit::display::MetricCard",
+      "source": "crates/gpui-kit/src/display/metric.rs",
+      "summary": "A compact KPI card.",
+      "construct": [
+        "new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: MetricState) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "metric-card"
+      ]
+    },
+    {
+      "name": "MicroMark",
+      "kind": "builder",
+      "path": "gpui_kit::motion::MicroMark",
+      "source": "crates/gpui-kit/src/motion/micro.rs",
+      "summary": "A labelled glyph that plays one named micro-motion.",
+      "construct": [
+        "new(ident: impl Into<Ident>, kind: Micro, label: impl Into<SharedString>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "micro"
+      ]
+    },
+    {
+      "name": "Minimap",
+      "kind": "builder",
+      "path": "gpui_kit::canvas::Minimap",
+      "source": "crates/gpui-kit/src/canvas/minimap.rs",
+      "summary": "A compact overview of host-owned marks.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "marks(marks: impl IntoIterator<Item = MinimapMark>) -> Self",
+        "view(view: MinimapView) -> Self",
+        "on_pan(handler: impl Fn(f32, f32, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [
+        "Pan"
+      ],
+      "scenes": [
+        "canvas-tools"
+      ]
+    },
+    {
       "name": "ModelViewer",
       "kind": "builder",
       "path": "gpui_kit::media::ModelViewer",
@@ -2214,6 +2402,25 @@
       ],
       "scenes": [
         "node-graph"
+      ]
+    },
+    {
+      "name": "NodeGroup",
+      "kind": "builder",
+      "path": "gpui_kit::canvas::NodeGroup",
+      "source": "crates/gpui-kit/src/canvas/group.rs",
+      "summary": "A group outline drawn over a canvas region the host already decided.",
+      "construct": [
+        "new(ident: impl Into<Ident>, label: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "selected(selected: bool) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "canvas-tools"
       ]
     },
     {
@@ -2669,6 +2876,30 @@
       ]
     },
     {
+      "name": "PromptBuilder",
+      "kind": "builder",
+      "path": "gpui_kit::agent::PromptBuilder",
+      "source": "crates/gpui-kit/src/agent/prompt.rs",
+      "summary": "A template with host-owned slots.",
+      "construct": [
+        "new(ident: impl Into<Ident>, label: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "body(body: impl Into<SharedString>) -> Self",
+        "slots(slots: impl IntoIterator<Item = PromptSlot>) -> Self",
+        "state(state: PromptBuilderState) -> Self",
+        "on_slot(handler: impl Fn(&PromptSlot, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [
+        "SlotActivated"
+      ],
+      "scenes": [
+        "prompt-builder"
+      ]
+    },
+    {
       "name": "PulseLoader",
       "kind": "builder",
       "path": "gpui_kit::display::PulseLoader",
@@ -2686,6 +2917,23 @@
       "reports": [],
       "scenes": [
         "loading"
+      ]
+    },
+    {
+      "name": "RadarChart",
+      "kind": "builder",
+      "path": "gpui_kit::display::RadarChart",
+      "source": "crates/gpui-kit/src/display/chart.rs",
+      "summary": "A polar reading over host-owned axes.",
+      "construct": [
+        "new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: ChartState) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "chart"
       ]
     },
     {
@@ -4761,6 +5009,38 @@
       ]
     },
     {
+      "name": "ArtifactKind",
+      "path": "gpui_kit::agent::ArtifactKind",
+      "summary": "What kind of artifact the host is showing.",
+      "variants": [
+        "Code",
+        "Document",
+        "Markup"
+      ],
+      "construct": [],
+      "options": [
+        "name() -> &'static str"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "ArtifactPreviewState",
+      "path": "gpui_kit::agent::ArtifactPreviewState",
+      "summary": "How the artifact was asked for.",
+      "variants": [
+        "Loading",
+        "Ready",
+        "Empty",
+        "Unavailable",
+        "Error"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "AspectFit",
       "path": "gpui_kit::layout::AspectFit",
       "summary": "Which dimension the parent decides, leaving the other to the ratio.",
@@ -4820,6 +5100,20 @@
       "options": [
         "detail(detail: impl Into<SharedString>) -> Self"
       ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "AudioWaveformState",
+      "path": "gpui_kit::media::AudioWaveformState",
+      "summary": "How the envelope was asked for.",
+      "variants": [
+        "Ready",
+        "Empty",
+        "Unavailable"
+      ],
+      "construct": [],
+      "options": [],
       "commands": [],
       "queries": []
     },
@@ -4977,6 +5271,34 @@
         "Picked",
         "MonthShown",
         "Hovered"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "CanvasToolbarAction",
+      "path": "gpui_kit::canvas::CanvasToolbarAction",
+      "summary": "A canvas chrome action the host already knows how to apply.",
+      "variants": [
+        "Fit",
+        "Snap",
+        "Arrange"
+      ],
+      "construct": [],
+      "options": [
+        "name() -> &'static str"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "CanvasToolbarEvent",
+      "path": "gpui_kit::canvas::CanvasToolbarEvent",
+      "summary": "What the toolbar reported.",
+      "variants": [
+        "Action"
       ],
       "construct": [],
       "options": [],
@@ -6622,6 +6944,34 @@
       "queries": []
     },
     {
+      "name": "FeedbackRatingEvent",
+      "path": "gpui_kit::agent::FeedbackRatingEvent",
+      "summary": "What the rating reported.",
+      "variants": [
+        "Voted",
+        "Tagged"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "FeedbackVote",
+      "path": "gpui_kit::agent::FeedbackVote",
+      "summary": "The two-way vote a reader can cast.",
+      "variants": [
+        "Up",
+        "Down"
+      ],
+      "construct": [],
+      "options": [
+        "name() -> &'static str"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "FieldState",
       "path": "gpui_kit::controls::FieldState",
       "summary": "What an editable surface currently reports about itself.",
@@ -7356,6 +7706,59 @@
       ]
     },
     {
+      "name": "KanbanCard",
+      "path": "gpui_kit::data::KanbanCard",
+      "summary": "One card on the board. Identity is the host's.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, title: impl Into<SharedString>, column: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "detail(detail: impl Into<SharedString>) -> Self"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "KanbanColumn",
+      "path": "gpui_kit::data::KanbanColumn",
+      "summary": "One named column. Identity is the host's.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, title: impl Into<SharedString>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "KanbanEvent",
+      "path": "gpui_kit::data::KanbanEvent",
+      "summary": "What the board reported.",
+      "variants": [
+        "CardActivated",
+        "CardMoved"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "KanbanState",
+      "path": "gpui_kit::data::KanbanState",
+      "summary": "How the board was asked for.",
+      "variants": [
+        "Ready",
+        "Empty",
+        "Unavailable"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "KeybindingRecorderEvent",
       "path": "gpui_kit::controls::KeybindingRecorderEvent",
       "summary": "What a KeybindingRecorder reports.",
@@ -7932,6 +8335,94 @@
       ]
     },
     {
+      "name": "MetricReading",
+      "path": "gpui_kit::display::MetricReading",
+      "summary": "One verified KPI the host already formatted.",
+      "variants": [],
+      "construct": [
+        "new(value: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "delta(delta: impl Into<SharedString>, tone: Tone) -> Self",
+        "trend(points: impl IntoIterator<Item = SparklinePoint>) -> Self"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "MetricState",
+      "path": "gpui_kit::display::MetricState",
+      "summary": "How the reading was asked for.",
+      "variants": [
+        "Loading",
+        "Ready",
+        "Empty",
+        "Unavailable",
+        "Error",
+        "Stale"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "name() -> &'static str"
+      ]
+    },
+    {
+      "name": "Micro",
+      "path": "gpui_kit::motion::Micro",
+      "summary": "A named procedural reaction.",
+      "variants": [
+        "Heartbeat",
+        "Bounce",
+        "Wobble",
+        "Pop",
+        "Sparkle"
+      ],
+      "construct": [],
+      "options": [
+        "name() -> &'static str"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "MinimapEvent",
+      "path": "gpui_kit::canvas::MinimapEvent",
+      "summary": "What a click on the overview reported.",
+      "variants": [
+        "Pan"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "MinimapMark",
+      "path": "gpui_kit::canvas::MinimapMark",
+      "summary": "One already-normalized mark on the overview.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, x: f32, y: f32, width: f32, height: f32) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "MinimapView",
+      "path": "gpui_kit::canvas::MinimapView",
+      "summary": "The visible window, already normalized.",
+      "variants": [],
+      "construct": [
+        "new(x: f32, y: f32, width: f32, height: f32) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "ModelAabb",
       "path": "gpui_kit::media::ModelAabb",
       "summary": "An axis-aligned box around everything the reader accepted.",
@@ -8500,6 +8991,22 @@
       "queries": []
     },
     {
+      "name": "ParticleBurst",
+      "path": "gpui_kit::effects::ParticleBurst",
+      "summary": "Resolves and consumes one semantic event against the active policy. A click-scale particle flavour resolved through the same policy as cues.",
+      "variants": [
+        "Confetti",
+        "Hearts",
+        "Stars"
+      ],
+      "construct": [],
+      "options": [
+        "name() -> &'static str"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "PartyGauge",
       "path": "gpui_kit::game::PartyGauge",
       "summary": "One stable caller-named gauge on a party member.",
@@ -8905,6 +9412,46 @@
         "is_animating() -> bool",
         "progress() -> f32"
       ]
+    },
+    {
+      "name": "PromptBuilderEvent",
+      "path": "gpui_kit::agent::PromptBuilderEvent",
+      "summary": "What a slot activation reports.",
+      "variants": [
+        "SlotActivated"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "PromptBuilderState",
+      "path": "gpui_kit::agent::PromptBuilderState",
+      "summary": "How the template was asked for.",
+      "variants": [
+        "Ready",
+        "Empty",
+        "Unavailable"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "PromptSlot",
+      "path": "gpui_kit::agent::PromptSlot",
+      "summary": "One named hole in a template. Identity is the host's, never the draw order.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, name: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "value(value: impl Into<SharedString>) -> Self"
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Quantity",
@@ -9899,6 +10446,9 @@
         "value_at(elapsed: Duration, velocity: f32) -> (f32, f32)",
         "settle_time() -> Duration",
         "settle_time_at(velocity: f32) -> Duration",
+        "settle_time_for(span: f32) -> Duration",
+        "settle_time_at_for(velocity: f32, span: f32) -> Duration",
+        "is_visually_settled(elapsed: Duration, velocity: f32, span: f32) -> bool",
         "animation() -> Animation"
       ],
       "commands": [],
@@ -9930,15 +10480,31 @@
       ],
       "options": [
         "max_items(max_items: usize) -> Self",
-        "reversed() -> Self"
+        "reversed() -> Self",
+        "with_budget(budget: StaggerBudget) -> Self"
       ],
       "commands": [],
       "queries": [
         "is_reversed() -> bool",
         "delay(index: usize, count: usize) -> Duration",
         "total(count: usize, spec: MotionSpec) -> Duration",
-        "spec(index: usize, count: usize, spec: MotionSpec) -> MotionSpec"
+        "spec(index: usize, count: usize, spec: MotionSpec) -> MotionSpec",
+        "progress_at(elapsed: Duration, index: usize, count: usize, spec: MotionSpec) -> f32"
       ]
+    },
+    {
+      "name": "StaggerBudget",
+      "path": "gpui_kit::motion::StaggerBudget",
+      "summary": "How much of a stagger the current frame is allowed to spend.",
+      "variants": [
+        "Full",
+        "Compressed",
+        "Off"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "StatusGroup",
@@ -11907,6 +12473,18 @@
       "example": "fn audio_player(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(640.0))\n        .child(\n            AudioPlayer::new(\"scene.audio.ready\")\n                .title(\"Release walkthrough\")\n                .subtitle(\"Recorded 12 March\")\n                .transport(\n                    FixtureTransport::ready(240.0)\n                        .position(72.0)\n                        .state(TransportState::Playing)\n                        .volume(0.7)\n                        .buffered([BufferedRange::new(0.0, 156.0)])\n                        .shared(),\n                )\n                .elapsed(\"01:12\")\n                .remaining(\"-02:48\")\n                .peaks(scene_peaks(96))\n                .speeds([1.0, 1.5, 2.0])\n                .step_seconds(10.0)\n                .on_event(|_, _, _| {}),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.audio.rule.backend\")\n                .label(\"Nothing here can decode it\"),\n        )\n        .child(\n            AudioPlayer::new(\"scene.audio.absent\")\n                .title(\"interview.opus\")\n                .transport(\n                    FixtureTransport::new()\n                        .no_backend(\"There is no Opus decoder on this machine.\")\n                        .shared(),\n                )\n                .on_event(|_, _, _| {}),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.audio.rule.none\")\n                .label(\"No player connected at all\"),\n        )\n        .child(\n            AudioPlayer::new(\"scene.audio.none\")\n                .title(\"Standup recording\")\n                .on_event(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
     },
     {
+      "name": "audio-waveform",
+      "capture": "cargo run -p xtask -- headless capture audio-waveform",
+      "kind": "exhibit",
+      "subjects": [
+        "AudioWaveform"
+      ],
+      "uses": [
+        "AudioWaveform"
+      ],
+      "example": "fn audio_waveform(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(520.0))\n        .child(caption(\n            &theme,\n            \"already-normalized peaks; a missing playhead draws no played split\",\n        ))\n        .child(\n            AudioWaveform::new(\"scene.waveform.ready\")\n                .peaks(scene_peaks(48))\n                .playhead(0.38),\n        )\n        .child(AudioWaveform::new(\"scene.waveform.empty\").state(AudioWaveformState::Empty))\n        .child(AudioWaveform::new(\"scene.waveform.unavailable\").state(\n            AudioWaveformState::Unavailable(\"The sampler host refused the request.\".into()),\n        ))\n        .into_any_element()\n}"
+    },
+    {
       "name": "video-player",
       "capture": "cargo run -p xtask -- headless capture video-player",
       "kind": "exhibit",
@@ -11969,6 +12547,42 @@
       "example": "fn cost_meter(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(520.0))\n        .child(\n            CostMeter::new(\"scene.cost.meter\")\n                .label(\"This run\")\n                .line(CostLine::new(\n                    \"spend\",\n                    \"Spend\",\n                    Reading::measured(1.24, \"1.24 credits\"),\n                ))\n                .line(CostLine::new(\n                    \"projected\",\n                    \"Projected at this rate\",\n                    Reading::estimated(4.0, \"4.00 credits\"),\n                ))\n                .line(\n                    CostLine::new(\n                        \"account\",\n                        \"Account balance\",\n                        Reading::measured(112.0, \"112.00 credits\"),\n                    )\n                    .stale(LastVerified::at(\"09:41 today\")),\n                )\n                .line(CostLine::new(\n                    \"storage\",\n                    \"Storage\",\n                    Reading::unavailable_because(\"The billing host refused the request.\"),\n                )),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.cost.rule.gauge\")\n                .label(\"A limit that is known, and one that is not\"),\n        )\n        .child(\n            ContextGauge::new(\n                \"scene.cost.context.known\",\n                Reading::measured(48_000.0, \"48,000 tokens\"),\n            )\n            .label(\"Context used\")\n            .limit(Limit::measured(128_000.0, \"128,000 tokens\")),\n        )\n        .child(\n            ContextGauge::new(\n                \"scene.cost.context.unknown\",\n                Reading::estimated(48_000.0, \"48,000 tokens\"),\n            )\n            .label(\"Context used\"),\n        )\n        .child(\n            ContextGauge::new(\"scene.cost.context.unavailable\", Reading::unavailable())\n                .label(\"Context used\")\n                .limit(Limit::measured(128_000.0, \"128,000 tokens\")),\n        )\n        .into_any_element()\n}"
     },
     {
+      "name": "prompt-builder",
+      "capture": "cargo run -p xtask -- headless capture prompt-builder",
+      "kind": "exhibit",
+      "subjects": [
+        "PromptBuilder"
+      ],
+      "uses": [
+        "PromptBuilder"
+      ],
+      "example": "fn prompt_builder(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(520.0))\n        .child(caption(\n            &theme,\n            \"host-owned slots; activating one reports identity, never fills the prompt\",\n        ))\n        .child(\n            PromptBuilder::new(\"scene.prompt.ready\", \"Review template\")\n                .body(\"Review {path} for {concern} and return a verdict.\")\n                .slots([\n                    PromptSlot::new(\"path\", \"path\").value(\"src/lib.rs\"),\n                    PromptSlot::new(\"concern\", \"concern\"),\n                ])\n                .on_slot(|_, _, _| {}),\n        )\n        .child(\n            PromptBuilder::new(\"scene.prompt.empty\", \"Review template\")\n                .state(PromptBuilderState::Empty),\n        )\n        .child(\n            PromptBuilder::new(\"scene.prompt.unavailable\", \"Review template\").state(\n                PromptBuilderState::Unavailable(\"The template host refused the request.\".into()),\n            ),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "feedback-rating",
+      "capture": "cargo run -p xtask -- headless capture feedback-rating",
+      "kind": "exhibit",
+      "subjects": [
+        "FeedbackRating"
+      ],
+      "uses": [
+        "FeedbackRating"
+      ],
+      "example": "fn feedback_rating(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(420.0))\n        .child(caption(\n            &theme,\n            \"vote and reason tags are host-owned; a disabled control installs no handler\",\n        ))\n        .child(\n            FeedbackRating::new(\"scene.feedback.ready\")\n                .vote(Some(FeedbackVote::Up))\n                .tags([(\"accurate\", \"Accurate\"), (\"incomplete\", \"Incomplete\")])\n                .current_tag(\"accurate\")\n                .on_vote(|_, _, _| {})\n                .on_tag(|_, _, _| {}),\n        )\n        .child(FeedbackRating::new(\"scene.feedback.idle\").on_vote(|_, _, _| {}))\n        .child(FeedbackRating::new(\"scene.feedback.disabled\").disabled(true))\n        .into_any_element()\n}"
+    },
+    {
+      "name": "artifact-preview",
+      "capture": "cargo run -p xtask -- headless capture artifact-preview",
+      "kind": "exhibit",
+      "subjects": [
+        "ArtifactPreview"
+      ],
+      "uses": [
+        "ArtifactPreview"
+      ],
+      "example": "fn artifact_preview(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(480.0))\n        .child(caption(\n            &theme,\n            \"a generated artifact is shown as the kind it is; a refusal stays a refusal\",\n        ))\n        .child(\n            ArtifactPreview::new(\"scene.artifact.ready\", \"patch.rs\")\n                .kind(ArtifactKind::Code)\n                .body(\"fn ready() -> bool { true }\")\n                .state(ArtifactPreviewState::Ready),\n        )\n        .child(\n            ArtifactPreview::new(\"scene.artifact.loading\", \"notes.md\")\n                .state(ArtifactPreviewState::Loading),\n        )\n        .child(\n            ArtifactPreview::new(\"scene.artifact.empty\", \"notes.md\")\n                .state(ArtifactPreviewState::Empty),\n        )\n        .child(\n            ArtifactPreview::new(\"scene.artifact.unavailable\", \"notes.md\").state(\n                ArtifactPreviewState::Unavailable(\"The artifact host is offline.\".into()),\n            ),\n        )\n        .into_any_element()\n}"
+    },
+    {
       "name": "tool-call",
       "capture": "cargo run -p xtask -- headless capture tool-call",
       "kind": "exhibit",
@@ -12005,6 +12619,22 @@
         "NodeGraph"
       ],
       "example": "fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneGraph>() {\n        cx.set_global(SceneGraph {\n            viewport: GraphViewport::default(),\n            ingest: gpui::point(24.0, 200.0),\n            validate: gpui::point(244.0, 56.0),\n            persist: gpui::point(500.0, 56.0),\n            observe: gpui::point(464.0, 330.0),\n            publish: gpui::point(684.0, 200.0),\n            selected: vec![\"scene.graph.validate\".into()],\n            deleted: Vec::new(),\n            edges: vec![\n                GraphEdge::new(\"scene.graph.ingest\", \"scene.graph.validate\")\n                    .id(\"scene.graph.edge.rows\")\n                    .ports(\"rows\", \"records\")\n                    .label(\"12.4k rows\")\n                    .active(true),\n                GraphEdge::new(\"scene.graph.validate\", \"scene.graph.persist\")\n                    .id(\"scene.graph.edge.valid\")\n                    .ports(\"valid\", \"records\")\n                    .active(true),\n                GraphEdge::new(\"scene.graph.validate\", \"scene.graph.observe\")\n                    .id(\"scene.graph.edge.telemetry\")\n                    .ports(\"telemetry\", \"events\")\n                    .label(\"telemetry\")\n                    .lane(-1),\n                GraphEdge::new(\"scene.graph.persist\", \"scene.graph.publish\")\n                    .id(\"scene.graph.edge.commit\")\n                    .ports(\"commit\", \"artifact\")\n                    .label(\"commit 8f72\")\n                    .active(true),\n                GraphEdge::new(\"scene.graph.observe\", \"scene.graph.validate\")\n                    .id(\"scene.graph.edge.retry\")\n                    .ports(\"retry\", \"retry\")\n                    .label(\"retry policy\")\n                    .lane(1)\n                    .feedback(),\n            ],\n        });\n    }\n    let scene = cx.global::<SceneGraph>();\n    let viewport = scene.viewport;\n    let ingest = scene.ingest;\n    let validate = scene.validate;\n    let persist = scene.persist;\n    let observe = scene.observe;\n    let publish = scene.publish;\n    let selected = scene.selected.clone();\n    let deleted = scene.deleted.clone();\n    let edges = scene.edges.clone();\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(\n            div().w(px(860.0)).h(px(500.0)).child(\n                NodeGraph::new(\"scene.graph\")\n                    .viewport(viewport)\n                    .zoom_range(0.55, 1.8)\n                    .minimap(true)\n                    .when(\n                        !deleted.iter().any(|id| id == \"scene.graph.ingest\"),\n                        |graph| {\n                            graph.node(\n                                GraphNode::new(\"scene.graph.ingest\", \"Stream ingest\")\n                                    .width(176.0)\n                                    .state(NodeState::Succeeded)\n                                    .thumbnail(scene_picture(\"Input preview\", cx))\n                                    .action(\"orders.v2 · partition 18\")\n                                    .metric(\"rate\", \"3.2k/s\")\n                                    .port(GraphPort::input(\"source\", \"Source\").side(PortSide::Top))\n                                    .port(GraphPort::output(\"rows\", \"Rows\"))\n                                    .port(GraphPort::output(\"errors\", \"Errors\"))\n                                    .selected(selected.iter().any(|id| id == \"scene.graph.ingest\")),\n                                ingest.x,\n                                ingest.y,\n                            )\n                        },\n                    )\n                    .when(\n                        !deleted.iter().any(|id| id == \"scene.graph.validate\"),\n                        |graph| {\n                            graph.node(\n                                GraphNode::new(\"scene.graph.validate\", \"Validate & enrich\")\n                                    .width(176.0)\n                                    .state(NodeState::Running)\n                                    .action(\"schema + fraud signals\")\n                                    .metric(\"p95\", \"18 ms\")\n                                    .port(GraphPort::input(\"records\", \"Records\"))\n                                    .port(GraphPort::input(\"retry\", \"Retry\").side(PortSide::Bottom))\n                                    .port(GraphPort::output(\"valid\", \"Valid\"))\n                                    .port(\n                                        GraphPort::output(\"telemetry\", \"Events\")\n                                            .side(PortSide::Bottom),\n                                    )\n                                    .selected(\n                                        selected.iter().any(|id| id == \"scene.graph.validate\"),\n                                    ),\n                                validate.x,\n                                validate.y,\n                            )\n                        },\n                    )\n                    .when(\n                        !deleted.iter().any(|id| id == \"scene.graph.persist\"),\n                        |graph| {\n                            graph.node(\n                                GraphNode::new(\"scene.graph.persist\", \"Persist batch\")\n                                    .width(176.0)\n                                    .state(NodeState::Succeeded)\n                                    .action(\"warehouse / orders\")\n                                    .metric(\"written\", \"12.3k\")\n                                    .port(GraphPort::input(\"records\", \"Records\"))\n                                    .port(GraphPort::output(\"commit\", \"Commit\"))\n                                    .selected(\n                                        selected.iter().any(|id| id == \"scene.graph.persist\"),\n                                    ),\n                                persist.x,\n                                persist.y,\n                            )\n                        },\n                    )\n                    .when(\n                        !deleted.iter().any(|id| id == \"scene.graph.observe\"),\n                        |graph| {\n                            graph.node(\n                                GraphNode::new(\"scene.graph.observe\", \"Observe quality\")\n                                    .width(176.0)\n                                    .state(NodeState::Failed)\n                                    .action(\"drift threshold exceeded\")\n                                    .metric(\"rejected\", \"94\")\n                                    .port(GraphPort::input(\"events\", \"Events\").side(PortSide::Top))\n                                    .port(GraphPort::output(\"retry\", \"Retry\").side(PortSide::Top))\n                                    .selected(\n                                        selected.iter().any(|id| id == \"scene.graph.observe\"),\n                                    ),\n                                observe.x,\n                                observe.y,\n                            )\n                        },\n                    )\n                    .when(\n                        !deleted.iter().any(|id| id == \"scene.graph.publish\"),\n                        |graph| {\n                            graph.node(\n                                GraphNode::new(\"scene.graph.publish\", \"Publish artifact\")\n                                    .width(176.0)\n                                    .state(NodeState::Pending)\n                                    .action(\"waiting for commit\")\n                                    .port(\n                                        GraphPort::input(\"artifact\", \"Artifact\")\n                                            .side(PortSide::Top),\n                                    )\n                                    .port(\n                                        GraphPort::output(\"release\", \"Release\")\n                                            .side(PortSide::Bottom),\n                                    )\n                                    .selected(\n                                        selected.iter().any(|id| id == \"scene.graph.publish\"),\n                                    ),\n                                publish.x,\n                                publish.y,\n                            )\n                        },\n                    )\n                    .edges(edges)\n                    .on_event(|event, _, cx| {\n                        cx.update_global::<SceneGraph, ()>(|scene, _| match event {\n                            NodeGraphEvent::ViewportChanged(viewport) => {\n                                scene.viewport = *viewport;\n                            }\n                            NodeGraphEvent::SelectionChanged { ids } => {\n                                scene.selected = ids.clone();\n                            }\n                            NodeGraphEvent::NodeMoved { id, position } => match id.as_ref() {\n                                \"scene.graph.ingest\" => scene.ingest = *position,\n                                \"scene.graph.validate\" => scene.validate = *position,\n                                \"scene.graph.persist\" => scene.persist = *position,\n                                \"scene.graph.observe\" => scene.observe = *position,\n                                \"scene.graph.publish\" => scene.publish = *position,\n                                _ => {}\n                            },\n                            NodeGraphEvent::NodeDeleted { id } => {\n                                scene.deleted.push(id.clone());\n                                scene.selected.retain(|selected| selected != id);\n                                scene\n                                    .edges\n                                    .retain(|edge| edge.from() != id && edge.to() != id);\n                            }\n                            NodeGraphEvent::ConnectionRequested { from, to } => {\n                                let id = format!(\n                                    \"scene.graph.edge.user.{}.{}.{}.{}\",\n                                    from.node, from.port, to.node, to.port\n                                );\n                                if !scene\n                                    .edges\n                                    .iter()\n                                    .any(|edge| edge.from() == &from.node && edge.to() == &to.node)\n                                {\n                                    scene.edges.push(\n                                        GraphEdge::new(from.node.clone(), to.node.clone())\n                                            .id(id)\n                                            .ports(from.port.clone(), to.port.clone())\n                                            .label(\"new connection\"),\n                                    );\n                                }\n                            }\n                            NodeGraphEvent::DisconnectRequested { id } => {\n                                scene.edges.retain(|edge| edge.edge_id() != *id);\n                            }\n                        });\n                        cx.refresh_windows();\n                    }),\n            ),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "canvas-tools",
+      "capture": "cargo run -p xtask -- headless capture canvas-tools",
+      "kind": "exhibit",
+      "subjects": [
+        "CanvasToolbar",
+        "Minimap",
+        "NodeGroup"
+      ],
+      "uses": [
+        "CanvasToolbar",
+        "Minimap",
+        "NodeGroup"
+      ],
+      "example": "fn canvas_tools(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(560.0))\n        .child(caption(\n            &theme,\n            \"overview, chrome, and a group wash; the host still owns pan and zoom\",\n        ))\n        .child(\n            CanvasToolbar::new(\"scene.canvas.toolbar\", \"125%\")\n                .snap(true)\n                .on_action(|_, _, _| {}),\n        )\n        .child(\n            Minimap::new(\"scene.canvas.minimap\")\n                .marks([\n                    MinimapMark::new(\"ingest\", 0.08, 0.42, 0.18, 0.16),\n                    MinimapMark::new(\"validate\", 0.36, 0.18, 0.20, 0.16),\n                    MinimapMark::new(\"publish\", 0.68, 0.48, 0.18, 0.16),\n                ])\n                .view(MinimapView::new(0.22, 0.20, 0.40, 0.36))\n                .on_pan(|_, _, _, _| {}),\n        )\n        .child(NodeGroup::new(\"scene.canvas.group\", \"Ingest\").selected(true))\n        .child(NodeGroup::new(\"scene.canvas.group.quiet\", \"Observe\"))\n        .into_any_element()\n}"
     },
     {
       "name": "browser-panel",
@@ -12299,8 +12929,10 @@
         "AreaChart",
         "BarChart",
         "ChartLegend",
+        "GaugeChart",
         "LineChart",
         "PieChart",
+        "RadarChart",
         "ScatterChart",
         "StackedBarChart"
       ],
@@ -12308,12 +12940,50 @@
         "AreaChart",
         "BarChart",
         "ChartLegend",
+        "GaugeChart",
         "LineChart",
         "PieChart",
+        "RadarChart",
         "ScatterChart",
         "StackedBarChart"
       ],
-      "example": "fn chart(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let cpu = [\n        ChartPoint::new(\"00:00\", 0.0, 0.20, \"00:00\", \"20%\"),\n        ChartPoint::new(\"00:15\", 0.25, 0.45, \"00:15\", \"45%\"),\n        ChartPoint::new(\"00:30\", 0.5, 0.38, \"00:30\", \"38%\"),\n        ChartPoint::new(\"00:45\", 0.75, 0.70, \"00:45\", \"70%\"),\n        ChartPoint::new(\"01:00\", 1.0, 0.62, \"01:00\", \"62%\"),\n    ];\n    let memory = [\n        ChartPoint::new(\"00:00\", 0.0, 0.40, \"00:00\", \"40%\"),\n        ChartPoint::new(\"00:15\", 0.25, 0.42, \"00:15\", \"42%\"),\n        ChartPoint::new(\"00:30\", 0.5, 0.55, \"00:30\", \"55%\"),\n        ChartPoint::new(\"00:45\", 0.75, 0.58, \"00:45\", \"58%\"),\n        ChartPoint::new(\"01:00\", 1.0, 0.61, \"01:00\", \"61%\"),\n    ];\n    stack(&theme)\n        .w(px(520.0))\n        .child(caption(\n            &theme,\n            \"host-owned series, host-owned axis wording, no invented scale\",\n        ))\n        .child(\n            LineChart::new(\n                \"scene.chart.ready\",\n                \"Fixture load\",\n                ChartState::Stale {\n                    series: vec![\n                        ChartSeries::new(\"cpu\", \"CPU\")\n                            .points(cpu)\n                            .tint(identity_tint(&theme, \"loader.blue\")),\n                        ChartSeries::new(\"memory\", \"Memory\")\n                            .points(memory)\n                            .tint(identity_tint(&theme, \"loader.orange\")),\n                    ],\n                    reason: \"Refresh failed; showing last verified sample\".into(),\n                },\n            )\n            .area()\n            .crosshair()\n            .current(\"cpu\", \"00:45\")\n            .on_current(|_, _, _| {})\n            .axes(\n                ChartAxes::default()\n                    .x_label(\"Time\")\n                    .y_label(\"Utilization\")\n                    .x_ends(\"00:00\", \"01:00\")\n                    .y_ends(\"0%\", \"100%\"),\n            ),\n        )\n        .child(LineChart::new(\n            \"scene.chart.empty\",\n            \"Fixture load\",\n            ChartState::Empty,\n        ))\n        .child(\n            BarChart::new(\n                \"scene.chart.bars\",\n                \"Fixture share\",\n                ChartState::Ready(vec![ChartSeries::new(\"share\", \"Share\").points([\n                    ChartPoint::new(\"alpha\", 0.0, 0.35, \"Alpha\", \"35 jobs\"),\n                    ChartPoint::new(\"beta\", 0.33, 0.70, \"Beta\", \"70 jobs\"),\n                    ChartPoint::new(\"gamma\", 0.66, 0.45, \"Gamma\", \"45 jobs\"),\n                    ChartPoint::new(\"delta\", 1.0, 0.90, \"Delta\", \"90 jobs\"),\n                ])]),\n            )\n            .axes(ChartAxes::default().y_ends(\"0\", \"max\")),\n        )\n        .child(\n            PieChart::new(\n                \"scene.chart.pie\",\n                \"Fixture share\",\n                ChartState::Ready(vec![ChartSeries::new(\"share\", \"Share\").points([\n                    ChartPoint::new(\"alpha\", 0.0, 0.25, \"Alpha\", \"25%\"),\n                    ChartPoint::new(\"beta\", 0.25, 0.35, \"Beta\", \"35%\"),\n                    ChartPoint::new(\"gamma\", 0.60, 0.20, \"Gamma\", \"20%\"),\n                    ChartPoint::new(\"delta\", 0.80, 0.20, \"Delta\", \"20%\"),\n                ])]),\n            )\n            .donut(),\n        )\n        .child(\n            StackedBarChart::new(\n                \"scene.chart.stacked\",\n                \"Fixture mix\",\n                ChartState::Ready(vec![\n                    ChartSeries::new(\"cpu\", \"CPU\")\n                        .points([\n                            ChartPoint::new(\"alpha\", 0.0, 0.30, \"Alpha\", \"30%\"),\n                            ChartPoint::new(\"beta\", 0.5, 0.20, \"Beta\", \"20%\"),\n                        ])\n                        .tint(identity_tint(&theme, \"loader.blue\")),\n                    ChartSeries::new(\"memory\", \"Memory\")\n                        .points([\n                            ChartPoint::new(\"alpha\", 0.0, 0.25, \"Alpha\", \"25%\"),\n                            ChartPoint::new(\"beta\", 0.5, 0.40, \"Beta\", \"40%\"),\n                        ])\n                        .tint(identity_tint(&theme, \"loader.orange\")),\n                ]),\n            )\n            .axes(ChartAxes::default().y_ends(\"0\", \"max\")),\n        )\n        .child(\n            ChartLegend::new(\n                \"scene.chart.legend\",\n                [\n                    ChartSeries::new(\"cpu\", \"CPU\").tint(identity_tint(&theme, \"loader.blue\")),\n                    ChartSeries::new(\"memory\", \"Memory\")\n                        .tint(identity_tint(&theme, \"loader.orange\")),\n                ],\n            )\n            .on_toggle(|_, _, _, _| {}),\n        )\n        .child(\n            AreaChart::new(\n                \"scene.chart.area\",\n                \"Fixture tokens\",\n                ChartState::Ready(vec![\n                    ChartSeries::new(\"tokens\", \"Tokens\")\n                        .points([\n                            ChartPoint::new(\"00:00\", 0.0, 0.20, \"00:00\", \"20%\"),\n                            ChartPoint::new(\"00:15\", 0.25, 0.45, \"00:15\", \"45%\"),\n                            ChartPoint::new(\"00:30\", 0.5, 0.38, \"00:30\", \"38%\"),\n                            ChartPoint::new(\"00:45\", 0.75, 0.70, \"00:45\", \"70%\"),\n                            ChartPoint::new(\"01:00\", 1.0, 0.62, \"01:00\", \"62%\"),\n                        ])\n                        .tint(identity_tint(&theme, \"loader.blue\")),\n                ]),\n            )\n            .axes(ChartAxes::default().y_ends(\"0\", \"max\"))\n            .crosshair(),\n        )\n        .child(\n            ScatterChart::new(\n                \"scene.chart.scatter\",\n                \"Fixture samples\",\n                ChartState::Ready(vec![ChartSeries::new(\"samples\", \"Samples\").points([\n                    ChartPoint::new(\"a\", 0.15, 0.30, \"A\", \"30\").weight(0.2),\n                    ChartPoint::new(\"b\", 0.40, 0.62, \"B\", \"62\").weight(0.6),\n                    ChartPoint::new(\"c\", 0.72, 0.48, \"C\", \"48\").weight(0.35),\n                    ChartPoint::new(\"d\", 0.88, 0.80, \"D\", \"80\").weight(0.9),\n                ])]),\n            )\n            .crosshair()\n            .current(\"samples\", \"b\")\n            .on_current(|_, _, _| {})\n            .axes(ChartAxes::default().y_ends(\"0\", \"max\")),\n        )\n        .into_any_element()\n}"
+      "example": "fn chart(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let cpu = [\n        ChartPoint::new(\"00:00\", 0.0, 0.20, \"00:00\", \"20%\"),\n        ChartPoint::new(\"00:15\", 0.25, 0.45, \"00:15\", \"45%\"),\n        ChartPoint::new(\"00:30\", 0.5, 0.38, \"00:30\", \"38%\"),\n        ChartPoint::new(\"00:45\", 0.75, 0.70, \"00:45\", \"70%\"),\n        ChartPoint::new(\"01:00\", 1.0, 0.62, \"01:00\", \"62%\"),\n    ];\n    let memory = [\n        ChartPoint::new(\"00:00\", 0.0, 0.40, \"00:00\", \"40%\"),\n        ChartPoint::new(\"00:15\", 0.25, 0.42, \"00:15\", \"42%\"),\n        ChartPoint::new(\"00:30\", 0.5, 0.55, \"00:30\", \"55%\"),\n        ChartPoint::new(\"00:45\", 0.75, 0.58, \"00:45\", \"58%\"),\n        ChartPoint::new(\"01:00\", 1.0, 0.61, \"01:00\", \"61%\"),\n    ];\n    stack(&theme)\n        .w(px(520.0))\n        .child(caption(\n            &theme,\n            \"host-owned series, host-owned axis wording, no invented scale\",\n        ))\n        .child(\n            LineChart::new(\n                \"scene.chart.ready\",\n                \"Fixture load\",\n                ChartState::Stale {\n                    series: vec![\n                        ChartSeries::new(\"cpu\", \"CPU\")\n                            .points(cpu)\n                            .tint(identity_tint(&theme, \"loader.blue\")),\n                        ChartSeries::new(\"memory\", \"Memory\")\n                            .points(memory)\n                            .tint(identity_tint(&theme, \"loader.orange\")),\n                    ],\n                    reason: \"Refresh failed; showing last verified sample\".into(),\n                },\n            )\n            .area()\n            .crosshair()\n            .current(\"cpu\", \"00:45\")\n            .on_current(|_, _, _| {})\n            .axes(\n                ChartAxes::default()\n                    .x_label(\"Time\")\n                    .y_label(\"Utilization\")\n                    .x_ends(\"00:00\", \"01:00\")\n                    .y_ends(\"0%\", \"100%\"),\n            ),\n        )\n        .child(LineChart::new(\n            \"scene.chart.empty\",\n            \"Fixture load\",\n            ChartState::Empty,\n        ))\n        .child(\n            BarChart::new(\n                \"scene.chart.bars\",\n                \"Fixture share\",\n                ChartState::Ready(vec![ChartSeries::new(\"share\", \"Share\").points([\n                    ChartPoint::new(\"alpha\", 0.0, 0.35, \"Alpha\", \"35 jobs\"),\n                    ChartPoint::new(\"beta\", 0.33, 0.70, \"Beta\", \"70 jobs\"),\n                    ChartPoint::new(\"gamma\", 0.66, 0.45, \"Gamma\", \"45 jobs\"),\n                    ChartPoint::new(\"delta\", 1.0, 0.90, \"Delta\", \"90 jobs\"),\n                ])]),\n            )\n            .axes(ChartAxes::default().y_ends(\"0\", \"max\")),\n        )\n        .child(\n            PieChart::new(\n                \"scene.chart.pie\",\n                \"Fixture share\",\n                ChartState::Ready(vec![ChartSeries::new(\"share\", \"Share\").points([\n                    ChartPoint::new(\"alpha\", 0.0, 0.25, \"Alpha\", \"25%\"),\n                    ChartPoint::new(\"beta\", 0.25, 0.35, \"Beta\", \"35%\"),\n                    ChartPoint::new(\"gamma\", 0.60, 0.20, \"Gamma\", \"20%\"),\n                    ChartPoint::new(\"delta\", 0.80, 0.20, \"Delta\", \"20%\"),\n                ])]),\n            )\n            .donut(),\n        )\n        .child(\n            StackedBarChart::new(\n                \"scene.chart.stacked\",\n                \"Fixture mix\",\n                ChartState::Ready(vec![\n                    ChartSeries::new(\"cpu\", \"CPU\")\n                        .points([\n                            ChartPoint::new(\"alpha\", 0.0, 0.30, \"Alpha\", \"30%\"),\n                            ChartPoint::new(\"beta\", 0.5, 0.20, \"Beta\", \"20%\"),\n                        ])\n                        .tint(identity_tint(&theme, \"loader.blue\")),\n                    ChartSeries::new(\"memory\", \"Memory\")\n                        .points([\n                            ChartPoint::new(\"alpha\", 0.0, 0.25, \"Alpha\", \"25%\"),\n                            ChartPoint::new(\"beta\", 0.5, 0.40, \"Beta\", \"40%\"),\n                        ])\n                        .tint(identity_tint(&theme, \"loader.orange\")),\n                ]),\n            )\n            .axes(ChartAxes::default().y_ends(\"0\", \"max\")),\n        )\n        .child(\n            ChartLegend::new(\n                \"scene.chart.legend\",\n                [\n                    ChartSeries::new(\"cpu\", \"CPU\").tint(identity_tint(&theme, \"loader.blue\")),\n                    ChartSeries::new(\"memory\", \"Memory\")\n                        .tint(identity_tint(&theme, \"loader.orange\")),\n                ],\n            )\n            .on_toggle(|_, _, _, _| {}),\n        )\n        .child(\n            AreaChart::new(\n                \"scene.chart.area\",\n                \"Fixture tokens\",\n                ChartState::Ready(vec![\n                    ChartSeries::new(\"tokens\", \"Tokens\")\n                        .points([\n                            ChartPoint::new(\"00:00\", 0.0, 0.20, \"00:00\", \"20%\"),\n                            ChartPoint::new(\"00:15\", 0.25, 0.45, \"00:15\", \"45%\"),\n                            ChartPoint::new(\"00:30\", 0.5, 0.38, \"00:30\", \"38%\"),\n                            ChartPoint::new(\"00:45\", 0.75, 0.70, \"00:45\", \"70%\"),\n                            ChartPoint::new(\"01:00\", 1.0, 0.62, \"01:00\", \"62%\"),\n                        ])\n                        .tint(identity_tint(&theme, \"loader.blue\")),\n                ]),\n            )\n            .axes(ChartAxes::default().y_ends(\"0\", \"max\"))\n            .crosshair(),\n        )\n        .child(\n            ScatterChart::new(\n                \"scene.chart.scatter\",\n                \"Fixture samples\",\n                ChartState::Ready(vec![ChartSeries::new(\"samples\", \"Samples\").points([\n                    ChartPoint::new(\"a\", 0.15, 0.30, \"A\", \"30\").weight(0.2),\n                    ChartPoint::new(\"b\", 0.40, 0.62, \"B\", \"62\").weight(0.6),\n                    ChartPoint::new(\"c\", 0.72, 0.48, \"C\", \"48\").weight(0.35),\n                    ChartPoint::new(\"d\", 0.88, 0.80, \"D\", \"80\").weight(0.9),\n                ])]),\n            )\n            .crosshair()\n            .current(\"samples\", \"b\")\n            .on_current(|_, _, _| {})\n            .axes(ChartAxes::default().y_ends(\"0\", \"max\")),\n        )\n        .child(RadarChart::new(\n            \"scene.chart.radar\",\n            \"Fixture profile\",\n            ChartState::Ready(vec![ChartSeries::new(\"profile\", \"Profile\").points([\n                ChartPoint::new(\"clarity\", 0.0, 0.80, \"Clarity\", \"80\"),\n                ChartPoint::new(\"speed\", 0.0, 0.55, \"Speed\", \"55\"),\n                ChartPoint::new(\"coverage\", 0.0, 0.70, \"Coverage\", \"70\"),\n                ChartPoint::new(\"cost\", 0.0, 0.40, \"Cost\", \"40\"),\n            ])]),\n        ))\n        .child(RadarChart::new(\n            \"scene.chart.radar-empty\",\n            \"Fixture profile\",\n            ChartState::Empty,\n        ))\n        .child(GaugeChart::new(\n            \"scene.chart.gauge\",\n            \"Fixture occupancy\",\n            ChartState::Ready(vec![\n                ChartSeries::new(\"occupancy\", \"Occupancy\")\n                    .points([ChartPoint::new(\"now\", 0.0, 0.72, \"Now\", \"72%\")]),\n            ]),\n        ))\n        .into_any_element()\n}"
+    },
+    {
+      "name": "metric-card",
+      "capture": "cargo run -p xtask -- headless capture metric-card",
+      "kind": "exhibit",
+      "subjects": [
+        "MetricCard"
+      ],
+      "uses": [
+        "MetricCard"
+      ],
+      "example": "fn metric_card(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(420.0))\n        .child(caption(\n            &theme,\n            \"a KPI keeps the last verified reading when a refresh fails\",\n        ))\n        .child(MetricCard::new(\n            \"scene.metric.ready\",\n            \"Tokens\",\n            MetricState::Ready(\n                MetricReading::new(\"12.4k\")\n                    .delta(\"+8%\", Tone::Success)\n                    .trend([\n                        SparklinePoint::new(0.0, 0.30),\n                        SparklinePoint::new(0.35, 0.55),\n                        SparklinePoint::new(0.70, 0.48),\n                        SparklinePoint::new(1.0, 0.72),\n                    ]),\n            ),\n        ))\n        .child(MetricCard::new(\n            \"scene.metric.loading\",\n            \"Tokens\",\n            MetricState::Loading,\n        ))\n        .child(MetricCard::new(\n            \"scene.metric.empty\",\n            \"Tokens\",\n            MetricState::Empty,\n        ))\n        .child(MetricCard::new(\n            \"scene.metric.unavailable\",\n            \"Tokens\",\n            MetricState::Unavailable(\"The meter host is offline.\".into()),\n        ))\n        .child(MetricCard::new(\n            \"scene.metric.error\",\n            \"Tokens\",\n            MetricState::Error(\"The meter returned an invalid reading.\".into()),\n        ))\n        .child(MetricCard::new(\n            \"scene.metric.stale\",\n            \"Tokens\",\n            MetricState::Stale {\n                reading: MetricReading::new(\"12.4k\").delta(\"+8%\", Tone::Warning),\n                reason: \"Refresh failed; showing last verified reading\".into(),\n            },\n        ))\n        .into_any_element()\n}"
+    },
+    {
+      "name": "kanban",
+      "capture": "cargo run -p xtask -- headless capture kanban",
+      "kind": "exhibit",
+      "subjects": [
+        "KanbanBoard"
+      ],
+      "uses": [
+        "KanbanBoard"
+      ],
+      "example": "fn kanban(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(640.0))\n        .child(caption(\n            &theme,\n            \"columns and cards are host-owned; a held card can report a move\",\n        ))\n        .child(\n            KanbanBoard::new(\"scene.kanban.ready\")\n                .columns([\n                    KanbanColumn::new(\"inbox\", \"Inbox\"),\n                    KanbanColumn::new(\"doing\", \"Doing\"),\n                    KanbanColumn::new(\"done\", \"Done\"),\n                ])\n                .cards([\n                    KanbanCard::new(\"triage\", \"Triage fixture\", \"inbox\")\n                        .detail(\"Waiting on review\"),\n                    KanbanCard::new(\"draw\", \"Draw scene\", \"doing\"),\n                    KanbanCard::new(\"ship\", \"Ship notes\", \"done\"),\n                ])\n                .held(\"triage\")\n                .on_card(|_, _, _| {})\n                .on_move(|_, _, _, _| {}),\n        )\n        .child(KanbanBoard::new(\"scene.kanban.empty\").state(KanbanState::Empty))\n        .child(\n            KanbanBoard::new(\"scene.kanban.unavailable\").state(KanbanState::Unavailable(\n                \"The board host refused the request.\".into(),\n            )),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "micro",
+      "capture": "cargo run -p xtask -- headless capture micro",
+      "kind": "exhibit",
+      "subjects": [
+        "MicroMark"
+      ],
+      "uses": [
+        "MicroMark"
+      ],
+      "example": "fn micro(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(520.0))\n        .child(caption(\n            &theme,\n            \"named functions of time; reduced motion leaves the glyph still\",\n        ))\n        .child(\n            row(&theme)\n                .child(MicroMark::new(\n                    \"scene.micro.heartbeat\",\n                    Micro::Heartbeat,\n                    \"Hb\",\n                ))\n                .child(MicroMark::new(\"scene.micro.bounce\", Micro::Bounce, \"Bn\"))\n                .child(MicroMark::new(\"scene.micro.wobble\", Micro::Wobble, \"Wb\"))\n                .child(MicroMark::new(\"scene.micro.pop\", Micro::Pop, \"Pp\"))\n                .child(MicroMark::new(\"scene.micro.sparkle\", Micro::Sparkle, \"Sk\")),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "trace",

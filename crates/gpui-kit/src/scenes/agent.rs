@@ -990,3 +990,83 @@ pub(super) fn offering_catalog(_window: &mut Window, cx: &mut App) -> AnyElement
         )
         .into_any_element()
 }
+
+pub(super) fn prompt_builder(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(520.0))
+        .child(caption(
+            &theme,
+            "host-owned slots; activating one reports identity, never fills the prompt",
+        ))
+        .child(
+            PromptBuilder::new("scene.prompt.ready", "Review template")
+                .body("Review {path} for {concern} and return a verdict.")
+                .slots([
+                    PromptSlot::new("path", "path").value("src/lib.rs"),
+                    PromptSlot::new("concern", "concern"),
+                ])
+                .on_slot(|_, _, _| {}),
+        )
+        .child(
+            PromptBuilder::new("scene.prompt.empty", "Review template")
+                .state(PromptBuilderState::Empty),
+        )
+        .child(
+            PromptBuilder::new("scene.prompt.unavailable", "Review template").state(
+                PromptBuilderState::Unavailable("The template host refused the request.".into()),
+            ),
+        )
+        .into_any_element()
+}
+
+pub(super) fn feedback_rating(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(420.0))
+        .child(caption(
+            &theme,
+            "vote and reason tags are host-owned; a disabled control installs no handler",
+        ))
+        .child(
+            FeedbackRating::new("scene.feedback.ready")
+                .vote(Some(FeedbackVote::Up))
+                .tags([("accurate", "Accurate"), ("incomplete", "Incomplete")])
+                .current_tag("accurate")
+                .on_vote(|_, _, _| {})
+                .on_tag(|_, _, _| {}),
+        )
+        .child(FeedbackRating::new("scene.feedback.idle").on_vote(|_, _, _| {}))
+        .child(FeedbackRating::new("scene.feedback.disabled").disabled(true))
+        .into_any_element()
+}
+
+pub(super) fn artifact_preview(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(480.0))
+        .child(caption(
+            &theme,
+            "a generated artifact is shown as the kind it is; a refusal stays a refusal",
+        ))
+        .child(
+            ArtifactPreview::new("scene.artifact.ready", "patch.rs")
+                .kind(ArtifactKind::Code)
+                .body("fn ready() -> bool { true }")
+                .state(ArtifactPreviewState::Ready),
+        )
+        .child(
+            ArtifactPreview::new("scene.artifact.loading", "notes.md")
+                .state(ArtifactPreviewState::Loading),
+        )
+        .child(
+            ArtifactPreview::new("scene.artifact.empty", "notes.md")
+                .state(ArtifactPreviewState::Empty),
+        )
+        .child(
+            ArtifactPreview::new("scene.artifact.unavailable", "notes.md").state(
+                ArtifactPreviewState::Unavailable("The artifact host is offline.".into()),
+            ),
+        )
+        .into_any_element()
+}

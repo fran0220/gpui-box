@@ -472,6 +472,82 @@ pub(super) fn chart(_window: &mut Window, cx: &mut App) -> AnyElement {
             .on_current(|_, _, _| {})
             .axes(ChartAxes::default().y_ends("0", "max")),
         )
+        .child(RadarChart::new(
+            "scene.chart.radar",
+            "Fixture profile",
+            ChartState::Ready(vec![ChartSeries::new("profile", "Profile").points([
+                ChartPoint::new("clarity", 0.0, 0.80, "Clarity", "80"),
+                ChartPoint::new("speed", 0.0, 0.55, "Speed", "55"),
+                ChartPoint::new("coverage", 0.0, 0.70, "Coverage", "70"),
+                ChartPoint::new("cost", 0.0, 0.40, "Cost", "40"),
+            ])]),
+        ))
+        .child(RadarChart::new(
+            "scene.chart.radar-empty",
+            "Fixture profile",
+            ChartState::Empty,
+        ))
+        .child(GaugeChart::new(
+            "scene.chart.gauge",
+            "Fixture occupancy",
+            ChartState::Ready(vec![
+                ChartSeries::new("occupancy", "Occupancy")
+                    .points([ChartPoint::new("now", 0.0, 0.72, "Now", "72%")]),
+            ]),
+        ))
+        .into_any_element()
+}
+
+pub(super) fn metric_card(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(420.0))
+        .child(caption(
+            &theme,
+            "a KPI keeps the last verified reading when a refresh fails",
+        ))
+        .child(MetricCard::new(
+            "scene.metric.ready",
+            "Tokens",
+            MetricState::Ready(
+                MetricReading::new("12.4k")
+                    .delta("+8%", Tone::Success)
+                    .trend([
+                        SparklinePoint::new(0.0, 0.30),
+                        SparklinePoint::new(0.35, 0.55),
+                        SparklinePoint::new(0.70, 0.48),
+                        SparklinePoint::new(1.0, 0.72),
+                    ]),
+            ),
+        ))
+        .child(MetricCard::new(
+            "scene.metric.loading",
+            "Tokens",
+            MetricState::Loading,
+        ))
+        .child(MetricCard::new(
+            "scene.metric.empty",
+            "Tokens",
+            MetricState::Empty,
+        ))
+        .child(MetricCard::new(
+            "scene.metric.unavailable",
+            "Tokens",
+            MetricState::Unavailable("The meter host is offline.".into()),
+        ))
+        .child(MetricCard::new(
+            "scene.metric.error",
+            "Tokens",
+            MetricState::Error("The meter returned an invalid reading.".into()),
+        ))
+        .child(MetricCard::new(
+            "scene.metric.stale",
+            "Tokens",
+            MetricState::Stale {
+                reading: MetricReading::new("12.4k").delta("+8%", Tone::Warning),
+                reason: "Refresh failed; showing last verified reading".into(),
+            },
+        ))
         .into_any_element()
 }
 

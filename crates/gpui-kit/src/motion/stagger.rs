@@ -102,6 +102,43 @@ impl Stagger {
     pub fn spec(&self, index: usize, count: usize, spec: MotionSpec) -> MotionSpec {
         spec.with_delay(spec.delay_ms + self.delay(index, count).as_millis() as u64)
     }
+
+    /// Progress of item `index` on one shared group clock.
+    ///
+    /// Every row samples the same `elapsed` instead of owning a timer. Past
+    /// the item's window the answer is 1, so a long list that has already
+    /// arrived does not keep scheduling frames for the last row.
+    pub fn progress_at(
+        &self,
+        elapsed: Duration,
+        index: usize,
+        count: usize,
+        spec: MotionSpec,
+    ) -> f32 {
+        let item = self.spec(index, count, spec);
+        let total = item.total().as_secs_f32();
+        if total <= 0.0 {
+            return 1.0;
+        }
+        item.progress((elapsed.as_secs_f32() / total).clamp(0.0, 1.0))
+    }
+
+    /// Compresses or silences the wave when the frame cannot afford one.
+    pub fn with_budget(self, budget: StaggerBudget) -> Self {
+        match budget {
+            StaggerBudget::Full => self,
+            StaggerBudget::Compressed => self.max_items(4),
+            StaggerBudget::Off => Self::new(Duration::ZERO, 2),
+        }
+    }
+}
+
+/// How much of a stagger the current frame is allowed to spend.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StaggerBudget {
+    Full,
+    Compressed,
+    Off,
 }
 
 /// The repeating phase for item `index` in a looping group animation, such as
@@ -210,5 +247,25 @@ mod tests {
             let phase = staggered_phase(0.2, index, 0.15);
             assert!((0.0..1.0).contains(&phase));
         }
+    }
+
+    #[test]
+    fn a_shared_clock_keeps_the_first_item_ahead_of_the_last() {
+        let stagger = Stagger::from_millis(30);
+        let mid = Duration::from_millis(40);
+        let first = stagger.progress_at(mid, 0, 5, spec());
+        let last = stagger.progress_at(mid, 4, 5, spec());
+        assert!(first > last);
+        assert_eq!(stagger.progress_at(Duration::ZERO, 0, 5, spec()), 0.0);
+        assert_eq!(
+            stagger.progress_at(Duration::from_millis(400), 4, 5, spec()),
+            1.0
+        );
+    }
+
+    #[test]
+    fn an_off_budget_starts_every_row_together() {
+        let stagger = Stagger::from_millis(30).with_budget(StaggerBudget::Off);
+        assert_eq!(stagger.delay(4, 5), Duration::ZERO);
     }
 }

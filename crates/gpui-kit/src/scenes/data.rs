@@ -549,3 +549,37 @@ pub(super) fn drag_tree(_window: &mut Window, cx: &mut App) -> AnyElement {
         )
         .into_any_element()
 }
+
+pub(super) fn kanban(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(640.0))
+        .child(caption(
+            &theme,
+            "columns and cards are host-owned; a held card can report a move",
+        ))
+        .child(
+            KanbanBoard::new("scene.kanban.ready")
+                .columns([
+                    KanbanColumn::new("inbox", "Inbox"),
+                    KanbanColumn::new("doing", "Doing"),
+                    KanbanColumn::new("done", "Done"),
+                ])
+                .cards([
+                    KanbanCard::new("triage", "Triage fixture", "inbox")
+                        .detail("Waiting on review"),
+                    KanbanCard::new("draw", "Draw scene", "doing"),
+                    KanbanCard::new("ship", "Ship notes", "done"),
+                ])
+                .held("triage")
+                .on_card(|_, _, _| {})
+                .on_move(|_, _, _, _| {}),
+        )
+        .child(KanbanBoard::new("scene.kanban.empty").state(KanbanState::Empty))
+        .child(
+            KanbanBoard::new("scene.kanban.unavailable").state(KanbanState::Unavailable(
+                "The board host refused the request.".into(),
+            )),
+        )
+        .into_any_element()
+}

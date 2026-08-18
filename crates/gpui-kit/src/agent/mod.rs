@@ -4,21 +4,26 @@
 //! costs. Runtime transports stay outside this module: [`model`] is the
 //! caller-owned snapshot components read, not a second agent runtime.
 pub mod approval;
+pub mod artifact;
 pub mod canvas;
 pub mod cost;
+pub mod feedback;
 pub mod model;
 pub mod offering_catalog;
 pub mod permission;
 pub mod persona;
 pub mod presentation;
+pub mod prompt;
 pub mod server_list;
 pub mod step_list;
 pub mod thinking;
 pub mod tool_call;
 
 pub use approval::{AlwaysScope, ApprovalDecision, ApprovalEvent, ApprovalPrompt, ApprovalStatus};
+pub use artifact::{ArtifactKind, ArtifactPreview, ArtifactPreviewState};
 pub use canvas::{AgentRunCanvas, AgentRunCanvasEvent, AgentRunLayout};
 pub use cost::{Basis, ContextGauge, CostLine, CostMeter, LastVerified, Limit, Quantity, Reading};
+pub use feedback::{FeedbackRating, FeedbackRatingEvent, FeedbackVote};
 pub use model::{
     AgentActivity, AgentDescriptor, AgentExecutionState, AgentId, AgentModelIssue, AgentOutcome,
     AgentPresence, AgentRunSnapshot, AgentSnapshot, AgentTaskSnapshot, AgentUiAction,
@@ -41,6 +46,7 @@ pub use presentation::{
     AgentActivityLine, AgentAppearance, AgentAvatar, AgentCard, AgentGroup, AgentRoster,
     AgentRunIssues, SubagentTree,
 };
+pub use prompt::{PromptBuilder, PromptBuilderEvent, PromptBuilderState, PromptSlot};
 pub use server_list::{Catalog, Offering, OfferingKind, ServerEntry, ServerList, ServerState};
 pub use step_list::{RunLength, Step, StepList, StepState};
 pub use thinking::{Reasoning, ThinkingBlock};

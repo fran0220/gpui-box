@@ -34,6 +34,7 @@ pub mod model_viewer;
 pub mod platform;
 pub mod transport;
 pub mod video_player;
+pub mod waveform;
 
 pub use audio_player::AudioPlayer;
 pub use gltf::{ModelBounds, ModelDefect, ModelError, ModelLimit, ModelMesh, ModelScene};
@@ -47,6 +48,7 @@ pub use transport::{
     MediaSnapshot, MediaTransport,
 };
 pub use video_player::VideoPlayer;
+pub use waveform::{AudioWaveform, AudioWaveformState};
 
 use gpui::{AnyElement, Hsla, IntoElement, ParentElement, SharedString, Styled, div, px};
 use gpui_kit_theme::{Space, Theme, TypeScale};

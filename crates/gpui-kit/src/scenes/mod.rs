@@ -34,6 +34,7 @@ mod effects;
 mod game;
 mod layout;
 mod media;
+mod motion;
 mod navigation;
 mod overlay;
 mod structured;
@@ -43,10 +44,11 @@ use gpui::{AnyElement, App, Window};
 use crate::foundation::direction::LayoutDirection;
 
 use agent::{
-    agent_avatar, agent_roster, agent_run_canvas, agent_run_issues, approval, cost_meter,
-    offering_catalog, permission_matrix, persona, server_list, step_list, thinking, tool_call,
+    agent_avatar, agent_roster, agent_run_canvas, agent_run_issues, approval, artifact_preview,
+    cost_meter, feedback_rating, offering_catalog, permission_matrix, persona, prompt_builder,
+    server_list, step_list, thinking, tool_call,
 };
-use canvas::node_graph;
+use canvas::{canvas_tools, node_graph};
 use compositions::{motion_flip, motion_state, reading_direction};
 #[cfg(all(feature = "terminal", not(target_family = "wasm")))]
 use content::terminal;
@@ -60,14 +62,15 @@ use controls::{
     search_field, settings, textarea, toggle, upload_list,
 };
 use data::{
-    data_grid, data_grid_editing, diagnostics_list, drag_list, drag_tree, list, table, tree,
-    tree_grid,
+    data_grid, data_grid_editing, diagnostics_list, drag_list, drag_tree, kanban, list, table,
+    tree, tree_grid,
 };
 #[cfg(feature = "fixtures")]
 use datetime::{calendar, date_range, date_time};
 use display::{
     animated_number, avatar, badge, card, chart, detail, divider, empty_state, failure_panel,
-    heatmap, icon, loading, progress_bar, progress_circle, sparkline, status, tag, trace,
+    heatmap, icon, loading, metric_card, progress_bar, progress_circle, sparkline, status, tag,
+    trace,
 };
 use effects::{cinematic_effects, visual_effects};
 use game::game_ui;
@@ -75,7 +78,8 @@ use layout::{
     aspect_ratio, ide_shell, responsive, scroll_area, scroll_fade, scroll_shadow, split_pane,
     split_tree, toolbar,
 };
-use media::{audio_player, model_viewer, video_player};
+use media::{audio_player, audio_waveform, model_viewer, video_player};
+use motion::micro;
 use navigation::{
     accordion, anchor_list, breadcrumb, collapsible, document_tabs, pagination, sidebar, tabs,
     undo_history, wizard,
@@ -554,6 +558,11 @@ pub fn catalog() -> Vec<Scene> {
             shows: Shows::Subjects(&["AudioPlayer"]),
         },
         Scene {
+            name: "audio-waveform",
+            build: audio_waveform,
+            shows: Shows::Subjects(&["AudioWaveform"]),
+        },
+        Scene {
             name: "video-player",
             build: video_player,
             shows: Shows::Subjects(&["VideoPlayer"]),
@@ -579,6 +588,21 @@ pub fn catalog() -> Vec<Scene> {
             shows: Shows::Subjects(&["ContextGauge", "CostMeter"]),
         },
         Scene {
+            name: "prompt-builder",
+            build: prompt_builder,
+            shows: Shows::Subjects(&["PromptBuilder"]),
+        },
+        Scene {
+            name: "feedback-rating",
+            build: feedback_rating,
+            shows: Shows::Subjects(&["FeedbackRating"]),
+        },
+        Scene {
+            name: "artifact-preview",
+            build: artifact_preview,
+            shows: Shows::Subjects(&["ArtifactPreview"]),
+        },
+        Scene {
             name: "tool-call",
             build: tool_call,
             shows: Shows::Subjects(&["ToolCallCard"]),
@@ -592,6 +616,11 @@ pub fn catalog() -> Vec<Scene> {
             name: "node-graph",
             build: node_graph,
             shows: Shows::Subjects(&["GraphNode", "NodeGraph"]),
+        },
+        Scene {
+            name: "canvas-tools",
+            build: canvas_tools,
+            shows: Shows::Subjects(&["CanvasToolbar", "Minimap", "NodeGroup"]),
         },
         Scene {
             name: "browser-panel",
@@ -724,11 +753,28 @@ pub fn catalog() -> Vec<Scene> {
                 "AreaChart",
                 "BarChart",
                 "ChartLegend",
+                "GaugeChart",
                 "LineChart",
                 "PieChart",
+                "RadarChart",
                 "ScatterChart",
                 "StackedBarChart",
             ]),
+        },
+        Scene {
+            name: "metric-card",
+            build: metric_card,
+            shows: Shows::Subjects(&["MetricCard"]),
+        },
+        Scene {
+            name: "kanban",
+            build: kanban,
+            shows: Shows::Subjects(&["KanbanBoard"]),
+        },
+        Scene {
+            name: "micro",
+            build: micro,
+            shows: Shows::Subjects(&["MicroMark"]),
         },
         Scene {
             name: "trace",

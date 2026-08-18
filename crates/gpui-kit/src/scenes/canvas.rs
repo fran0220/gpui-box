@@ -235,3 +235,31 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
         )
         .into_any_element()
 }
+
+pub(super) fn canvas_tools(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(560.0))
+        .child(caption(
+            &theme,
+            "overview, chrome, and a group wash; the host still owns pan and zoom",
+        ))
+        .child(
+            CanvasToolbar::new("scene.canvas.toolbar", "125%")
+                .snap(true)
+                .on_action(|_, _, _| {}),
+        )
+        .child(
+            Minimap::new("scene.canvas.minimap")
+                .marks([
+                    MinimapMark::new("ingest", 0.08, 0.42, 0.18, 0.16),
+                    MinimapMark::new("validate", 0.36, 0.18, 0.20, 0.16),
+                    MinimapMark::new("publish", 0.68, 0.48, 0.18, 0.16),
+                ])
+                .view(MinimapView::new(0.22, 0.20, 0.40, 0.36))
+                .on_pan(|_, _, _, _| {}),
+        )
+        .child(NodeGroup::new("scene.canvas.group", "Ingest").selected(true))
+        .child(NodeGroup::new("scene.canvas.group.quiet", "Observe"))
+        .into_any_element()
+}

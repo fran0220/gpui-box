@@ -870,6 +870,55 @@ pub fn effect_policy(cx: &App) -> EffectPolicy {
 }
 
 /// Resolves and consumes one semantic event against the active policy.
+/// A click-scale particle flavour resolved through the same policy as cues.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParticleBurst {
+    Confetti,
+    Hearts,
+    Stars,
+}
+
+impl ParticleBurst {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Confetti => "confetti",
+            Self::Hearts => "hearts",
+            Self::Stars => "stars",
+        }
+    }
+
+    fn cue(self) -> VisualCue {
+        match self {
+            Self::Confetti => VisualCue::Reward,
+            Self::Hearts => VisualCue::Success,
+            Self::Stars => VisualCue::Arrival,
+        }
+    }
+}
+
+/// Plans a one-shot particle burst. Identity is consumed once, like any cue.
+pub fn burst_particles(
+    id: impl Into<SharedString>,
+    surface: impl Into<SharedString>,
+    target: impl Into<SharedString>,
+    style: ParticleBurst,
+    cx: &mut App,
+) -> EffectPlan {
+    plan_effect(EffectEvent::new(id, surface, target, style.cue()), cx)
+}
+
+/// Compresses a list wave to the active quality tier.
+pub fn stagger_for_policy(stagger: crate::motion::Stagger, cx: &App) -> crate::motion::Stagger {
+    use crate::motion::StaggerBudget;
+    let budget = match effect_policy(cx).quality {
+        EffectQuality::Off => StaggerBudget::Off,
+        EffectQuality::Essential => StaggerBudget::Compressed,
+        EffectQuality::Balanced | EffectQuality::Cinematic => StaggerBudget::Full,
+    };
+    stagger.with_budget(budget)
+}
+
+/// Resolves and consumes one semantic event against the active policy.
 pub fn plan_effect(event: EffectEvent, cx: &mut App) -> EffectPlan {
     install(cx);
     let frame = keyed::frame_counter(cx).unwrap_or_default();

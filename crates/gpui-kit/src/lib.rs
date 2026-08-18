@@ -92,10 +92,12 @@ pub mod prelude {
     pub use crate::agent::approval::{
         AlwaysScope, ApprovalDecision, ApprovalEvent, ApprovalPrompt, ApprovalStatus,
     };
+    pub use crate::agent::artifact::{ArtifactKind, ArtifactPreview, ArtifactPreviewState};
     pub use crate::agent::canvas::{AgentRunCanvas, AgentRunCanvasEvent, AgentRunLayout};
     pub use crate::agent::cost::{
         Basis, ContextGauge, CostLine, CostMeter, LastVerified, Limit, Quantity, Reading,
     };
+    pub use crate::agent::feedback::{FeedbackRating, FeedbackRatingEvent, FeedbackVote};
     pub use crate::agent::model::{
         AgentActivity, AgentDescriptor, AgentExecutionState, AgentId, AgentModelIssue,
         AgentOutcome, AgentPresence, AgentRunSnapshot, AgentSnapshot, AgentTaskSnapshot,
@@ -118,6 +120,9 @@ pub mod prelude {
         AgentActivityLine, AgentAppearance, AgentAvatar, AgentCard, AgentGroup, AgentRoster,
         AgentRunIssues, SubagentTree,
     };
+    pub use crate::agent::prompt::{
+        PromptBuilder, PromptBuilderEvent, PromptBuilderState, PromptSlot,
+    };
     pub use crate::agent::server_list::{
         Catalog, Offering, OfferingKind, ServerEntry, ServerList, ServerState,
     };
@@ -125,9 +130,10 @@ pub mod prelude {
     pub use crate::agent::thinking::{Reasoning, ThinkingBlock};
     pub use crate::agent::tool_call::{Elapsed, ToolBody, ToolCallCard, ToolCallState, ToolOutput};
     pub use crate::canvas::{
-        Diff, EdgeKind, GraphEdge, GraphEndpoint, GraphInteraction, GraphNode, GraphPort,
-        GraphState, GraphViewport, NodeGraph, NodeGraphEvent, NodeMetric, NodeState, Placed,
-        PortDirection, PortSide, layered_layout,
+        CanvasToolbar, CanvasToolbarAction, CanvasToolbarEvent, Diff, EdgeKind, GraphEdge,
+        GraphEndpoint, GraphInteraction, GraphNode, GraphPort, GraphState, GraphViewport, Minimap,
+        MinimapEvent, MinimapMark, MinimapView, NodeGraph, NodeGraphEvent, NodeGroup, NodeMetric,
+        NodeState, Placed, PortDirection, PortSide, layered_layout,
     };
     pub use crate::content::{
         AgentBlockKind, AgentDocument, AgentDocumentBlock, AgentDocumentEvent, AgentDocumentState,
@@ -176,8 +182,9 @@ pub mod prelude {
         Align, BranchState, BulkBar, Cell, CellRange, Column, ColumnGroup, ColumnWidth, DataGrid,
         Diagnostic, DiagnosticAction, DiagnosticFilter, DiagnosticLocation, DiagnosticSeverity,
         DiagnosticsList, EditIntent, EditOutcome, EditingCell, Expanded, GridColumn, GridLines,
-        GridRow, List, ListItem, Row, SelectionChange, SelectionMode, SortDirection, Table, Tree,
-        TreeGrid, TreeGridRow, TreeNode,
+        GridRow, KanbanBoard, KanbanCard, KanbanColumn, KanbanEvent, KanbanState, List, ListItem,
+        Row, SelectionChange, SelectionMode, SortDirection, Table, Tree, TreeGrid, TreeGridRow,
+        TreeNode,
     };
     pub use crate::datetime::{
         BlockedDay, BlockedReport, Calendar, CalendarEvent, Clock, DateAdapter, DateInput,
@@ -191,7 +198,7 @@ pub mod prelude {
     pub use crate::display::card::{Card, CardHeader, CardVariant, ListRow};
     pub use crate::display::chart::{
         AreaChart, BarChart, ChartAxes, ChartLegend, ChartPoint, ChartSelection, ChartSeries,
-        ChartState, LineChart, PieChart, ScatterChart, StackedBarChart,
+        ChartState, GaugeChart, LineChart, PieChart, RadarChart, ScatterChart, StackedBarChart,
     };
     pub use crate::display::description_list::{
         DescriptionItem, DescriptionList, DescriptionValue,
@@ -202,6 +209,7 @@ pub mod prelude {
     pub use crate::display::highlight::HighlightedText;
     pub use crate::display::icon::{Icon, IconTone};
     pub use crate::display::loading::{GradientSpinner, PulseLoader, Skeleton};
+    pub use crate::display::metric::{MetricCard, MetricReading, MetricState};
     pub use crate::display::progress::ProgressBar;
     pub use crate::display::progress_circle::ProgressCircle;
     pub use crate::display::sparkline::{
@@ -219,8 +227,9 @@ pub mod prelude {
         DotLottieMetadata, DotLottiePlayback, DotLottiePlaybackState, DotLottieRequest,
         DotLottieSample, EffectBudget, EffectCost, EffectEvent, EffectFallback, EffectImportance,
         EffectParticles, EffectPlan, EffectPlanner, EffectPolicy, EffectPresentation,
-        EffectQuality, EffectRecipe, EffectSuppression, UnavailableDotLottieAdapter, VisualCue,
-        effect_policy, plan_effect, set_effect_policy,
+        EffectQuality, EffectRecipe, EffectSuppression, ParticleBurst, UnavailableDotLottieAdapter,
+        VisualCue, burst_particles, effect_policy, plan_effect, set_effect_policy,
+        stagger_for_policy,
     };
     pub use crate::foundation::direction::{
         ActiveDirection, DirectionalExt, LayoutDirection, LogicalSide, PhysicalSide,
@@ -251,15 +260,16 @@ pub mod prelude {
         StatusBar, StatusGroup, StatusItem, Toolbar, ToolbarItem, scroll_offset,
     };
     pub use crate::media::{
-        AudioPlayer, FixtureTransport, MediaAvailability, MediaCommand, MediaEvent, MediaOrigin,
-        MediaOutcome, MediaSnapshot, MediaSource, MediaTransport, ModelBounds, ModelDefect,
-        ModelError, ModelLimit, ModelMesh, ModelScene, ModelShading, ModelState, ModelViewer,
-        ModelViewerEvent, NativeMediaError, NativeMediaEvent, NativeMediaPlayer,
-        NativeMediaSubscription, PlatformMediaTransport, VideoPlayer,
+        AudioPlayer, AudioWaveform, AudioWaveformState, FixtureTransport, MediaAvailability,
+        MediaCommand, MediaEvent, MediaOrigin, MediaOutcome, MediaSnapshot, MediaSource,
+        MediaTransport, ModelBounds, ModelDefect, ModelError, ModelLimit, ModelMesh, ModelScene,
+        ModelShading, ModelState, ModelViewer, ModelViewerEvent, NativeMediaError,
+        NativeMediaEvent, NativeMediaPlayer, NativeMediaSubscription, PlatformMediaTransport,
+        VideoPlayer,
     };
     pub use crate::motion::{
-        Flip, Flipping, Keyframe, Keyframes, Presence, ScrollLink, Shape, Shaping, Transition,
-        Velocity, flip,
+        Flip, Flipping, Keyframe, Keyframes, Micro, MicroMark, MicroMotion, Presence, ScrollLink,
+        Shape, Shaping, Transition, Velocity, flip, micro,
     };
     pub use crate::navigation::{
         Accordion, AccordionSection, Anchor, AnchorList, Breadcrumb, Collapsible, Crumb,

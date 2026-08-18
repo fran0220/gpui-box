@@ -29,6 +29,7 @@
 
 pub mod diagnostics_list;
 pub mod grid;
+pub mod kanban;
 pub mod list;
 pub mod table;
 pub mod tree;
@@ -43,6 +44,7 @@ pub use grid::{
     BulkBar, CellRange, ColumnGroup, DataGrid, EditIntent, EditOutcome, EditingCell, Expanded,
     GridColumn, GridLines, GridRow, SelectionChange, SelectionMode,
 };
+pub use kanban::{KanbanBoard, KanbanCard, KanbanColumn, KanbanEvent, KanbanState};
 pub use list::{List, ListItem};
 pub use table::{Align, Cell, Column, ColumnWidth, Row, SortDirection, Table};
 pub use tree::{BranchState, Tree, TreeNode};

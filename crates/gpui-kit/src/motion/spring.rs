@@ -11,6 +11,10 @@ use gpui_kit_theme::{SpringPreset, SpringTokens, Theme};
 
 /// The fraction of the remaining distance treated as arrived.
 const SETTLE_EPSILON: f32 = 0.001;
+/// A displacement smaller than this is not worth another paint.
+const PIXEL_SETTLE: f32 = 0.1;
+/// An opacity change smaller than this is not worth another paint.
+const OPACITY_SETTLE: f32 = 0.001;
 /// A spring that has not settled by this point is treated as settled anyway,
 /// so an over-soft configuration cannot animate forever.
 const MAX_SETTLE: Duration = Duration::from_secs(4);
@@ -175,16 +179,49 @@ impl Spring {
     /// The same, for a spring released with `velocity` already carried into
     /// the motion: one that is travelling fast needs longer to come to rest.
     pub fn settle_time_at(self, velocity: f32) -> Duration {
+        self.settle_time_at_for(velocity, 1.0)
+    }
+
+    /// How long until the remaining change is smaller than a pixel or an
+    /// opacity step, for a motion whose full span is `span`.
+    ///
+    /// A ten-pixel slide can stop when 0.1px remains. A fade whose span is
+    /// `1.0` still uses the opacity floor. Both also require the velocity to
+    /// have dropped below the same floor, so a spring that is still racing
+    /// through the epsilon band is not marked settled.
+    pub fn settle_time_for(self, span: f32) -> Duration {
+        self.settle_time_at_for(0.0, span)
+    }
+
+    /// The same, for a spring released with `velocity` already carried in.
+    pub fn settle_time_at_for(self, velocity: f32, span: f32) -> Duration {
         let step = Duration::from_millis(4);
-        let settled = |elapsed| (1.0 - self.value_at(elapsed, velocity).0).abs() < SETTLE_EPSILON;
         let mut elapsed = step;
         while elapsed < MAX_SETTLE {
-            if settled(elapsed) && settled(elapsed + step) {
+            if self.is_visually_settled(elapsed, velocity, span)
+                && self.is_visually_settled(elapsed + step, velocity, span)
+            {
                 return elapsed;
             }
             elapsed += step;
         }
         MAX_SETTLE
+    }
+
+    /// Whether the remaining visual change is below a pixel or an opacity step.
+    pub fn is_visually_settled(self, elapsed: Duration, velocity: f32, span: f32) -> bool {
+        let (value, rate) = self.value_at(elapsed, velocity);
+        let remaining = (1.0 - value).abs() * span.max(0.0);
+        let speed = rate.abs() * span.max(0.0);
+        remaining < Self::visual_epsilon(span) && speed < Self::visual_epsilon(span)
+    }
+
+    fn visual_epsilon(span: f32) -> f32 {
+        if span <= 1.0 {
+            OPACITY_SETTLE.max(SETTLE_EPSILON * span.max(f32::EPSILON))
+        } else {
+            (PIXEL_SETTLE / span).max(SETTLE_EPSILON)
+        }
     }
 
     /// Expresses the spring as a GPUI animation, so it can drive
@@ -452,5 +489,12 @@ mod tests {
     fn a_spring_thrown_the_wrong_way_takes_longer_to_come_to_rest() {
         let spring = spring(SpringPreset::Smooth);
         assert!(spring.settle_time_at(-6.0) > spring.settle_time());
+    }
+
+    #[test]
+    fn a_short_pixel_span_settles_sooner_than_the_normalized_clock() {
+        let spring = spring(SpringPreset::Smooth);
+        assert!(spring.settle_time_for(8.0) <= spring.settle_time());
+        assert!(spring.is_visually_settled(spring.settle_time_for(8.0), 0.0, 8.0));
     }
 }

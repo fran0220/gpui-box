@@ -41,6 +41,7 @@ mod gesture;
 mod interpolate;
 pub(crate) mod keyed;
 mod keyframes;
+mod micro;
 mod presence;
 mod scroll_link;
 mod sequence;
@@ -58,6 +59,7 @@ pub use gesture::{
 };
 pub use interpolate::Interpolate;
 pub use keyframes::{Keyframe, Keyframes};
+pub use micro::{Micro, MicroMark, MicroMotion, micro};
 pub use presence::{Phase, Presence};
 pub use scroll_link::ScrollLink;
 pub use sequence::Sequence;
@@ -66,7 +68,7 @@ pub use spec::{
     menu, menu_in, pulse_wave, resize, row_in, shimmer_offset, state_change, surface_in, tracking,
 };
 pub use spring::Spring;
-pub use stagger::{ROW_STAGGER_CAP, Stagger, staggered_phase};
+pub use stagger::{ROW_STAGGER_CAP, Stagger, StaggerBudget, staggered_phase};
 pub use transition::Transition;
 pub(crate) use transition::{tracked, tracked_or_snap};
 

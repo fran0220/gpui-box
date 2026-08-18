@@ -2072,6 +2072,322 @@ fn ready_stacked(
         .into_any_element()
 }
 
+/// A polar reading over host-owned axes.
+///
+/// Each point is an axis: `id` is the axis, `y` is the already-normalized
+/// radius, and `label` is the host's wording. Angular order is the host's
+/// point order. `x` is ignored.
+#[derive(IntoElement)]
+pub struct RadarChart {
+    ident: Ident,
+    label: SharedString,
+    state: ChartState,
+}
+
+impl RadarChart {
+    pub fn new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: ChartState) -> Self {
+        Self {
+            ident: ident.into(),
+            label: label.into(),
+            state,
+        }
+    }
+}
+
+impl RenderOnce for RadarChart {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let theme = cx.theme().clone();
+        let (body, spec): (AnyElement, NodeSpec) = match self.state.visible_series() {
+            Some((series, stale)) => {
+                let count = series.iter().map(|item| item.points.len()).sum();
+                (
+                    ready_radar(&self.ident, &self.label, series, stale.cloned(), &theme, cx),
+                    chart_spec(&self.ident, &self.label, &self.state, count, stale),
+                )
+            }
+            None => match &self.state {
+                ChartState::Empty => (
+                    non_ready_body(
+                        &self.label,
+                        EmptyState::new(
+                            self.ident.child("empty"),
+                            cx.strings().text(StringKey::RadarEmpty),
+                        )
+                        .kind(EmptyKind::Empty),
+                        &theme,
+                    ),
+                    NodeSpec::new(self.ident.semantic_id(), Role::Status)
+                        .text(self.label.clone())
+                        .value("empty"),
+                ),
+                _ => line_like_state(&self.ident, &self.label, &self.state, cx),
+            },
+        };
+        div().w_full().child(body).semantic_in(cx, spec)
+    }
+}
+
+fn ready_radar(
+    ident: &Ident,
+    label: &SharedString,
+    series: &[ChartSeries],
+    stale: Option<SharedString>,
+    theme: &gpui_kit_theme::Theme,
+    cx: &mut App,
+) -> AnyElement {
+    let axes = series
+        .first()
+        .map(|first| first.points.as_slice())
+        .unwrap_or(&[]);
+    let axis_count = axes.len().max(3);
+    let rings = [0.25, 0.5, 0.75, 1.0];
+    let accent = theme.colors.accent;
+    let faint = theme.colors.text_faint;
+    let plotted = series.to_vec();
+    div()
+        .column()
+        .w_full()
+        .gap_token(theme, Space::Xs)
+        .child(chart_heading(label, None, theme))
+        .children(stale.map(|reason| stale_warning(ident, reason, theme, cx)))
+        .child(
+            canvas(
+                |_, _, _| {},
+                move |bounds, _, window, _| {
+                    let width = f32::from(bounds.size.width);
+                    let height = f32::from(bounds.size.height);
+                    if width <= 0.0 || height <= 0.0 {
+                        return;
+                    }
+                    let center = point(
+                        bounds.origin.x + px(width / 2.0),
+                        bounds.origin.y + px(height / 2.0),
+                    );
+                    let radius = width.min(height) * 0.42;
+                    for ring in rings {
+                        let mut web = PathBuilder::stroke(px(1.0));
+                        for index in 0..=axis_count {
+                            let angle = radar_angle(index % axis_count, axis_count);
+                            let spot = radar_point(center, radius * ring, angle);
+                            if index == 0 {
+                                web.move_to(spot);
+                            } else {
+                                web.line_to(spot);
+                            }
+                        }
+                        if let Ok(path) = web.build() {
+                            window.paint_path(path, faint);
+                        }
+                    }
+                    for series in &plotted {
+                        let color = series.color.unwrap_or(accent);
+                        let mut fill = PathBuilder::fill();
+                        let mut stroke = PathBuilder::stroke(px(1.5));
+                        for (index, point) in series.points.iter().enumerate() {
+                            let angle = radar_angle(index, axis_count);
+                            let spot = radar_point(
+                                center,
+                                radius * point.position.y.clamp(0.0, 1.0),
+                                angle,
+                            );
+                            if index == 0 {
+                                fill.move_to(spot);
+                                stroke.move_to(spot);
+                            } else {
+                                fill.line_to(spot);
+                                stroke.line_to(spot);
+                            }
+                        }
+                        fill.close();
+                        stroke.close();
+                        if let Ok(path) = fill.build() {
+                            window.paint_path(path, color.opacity(0.22));
+                        }
+                        if let Ok(path) = stroke.build() {
+                            window.paint_path(path, color);
+                        }
+                    }
+                },
+            )
+            .w_full()
+            .h(px(200.0)),
+        )
+        .child(
+            div()
+                .row()
+                .flex_wrap()
+                .gap_token(theme, Space::Sm)
+                .children(axes.iter().map(|axis| {
+                    div()
+                        .type_scale(theme, TypeScale::Caption)
+                        .text_color(theme.colors.text_muted)
+                        .child(axis.label.clone())
+                        .semantic_in(
+                            cx,
+                            NodeSpec::new(
+                                ident.child("axis").child(axis.id.as_ref()).semantic_id(),
+                                Role::Status,
+                            )
+                            .text(axis.label.clone())
+                            .value(axis.value.clone()),
+                        )
+                })),
+        )
+        .into_any_element()
+}
+
+fn radar_angle(index: usize, count: usize) -> f32 {
+    -std::f32::consts::FRAC_PI_2 + (index as f32) * std::f32::consts::TAU / count as f32
+}
+
+fn radar_point(center: Point<Pixels>, radius: f32, angle: f32) -> Point<Pixels> {
+    point(
+        center.x + px(radius * angle.cos()),
+        center.y + px(radius * angle.sin()),
+    )
+}
+
+/// A single already-normalized reading on a semicircle.
+///
+/// `value` is a host-formatted string. `amount` is the needle, already in
+/// `0..=1`. An unknown amount draws the scale and no needle.
+#[derive(IntoElement)]
+pub struct GaugeChart {
+    ident: Ident,
+    label: SharedString,
+    state: ChartState,
+}
+
+impl GaugeChart {
+    pub fn new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: ChartState) -> Self {
+        Self {
+            ident: ident.into(),
+            label: label.into(),
+            state,
+        }
+    }
+}
+
+impl RenderOnce for GaugeChart {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let theme = cx.theme().clone();
+        let (body, spec): (AnyElement, NodeSpec) = match self.state.visible_series() {
+            Some((series, stale)) => {
+                let point = series
+                    .first()
+                    .and_then(|series| series.points.first())
+                    .cloned();
+                let color = series
+                    .first()
+                    .and_then(|series| series.color)
+                    .unwrap_or(theme.colors.accent);
+                (
+                    ready_gauge(
+                        &self.ident,
+                        &self.label,
+                        point.as_ref(),
+                        color,
+                        stale.cloned(),
+                        &theme,
+                        cx,
+                    ),
+                    chart_spec(
+                        &self.ident,
+                        &self.label,
+                        &self.state,
+                        usize::from(point.is_some()),
+                        stale,
+                    ),
+                )
+            }
+            None => line_like_state(&self.ident, &self.label, &self.state, cx),
+        };
+        div().w_full().child(body).semantic_in(cx, spec)
+    }
+}
+
+fn ready_gauge(
+    ident: &Ident,
+    label: &SharedString,
+    reading: Option<&ChartPoint>,
+    color: Hsla,
+    stale: Option<SharedString>,
+    theme: &gpui_kit_theme::Theme,
+    cx: &mut App,
+) -> AnyElement {
+    let amount = reading.map(|point| point.position.y.clamp(0.0, 1.0));
+    let wording = reading
+        .map(|point| point.value.clone())
+        .unwrap_or_else(|| cx.strings().text(StringKey::GaugeEmpty));
+    div()
+        .column()
+        .w_full()
+        .gap_token(theme, Space::Xs)
+        .child(chart_heading(label, None, theme))
+        .children(stale.map(|reason| stale_warning(ident, reason, theme, cx)))
+        .child(
+            canvas(
+                |_, _, _| {},
+                move |bounds, _, window, _| {
+                    let width = f32::from(bounds.size.width);
+                    let height = f32::from(bounds.size.height);
+                    if width <= 0.0 || height <= 0.0 {
+                        return;
+                    }
+                    let center = point(
+                        bounds.origin.x + px(width / 2.0),
+                        bounds.origin.y + px(height * 0.86),
+                    );
+                    let radius = width.min(height * 1.6) * 0.42;
+                    let mut track = PathBuilder::stroke(px(10.0));
+                    gauge_arc(&mut track, center, radius, 0.0, 1.0);
+                    if let Ok(path) = track.build() {
+                        window.paint_path(path, color.opacity(0.18));
+                    }
+                    if let Some(amount) = amount {
+                        let mut fill = PathBuilder::stroke(px(10.0));
+                        gauge_arc(&mut fill, center, radius, 0.0, amount);
+                        if let Ok(path) = fill.build() {
+                            window.paint_path(path, color);
+                        }
+                    }
+                },
+            )
+            .w_full()
+            .h(px(120.0)),
+        )
+        .child(
+            div()
+                .type_scale(theme, TypeScale::Subtitle)
+                .text_align(gpui::TextAlign::Center)
+                .child(wording)
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(ident.child("reading").semantic_id(), Role::Status)
+                        .text(label.clone())
+                        .value(reading.map(|point| point.value.clone()).unwrap_or_default()),
+                ),
+        )
+        .into_any_element()
+}
+
+fn gauge_arc(builder: &mut PathBuilder, center: Point<Pixels>, radius: f32, start: f32, end: f32) {
+    let steps = 24;
+    for index in 0..=steps {
+        let t = start + (end - start) * (index as f32 / steps as f32);
+        let angle = std::f32::consts::PI * (1.0 - t);
+        let spot = point(
+            center.x + px(radius * angle.cos()),
+            center.y - px(radius * angle.sin()),
+        );
+        if index == 0 {
+            builder.move_to(spot);
+        } else {
+            builder.line_to(spot);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

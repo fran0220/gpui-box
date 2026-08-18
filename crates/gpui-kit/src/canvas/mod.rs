@@ -37,10 +37,16 @@
 
 mod edge;
 mod graph;
+mod group;
+mod minimap;
 mod node;
+mod toolbar;
 
 pub use edge::{EdgeKind, GraphEdge, GraphEndpoint, PortSide};
 pub use graph::{
     GraphInteraction, GraphState, GraphViewport, NodeGraph, NodeGraphEvent, Placed, layered_layout,
 };
+pub use group::NodeGroup;
+pub use minimap::{Minimap, MinimapEvent, MinimapMark, MinimapView};
 pub use node::{Diff, GraphNode, GraphPort, NODE_WIDTH, NodeMetric, NodeState, PortDirection};
+pub use toolbar::{CanvasToolbar, CanvasToolbarAction, CanvasToolbarEvent};

@@ -157,3 +157,23 @@ pub(super) fn model_viewer(_window: &mut Window, cx: &mut App) -> AnyElement {
         )
         .into_any_element()
 }
+
+pub(super) fn audio_waveform(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(520.0))
+        .child(caption(
+            &theme,
+            "already-normalized peaks; a missing playhead draws no played split",
+        ))
+        .child(
+            AudioWaveform::new("scene.waveform.ready")
+                .peaks(scene_peaks(48))
+                .playhead(0.38),
+        )
+        .child(AudioWaveform::new("scene.waveform.empty").state(AudioWaveformState::Empty))
+        .child(AudioWaveform::new("scene.waveform.unavailable").state(
+            AudioWaveformState::Unavailable("The sampler host refused the request.".into()),
+        ))
+        .into_any_element()
+}

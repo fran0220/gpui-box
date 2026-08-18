@@ -16,7 +16,7 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
 use web_time::Instant;
 
 use crate::display::empty::EmptyState;
@@ -1816,8 +1816,7 @@ fn graph_minimap(
         .h(px(88.0))
         .radius(theme, Radius::Small)
         .surface(theme, Surface::Overlay)
-        .border(px(theme.borders.hairline))
-        .border_color(theme.colors.divider)
+        .elevation(theme, Elevation::Raised)
         .overflow_hidden()
         .children(marks)
         .semantic_in(

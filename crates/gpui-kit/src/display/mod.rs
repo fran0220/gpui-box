@@ -12,6 +12,7 @@ pub mod heatmap;
 pub mod highlight;
 pub mod icon;
 pub mod loading;
+pub mod metric;
 pub mod progress;
 pub mod progress_circle;
 pub(crate) mod signature;

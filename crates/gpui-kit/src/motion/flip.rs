@@ -293,6 +293,15 @@ impl FlipState {
         self.size_frame = Some(now);
     }
 
+    /// Whether layout and paint already agree, so invert would be a no-op.
+    fn is_home(&self, origin: Point<Pixels>, settle: Duration) -> bool {
+        self.origin == Some(origin)
+            && self.current == Point::default()
+            && self.elapsed >= settle
+            && self.size.is_none_or(|size| !size.is_animating())
+            && self.shape.is_none_or(|shape| !shape.is_animating())
+    }
+
     /// Puts the element where layout put it with nothing in flight.
     fn settle(&mut self, origin: Point<Pixels>, settle: Duration) {
         self.origin = Some(origin);
@@ -703,6 +712,8 @@ impl Element for Flipped {
                 {
                     state.settle_size(natural, self.spec(), now);
                 }
+            } else if state.is_home(origin, self.settle) {
+                // Same bounds and already at rest: skip invert and the next tick.
             } else {
                 state.advance(now);
                 let residual = state.sample(self.spring, self.settle);
@@ -1006,5 +1017,14 @@ mod tests {
         let mut state = FlipState::default();
         assert!(!state.claim(None));
         assert!(!state.claim(None));
+    }
+
+    #[test]
+    fn an_unchanged_origin_that_has_settled_is_already_home() {
+        let settle = grab().settle_time();
+        let mut state = FlipState::default();
+        state.settle(point(px(12.0), px(8.0)), settle);
+        assert!(state.is_home(point(px(12.0), px(8.0)), settle));
+        assert!(!state.is_home(point(px(40.0), px(8.0)), settle));
     }
 }
