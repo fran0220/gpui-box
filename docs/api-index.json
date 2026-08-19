@@ -8235,13 +8235,15 @@
       "options": [
         "shortcut(keystroke: impl Into<SharedString>) -> Self",
         "icon(glyph: Icon) -> Self",
-        "disabled(disabled: bool) -> Self"
+        "disabled(disabled: bool) -> Self",
+        "destructive(destructive: bool) -> Self"
       ],
       "commands": [],
       "queries": [
         "id() -> &SharedString",
         "label() -> &SharedString",
-        "is_disabled() -> bool"
+        "is_disabled() -> bool",
+        "is_destructive() -> bool"
       ]
     },
     {

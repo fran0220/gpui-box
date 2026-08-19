@@ -159,6 +159,10 @@ pub(super) fn menu_items() -> Vec<MenuItem> {
                 MenuItem::command("share.export", "Export as file"),
             ],
         ),
+        MenuItem::separator("destroy"),
+        MenuItem::command("delete", "Delete this run")
+            .icon(Icon::Trash)
+            .destructive(true),
     ]
 }
 

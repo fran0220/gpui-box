@@ -61,6 +61,9 @@ pub struct MenuItem {
     shortcut: Option<SharedString>,
     icon: Option<Icon>,
     disabled: bool,
+    /// A command that destroys something. Painted in danger so a delete row
+    /// is not just another line of body text.
+    destructive: bool,
 }
 
 impl MenuItem {
@@ -73,6 +76,7 @@ impl MenuItem {
             shortcut: None,
             icon: None,
             disabled: false,
+            destructive: false,
         }
     }
 
@@ -135,6 +139,13 @@ impl MenuItem {
         self
     }
 
+    /// Marks the item as one that destroys something. The row still reports
+    /// [`MenuEvent::Invoked`]; the host decides what that means.
+    pub fn destructive(mut self, destructive: bool) -> Self {
+        self.destructive = destructive;
+        self
+    }
+
     pub fn id(&self) -> &SharedString {
         &self.id
     }
@@ -145,6 +156,22 @@ impl MenuItem {
 
     pub fn is_disabled(&self) -> bool {
         self.disabled
+    }
+
+    pub fn is_destructive(&self) -> bool {
+        self.destructive
+    }
+
+    /// The foreground a row uses. A refused row stays muted even when marked
+    /// destructive, so refusal remains visible.
+    fn foreground(&self, theme: &Theme) -> gpui::Hsla {
+        if self.disabled {
+            theme.colors.text_disabled
+        } else if self.destructive {
+            theme.colors.danger
+        } else {
+            theme.colors.text
+        }
     }
 
     /// Whether the keyboard can land on this row.
@@ -464,6 +491,7 @@ fn row<V: 'static>(
                 (Some(false), _) => None,
                 (None, glyph) => glyph,
             };
+            let color = item.foreground(theme);
 
             let row = popover::menu_row(theme, false, active || opened)
                 .id(row_ident.element_id())
@@ -477,22 +505,12 @@ fn row<V: 'static>(
                         .flex_none()
                         .w(px(GLYPH_SLOT))
                         .justify_center()
-                        .children(glyph.map(|glyph| {
-                            icon(glyph).size(px(14.0)).text_color(if item.disabled {
-                                theme.colors.text_disabled
-                            } else {
-                                theme.colors.text
-                            })
-                        })),
+                        .children(glyph.map(|glyph| icon(glyph).size(px(14.0)).text_color(color))),
                 )
                 .child(
                     text(theme, TypeScale::Label, item.label.clone())
                         .flex_1()
-                        .text_color(if item.disabled {
-                            theme.colors.text_disabled
-                        } else {
-                            theme.colors.text
-                        }),
+                        .text_color(color),
                 )
                 .children(
                     item.shortcut
@@ -508,6 +526,8 @@ fn row<V: 'static>(
                             .size(px(12.0))
                             .text_color(if item.disabled {
                                 theme.colors.text_disabled
+                            } else if item.destructive {
+                                theme.colors.danger
                             } else {
                                 theme.colors.text_muted
                             })
@@ -1332,5 +1352,34 @@ mod tests {
             Some(vec![5, 1])
         );
         assert_eq!(MenuState::path_to(&items, "edit.nothing"), None);
+    }
+
+    #[test]
+    fn a_destructive_row_is_still_something_that_can_be_taken() {
+        let item = MenuItem::command("delete", "Delete").destructive(true);
+        assert!(item.is_destructive());
+        assert!(item.is_selectable());
+        let items = vec![item];
+        let mut state = MenuState {
+            path: Vec::new(),
+            active: Some(0),
+        };
+        assert_eq!(
+            state.activate(&items, &[0]),
+            Activation::Invoked("delete".into())
+        );
+    }
+
+    #[test]
+    fn a_destructive_refusal_still_installs_nothing() {
+        let item = MenuItem::command("delete", "Delete")
+            .destructive(true)
+            .disabled(true);
+        assert!(item.is_destructive());
+        assert!(item.is_disabled());
+        assert!(!item.is_selectable());
+        let items = vec![item];
+        let mut state = MenuState::default();
+        assert_eq!(state.activate(&items, &[0]), Activation::Ignored);
     }
 }
