@@ -8,6 +8,10 @@
 //! [`ToastLayer`] holds transient notifications, which report what happened
 //! and never hide a failure on a timer.
 //!
+//! [`Positioner`] answers which side an anchored surface lands on and how
+//! much room it has there, for a surface that has to be built to fit before
+//! anything is painted.
+//!
 //! [`Popover`] is the anchored surface the menu family is built from:
 //! [`Menu`] hangs one off a trigger, [`ContextMenu`] opens the same list at
 //! the pointer, and [`CommandPalette`] filters it from the keyboard.
@@ -26,6 +30,7 @@ pub mod notification_center;
 mod palette;
 pub mod panel;
 pub mod popover;
+pub mod positioner;
 pub(crate) mod stack;
 pub mod toast;
 pub mod tooltip;
@@ -45,5 +50,6 @@ pub use notification_center::{
 };
 pub use palette::{Command, CommandPalette, CommandPaletteEvent};
 pub use popover::{Popover, PopoverEvent};
+pub use positioner::{Positioner, Room, Side};
 pub use toast::{Toast, ToastCorner, ToastLayer};
 pub use tooltip::{Tooltip, Tooltipped};

@@ -21,6 +21,7 @@ use crate::controls::button::Button;
 use crate::foundation::{Ident, StyledExt, text};
 use crate::overlay::focus::FocusTrap;
 use crate::overlay::layer::{Overlay, Placement, surface};
+use crate::overlay::positioner::Positioner;
 
 use crate::motion;
 use crate::strings::{ActiveSearch, EnglishSearch, SearchMatcher};
@@ -197,40 +198,15 @@ pub(crate) fn menu_geometry(
     desired_height: f32,
     min_width: f32,
 ) -> MenuGeometry {
-    let viewport = window.viewport_size();
-    let viewport_height = f32::from(viewport.height);
-    let viewport_width = f32::from(viewport.width);
-    let margin = theme.spacing.sm;
-    let gap = (theme.spacing.sm - 2.0).max(0.0);
-    let usable_width = (viewport_width - margin * 2.0).max(0.0);
-    let measured_width = f32::from(trigger.size.width);
-    let width = measured_width.max(min_width).min(usable_width);
-    let measured = measured_width > 0.0 && f32::from(trigger.size.height) > 0.0;
-
-    if !measured {
-        return MenuGeometry {
-            placement: Placement::Below,
-            max_height: desired_height.min((viewport_height - margin * 2.0 - gap).max(0.0)),
-            width,
-        };
-    }
-
-    let below = (viewport_height - margin - f32::from(trigger.bottom()) - gap).max(0.0);
-    let above = (f32::from(trigger.top()) - margin - gap).max(0.0);
-    let placement = if below >= desired_height || below >= above {
-        Placement::Below
-    } else {
-        Placement::Above
-    };
-    let available = match placement {
-        Placement::Above => above,
-        _ => below,
-    };
+    let room = Positioner::below(desired_height)
+        .min_width(min_width)
+        .spacing(theme.spacing.sm, theme.spacing.sm - 2.0)
+        .resolve(window, trigger);
 
     MenuGeometry {
-        placement,
-        max_height: desired_height.min(available),
-        width,
+        placement: room.side.into(),
+        max_height: room.height,
+        width: room.width,
     }
 }
 
