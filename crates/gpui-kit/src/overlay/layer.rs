@@ -178,10 +178,15 @@ impl RenderOnce for Overlay {
         let anchor = self.anchor();
         let content = self.content.unwrap_or_else(|| div().into_any_element());
 
+        // Text inside a floating surface is its own document. A drag started
+        // in a dialog does not reach the page behind it, and a drag started on
+        // the page does not run through a menu that happens to be open over
+        // it. The seed is the overlay's own identity, so two open surfaces are
+        // also separate from each other.
         let surface = div()
             .id(element_id)
             .occlude()
-            .child(content)
+            .child(gpui::selection_scope(self.ident.as_str(), content))
             .into_any_element();
 
         // An anchored surface flips to the opposite corner rather than being

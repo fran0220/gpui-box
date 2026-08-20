@@ -1085,3 +1085,282 @@ fn a_disabled_list_installs_no_handler_at_all(cx: &mut TestAppContext) {
     assert!(harness.node("attachments.archive.retry").is_none());
     assert!(calls.borrow().is_empty());
 }
+
+// --------------------------------------------------- selection across a document
+
+/// Three text blocks in reading order, each with its own semantic node, which
+/// is what lets a test point at one and drag to another.
+fn selectable_document(cx: &mut TestAppContext) -> Harness {
+    Harness::new(cx, gpui_kit::install, |_, _| {
+        AgentDocument::new("report")
+            .block(AgentDocumentBlock::text("first", "alpha bravo charlie"))
+            .block(AgentDocumentBlock::text("second", "delta echo foxtrot"))
+            .block(AgentDocumentBlock::text("third", "golf hotel india"))
+            .into_any_element()
+    })
+}
+
+/// Presses at one fraction across a block and releases at a fraction across
+/// another.
+///
+/// A block is as wide as the document, so its centre is well past the end of
+/// a short line: the leading edge is the start of the text and the trailing
+/// edge is its end. Selecting both blocks whole therefore means aiming at the
+/// outer edges of the pair, whichever way the drag runs.
+fn drag_between_blocks(harness: &mut Harness, from: (&str, f32), to: (&str, f32)) {
+    let start = harness.point_across(from.0, from.1);
+    harness.context().simulate_event(MouseDownEvent {
+        button: MouseButton::Left,
+        position: start,
+        modifiers: Modifiers::none(),
+        click_count: 1,
+        first_mouse: false,
+    });
+    harness.context().run_until_parked();
+    let end = harness.point_across(to.0, to.1);
+    harness.drag_to(end);
+    harness.drop_here();
+}
+
+#[gpui::test]
+fn a_drag_across_blocks_selects_every_block_it_passed(cx: &mut TestAppContext) {
+    let mut harness = selectable_document(cx);
+
+    drag_between_blocks(
+        &mut harness,
+        ("report.block.first", 0.02),
+        ("report.block.third", 0.98),
+    );
+
+    let copy = harness
+        .update(|window, _| window.document_selection_text())
+        .expect("a drag across three blocks selects something");
+    assert_eq!(
+        copy.participants, 3,
+        "the block between the two ends is part of the selection without being pressed"
+    );
+    assert!(
+        copy.text.contains("delta echo foxtrot"),
+        "the middle block is copied in full, not sampled: {:?}",
+        copy.text
+    );
+    assert!(
+        copy.complete,
+        "every participant was mounted, so the copy is not a partial reading"
+    );
+}
+
+#[gpui::test]
+fn nested_markdown_keeps_its_place_between_document_blocks(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        AgentDocument::new("report")
+            .block(AgentDocumentBlock::text("first", "opening block"))
+            .block(AgentDocumentBlock::markdown(
+                "middle",
+                "**second** and *third* plus `fourth` after",
+            ))
+            .block(AgentDocumentBlock::text("last", "closing block"))
+            .into_any_element()
+    });
+
+    drag_between_blocks(
+        &mut harness,
+        ("report.block.first", 0.02),
+        ("report.block.last", 0.98),
+    );
+
+    let copy = harness
+        .update(|window, _| window.document_selection_text())
+        .expect("the mixed document is selected");
+    let markdown_end = copy
+        .text
+        .find("after")
+        .expect("the final Markdown run was copied");
+    let closing = copy
+        .text
+        .find("closing block")
+        .expect("the closing block was copied");
+    assert!(
+        markdown_end < closing,
+        "all nested Markdown runs stay before the sibling block that follows them: {:?}",
+        copy.text
+    );
+}
+
+#[gpui::test]
+fn a_backwards_drag_reads_the_same_span_as_a_forwards_one(cx: &mut TestAppContext) {
+    // The same two points, pressed in each order. A selection is a span, not a
+    // direction, so the reading is the same either way.
+    let forwards = {
+        let mut harness = selectable_document(cx);
+        drag_between_blocks(
+            &mut harness,
+            ("report.block.first", 0.05),
+            ("report.block.third", 0.05),
+        );
+        harness
+            .update(|window, _| window.document_selection_text())
+            .expect("a downward drag selects")
+    };
+
+    let backwards = {
+        let mut harness = selectable_document(cx);
+        drag_between_blocks(
+            &mut harness,
+            ("report.block.third", 0.05),
+            ("report.block.first", 0.05),
+        );
+        harness
+            .update(|window, _| window.document_selection_text())
+            .expect("an upward drag selects")
+    };
+
+    assert_eq!(forwards, backwards);
+    assert!(
+        forwards.text.contains("delta echo foxtrot"),
+        "the block between the two ends is read whole in both directions: {:?}",
+        forwards.text
+    );
+}
+
+#[gpui::test]
+fn selecting_all_reaches_the_whole_document(cx: &mut TestAppContext) {
+    let mut harness = selectable_document(cx);
+
+    // A press is what gives the text focus; the shortcut then acts on the
+    // document rather than on the pressed block.
+    harness.drag_start("report.block.second");
+    harness.drop_here();
+    harness.keystrokes("cmd-a");
+
+    let copy = harness
+        .update(|window, _| window.document_selection_text())
+        .expect("select all selects");
+    assert_eq!(copy.participants, 3);
+    assert!(copy.text.contains("alpha bravo charlie"));
+    assert!(copy.text.contains("golf hotel india"));
+}
+
+#[gpui::test]
+fn a_selection_is_dismissed_by_a_press_that_lands_on_no_text(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        div()
+            .w_full()
+            .h(gpui::px(600.0))
+            .child(
+                AgentDocument::new("report")
+                    .block(AgentDocumentBlock::text("first", "alpha bravo charlie"))
+                    .block(AgentDocumentBlock::text("second", "delta echo foxtrot")),
+            )
+            .into_any_element()
+    });
+
+    drag_between_blocks(
+        &mut harness,
+        ("report.block.first", 0.02),
+        ("report.block.second", 0.98),
+    );
+    assert!(harness.update(|window, _| window.document_selection_text().is_some()));
+
+    // Well below the last block, where no participant sits.
+    let empty = harness.point_in("report.block.second") + gpui::point(gpui::px(0.), gpui::px(300.));
+    harness.context().simulate_event(MouseDownEvent {
+        button: MouseButton::Left,
+        position: empty,
+        modifiers: Modifiers::none(),
+        click_count: 1,
+        first_mouse: false,
+    });
+    harness.context().run_until_parked();
+
+    assert!(
+        harness.update(|window, _| window.document_selection().is_empty()),
+        "a press with nothing under it puts the selection down"
+    );
+}
+
+#[gpui::test]
+fn a_drag_inside_an_overlay_does_not_reach_the_page_behind_it(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        div()
+            .w_full()
+            .child(AgentDocument::new("page").block(AgentDocumentBlock::text(
+                "body",
+                "page text nobody selected",
+            )))
+            .child(
+                Overlay::modal("dialog").child(
+                    AgentDocument::new("dialog.document")
+                        .block(AgentDocumentBlock::text("top", "dialog first line"))
+                        .block(AgentDocumentBlock::text("bottom", "dialog second line")),
+                ),
+            )
+            .into_any_element()
+    });
+
+    drag_between_blocks(
+        &mut harness,
+        ("dialog.document.block.top", 0.02),
+        ("dialog.document.block.bottom", 0.98),
+    );
+
+    let copy = harness
+        .update(|window, _| window.document_selection_text())
+        .expect("the dialog's own text is selectable");
+    assert_eq!(
+        copy.participants, 2,
+        "only the dialog's blocks took part: {:?}",
+        copy.text
+    );
+    assert!(
+        !copy.text.contains("page text nobody selected"),
+        "the page behind a dialog is a different document: {:?}",
+        copy.text
+    );
+}
+
+#[gpui::test]
+fn a_copy_across_a_virtualized_log_says_it_could_not_read_it_all(cx: &mut TestAppContext) {
+    // Long messages, so the message column reaches across the row and a
+    // pointer aimed at the row is aimed at its text.
+    let entries: Vec<LogEntry> = (0..1000)
+        .map(|index| {
+            LogEntry::new(
+                format!("entry-{index:04}"),
+                format!(
+                    "Fixture log message {index:04} with enough words after it to fill the row it is drawn in"
+                ),
+            )
+            .level("INFO", Tone::Info)
+        })
+        .collect();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        LogStream::new("logs", entries.clone())
+            .visible_rows(6)
+            .into_any_element()
+    });
+
+    // The stream opens on its newest rows, which are the ones actually laid
+    // out and therefore the only ones a pointer can reach.
+    // A row is wider than its message column, which starts after the level
+    // and timestamp, so the drag aims inside that column rather than at the
+    // row's own edges.
+    drag_between_blocks(
+        &mut harness,
+        ("logs.entries.entry-0996", 0.3),
+        ("logs.entries.entry-0999", 0.45),
+    );
+
+    let copy = harness
+        .update(|window, _| window.document_selection_text())
+        .expect("the mounted rows are selectable");
+    assert!(
+        copy.text.contains("Fixture log message 0997"),
+        "the rows between the two ends are read whole: {:?}",
+        copy.text
+    );
+    assert!(
+        !copy.complete,
+        "a virtualized stream cannot promise it read every row it spanned"
+    );
+}

@@ -28,6 +28,12 @@ use crate::motion;
 
 type EventHandler = Rc<dyn Fn(&AgentDocumentEvent, &mut Window, &mut App)>;
 
+/// Each block receives this many reading-order values for selectable runs.
+/// A block count or a Markdown run count that reaches 2³² cannot be laid out
+/// by this component in practice; partitioning here keeps nested Markdown runs
+/// ordered inside their block instead of competing with sibling block orders.
+const SELECTION_ORDER_STRIDE: u64 = 1 << 32;
+
 /// The semantic kind of one document block.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AgentBlockKind {
@@ -372,8 +378,15 @@ impl RenderOnce for AgentDocument {
                 .into_any_element(),
             AgentDocumentState::Ready => {
                 let mut column = div().w_full().column().gap_token(&theme, Space::Lg);
-                for block in self.blocks {
-                    column = column.child(render_block(&ident, block, self.on_event.clone(), cx));
+                for (order, block) in self.blocks.into_iter().enumerate() {
+                    column = column.child(render_block(
+                        &ident,
+                        block,
+                        // A block's place in the document is its reading order.
+                        order as u64,
+                        self.on_event.clone(),
+                        cx,
+                    ));
                 }
                 column.into_any_element()
             }
@@ -391,22 +404,32 @@ impl RenderOnce for AgentDocument {
 fn render_block(
     document: &Ident,
     block: AgentDocumentBlock,
+    order: u64,
     on_event: Option<EventHandler>,
     cx: &mut App,
 ) -> AnyElement {
     let theme = cx.theme().clone();
     let ident = document.child(format!("block.{}", block.id));
     let state = format!("{}:revision-{}", block.kind.as_str(), block.revision);
+    let selection_order = order.saturating_mul(SELECTION_ORDER_STRIDE);
     let body = match block.body {
         AgentBlockBody::Text(text) => div()
             .w_full()
             .type_scale(&theme, TypeScale::Body)
             .text_tone(&theme, TextTone::Primary)
-            .child(StyledText::new(text).selectable(ident.child("text").element_id()))
+            .child({
+                let text_ident = ident.child("text");
+                StyledText::new(text).selectable_in_document(
+                    text_ident.element_id(),
+                    text_ident.semantic_id(),
+                    selection_order,
+                )
+            })
             .into_any_element(),
         AgentBlockBody::Markdown(source) => {
             let block_id = block.id.clone();
             Markdown::new(ident.child("markdown"), source)
+                .selection_order_start(selection_order)
                 .when_some(on_event, |markdown, on_event| {
                     markdown.on_event(move |event, window, cx| {
                         on_event(

@@ -275,11 +275,13 @@ impl Sizable for CodeView {
 }
 
 /// One rendered line: the gutter number, the rail, and the coloured runs.
+#[allow(clippy::too_many_arguments)]
 fn line_element(
     ident: &Ident,
     line: &CodeLine,
     gutter: f32,
     line_numbers: bool,
+    virtualized: bool,
     theme: &Theme,
     cx: &App,
 ) -> AnyElement {
@@ -288,6 +290,8 @@ fn line_element(
         .map(|mark| mark.colors(theme))
         .unzip_or(theme.colors.hairline, gpui::transparent_black());
     let struck = line.mark.is_some_and(LineMark::struck);
+
+    let text_ident = ident.child(format!("line-{}-text", line.number));
 
     let row = div()
         .row()
@@ -323,11 +327,22 @@ fn line_element(
                 .pl(px(GUTTER_GAP / 2.0))
                 .when(struck, |element| element.line_through())
                 .child(
-                    styled_code(theme, line.text.clone(), &line.spans).selectable(
-                        ident
-                            .child(format!("line-{}-text", line.number))
-                            .element_id(),
-                    ),
+                    styled_code(theme, line.text.clone(), &line.spans)
+                        .selectable_in_document(
+                            text_ident.element_id(),
+                            // The line number is this file's reading order, and
+                            // it stays that whether or not the line is on
+                            // screen, so a selection spanning a scroll still
+                            // resolves.
+                            text_ident.semantic_id(),
+                            line.number as u64,
+                        )
+                        // In the virtualized mode the rows between two ends of
+                        // a selection may never have been laid out, so a copy
+                        // that crosses them reports itself incomplete rather
+                        // than inventing them. The copy control remains the
+                        // whole-document operation.
+                        .virtualized_participant(virtualized),
                 ),
         );
 
@@ -447,7 +462,15 @@ impl RenderOnce for CodeView {
                 let line = &lines[index];
                 ListItem::new(
                     line_id(&list_ident, line.number),
-                    line_element(&list_ident, line, gutter, line_numbers, &theme_for_rows, cx),
+                    line_element(
+                        &list_ident,
+                        line,
+                        gutter,
+                        line_numbers,
+                        true,
+                        &theme_for_rows,
+                        cx,
+                    ),
                 )
             })
             .row_height(theme.typography.code.line_height)
@@ -466,7 +489,15 @@ impl RenderOnce for CodeView {
                         self.lines
                             .iter()
                             .map(|line| {
-                                line_element(&body_ident, line, gutter, line_numbers, &theme, cx)
+                                line_element(
+                                    &body_ident,
+                                    line,
+                                    gutter,
+                                    line_numbers,
+                                    false,
+                                    &theme,
+                                    cx,
+                                )
                             })
                             .collect::<Vec<_>>(),
                     ),

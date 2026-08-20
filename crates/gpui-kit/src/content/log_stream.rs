@@ -455,7 +455,10 @@ fn entries_body(
         let entry = &rows[index];
         ListItem::new(
             entry.id.clone(),
-            entry_row(&parent, entry, &row_theme, ansi, cx),
+            // The row's position in the filtered stream is its reading order.
+            // The list is virtualized, so a copy spanning rows that were never
+            // mounted says so rather than dropping them silently.
+            entry_row(&parent, entry, index as u64, true, &row_theme, ansi, cx),
         )
         // Log payloads stay out of diagnostic snapshots. The caller's
         // level is enough to name the row without publishing the message.
@@ -472,9 +475,12 @@ fn entries_body(
     list.into_any_element()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn entry_row(
     parent: &Ident,
     entry: &LogEntry,
+    order: u64,
+    virtualized: bool,
     theme: &gpui_kit_theme::Theme,
     ansi: bool,
     cx: &App,
@@ -496,6 +502,7 @@ fn entry_row(
     } else {
         let mut message = HighlightedText::new(entry.message.clone())
             .selectable(entry_ident.child("message"))
+            .in_document(order, virtualized)
             .hits(entry.search_hits.clone())
             .monospace(true);
         if let Some(current) = entry.current_hit {

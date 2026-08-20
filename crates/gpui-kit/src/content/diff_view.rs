@@ -440,7 +440,10 @@ impl RenderOnce for DiffView {
                 let label = cx.strings().text(row.kind.label_key());
                 ListItem::new(
                     row.id.clone(),
-                    diff_row(&row.id, &row.kind, &row_theme, &expand_label),
+                    // The row's position in the flattened diff is its reading
+                    // order. The list is virtualized, so a copy spanning rows
+                    // that were never mounted reports itself incomplete.
+                    diff_row(&row.id, &row.kind, index as u64, &row_theme, &expand_label),
                 )
                 // Source and paths stay out of diagnostic snapshots. Stable
                 // business ids and the row kind remain addressable.
@@ -602,6 +605,7 @@ fn flatten(files: Vec<DiffFile>, presentation: DiffPresentation) -> Vec<FlatRow>
 fn diff_row(
     id: &SharedString,
     kind: &FlatKind,
+    order: u64,
     theme: &Theme,
     expand: &SharedString,
 ) -> AnyElement {
@@ -646,8 +650,8 @@ fn diff_row(
             side,
             old_number,
             new_number,
-        } => unified_line(id, side, *old_number, *new_number, theme),
-        FlatKind::Split { old, new } => split_line(id, old.as_ref(), new.as_ref(), theme),
+        } => unified_line(id, side, *old_number, *new_number, order * 2, theme),
+        FlatKind::Split { old, new } => split_line(id, old.as_ref(), new.as_ref(), order, theme),
     }
 }
 
@@ -656,6 +660,7 @@ fn unified_line(
     side: &DiffSide,
     old_number: Option<usize>,
     new_number: Option<usize>,
+    order: u64,
     theme: &Theme,
 ) -> AnyElement {
     let color = side.mark.tone().color(theme);
@@ -689,7 +694,12 @@ fn unified_line(
                 .whitespace_nowrap()
                 .child(
                     styled_code(theme, side.text.clone(), &side.spans)
-                        .selectable(SharedString::from(format!("{id}.text"))),
+                        .selectable_in_document(
+                            SharedString::from(format!("{id}.text")),
+                            SharedString::from(format!("{id}.text")),
+                            order,
+                        )
+                        .virtualized_participant(true),
                 ),
         )
         .into_any_element()
@@ -699,6 +709,7 @@ fn split_line(
     id: &SharedString,
     old: Option<&DiffSide>,
     new: Option<&DiffSide>,
+    order: u64,
     theme: &Theme,
 ) -> AnyElement {
     div()
@@ -709,7 +720,9 @@ fn split_line(
         .font_family(theme.typography.mono.clone())
         .text_size(px(theme.typography.code.size))
         .line_height(px(theme.typography.code.line_height))
-        .child(code_side(id, "old", old, theme))
+        // Within one split row the left column reads before the right, so the
+        // two columns take consecutive orders under the row's own.
+        .child(code_side(id, "old", old, order * 2, theme))
         .child(
             div()
                 .flex_none()
@@ -717,11 +730,17 @@ fn split_line(
                 .h_full()
                 .bg(theme.colors.divider),
         )
-        .child(code_side(id, "new", new, theme))
+        .child(code_side(id, "new", new, order * 2 + 1, theme))
         .into_any_element()
 }
 
-fn code_side(id: &SharedString, slot: &str, side: Option<&DiffSide>, theme: &Theme) -> AnyElement {
+fn code_side(
+    id: &SharedString,
+    slot: &str,
+    side: Option<&DiffSide>,
+    order: u64,
+    theme: &Theme,
+) -> AnyElement {
     let mark = side.map_or(DiffLineMark::Context, |side| side.mark);
     let color = mark.tone().color(theme);
     div()
@@ -750,8 +769,10 @@ fn code_side(id: &SharedString, slot: &str, side: Option<&DiffSide>, theme: &The
                 .overflow_hidden()
                 .whitespace_nowrap()
                 .children(side.map(|side| {
+                    let key = SharedString::from(format!("{id}.{slot}.text"));
                     styled_code(theme, side.text.clone(), &side.spans)
-                        .selectable(SharedString::from(format!("{id}.{slot}.text")))
+                        .selectable_in_document(key.clone(), key, order)
+                        .virtualized_participant(true)
                 })),
         )
         .into_any_element()

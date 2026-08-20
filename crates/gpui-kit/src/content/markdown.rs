@@ -107,6 +107,9 @@ pub struct Markdown {
     ident: Ident,
     source: SharedString,
     max_lines: Option<usize>,
+    /// The first reading-order value this document may claim when it is
+    /// embedded in a larger document.
+    selection_order_start: u64,
     on_event: Option<EventHandler>,
     image: Option<ImageSource>,
     highlighter: Option<Highlighter>,
@@ -131,6 +134,7 @@ impl Markdown {
             ident: ident.into(),
             source: source.into(),
             max_lines: None,
+            selection_order_start: 0,
             on_event: None,
             image: None,
             highlighter: None,
@@ -145,6 +149,14 @@ impl Markdown {
     /// layout knows.
     pub fn max_lines(mut self, lines: usize) -> Self {
         self.max_lines = Some(lines);
+        self
+    }
+
+    /// Places this Markdown document inside a caller-owned reading-order
+    /// partition. Kept crate-private until a public composition contract needs
+    /// to expose hierarchical selection order directly.
+    pub(crate) fn selection_order_start(mut self, order: u64) -> Self {
+        self.selection_order_start = order;
         self
     }
 
@@ -199,6 +211,7 @@ impl RenderOnce for Markdown {
             image: self.image.clone(),
             highlighter: self.highlighter.clone(),
             used: HashMap::new(),
+            reading_order: self.selection_order_start,
             requested: Vec::new(),
         };
 
@@ -283,6 +296,11 @@ struct Painter {
     /// How many parts have already claimed each id stem, so a document that
     /// links to the same place twice still publishes two distinct nodes.
     used: HashMap<String, usize>,
+    /// How many selectable runs have been emitted, which is the reading order
+    /// the document selection joins them in. It counts emissions rather than
+    /// positions in the source, so a run's order matches the order a reader
+    /// meets it.
+    reading_order: u64,
     requested: Vec<ImageRequest>,
 }
 
@@ -299,6 +317,13 @@ impl Painter {
             1 => self.ident.child(stem),
             repeat => self.ident.child(format!("{stem}-{repeat}")),
         }
+    }
+
+    /// The next reading order, consumed by one selectable run.
+    fn next_reading_order(&mut self) -> u64 {
+        let order = self.reading_order;
+        self.reading_order += 1;
+        order
     }
 
     fn report(&self, event: MarkdownEvent) -> Option<impl Fn(&mut Window, &mut App) + use<>> {
@@ -416,10 +441,12 @@ impl Painter {
             match inline {
                 Inline::Text(text) => {
                     let ident = self.ident_for("text", text.as_ref());
-                    elements.push(run(&theme, ident.element_id(), text.clone(), style));
+                    let order = self.next_reading_order();
+                    elements.push(run(&theme, &ident, order, text.clone(), style));
                 }
                 Inline::Code(text) => {
                     let ident = self.ident_for("code", text.as_ref());
+                    let order = self.next_reading_order();
                     elements.push(
                         div()
                             .px(px(theme.space(Space::Xs)))
@@ -427,7 +454,11 @@ impl Painter {
                             .bg(theme.colors.raised)
                             .font_family(theme.typography.mono.clone())
                             .text_size(px(theme.typography.code.size))
-                            .child(StyledText::new(text.clone()).selectable(ident.element_id()))
+                            .child(StyledText::new(text.clone()).selectable_in_document(
+                                ident.element_id(),
+                                ident.semantic_id(),
+                                order,
+                            ))
                             .into_any_element(),
                     );
                 }
@@ -469,7 +500,8 @@ impl Painter {
                 Inline::Html(html) => elements.push(self.html_inline(html.clone(), cx)),
                 Inline::SoftBreak => {
                     let ident = self.ident_for("text", "soft break");
-                    elements.push(run(&theme, ident.element_id(), " ".into(), style));
+                    let order = self.next_reading_order();
+                    elements.push(run(&theme, &ident, order, " ".into(), style));
                 }
                 Inline::HardBreak => {
                     elements.push(div().w_full().h(px(0.0)).flex_none().into_any_element())
@@ -505,6 +537,9 @@ impl Painter {
             None => href.clone(),
         };
         let runs = self.inlines(content, style, window, cx);
+        // A link whose content produced no runs still reads at one place in
+        // the document, so it claims an order of its own.
+        let label_order = self.next_reading_order();
         let taken = self.report(MarkdownEvent::LinkClicked { href: href.clone() });
 
         div()
@@ -519,7 +554,8 @@ impl Painter {
             .children(if runs.is_empty() {
                 vec![run(
                     &theme,
-                    ident.child("text").element_id(),
+                    &ident.child("text"),
+                    label_order,
                     label.clone(),
                     style,
                 )]
@@ -624,6 +660,7 @@ impl Painter {
         // The id seed stays English on purpose: a semantic id that moved when
         // the host installed a translation would not be a stable id.
         let ident = self.ident_for("code", language.as_deref().unwrap_or(PLAIN_TEXT_ID));
+        let code_order = self.next_reading_order();
         let label = language
             .clone()
             .unwrap_or_else(|| cx.strings().text(StringKey::MarkdownPlainText));
@@ -653,10 +690,14 @@ impl Painter {
             .text_size(px(theme.typography.code.size))
             .line_height(px(theme.typography.code.line_height))
             .text_color(theme.colors.text)
-            .child(
-                styled_code(&theme, text.clone(), &spans)
-                    .selectable(ident.child("text").element_id()),
-            );
+            .child({
+                let text_ident = ident.child("text");
+                styled_code(&theme, text.clone(), &spans).selectable_in_document(
+                    text_ident.element_id(),
+                    text_ident.semantic_id(),
+                    code_order,
+                )
+            });
 
         div()
             .column()
@@ -1003,7 +1044,13 @@ const UNRENDERED: SharedString = SharedString::new_static("unrendered html");
 const PLAIN_TEXT_ID: &str = "plain text";
 const TASK_ID: &str = "task";
 
-fn run(theme: &Theme, id: gpui::ElementId, text: SharedString, style: RunStyle) -> AnyElement {
+fn run(
+    theme: &Theme,
+    ident: &Ident,
+    order: u64,
+    text: SharedString,
+    style: RunStyle,
+) -> AnyElement {
     div()
         .when(style.strong, |element| {
             element.font_weight(FontWeight::BOLD)
@@ -1012,7 +1059,11 @@ fn run(theme: &Theme, id: gpui::ElementId, text: SharedString, style: RunStyle) 
         .when(style.struck, |element| {
             element.line_through().text_color(theme.colors.text_muted)
         })
-        .child(StyledText::new(text).selectable(id))
+        .child(StyledText::new(text).selectable_in_document(
+            ident.element_id(),
+            ident.semantic_id(),
+            order,
+        ))
         .into_any_element()
 }
 

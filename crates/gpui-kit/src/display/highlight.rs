@@ -46,6 +46,8 @@ use crate::foundation::Ident;
 pub struct HighlightedText {
     ident: Option<Ident>,
     selection_ident: Option<Ident>,
+    document_order: Option<u64>,
+    virtualized: bool,
     text: SharedString,
     hits: Vec<Range<usize>>,
     current: Option<usize>,
@@ -57,6 +59,8 @@ impl HighlightedText {
         Self {
             ident: None,
             selection_ident: None,
+            document_order: None,
+            virtualized: false,
             text: text.into(),
             hits: Vec::new(),
             current: None,
@@ -76,6 +80,19 @@ impl HighlightedText {
     /// caller-owned content whose bounds still need stable transient state.
     pub fn selectable(mut self, ident: impl Into<Ident>) -> Self {
         self.selection_ident = Some(ident.into());
+        self
+    }
+
+    /// Joins this text to its window's document selection at `order`, so one
+    /// drag reaches the entries above and below it rather than stopping at
+    /// this row's edge.
+    ///
+    /// A caller that virtualizes its rows passes `virtualized`, which makes a
+    /// copy crossing the rows that were never mounted report itself
+    /// incomplete instead of quietly omitting them.
+    pub fn in_document(mut self, order: u64, virtualized: bool) -> Self {
+        self.document_order = Some(order);
+        self.virtualized = virtualized;
         self
     }
 
@@ -187,10 +204,10 @@ impl RenderOnce for HighlightedText {
             })
             .collect::<Vec<_>>();
         let text = StyledText::new(self.text.clone()).with_highlights(highlights);
-        let selectable_id = self
+        let selectable = self
             .selection_ident
             .as_ref()
-            .map(|ident| ident.child("text").element_id());
+            .map(|ident| ident.child("text"));
 
         let mut element = div()
             .flex()
@@ -203,9 +220,13 @@ impl RenderOnce for HighlightedText {
                     .text_size(px(theme.typography.code.size))
                     .line_height(px(theme.typography.code.line_height))
             });
-        element = match selectable_id {
-            Some(id) => element.child(text.selectable(id)),
-            None => element.child(text),
+        element = match (selectable, self.document_order) {
+            (Some(ident), Some(order)) => element.child(
+                text.selectable_in_document(ident.element_id(), ident.semantic_id(), order)
+                    .virtualized_participant(self.virtualized),
+            ),
+            (Some(ident), None) => element.child(text.selectable(ident.element_id())),
+            (None, _) => element.child(text),
         };
         match self.ident {
             Some(ident) => {
