@@ -5,6 +5,12 @@
 //! an input method speaks in, and a length limit that truncates rather than
 //! rejects are the same arithmetic in both.
 
+mod buffer;
+mod history;
+
+pub(crate) use buffer::{EditBuffer, EditRules};
+pub(crate) use history::EditCause as Cause;
+
 use std::ops::Range;
 
 pub(crate) use gpui::{

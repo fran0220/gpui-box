@@ -69,6 +69,8 @@ actions!(
         Copy,
         Cut,
         Paste,
+        Undo,
+        Redo,
         Submit,
         Cancel,
         ShowCharacterPalette,
@@ -143,6 +145,8 @@ pub(crate) fn install(cx: &mut App) {
         KeyBinding::new(&format!("{primary}-c"), Copy, Some(KEY_CONTEXT)),
         KeyBinding::new(&format!("{primary}-x"), Cut, Some(KEY_CONTEXT)),
         KeyBinding::new(&format!("{primary}-v"), Paste, Some(KEY_CONTEXT)),
+        KeyBinding::new(&format!("{primary}-z"), Undo, Some(KEY_CONTEXT)),
+        KeyBinding::new(&format!("{primary}-shift-z"), Redo, Some(KEY_CONTEXT)),
     ];
 
     if !line.is_empty() {
@@ -220,18 +224,15 @@ impl EventEmitter<TextInputEvent> for TextInput {}
 pub struct TextInput {
     ident: Ident,
     focus_handle: FocusHandle,
-    content: SharedString,
     placeholder: SharedString,
     /// What to call the field where nothing on screen already does. A control
     /// that wraps a bare field owns the visible label, so the field it types
     /// into has to be told its own name or it reaches a reader unnamed.
     name: SharedString,
-    /// A caret is an empty selection, so one range describes both.
-    selected_range: Range<usize>,
-    selection_reversed: bool,
-    /// The range the input method is currently composing, which is underlined
-    /// and replaced wholesale as composition continues.
-    marked_range: Option<Range<usize>>,
+    /// The value, the caret, the composition in flight, and the transactions
+    /// that got here. Every mutation goes through it, so undo describes the
+    /// value the field is actually showing.
+    edit: text_edit::EditBuffer,
     size: ControlSize,
     disabled: bool,
     invalid: bool,
@@ -277,12 +278,12 @@ impl TextInput {
         Self {
             ident: ident.into(),
             focus_handle,
-            content: SharedString::default(),
             placeholder: SharedString::default(),
             name: SharedString::default(),
-            selected_range: 0..0,
-            selection_reversed: false,
-            marked_range: None,
+            edit: text_edit::EditBuffer::new(text_edit::EditRules {
+                single_line: true,
+                ..Default::default()
+            }),
             size: ControlSize::Md,
             disabled: false,
             invalid: false,
@@ -325,8 +326,7 @@ impl TextInput {
     /// Seeds the initial text, with the caret at the end.
     pub fn text(mut self, text: impl Into<SharedString>) -> Self {
         let text = text.into();
-        self.content = text_edit::normalize_single_line(&text).into();
-        self.selected_range = self.content.len()..self.content.len();
+        self.edit.set_text(&text);
         self
     }
 
@@ -351,6 +351,11 @@ impl TextInput {
     pub fn secret(mut self, secret: bool) -> Self {
         self.secret = secret;
         self.visually_masked = secret;
+        if secret {
+            // Nothing that held a credential is kept where an undo could put
+            // it back on screen.
+            self.edit.forbid_history();
+        }
         self
     }
 
@@ -370,6 +375,8 @@ impl TextInput {
         self.secret = true;
         self.visually_masked = true;
         self.max_graphemes = Some(slots);
+        self.edit.rules_mut().max_graphemes = Some(slots);
+        self.edit.forbid_history();
         self.visual_slots = Some(slots);
         cx.notify();
     }
@@ -387,27 +394,27 @@ impl TextInput {
     /// Refuses input past a length in bytes of UTF-8.
     pub fn max_length(mut self, max_length: usize) -> Self {
         self.max_length = Some(max_length);
+        self.edit.rules_mut().max_length = Some(max_length);
         self
     }
 
     pub fn value(&self) -> &SharedString {
-        &self.content
+        self.edit.text()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.content.is_empty()
+        self.edit.is_empty()
     }
 
     /// Replaces the text from the host side, for example when a form resets.
     pub fn set_value(&mut self, value: impl Into<SharedString>, cx: &mut Context<Self>) {
         let value = value.into();
-        self.content = text_edit::normalize_single_line(&value).into();
+        // A value the host set is not a step the reader can walk back
+        // through, so it ends the history rather than joining it.
+        self.edit.set_text(&value);
         self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
-        let end = self.content.len();
-        self.selected_range = end..end;
-        self.marked_range = None;
         self.scroll_offset = px(0.0);
-        cx.emit(TextInputEvent::Change(self.content.clone()));
+        cx.emit(TextInputEvent::Change(self.edit.text().clone()));
         cx.notify();
     }
 
@@ -427,11 +434,8 @@ impl TextInput {
     /// host a change it made itself.
     pub fn set_text_quietly(&mut self, value: impl Into<SharedString>, cx: &mut Context<Self>) {
         let value = value.into();
-        self.content = text_edit::normalize_single_line(&value).into();
+        self.edit.set_text(&value);
         self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
-        let end = self.content.len();
-        self.selected_range = end..end;
-        self.marked_range = None;
         self.scroll_offset = px(0.0);
         cx.notify();
     }
@@ -439,7 +443,7 @@ impl TextInput {
     pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
         self.disabled = disabled;
         if disabled {
-            self.marked_range = None;
+            self.edit.set_marked(None);
             self.is_selecting = false;
         }
         cx.notify();
@@ -478,14 +482,15 @@ impl TextInput {
     }
 
     pub fn selected_range(&self) -> Range<usize> {
-        self.selected_range.clone()
+        self.edit.selection()
     }
 
     pub fn cursor_offset(&self) -> usize {
-        if self.selection_reversed {
-            self.selected_range.start
+        let selection = self.edit.selection();
+        if self.edit.is_reversed() {
+            selection.start
         } else {
-            self.selected_range.end
+            selection.end
         }
     }
 
@@ -498,7 +503,7 @@ impl TextInput {
     }
 
     pub(crate) fn marked_range(&self) -> Option<Range<usize>> {
-        self.marked_range.clone()
+        self.edit.marked()
     }
 
     pub(crate) fn scroll_offset(&self) -> Pixels {
@@ -519,10 +524,10 @@ impl TextInput {
     /// The mask is one dot per grapheme so the caret can still be placed
     /// between characters the typist entered.
     pub(crate) fn display_text(&self) -> SharedString {
-        if !self.visually_masked || self.content.is_empty() {
-            return self.content.clone();
+        if !self.visually_masked || self.edit.is_empty() {
+            return self.edit.text().clone();
         }
-        SharedString::from("•".repeat(self.content.graphemes(true).count()))
+        SharedString::from("•".repeat(self.edit.text().graphemes(true).count()))
     }
 
     /// Maps a content offset onto the masked text, which has its own byte
@@ -531,45 +536,95 @@ impl TextInput {
         if !self.visually_masked {
             return offset;
         }
-        let graphemes = self.content[..offset.min(self.content.len())]
+        let graphemes = self.edit.text()[..offset.min(self.edit.text().len())]
             .graphemes(true)
             .count();
         graphemes * "•".len()
     }
 
+    /// The range an edit covers when the caller did not name one: whatever an
+    /// input method is composing, or the selection.
+    fn edit_range(&self, range_utf16: Option<Range<usize>>) -> Range<usize> {
+        range_utf16
+            .as_ref()
+            .map(|range| self.range_from_utf16(range))
+            .or_else(|| self.edit.marked())
+            .unwrap_or_else(|| self.edit.selection())
+    }
+
+    /// The one place this control's text changes.
+    ///
+    /// `cause` is what the reader did, which decides whether the edit joins
+    /// the step before it and whether it is remembered at all.
+    fn apply_edit(
+        &mut self,
+        range_utf16: Option<Range<usize>>,
+        new_text: &str,
+        cause: text_edit::Cause,
+        cx: &mut Context<Self>,
+    ) {
+        if self.disabled || self.read_only {
+            return;
+        }
+        let range = self.edit_range(range_utf16);
+        // A key that arrives while an input method is composing ends the
+        // composition, so the run is one step rather than merging with what
+        // follows it.
+        self.edit.end_composition();
+        let outcome = self.edit.replace(range, new_text, cause);
+        if outcome.changed {
+            self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
+            cx.emit(TextInputEvent::Change(self.edit.text().clone()));
+        }
+        cx.notify();
+    }
+
+    /// Takes back the last thing the reader did.
+    ///
+    /// A secret field has nothing to take back, and a read-only or disabled
+    /// field installs no handler for this at all.
+    fn undo(&mut self, _: &Undo, _: &mut Window, cx: &mut Context<Self>) {
+        if self.disabled || self.read_only || !self.edit.undo() {
+            return;
+        }
+        self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
+        cx.emit(TextInputEvent::Change(self.edit.text().clone()));
+        cx.notify();
+    }
+
+    fn redo(&mut self, _: &Redo, _: &mut Window, cx: &mut Context<Self>) {
+        if self.disabled || self.read_only || !self.edit.redo() {
+            return;
+        }
+        self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
+        cx.emit(TextInputEvent::Change(self.edit.text().clone()));
+        cx.notify();
+    }
+
     fn move_to(&mut self, offset: usize, cx: &mut Context<Self>) {
-        self.selected_range = offset..offset;
-        self.selection_reversed = false;
+        self.edit.set_caret(offset);
         cx.notify();
     }
 
     fn select_to(&mut self, offset: usize, cx: &mut Context<Self>) {
-        if self.selection_reversed {
-            self.selected_range.start = offset;
-        } else {
-            self.selected_range.end = offset;
-        }
-        if self.selected_range.end < self.selected_range.start {
-            self.selection_reversed = !self.selection_reversed;
-            self.selected_range = self.selected_range.end..self.selected_range.start;
-        }
+        self.edit.extend_selection(offset);
         cx.notify();
     }
 
     fn previous_boundary(&self, offset: usize) -> usize {
-        text_edit::previous_boundary(&self.content, offset)
+        text_edit::previous_boundary(self.edit.text(), offset)
     }
 
     fn next_boundary(&self, offset: usize) -> usize {
-        text_edit::next_boundary(&self.content, offset)
+        text_edit::next_boundary(self.edit.text(), offset)
     }
 
     fn previous_word_boundary(&self, offset: usize) -> usize {
-        text_edit::previous_word_boundary(&self.content, offset)
+        text_edit::previous_word_boundary(self.edit.text(), offset)
     }
 
     fn next_word_boundary(&self, offset: usize) -> usize {
-        text_edit::next_word_boundary(&self.content, offset)
+        text_edit::next_word_boundary(self.edit.text(), offset)
     }
 
     pub(crate) fn index_for_position(&self, position: Point<Pixels>, rtl: bool) -> usize {
@@ -592,14 +647,14 @@ impl TextInput {
                 x - slot_width * physical_slot as f32 >= slot_width / 2.0
             };
             let boundary = (logical_slot + usize::from(after_midpoint))
-                .min(self.content.graphemes(true).count());
+                .min(self.edit.text().graphemes(true).count());
             return self.content_offset_for_grapheme(boundary);
         }
         if position.y < bounds.top() {
             return 0;
         }
         if position.y > bounds.bottom() {
-            return self.content.len();
+            return self.edit.text().len();
         }
         let Some(line) = self.last_layout.as_ref() else {
             return 0;
@@ -625,22 +680,23 @@ impl TextInput {
     }
 
     fn content_offset_for_grapheme(&self, grapheme: usize) -> usize {
-        self.content
+        self.edit
+            .text()
             .grapheme_indices(true)
             .nth(grapheme)
             .map(|(index, _)| index)
-            .unwrap_or(self.content.len())
+            .unwrap_or(self.edit.text().len())
     }
 
     fn grapheme_offset(&self, offset: usize) -> usize {
-        self.content[..offset.min(self.content.len())]
+        self.edit.text()[..offset.min(self.edit.text().len())]
             .graphemes(true)
             .count()
     }
 
     fn left(&mut self, _: &Left, _: &mut Window, cx: &mut Context<Self>) {
         let backwards = self.visual_slots.is_none() || !cx.layout_direction().is_rtl();
-        if self.selected_range.is_empty() {
+        if self.edit.selection().is_empty() {
             let offset = if backwards {
                 self.previous_boundary(self.cursor_offset())
             } else {
@@ -649,9 +705,9 @@ impl TextInput {
             self.move_to(offset, cx);
         } else {
             let offset = if backwards {
-                self.selected_range.start
+                self.edit.selection().start
             } else {
-                self.selected_range.end
+                self.edit.selection().end
             };
             self.move_to(offset, cx);
         }
@@ -659,7 +715,7 @@ impl TextInput {
 
     fn right(&mut self, _: &Right, _: &mut Window, cx: &mut Context<Self>) {
         let forwards = self.visual_slots.is_none() || !cx.layout_direction().is_rtl();
-        if self.selected_range.is_empty() {
+        if self.edit.selection().is_empty() {
             let offset = if forwards {
                 self.next_boundary(self.cursor_offset())
             } else {
@@ -668,9 +724,9 @@ impl TextInput {
             self.move_to(offset, cx);
         } else {
             let offset = if forwards {
-                self.selected_range.end
+                self.edit.selection().end
             } else {
-                self.selected_range.start
+                self.edit.selection().start
             };
             self.move_to(offset, cx);
         }
@@ -740,12 +796,12 @@ impl TextInput {
     }
 
     fn select_to_line_end(&mut self, _: &SelectToLineEnd, _: &mut Window, cx: &mut Context<Self>) {
-        self.select_to(self.content.len(), cx);
+        self.select_to(self.edit.text().len(), cx);
     }
 
     fn select_all(&mut self, _: &SelectAll, _: &mut Window, cx: &mut Context<Self>) {
         self.move_to(0, cx);
-        self.select_to(self.content.len(), cx);
+        self.select_to(self.edit.text().len(), cx);
     }
 
     fn line_start(&mut self, _: &LineStart, _: &mut Window, cx: &mut Context<Self>) {
@@ -753,90 +809,90 @@ impl TextInput {
     }
 
     fn line_end(&mut self, _: &LineEnd, _: &mut Window, cx: &mut Context<Self>) {
-        self.move_to(self.content.len(), cx);
+        self.move_to(self.edit.text().len(), cx);
     }
 
-    fn backspace(&mut self, _: &Backspace, window: &mut Window, cx: &mut Context<Self>) {
-        if self.selected_range.is_empty() {
+    fn backspace(&mut self, _: &Backspace, _window: &mut Window, cx: &mut Context<Self>) {
+        if self.edit.selection().is_empty() {
             if self.cursor_offset() == 0 {
                 cx.emit(TextInputEvent::BackspaceAtStart);
                 return;
             }
             self.select_to(self.previous_boundary(self.cursor_offset()), cx);
         }
-        self.replace_text_in_range(None, "", window, cx);
+        self.apply_edit(None, "", text_edit::Cause::Deleting, cx);
     }
 
-    fn delete(&mut self, _: &Delete, window: &mut Window, cx: &mut Context<Self>) {
-        if self.selected_range.is_empty() {
+    fn delete(&mut self, _: &Delete, _window: &mut Window, cx: &mut Context<Self>) {
+        if self.edit.selection().is_empty() {
             self.select_to(self.next_boundary(self.cursor_offset()), cx);
         }
-        self.replace_text_in_range(None, "", window, cx);
+        self.apply_edit(None, "", text_edit::Cause::Deleting, cx);
     }
 
     fn delete_word_left(
         &mut self,
         _: &DeleteWordLeft,
-        window: &mut Window,
+        _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.selected_range.is_empty() {
+        if self.edit.selection().is_empty() {
             self.select_to(self.previous_word_boundary(self.cursor_offset()), cx);
         }
-        self.replace_text_in_range(None, "", window, cx);
+        self.apply_edit(None, "", text_edit::Cause::Deleting, cx);
     }
 
     fn delete_word_right(
         &mut self,
         _: &DeleteWordRight,
-        window: &mut Window,
+        _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.selected_range.is_empty() {
+        if self.edit.selection().is_empty() {
             self.select_to(self.next_word_boundary(self.cursor_offset()), cx);
         }
-        self.replace_text_in_range(None, "", window, cx);
+        self.apply_edit(None, "", text_edit::Cause::Deleting, cx);
     }
 
     fn delete_to_line_start(
         &mut self,
         _: &DeleteToLineStart,
-        window: &mut Window,
+        _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.selected_range.is_empty() {
+        if self.edit.selection().is_empty() {
             self.select_to(0, cx);
         }
-        self.replace_text_in_range(None, "", window, cx);
+        self.apply_edit(None, "", text_edit::Cause::Deleting, cx);
     }
 
     fn copy(&mut self, _: &Copy, _: &mut Window, cx: &mut Context<Self>) {
         // A secret is never handed to the clipboard, where nothing in this
         // library controls where it goes next.
-        if self.selected_range.is_empty() || self.secret {
+        if self.edit.selection().is_empty() || self.secret {
             return;
         }
-        let selected = self.content[self.selected_range.clone()].to_string();
+        let selected = self.edit.text()[self.edit.selection()].to_string();
         cx.write_to_clipboard(ClipboardItem::new_string(selected));
     }
 
-    fn cut(&mut self, _: &Cut, window: &mut Window, cx: &mut Context<Self>) {
-        if self.selected_range.is_empty() || self.secret {
+    fn cut(&mut self, _: &Cut, _window: &mut Window, cx: &mut Context<Self>) {
+        if self.edit.selection().is_empty() || self.secret {
             return;
         }
-        let selected = self.content[self.selected_range.clone()].to_string();
+        let selected = self.edit.text()[self.edit.selection()].to_string();
         cx.write_to_clipboard(ClipboardItem::new_string(selected));
-        self.replace_text_in_range(None, "", window, cx);
+        self.apply_edit(None, "", text_edit::Cause::Cut, cx);
     }
 
-    fn paste(&mut self, _: &Paste, window: &mut Window, cx: &mut Context<Self>) {
+    fn paste(&mut self, _: &Paste, _window: &mut Window, cx: &mut Context<Self>) {
         let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) else {
             return;
         };
         // A single-line control accepts pasted lines as spaces rather than
         // silently dropping everything after the first newline.
         let text = text.replace(['\n', '\r'], " ");
-        self.replace_text_in_range(None, &text, window, cx);
+        self.apply_edit(None, &text, text_edit::Cause::Paste, cx);
     }
 
     fn submit(&mut self, _: &Submit, _: &mut Window, cx: &mut Context<Self>) {
@@ -872,7 +928,7 @@ impl TextInput {
             self.select_to(offset, cx);
         } else if event.click_count > 1 {
             self.move_to(0, cx);
-            self.select_to(self.content.len(), cx);
+            self.select_to(self.edit.text().len(), cx);
         } else {
             self.move_to(offset, cx);
         }
@@ -892,15 +948,15 @@ impl TextInput {
     }
 
     fn offset_to_utf16(&self, offset: usize) -> usize {
-        text_edit::offset_to_utf16(&self.content, offset)
+        text_edit::offset_to_utf16(self.edit.text(), offset)
     }
 
     fn range_to_utf16(&self, range: &Range<usize>) -> Range<usize> {
-        text_edit::range_to_utf16(&self.content, range)
+        text_edit::range_to_utf16(self.edit.text(), range)
     }
 
     fn range_from_utf16(&self, range: &Range<usize>) -> Range<usize> {
-        text_edit::range_from_utf16(&self.content, range)
+        text_edit::range_from_utf16(self.edit.text(), range)
     }
 
     fn semantics(&self, window: &Window) -> NodeSpec {
@@ -926,18 +982,18 @@ impl TextInput {
         // A secret publishes its shape, never its text, so a snapshot can
         // assert that something was typed without carrying the credential.
         if self.secret {
-            if !self.content.is_empty() {
+            if !self.edit.is_empty() {
                 spec = spec.value("[REDACTED]");
             }
             if let Some(slots) = self.visual_slots {
                 spec = spec.description(SharedString::from(format!(
                     "{}/{}",
-                    self.content.graphemes(true).count(),
+                    self.edit.text().graphemes(true).count(),
                     slots
                 )));
             }
-        } else if !self.content.is_empty() {
-            spec = spec.value(self.content.clone());
+        } else if !self.edit.is_empty() {
+            spec = spec.value(self.edit.text().clone());
         }
         let _ = window;
         spec
@@ -955,7 +1011,7 @@ impl std::fmt::Debug for TextInput {
             .field("disabled", &self.disabled)
             .field("invalid", &self.invalid)
             .field("secret", &self.secret)
-            .field("length", &self.content.graphemes(true).count())
+            .field("length", &self.edit.text().graphemes(true).count())
             .finish()
     }
 }
@@ -990,7 +1046,7 @@ impl EntityInputHandler for TextInput {
     ) -> Option<String> {
         let range = self.range_from_utf16(&range_utf16);
         actual_range.replace(self.range_to_utf16(&range));
-        Some(self.content.get(range)?.to_string())
+        Some(self.edit.text().get(range)?.to_string())
     }
 
     fn selected_text_range(
@@ -1000,8 +1056,8 @@ impl EntityInputHandler for TextInput {
         _cx: &mut Context<Self>,
     ) -> Option<UTF16Selection> {
         Some(UTF16Selection {
-            range: self.range_to_utf16(&self.selected_range),
-            reversed: self.selection_reversed,
+            range: self.range_to_utf16(&self.edit.selection()),
+            reversed: self.edit.is_reversed(),
         })
     }
 
@@ -1010,13 +1066,12 @@ impl EntityInputHandler for TextInput {
         _window: &mut Window,
         _cx: &mut Context<Self>,
     ) -> Option<Range<usize>> {
-        self.marked_range
-            .as_ref()
-            .map(|range| self.range_to_utf16(range))
+        self.edit.marked().map(|range| self.range_to_utf16(&range))
     }
 
     fn unmark_text(&mut self, _window: &mut Window, _cx: &mut Context<Self>) {
-        self.marked_range = None;
+        self.edit.end_composition();
+        self.edit.set_marked(None);
     }
 
     fn replace_text_in_range(
@@ -1026,35 +1081,9 @@ impl EntityInputHandler for TextInput {
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.disabled || self.read_only {
-            return;
-        }
-        let range = range_utf16
-            .as_ref()
-            .map(|range| self.range_from_utf16(range))
-            .or_else(|| self.marked_range.clone())
-            .unwrap_or_else(|| self.selected_range.clone());
-
-        let new_text = text_edit::normalize_single_line(new_text);
-        let new_text =
-            text_edit::fit_to_max_length(&self.content, self.max_length, &range, &new_text);
-        let new_text =
-            text_edit::fit_to_max_graphemes(&self.content, self.max_graphemes, &range, &new_text);
-        let next_content =
-            self.content[..range.start].to_owned() + &new_text + &self.content[range.end..];
-        let changed = self.content.as_ref() != next_content.as_str();
-        if changed {
-            self.content = next_content.into();
-            self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
-        }
-        let caret = range.start + new_text.len();
-        self.selected_range = caret..caret;
-        self.selection_reversed = false;
-        self.marked_range = None;
-        if changed {
-            cx.emit(TextInputEvent::Change(self.content.clone()));
-        }
-        cx.notify();
+        // Text arriving through the input handler is text the reader entered,
+        // whether from a key or from an input method that just committed.
+        self.apply_edit(range_utf16, new_text, text_edit::Cause::Typing, cx);
     }
 
     fn replace_and_mark_text_in_range(
@@ -1068,41 +1097,19 @@ impl EntityInputHandler for TextInput {
         if self.disabled || self.read_only {
             return;
         }
-        let range = range_utf16
+        let range = self.edit_range(range_utf16);
+        // GPUI reports the composing selection relative to the replacement,
+        // not to the whole value, so it is converted against exactly that
+        // replacement. Converting against the already-mutated value can land
+        // inside an astral scalar.
+        let normalised = text_edit::normalize_single_line(new_text);
+        let inside = new_selected_range_utf16
             .as_ref()
-            .map(|range| self.range_from_utf16(range))
-            .or_else(|| self.marked_range.clone())
-            .unwrap_or_else(|| self.selected_range.clone());
-
-        let new_text = text_edit::normalize_single_line(new_text);
-        let new_text =
-            text_edit::fit_to_max_length(&self.content, self.max_length, &range, &new_text);
-        let new_text =
-            text_edit::fit_to_max_graphemes(&self.content, self.max_graphemes, &range, &new_text);
-        let next_content =
-            self.content[..range.start].to_owned() + &new_text + &self.content[range.end..];
-        let changed = self.content.as_ref() != next_content.as_str();
-        if changed {
-            self.content = next_content.into();
+            .map(|range_utf16| text_edit::range_from_utf16(&normalised, range_utf16));
+        let outcome = self.edit.replace_and_mark(range, new_text, inside);
+        if outcome.changed {
             self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
-        }
-        self.marked_range =
-            (!new_text.is_empty()).then(|| range.start..range.start + new_text.len());
-        self.selected_range = new_selected_range_utf16
-            .as_ref()
-            // GPUI reports this range relative to the composing replacement,
-            // not the full document. Convert against exactly that replacement
-            // before offsetting it into the document; converting against the
-            // already-mutated document can land inside an astral UTF-8 scalar.
-            .map(|range_utf16| text_edit::range_from_utf16(&new_text, range_utf16))
-            .map(|new_range| new_range.start + range.start..new_range.end + range.start)
-            .unwrap_or_else(|| {
-                let caret = range.start + new_text.len();
-                caret..caret
-            });
-        self.selection_reversed = false;
-        if changed {
-            cx.emit(TextInputEvent::Change(self.content.clone()));
+            cx.emit(TextInputEvent::Change(self.edit.text().clone()));
         }
         cx.notify();
     }
@@ -1180,11 +1187,11 @@ impl Render for TextInput {
         };
         let shell = shell.font_fallbacks(gpui_kit_assets::text_fallbacks());
 
-        let content = self.content.clone();
-        let (anchor, focus) = if self.selection_reversed {
-            (self.selected_range.end, self.selected_range.start)
+        let content = self.edit.text().clone();
+        let (anchor, focus) = if self.edit.is_reversed() {
+            (self.edit.selection().end, self.edit.selection().start)
         } else {
-            (self.selected_range.start, self.selected_range.end)
+            (self.edit.selection().start, self.edit.selection().end)
         };
         let accessible_snapshot = self.accessible_snapshot.clone();
         let selection_representable = text_edit::accessible_text_is_representable(&content);
@@ -1236,6 +1243,15 @@ impl Render for TextInput {
                     .on_action(cx.listener(Self::delete_to_line_start))
                     .on_action(cx.listener(Self::cut))
                     .on_action(cx.listener(Self::paste))
+                    // An action with nothing to act on installs no handler,
+                    // so a host binding on the same key is not shadowed by a
+                    // listener that would do nothing.
+                    .when(self.edit.can_undo(), |element| {
+                        element.on_action(cx.listener(Self::undo))
+                    })
+                    .when(self.edit.can_redo(), |element| {
+                        element.on_action(cx.listener(Self::redo))
+                    })
                     .on_action(cx.listener(Self::show_character_palette))
             })
             .when(!self.secret, |element| {
@@ -1276,7 +1292,7 @@ impl Render for TextInput {
                                     };
                                     let Some(anchor) =
                                         text_edit::byte_offset_for_published_position(
-                                            &input.content,
+                                            input.edit.text(),
                                             input.accessibility_revision,
                                             published,
                                             selection.anchor,
@@ -1285,16 +1301,18 @@ impl Render for TextInput {
                                         return;
                                     };
                                     let Some(focus) = text_edit::byte_offset_for_published_position(
-                                        &input.content,
+                                        input.edit.text(),
                                         input.accessibility_revision,
                                         published,
                                         selection.focus,
                                     ) else {
                                         return;
                                     };
-                                    input.selected_range = anchor.min(focus)..anchor.max(focus);
-                                    input.selection_reversed = focus < anchor;
-                                    input.marked_range = None;
+                                    input.edit.set_selection(
+                                        anchor.min(focus)..anchor.max(focus),
+                                        focus < anchor,
+                                    );
+                                    input.edit.set_marked(None);
                                     cx.notify();
                                 });
                             },
@@ -1302,7 +1320,7 @@ impl Render for TextInput {
                     })
             })
             .when(!self.disabled && !self.read_only, |element| {
-                element.on_a11y_action(AccessibleAction::SetValue, move |data, window, cx| {
+                element.on_a11y_action(AccessibleAction::SetValue, move |data, _window, cx| {
                     let Some(ActionData::Value(value)) = data else {
                         return;
                     };
@@ -1310,8 +1328,12 @@ impl Render for TextInput {
                         if input.disabled || input.read_only {
                             return;
                         }
-                        let end = text_edit::offset_to_utf16(&input.content, input.content.len());
-                        input.replace_text_in_range(Some(0..end), value, window, cx);
+                        let end =
+                            text_edit::offset_to_utf16(input.edit.text(), input.edit.text().len());
+                        // A value set through assistive technology replaces
+                        // the field wholesale; it is one step, not a run of
+                        // typing that the next keystroke could join.
+                        input.apply_edit(Some(0..end), value, text_edit::Cause::Programmatic, cx);
                     });
                 })
             })
