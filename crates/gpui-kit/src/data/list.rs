@@ -22,15 +22,15 @@ use std::ops::Range;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, InteractiveElement, IntoElement, ListSizingBehavior, ParentElement,
-    RenderOnce, ScrollStrategy, SharedString, StatefulInteractiveElement, Styled, Window, div,
-    point, prelude::FluentBuilder, px, uniform_list,
+    AnyElement, App, InteractiveElement, IntoElement, ListAlignment, ListSizingBehavior,
+    ParentElement, RenderOnce, ScrollStrategy, SharedString, StatefulInteractiveElement, Styled,
+    Window, div, list, point, prelude::FluentBuilder, px, uniform_list,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Theme};
 
-use crate::data::viewport::scroll_handle;
-pub use crate::data::viewport::scroll_to_row;
+use crate::data::viewport::{list_state, scroll_handle};
+pub use crate::data::viewport::{reveal_row, scroll_to_row};
 use crate::foundation::direction::ActiveDirection;
 use crate::foundation::{
     Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedRow, Sizable, StyledExt,
@@ -94,6 +94,10 @@ pub struct List {
     render_row: RenderRow,
     selected: Option<SharedString>,
     row_height: Option<f32>,
+    /// Whether a row is as tall as its content rather than as tall as a slot.
+    flowing: bool,
+    /// Where a flowing list rests when its content does not fill it.
+    alignment: ListAlignment,
     visible_rows: Option<usize>,
     size: ControlSize,
     disabled: bool,
@@ -129,6 +133,8 @@ impl List {
             render_row: Rc::new(render_row),
             selected: None,
             row_height: None,
+            flowing: false,
+            alignment: ListAlignment::Top,
             visible_rows: None,
             size: ControlSize::Md,
             disabled: false,
@@ -148,6 +154,30 @@ impl List {
     /// the default comes from the control scale for the list's size.
     pub fn row_height(mut self, height: f32) -> Self {
         self.row_height = Some(height);
+        self
+    }
+
+    /// Lets each row be as tall as what it holds.
+    ///
+    /// A uniform list costs the same for ten thousand rows as for ten because
+    /// it knows where every row starts without laying one out. That is also
+    /// its price: a row is a slot, and content longer than the slot has to say
+    /// how much it left out. A flowing list measures a row when it first comes
+    /// into view and keeps that measurement, so the row grows to fit — and in
+    /// exchange it can only estimate how far a set it has not seen reaches, so
+    /// a scrollbar over one settles as the reader moves through it.
+    ///
+    /// [`List::row_height`] stops being the height of a row and becomes the
+    /// estimate used for rows nobody has laid out yet.
+    pub fn flowing(mut self) -> Self {
+        self.flowing = true;
+        self
+    }
+
+    /// Rests a flowing list against its end rather than its start, for a
+    /// conversation or a log whose newest row is the one worth seeing.
+    pub fn anchored_to_end(mut self) -> Self {
+        self.alignment = ListAlignment::Bottom;
         self
     }
 
@@ -234,7 +264,46 @@ impl RenderOnce for List {
         // the row it is moving away from without consulting the data set.
         let rendered: Rendered = Rc::new(RefCell::new(HashMap::new()));
 
-        let rows = {
+        let sizing = if self.visible_rows.is_some() {
+            ListSizingBehavior::Auto
+        } else {
+            ListSizingBehavior::Infer
+        };
+        let flowing = self.flowing;
+        let rows: AnyElement = if flowing {
+            let state = list_state(&ident, count, self.alignment, px(row_height), cx);
+            let ident = ident.clone();
+            let theme = theme.clone();
+            let selected = self.selected.clone();
+            let handler = handler.clone();
+            let render_row = Rc::clone(&render_row);
+            let rendered = Rc::clone(&rendered);
+            let reorder = reorder.clone();
+            list(state, move |index, window, cx| {
+                let item = render_row(index, window, cx);
+                rendered.borrow_mut().insert(index, item.id.clone());
+                // A flowing row states no height: it is as tall as what it
+                // holds, which is the whole point of asking for one.
+                row_element(
+                    &ident,
+                    &theme,
+                    None,
+                    item,
+                    index,
+                    selected.as_ref(),
+                    handler.as_ref(),
+                    reorder.as_ref(),
+                    window,
+                    cx,
+                )
+            })
+            .with_sizing_behavior(sizing)
+            .w_full()
+            .when_some(self.visible_rows, |element, rows| {
+                element.h(px(row_height * rows as f32))
+            })
+            .into_any_element()
+        } else {
             let ident = ident.clone();
             let theme = theme.clone();
             let selected = self.selected.clone();
@@ -256,7 +325,7 @@ impl RenderOnce for List {
                             row_element(
                                 &ident,
                                 &theme,
-                                row_height,
+                                Some(row_height),
                                 item,
                                 index,
                                 selected.as_ref(),
@@ -269,17 +338,14 @@ impl RenderOnce for List {
                         .collect::<Vec<_>>()
                 },
             )
-        }
-        .track_scroll(&scroll)
-        .w_full()
-        .with_sizing_behavior(if self.visible_rows.is_some() {
-            ListSizingBehavior::Auto
-        } else {
-            ListSizingBehavior::Infer
-        })
-        .when_some(self.visible_rows, |element, rows| {
-            element.h(px(row_height * rows as f32))
-        });
+            .track_scroll(&scroll)
+            .w_full()
+            .with_sizing_behavior(sizing)
+            .when_some(self.visible_rows, |element, rows| {
+                element.h(px(row_height * rows as f32))
+            })
+            .into_any_element()
+        };
 
         let mut container = div().id(ident.element_id()).column().w_full().child(rows);
 
@@ -289,7 +355,8 @@ impl RenderOnce for List {
         if reorder.is_some() {
             let rendered = Rc::clone(&rendered);
             let scroll = scroll.clone();
-            container = container.on_drag_move::<DragItem>(move |event, window, _| {
+            let reveal_ident = ident.clone();
+            container = container.on_drag_move::<DragItem>(move |event, window, cx| {
                 let pointer = event.event.position;
                 if !event.bounds.contains(&pointer) {
                     return;
@@ -310,7 +377,11 @@ impl RenderOnce for List {
                 let Some(next) = next else {
                     return;
                 };
-                scroll.scroll_to_item(next, ScrollStrategy::Nearest);
+                if flowing {
+                    reveal_row(&reveal_ident, next, cx);
+                } else {
+                    scroll.scroll_to_item(next, ScrollStrategy::Nearest);
+                }
                 window.refresh();
             });
         }
@@ -318,6 +389,7 @@ impl RenderOnce for List {
         if let Some(handler) = handler {
             let selected = self.selected.clone();
             let rendered = Rc::clone(&rendered);
+            let keyboard_ident = ident.clone();
             container = container.on_key_down(move |event, window, cx| {
                 let from = current_index(&rendered, selected.as_ref());
                 let Some(target) = target_index(event.keystroke.key.as_str(), from, count) else {
@@ -336,7 +408,11 @@ impl RenderOnce for List {
                 // is being told about is one the typist can see. Scrolling is
                 // the list's own state, so it asks for the frame that applies
                 // it rather than waiting for the caller to notice.
-                scroll.scroll_to_item(index, ScrollStrategy::Nearest);
+                if flowing {
+                    reveal_row(&keyboard_ident, index, cx);
+                } else {
+                    scroll.scroll_to_item(index, ScrollStrategy::Nearest);
+                }
                 window.refresh();
                 if Some(&id) == selected.as_ref() {
                     return;
@@ -388,7 +464,7 @@ impl List {
 fn row_element(
     list: &Ident,
     theme: &Theme,
-    height: f32,
+    height: Option<f32>,
     item: ListItem,
     index: usize,
     selected: Option<&SharedString>,
@@ -410,7 +486,7 @@ fn row_element(
         .id(ident.element_id())
         .row()
         .w_full()
-        .h(px(height))
+        .when_some(height, |element, height| element.h(px(height)))
         .px(px(theme.space(Space::Sm)))
         .gap(px(theme.space(Space::Sm)))
         .selected_row(theme, cx.layout_direction(), selected)

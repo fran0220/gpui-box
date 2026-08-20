@@ -15,14 +15,20 @@
 //! owns the clock owns the wording. A message whose time nobody knows says so
 //! rather than being floated to an end that would claim when it happened.
 //!
-//! # One message, one slot
+//! # One message, one slot — unless the caller says otherwise
 //!
-//! Virtualization here is [`List`], which is `uniform_list`, so every row is
-//! the same height. That is the whole reason a conversation of ten thousand
+//! By default virtualization here is a uniform [`List`], so every row is the
+//! same height. That is the whole reason a conversation of ten thousand
 //! messages costs the same as one of ten, and the price is that a message
 //! occupies a slot rather than growing to fit: [`MessageList::body_lines`]
 //! decides how tall the slot is, and a body longer than that says how many
 //! lines it left out instead of being quietly cut off.
+//!
+//! [`MessageList::grows_to_fit`] buys the other trade: each message is as tall
+//! as what it says, nothing is left out, and the list measures a message when
+//! it first comes into view. It costs an exact answer to "how far does this
+//! conversation reach" for the part of it nobody has scrolled through, which
+//! is what a scrollbar over one is settling towards as the reader moves.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -266,7 +272,9 @@ pub struct MessageList {
     ident: Ident,
     messages: Vec<Message>,
     visible_rows: Option<usize>,
-    body_lines: usize,
+    /// How many lines of body a slot holds, or `None` for a conversation whose
+    /// messages are as tall as what they say.
+    body_lines: Option<usize>,
     group_consecutive: bool,
     on_retry: Option<RetryHandler>,
     on_markdown: Option<MarkdownHandler>,
@@ -290,7 +298,7 @@ impl MessageList {
             ident: ident.into(),
             messages: messages.into_iter().collect(),
             visible_rows: None,
-            body_lines: 3,
+            body_lines: Some(3),
             group_consecutive: false,
             on_retry: None,
             on_markdown: None,
@@ -306,7 +314,24 @@ impl MessageList {
 
     /// How many lines of body each message's slot holds.
     pub fn body_lines(mut self, lines: usize) -> Self {
-        self.body_lines = lines.max(1);
+        self.body_lines = Some(lines.max(1));
+        self
+    }
+
+    /// Lets each message be as tall as what it says.
+    ///
+    /// The default is a slot: every message is the same height, which is what
+    /// makes a conversation of ten thousand cost the same as one of ten, and a
+    /// body longer than the slot says how many lines it left out. This trades
+    /// that for messages that are whole. The list then measures a message when
+    /// it first comes into view, so it can only estimate how far a conversation
+    /// it has not scrolled through reaches, and a scrollbar over one settles as
+    /// the reader moves down it.
+    ///
+    /// This and [`MessageList::body_lines`] are the same setting: the last one
+    /// named wins.
+    pub fn grows_to_fit(mut self) -> Self {
+        self.body_lines = None;
         self
     }
 
@@ -342,13 +367,17 @@ impl MessageList {
         self
     }
 
-    /// The height of one slot: a header line, `body_lines` of body, and a
-    /// footer line, inside the row's own padding.
+    /// The height of one slot: a header line, some body, and a footer line,
+    /// inside the row's own padding.
+    ///
+    /// For a conversation that grows to fit, this is not a height but an
+    /// estimate: what a message nobody has laid out yet is assumed to be, so a
+    /// scrollbar starts roughly right rather than starting wrong.
     fn row_height(&self, theme: &Theme) -> f32 {
         theme.space(Space::Sm) * 2.0
             + theme.typography.caption.line_height
             + theme.space(Space::Xs) * 2.0
-            + theme.typography.body.line_height * self.body_lines as f32
+            + theme.typography.body.line_height * self.body_lines.unwrap_or(3) as f32
             + theme.control.get(ControlSize::Sm).height
     }
 }
@@ -403,6 +432,7 @@ impl RenderOnce for MessageList {
             .text(shown_author(message.author.as_ref()))
         })
         .row_height(row_height)
+        .when(body_lines.is_none(), List::flowing)
         .when_some(self.visible_rows, List::visible_rows);
 
         div()
@@ -619,7 +649,7 @@ fn row(
     list: &Ident,
     message: &Message,
     continues: bool,
-    body_lines: usize,
+    body_lines: Option<usize>,
     on_retry: Option<&RetryHandler>,
     on_markdown: Option<&MarkdownHandler>,
     window: &mut Window,
@@ -683,6 +713,13 @@ fn row(
         .h(px(theme.control.get(ControlSize::Sm).height))
         .child(delivery_mark(&ident, &message.delivery, &theme, cx));
 
+    // What the slot cut off is reported next to the delivery mark rather than
+    // under the body: the body is clipped to the slot, so a note drawn after
+    // its last line is a note nobody can read.
+    if let Some(hidden) = lines_left_out(message, body_lines) {
+        footer = footer.child(truncation_mark(&ident, hidden, &theme, cx));
+    }
+
     for attachment in &message.attachments {
         footer = footer.child(attachment_chip(&ident, attachment, &theme, cx));
     }
@@ -717,19 +754,55 @@ fn row(
         .into_any_element()
 }
 
+/// How many lines of a text body the slot did not have room for, or `None`
+/// when it had room for all of them.
+fn lines_left_out(message: &Message, body_lines: Option<usize>) -> Option<usize> {
+    // A Markdown body is clipped by rendered height rather than by lines, so
+    // nothing here knows a number to report and it does not invent one.
+    let MessageBody::Text(text) = &message.body else {
+        return None;
+    };
+    let limit = body_lines?;
+    let hidden = text.lines().count().saturating_sub(limit);
+    (hidden > 0).then_some(hidden)
+}
+
+fn truncation_mark(ident: &Ident, hidden: usize, theme: &Theme, cx: &mut App) -> AnyElement {
+    let label = if hidden == 1 {
+        cx.strings().text(StringKey::MessageShowMoreOne)
+    } else {
+        cx.strings()
+            .format(StringKey::MessageShowMoreMany, &[&hidden.to_string()])
+    };
+    div()
+        .type_scale(theme, TypeScale::Caption)
+        .text_color(theme.colors.text_faint)
+        .child(label.clone())
+        .semantic_in(
+            cx,
+            NodeSpec::new(ident.child("truncated").semantic_id(), Role::Status)
+                .parent(ident.semantic_id())
+                .text(label)
+                .value(hidden.to_string()),
+        )
+        .into_any_element()
+}
+
 fn body_element(
     ident: &Ident,
     message: &Message,
-    body_lines: usize,
+    body_lines: Option<usize>,
     on_markdown: Option<&MarkdownHandler>,
     theme: &Theme,
-    cx: &mut App,
+    _cx: &mut App,
 ) -> AnyElement {
-    let height = theme.typography.body.line_height * body_lines as f32;
+    let height = body_lines.map(|lines| theme.typography.body.line_height * lines as f32);
     match &message.body {
         MessageBody::Markdown(source) => {
-            let mut markdown =
-                Markdown::new(ident.child("body"), source.clone()).max_lines(body_lines);
+            let mut markdown = Markdown::new(ident.child("body"), source.clone());
+            if let Some(lines) = body_lines {
+                markdown = markdown.max_lines(lines);
+            }
             if let Some(handler) = on_markdown {
                 let handler = Rc::clone(handler);
                 let id = message.id.clone();
@@ -738,47 +811,32 @@ fn body_element(
             }
             div()
                 .w_full()
-                .h(px(height))
-                .overflow_hidden()
+                .when_some(height, |element, height| {
+                    element.h(px(height)).overflow_hidden()
+                })
                 .child(markdown)
                 .into_any_element()
         }
         MessageBody::Text(text) => {
             let lines: Vec<&str> = text.lines().collect();
-            let hidden = lines.len().saturating_sub(body_lines);
-            let shown = lines
-                .iter()
-                .take(body_lines)
-                .copied()
-                .collect::<Vec<_>>()
-                .join("\n");
+            let shown = match body_lines {
+                Some(limit) => lines
+                    .iter()
+                    .take(limit)
+                    .copied()
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+                None => text.to_string(),
+            };
             div()
                 .column()
                 .w_full()
-                .h(px(height))
-                .overflow_hidden()
+                .when_some(height, |element, height| {
+                    element.h(px(height)).overflow_hidden()
+                })
                 .type_scale(theme, TypeScale::Body)
                 .text_color(theme.colors.text)
                 .child(SharedString::from(shown))
-                .children((hidden > 0).then(|| {
-                    let label = if hidden == 1 {
-                        cx.strings().text(StringKey::MessageShowMoreOne)
-                    } else {
-                        cx.strings()
-                            .format(StringKey::MessageShowMoreMany, &[&hidden.to_string()])
-                    };
-                    div()
-                        .type_scale(theme, TypeScale::Caption)
-                        .text_color(theme.colors.text_faint)
-                        .child(label.clone())
-                        .semantic_in(
-                            cx,
-                            NodeSpec::new(ident.child("truncated").semantic_id(), Role::Status)
-                                .parent(ident.semantic_id())
-                                .text(label)
-                                .value(hidden.to_string()),
-                        )
-                }))
                 .into_any_element()
         }
     }

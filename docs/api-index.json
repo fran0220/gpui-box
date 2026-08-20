@@ -1755,6 +1755,7 @@
       "options": [
         "id(ident: impl Into<Ident>) -> Self",
         "selectable(ident: impl Into<Ident>) -> Self",
+        "in_document(order: u64, virtualized: bool) -> Self",
         "hits(hits: impl IntoIterator<Item = Range<usize>>) -> Self",
         "current(index: usize) -> Self",
         "monospace(monospace: bool) -> Self"
@@ -2096,6 +2097,8 @@
       "options": [
         "selected(id: impl Into<SharedString>) -> Self",
         "row_height(height: f32) -> Self",
+        "flowing() -> Self",
+        "anchored_to_end() -> Self",
         "visible_rows(rows: usize) -> Self",
         "on_select(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self",
         "reorderable(reorderable: bool) -> Self",
@@ -2267,6 +2270,7 @@
       "options": [
         "visible_rows(rows: usize) -> Self",
         "body_lines(lines: usize) -> Self",
+        "grows_to_fit() -> Self",
         "group_consecutive(group: bool) -> Self",
         "on_retry(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self",
         "on_markdown(handler: impl Fn(SharedString, &MarkdownEvent, &mut Window, &mut App) + 'static) -> Self"
@@ -2275,7 +2279,8 @@
       "queries": [],
       "reports": [],
       "scenes": [
-        "conversation"
+        "conversation",
+        "conversation-growing"
       ]
     },
     {
@@ -3095,6 +3100,7 @@
         "new(ident: impl Into<Ident>) -> Self"
       ],
       "options": [
+        "bound_to(target: impl ScrollTarget + 'static) -> Self",
         "axis(axis: ScrollAxis) -> Self",
         "vertical() -> Self",
         "horizontal() -> Self",
@@ -9381,6 +9387,24 @@
       "queries": []
     },
     {
+      "name": "Positioner",
+      "path": "gpui_kit::overlay::Positioner",
+      "summary": "What a surface asked for.",
+      "variants": [],
+      "construct": [
+        "below(height: f32) -> Self"
+      ],
+      "options": [
+        "side(side: Side) -> Self",
+        "min_width(width: f32) -> Self",
+        "spacing(margin: f32, gap: f32) -> Self",
+        "resolve(window: &Window, trigger: Bounds<Pixels>) -> Room",
+        "resolve_in(width: f32, height: f32, trigger: Bounds<Pixels>) -> Room"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "PrepaintState",
       "path": "gpui_kit::controls::PrepaintState",
       "summary": "",
@@ -9652,6 +9676,16 @@
       "queries": [
         "name() -> &'static str"
       ]
+    },
+    {
+      "name": "Room",
+      "path": "gpui_kit::overlay::Room",
+      "summary": "Where a surface goes and how much of it there can be.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Row",
@@ -10155,6 +10189,24 @@
       "construct": [],
       "options": [
         "apply(text: Text) -> BlockKind"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "Side",
+      "path": "gpui_kit::overlay::Side",
+      "summary": "Which side of the trigger a surface is asked to go on.",
+      "variants": [
+        "Below",
+        "Above",
+        "Before",
+        "After"
+      ],
+      "construct": [],
+      "options": [
+        "opposite() -> Self",
+        "is_vertical() -> bool"
       ],
       "commands": [],
       "queries": []
@@ -12437,6 +12489,18 @@
         "MessageList"
       ],
       "example": "fn conversation(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(560.0))\n        .child(\n            MessageList::new(\"scene.conversation.thread\", scene_thread())\n                .group_consecutive(true)\n                .body_lines(2)\n                .on_retry(|_, _, _| {})\n                .on_markdown(|_, _, _, _| {}),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.conversation.rule\")\n                .label(\"Scrolled away from the newest message\"),\n        )\n        .child(\n            // A viewport shorter than the thread opens at its top, so the\n            // messages below it have never been on screen and the list says\n            // how many there are rather than letting them be discovered.\n            MessageList::new(\"scene.conversation.behind\", scene_thread())\n                .visible_rows(2)\n                .body_lines(2)\n                .on_retry(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "conversation-growing",
+      "capture": "cargo run -p xtask -- headless capture conversation-growing",
+      "kind": "exhibit",
+      "subjects": [
+        "MessageList"
+      ],
+      "uses": [
+        "MessageList"
+      ],
+      "example": "fn conversation_growing(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let long = || {\n        vec![\n            Message::new(\"msg-ask\", \"What did the freeze window actually cover?\")\n                .author(\"Ada\")\n                .time(\"09:14\")\n                .delivery(DeliveryState::Read),\n            Message::new(\n                \"msg-long\",\n                \"Everything published after the tag.\\nThe artifacts, the changelog.\\nThe signed manifest.\\nThe release notes.\\nNothing before it moved.\",\n            )\n            .author(\"Grace\")\n            .time(\"09:15\")\n            .delivery(DeliveryState::Delivered),\n        ]\n    };\n    stack(&theme)\n        .w(px(560.0))\n        .child(\n            Divider::new()\n                .id(\"scene.growing.slotted.rule\")\n                .label(\"A slot, two lines of body\"),\n        )\n        .child(\n            MessageList::new(\"scene.growing.slotted\", long())\n                .body_lines(2)\n                .on_retry(|_, _, _| {}),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.growing.grown.rule\")\n                .label(\"As tall as what it says\"),\n        )\n        .child(\n            MessageList::new(\"scene.growing.grown\", long())\n                .grows_to_fit()\n                .on_retry(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "image-viewer",

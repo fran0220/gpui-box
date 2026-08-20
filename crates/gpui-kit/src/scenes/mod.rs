@@ -53,8 +53,8 @@ use compositions::{motion_flip, motion_state, reading_direction};
 #[cfg(all(feature = "terminal", not(target_family = "wasm")))]
 use content::terminal;
 use content::{
-    agent_document, browser_panel, code_view, conversation, diff_view, image_viewer, log_stream,
-    markdown, transport,
+    agent_document, browser_panel, code_view, conversation, conversation_growing, diff_view,
+    image_viewer, log_stream, markdown, transport,
 };
 use controls::{
     actions, auth_sign_in, auth_verification, button, cascader, choice, color_picker, copy_button,
@@ -540,6 +540,11 @@ pub fn catalog() -> Vec<Scene> {
         Scene {
             name: "conversation",
             build: conversation,
+            shows: Shows::Subjects(&["MessageList"]),
+        },
+        Scene {
+            name: "conversation-growing",
+            build: conversation_growing,
             shows: Shows::Subjects(&["MessageList"]),
         },
         Scene {

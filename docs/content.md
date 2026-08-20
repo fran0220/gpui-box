@@ -83,13 +83,14 @@ ranges tagged with the library's existing `Tone` vocabulary. There are no
 syntax categories in this crate, because deciding a word is a keyword is a
 grammar's judgement and this crate has no grammar.
 
-Code blocks and prose runs use GPUI's read-only selection primitive. Pointer
-dragging, reverse selection, Copy, Select All, wrapped and bidirectional hit
-testing, and AccessKit selection all operate on grapheme boundaries. Every
-code block still carries a whole-value copy action that puts its exact bytes on
-the clipboard and reports `MarkdownEvent::CodeCopied`; that operation also
-includes text outside a mounted or visible range. Nothing is reflowed,
-retyped, or re-indented on the way.
+Code blocks and prose runs use GPUI's document selection. Pointer dragging can
+cross separately mounted runs and blocks in reading order; reverse selection,
+Copy, Select All, wrapped and bidirectional hit testing, and AccessKit
+selection all operate on grapheme boundaries. Every code block still carries a
+whole-value copy action that puts its exact bytes on the clipboard and reports
+`MarkdownEvent::CodeCopied`; that operation also includes text outside a
+mounted or visible range. Nothing is reflowed, retyped, or re-indented on the
+way.
 
 ### Truncation says how much it cut
 
@@ -175,15 +176,19 @@ end that would claim when it happened. An author nobody named is `unknown`,
 not blank, because a blank byline reads as a message with no author rather than
 one whose author was not recorded.
 
-### One message, one slot
+### One message, one slot — unless the caller buys measurement
 
-Virtualization is `List`, which is `uniform_list`, so every row is the same
-height. That is what makes a conversation of ten thousand messages cost what
-one of ten costs, and the price is stated rather than hidden:
-`MessageList::body_lines(n)` decides how tall a slot is, and a body longer than
-that says how many lines it left out — through `Markdown::max_lines` for a
-Markdown body, and through the same wording for a plain one. There is no second
-virtualization in this library and there will not be one.
+The default `List` is uniform, so every row is the same height. That is what
+makes a conversation of ten thousand messages cost what one of ten costs, and
+the price is stated rather than hidden: `MessageList::body_lines(n)` decides
+how tall a slot is, and a plain body longer than that reports how many lines it
+left out beside the delivery state.
+
+`MessageList::grows_to_fit()` chooses the other truthful trade. Rows remain
+virtualized, but GPUI measures each one when it first approaches the viewport
+and keeps that height, so every message is whole. The list can only estimate
+the extent of rows it has not measured, and its scrollbar settles as the reader
+moves through them. The last call to `body_lines` or `grows_to_fit` wins.
 
 ## Media
 

@@ -314,3 +314,75 @@ fn a_reader_at_the_bottom_follows_without_being_told_anything(cx: &mut TestAppCo
         "a reader already at the bottom is followed, not counted at"
     );
 }
+
+/// A conversation drawn either way, with one long message in it.
+fn long_message(cx: &mut TestAppContext, grows: bool) -> Harness {
+    Harness::new(cx, gpui_kit::install, move |_, _| {
+        let list = MessageList::new(
+            "chat",
+            [Message::new("msg-long", "one\ntwo\nthree\nfour\nfive")
+                .author("Ada")
+                .time("09:15")],
+        )
+        .visible_rows(4);
+        if grows {
+            list.grows_to_fit().into_any_element()
+        } else {
+            list.body_lines(2).into_any_element()
+        }
+    })
+}
+
+#[gpui::test]
+fn a_slot_says_how_much_of_a_message_it_left_out(cx: &mut TestAppContext) {
+    let mut harness = long_message(cx, false);
+    let left_out = harness
+        .node("chat.msg-long.truncated")
+        .expect("a slot that cut a message off says so");
+
+    assert_eq!(
+        left_out.value.as_deref(),
+        Some("3"),
+        "five lines in a two-line slot leaves three"
+    );
+}
+
+#[gpui::test]
+fn a_message_that_grows_to_fit_leaves_nothing_out(cx: &mut TestAppContext) {
+    let mut harness = long_message(cx, true);
+
+    assert!(
+        harness.node("chat.msg-long").is_some(),
+        "the message is still published"
+    );
+    assert!(
+        harness.node("chat.msg-long.truncated").is_none(),
+        "nothing was left out, so there is nothing to report"
+    );
+}
+
+#[gpui::test]
+fn a_growing_conversation_still_only_builds_its_viewport(cx: &mut TestAppContext) {
+    let messages: Vec<Message> = (0..2_000)
+        .map(|index| {
+            Message::new(format!("msg-{index}"), format!("Message {index}"))
+                .author("Ada")
+                .time("09:15")
+        })
+        .collect();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        MessageList::new("chat", messages.clone())
+            .grows_to_fit()
+            .visible_rows(6)
+            .into_any_element()
+    });
+
+    assert!(
+        harness.node("chat.msg-0").is_some(),
+        "the messages at the top are the ones on screen"
+    );
+    assert!(
+        harness.node("chat.msg-1999").is_none(),
+        "growing to fit is still virtualization: a message nobody can see is not laid out"
+    );
+}

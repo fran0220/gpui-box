@@ -427,6 +427,51 @@ pub(super) fn conversation(_window: &mut Window, cx: &mut App) -> AnyElement {
         .into_any_element()
 }
 
+/// The same thread drawn both ways, so the trade is visible rather than
+/// described: a slot leaves the long message's last lines out and says how
+/// many, and a message that grows to fit is whole.
+pub(super) fn conversation_growing(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let long = || {
+        vec![
+            Message::new("msg-ask", "What did the freeze window actually cover?")
+                .author("Ada")
+                .time("09:14")
+                .delivery(DeliveryState::Read),
+            Message::new(
+                "msg-long",
+                "Everything published after the tag.\nThe artifacts, the changelog.\nThe signed manifest.\nThe release notes.\nNothing before it moved.",
+            )
+            .author("Grace")
+            .time("09:15")
+            .delivery(DeliveryState::Delivered),
+        ]
+    };
+    stack(&theme)
+        .w(px(560.0))
+        .child(
+            Divider::new()
+                .id("scene.growing.slotted.rule")
+                .label("A slot, two lines of body"),
+        )
+        .child(
+            MessageList::new("scene.growing.slotted", long())
+                .body_lines(2)
+                .on_retry(|_, _, _| {}),
+        )
+        .child(
+            Divider::new()
+                .id("scene.growing.grown.rule")
+                .label("As tall as what it says"),
+        )
+        .child(
+            MessageList::new("scene.growing.grown", long())
+                .grows_to_fit()
+                .on_retry(|_, _, _| {}),
+        )
+        .into_any_element()
+}
+
 pub(super) fn image_viewer(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)

@@ -21,8 +21,8 @@ use std::rc::Rc;
 
 use gpui::{
     AnyElement, App, Global, InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels,
-    Point, RenderOnce, ScrollHandle, SharedString, StatefulInteractiveElement, Styled, Window, div,
-    prelude::FluentBuilder, px, relative,
+    Point, RenderOnce, ScrollHandle, ScrollTarget, SharedString, StatefulInteractiveElement,
+    Styled, Window, div, prelude::FluentBuilder, px, relative,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Theme};
@@ -71,6 +71,9 @@ pub struct ScrollArea {
     /// Whether the area is as tall as what it holds instead of as tall as it
     /// is offered.
     fit_height: bool,
+    /// Something that already scrolls, whose position this area draws rather
+    /// than scrolling its own content.
+    target: Option<Rc<dyn ScrollTarget>>,
     content: Option<AnyElement>,
 }
 
@@ -95,8 +98,22 @@ impl ScrollArea {
             width: None,
             height: None,
             fit_height: false,
+            target: None,
             content: None,
         }
+    }
+
+    /// Draws this area's scrollbar for something that scrolls itself.
+    ///
+    /// A virtualized list holds its own scroll position, because it decides
+    /// which rows exist from where it has been scrolled to. Wrapping one in an
+    /// overflowing container gives it a second, disagreeing position and a
+    /// thumb sized from a content height nobody has measured. Bound to the
+    /// list's own [`ScrollTarget`], the area stops scrolling and only reports:
+    /// the numbers on the gutter, and in the semantic tree, are the list's.
+    pub fn bound_to(mut self, target: impl ScrollTarget + 'static) -> Self {
+        self.target = Some(Rc::new(target));
+        self
     }
 
     pub fn axis(mut self, axis: ScrollAxis) -> Self {
@@ -156,9 +173,17 @@ impl ScrollArea {
 impl RenderOnce for ScrollArea {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let handle = scroll_handle(&self.ident, cx);
-        let offset = handle.offset();
-        let max = handle.max_offset();
+        let bound = self.target.is_some();
+        // The area's own handle exists whether or not it is used, because the
+        // viewport element has to be told about it before the branch below
+        // decides whether it scrolls.
+        let own_handle = scroll_handle(&self.ident, cx);
+        let target: Rc<dyn ScrollTarget> = match self.target.clone() {
+            Some(target) => target,
+            None => Rc::new(own_handle.clone()),
+        };
+        let offset = target.scroll_offset();
+        let max = target.max_scroll_offset();
         // Whether a scrollbar is needed depends on a size only layout knows,
         // so the viewport is measured during prepaint and the frame that
         // learns a new size asks for one more.
@@ -181,13 +206,16 @@ impl RenderOnce for ScrollArea {
             .id(self.ident.child("viewport").element_id())
             .w_full()
             .when(!fit_height, |element| element.h_full())
-            .when(self.axis.has_vertical(), |element| {
+            // A bound area scrolls nothing: the thing it is bound to already
+            // does, and a second scrolling container over the same content
+            // would fight it.
+            .when(!bound && self.axis.has_vertical(), |element| {
                 element.overflow_y_scroll()
             })
-            .when(self.axis.has_horizontal(), |element| {
+            .when(!bound && self.axis.has_horizontal(), |element| {
                 element.overflow_x_scroll()
             })
-            .track_scroll(&handle)
+            .when(!bound, |element| element.track_scroll(&own_handle))
             .child(content);
 
         // The shadow is a function of the offset and nothing else: it does not
@@ -265,7 +293,7 @@ impl RenderOnce for ScrollArea {
                 f32::from(viewport.height),
                 f32::from(max.y),
                 -f32::from(offset.y),
-                &handle,
+                &target,
                 offset,
                 &theme,
                 cx,
@@ -279,7 +307,7 @@ impl RenderOnce for ScrollArea {
                 f32::from(viewport.width),
                 f32::from(max.x),
                 -f32::from(offset.x),
-                &handle,
+                &target,
                 offset,
                 &theme,
                 cx,
@@ -333,7 +361,7 @@ fn bar(
     viewport: f32,
     max: f32,
     scrolled: f32,
-    handle: &ScrollHandle,
+    target: &Rc<dyn ScrollTarget>,
     offset: Point<Pixels>,
     theme: &Theme,
     cx: &mut App,
@@ -394,7 +422,24 @@ fn bar(
         .children(thumb);
 
     if overflowing {
-        let handle = handle.clone();
+        // A list that measures its rows as they arrive learns it is taller
+        // than it thought while the thumb is being dragged, which would move
+        // the thumb out from under the pointer holding it.
+        gutter = gutter
+            .on_mouse_down(MouseButton::Left, {
+                let target = Rc::clone(target);
+                move |_, _, _| target.set_scroll_dragging(true)
+            })
+            .on_mouse_up(MouseButton::Left, {
+                let target = Rc::clone(target);
+                move |_, _, _| target.set_scroll_dragging(false)
+            })
+            .on_mouse_up_out(MouseButton::Left, {
+                let target = Rc::clone(target);
+                move |_, _, _| target.set_scroll_dragging(false)
+            });
+
+        let target = Rc::clone(target);
         let track = Rc::clone(&track);
         gutter = gutter.on_mouse_move(move |event, window, _| {
             if event.pressed_button != Some(MouseButton::Left) {
@@ -420,7 +465,7 @@ fn bar(
             let travel = (extent * (1.0 - fraction)).max(f32::EPSILON);
             let next = (((pointer - origin) - travel * fraction / 2.0) / travel).clamp(0.0, 1.0);
             let scrolled = -next * max;
-            handle.set_offset(if vertical {
+            target.set_scroll_offset(if vertical {
                 gpui::point(offset.x, px(scrolled))
             } else {
                 gpui::point(px(scrolled), offset.y)
