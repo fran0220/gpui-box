@@ -89,6 +89,14 @@ force Kit highlights to recompose text into separate layout elements. They use
 the workspace's existing Unicode segmentation and bidirectional libraries and
 import no editor or product source.
 
+The window-owned document-selection coordinator, caller-declared reading order,
+overlay scope isolation, truthful virtualized-copy coverage, and aggregate
+clipboard path are subsequent GPUI Box work above that selectable-text
+primitive. The generic `ScrollTarget` contract over overflowing containers,
+uniform lists, and measured variable-height lists is GPUI Box work as well.
+Both additions coordinate existing framework layout and input state and import
+no editor, product, or third-party source.
+
 The bounded native external-data drag bridge for encoded images, MIME-tagged
 text, URLs, and promised or virtual files on macOS and Windows is subsequent
 GPUI Box work. It uses operating-system drag and pasteboard APIs and imports no

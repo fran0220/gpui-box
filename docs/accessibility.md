@@ -130,9 +130,11 @@ role but publish neither plaintext nor text runs. Read-only selectable
 `StyledText` uses the same grapheme and bidi run contract and additionally
 publishes word starts plus shaped per-grapheme positions, widths, and run
 bounds; `SetTextSelection` is accepted only against the exact published text
-and layout revision. Live regions are explicit
-opt-in: static Status nodes are not live, ordinary toasts are polite, and danger
-toasts are assertive, with the whole toast marked atomic. Announcement speech
+and layout revision. A document selection reuses those per-participant runs,
+joins them only inside one declared selection scope, and never publishes text
+from an unmounted or sensitive participant. Live regions are explicit opt-in:
+static Status nodes are not live, ordinary toasts are polite, and danger toasts
+are assertive, with the whole toast marked atomic. Announcement speech
 and timing, editable per-grapheme geometry and native caret geometry, and native
 child nodes remain separate platform work.
 

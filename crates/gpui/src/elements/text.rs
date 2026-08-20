@@ -3,7 +3,8 @@ use crate::{
     ActiveTooltip, AnyView, App, Bounds, ClipboardItem, CursorStyle, DispatchPhase, Element,
     ElementId, FocusHandle, GlobalElementId, HighlightStyle, Hitbox, HitboxBehavior,
     InspectorElementId, IntoElement, KeyDownEvent, LayoutId, MouseButton, MouseDownEvent,
-    MouseMoveEvent, MouseUpEvent, PaintQuad, Pixels, Point, SharedString, Size, TextAlign,
+    MouseMoveEvent, MouseUpEvent, PaintQuad, Pixels, Point, SelectionContentKey, SelectionCoverage,
+    SelectionEndpoint, SelectionParticipant, SelectionUnit, SharedString, Size, TextAlign,
     TextOverflow, TextRun, TextStyle, TooltipId, TruncateFrom, WhiteSpace, Window, WrappedLine,
     WrappedLineLayout, accesskit, fill, register_tooltip_mouse_handlers, set_tooltip_on_window,
 };
@@ -429,6 +430,20 @@ impl StyledText {
     /// The id retains the transient selection and focus state across frames.
     pub fn selectable(self, id: impl Into<ElementId>) -> InteractiveText {
         InteractiveText::new(id, self).selectable()
+    }
+
+    /// Make this styled text part of its window's document selection, so one
+    /// drag reaches every participating element between its two ends.
+    ///
+    /// `key` is business identity and `order` is reading order. See
+    /// [`InteractiveText::selectable_in_document`].
+    pub fn selectable_in_document(
+        self,
+        id: impl Into<ElementId>,
+        key: impl Into<SelectionContentKey>,
+        order: u64,
+    ) -> InteractiveText {
+        InteractiveText::new(id, self).selectable_in_document(key, order)
     }
 
     /// Set the styling attributes for the given text, as well as
@@ -1162,6 +1177,16 @@ pub struct InteractiveText {
     tooltip_id: Option<TooltipId>,
     clickable_ranges: Vec<Range<usize>>,
     selectable: bool,
+    document: Option<DocumentParticipation>,
+}
+
+/// How a text element takes part in its window's document selection.
+#[derive(Clone, Debug)]
+struct DocumentParticipation {
+    key: SelectionContentKey,
+    order: u64,
+    coverage: SelectionCoverage,
+    sensitive: bool,
 }
 
 struct InteractiveTextClickEvent {
@@ -1233,6 +1258,7 @@ impl InteractiveText {
             tooltip_id: None,
             clickable_ranges: Vec::new(),
             selectable: false,
+            document: None,
         }
     }
 
@@ -1244,6 +1270,59 @@ impl InteractiveText {
     /// click, but not when the same gesture selected text.
     pub fn selectable(mut self) -> Self {
         self.selectable = true;
+        self
+    }
+
+    /// Joins this element to its window's document selection.
+    ///
+    /// One drag then spans every participating element between its two ends,
+    /// in the reading order they declare, rather than stopping at whichever
+    /// value happened to be mounted first. `key` is business identity and
+    /// `order` is reading order; neither may be a list position, because a
+    /// selection that follows the viewport instead of the text is the bug this
+    /// replaces.
+    ///
+    /// A document participant does not also keep a private selection: the two
+    /// would disagree about the same drag.
+    pub fn selectable_in_document(
+        mut self,
+        key: impl Into<SelectionContentKey>,
+        order: u64,
+    ) -> Self {
+        self.selectable = true;
+        self.document = Some(DocumentParticipation {
+            key: key.into(),
+            order,
+            coverage: SelectionCoverage::Complete,
+            sensitive: false,
+        });
+        self
+    }
+
+    /// States that this participant is one mounted window onto a longer run,
+    /// such as a virtualized log or diff.
+    ///
+    /// A copy whose span crosses it reports itself incomplete, because the
+    /// rows in between were never rendered and GPUI will not invent them.
+    pub fn virtualized_participant(mut self, virtualized: bool) -> Self {
+        if let Some(document) = self.document.as_mut() {
+            document.coverage = if virtualized {
+                SelectionCoverage::Virtualized
+            } else {
+                SelectionCoverage::Complete
+            };
+        }
+        self
+    }
+
+    /// Refuses to take part in the document selection at all.
+    ///
+    /// A sensitive value is never registered, so it cannot reach the aggregate
+    /// copy path by being mounted beside content that can.
+    pub fn sensitive_participant(mut self, sensitive: bool) -> Self {
+        if let Some(document) = self.document.as_mut() {
+            document.sensitive = sensitive;
+        }
         self
     }
 
@@ -1313,7 +1392,237 @@ fn selectable_index_at(text: &str, layout: &TextLayout, position: Point<Pixels>)
     }
 }
 
-fn word_range_at(text: &str, index: usize) -> Range<usize> {
+/// Installs the gesture handlers of a text element that takes part in its
+/// window's document selection.
+///
+/// The element still hit-tests and resolves offsets in its own text, but the
+/// selection itself lives on the window, so a drag that leaves this element
+/// continues rather than ending at its edge. Exactly one participant answers a
+/// pointer move: the one the press opened, identified by
+/// [`DocumentSelectionState::owns_drag`].
+#[allow(clippy::too_many_arguments)]
+fn paint_document_selection_handlers(
+    document: DocumentParticipation,
+    hitbox: &Hitbox,
+    focus_handle: &FocusHandle,
+    text_layout: &TextLayout,
+    text: &SharedString,
+    selection_state: &Rc<RefCell<TextSelectionState>>,
+    a11y_node_id: Option<accesskit::NodeId>,
+    window: &mut Window,
+) {
+    let scope = window.selection_scope();
+    let key = document.key.clone();
+    let order = document.order;
+
+    let hitbox_for_down = hitbox.clone();
+    let layout_for_down = text_layout.clone();
+    let text_for_down = text.clone();
+    let rows_for_down = selection_state.clone();
+    let focus_for_down = focus_handle.clone();
+    let key_for_down = key.clone();
+    window.on_mouse_event(move |event: &MouseDownEvent, phase, window, cx| {
+        if phase != DispatchPhase::Bubble || event.button != MouseButton::Left {
+            return;
+        }
+        if !hitbox_for_down.is_hovered(window) {
+            // A press that lands in no participant of this scope dismisses the
+            // selection. Every participant reaches the same verdict from the
+            // same registry, so which one runs first does not matter.
+            if window.document_selection().scope() == scope
+                && !window.document_selection().is_empty()
+                && !window.selection_participant_contains(scope, event.position)
+            {
+                window.clear_document_selection();
+                window.refresh();
+            }
+            return;
+        }
+        let index = selectable_index_at(&text_for_down, &layout_for_down, event.position);
+        let endpoint = SelectionEndpoint {
+            key: key_for_down.clone(),
+            order,
+            offset: index,
+        };
+        if event.modifiers.shift && event.click_count == 1 {
+            window
+                .document_selection_mut()
+                .begin_shift_extend(scope, endpoint);
+        } else {
+            let (unit, kind) = match event.click_count {
+                2 => (word_range_at(&text_for_down, index), SelectionUnit::Word),
+                count if count >= 3 => {
+                    let rows = rows_for_down.borrow().visual_rows.clone();
+                    (visual_row_at(&rows, index), SelectionUnit::Row)
+                }
+                _ => (index..index, SelectionUnit::Caret),
+            };
+            window
+                .document_selection_mut()
+                .begin(scope, endpoint, unit, kind);
+        }
+        focus_for_down.focus(window, cx);
+        window.capture_pointer(hitbox_for_down.id);
+        window.refresh();
+    });
+
+    let key_for_move = key.clone();
+    window.on_mouse_event(move |event: &MouseMoveEvent, phase, window, _cx| {
+        if phase == DispatchPhase::Capture
+            || event.pressed_button != Some(MouseButton::Left)
+            || !window.document_selection().owns_drag(&key_for_move)
+        {
+            return;
+        }
+        if window.drag_document_selection_to(event.position) {
+            window.refresh();
+        }
+    });
+
+    let key_for_up = key.clone();
+    window.on_mouse_event(move |event: &MouseUpEvent, phase, window, cx| {
+        if phase == DispatchPhase::Capture
+            || event.button != MouseButton::Left
+            || !window.document_selection().owns_drag(&key_for_up)
+        {
+            return;
+        }
+        window.drag_document_selection_to(event.position);
+        window.document_selection_mut().end_drag();
+        let selected = !window.document_selection().is_empty();
+        window.release_pointer();
+        window.refresh();
+        if selected {
+            // A selection gesture is not a click on an enclosing link or
+            // button. Keep a zero-length click composable with those ancestors.
+            cx.stop_propagation();
+        }
+    });
+
+    let text_for_key = text.clone();
+    let rows_for_key = selection_state.clone();
+    let key_for_key = key.clone();
+    window.on_key_event(move |event: &KeyDownEvent, phase, window, cx| {
+        if phase != DispatchPhase::Bubble {
+            return;
+        }
+        let modifiers = event.keystroke.modifiers;
+        let key_name = event.keystroke.key.as_str();
+        if modifiers.secondary() && !modifiers.shift && !modifiers.alt && !modifiers.function {
+            match key_name {
+                "a" => {
+                    window.select_all_in_selection_scope(scope);
+                    window.refresh();
+                    cx.stop_propagation();
+                }
+                "c" => {
+                    if let Some(copy) = window.document_selection_text() {
+                        // An incomplete copy is still exactly what was read.
+                        // Nothing is invented for the rows that were never
+                        // rendered.
+                        cx.write_to_clipboard(ClipboardItem::new_string(copy.text));
+                        cx.stop_propagation();
+                    }
+                }
+                _ => {}
+            }
+            return;
+        }
+
+        if modifiers.control || modifiers.platform || modifiers.alt || modifiers.function {
+            return;
+        }
+        // Caret motion stays inside the participant that holds the moving end,
+        // so a key press never silently jumps to another paragraph.
+        let Some(focus) = window.document_selection().focus().cloned() else {
+            return;
+        };
+        if focus.key != key_for_key || window.document_selection().scope() != scope {
+            return;
+        }
+        let covered = window
+            .document_selection()
+            .range_for(&key_for_key, scope, order, text_for_key.len())
+            .unwrap_or(0..0);
+        let rows = rows_for_key.borrow().visual_rows.clone();
+        let next = match key_name {
+            "left" if !modifiers.shift && !covered.is_empty() => covered.start,
+            "right" if !modifiers.shift && !covered.is_empty() => covered.end,
+            "left" => previous_grapheme_boundary(&text_for_key, focus.offset.saturating_sub(1)),
+            "right" => next_grapheme_boundary(&text_for_key, focus.offset),
+            "home" => visual_row_at(&rows, focus.offset).start,
+            "end" => visual_row_at(&rows, focus.offset).end,
+            _ => return,
+        };
+        let endpoint = SelectionEndpoint {
+            key: key_for_key.clone(),
+            order,
+            offset: next,
+        };
+        let selection = window.document_selection_mut();
+        if modifiers.shift {
+            selection.extend_to(scope, endpoint);
+        } else {
+            selection.begin(scope, endpoint, next..next, SelectionUnit::Caret);
+            selection.end_drag();
+        }
+        window.refresh();
+        cx.stop_propagation();
+    });
+
+    if let Some(node_id) = a11y_node_id
+        && accessible_text_is_representable(text)
+    {
+        let selection_for_a11y = selection_state.clone();
+        let text_for_a11y = text.clone();
+        let key_for_a11y = key;
+        window.on_a11y_action(
+            node_id,
+            accesskit::Action::SetTextSelection,
+            move |data, window, _| {
+                let Some(accesskit::ActionData::SetTextSelection(requested)) = data else {
+                    return;
+                };
+                let selection = selection_for_a11y.borrow();
+                let Some(published) = selection.published.as_ref() else {
+                    return;
+                };
+                let Some(anchor) = byte_offset_for_published_position(
+                    &text_for_a11y,
+                    selection.revision,
+                    published,
+                    requested.anchor,
+                ) else {
+                    return;
+                };
+                let Some(focus) = byte_offset_for_published_position(
+                    &text_for_a11y,
+                    selection.revision,
+                    published,
+                    requested.focus,
+                ) else {
+                    return;
+                };
+                drop(selection);
+                let state = window.document_selection_mut();
+                state.begin(
+                    scope,
+                    SelectionEndpoint {
+                        key: key_for_a11y.clone(),
+                        order,
+                        offset: anchor,
+                    },
+                    anchor..focus,
+                    SelectionUnit::Caret,
+                );
+                state.end_drag();
+                window.refresh();
+            },
+        );
+    }
+}
+
+pub(crate) fn word_range_at(text: &str, index: usize) -> Range<usize> {
     text.split_word_bound_indices()
         .find_map(|(start, word)| {
             let end = start + word.len();
@@ -1322,7 +1631,7 @@ fn word_range_at(text: &str, index: usize) -> Range<usize> {
         .unwrap_or(index..index)
 }
 
-fn visual_row_at(rows: &[Range<usize>], index: usize) -> Range<usize> {
+pub(crate) fn visual_row_at(rows: &[Range<usize>], index: usize) -> Range<usize> {
     rows.iter()
         .find(|row| row.start <= index && index < row.end)
         .or_else(|| rows.last())
@@ -1446,7 +1755,40 @@ impl Element for InteractiveText {
                 if self.selectable {
                     let source = self.text.layout().source();
                     let visual_rows = self.text.layout().visual_rows();
-                    selection.borrow_mut().update_source(&source, visual_rows);
+                    selection
+                        .borrow_mut()
+                        .update_source(&source, visual_rows.clone());
+                    if let Some(document) = self.document.as_ref() {
+                        let scope = window.selection_scope();
+                        let layout = self.text.layout().clone();
+                        let resolver_text = source.clone();
+                        let mut participant =
+                            SelectionParticipant::new(document.key.clone(), document.order, bounds)
+                                .scope(scope)
+                                .text(source.clone())
+                                .rows(visual_rows)
+                                .sensitive(document.sensitive)
+                                .resolver(Rc::new(move |position| {
+                                    selectable_index_at(&resolver_text, &layout, position)
+                                }));
+                        if document.coverage == SelectionCoverage::Virtualized {
+                            participant = participant.virtualized();
+                        }
+                        window.register_selection_participant(&participant);
+
+                        // The element's own selection state becomes a mirror of
+                        // the slice the document assigns to this participant, so
+                        // painting, accessibility, and click suppression keep
+                        // reading one place while only the gesture handlers
+                        // change.
+                        let covered = window
+                            .document_selection()
+                            .range_for(&document.key, scope, document.order, source.len())
+                            .unwrap_or(0..0);
+                        let mut mirrored = selection.borrow_mut();
+                        mirrored.anchor = covered.start;
+                        mirrored.focus = covered.end;
+                    }
                     let range = selection.borrow().range();
                     let color = Colors::for_appearance(window).selected.opacity(0.4);
                     selection_quads.extend(
@@ -1502,6 +1844,7 @@ impl Element for InteractiveText {
         let text_layout = self.text.layout().clone();
         let text = text_layout.source();
         let selectable = self.selectable;
+        let document = self.document.clone();
         let a11y_node_id = global_id.map(GlobalElementId::accesskit_node_id);
         window.with_element_state::<InteractiveTextState, _>(
             global_id.expect("required framework invariant must hold"),
@@ -1516,201 +1859,225 @@ impl Element for InteractiveText {
                     window.next_frame.tab_stops.insert(&focus_handle);
                     window.set_cursor_style(CursorStyle::IBeam, hitbox);
 
-                    let hitbox_for_down = hitbox.clone();
-                    let layout_for_down = text_layout.clone();
-                    let selection_for_down = selection_state.clone();
-                    let focus_for_down = focus_handle.clone();
-                    let text_for_down = text.clone();
-                    window.on_mouse_event(move |event: &MouseDownEvent, phase, window, cx| {
-                        if phase != DispatchPhase::Bubble
-                            || event.button != MouseButton::Left
-                            || !hitbox_for_down.is_hovered(window)
-                        {
-                            return;
-                        }
-                        let index =
-                            selectable_index_at(&text_for_down, &layout_for_down, event.position);
-                        let mut selection = selection_for_down.borrow_mut();
-                        if event.modifiers.shift && event.click_count == 1 {
-                            selection.focus = index;
-                            selection.drag_unit = None;
-                        } else {
-                            let selected = match event.click_count {
-                                2 => word_range_at(&text_for_down, index),
-                                count if count >= 3 => visual_row_at(&selection.visual_rows, index),
-                                _ => index..index,
-                            };
-                            selection.anchor = selected.start;
-                            selection.focus = selected.end;
-                            selection.drag_unit = (!selected.is_empty()).then_some(selected);
-                        }
-                        selection.dragging = true;
-                        drop(selection);
-                        focus_for_down.focus(window, cx);
-                        window.capture_pointer(hitbox_for_down.id);
-                        window.refresh();
-                    });
-
-                    let hitbox_for_move = hitbox.clone();
-                    let layout_for_move = text_layout.clone();
-                    let selection_for_move = selection_state.clone();
-                    let text_for_move = text.clone();
-                    window.on_mouse_event(move |event: &MouseMoveEvent, phase, window, _cx| {
-                        if phase == DispatchPhase::Capture
-                            || event.pressed_button != Some(MouseButton::Left)
-                            || !hitbox_for_move.is_hovered(window)
-                            || !selection_for_move.borrow().dragging
-                        {
-                            return;
-                        }
-                        let index =
-                            selectable_index_at(&text_for_move, &layout_for_move, event.position);
-                        let mut selection = selection_for_move.borrow_mut();
-                        let before = selection.range();
-                        extend_pointer_selection(&mut selection, index);
-                        if selection.range() != before {
+                    if let Some(document) = document.clone() {
+                        paint_document_selection_handlers(
+                            document,
+                            hitbox,
+                            &focus_handle,
+                            &text_layout,
+                            &text,
+                            &selection_state,
+                            a11y_node_id,
+                            window,
+                        );
+                    } else {
+                        let hitbox_for_down = hitbox.clone();
+                        let layout_for_down = text_layout.clone();
+                        let selection_for_down = selection_state.clone();
+                        let focus_for_down = focus_handle.clone();
+                        let text_for_down = text.clone();
+                        window.on_mouse_event(move |event: &MouseDownEvent, phase, window, cx| {
+                            if phase != DispatchPhase::Bubble
+                                || event.button != MouseButton::Left
+                                || !hitbox_for_down.is_hovered(window)
+                            {
+                                return;
+                            }
+                            let index = selectable_index_at(
+                                &text_for_down,
+                                &layout_for_down,
+                                event.position,
+                            );
+                            let mut selection = selection_for_down.borrow_mut();
+                            if event.modifiers.shift && event.click_count == 1 {
+                                selection.focus = index;
+                                selection.drag_unit = None;
+                            } else {
+                                let selected = match event.click_count {
+                                    2 => word_range_at(&text_for_down, index),
+                                    count if count >= 3 => {
+                                        visual_row_at(&selection.visual_rows, index)
+                                    }
+                                    _ => index..index,
+                                };
+                                selection.anchor = selected.start;
+                                selection.focus = selected.end;
+                                selection.drag_unit = (!selected.is_empty()).then_some(selected);
+                            }
+                            selection.dragging = true;
                             drop(selection);
+                            focus_for_down.focus(window, cx);
+                            window.capture_pointer(hitbox_for_down.id);
                             window.refresh();
-                        }
-                    });
+                        });
 
-                    let layout_for_up = text_layout.clone();
-                    let selection_for_up = selection_state.clone();
-                    let text_for_up = text.clone();
-                    window.on_mouse_event(move |event: &MouseUpEvent, phase, window, cx| {
-                        if phase == DispatchPhase::Capture
-                            || event.button != MouseButton::Left
-                            || !selection_for_up.borrow().dragging
-                        {
-                            return;
-                        }
-                        let index =
-                            selectable_index_at(&text_for_up, &layout_for_up, event.position);
-                        let mut selection = selection_for_up.borrow_mut();
-                        extend_pointer_selection(&mut selection, index);
-                        selection.dragging = false;
-                        selection.drag_unit = None;
-                        let selected = !selection.range().is_empty();
-                        drop(selection);
-                        window.release_pointer();
-                        window.refresh();
-                        if selected {
-                            // A selection gesture is not a click on an
-                            // enclosing link or button. Keep a zero-length
-                            // click composable with those ancestors.
-                            cx.stop_propagation();
-                        }
-                    });
+                        let hitbox_for_move = hitbox.clone();
+                        let layout_for_move = text_layout.clone();
+                        let selection_for_move = selection_state.clone();
+                        let text_for_move = text.clone();
+                        window.on_mouse_event(move |event: &MouseMoveEvent, phase, window, _cx| {
+                            if phase == DispatchPhase::Capture
+                                || event.pressed_button != Some(MouseButton::Left)
+                                || !hitbox_for_move.is_hovered(window)
+                                || !selection_for_move.borrow().dragging
+                            {
+                                return;
+                            }
+                            let index = selectable_index_at(
+                                &text_for_move,
+                                &layout_for_move,
+                                event.position,
+                            );
+                            let mut selection = selection_for_move.borrow_mut();
+                            let before = selection.range();
+                            extend_pointer_selection(&mut selection, index);
+                            if selection.range() != before {
+                                drop(selection);
+                                window.refresh();
+                            }
+                        });
 
-                    let selection_for_key = selection_state.clone();
-                    let text_for_key = text.clone();
-                    window.on_key_event(move |event: &KeyDownEvent, phase, window, cx| {
-                        if phase != DispatchPhase::Bubble {
-                            return;
-                        }
-                        let modifiers = event.keystroke.modifiers;
-                        let key = event.keystroke.key.as_str();
-                        if modifiers.secondary()
-                            && !modifiers.shift
-                            && !modifiers.alt
-                            && !modifiers.function
-                        {
-                            match key {
-                                "a" => {
-                                    let mut selection = selection_for_key.borrow_mut();
-                                    selection.anchor = 0;
-                                    selection.focus = text_for_key.len();
-                                    drop(selection);
-                                    window.refresh();
-                                    cx.stop_propagation();
-                                }
-                                "c" => {
-                                    let range = selection_for_key.borrow().range();
-                                    if !range.is_empty() {
-                                        cx.write_to_clipboard(ClipboardItem::new_string(
-                                            text_for_key[range].to_string(),
-                                        ));
+                        let layout_for_up = text_layout.clone();
+                        let selection_for_up = selection_state.clone();
+                        let text_for_up = text.clone();
+                        window.on_mouse_event(move |event: &MouseUpEvent, phase, window, cx| {
+                            if phase == DispatchPhase::Capture
+                                || event.button != MouseButton::Left
+                                || !selection_for_up.borrow().dragging
+                            {
+                                return;
+                            }
+                            let index =
+                                selectable_index_at(&text_for_up, &layout_for_up, event.position);
+                            let mut selection = selection_for_up.borrow_mut();
+                            extend_pointer_selection(&mut selection, index);
+                            selection.dragging = false;
+                            selection.drag_unit = None;
+                            let selected = !selection.range().is_empty();
+                            drop(selection);
+                            window.release_pointer();
+                            window.refresh();
+                            if selected {
+                                // A selection gesture is not a click on an
+                                // enclosing link or button. Keep a zero-length
+                                // click composable with those ancestors.
+                                cx.stop_propagation();
+                            }
+                        });
+
+                        let selection_for_key = selection_state.clone();
+                        let text_for_key = text.clone();
+                        window.on_key_event(move |event: &KeyDownEvent, phase, window, cx| {
+                            if phase != DispatchPhase::Bubble {
+                                return;
+                            }
+                            let modifiers = event.keystroke.modifiers;
+                            let key = event.keystroke.key.as_str();
+                            if modifiers.secondary()
+                                && !modifiers.shift
+                                && !modifiers.alt
+                                && !modifiers.function
+                            {
+                                match key {
+                                    "a" => {
+                                        let mut selection = selection_for_key.borrow_mut();
+                                        selection.anchor = 0;
+                                        selection.focus = text_for_key.len();
+                                        drop(selection);
+                                        window.refresh();
                                         cx.stop_propagation();
                                     }
+                                    "c" => {
+                                        let range = selection_for_key.borrow().range();
+                                        if !range.is_empty() {
+                                            cx.write_to_clipboard(ClipboardItem::new_string(
+                                                text_for_key[range].to_string(),
+                                            ));
+                                            cx.stop_propagation();
+                                        }
+                                    }
+                                    _ => {}
                                 }
-                                _ => {}
+                                return;
                             }
-                            return;
-                        }
 
-                        if modifiers.control
-                            || modifiers.platform
-                            || modifiers.alt
-                            || modifiers.function
+                            if modifiers.control
+                                || modifiers.platform
+                                || modifiers.alt
+                                || modifiers.function
+                            {
+                                return;
+                            }
+                            let mut selection = selection_for_key.borrow_mut();
+                            let next = match key {
+                                "left" if !modifiers.shift && !selection.range().is_empty() => {
+                                    selection.range().start
+                                }
+                                "right" if !modifiers.shift && !selection.range().is_empty() => {
+                                    selection.range().end
+                                }
+                                "left" => previous_grapheme_boundary(
+                                    &text_for_key,
+                                    selection.focus.saturating_sub(1),
+                                ),
+                                "right" => next_grapheme_boundary(&text_for_key, selection.focus),
+                                "home" => {
+                                    visual_row_at(&selection.visual_rows, selection.focus).start
+                                }
+                                "end" => visual_row_at(&selection.visual_rows, selection.focus).end,
+                                _ => return,
+                            };
+                            selection.focus = next;
+                            if !modifiers.shift {
+                                selection.anchor = next;
+                            }
+                            drop(selection);
+                            window.refresh();
+                            cx.stop_propagation();
+                        });
+
+                        if let Some(node_id) = a11y_node_id
+                            && accessible_text_is_representable(&text)
                         {
-                            return;
+                            let selection_for_a11y = selection_state.clone();
+                            let text_for_a11y = text.clone();
+                            window.on_a11y_action(
+                                node_id,
+                                accesskit::Action::SetTextSelection,
+                                move |data, window, _| {
+                                    let Some(accesskit::ActionData::SetTextSelection(requested)) =
+                                        data
+                                    else {
+                                        return;
+                                    };
+                                    let selection = selection_for_a11y.borrow();
+                                    let Some(published) = selection.published.as_ref() else {
+                                        return;
+                                    };
+                                    let Some(anchor) = byte_offset_for_published_position(
+                                        &text_for_a11y,
+                                        selection.revision,
+                                        published,
+                                        requested.anchor,
+                                    ) else {
+                                        return;
+                                    };
+                                    let Some(focus) = byte_offset_for_published_position(
+                                        &text_for_a11y,
+                                        selection.revision,
+                                        published,
+                                        requested.focus,
+                                    ) else {
+                                        return;
+                                    };
+                                    drop(selection);
+                                    let mut selection = selection_for_a11y.borrow_mut();
+                                    selection.anchor = anchor;
+                                    selection.focus = focus;
+                                    window.refresh();
+                                },
+                            );
                         }
-                        let mut selection = selection_for_key.borrow_mut();
-                        let next = match key {
-                            "left" if !modifiers.shift && !selection.range().is_empty() => {
-                                selection.range().start
-                            }
-                            "right" if !modifiers.shift && !selection.range().is_empty() => {
-                                selection.range().end
-                            }
-                            "left" => previous_grapheme_boundary(
-                                &text_for_key,
-                                selection.focus.saturating_sub(1),
-                            ),
-                            "right" => next_grapheme_boundary(&text_for_key, selection.focus),
-                            "home" => visual_row_at(&selection.visual_rows, selection.focus).start,
-                            "end" => visual_row_at(&selection.visual_rows, selection.focus).end,
-                            _ => return,
-                        };
-                        selection.focus = next;
-                        if !modifiers.shift {
-                            selection.anchor = next;
-                        }
-                        drop(selection);
-                        window.refresh();
-                        cx.stop_propagation();
-                    });
-
-                    if let Some(node_id) = a11y_node_id
-                        && accessible_text_is_representable(&text)
-                    {
-                        let selection_for_a11y = selection_state.clone();
-                        let text_for_a11y = text.clone();
-                        window.on_a11y_action(
-                            node_id,
-                            accesskit::Action::SetTextSelection,
-                            move |data, window, _| {
-                                let Some(accesskit::ActionData::SetTextSelection(requested)) = data
-                                else {
-                                    return;
-                                };
-                                let selection = selection_for_a11y.borrow();
-                                let Some(published) = selection.published.as_ref() else {
-                                    return;
-                                };
-                                let Some(anchor) = byte_offset_for_published_position(
-                                    &text_for_a11y,
-                                    selection.revision,
-                                    published,
-                                    requested.anchor,
-                                ) else {
-                                    return;
-                                };
-                                let Some(focus) = byte_offset_for_published_position(
-                                    &text_for_a11y,
-                                    selection.revision,
-                                    published,
-                                    requested.focus,
-                                ) else {
-                                    return;
-                                };
-                                drop(selection);
-                                let mut selection = selection_for_a11y.borrow_mut();
-                                selection.anchor = anchor;
-                                selection.focus = focus;
-                                window.refresh();
-                            },
-                        );
                     }
                 }
                 if let Some(click_listener) = self.click_listener.take() {

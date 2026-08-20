@@ -4204,6 +4204,15 @@ impl ScrollHandle {
         self.0.borrow().max_offset
     }
 
+    /// Pretend a frame has been laid out, so a test can ask a handle where it
+    /// is without building a window to scroll.
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn set_measured_for_test(&self, bounds: Bounds<Pixels>, max_offset: Point<Pixels>) {
+        let mut state = self.0.borrow_mut();
+        state.bounds = bounds;
+        state.max_offset = max_offset;
+    }
+
     /// Get the top child that's scrolled into view.
     pub fn top_item(&self) -> usize {
         let state = self.0.borrow();

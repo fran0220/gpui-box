@@ -4,22 +4,24 @@ use crate::{
     Action, AnyDrag, AnyElement, AnyImageCache, AnyTooltip, AnyView, App, AppContext, Arena, Asset,
     AsyncWindowContext, AtlasTile, AvailableSpace, BackdropGlass, Background, BorderStyle, Bounds,
     BoxShadow, Capslock, Context, Corners, CursorHideMode, CursorStyle, Decorations, DevicePixels,
-    DispatchActionListener, DispatchNodeId, DispatchTree, DisplayId, Edges, Effect, Entity,
-    EntityId, EventEmitter, ExternalDropEvent, FileDropEvent, FontId, GlassLobe, GlassMaterial,
-    Global, GlobalElementId, GlyphId, GpuSpecs, Hsla, InputHandler, IsZero, KeyBinding, KeyContext,
-    KeyDownEvent, KeyEvent, Keystroke, KeystrokeEvent, LayoutId, LineLayoutIndex, MAX_GLASS_LOBES,
-    Modifiers, ModifiersChangedEvent, MonochromeSprite, MouseButton, MouseEvent, MouseMoveEvent,
-    MouseUpEvent, ParticleEmitter, Path, Pixels, PlatformAtlas, PlatformDisplay, PlatformInput,
-    PlatformInputHandler, PlatformViewHandle, PlatformViewPlacement, PlatformViewRegistry,
-    PlatformWindow, Point, PolychromeSprite, Priority, PromptButton, PromptLevel, Quad, Render,
-    RenderGlyphParams, RenderImage, RenderImageParams, RenderSvgParams, Replay, ResizeEdge,
-    SMOOTH_SVG_SCALE_FACTOR, SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y, ScaledPixels, Scene, Shadow,
-    SharedString, Size, SpriteColorMode, SpriteInstance, StrikethroughStyle, Style, SubpixelSprite,
-    SubscriberSet, Subscription, SystemWindowTab, SystemWindowTabController, TabStopMap,
-    TaffyLayoutEngine, Task, TextRenderingMode, TextStyle, TextStyleRefinement, ThermalState,
-    TransformationMatrix, Underline, UnderlineStyle, WindowAppearance, WindowBackgroundAppearance,
-    WindowBounds, WindowControls, WindowDecorations, WindowOptions, WindowParams, WindowTextSystem,
-    point, prelude::*, profiler, px, rems, size, transparent_black,
+    DispatchActionListener, DispatchNodeId, DispatchTree, DisplayId, DocumentSelectionState, Edges,
+    Effect, Entity, EntityId, EventEmitter, ExternalDropEvent, FileDropEvent, FontId, GlassLobe,
+    GlassMaterial, Global, GlobalElementId, GlyphId, GpuSpecs, Hsla, InputHandler, IsZero,
+    KeyBinding, KeyContext, KeyDownEvent, KeyEvent, Keystroke, KeystrokeEvent, LayoutId,
+    LineLayoutIndex, MAX_GLASS_LOBES, Modifiers, ModifiersChangedEvent, MonochromeSprite,
+    MouseButton, MouseEvent, MouseMoveEvent, MouseUpEvent, ParticleEmitter, Path, Pixels,
+    PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformViewHandle,
+    PlatformViewPlacement, PlatformViewRegistry, PlatformWindow, Point, PolychromeSprite, Priority,
+    PromptButton, PromptLevel, Quad, Render, RenderGlyphParams, RenderImage, RenderImageParams,
+    RenderSvgParams, Replay, ResizeEdge, SMOOTH_SVG_SCALE_FACTOR, SUBPIXEL_VARIANTS_X,
+    SUBPIXEL_VARIANTS_Y, ScaledPixels, Scene, SelectionCopy, SelectionParticipant,
+    SelectionScopeId, Shadow, SharedString, Size, SpriteColorMode, SpriteInstance,
+    StrikethroughStyle, Style, SubpixelSprite, SubscriberSet, Subscription, SystemWindowTab,
+    SystemWindowTabController, TabStopMap, TaffyLayoutEngine, Task, TextRenderingMode, TextStyle,
+    TextStyleRefinement, ThermalState, TransformationMatrix, Underline, UnderlineStyle,
+    WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControls, WindowDecorations,
+    WindowOptions, WindowParams, WindowTextSystem, point, prelude::*, profiler, px, rems, size,
+    transparent_black,
 };
 
 use anyhow::{Context as _, Result, anyhow};
@@ -939,6 +941,13 @@ pub(crate) struct Frame {
     /// Interactive hitboxes keyed by stable element identity, used to carry
     /// pointer capture across frames that redraw during a gesture.
     pointer_capture_hitboxes: FxHashMap<GlobalElementId, HitboxId>,
+    /// Text elements taking part in this window's document selection, keyed by
+    /// scope and the business identity each declared. Rebuilding the map every
+    /// prepaint is what expires a participant that stopped being mounted.
+    pub(crate) selection_participants: FxHashMap<
+        (crate::SelectionScopeId, crate::SelectionContentKey),
+        crate::RegisteredParticipant,
+    >,
     pub(crate) window_control_hitboxes: Vec<(WindowControlArea, Hitbox)>,
     pub(crate) deferred_draws: Vec<DeferredDraw>,
     /// Natively hosted views painted by this frame, in paint order.
@@ -990,6 +999,7 @@ impl Frame {
             overlay_scene_start: 0,
             hitboxes: Vec::new(),
             pointer_capture_hitboxes: FxHashMap::default(),
+            selection_participants: FxHashMap::default(),
             window_control_hitboxes: Vec::new(),
             deferred_draws: Vec::new(),
             platform_views: Vec::new(),
@@ -1021,6 +1031,7 @@ impl Frame {
         self.cursor_styles.clear();
         self.hitboxes.clear();
         self.pointer_capture_hitboxes.clear();
+        self.selection_participants.clear();
         self.window_control_hitboxes.clear();
         self.deferred_draws.clear();
         self.platform_views.clear();
@@ -1132,6 +1143,11 @@ pub struct Window {
     pub(crate) element_opacity: f32,
     pub(crate) edge_fade: Option<EdgeFade>,
     pub(crate) content_mask_stack: Vec<ContentMask<Pixels>>,
+    pub(crate) selection_scope_stack: Vec<crate::SelectionScopeId>,
+    /// One selection that may span separately mounted text elements. It
+    /// belongs to the window rather than to a global, so a closed window
+    /// leaves nothing behind.
+    pub(crate) document_selection: crate::DocumentSelectionState,
     pub(crate) requested_autoscroll: Option<Bounds<Pixels>>,
     pub(crate) image_cache_stack: Vec<AnyImageCache>,
     pub(crate) rendered_frame: Frame,
@@ -1991,6 +2007,8 @@ impl Window {
             prompt: None,
             client_inset: None,
             image_cache_stack: Vec::new(),
+            selection_scope_stack: Vec::new(),
+            document_selection: crate::DocumentSelectionState::default(),
             captured_hitbox: None,
             captured_pointer_element: None,
             #[cfg(any(feature = "inspector", debug_assertions))]
@@ -3621,6 +3639,127 @@ impl Window {
         } else {
             f(self)
         }
+    }
+
+    /// Draws `f` inside an isolated text-selection scope.
+    ///
+    /// A drag started inside the scope never reaches text outside it, and text
+    /// outside it never joins a selection started within. This is what keeps a
+    /// dialog mounted over a document from being selected together with it.
+    pub fn with_selection_scope<F, R>(&mut self, scope: SelectionScopeId, f: F) -> R
+    where
+        F: FnOnce(&mut Self) -> R,
+    {
+        self.selection_scope_stack.push(scope);
+        let result = f(self);
+        self.selection_scope_stack.pop();
+        result
+    }
+
+    /// The selection scope the element currently being drawn belongs to.
+    pub fn selection_scope(&self) -> SelectionScopeId {
+        self.selection_scope_stack
+            .last()
+            .copied()
+            .unwrap_or(SelectionScopeId::ROOT)
+    }
+
+    /// Declares a text element as part of this window's document selection for
+    /// the frame being prepainted.
+    ///
+    /// A participant marked [`SelectionParticipant::sensitive`] is refused, so
+    /// its bytes can never reach the aggregate copy path.
+    pub fn register_selection_participant(&mut self, participant: &SelectionParticipant) {
+        crate::document_selection_register(
+            &mut self.next_frame.selection_participants,
+            participant,
+        );
+    }
+
+    /// This window's document selection.
+    pub fn document_selection(&self) -> &DocumentSelectionState {
+        &self.document_selection
+    }
+
+    /// This window's document selection, for a caller placing or clearing it.
+    pub fn document_selection_mut(&mut self) -> &mut DocumentSelectionState {
+        &mut self.document_selection
+    }
+
+    /// Forgets the document selection.
+    pub fn clear_document_selection(&mut self) {
+        self.document_selection.clear();
+    }
+
+    /// Reads the document selection out of the participants that were drawn.
+    ///
+    /// Returns `None` when nothing is selected. The result states whether it
+    /// could prove it saw the whole span; see [`SelectionCopy::complete`].
+    pub fn document_selection_text(&self) -> Option<SelectionCopy> {
+        self.document_selection
+            .copy(&self.drawn_selection_participants())
+    }
+
+    /// Selects every participant of one scope, end to end.
+    pub fn select_all_in_selection_scope(&mut self, scope: SelectionScopeId) {
+        let participants = self.drawn_selection_participants();
+        self.document_selection.select_all(scope, &participants);
+    }
+
+    pub(crate) fn drawn_selection_participants(&self) -> Vec<crate::Registered> {
+        crate::document_selection_registered(&self.rendered_frame.selection_participants)
+    }
+
+    /// Whether a window position lands inside a participant of `scope`.
+    ///
+    /// A press that lands nowhere is how a document selection is dismissed,
+    /// so this answers a question about the gesture rather than about paint.
+    pub fn selection_participant_contains(
+        &self,
+        scope: SelectionScopeId,
+        position: Point<Pixels>,
+    ) -> bool {
+        matches!(
+            crate::land_selection(&self.drawn_selection_participants(), scope, position),
+            crate::Landing::Inside(_)
+        )
+    }
+
+    /// Moves the far end of the document selection to a window position.
+    ///
+    /// A position inside a participant selects to that offset. A position past
+    /// the mounted content extends to the edge it passed, so a drag that left
+    /// the text it started in still means something. Returns whether the
+    /// selection changed.
+    pub fn drag_document_selection_to(&mut self, position: Point<Pixels>) -> bool {
+        let scope = self.document_selection.scope();
+        let participants = self.drawn_selection_participants();
+        let Some(endpoint) = crate::selection_endpoint_at(&participants, scope, position) else {
+            return false;
+        };
+        let before = (
+            self.document_selection.anchor().cloned(),
+            self.document_selection.focus().cloned(),
+        );
+        let target_unit = crate::selection_unit_range(
+            &participants,
+            &endpoint.key,
+            endpoint.offset,
+            self.document_selection.drag_kind(),
+        );
+        self.document_selection
+            .extend_to_snapped(scope, endpoint, target_unit);
+        self.document_selection
+            .set_autoscroll(crate::selection_autoscroll_for(
+                &participants,
+                scope,
+                position,
+            ));
+        before
+            != (
+                self.document_selection.anchor().cloned(),
+                self.document_selection.focus().cloned(),
+            )
     }
 
     /// Updates the cursor style at the platform level. This method should only be called

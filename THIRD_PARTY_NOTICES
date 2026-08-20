@@ -41,6 +41,10 @@ clipboard behavior, bounded native external-data drag delivery, and AccessKit
 text-run publication are GPUI Box work and import no editor or product source.
 Rounded shaped-text backgrounds added with that primitive are GPUI Box work as
 well.
+The window-owned document-selection coordinator, isolated selection scopes,
+virtualized-copy coverage, and generic scroll-target contract are GPUI Box work
+over existing framework state and import no editor, product, or third-party
+source.
 The AVFoundation and Media Foundation playback services are GPUI Box work and
 use operating-system frameworks; they import no additional third-party source
 or media assets.

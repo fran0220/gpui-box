@@ -46,6 +46,24 @@ different transcendental approximations for the noise. Color conversion and
 edge rasterization remain renderer-specific, which is why each renderer
 retains its own baseline rather than claiming identical bytes across platforms.
 
+Read-only `StyledText` selection is a framework primitive rather than a Kit
+gesture. A window-owned coordinator joins separately mounted participants in
+caller-declared reading order, while stable business keys keep a selection on
+the same content across reordering and re-virtualization. Selection scopes
+isolate overlays from the page behind them. A copy crossing virtualized rows
+contains only mounted text and reports `complete: false`; GPUI never invents
+content it did not lay out. Pointer capture, grapheme-safe reverse drags, Copy,
+Select All, and AccessKit selection continue to use the shaped text geometry of
+each participant. A host that needs a complete copy of unmounted content still
+uses the component's whole-value copy intent.
+
+`ScrollTarget` gives overflowing containers, uniform lists, and measured
+variable-height lists one offset, extent, viewport, and mutation contract.
+Kit scrollbars bind to that target instead of wrapping a virtualized list in a
+second scrolling container. A measured list freezes its reported extent while
+the thumb is dragged, so newly measured rows cannot move the thumb away from
+the pointer.
+
 `Window::paint_sprite_batch` samples half-open physical-pixel rectangles from
 one `RenderImage` frame and retains one atlas upload for all instances. Each
 instance carries logical destination bounds, a center-relative transform,
