@@ -283,13 +283,11 @@ impl RenderOnce for Outline {
         }
 
         let theme = cx.theme().clone();
-        let viewed = self
-            .over
-            .as_ref()
-            .and_then(|list| viewed_rows(list, cx))
-            .unwrap_or((0, 0.0));
-        let current = current_mark(&self.marks, viewed.0);
-        let slots = self.slots.unwrap_or_else(|| fitting(viewed.1));
+        let viewed = self.over.as_ref().and_then(|list| viewed_rows(list, cx));
+        let first_row = viewed.map(|viewed| viewed.first_row).unwrap_or(0);
+        let height = viewed.map(|viewed| f32::from(viewed.height)).unwrap_or(0.0);
+        let current = current_mark(&self.marks, first_row);
+        let slots = self.slots.unwrap_or_else(|| fitting(height));
         let ranges = buckets(self.marks.len(), slots);
 
         div()

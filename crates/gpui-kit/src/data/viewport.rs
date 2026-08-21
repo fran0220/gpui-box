@@ -337,6 +337,15 @@ fn step_toward(
     cx.refresh_windows();
 }
 
+/// What a surface drawn over a list can see of it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Viewed {
+    /// The first row the reader can see.
+    pub first_row: usize,
+    /// How tall the frame showing it is.
+    pub height: Pixels,
+}
+
 /// The first row of this surface that the reader can see, and how tall the
 /// frame showing it is.
 ///
@@ -346,17 +355,14 @@ fn step_toward(
 /// not been laid out as a variable-height list, which is one frame at most and
 /// is not the same answer as "the top", so a caller can tell "not yet" from
 /// "row zero".
-pub(crate) fn viewed_rows(ident: &Ident, cx: &mut App) -> Option<(usize, f32)> {
+pub fn viewed_rows(ident: &Ident, cx: &mut App) -> Option<Viewed> {
     let state = flow_state(ident, cx)?;
-    let height = f32::from(state.viewport_bounds().size.height);
-    Some((state.logical_scroll_top().item_ix, height))
+    Some(Viewed {
+        first_row: state.logical_scroll_top().item_ix,
+        height: state.viewport_bounds().size.height,
+    })
 }
 
-/// The variable-height state of this surface, if it has one.
-///
-/// A surface has one only once it has rendered as a variable-height list, so
-/// moving a list by name reaches whichever kind it turned out to be rather
-/// than moving a uniform handle nothing is drawn from.
 pub(crate) fn flow_state(ident: &Ident, cx: &mut App) -> Option<ListState> {
     if !cx.has_global::<FlowStates>() {
         return None;

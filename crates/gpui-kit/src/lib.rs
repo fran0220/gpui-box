@@ -185,7 +185,7 @@ pub mod prelude {
         DiagnosticsList, EditIntent, EditOutcome, EditingCell, Expanded, Flow, GridColumn,
         GridLines, GridRow, KanbanBoard, KanbanCard, KanbanColumn, KanbanEvent, KanbanState, List,
         ListItem, Row, SelectionChange, SelectionMode, SortDirection, Table, Tree, TreeGrid,
-        TreeGridRow, TreeNode,
+        TreeGridRow, TreeNode, Viewed,
     };
     pub use crate::datetime::{
         BlockedDay, BlockedReport, Calendar, CalendarEvent, Clock, DateAdapter, DateInput,

@@ -11584,6 +11584,16 @@
       ]
     },
     {
+      "name": "Viewed",
+      "path": "gpui_kit::data::Viewed",
+      "summary": "What a surface drawn over a list can see of it.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "ViewportState",
       "path": "gpui_kit::content::ViewportState",
       "summary": "What is behind the panel right now.",
