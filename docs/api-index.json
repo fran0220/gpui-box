@@ -1297,6 +1297,8 @@
       "options": [
         "presentation(presentation: DiffPresentation) -> Self",
         "visible_rows(rows: usize) -> Self",
+        "wrapping(wrapping: bool) -> Self",
+        "language(language: impl Into<SharedString>) -> Self",
         "on_event(handler: impl Fn(DiffViewEvent, &mut Window, &mut App) + 'static) -> Self"
       ],
       "commands": [],
@@ -1305,7 +1307,8 @@
         "FileActivated",
         "HunkActivated",
         "LineActivated",
-        "ExpandHunk"
+        "ExpandHunk",
+        "UnfoldFile"
       ],
       "scenes": [
         "diff-view"
@@ -6231,7 +6234,9 @@
       "construct": [
         "new(id: impl Into<SharedString>, label: impl Into<SharedString>, hunks: impl IntoIterator<Item = DiffHunk>) -> Self"
       ],
-      "options": [],
+      "options": [
+        "folded(folded: bool) -> Self"
+      ],
       "commands": [],
       "queries": []
     },
@@ -6293,7 +6298,8 @@
         "FileActivated",
         "HunkActivated",
         "LineActivated",
-        "ExpandHunk"
+        "ExpandHunk",
+        "UnfoldFile"
       ],
       "construct": [],
       "options": [],
@@ -13154,7 +13160,7 @@
       "uses": [
         "DiffView"
       ],
-      "example": "fn diff_view(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(840.0))\n        .child(caption(\n            &theme,\n            \"the same caller-owned rows arranged as unified and split\",\n        ))\n        .child(\n            div()\n                .column()\n                .items_start()\n                .gap_token(&theme, Space::Md)\n                .child(\n                    div().w(px(840.0)).child(\n                        DiffView::new(\"scene.diff.unified\", scene_diff())\n                            .visible_rows(7)\n                            .on_event(|_, _, _| {}),\n                    ),\n                )\n                .child(\n                    div().w(px(840.0)).child(\n                        DiffView::new(\"scene.diff.split\", scene_diff())\n                            .presentation(DiffPresentation::Split)\n                            .visible_rows(7)\n                            .on_event(|_, _, _| {}),\n                    ),\n                ),\n        )\n        .into_any_element()\n}"
+      "example": "fn diff_view(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(840.0))\n        .child(caption(\n            &theme,\n            \"the same caller-owned rows arranged as unified and split\",\n        ))\n        .child(\n            div()\n                .column()\n                .items_start()\n                .gap_token(&theme, Space::Md)\n                .child(\n                    div().w(px(840.0)).child(\n                        DiffView::new(\"scene.diff.unified\", scene_diff())\n                            .visible_rows(7)\n                            .on_event(|_, _, _| {}),\n                    ),\n                )\n                .child(\n                    div().w(px(840.0)).child(\n                        DiffView::new(\"scene.diff.split\", scene_diff())\n                            .presentation(DiffPresentation::Split)\n                            .visible_rows(7)\n                            .on_event(|_, _, _| {}),\n                    ),\n                ),\n        )\n        .child(caption(\n            &theme,\n            \"a review of several files: two folded behind headers that say what \\\n             they hold, one open and coloured by its named language\",\n        ))\n        .child(\n            div().w(px(840.0)).child(\n                DiffView::new(\"scene.diff.review\", scene_review())\n                    .language(\"rust\")\n                    .visible_rows(9)\n                    .on_event(|_, _, _| {}),\n            ),\n        )\n        .child(caption(\n            &theme,\n            \"the same rows measured rather than slotted, so a line longer than \\\n             the frame wraps instead of being cut off\",\n        ))\n        .child(\n            div().w(px(420.0)).child(\n                DiffView::new(\"scene.diff.wrapping\", scene_long_line())\n                    .wrapping(true)\n                    .visible_rows(6)\n                    .on_event(|_, _, _| {}),\n            ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "sparkline",

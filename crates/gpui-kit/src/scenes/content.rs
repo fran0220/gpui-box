@@ -199,7 +199,86 @@ pub(super) fn diff_view(_window: &mut Window, cx: &mut App) -> AnyElement {
                     ),
                 ),
         )
+        .child(caption(
+            &theme,
+            "a review of several files: two folded behind headers that say what \
+             they hold, one open and coloured by its named language",
+        ))
+        .child(
+            div().w(px(840.0)).child(
+                DiffView::new("scene.diff.review", scene_review())
+                    .language("rust")
+                    .visible_rows(9)
+                    .on_event(|_, _, _| {}),
+            ),
+        )
+        .child(caption(
+            &theme,
+            "the same rows measured rather than slotted, so a line longer than \
+             the frame wraps instead of being cut off",
+        ))
+        .child(
+            div().w(px(420.0)).child(
+                DiffView::new("scene.diff.wrapping", scene_long_line())
+                    .wrapping(true)
+                    .visible_rows(6)
+                    .on_event(|_, _, _| {}),
+            ),
+        )
         .into_any_element()
+}
+
+/// Three files, two of them folded: the shape the top of a real review has.
+fn scene_review() -> Vec<DiffFile> {
+    let mut files = scene_diff();
+    files.push(
+        DiffFile::new(
+            "adapter",
+            "src/adapter.rs",
+            [DiffHunk::new(
+                "open",
+                "@@ -12,2 +12,3 @@ fn open",
+                [
+                    DiffLine::added("guard", "    let held = registry.lock();").new_number(12),
+                    DiffLine::removed("stale", "    let held = registry.take();").old_number(12),
+                ],
+            )],
+        )
+        .folded(true),
+    );
+    files.push(
+        DiffFile::new(
+            "notes",
+            "docs/notes.md",
+            [DiffHunk::new(
+                "intro",
+                "@@ -1,1 +1,1 @@",
+                [DiffLine::added("line", "The cache is verified now.").new_number(1)],
+            )],
+        )
+        .folded(true),
+    );
+    files
+}
+
+/// One line far wider than the frame it is drawn in, which is the case fixed
+/// rows cannot show at all.
+fn scene_long_line() -> Vec<DiffFile> {
+    vec![DiffFile::new(
+        "config",
+        "config/build.json",
+        [DiffHunk::new(
+            "one",
+            "@@ -1,1 +1,1 @@",
+            [DiffLine::paired(
+                "targets",
+                "{\"targets\":[\"macos-arm64\",\"macos-x86\",\"windows-x86\"],\"strip\":false}",
+                "{\"targets\":[\"macos-arm64\",\"macos-x86\",\"windows-x86\",\"linux-arm64\"],\"strip\":true}",
+            )
+            .old_number(1)
+            .new_number(1)],
+        )],
+    )]
 }
 
 pub(super) fn code_view(_window: &mut Window, cx: &mut App) -> AnyElement {

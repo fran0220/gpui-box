@@ -17,6 +17,7 @@ use gpui::{
 use gpui_kit::prelude::*;
 use gpui_kit_semantics::Role;
 use gpui_kit_testkit::harness::Harness;
+use gpui_kit_theme::SyntaxColor;
 
 type Calls<T> = Rc<RefCell<Vec<T>>>;
 
@@ -1399,4 +1400,101 @@ fn a_language_nobody_here_can_read_is_still_the_language_it_was_called(cx: &mut 
     let view = harness.node("hunk").expect("published");
     assert_eq!(view.text.as_deref(), Some("cobol"));
     assert!(harness.node("hunk.lines.line-41").is_some());
+}
+
+#[gpui::test]
+fn a_folded_file_keeps_only_its_header_and_says_what_it_holds(cx: &mut TestAppContext) {
+    // A review of many files is unreadable as all their rows at once, and the
+    // fold is only useful if the header that remains says enough to choose by.
+    let (events, sink) = recorder::<DiffViewEvent>();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let sink = sink.clone();
+        let files: Vec<DiffFile> = fixture_diff(9)
+            .into_iter()
+            .map(|file| file.folded(true))
+            .collect();
+        DiffView::new("review", files)
+            .visible_rows(5)
+            .on_event(move |event, _, _| sink.borrow_mut().push(event))
+            .into_any_element()
+    });
+
+    assert!(
+        harness.node("review.rows.file.report").is_some(),
+        "the file itself is still there"
+    );
+    assert!(
+        harness.node("review.rows.file.report.hunk.body").is_none(),
+        "and everything under it is not"
+    );
+
+    harness.click("review.rows.file.report");
+    assert_eq!(
+        events.borrow().as_slice(),
+        [DiffViewEvent::UnfoldFile {
+            file_id: "report".into(),
+        }],
+        "a folded header asks to be opened rather than reporting a visit"
+    );
+}
+
+#[gpui::test]
+fn naming_the_language_colours_only_the_lines_that_arrived_uncoloured(cx: &mut TestAppContext) {
+    // The same rule `CodeView` keeps: the caller's grammar outranks the
+    // scanner, and a replacement keeps the more specific claim about which
+    // words changed.
+    let plain = DiffLine::added("added", "fn main() {}");
+    let claimed = DiffLine::added("claimed", "let held = 1;").spans([CodeSpan {
+        range: 0..3,
+        role: SyntaxColor::Removed,
+    }]);
+    let file = DiffFile::new(
+        "src",
+        "src/main.rs",
+        [DiffHunk::new("body", "@@ @@", [plain, claimed])],
+    );
+
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        DiffView::new("review", [file.clone()])
+            .language("rust")
+            .visible_rows(6)
+            .into_any_element()
+    });
+
+    // Highlighting is paint, so what a test can hold it to is that the rows
+    // still say exactly what they said: the text, the marks and the identities
+    // do not move because a colour was applied.
+    let added = harness
+        .node("review.rows.file.src.hunk.body.line.added")
+        .expect("the added line is published");
+    assert_eq!(added.text.as_deref(), Some("Added"));
+    assert!(
+        harness
+            .node("review.rows.file.src.hunk.body.line.claimed")
+            .is_some(),
+        "and so is the line whose spans the caller supplied"
+    );
+}
+
+#[gpui::test]
+fn a_wrapping_diff_keeps_every_row_addressable(cx: &mut TestAppContext) {
+    // Measured rows are the other half of the fixed-height trade. What must
+    // not change is which rows exist and what they report.
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        DiffView::new("review", fixture_diff(6))
+            .wrapping(true)
+            .visible_rows(8)
+            .into_any_element()
+    });
+
+    for index in 0..6 {
+        assert!(
+            harness
+                .node(&format!(
+                    "review.rows.file.report.hunk.body.line.line-{index:04}"
+                ))
+                .is_some(),
+            "line {index} went missing once rows were measured"
+        );
+    }
 }

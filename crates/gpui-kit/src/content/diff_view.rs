@@ -1,25 +1,45 @@
 //! Read-only presentation of a diff the caller already computed.
 //!
-//! Files, hunks, lines, line identities, old and new line numbers, marks and
-//! pre-classified code spans all come from the caller. This module computes no
-//! diff, parses no syntax, applies no patch and reads no filesystem.
+//! Files, hunks, lines, line identities, old and new line numbers and marks
+//! all come from the caller. This module computes no diff, applies no patch
+//! and reads no filesystem.
 //!
 //! # One renderer, two arrangements
 //!
 //! Unified and split presentation use the same caller-supplied logical rows
 //! and the same line-side renderer. For a replacement, the caller supplies
 //! the aligned old and new sides: split mode places them opposite one another,
-//! while unified mode places them on consecutive fixed rows. The component
-//! never guesses which removal belongs with which addition.
+//! while unified mode places them on consecutive rows. The component never
+//! guesses which removal belongs with which addition.
 //!
-//! # Large data
+//! # Colour
+//!
+//! Spans are the caller's to supply and their spans always win. Two things
+//! fill in what the caller left empty, in this order. On a replacement,
+//! [`word_spans`] marks the tokens with no counterpart on the other side,
+//! because on a row that exists because two versions differ, where they differ
+//! is the point. Everything else, when the caller named a language with
+//! [`DiffView::language`], is coloured by [`crate::content::highlight`] — a
+//! scanner, not a parser, on a language this crate has a table for, changing
+//! colour and nothing else. Each side carries its own scan, since the old and
+//! new texts are two versions of one file and not one document.
+//!
+//! # Size, and what it costs
 //!
 //! The hierarchy is flattened once per render, which walks all caller-owned
-//! files, hunks and lines. The resulting fixed-height rows are handed to the
-//! virtualized [`List`], so only viewport rows are laid out
-//! or published. The explicit price is the same one paid by virtualized
-//! `CodeView`: long lines are clipped and do not horizontally scroll. This is
-//! suitable for a large already-materialized diff, not for lazy diff loading.
+//! files, hunks and lines. The resulting rows are handed to the virtualized
+//! [`List`], so only the viewport is laid out or published.
+//!
+//! Rows are fixed-height by default, which is what makes a hundred-thousand
+//! row diff open instantly: no row has to be laid out for the list to know
+//! where any other one is. The price is that a long line is clipped, and
+//! [`DiffView::wrapping`] is the other side of that trade for a diff whose
+//! changes live at the ends of long lines.
+//!
+//! Neither helps with a review of forty files, which is unreadable at any row
+//! height. [`DiffFile::folded`] puts a file away behind a header that says how
+//! many lines it adds and removes, so the top of a large review is a list of
+//! files again.
 
 use std::collections::HashMap;
 use std::ops::Range;
@@ -35,6 +55,7 @@ use gpui_kit_theme::{
 };
 
 use crate::content::code_view::styled_code;
+use crate::content::highlight::{Carry, Language, line_spans};
 use crate::content::markdown::CodeSpan;
 use crate::data::{List, ListItem};
 use crate::display::badge::Tone;
@@ -277,6 +298,8 @@ pub struct DiffFile {
     pub id: SharedString,
     pub label: SharedString,
     pub hunks: Vec<DiffHunk>,
+    /// When true the file's header stays and its hunks do not.
+    pub folded: bool,
 }
 
 impl DiffFile {
@@ -289,7 +312,44 @@ impl DiffFile {
             id: id.into(),
             label: label.into(),
             hunks: hunks.into_iter().collect(),
+            folded: false,
         }
+    }
+
+    /// Puts the whole file away behind its header.
+    ///
+    /// A review of forty files is unreadable as forty thousand rows, and the
+    /// hunk-level collapse does not help: it still leaves every file's header
+    /// and every hunk's header on screen. Folding is what makes the top of a
+    /// large review a list of files again.
+    ///
+    /// The header of a folded file says what it is hiding — how many lines
+    /// were added and removed — because a fold that says only "there is
+    /// something here" makes the reader open every file to find out which ones
+    /// matter, which is the thing folding was for.
+    pub fn folded(mut self, folded: bool) -> Self {
+        self.folded = folded;
+        self
+    }
+
+    /// How many lines this file adds and removes, over all its hunks,
+    /// collapsed ones included: a collapsed hunk still changed what it
+    /// changed.
+    fn changed(&self) -> (usize, usize) {
+        self.hunks.iter().flat_map(|hunk| hunk.lines.iter()).fold(
+            (0, 0),
+            |(added, removed), line| {
+                let adds = line
+                    .new
+                    .as_ref()
+                    .is_some_and(|side| side.mark == DiffLineMark::Added);
+                let takes = line
+                    .old
+                    .as_ref()
+                    .is_some_and(|side| side.mark == DiffLineMark::Removed);
+                (added + usize::from(adds), removed + usize::from(takes))
+            },
+        )
     }
 }
 
@@ -313,6 +373,13 @@ pub enum DiffViewEvent {
         file_id: SharedString,
         hunk_id: SharedString,
     },
+    /// The host should put this file back on screen. Reported instead of
+    /// [`DiffViewEvent::FileActivated`] while a file is folded, so a host that
+    /// treats a header click as "open this file elsewhere" does not have to
+    /// guess which of the two the reader meant.
+    UnfoldFile {
+        file_id: SharedString,
+    },
 }
 
 /// A virtualized, read-only diff presentation.
@@ -322,6 +389,8 @@ pub struct DiffView {
     files: Vec<DiffFile>,
     presentation: DiffPresentation,
     visible_rows: usize,
+    wrapping: bool,
+    language: Option<SharedString>,
     on_event: Option<EventHandler>,
 }
 
@@ -333,6 +402,8 @@ impl std::fmt::Debug for DiffView {
             .field("files", &self.files.len())
             .field("presentation", &self.presentation)
             .field("visible_rows", &self.visible_rows)
+            .field("wrapping", &self.wrapping)
+            .field("language", &self.language)
             .field("has_handler", &self.on_event.is_some())
             .finish()
     }
@@ -345,6 +416,8 @@ impl DiffView {
             files: files.into_iter().collect(),
             presentation: DiffPresentation::Unified,
             visible_rows: 18,
+            wrapping: false,
+            language: None,
             on_event: None,
         }
     }
@@ -358,6 +431,43 @@ impl DiffView {
     /// and hunk headers each occupy one row too.
     pub fn visible_rows(mut self, rows: usize) -> Self {
         self.visible_rows = rows.max(1);
+        self
+    }
+
+    /// Wraps a line that is too long instead of clipping it.
+    ///
+    /// Fixed rows are what make a large diff cheap: every row's height is
+    /// known without laying it out, so the list can jump anywhere in a hundred
+    /// thousand rows immediately. The price is that a long line is cut off at
+    /// the right edge, and in a diff that price is sometimes wrong — a
+    /// minified bundle, a long string literal, a one-line JSON change is a
+    /// line whose *end* is the change, and a diff that hides it is showing
+    /// nothing.
+    ///
+    /// So this is a choice rather than a default. Rows are then measured as
+    /// they are laid out, which costs layout for every row the reader passes
+    /// and makes the scrollbar settle rather than being right immediately.
+    pub fn wrapping(mut self, wrapping: bool) -> Self {
+        self.wrapping = wrapping;
+        self
+    }
+
+    /// Colours code that arrived without colours, by the language the caller
+    /// says it is.
+    ///
+    /// A diff of code is code, and reading it uncoloured next to a coloured
+    /// editor is harder than it needs to be. The rule is the same one
+    /// [`CodeView::language`](crate::content::CodeView::language) keeps: a
+    /// line that arrived with spans keeps them, because the caller's grammar
+    /// outranks this scanner, and a language this crate does not know colours
+    /// nothing rather than guessing.
+    ///
+    /// A replacement keeps its word-level spans rather than gaining syntax
+    /// colour. Saying *which words changed* is the more specific claim on a
+    /// row that exists because two versions differ, and two claims in one
+    /// place is one too many.
+    pub fn language(mut self, language: impl Into<SharedString>) -> Self {
+        self.language = Some(language.into());
         self
     }
 
@@ -381,7 +491,13 @@ struct FlatRow {
 
 #[derive(Debug, Clone)]
 enum FlatKind {
-    File(SharedString),
+    File {
+        label: SharedString,
+        /// Added and removed line counts, so a folded header says what it
+        /// holds instead of only that it holds something.
+        changed: (usize, usize),
+        folded: bool,
+    },
     Hunk(SharedString),
     Expand,
     Unified {
@@ -398,7 +514,7 @@ enum FlatKind {
 impl FlatKind {
     fn label_key(&self) -> StringKey {
         match self {
-            Self::File(_) => StringKey::DiffFile,
+            Self::File { .. } => StringKey::DiffFile,
             Self::Hunk(_) => StringKey::DiffHunk,
             Self::Expand => StringKey::DiffExpandHunk,
             Self::Unified { side, .. } => side.mark.key(),
@@ -418,8 +534,11 @@ impl FlatKind {
 }
 
 impl RenderOnce for DiffView {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(mut self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
+        if let Some(known) = self.language.as_deref().and_then(Language::named) {
+            colour(&mut self.files, known);
+        }
         let rows = Rc::new(flatten(self.files, self.presentation));
         let count = rows.len();
         let list_ident = self.ident.child("rows");
@@ -449,8 +568,11 @@ impl RenderOnce for DiffView {
                 // business ids and the row kind remain addressable.
                 .text(label)
             })
-            .row_height(theme.control.get(ControlSize::Sm).height)
             .visible_rows(self.visible_rows);
+            list = match self.wrapping {
+                true => list.flowing(),
+                false => list.row_height(theme.control.get(ControlSize::Sm).height),
+            };
 
             if let Some(handler) = self.on_event.clone() {
                 let indices: Rc<HashMap<SharedString, usize>> = Rc::new(
@@ -487,17 +609,66 @@ impl RenderOnce for DiffView {
     }
 }
 
+/// Colours every line that arrived without colours, one file at a time.
+///
+/// The scan carries state from line to line, because a block comment or a
+/// string opened on one line is still open on the next, and a scanner that
+/// forgot that would colour the inside of a comment as code.
+///
+/// Each side is carried separately. The old and new texts are two different
+/// versions of one file, and threading one scan through both would let a
+/// bracket that only exists in the new version change how the old version is
+/// read. A removed line is scanned in the old file's sequence and an added
+/// line in the new file's, which is what each of them actually is.
+fn colour(files: &mut [DiffFile], language: Language) {
+    for file in files {
+        let (mut old, mut new) = (Carry::None, Carry::None);
+        for line in file.hunks.iter_mut().flat_map(|hunk| hunk.lines.iter_mut()) {
+            // Which words changed is settled before the syntax scan, so a
+            // replacement keeps that answer. It is the more specific claim: on
+            // a row that exists because two versions differ, showing where
+            // they differ beats showing that both are code.
+            let (was, is) = fill_word_spans(line.old.take(), line.new.take());
+            (line.old, line.new) = (was, is);
+            for (side, carry) in [(line.old.as_mut(), &mut old), (line.new.as_mut(), &mut new)] {
+                let Some(side) = side else { continue };
+                let (found, next) = line_spans(language, side.text.as_ref(), *carry);
+                *carry = next;
+                // A line that already has spans keeps them, but the scan still
+                // has to cross it: skipping it would lose the comment or
+                // string it opened and mis-colour everything after.
+                if side.spans.is_empty() {
+                    side.spans = found;
+                }
+            }
+        }
+    }
+}
+
 fn flatten(files: Vec<DiffFile>, presentation: DiffPresentation) -> Vec<FlatRow> {
     let mut rows = Vec::new();
     for file in files {
         let file_path = Ident::new("file").child(file.id.as_ref());
+        let changed = file.changed();
         rows.push(FlatRow {
             id: file_path.semantic_id(),
-            event: DiffViewEvent::FileActivated {
-                file_id: file.id.clone(),
+            event: match file.folded {
+                true => DiffViewEvent::UnfoldFile {
+                    file_id: file.id.clone(),
+                },
+                false => DiffViewEvent::FileActivated {
+                    file_id: file.id.clone(),
+                },
             },
-            kind: FlatKind::File(file.label),
+            kind: FlatKind::File {
+                label: file.label,
+                changed,
+                folded: file.folded,
+            },
         });
+        if file.folded {
+            continue;
+        }
         for hunk in file.hunks {
             let hunk_path = file_path.child("hunk").child(hunk.id.as_ref());
             rows.push(FlatRow {
@@ -602,6 +773,36 @@ fn flatten(files: Vec<DiffFile>, presentation: DiffPresentation) -> Vec<FlatRow>
     rows
 }
 
+/// The `+n −m` a file header carries.
+///
+/// Nothing at all when the file changes nothing, because a pair of zeroes is
+/// noise on every row of a large review, and the two counts are separate
+/// elements because they are separate colours: the eye reads how much was
+/// taken out against how much came in without reading either number.
+fn counts(changed: (usize, usize), theme: &Theme) -> Vec<AnyElement> {
+    let (added, removed) = changed;
+    let mut marks = Vec::new();
+    if added > 0 {
+        marks.push(
+            div()
+                .type_scale(theme, TypeScale::Caption)
+                .text_color(theme.colors.syntax.get(SyntaxColor::Added))
+                .child(SharedString::from(format!("+{added}")))
+                .into_any_element(),
+        );
+    }
+    if removed > 0 {
+        marks.push(
+            div()
+                .type_scale(theme, TypeScale::Caption)
+                .text_color(theme.colors.syntax.get(SyntaxColor::Removed))
+                .child(SharedString::from(format!("\u{2212}{removed}")))
+                .into_any_element(),
+        );
+    }
+    marks
+}
+
 fn diff_row(
     id: &SharedString,
     kind: &FlatKind,
@@ -610,16 +811,32 @@ fn diff_row(
     expand: &SharedString,
 ) -> AnyElement {
     match kind {
-        FlatKind::File(label) => div()
+        FlatKind::File {
+            label,
+            changed,
+            folded,
+        } => div()
             .row()
             .items_center()
+            .gap_token(theme, Space::Sm)
             .w_full()
             .h_full()
             .px_token(theme, Space::Sm)
             .type_scale(theme, TypeScale::Label)
             .text_color(theme.colors.text)
             .bg(theme.colors.raised)
+            // A folded file is marked as one, so a header that hides
+            // everything under it is distinguishable from a file that happens
+            // to change nothing.
+            .when(*folded, |element| {
+                element.child(
+                    gpui_kit_assets::icon(gpui_kit_assets::Icon::AltArrowRight)
+                        .size(px(theme.typography.label.size))
+                        .text_color(theme.colors.text_muted),
+                )
+            })
             .child(label.clone())
+            .children(counts(*changed, theme))
             .into_any_element(),
         FlatKind::Expand => div()
             .row()
