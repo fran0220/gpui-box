@@ -62,8 +62,8 @@ use controls::{
     search_field, settings, textarea, toggle, upload_list,
 };
 use data::{
-    data_grid, data_grid_editing, diagnostics_list, drag_list, drag_tree, kanban, list, table,
-    tree, tree_grid,
+    data_grid, data_grid_editing, diagnostics_list, drag_list, drag_tree, flow, kanban, list,
+    table, tree, tree_grid,
 };
 #[cfg(feature = "fixtures")]
 use datetime::{calendar, date_range, date_time};
@@ -322,6 +322,11 @@ pub fn catalog() -> Vec<Scene> {
             name: "list",
             build: list,
             shows: Shows::Subjects(&["List"]),
+        },
+        Scene {
+            name: "flow",
+            build: flow,
+            shows: Shows::Subjects(&["Flow"]),
         },
         Scene {
             name: "table",

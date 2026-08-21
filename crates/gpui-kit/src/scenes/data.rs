@@ -95,6 +95,86 @@ pub(super) fn list(_window: &mut Window, cx: &mut App) -> AnyElement {
         .into_any_element()
 }
 
+/// What one flow row holds: a label, and prose whose length decides how tall
+/// the row turns out to be.
+fn fixture_entry(index: usize) -> (SharedString, SharedString) {
+    let body = match index % 3 {
+        0 => "A short entry.".to_string(),
+        1 => "An entry long enough to wrap onto a second line, which is what \
+              makes this row taller than the one above it."
+            .to_string(),
+        _ => "An entry longer still. Nothing here is a slot: the row is as \
+              tall as the prose it holds, and the flow measures it once, when \
+              it first comes into view, then keeps that measurement while the \
+              rows around it change."
+            .to_string(),
+    };
+    (
+        SharedString::from(format!("entry-{index:04}")),
+        SharedString::from(body),
+    )
+}
+
+pub(super) fn flow(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(560.0))
+        .child(caption(
+            &theme,
+            "rows drawn by the caller, laid out only where the viewport reaches; \
+             a row is as tall as what it holds",
+        ))
+        .child(
+            div()
+                .surface(&theme, Surface::Panel)
+                .radius(&theme, Radius::Card)
+                .overflow_hidden()
+                .child({
+                    let theme = theme.clone();
+                    Flow::new(
+                        "scene.flow.entries",
+                        FIXTURE_RECORDS,
+                        move |index, _, cx| {
+                            let (id, body) = fixture_entry(index);
+                            // A flow publishes nothing of its own, so the rows say
+                            // what they are — which is the arrangement any caller
+                            // drawing its own rows ends up with.
+                            div()
+                                .w_full()
+                                .column()
+                                .gap_token(&theme, Space::Xs)
+                                .px_token(&theme, Space::Md)
+                                .py_token(&theme, Space::Sm)
+                                .child(
+                                    crate::foundation::text(&theme, TypeScale::Caption, id.clone())
+                                        .text_tone(&theme, TextTone::Muted),
+                                )
+                                .child(crate::foundation::text(
+                                    &theme,
+                                    TypeScale::Body,
+                                    body.clone(),
+                                ))
+                                .semantic_in(
+                                    cx,
+                                    NodeSpec::new(format!("scene.flow.entries.{id}"), Role::Row)
+                                        .parent("scene.flow.entries")
+                                        .text(body),
+                                )
+                                .into_any_element()
+                        },
+                    )
+                    .estimate(72.0)
+                    .visible_rows(5)
+                })
+                .semantic_in(
+                    cx,
+                    NodeSpec::new("scene.flow.entries", Role::List)
+                        .value(FIXTURE_RECORDS.to_string()),
+                ),
+        )
+        .into_any_element()
+}
+
 pub(super) fn table(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     let state = |label: &'static str, tone: Tone| {

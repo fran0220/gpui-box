@@ -182,10 +182,10 @@ pub mod prelude {
     pub use crate::data::{
         Align, BranchState, BulkBar, Cell, CellRange, Column, ColumnGroup, ColumnWidth, DataGrid,
         Diagnostic, DiagnosticAction, DiagnosticFilter, DiagnosticLocation, DiagnosticSeverity,
-        DiagnosticsList, EditIntent, EditOutcome, EditingCell, Expanded, GridColumn, GridLines,
-        GridRow, KanbanBoard, KanbanCard, KanbanColumn, KanbanEvent, KanbanState, List, ListItem,
-        Row, SelectionChange, SelectionMode, SortDirection, Table, Tree, TreeGrid, TreeGridRow,
-        TreeNode,
+        DiagnosticsList, EditIntent, EditOutcome, EditingCell, Expanded, Flow, GridColumn,
+        GridLines, GridRow, KanbanBoard, KanbanCard, KanbanColumn, KanbanEvent, KanbanState, List,
+        ListItem, Row, SelectionChange, SelectionMode, SortDirection, Table, Tree, TreeGrid,
+        TreeGridRow, TreeNode,
     };
     pub use crate::datetime::{
         BlockedDay, BlockedReport, Calendar, CalendarEvent, Clock, DateAdapter, DateInput,

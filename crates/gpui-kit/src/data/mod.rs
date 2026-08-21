@@ -28,6 +28,7 @@
 //! the wrong one for a hundred thousand log lines.
 
 pub mod diagnostics_list;
+pub mod flow;
 pub mod grid;
 pub mod kanban;
 pub mod list;
@@ -40,6 +41,7 @@ pub use diagnostics_list::{
     Diagnostic, DiagnosticAction, DiagnosticFilter, DiagnosticLocation, DiagnosticSeverity,
     DiagnosticsList,
 };
+pub use flow::Flow;
 pub use grid::{
     BulkBar, CellRange, ColumnGroup, DataGrid, EditIntent, EditOutcome, EditingCell, Expanded,
     GridColumn, GridLines, GridRow, SelectionChange, SelectionMode,

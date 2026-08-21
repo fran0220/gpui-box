@@ -1583,6 +1583,29 @@
       ]
     },
     {
+      "name": "Flow",
+      "kind": "builder",
+      "path": "gpui_kit::data::Flow",
+      "source": "crates/gpui-kit/src/data/flow.rs",
+      "summary": "Rows drawn by their caller, laid out only where the viewport reaches.",
+      "construct": [
+        "new(ident: impl Into<Ident>, count: usize, render_row: impl Fn(usize, &mut Window, &mut App) -> AnyElement + 'static) -> Self"
+      ],
+      "options": [
+        "keys(keys: impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
+        "estimate(height: f32) -> Self",
+        "anchored_to_end() -> Self",
+        "visible_rows(rows: usize) -> Self",
+        "fills() -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "flow"
+      ]
+    },
+    {
       "name": "FormField",
       "kind": "builder",
       "path": "gpui_kit::controls::FormField",
@@ -12169,6 +12192,18 @@
         "List"
       ],
       "example": "fn list(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(420.0))\n        .child(\n            crate::foundation::text(\n                &theme,\n                TypeScale::Caption,\n                SharedString::from(format!(\n                    \"{FIXTURE_RECORDS} fixture records; only the rendered ones publish\"\n                )),\n            )\n            .text_tone(&theme, TextTone::Muted),\n        )\n        .child(\n            div()\n                .surface(&theme, Surface::Panel)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(\n                    List::new(\"scene.list.records\", FIXTURE_RECORDS, |index, _, _| {\n                        let (id, label) = fixture_record(index);\n                        ListItem::new(id, label.clone()).text(label)\n                    })\n                    .selected(fixture_record(2).0)\n                    .visible_rows(8)\n                    .on_select(|_, _, _| {}),\n                ),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "flow",
+      "capture": "cargo run -p xtask -- headless capture flow",
+      "kind": "exhibit",
+      "subjects": [
+        "Flow"
+      ],
+      "uses": [
+        "Flow"
+      ],
+      "example": "fn flow(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(560.0))\n        .child(caption(\n            &theme,\n            \"rows drawn by the caller, laid out only where the viewport reaches; \\\n             a row is as tall as what it holds\",\n        ))\n        .child(\n            div()\n                .surface(&theme, Surface::Panel)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child({\n                    let theme = theme.clone();\n                    Flow::new(\n                        \"scene.flow.entries\",\n                        FIXTURE_RECORDS,\n                        move |index, _, cx| {\n                            let (id, body) = fixture_entry(index);\n                            // A flow publishes nothing of its own, so the rows say\n                            // what they are — which is the arrangement any caller\n                            // drawing its own rows ends up with.\n                            div()\n                                .w_full()\n                                .column()\n                                .gap_token(&theme, Space::Xs)\n                                .px_token(&theme, Space::Md)\n                                .py_token(&theme, Space::Sm)\n                                .child(\n                                    crate::foundation::text(&theme, TypeScale::Caption, id.clone())\n                                        .text_tone(&theme, TextTone::Muted),\n                                )\n                                .child(crate::foundation::text(\n                                    &theme,\n                                    TypeScale::Body,\n                                    body.clone(),\n                                ))\n                                .semantic_in(\n                                    cx,\n                                    NodeSpec::new(format!(\"scene.flow.entries.{id}\"), Role::Row)\n                                        .parent(\"scene.flow.entries\")\n                                        .text(body),\n                                )\n                                .into_any_element()\n                        },\n                    )\n                    .estimate(72.0)\n                    .visible_rows(5)\n                })\n                .semantic_in(\n                    cx,\n                    NodeSpec::new(\"scene.flow.entries\", Role::List)\n                        .value(FIXTURE_RECORDS.to_string()),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "table",

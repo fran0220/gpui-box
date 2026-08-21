@@ -4,9 +4,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use gpui::{IntoElement, SharedString, TestAppContext};
+use gpui::{IntoElement, SharedString, Styled, TestAppContext};
+use gpui_kit::motion::engage_end;
 use gpui_kit::prelude::*;
-use gpui_kit_semantics::{Node, Role};
+use gpui_kit_semantics::{Node, NodeSpec, Role, Semantic};
 use gpui_kit_testkit::harness::Harness;
 
 type Calls<T> = Rc<RefCell<Vec<T>>>;
@@ -601,5 +602,88 @@ fn a_virtualized_row_is_settled_on_the_frame_it_first_renders(cx: &mut TestAppCo
         rows_of(&mut harness, "data.list"),
         arrived,
         "a row must be where it belongs on the frame it appears"
+    );
+}
+
+// --------------------------------------------------------------------- flow
+
+/// A flow of caller-drawn rows: a turn is a card that names itself, and
+/// nothing wraps it. Rows differ in height, which is the only reason a flow
+/// exists rather than a uniform list.
+fn turns(cx: &mut TestAppContext, data: Data) -> Harness {
+    Harness::new(cx, gpui_kit::install, move |_, _| {
+        let rows = data.clone();
+        let count = rows.borrow().len();
+        let keys: Vec<SharedString> = rows.borrow().iter().map(|(id, _)| id.clone()).collect();
+        Flow::new("data.flow", count, move |index, _, cx| {
+            let (id, label) = rows.borrow()[index].clone();
+            gpui::div()
+                .w_full()
+                .h(gpui::px(if index % 2 == 0 { 40.0 } else { 90.0 }))
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(format!("data.flow.{id}"), Role::Row)
+                        .parent("data.flow")
+                        .text(label),
+                )
+                .into_any_element()
+        })
+        .keys(keys)
+        .estimate(60.0)
+        .anchored_to_end()
+        .visible_rows(4)
+        .into_any_element()
+    })
+}
+
+#[gpui::test]
+fn a_flow_lays_out_the_rows_its_viewport_reaches_and_no_others(cx: &mut TestAppContext) {
+    let data: Data = Rc::new(RefCell::new(records(200)));
+    let mut harness = turns(cx, data);
+    harness.frame();
+
+    let drawn = (0..200)
+        .filter(|index| {
+            harness
+                .node(&format!("data.flow.record-{index:04}"))
+                .is_some()
+        })
+        .count();
+    assert!(
+        drawn > 0 && drawn < 40,
+        "a viewport four rows tall drew {drawn} of two hundred rows"
+    );
+}
+
+#[gpui::test]
+fn a_flow_is_followed_by_name_like_any_other_surface(cx: &mut TestAppContext) {
+    // The point of drawing the rows yourself is that you keep everything else:
+    // a surface whose rows nobody else designed is still scrolled, followed
+    // and released by naming it.
+    let data: Data = Rc::new(RefCell::new(records(200)));
+    let mut harness = turns(cx, data.clone());
+    harness.frame();
+
+    let flow = Ident::new("data.flow");
+    harness.update({
+        let flow = flow.clone();
+        move |_, cx| engage_end(&flow, cx)
+    });
+    for _ in 0..90 {
+        harness.advance(std::time::Duration::from_millis(16));
+    }
+    assert!(
+        harness.node("data.flow.record-0199").is_some(),
+        "following the end has to arrive at the end"
+    );
+
+    data.borrow_mut()
+        .push(("record-new".into(), "Fixture record new".into()));
+    for _ in 0..90 {
+        harness.advance(std::time::Duration::from_millis(16));
+    }
+    assert!(
+        harness.node("data.flow.record-new").is_some(),
+        "a row arriving while the end is held is followed"
     );
 }

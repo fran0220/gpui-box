@@ -24,12 +24,13 @@ use std::rc::Rc;
 use gpui::{
     AnyElement, App, InteractiveElement, IntoElement, ListAlignment, ListSizingBehavior,
     ParentElement, RenderOnce, ScrollStrategy, SharedString, StatefulInteractiveElement, Styled,
-    Window, div, list, point, prelude::FluentBuilder, px, uniform_list,
+    Window, div, point, prelude::FluentBuilder, px, uniform_list,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Theme};
 
-use crate::data::viewport::{Rows, list_state, scroll_handle};
+use crate::data::flow::Flow;
+use crate::data::viewport::scroll_handle;
 pub use crate::data::viewport::{glide_to_row, reveal_row, scroll_to_row};
 use crate::foundation::direction::ActiveDirection;
 use crate::foundation::{
@@ -296,14 +297,6 @@ impl RenderOnce for List {
         };
         let flowing = self.flowing;
         let rows: AnyElement = if flowing {
-            let described = match &self.keys {
-                Some(keys) if keys.len() == count => Rows::Keyed(keys),
-                // A caller whose names do not cover the rows it says it has
-                // has described something other than this list, so the count
-                // is believed and the names are not.
-                _ => Rows::Counted(count),
-            };
-            let state = list_state(&ident, described, self.alignment, px(row_height), cx);
             let ident = ident.clone();
             let theme = theme.clone();
             let selected = self.selected.clone();
@@ -311,13 +304,16 @@ impl RenderOnce for List {
             let render_row = Rc::clone(&render_row);
             let rendered = Rc::clone(&rendered);
             let reorder = reorder.clone();
-            list(state, move |index, window, cx| {
+            let row_ident = ident.clone();
+            // A list whose rows are as tall as their content is a flow whose
+            // rows happen to be list rows.
+            let mut flow = Flow::new(ident, count, move |index, window, cx| {
                 let item = render_row(index, window, cx);
                 rendered.borrow_mut().insert(index, item.id.clone());
                 // A flowing row states no height: it is as tall as what it
                 // holds, which is the whole point of asking for one.
                 row_element(
-                    &ident,
+                    &row_ident,
                     &theme,
                     None,
                     item,
@@ -329,12 +325,17 @@ impl RenderOnce for List {
                     cx,
                 )
             })
-            .with_sizing_behavior(sizing)
-            .w_full()
-            .when_some(self.visible_rows, |element, rows| {
-                element.h(px(row_height * rows as f32))
-            })
-            .into_any_element()
+            .estimate(row_height);
+            if self.alignment == ListAlignment::Bottom {
+                flow = flow.anchored_to_end();
+            }
+            if let Some(keys) = self.keys.clone() {
+                flow = flow.keys(keys);
+            }
+            if let Some(rows) = self.visible_rows {
+                flow = flow.visible_rows(rows);
+            }
+            flow.into_any_element()
         } else {
             let ident = ident.clone();
             let theme = theme.clone();
