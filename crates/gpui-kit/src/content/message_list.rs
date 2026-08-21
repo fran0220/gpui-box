@@ -31,12 +31,11 @@
 //! is what a scrollbar over one is settling towards as the reader moves.
 
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, Global, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window,
-    div, prelude::FluentBuilder, px,
+    AnyElement, App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div,
+    prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Surface, Theme, TypeScale};
@@ -407,6 +406,10 @@ impl RenderOnce for MessageList {
         // itself instead of every message after it.
         let row_keys: Vec<SharedString> =
             messages.iter().map(|message| message.id.clone()).collect();
+        // The same names say which messages the conversation still holds, so
+        // per-message state goes when its message does rather than when its
+        // row happens to stop being drawn.
+        keyed::retain_scope::<Stream>(&ident.semantic_id(), &row_keys, cx);
         let rows = List::new(ident.clone(), count, move |index, window, cx| {
             if let Some(highest) = seen.borrow_mut().current.as_mut() {
                 *highest = (*highest).max(index);
@@ -601,11 +604,9 @@ impl MessageList {
     }
 }
 
-/// When the indicator for a streaming message started, keyed by message.
+/// When the indicator for a streaming message started.
 #[derive(Debug, Default)]
-struct Streams(RefCell<HashMap<SharedString, Instant>>);
-
-impl Global for Streams {}
+struct Stream(Option<Instant>);
 
 /// When the streaming indicator on `message` in `list` began.
 ///
@@ -615,28 +616,30 @@ impl Global for Streams {}
 /// reporting the token, not the stream. Answers `None` once the message stops
 /// streaming.
 pub fn streaming_since(list: &Ident, message: &str, cx: &App) -> Option<Instant> {
-    cx.try_global::<Streams>()
-        .and_then(|streams| streams.0.borrow().get(&stream_key(list, message)).copied())
+    keyed::scoped_peek::<Stream>(&list.semantic_id(), &stream_key(message), cx)
+        .and_then(|stream| stream.borrow().0)
 }
 
-fn stream_key(list: &Ident, message: &str) -> SharedString {
-    list.child(message).child("streaming").semantic_id()
+fn stream_key(message: &str) -> SharedString {
+    SharedString::from(message.to_string())
 }
 
 /// The instant this message's stream began, started on first sight.
+///
+/// The clock belongs to the conversation rather than to the row, because a
+/// message can stop streaming while it is scrolled out of view: a clock tied
+/// to the element would be left behind by the frame that would have cleared
+/// it, and a conversation that ran long enough would accumulate one entry per
+/// message it had ever streamed. Tied to the list, it goes when the list does.
 fn stream_began(list: &Ident, message: &str, streaming: bool, cx: &mut App) -> Option<Instant> {
-    if !cx.has_global::<Streams>() {
-        cx.set_global(Streams::default());
-    }
-    let key = stream_key(list, message);
-    let streams = cx.global::<Streams>();
-    let mut clocks = streams.0.borrow_mut();
+    let cell = keyed::scoped_slot::<Stream>(&list.semantic_id(), &stream_key(message), cx);
     if !streaming {
-        clocks.remove(&key);
+        cell.borrow_mut().0 = None;
         return None;
     }
     let now = cx.background_executor().now();
-    Some(*clocks.entry(key).or_insert(now))
+    let mut stream = cell.borrow_mut();
+    Some(*stream.0.get_or_insert(now))
 }
 
 fn shown_author(author: Option<&SharedString>) -> SharedString {
