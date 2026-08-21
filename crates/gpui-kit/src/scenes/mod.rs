@@ -54,7 +54,7 @@ use compositions::{motion_flip, motion_state, reading_direction};
 use content::terminal;
 use content::{
     agent_document, browser_panel, code_view, conversation, conversation_growing, diff_view,
-    image_viewer, log_stream, markdown, transport,
+    image_viewer, log_stream, markdown, outline, transport,
 };
 use controls::{
     actions, auth_sign_in, auth_verification, button, cascader, choice, color_picker, copy_button,
@@ -541,6 +541,11 @@ pub fn catalog() -> Vec<Scene> {
             name: "conversation",
             build: conversation,
             shows: Shows::Subjects(&["MessageList"]),
+        },
+        Scene {
+            name: "outline",
+            build: outline,
+            shows: Shows::Subjects(&["Outline"]),
         },
         Scene {
             name: "conversation-growing",

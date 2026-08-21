@@ -8,13 +8,25 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::time::Duration;
 
 use gpui::{
-    App, Global, ListAlignment, ListState, Pixels, ScrollStrategy, SharedString,
+    App, Global, ListAlignment, ListOffset, ListState, Pixels, ScrollStrategy, SharedString,
     UniformListScrollHandle, px,
 };
 
 use crate::foundation::Ident;
+use crate::motion::{CubicBezier, Glide, MotionSpec, reduce_motion};
+
+/// How long a glide takes to cross whatever distance it has, and on what
+/// curve. Ease-in-out over the whole travel, so a jump across a long
+/// conversation leaves gently, covers ground, and settles — which is what
+/// makes the arrival legible as "you moved there" rather than "the page
+/// changed".
+const GLIDE: MotionSpec = MotionSpec::new(500, CubicBezier::new(0.42, 0.0, 0.58, 1.0));
+
+/// The interval a glide asks for its frames at, near enough to a 60Hz frame.
+const FRAME: Duration = Duration::from_millis(16);
 
 /// How far past the viewport a variable-height list lays rows out, so that a
 /// row is measured before it is scrolled into view rather than popping in at
@@ -197,6 +209,137 @@ pub fn reveal_row(ident: &Ident, index: usize, cx: &mut App) {
         return;
     }
     scroll_handle(ident, cx).scroll_to_item(index, ScrollStrategy::Nearest);
+}
+
+/// Travels to row `index` rather than arriving there.
+///
+/// A jump across a long conversation destroys the reader's place: the screen
+/// they were looking at is replaced by another one, and nothing on it says
+/// which direction they came from or how far they went. Moving there over half
+/// a second says both, and costs nothing but the half second.
+///
+/// The distance is not known when the glide starts. Rows above the viewport
+/// have never been laid out, so the pixels between here and there can only be
+/// estimated, and the estimate is corrected as rows are measured. [`Glide`] is
+/// what makes that survivable: each frame consumes the share of the *current*
+/// remaining distance that the curve says belongs to it, so a correction
+/// mid-flight continues the same timeline instead of restarting it.
+///
+/// A reader who has asked for reduced motion is taken straight there, and so
+/// is a surface that is not a variable-height list: a uniform list knows every
+/// row's height without laying it out, so it has no unmeasured distance for
+/// this to solve and its own scroll already lands correctly.
+pub fn glide_to_row(ident: &Ident, index: usize, cx: &mut App) {
+    let Some(state) = flow_state(ident, cx).filter(|_| !reduce_motion(cx)) else {
+        reveal_row(ident, index, cx);
+        return;
+    };
+    let total = GLIDE.total();
+    cx.spawn(async move |cx| {
+        let mut glide = Glide::new();
+        let started = std::time::Instant::now();
+        // A bound rather than a `loop`, so a window that stops laying the list
+        // out cannot leave a task asking for frames forever. The slack past
+        // the duration covers frames that arrived late.
+        let frames = total.as_millis() as usize / FRAME.as_millis() as usize + 90;
+        let mut height = None;
+        for _ in 0..frames {
+            cx.background_executor().timer(FRAME).await;
+            let elapsed = started.elapsed().as_secs_f32() / total.as_secs_f32();
+            let share = glide.step(GLIDE.curve.eval(elapsed.min(1.0)));
+            if glide.arrived() {
+                break;
+            }
+            cx.update(|cx| step_toward(&state, index, share, &mut height, cx));
+        }
+        // However the travel went, it ends on the row that was asked for.
+        cx.update(|cx| {
+            state.scroll_to(ListOffset {
+                item_ix: index,
+                offset_in_item: px(0.0),
+            });
+            cx.refresh_windows();
+        });
+    })
+    .detach();
+}
+
+/// One frame of a glide: move `share` of whatever distance is left.
+///
+/// Where the answer comes from depends on what has been measured. A target
+/// that is laid out has real bounds and the step is exact to the pixel. One
+/// that is not is approached in row space, over an average row height learned
+/// from the viewport — averaged over the whole visible span rather than taken
+/// from one row, because a single sample whipsaws between a one-line paragraph
+/// and a forty-line code block and the whipsaw is visible as an uneven step.
+fn step_toward(
+    state: &ListState,
+    index: usize,
+    share: f32,
+    height: &mut Option<f32>,
+    cx: &mut App,
+) {
+    let viewport = f32::from(state.viewport_bounds().size.height);
+    if viewport > 0.0 {
+        let top = state.logical_scroll_top().item_ix;
+        let bottom = f32::from(state.viewport_bounds().bottom());
+        let mut row = top;
+        let mut rows = 0.0f32;
+        while let Some(bounds) = state.bounds_for_item(row) {
+            if f32::from(bounds.top()) >= bottom {
+                break;
+            }
+            rows += 1.0;
+            row += 1;
+        }
+        if rows > 0.0 {
+            let mean = viewport / rows;
+            let learned = height.get_or_insert(mean);
+            *learned += 0.5 * (mean - *learned);
+        }
+    }
+
+    if let Some(bounds) = state.bounds_for_item(index) {
+        let away = bounds.top() - state.viewport_bounds().top();
+        state.scroll_by(px(share * f32::from(away)));
+        cx.refresh_windows();
+        return;
+    }
+
+    // Unmeasured: travel in row space along the same timeline, and read the
+    // position back next frame so a measurement that corrects the estimate is
+    // simply where the glide now is.
+    let top = state.logical_scroll_top();
+    let measured = state
+        .bounds_for_item(top.item_ix)
+        .map(|bounds| f32::from(bounds.size.height).max(1.0));
+    let estimate = height.or(measured).unwrap_or(0.0);
+    let here = top.item_ix as f32
+        + measured
+            .map(|tall| (f32::from(top.offset_in_item) / tall).clamp(0.0, 1.0))
+            .unwrap_or(0.0);
+    let next = here + share * (index as f32 - here);
+    let row = (next.floor().max(0.0) as usize).min(state.item_count().saturating_sub(1));
+    state.scroll_to(ListOffset {
+        item_ix: row,
+        offset_in_item: px((next - row as f32) * estimate),
+    });
+    cx.refresh_windows();
+}
+
+/// The first row of this surface that the reader can see, and how tall the
+/// frame showing it is.
+///
+/// A surface drawn *over* a list — an outline, a scrollbar, a position
+/// readout — needs both and owns neither. It reads them by naming the list,
+/// the same way it moves it by naming the list. `None` while the surface has
+/// not been laid out as a variable-height list, which is one frame at most and
+/// is not the same answer as "the top", so a caller can tell "not yet" from
+/// "row zero".
+pub(crate) fn viewed_rows(ident: &Ident, cx: &mut App) -> Option<(usize, f32)> {
+    let state = flow_state(ident, cx)?;
+    let height = f32::from(state.viewport_bounds().size.height);
+    Some((state.logical_scroll_top().item_ix, height))
 }
 
 /// The variable-height state of this surface, if it has one.

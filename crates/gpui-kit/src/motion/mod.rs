@@ -14,6 +14,9 @@
 //!   [`flick`], [`rubber_band`] and [`Transition::release`] need;
 //! - [`ScrollLink`] reads a scroll offset as a progress, which is motion with
 //!   no clock in it at all;
+//! - [`Glide`] eases toward a target whose distance is not known until you
+//!   arrive, which is what scrolling a virtualized list to a row far off
+//!   screen is;
 //! - [`follow_end`] holds a growing surface against its own end, with a
 //!   [`Chase`] whose target keeps moving and which a gesture, not arriving
 //!   content, interrupts;
@@ -42,6 +45,7 @@ mod easing;
 mod flip;
 mod follow;
 mod gesture;
+mod glide;
 mod interpolate;
 pub(crate) mod keyed;
 mod keyframes;
@@ -62,6 +66,7 @@ pub use follow::{AtEnd, Chase, STICK_BAND, engage_end, follow_end, follows_end, 
 pub use gesture::{
     Flick, VELOCITY_WINDOW, Velocity, VelocityTracker, flick, overscroll, rubber_band,
 };
+pub use glide::Glide;
 pub use interpolate::Interpolate;
 pub use keyframes::{Keyframe, Keyframes};
 pub use micro::{Micro, MicroMark, MicroMotion, micro};

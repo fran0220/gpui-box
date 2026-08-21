@@ -32,6 +32,7 @@ pub mod image_viewer;
 pub mod log_stream;
 pub mod markdown;
 pub mod message_list;
+pub mod outline;
 #[cfg(all(feature = "terminal", not(target_family = "wasm")))]
 pub mod terminal;
 pub mod transport;
@@ -55,6 +56,7 @@ pub use markdown::{
 pub use message_list::{
     Attachment, DeliveryState, Message, MessageBody, MessageList, Reaction, streaming_since,
 };
+pub use outline::{Mark, Outline};
 #[cfg(all(feature = "terminal", not(target_family = "wasm")))]
 pub use terminal::{
     CellHit, CellSide, CellSnapshot, CursorSnapshot, Emulator, GridGeometry, GridPoint, GridSize,

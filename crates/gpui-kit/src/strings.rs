@@ -588,6 +588,9 @@ string_keys! {
     TabClose => "tab.close", "Close {0}";
     TabMoreTabs => "tab.more-tabs", "More tabs";
 
+    // An outline of a long surface, and what a condensed mark stands for.
+    OutlineMarks => "outline.marks", "{0} places";
+
     // Search, and find and replace.
     SearchPlaceholder => "search.placeholder", "Find";
     SearchNoHits => "search.no-hits", "No results";

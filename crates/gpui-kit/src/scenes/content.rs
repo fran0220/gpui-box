@@ -453,6 +453,57 @@ pub(super) fn conversation(_window: &mut Window, cx: &mut App) -> AnyElement {
         .into_any_element()
 }
 
+/// An outline beside the surface it maps, at both lengths that matter: short
+/// enough for a mark per place, and long enough that the marks have to
+/// condense into even ranges.
+///
+/// Both are drawn because the whole design claim is that the footprint does
+/// not change between them.
+pub(super) fn outline(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let mapped = |ident: &'static str, turns: usize| {
+        let rows = turns * 2;
+        div()
+            .flex()
+            .gap(px(theme.space(Space::Sm)))
+            .h(px(220.0))
+            .child(
+                Outline::new(format!("{ident}.outline"))
+                    .over(format!("{ident}.rows"))
+                    .marks((0..turns).map(|turn| {
+                        Mark::new(format!("ask-{turn}"), turn * 2, format!("Question {turn}"))
+                            .detail(format!("The answer to question {turn} began here."))
+                    })),
+            )
+            .child(
+                div().w(px(440.0)).child(
+                    List::new(ident, rows, move |row, _, _| {
+                        let (who, what) = match row % 2 {
+                            0 => ("Ada", format!("Question {}", row / 2)),
+                            _ => ("Assistant", format!("Answer {}", row / 2)),
+                        };
+                        ListItem::new(format!("row-{row}"), div().child(format!("{who}: {what}")))
+                            .text(format!("{who}: {what}"))
+                    })
+                    .flowing(),
+                ),
+            )
+    };
+    stack(&theme)
+        .w(px(560.0))
+        .child(caption(
+            &theme,
+            "five exchanges: a mark for each, and the one being read is brighter",
+        ))
+        .child(mapped("scene.outline.short.rows", 5))
+        .child(caption(
+            &theme,
+            "eighty exchanges: the same footprint, each mark now standing for a range",
+        ))
+        .child(mapped("scene.outline.long.rows", 80))
+        .into_any_element()
+}
+
 /// The same thread drawn both ways, so the trade is visible rather than
 /// described: a slot leaves the long message's last lines out and says how
 /// many, and a message that grows to fit is whole.

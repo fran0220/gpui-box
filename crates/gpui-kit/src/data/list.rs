@@ -30,7 +30,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Theme};
 
 use crate::data::viewport::{Rows, list_state, scroll_handle};
-pub use crate::data::viewport::{reveal_row, scroll_to_row};
+pub use crate::data::viewport::{glide_to_row, reveal_row, scroll_to_row};
 use crate::foundation::direction::ActiveDirection;
 use crate::foundation::{
     Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedRow, Sizable, StyledExt,

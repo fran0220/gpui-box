@@ -140,9 +140,10 @@ pub mod prelude {
         AnsiRun, Attachment, BrowserPanel, BufferedRange, Carry, CodeBlock, CodeLine, CodeSpan,
         CodeView, DeliveryState, DiffFile, DiffHunk, DiffLine, DiffPresentation, DiffView,
         DiffViewEvent, FitMode, ImageFrame, ImageRequest, ImageSize, ImageState, ImageViewer,
-        ImageViewerEvent, Language, LineMark, LogEntry, LogStream, LogStreamState, Markdown,
-        MarkdownEvent, Message, MessageBody, MessageList, Reaction, TrackStep, TransportBar,
-        TransportDuration, TransportEvent, TransportState, ViewportState, strip_ansi, word_spans,
+        ImageViewerEvent, Language, LineMark, LogEntry, LogStream, LogStreamState, Mark, Markdown,
+        MarkdownEvent, Message, MessageBody, MessageList, Outline, Reaction, TrackStep,
+        TransportBar, TransportDuration, TransportEvent, TransportState, ViewportState, strip_ansi,
+        word_spans,
     };
     pub use crate::controls::auth::{
         OneTimeCodeInput, OneTimeCodeInputEvent, PasswordInput, PasswordInputEvent,

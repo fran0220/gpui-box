@@ -2597,6 +2597,29 @@
       ]
     },
     {
+      "name": "Outline",
+      "kind": "builder",
+      "path": "gpui_kit::content::Outline",
+      "source": "crates/gpui-kit/src/content/outline.rs",
+      "summary": "The outline of a long surface. Reports the mark that was chosen, and travels there.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "over(list: impl Into<Ident>) -> Self",
+        "marks(marks: impl IntoIterator<Item = Mark>) -> Self",
+        "mark(mark: Mark) -> Self",
+        "slots(slots: usize) -> Self",
+        "on_select(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "outline"
+      ]
+    },
+    {
       "name": "Overlay",
       "kind": "builder",
       "path": "gpui_kit::overlay::Overlay",
@@ -7296,6 +7319,23 @@
       "queries": []
     },
     {
+      "name": "Glide",
+      "path": "gpui_kit::motion::Glide",
+      "summary": "A curve's progress, expressed as how much of what is left to go.",
+      "variants": [],
+      "construct": [
+        "new() -> Self"
+      ],
+      "options": [],
+      "commands": [
+        "step(eased: f32) -> f32"
+      ],
+      "queries": [
+        "arrived() -> bool",
+        "progress() -> f32"
+      ]
+    },
+    {
       "name": "GraphEdge",
       "path": "gpui_kit::canvas::GraphEdge",
       "summary": "A controlled connection between two graph nodes.",
@@ -8177,7 +8217,7 @@
     {
       "name": "Mark",
       "path": "gpui_kit::content::Mark",
-      "summary": "",
+      "summary": "A place in the mapped surface worth returning to.",
       "variants": [
         "Bold",
         "Italic",
@@ -8186,10 +8226,17 @@
         "Link",
         "Image"
       ],
-      "construct": [],
-      "options": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, row: usize, title: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "detail(detail: impl Into<SharedString>) -> Self"
+      ],
       "commands": [],
-      "queries": []
+      "queries": [
+        "id() -> &SharedString",
+        "row() -> usize"
+      ]
     },
     {
       "name": "MarkSpan",
@@ -12611,6 +12658,18 @@
         "MessageList"
       ],
       "example": "fn conversation(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(560.0))\n        .child(\n            MessageList::new(\"scene.conversation.thread\", scene_thread())\n                .group_consecutive(true)\n                .body_lines(2)\n                .on_retry(|_, _, _| {})\n                .on_markdown(|_, _, _, _| {}),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.conversation.rule\")\n                .label(\"Scrolled away from the newest message\"),\n        )\n        .child(\n            // A viewport shorter than the thread opens at its top, so the\n            // messages below it have never been on screen and the list says\n            // how many there are rather than letting them be discovered.\n            MessageList::new(\"scene.conversation.behind\", scene_thread())\n                .visible_rows(2)\n                .body_lines(2)\n                .on_retry(|_, _, _| {}),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "outline",
+      "capture": "cargo run -p xtask -- headless capture outline",
+      "kind": "exhibit",
+      "subjects": [
+        "Outline"
+      ],
+      "uses": [
+        "Outline"
+      ],
+      "example": "fn outline(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let mapped = |ident: &'static str, turns: usize| {\n        let rows = turns * 2;\n        div()\n            .flex()\n            .gap(px(theme.space(Space::Sm)))\n            .h(px(220.0))\n            .child(\n                Outline::new(format!(\"{ident}.outline\"))\n                    .over(format!(\"{ident}.rows\"))\n                    .marks((0..turns).map(|turn| {\n                        Mark::new(format!(\"ask-{turn}\"), turn * 2, format!(\"Question {turn}\"))\n                            .detail(format!(\"The answer to question {turn} began here.\"))\n                    })),\n            )\n            .child(\n                div().w(px(440.0)).child(\n                    List::new(ident, rows, move |row, _, _| {\n                        let (who, what) = match row % 2 {\n                            0 => (\"Ada\", format!(\"Question {}\", row / 2)),\n                            _ => (\"Assistant\", format!(\"Answer {}\", row / 2)),\n                        };\n                        ListItem::new(format!(\"row-{row}\"), div().child(format!(\"{who}: {what}\")))\n                            .text(format!(\"{who}: {what}\"))\n                    })\n                    .flowing(),\n                ),\n            )\n    };\n    stack(&theme)\n        .w(px(560.0))\n        .child(caption(\n            &theme,\n            \"five exchanges: a mark for each, and the one being read is brighter\",\n        ))\n        .child(mapped(\"scene.outline.short.rows\", 5))\n        .child(caption(\n            &theme,\n            \"eighty exchanges: the same footprint, each mark now standing for a range\",\n        ))\n        .child(mapped(\"scene.outline.long.rows\", 80))\n        .into_any_element()\n}"
     },
     {
       "name": "conversation-growing",
