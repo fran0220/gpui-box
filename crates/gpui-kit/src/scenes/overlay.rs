@@ -135,6 +135,7 @@ pub(super) fn tooltip(_window: &mut Window, cx: &mut App) -> AnyElement {
 /// every frame. Building them once is also what makes the capture static.
 pub(super) struct SceneMenus {
     menu: Entity<Menu>,
+    hung: Entity<Menu>,
     context: Entity<ContextMenu>,
     palette: Entity<CommandPalette>,
     popover: Entity<Popover>,
@@ -192,6 +193,14 @@ pub(super) fn ensure_menus(window: &mut Window, cx: &mut App) {
         menu.open_submenu("share", window, cx);
     });
 
+    let hung = cx.new(|cx| {
+        Menu::new("scene.menu.hung", window, cx)
+            .trigger("Model")
+            .items(menu_items())
+            .hang(Hang::End)
+    });
+    hung.update(cx, |menu, cx| menu.open(window, cx));
+
     let context = cx.new(|cx| {
         ContextMenu::new("scene.context.run", window, cx)
             .name("Run actions")
@@ -247,6 +256,7 @@ pub(super) fn ensure_menus(window: &mut Window, cx: &mut App) {
 
     cx.set_global(SceneMenus {
         menu,
+        hung,
         context,
         palette,
         popover,
@@ -273,12 +283,19 @@ pub(super) fn popover(window: &mut Window, cx: &mut App) -> AnyElement {
 
 pub(super) fn menu(window: &mut Window, cx: &mut App) -> AnyElement {
     ensure_menus(window, cx);
-    let menu = cx.global::<SceneMenus>().menu.clone();
+    let menus = cx.global::<SceneMenus>();
+    let menu = menus.menu.clone();
+    let hung = menus.hung.clone();
     let theme = cx.theme().clone();
     stack(&theme)
         .w(px(560.0))
         .h(px(360.0))
         .child(menu)
+        .child(caption(
+            &theme,
+            "a trigger against the trailing edge hangs its surface from that edge instead",
+        ))
+        .child(div().w_full().flex().justify_end().child(hung))
         .into_any_element()
 }
 

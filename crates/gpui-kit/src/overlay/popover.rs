@@ -20,7 +20,7 @@ use gpui_kit_theme::{ActiveTheme, Elevation, Space, TextTone, Theme, TypeScale};
 use crate::controls::button::Button;
 use crate::foundation::{Ident, StyledExt, text};
 use crate::overlay::focus::FocusTrap;
-use crate::overlay::layer::{Overlay, Placement, surface};
+use crate::overlay::layer::{Hang, Overlay, Placement, surface};
 use crate::overlay::positioner::Positioner;
 
 use crate::motion;
@@ -182,6 +182,7 @@ pub fn card_flush(theme: &Theme) -> gpui::Div {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct MenuGeometry {
     pub placement: Placement,
+    pub hang: Hang,
     pub max_height: f32,
     pub width: f32,
 }
@@ -205,6 +206,7 @@ pub(crate) fn menu_geometry(
 
     MenuGeometry {
         placement: room.side.into(),
+        hang: room.hang,
         max_height: room.height,
         width: room.width,
     }
@@ -215,6 +217,7 @@ pub(crate) fn menu_overlay(
     ident: &Ident,
     theme: &Theme,
     placement: Placement,
+    hang: Hang,
     content: AnyElement,
 ) -> AnyElement {
     let gap = px((theme.spacing.sm - 2.0).max(0.0));
@@ -226,6 +229,7 @@ pub(crate) fn menu_overlay(
 
     Overlay::new(ident.child("overlay"))
         .placement(placement)
+        .hang(hang)
         .window_snap_margin(px(theme.spacing.sm))
         .child(motion::menu_in(ident.element_id(), theme, frame))
         .into_any_element()
@@ -242,39 +246,57 @@ fn pinned(layer: AnyElement) -> AnyElement {
 }
 
 /// Places `content` under `anchor`, flipping above when there is no room.
-pub fn anchored_below(id: impl Into<ElementId>, theme: &Theme, content: AnyElement) -> AnyElement {
-    pinned(
-        gpui::deferred(
-            gpui::anchored()
-                .anchor(Anchor::TopLeft)
-                .snap_to_window_with_margin(px(theme.spacing.sm))
-                .child(motion::menu_in(
-                    id,
-                    theme,
-                    div()
-                        .occlude()
-                        .pt(px(theme.spacing.sm - 2.0))
-                        .child(content),
-                )),
-        )
-        .priority(1)
-        .into_any_element(),
-    )
+pub fn anchored_below(
+    id: impl Into<ElementId>,
+    theme: &Theme,
+    hang: Hang,
+    content: AnyElement,
+) -> AnyElement {
+    anchored(id, theme, Placement::Below, hang, content)
 }
 
 /// Places `content` over `anchor`, flipping below when there is no room.
-pub fn anchored_above(id: impl Into<ElementId>, theme: &Theme, content: AnyElement) -> AnyElement {
+pub fn anchored_above(
+    id: impl Into<ElementId>,
+    theme: &Theme,
+    hang: Hang,
+    content: AnyElement,
+) -> AnyElement {
+    anchored(id, theme, Placement::Above, hang, content)
+}
+
+/// Places `content` beside the slot it is mounted in, on the stated side and
+/// hanging from the stated edge.
+///
+/// The gap is on the side the surface came from, so the surface clears its
+/// trigger by the same air whichever way it opened.
+pub fn anchored(
+    id: impl Into<ElementId>,
+    theme: &Theme,
+    placement: Placement,
+    hang: Hang,
+    content: AnyElement,
+) -> AnyElement {
+    let above = placement == Placement::Above;
+    let gap = px((theme.spacing.sm - 2.0).max(0.0));
+    let anchor = match (above, hang) {
+        (true, Hang::Start) => Anchor::BottomLeft,
+        (true, Hang::End) => Anchor::BottomRight,
+        (false, Hang::Start) => Anchor::TopLeft,
+        (false, Hang::End) => Anchor::TopRight,
+    };
     pinned(
         gpui::deferred(
             gpui::anchored()
-                .anchor(Anchor::BottomLeft)
+                .anchor(anchor)
                 .snap_to_window_with_margin(px(theme.spacing.sm))
                 .child(motion::menu_in(
                     id,
                     theme,
                     div()
                         .occlude()
-                        .pb(px(theme.spacing.sm - 2.0))
+                        .when(above, |element| element.pb(gap))
+                        .when(!above, |element| element.pt(gap))
                         .child(content),
                 )),
         )
@@ -453,16 +475,23 @@ pub fn dialog_body(theme: &Theme, body: impl Into<SharedString>) -> gpui::Div {
 ///
 /// A surface anchors to where its slot sits, so the slot goes under the
 /// trigger for a surface that opens downwards and above it for one that opens
-/// upwards. The slot takes no space of its own.
+/// upwards, and on the trigger's trailing edge for one that grows back across
+/// the page. The slot takes no space of its own.
 pub fn anchored_slot(
     placement: Placement,
+    hang: Hang,
     trigger: AnyElement,
     overlay: Option<AnyElement>,
 ) -> gpui::Div {
     let slot = div().relative().children(overlay);
     // The trigger sizes to itself: one stretched to its container would claim
-    // to be a full-width control.
-    let frame = div().flex().flex_col().items_start();
+    // to be a full-width control. The slot is empty, so putting the column's
+    // cross-axis alignment on the trailing edge moves the slot to the
+    // trigger's right edge and leaves the trigger itself where it was.
+    let frame = div().flex().flex_col().map(|frame| match hang {
+        Hang::Start => frame.items_start(),
+        Hang::End => frame.items_end(),
+    });
     match placement {
         Placement::Above => frame.child(slot).child(trigger),
         _ => frame.child(trigger).child(slot),
@@ -501,6 +530,7 @@ pub struct Popover {
     trigger_icon: Option<Icon>,
     content: Option<Content>,
     placement: Placement,
+    hang: Hang,
     dismissable: bool,
     open: bool,
     /// Set by `open`, cleared by the first frame that can act on it.
@@ -516,6 +546,7 @@ impl std::fmt::Debug for Popover {
             .field("trigger", &self.trigger)
             .field("has_content", &self.content.is_some())
             .field("placement", &self.placement)
+            .field("hang", &self.hang)
             .field("dismissable", &self.dismissable)
             .field("open", &self.open)
             .finish()
@@ -532,6 +563,7 @@ impl Popover {
             trigger_icon: None,
             content: None,
             placement: Placement::Below,
+            hang: Hang::Start,
             dismissable: true,
             open: false,
             pending_focus: false,
@@ -561,6 +593,16 @@ impl Popover {
 
     pub fn placement(mut self, placement: Placement) -> Self {
         self.placement = placement;
+        self
+    }
+
+    /// Which of the trigger's edges the surface hangs from.
+    ///
+    /// A trigger near the trailing edge of the window wants [`Hang::End`]: the
+    /// surface then grows back across the page instead of being slid sideways
+    /// off its trigger to stay inside the window.
+    pub fn hang(mut self, hang: Hang) -> Self {
+        self.hang = hang;
         self
     }
 
@@ -683,11 +725,12 @@ impl Render for Popover {
             );
             Overlay::new(self.ident.child("overlay"))
                 .placement(self.placement)
+                .hang(self.hang)
                 .child(card)
                 .into_any_element()
         });
 
-        anchored_slot(self.placement, trigger, overlay).semantic_in(
+        anchored_slot(self.placement, self.hang, trigger, overlay).semantic_in(
             cx,
             NodeSpec::new(self.ident.semantic_id(), Role::Group).expanded(self.open),
         )

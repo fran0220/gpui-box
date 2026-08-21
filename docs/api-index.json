@@ -1783,6 +1783,7 @@
         "name(name: impl Into<SharedString>) -> Self",
         "content(content: impl Fn(&mut Window, &mut App) -> AnyElement + 'static) -> Self",
         "placement(placement: Placement) -> Self",
+        "hang(hang: Hang) -> Self",
         "open_delay(delay: Duration) -> Self",
         "grace(grace: Duration) -> Self"
       ],
@@ -2204,7 +2205,8 @@
         "trigger_variant(variant: ButtonVariant) -> Self",
         "trigger_join(join: ButtonJoin) -> Self",
         "items(items: impl IntoIterator<Item = MenuItem>) -> Self",
-        "placement(placement: Placement) -> Self"
+        "placement(placement: Placement) -> Self",
+        "hang(hang: Hang) -> Self"
       ],
       "commands": [
         "set_trigger_name(name: impl Into<SharedString>, cx: &mut Context<Self>)",
@@ -2609,6 +2611,7 @@
         "layer(layer: Layer) -> Self",
         "stack(depth: usize) -> Self",
         "placement(placement: Placement) -> Self",
+        "hang(hang: Hang) -> Self",
         "scrim(scrim: bool) -> Self",
         "child(content: impl IntoElement) -> Self",
         "on_dismiss(handler: impl Fn(&mut Window, &mut App) + 'static) -> Self"
@@ -2816,6 +2819,7 @@
         "trigger_icon(icon: Icon) -> Self",
         "content(content: impl Fn(&mut Window, &mut App) -> AnyElement + 'static) -> Self",
         "placement(placement: Placement) -> Self",
+        "hang(hang: Hang) -> Self",
         "dismissable(dismissable: bool) -> Self"
       ],
       "commands": [
@@ -7468,6 +7472,21 @@
       "queries": []
     },
     {
+      "name": "Hang",
+      "path": "gpui_kit::overlay::Hang",
+      "summary": "Which of its anchor's edges a floating surface hangs from.",
+      "variants": [
+        "Start",
+        "End"
+      ],
+      "construct": [],
+      "options": [
+        "opposite() -> Self"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "HeatCell",
       "path": "gpui_kit::display::HeatCell",
       "summary": "One observation in the matrix, or the absence of one.",
@@ -9461,6 +9480,7 @@
       ],
       "options": [
         "side(side: Side) -> Self",
+        "hang(hang: Hang) -> Self",
         "min_width(width: f32) -> Self",
         "spacing(margin: f32, gap: f32) -> Self",
         "resolve(window: &Window, trigger: Bounds<Pixels>) -> Room",
@@ -11933,7 +11953,7 @@
       "uses": [
         "Menu"
       ],
-      "example": "fn menu(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_menus(window, cx);\n    let menu = cx.global::<SceneMenus>().menu.clone();\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(560.0))\n        .h(px(360.0))\n        .child(menu)\n        .into_any_element()\n}"
+      "example": "fn menu(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_menus(window, cx);\n    let menus = cx.global::<SceneMenus>();\n    let menu = menus.menu.clone();\n    let hung = menus.hung.clone();\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(560.0))\n        .h(px(360.0))\n        .child(menu)\n        .child(caption(\n            &theme,\n            \"a trigger against the trailing edge hangs its surface from that edge instead\",\n        ))\n        .child(div().w_full().flex().justify_end().child(hung))\n        .into_any_element()\n}"
     },
     {
       "name": "context-menu",

@@ -55,7 +55,7 @@ use gpui_kit_theme::{ActiveTheme, Elevation, Space};
 use web_time::Instant;
 
 use crate::foundation::{FocusRing, Ident, StyledExt};
-use crate::overlay::layer::{Overlay, Placement, surface};
+use crate::overlay::layer::{Hang, Overlay, Placement, surface};
 use crate::overlay::popover::anchored_slot;
 
 /// How long a pointer has to rest on the trigger before the card opens.
@@ -102,6 +102,7 @@ pub struct HoverCard {
     name: Option<SharedString>,
     content: Option<Content>,
     placement: Placement,
+    hang: Hang,
     open_delay: Duration,
     grace: Duration,
     over_trigger: bool,
@@ -138,6 +139,7 @@ impl HoverCard {
             name: None,
             content: None,
             placement: Placement::Below,
+            hang: Hang::Start,
             open_delay: DEFAULT_OPEN_DELAY,
             grace: DEFAULT_GRACE,
             over_trigger: false,
@@ -177,6 +179,16 @@ impl HoverCard {
 
     pub fn placement(mut self, placement: Placement) -> Self {
         self.placement = placement;
+        self
+    }
+
+    /// Which of the trigger's edges the surface hangs from.
+    ///
+    /// A trigger near the trailing edge of the window wants [`Hang::End`]: the
+    /// surface then grows back across the page instead of being slid sideways
+    /// off its trigger to stay inside the window.
+    pub fn hang(mut self, hang: Hang) -> Self {
+        self.hang = hang;
         self
     }
 
@@ -424,11 +436,12 @@ impl Render for HoverCard {
 
             Overlay::new(self.ident.child("overlay"))
                 .placement(self.placement)
+                .hang(self.hang)
                 .child(card)
                 .into_any_element()
         });
 
-        anchored_slot(self.placement, trigger, overlay).semantic_in(
+        anchored_slot(self.placement, self.hang, trigger, overlay).semantic_in(
             cx,
             NodeSpec::new(self.ident.semantic_id(), Role::Group).expanded(self.open),
         )

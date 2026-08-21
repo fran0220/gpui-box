@@ -27,8 +27,8 @@ use crate::foundation::{
 };
 use crate::layout::measure;
 use crate::motion;
-use crate::overlay::Placement;
 use crate::overlay::popover::{self, MenuKey};
+use crate::overlay::{Hang, Placement};
 use crate::strings::{ActiveStrings, StringKey};
 
 /// How wide the list gets before it stops growing, and how tall before it
@@ -547,6 +547,7 @@ impl Combobox {
             &self.ident.child("menu.anchor"),
             &theme,
             geometry.placement,
+            geometry.hang,
             list,
         )
     }
@@ -700,6 +701,7 @@ impl Render for Combobox {
             )
         });
         let placement = geometry.map_or(Placement::Below, |geometry| geometry.placement);
+        let hang = geometry.map_or(Hang::Start, |geometry| geometry.hang);
         let menu = geometry.map(|geometry| self.menu(geometry, cx));
         let mut spec = NodeSpec::new(self.ident.semantic_id(), Role::Combobox)
             .disabled(self.disabled)
@@ -760,7 +762,7 @@ impl Render for Combobox {
             .capture_action(cx.listener(Self::on_line_start))
             .capture_action(cx.listener(Self::on_line_end))
             .capture_key_down(cx.listener(Self::on_key_down))
-            .child(popover::anchored_slot(placement, trigger, menu))
+            .child(popover::anchored_slot(placement, hang, trigger, menu))
             .semantic_in(cx, spec)
     }
 }

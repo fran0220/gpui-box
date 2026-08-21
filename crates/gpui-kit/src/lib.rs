@@ -279,7 +279,7 @@ pub mod prelude {
     pub use crate::overlay::{
         Command, CommandPalette, CommandPaletteEvent, ContextMenu, ContextMenuEvent, Dialog,
         DialogEvent, Drawer, DrawerEvent, Edge, FocusTrap, Frost, Glass, GlassGroup, GlassPreset,
-        HoverCard, HoverCardEvent, Kbd, Menu, MenuEvent, MenuItem, Menubar, MenubarEvent,
+        Hang, HoverCard, HoverCardEvent, Kbd, Menu, MenuEvent, MenuItem, Menubar, MenubarEvent,
         MenubarMenu, Notification, NotificationCenter, NotificationCenterEvent, Overlay, Placement,
         Popover, PopoverEvent, Toast, ToastCorner, ToastLayer, Tooltip, Tooltipped, UnreadCount,
     };

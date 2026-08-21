@@ -42,7 +42,7 @@ pub use frost::Frost;
 pub use glass::{Glass, GlassGroup, GlassPreset};
 pub use hover_card::{HoverCard, HoverCardEvent};
 pub use kbd::{Kbd, caps};
-pub use layer::{Edge, Overlay, Placement, priority, surface};
+pub use layer::{Edge, Hang, Overlay, Placement, priority, surface};
 pub use menu::{ContextMenu, ContextMenuEvent, Menu, MenuEvent, MenuItem};
 pub use menubar::{Menubar, MenubarEvent, MenubarMenu};
 pub use notification_center::{

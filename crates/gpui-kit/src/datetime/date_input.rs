@@ -22,6 +22,7 @@ use crate::controls::input::{TextInput, TextInputEvent};
 use crate::datetime::adapter::{Day, SharedDateAdapter};
 use crate::datetime::calendar::{Calendar, CalendarEvent};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text as foundation_text};
+use crate::overlay::Hang;
 use crate::overlay::popover;
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -342,6 +343,7 @@ impl Render for DateInput {
             popover::anchored_below(
                 ElementId::from(self.ident.child("surface").semantic_id()),
                 &theme,
+                Hang::Start,
                 card,
             )
         });

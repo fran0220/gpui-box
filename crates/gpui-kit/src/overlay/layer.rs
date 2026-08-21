@@ -37,6 +37,33 @@ impl Edge {
     }
 }
 
+/// Which of its anchor's edges a floating surface hangs from.
+///
+/// [`Placement`] says whether a menu opens up or down; this says which way it
+/// grows across the page. They are separate because a trigger near the
+/// trailing edge of a window needs the second answer and not the first: the
+/// menu still opens downward, it just has to grow back toward the middle
+/// instead of off the edge.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Hang {
+    /// Leading edges together, which is where a menu goes unless it cannot.
+    #[default]
+    Start,
+    /// Trailing edges together, so a surface wider than its trigger grows back
+    /// across the page rather than off it.
+    End,
+}
+
+impl Hang {
+    /// The edge a surface lines up with when this one leaves the window.
+    pub fn opposite(self) -> Self {
+        match self {
+            Self::Start => Self::End,
+            Self::End => Self::Start,
+        }
+    }
+}
+
 /// Where a floating surface sits.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Placement {
@@ -65,6 +92,7 @@ pub struct Overlay {
     /// so a nested dialog paints above the one that opened it.
     stack: usize,
     placement: Placement,
+    hang: Hang,
     window_snap_margin: Option<Pixels>,
     scrim: bool,
     content: Option<AnyElement>,
@@ -78,6 +106,7 @@ impl std::fmt::Debug for Overlay {
             .field("ident", &self.ident)
             .field("layer", &self.layer)
             .field("placement", &self.placement)
+            .field("hang", &self.hang)
             .field("window_snap_margin", &self.window_snap_margin)
             .field("scrim", &self.scrim)
             .field("dismissible", &self.on_dismiss.is_some())
@@ -92,6 +121,7 @@ impl Overlay {
             layer: Layer::Popover,
             stack: 0,
             placement: Placement::Below,
+            hang: Hang::Start,
             window_snap_margin: None,
             scrim: false,
             content: None,
@@ -132,6 +162,15 @@ impl Overlay {
         self
     }
 
+    /// Which of the anchor's edges the surface hangs from.
+    ///
+    /// The caller has to put the anchor slot on the same edge, which
+    /// [`crate::overlay::popover::anchored_slot`] does.
+    pub fn hang(mut self, hang: Hang) -> Self {
+        self.hang = hang;
+        self
+    }
+
     /// Keeps an already side-resolved anchored surface inside the window.
     ///
     /// Choosing above or below remains the caller's policy because only the
@@ -160,10 +199,16 @@ impl Overlay {
         self
     }
 
+    /// The corner of the surface that sits on the anchor point.
+    ///
+    /// Above puts the surface's bottom on the anchor and below puts its top
+    /// there; where it hangs from picks which end of that edge is pinned.
     fn anchor(&self) -> Anchor {
-        match self.placement {
-            Placement::Above => Anchor::BottomLeft,
-            _ => Anchor::TopLeft,
+        match (self.placement, self.hang) {
+            (Placement::Above, Hang::Start) => Anchor::BottomLeft,
+            (Placement::Above, Hang::End) => Anchor::BottomRight,
+            (_, Hang::Start) => Anchor::TopLeft,
+            (_, Hang::End) => Anchor::TopRight,
         }
     }
 }
@@ -327,6 +372,26 @@ mod tests {
         assert_eq!(
             Overlay::new("menu").placement(Placement::Below).anchor(),
             Anchor::TopLeft
+        );
+    }
+
+    #[test]
+    fn where_it_hangs_is_the_other_axis_and_leaves_the_side_alone() {
+        // A trigger near the trailing edge still opens downward. What changes
+        // is which way the surface grows from there.
+        assert_eq!(
+            Overlay::new("menu")
+                .placement(Placement::Below)
+                .hang(Hang::End)
+                .anchor(),
+            Anchor::TopRight
+        );
+        assert_eq!(
+            Overlay::new("menu")
+                .placement(Placement::Above)
+                .hang(Hang::End)
+                .anchor(),
+            Anchor::BottomRight
         );
     }
 }

@@ -23,8 +23,8 @@ use crate::foundation::{
 };
 use crate::layout::measure;
 use crate::motion;
-use crate::overlay::Placement;
 use crate::overlay::popover::{self, MenuKey};
+use crate::overlay::{Hang, Placement};
 use crate::strings::{ActiveStrings, StringKey};
 
 const MENU_MIN_WIDTH: f32 = 180.0;
@@ -436,6 +436,7 @@ impl Select {
             &self.ident.child("menu.anchor"),
             &theme,
             geometry.placement,
+            geometry.hang,
             list,
         )
     }
@@ -589,6 +590,7 @@ impl Render for Select {
             )
         });
         let placement = geometry.map_or(Placement::Below, |geometry| geometry.placement);
+        let hang = geometry.map_or(Hang::Start, |geometry| geometry.hang);
         let menu = geometry.map(|geometry| self.menu(geometry, cx));
 
         let trigger = div()
@@ -674,6 +676,6 @@ impl Render for Select {
             .child(trigger)
             .into_any_element();
 
-        popover::anchored_slot(placement, trigger, menu)
+        popover::anchored_slot(placement, hang, trigger, menu)
     }
 }

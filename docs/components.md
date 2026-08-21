@@ -711,7 +711,7 @@ is in `docs/interaction.md`.
 
 | Component | Kind | Notes |
 |---|---|---|
-| `Overlay` | builder | Placement, token-driven paint priority, scrim, dismissal |
+| `Overlay` | builder | Placement, which trigger edge it hangs from, token-driven paint priority, scrim, dismissal |
 | `Frost` | builder | Glass: the pixels behind are blurred and the surface colour is laid over them at `effect.glassAlpha`, so a popover, dialog or rail on a translucent window keeps its contrast. The whole subtree paints in one scene layer, which is what keeps the blur underneath the content instead of intermittently over it. Where the renderer has no backdrop blur, and where a theme sets `effect.glassAlpha` to 1, the tinted fill is drawn on its own and the surface is merely unblurred |
 | `Dialog` | view | Composed modal: reports opened, confirmed, cancelled, dismissed, closed. A dialog that is not dismissable installs no escape or scrim handler |
 | `Drawer` | view | The same surface arriving from an edge: same scrim, same focus trap, same escape and scrim dismissal. It slides out through `Presence`, and because an element cannot animate after it is dropped it stays in the tree until the exit finishes and only then reports `Closed` |

@@ -13,7 +13,17 @@
 //! same frame it is building.
 //!
 //! That is what this answers: given where the trigger was measured and how
-//! much of the window there is, which side, how wide, and how tall.
+//! much of the window there is, which side, which edge to hang from, how wide,
+//! and how tall.
+//!
+//! # Which edge it hangs from is decided, not assumed
+//!
+//! `anchored` also slides a surface back inside the window, which keeps it on
+//! screen and quietly unhooks it from its trigger: a menu that was under a
+//! chip is now under the chip and 40 points to the left of it, pointing at
+//! nothing. So the trailing edge is resolved here too, on the same rule as the
+//! side. A surface that would run off is lined up with its trigger's other
+//! edge instead, where it is still attached to the thing that opened it.
 //!
 //! # It is only ever as good as the measurement
 //!
@@ -25,7 +35,7 @@
 
 use gpui::{Bounds, Pixels, Window};
 
-use crate::overlay::layer::Placement;
+use crate::overlay::layer::{Hang, Placement};
 
 /// Which side of the trigger a surface is asked to go on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -75,6 +85,8 @@ impl From<Side> for Placement {
 pub struct Positioner {
     /// Where it would rather be.
     pub side: Side,
+    /// Which of the trigger's edges it would rather hang from.
+    pub hang: Hang,
     /// How tall it would be if nothing stopped it.
     pub height: f32,
     /// The narrowest it is worth drawing. A surface is at least this wide even
@@ -92,6 +104,7 @@ impl Positioner {
     pub fn below(height: f32) -> Self {
         Self {
             side: Side::Below,
+            hang: Hang::Start,
             height,
             min_width: 0.0,
             margin: 0.0,
@@ -101,6 +114,13 @@ impl Positioner {
 
     pub fn side(mut self, side: Side) -> Self {
         self.side = side;
+        self
+    }
+
+    /// Which of the trigger's edges the surface would rather hang from. It
+    /// keeps that edge when there is room for it there.
+    pub fn hang(mut self, hang: Hang) -> Self {
+        self.hang = hang;
         self
     }
 
@@ -141,10 +161,12 @@ impl Positioner {
             // asks for the frame that knows better.
             return Room {
                 side: self.side,
+                hang: self.hang,
                 width: surface_width,
                 height: self.height.min((usable_height - self.gap).max(0.0)),
                 measured: false,
                 flipped: false,
+                rehung: false,
             };
         }
 
@@ -170,16 +192,33 @@ impl Positioner {
         let flipped = preferred < self.height && alternative > preferred;
         let available = if flipped { alternative } else { preferred };
 
+        // The same rule sideways. Room from a trigger's leading edge runs to
+        // the far side of the window; room from its trailing edge runs back
+        // the other way.
+        let leading = (width - self.margin - f32::from(trigger.left())).max(0.0);
+        let trailing = (f32::from(trigger.right()) - self.margin).max(0.0);
+        let (edge, other_edge) = match self.hang {
+            Hang::Start => (leading, trailing),
+            Hang::End => (trailing, leading),
+        };
+        let rehung = edge < surface_width && other_edge > edge;
+
         Room {
             side: if flipped {
                 self.side.opposite()
             } else {
                 self.side
             },
+            hang: if rehung {
+                self.hang.opposite()
+            } else {
+                self.hang
+            },
             width: surface_width,
             height: self.height.min(available),
             measured: true,
             flipped,
+            rehung,
         }
     }
 }
@@ -189,6 +228,8 @@ impl Positioner {
 pub struct Room {
     /// The side it actually lands on.
     pub side: Side,
+    /// The trigger edge it actually hangs from.
+    pub hang: Hang,
     /// How wide it is drawn.
     pub width: f32,
     /// The tallest it may be without leaving the window.
@@ -199,6 +240,9 @@ pub struct Room {
     pub measured: bool,
     /// Whether it had to leave the side it asked for.
     pub flipped: bool,
+    /// Whether it had to move to the trigger's other edge to stay in the
+    /// window.
+    pub rehung: bool,
 }
 
 #[cfg(test)]
@@ -302,6 +346,74 @@ mod tests {
         assert_eq!(room.side, Side::Before);
         assert!(room.flipped);
         assert_eq!(room.height, 300.0);
+    }
+
+    #[test]
+    fn a_menu_with_room_beside_its_trigger_hangs_from_its_leading_edge() {
+        let room = menu().resolve_in(1000.0, 800.0, trigger(100.0, 32.0));
+
+        assert_eq!(room.hang, Hang::Start);
+        assert!(!room.rehung);
+    }
+
+    #[test]
+    fn a_menu_wider_than_the_room_after_its_trigger_hangs_from_the_other_edge() {
+        // A small chip against the right of a 400-wide window opening a menu
+        // that wants 200: 72 points of room from its leading edge, 372 from
+        // its trailing one.
+        let chip = Bounds {
+            origin: point(px(320.0), px(100.0)),
+            size: size(px(60.0), px(32.0)),
+        };
+        let room = Positioner::below(300.0)
+            .min_width(200.0)
+            .spacing(8.0, 6.0)
+            .resolve_in(400.0, 800.0, chip);
+
+        assert_eq!(room.hang, Hang::End);
+        assert!(room.rehung);
+        assert_eq!(
+            room.side,
+            Side::Below,
+            "which way it opens is a separate question and this did not change it"
+        );
+    }
+
+    #[test]
+    fn a_menu_that_fits_on_neither_edge_keeps_the_one_it_asked_for() {
+        // Centred in a window narrower than the surface: neither edge has room
+        // and moving it would not find any, so it is not moved.
+        let centred = Bounds {
+            origin: point(px(20.0), px(100.0)),
+            size: size(px(160.0), px(32.0)),
+        };
+        let room = Positioner::below(300.0)
+            .min_width(400.0)
+            .spacing(8.0, 6.0)
+            .resolve_in(200.0, 800.0, centred);
+
+        assert_eq!(room.hang, Hang::Start);
+        assert!(!room.rehung);
+    }
+
+    #[test]
+    fn an_unmeasured_trigger_keeps_the_edge_it_asked_for_too() {
+        let unmeasured = Bounds {
+            origin: point(px(0.0), px(0.0)),
+            size: size(px(0.0), px(0.0)),
+        };
+        let room = menu().hang(Hang::End).resolve_in(1000.0, 800.0, unmeasured);
+
+        assert_eq!(room.hang, Hang::End);
+        assert!(!room.rehung, "nothing has been decided from anything");
+    }
+
+    #[test]
+    fn every_hang_has_an_opposite_and_it_is_itself_twice_over() {
+        for hang in [Hang::Start, Hang::End] {
+            assert_eq!(hang.opposite().opposite(), hang);
+            assert_ne!(hang.opposite(), hang);
+        }
     }
 
     #[test]

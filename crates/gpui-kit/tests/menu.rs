@@ -658,3 +658,49 @@ fn a_context_menu_reports_the_command_and_closes(cx: &mut TestAppContext) {
         "the wrapped region stays after the menu closes"
     );
 }
+
+#[gpui::test]
+fn an_end_aligned_menu_hangs_off_the_trailing_edge_of_its_trigger(cx: &mut TestAppContext) {
+    // A trigger sitting against the right of its container opens a menu wider
+    // than itself. Lined up the usual way the surface would run off the page
+    // and be slid back until it no longer pointed at anything; lined up on the
+    // trailing edge it stays attached to what opened it.
+    let slot: Rc<RefCell<Option<Entity<Menu>>>> = Rc::new(RefCell::new(None));
+    let build_slot = slot.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        let menu = build_slot
+            .borrow_mut()
+            .get_or_insert_with(|| {
+                cx.new(|cx| {
+                    Menu::new("workspace.edit", window, cx)
+                        .trigger("Edit")
+                        .items(items())
+                        .hang(Hang::End)
+                })
+            })
+            .clone();
+        div()
+            .w(px(600.0))
+            .h(px(400.0))
+            .flex()
+            .justify_end()
+            .child(menu)
+            .into_any_element()
+    });
+    harness.snapshot();
+
+    let menu = slot.borrow().clone().expect("built");
+    open(&mut harness, &menu);
+
+    let trigger = harness.bounds("workspace.edit.trigger").expect("laid out");
+    let surface = harness.bounds("workspace.edit.undo").expect("laid out");
+
+    assert!(
+        surface.right() <= trigger.right() + px(1.0),
+        "the surface ends where its trigger ends: trigger {trigger:?}, row {surface:?}"
+    );
+    assert!(
+        surface.left() < trigger.left(),
+        "and grows back across the page rather than off it"
+    );
+}

@@ -28,7 +28,7 @@ use crate::foundation::{Ident, Pressable, Sizable, StyledExt, text};
 use crate::motion;
 use crate::overlay::focus::FocusTrap;
 use crate::overlay::kbd::Kbd;
-use crate::overlay::layer::{Overlay, Placement, surface};
+use crate::overlay::layer::{Hang, Overlay, Placement, surface};
 use crate::overlay::popover::{self, MenuKey};
 
 /// The narrowest a panel gets, so a one-word command still reads as a menu.
@@ -579,6 +579,7 @@ pub struct Menu {
     trigger_size: ControlSize,
     items: Vec<MenuItem>,
     placement: Placement,
+    hang: Hang,
     open: bool,
     /// Set when opening, cleared by the first frame that can act on it.
     pending_focus: bool,
@@ -613,6 +614,7 @@ impl Menu {
             trigger_size: ControlSize::Md,
             items: Vec::new(),
             placement: Placement::Below,
+            hang: Hang::Start,
             open: false,
             pending_focus: false,
             state: MenuState::default(),
@@ -676,6 +678,16 @@ impl Menu {
 
     pub fn placement(mut self, placement: Placement) -> Self {
         self.placement = placement;
+        self
+    }
+
+    /// Which of the trigger's edges the surface hangs from.
+    ///
+    /// A trigger near the trailing edge of the window wants [`Hang::End`]: the
+    /// surface then grows back across the page instead of being slid sideways
+    /// off its trigger to stay inside the window.
+    pub fn hang(mut self, hang: Hang) -> Self {
+        self.hang = hang;
         self
     }
 
@@ -946,11 +958,12 @@ impl Render for Menu {
 
             Overlay::new(self.ident.child("overlay"))
                 .placement(self.placement)
+                .hang(self.hang)
                 .child(content)
                 .into_any_element()
         });
 
-        popover::anchored_slot(self.placement, trigger, overlay).semantic_in(
+        popover::anchored_slot(self.placement, self.hang, trigger, overlay).semantic_in(
             cx,
             NodeSpec::new(self.ident.semantic_id(), Role::Group)
                 .expanded(self.open)

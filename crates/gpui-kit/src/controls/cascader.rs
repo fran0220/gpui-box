@@ -17,7 +17,7 @@ use crate::foundation::{
     StyledExt, text as foundation_text,
 };
 use crate::overlay::{
-    Placement,
+    Hang, Placement,
     popover::{self, MenuKey},
 };
 use crate::state::Loadable;
@@ -580,6 +580,7 @@ impl Cascader {
         popover::anchored_below(
             ElementId::from(self.ident.child("menu.anchor").semantic_id()),
             &theme,
+            Hang::Start,
             card.into_any_element(),
         )
     }
@@ -668,7 +669,7 @@ impl Render for Cascader {
                     .text_color(theme.colors.text_muted),
             )
             .into_any_element();
-        popover::anchored_slot(Placement::Below, trigger, menu)
+        popover::anchored_slot(Placement::Below, Hang::Start, trigger, menu)
             .id(self.ident.element_id())
             .when(!self.disabled, |el| {
                 el.track_focus(&self.focus_handle)
