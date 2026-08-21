@@ -3720,6 +3720,7 @@
         "on_select(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self",
         "on_close(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self",
         "overflow_after(count: usize) -> Self",
+        "scrolling() -> Self",
         "overflow_menu(menu: Entity<Menu>) -> Self",
         "reorderable(reorderable: bool) -> Self",
         "accepts(predicate: impl Fn(&DragItem, &DropPosition) -> bool + 'static) -> Self",
@@ -12049,7 +12050,7 @@
       "uses": [
         "Tabs"
       ],
-      "example": "fn tabs(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(520.0))\n        .child(\n            Tabs::new(\"scene.tabs.workspace\")\n                .tabs([\n                    TabItem::new(\"overview\", \"Overview\").icon(Icon::Widget),\n                    TabItem::new(\"runs\", \"Runs\").badge(\"12\"),\n                    TabItem::new(\"logs\", \"Logs\"),\n                    TabItem::new(\"billing\", \"Billing\").disabled(true),\n                ])\n                .selected(\"runs\")\n                .on_select(|_, _, _| {}),\n        )\n        // The body belongs to the caller: tabs render the strip only.\n        .child(crate::foundation::text(\n            &theme,\n            TypeScale::Body,\n            \"Runs are rendered by the caller, not by the strip.\",\n        ))\n        .into_any_element()\n}"
+      "example": "fn tabs(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(520.0))\n        .child(\n            Tabs::new(\"scene.tabs.workspace\")\n                .tabs([\n                    TabItem::new(\"overview\", \"Overview\").icon(Icon::Widget),\n                    TabItem::new(\"runs\", \"Runs\").badge(\"12\"),\n                    TabItem::new(\"logs\", \"Logs\"),\n                    TabItem::new(\"billing\", \"Billing\").disabled(true),\n                ])\n                .selected(\"runs\")\n                .on_select(|_, _, _| {}),\n        )\n        // The body belongs to the caller: tabs render the strip only.\n        .child(crate::foundation::text(\n            &theme,\n            TypeScale::Body,\n            \"Runs are rendered by the caller, not by the strip.\",\n        ))\n        .child(caption(\n            &theme,\n            \"the other answer to a strip with no room: it scrolls, and the \\\n             edge with more behind it fades\",\n        ))\n        // Deliberately narrower than its tabs, because a strip that fits shows\n        // nothing about what a strip that does not fit does.\n        .child(\n            div().w(px(300.0)).child(\n                Tabs::new(\"scene.tabs.spaces\")\n                    .tabs((1..=9).map(|n| {\n                        TabItem::new(format!(\"space-{n}\"), format!(\"Workspace {n}\"))\n                            .icon(Icon::Widget)\n                    }))\n                    .selected(\"space-5\")\n                    .scrolling()\n                    .on_select(|_, _, _| {}),\n            ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "accordion",

@@ -23,6 +23,25 @@ pub(super) fn tabs(_window: &mut Window, cx: &mut App) -> AnyElement {
             TypeScale::Body,
             "Runs are rendered by the caller, not by the strip.",
         ))
+        .child(caption(
+            &theme,
+            "the other answer to a strip with no room: it scrolls, and the \
+             edge with more behind it fades",
+        ))
+        // Deliberately narrower than its tabs, because a strip that fits shows
+        // nothing about what a strip that does not fit does.
+        .child(
+            div().w(px(300.0)).child(
+                Tabs::new("scene.tabs.spaces")
+                    .tabs((1..=9).map(|n| {
+                        TabItem::new(format!("space-{n}"), format!("Workspace {n}"))
+                            .icon(Icon::Widget)
+                    }))
+                    .selected("space-5")
+                    .scrolling()
+                    .on_select(|_, _, _| {}),
+            ),
+        )
         .into_any_element()
 }
 

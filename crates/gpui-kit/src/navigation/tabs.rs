@@ -18,14 +18,15 @@
 //! separate `DocumentTabs` would have to reimplement all of it and would then
 //! be a second place for the two of them to disagree about what a tab is.
 //!
-//! Overflow is a menu of the tabs that did not fit rather than a scrolling
-//! strip. See [`Tabs::overflow_after`].
+//! A strip too wide for its frame does one of two things, and the caller
+//! says which: it moves the surplus into a menu ([`Tabs::overflow_after`]) or
+//! it scrolls ([`Tabs::scrolling`]). Neither hides a tab from the keyboard.
 
 use std::rc::Rc;
 
 use gpui::{
     App, Entity, InteractiveElement, IntoElement, MouseButton, MouseDownEvent, ParentElement,
-    RenderOnce, SharedString, StatefulInteractiveElement, Styled, Window, div, point,
+    RenderOnce, ScrollHandle, SharedString, StatefulInteractiveElement, Styled, Window, div, point,
     prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::{Icon, icon};
@@ -33,13 +34,14 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlMetrics, ControlSize, Space, Theme, TypeScale};
 
 use crate::display::badge::Badge;
-use crate::foundation::direction::{ActiveDirection, DirectionalExt};
+use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
 use crate::foundation::stepping::bounded_step;
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
 use crate::interaction::dnd::{
     self, DragItem, DropAxis, DropIntent, DropPosition, MakingWay, RowTarget, SurfaceDrag,
 };
-use crate::motion::{Flipping, flip};
+use crate::layout::ScrollFade;
+use crate::motion::{Flipping, flip, keyed};
 use crate::overlay::{Menu, MenuItem};
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -51,6 +53,18 @@ type Accepts = Rc<dyn Fn(&DragItem, &DropPosition) -> bool>;
 /// The width of the dot a tab wears while it has something unsaved. It occurs
 /// once, so it stays next to the component rather than in the token document.
 const MARK_SIZE: f32 = 7.0;
+
+/// How wide the fade at a scrolling strip's edge is. Wide enough that a tab
+/// passing under it dims over several pixels of travel rather than meeting a
+/// line, which is what makes it read as "there is more" instead of as damage.
+const FADE_BAND: f32 = 36.0;
+
+/// How far the strip may be from an end before it counts as away from it.
+///
+/// Measurement lands on fractions, and a strip sitting at rest one hundredth
+/// of a pixel from zero must not paint a fade over a tab that is entirely
+/// visible.
+const AT_END: f32 = 1.0;
 
 /// Whether what a tab holds has been written down, and what happened when
 /// somebody tried.
@@ -206,6 +220,53 @@ impl TabItem {
     }
 }
 
+/// What a strip does with the tabs it has no room for.
+///
+/// The two answers are not interchangeable, and which one is right depends on
+/// what a tab stands for. A menu is right when the tabs are documents: they
+/// have names, the names are how the reader thinks of them, and a list of
+/// names is a better index than a strip you have to travel along. Scrolling is
+/// right when a tab is a *place* the reader has arranged — a workspace, a
+/// project — because then its position in the row is part of what identifies
+/// it, and moving it into a menu takes that away.
+///
+/// Either way every tab keeps its keyboard: arrow, home and end step over all
+/// of them, and a step that lands on a tab which is not on screen brings it
+/// there.
+/// Private because the two builders are the whole of the choice: a caller
+/// names the behaviour it wants, never this. It also keeps `Overflow` from
+/// colliding with GPUI's own, which a host importing both preludes would hit.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum Overflow {
+    /// The strip wraps onto another row. Nothing is hidden and nothing moves,
+    /// which is right for a handful of tabs in a container that can grow.
+    #[default]
+    Wraps,
+    /// Tabs past the cut are moved into a menu. Needs [`Tabs::overflow_menu`];
+    /// without one there is nowhere to move them, so nothing is cut.
+    Menu(usize),
+    /// The strip scrolls sideways, fading at whichever edge has more behind
+    /// it.
+    Scrolls,
+}
+
+/// What a scrolling strip has to remember between two frames.
+///
+/// It is keyed on the strip's own identity rather than owned by the caller,
+/// because both halves are the strip's business and neither is a decision the
+/// host makes: where the reader left the strip, and which tab it has already
+/// brought into view. Asking every caller to hold a `ScrollHandle` would put a
+/// field in every host for something no host reads.
+#[derive(Default)]
+struct Strip {
+    scroll: ScrollHandle,
+    /// The selection this strip has already scrolled to. Scrolling on the
+    /// *change* rather than on the state is the whole of not fighting the
+    /// reader: once a tab has been shown, scrolling away from it is allowed to
+    /// stick.
+    showed: Option<SharedString>,
+}
+
 /// A row of tabs. The strip publishes one [`Role::Tab`] node per tab.
 #[derive(IntoElement)]
 pub struct Tabs {
@@ -219,7 +280,7 @@ pub struct Tabs {
     reorderable: bool,
     accepts: Option<Accepts>,
     on_reorder: Option<ReorderHandler>,
-    overflow_after: Option<usize>,
+    overflow: Overflow,
     overflow_menu: Option<Entity<Menu>>,
 }
 
@@ -233,7 +294,7 @@ impl std::fmt::Debug for Tabs {
             .field("disabled", &self.disabled)
             .field("has_handler", &self.on_select.is_some())
             .field("closable", &self.on_close.is_some())
-            .field("overflow_after", &self.overflow_after)
+            .field("overflow", &self.overflow)
             .finish()
     }
 }
@@ -251,7 +312,7 @@ impl Tabs {
             reorderable: false,
             accepts: None,
             on_reorder: None,
-            overflow_after: None,
+            overflow: Overflow::default(),
             overflow_menu: None,
         }
     }
@@ -302,17 +363,44 @@ impl Tabs {
     /// states: GPUI measures after the element tree exists, so a strip cannot
     /// find out what fits and then still move a tab somewhere else.
     ///
-    /// A menu rather than a scrolling strip, because a scroll offset is not
-    /// something a reader can address: a tab scrolled out of view is at a
-    /// position nobody can name, has no bounds, publishes nothing, and a
-    /// horizontal scroll region would also eat the left and right arrows the
-    /// strip uses to step between tabs. A menu keeps every hidden tab named,
-    /// listed, and carrying its own save state. Either way the keyboard
-    /// reaches a hidden tab directly: arrow, home and end step over **every**
-    /// tab the caller declared, hidden or not, and report the one they land
-    /// on.
+    /// A menu keeps every hidden tab named, listed, and carrying its own save
+    /// state, which is what makes it the right answer for document tabs: the
+    /// name is how the reader thinks of the thing, so a list of names is a
+    /// better index than a row you travel along. Where position is part of
+    /// what identifies a tab, [`Tabs::scrolling`] is the other answer.
+    ///
+    /// Either way the keyboard reaches a hidden tab directly: arrow, home and
+    /// end step over **every** tab the caller declared, hidden or not, and
+    /// report the one they land on.
+    ///
+    /// This and [`Tabs::scrolling`] are the same setting, so the later call
+    /// replaces the earlier one rather than the two combining into a strip
+    /// that both scrolls and hides.
     pub fn overflow_after(mut self, count: usize) -> Self {
-        self.overflow_after = Some(count);
+        self.overflow = Overflow::Menu(count);
+        self
+    }
+
+    /// Lets the strip scroll sideways instead of wrapping or hiding.
+    ///
+    /// Scrolling costs something a menu does not: a tab that is off screen has
+    /// no position the reader can point at. The strip pays that back two ways.
+    /// The keyboard still steps over every tab, and a step that lands on one
+    /// which is not on screen scrolls it into view — so nothing is reachable
+    /// only by dragging a strip about. And the edge with more behind it fades,
+    /// so "there are further tabs this way" is on screen rather than something
+    /// you find by trying.
+    ///
+    /// Bringing the selection into view happens when the selection *changes*,
+    /// not while it stays put. A strip that re-centred the current tab every
+    /// frame would haul itself back the instant the reader scrolled off to
+    /// look at something else, which is the failure that makes people stop
+    /// scrolling these strips at all.
+    ///
+    /// This and [`Tabs::overflow_after`] are the same setting, so the later
+    /// call replaces the earlier one.
+    pub fn scrolling(mut self) -> Self {
+        self.overflow = Overflow::Scrolls;
         self
     }
 
@@ -329,8 +417,8 @@ impl Tabs {
     /// Where the cut falls, which is nowhere when there is no menu to move
     /// anything into.
     fn cut(&self) -> usize {
-        match (self.overflow_after, self.overflow_menu.is_some()) {
-            (Some(cut), true) => cut,
+        match (self.overflow, self.overflow_menu.is_some()) {
+            (Overflow::Menu(cut), true) => cut,
             _ => usize::MAX,
         }
     }
@@ -694,12 +782,51 @@ impl RenderOnce for Tabs {
         let reorder = self.reorder(window, cx);
 
         let direction = cx.layout_direction();
+        let scrolls = self.overflow == Overflow::Scrolls;
+        // Where the reader left the strip, and what it has already shown them.
+        let state = scrolls.then(|| keyed::slot::<Strip>(&self.ident.semantic_id(), cx));
+        let mut fades = (false, false);
+        let mut scroll = None;
+        if let Some(state) = &state {
+            let mut state = state.borrow_mut();
+            if state.showed != self.selected {
+                if let Some(index) = self
+                    .selected
+                    .as_ref()
+                    .and_then(|id| self.tabs.iter().position(|tab| &tab.id == id))
+                {
+                    // Applied in the next prepaint, once the tabs have bounds
+                    // to be scrolled to, and by the minimum that puts the tab
+                    // fully on screen.
+                    state.scroll.scroll_to_item(index);
+                }
+                state.showed = self.selected.clone();
+            }
+            // Read as a distance from the start, because which sign means
+            // "scrolled onward" is a detail of the platform's scroll
+            // convention and not something worth depending on.
+            let travelled = f32::from(state.scroll.offset().x).abs();
+            let total = f32::from(state.scroll.max_offset().x).abs();
+            let (from_start, from_end) = (travelled > AT_END, travelled < total - AT_END);
+            fades = match direction {
+                LayoutDirection::LeftToRight => (from_start, from_end),
+                LayoutDirection::RightToLeft => (from_end, from_start),
+            };
+            scroll = Some(state.scroll.clone());
+        }
+
         let mut strip = div()
             .id(self.ident.element_id())
             .row_reading(direction)
             .items_end()
-            .flex_wrap()
-            .gap(px(theme.space(Space::Xs)));
+            .gap(px(theme.space(Space::Xs)))
+            // Wrapping and scrolling are contradictory answers to the same
+            // question: a strip that wraps never has a second screenful to
+            // scroll to.
+            .when(!scrolls, |element| element.flex_wrap())
+            .when_some(scroll.as_ref(), |element, scroll| {
+                element.min_w_0().overflow_x_scroll().track_scroll(scroll)
+            });
 
         if let (false, Some(handler)) = (self.disabled, self.on_select.clone()) {
             let tabs = self.tabs.clone();
@@ -770,12 +897,34 @@ impl RenderOnce for Tabs {
                     )
             });
 
-        strip.children(overflow).semantic_in(
-            cx,
-            // The strip holds every tab the caller declared, drawn or
-            // overflowed, because the keyboard reaches all of them.
-            NodeSpec::new(self.ident.semantic_id(), Role::List).value(self.tabs.len().to_string()),
-        )
+        let strip = strip.children(overflow);
+        // The strip holds every tab the caller declared, drawn or overflowed,
+        // because the keyboard reaches all of them.
+        let published =
+            NodeSpec::new(self.ident.semantic_id(), Role::List).value(self.tabs.len().to_string());
+
+        match scrolls {
+            // A scrolling element's own bounds travel with its content, so the
+            // strip publishes the frame around it instead. Otherwise the one
+            // node that says where the strip is would report a rectangle
+            // somewhere off the left of the window as soon as the reader
+            // scrolled, and nothing would be able to say which tabs are on
+            // screen.
+            true => div()
+                .child(
+                    ScrollFade::new(self.ident.child("fade"))
+                        .band(FADE_BAND)
+                        .left(fades.0)
+                        .right(fades.1)
+                        // The strip is as tall as one tab; a fade sized to its
+                        // container would paint over whatever sits beneath it.
+                        .fit_height()
+                        .child(strip),
+                )
+                .semantic_in(cx, published)
+                .into_any_element(),
+            false => strip.semantic_in(cx, published).into_any_element(),
+        }
     }
 }
 

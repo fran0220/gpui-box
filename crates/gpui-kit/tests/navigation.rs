@@ -350,3 +350,137 @@ fn a_short_trail_is_not_collapsed(cx: &mut TestAppContext) {
     assert!(harness.node("nav.trail.collapsed").is_none());
     assert!(harness.node("nav.trail.projects").is_some());
 }
+
+/// Eight tabs in a frame with room for about three, so the strip genuinely has
+/// somewhere to scroll. The selection is held by the test the way a host would
+/// hold it, because that is what makes changing it observable.
+fn scrolling_strip(cx: &mut TestAppContext) -> (Harness, Rc<RefCell<String>>) {
+    let selected = Rc::new(RefCell::new("space-1".to_string()));
+    let current = selected.clone();
+    let harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let selected = current.borrow().clone();
+        gpui::div()
+            .w(gpui::px(240.0))
+            .child(
+                Tabs::new("shell.spaces")
+                    .tabs(
+                        (1..=8)
+                            .map(|n| TabItem::new(format!("space-{n}"), format!("Workspace {n}"))),
+                    )
+                    .selected(selected)
+                    .scrolling()
+                    .on_select(|_, _, _| {}),
+            )
+            .into_any_element()
+    });
+    (harness, selected)
+}
+
+#[gpui::test]
+fn a_scrolling_strip_still_publishes_every_tab_it_was_given(cx: &mut TestAppContext) {
+    // The keyboard steps over all of them, so all of them are named. A tab
+    // that is off screen is scrolled away, not withheld.
+    let (mut harness, _) = scrolling_strip(cx);
+
+    for n in 1..=8 {
+        assert!(
+            harness.node(&format!("shell.spaces.space-{n}")).is_some(),
+            "workspace {n} is unreachable"
+        );
+    }
+    assert_eq!(
+        harness
+            .node("shell.spaces")
+            .expect("the strip publishes itself")
+            .value
+            .as_deref(),
+        Some("8")
+    );
+}
+
+#[gpui::test]
+fn choosing_a_tab_that_is_off_screen_brings_it_into_view(cx: &mut TestAppContext) {
+    let (mut harness, selected) = scrolling_strip(cx);
+    let frame = harness.bounds("shell.spaces").expect("the strip is drawn");
+    let last = harness
+        .bounds("shell.spaces.space-8")
+        .expect("the last tab is drawn");
+    assert!(
+        last.right() > frame.right(),
+        "the strip has to actually overflow for this to mean anything: \
+         last tab ends at {:?}, frame at {:?}",
+        last.right(),
+        frame.right()
+    );
+
+    *selected.borrow_mut() = "space-8".to_string();
+    harness.frame();
+    // The scroll is applied in the prepaint after the one that asked for it,
+    // so the tab has bounds to be scrolled to.
+    harness.frame();
+
+    let shown = harness
+        .bounds("shell.spaces.space-8")
+        .expect("the last tab is still drawn");
+    let frame = harness.bounds("shell.spaces").expect("the strip is drawn");
+    assert!(
+        shown.right() <= frame.right() + gpui::px(1.0) && shown.left() >= frame.left(),
+        "the chosen tab is still outside the strip: tab {shown:?}, strip {frame:?}"
+    );
+}
+
+#[gpui::test]
+fn a_strip_the_reader_scrolled_does_not_haul_itself_back(cx: &mut TestAppContext) {
+    // Scrolling on the selection's *change* rather than on the selection is
+    // the whole of this: once a tab has been shown, looking somewhere else has
+    // to be allowed to stick, or the strip fights every attempt to read it.
+    let (mut harness, selected) = scrolling_strip(cx);
+    *selected.borrow_mut() = "space-8".to_string();
+    harness.frame();
+    harness.frame();
+    let shown = harness.bounds("shell.spaces.space-8").expect("drawn");
+
+    // Several frames with nothing changing: no drift, and no second scroll.
+    for _ in 0..3 {
+        harness.frame();
+    }
+
+    assert_eq!(
+        harness.bounds("shell.spaces.space-8").expect("drawn"),
+        shown,
+        "the strip moved on its own while the selection stood still"
+    );
+}
+
+#[gpui::test]
+fn the_edge_that_has_more_behind_it_is_the_edge_that_fades(cx: &mut TestAppContext) {
+    // "There is more this way" has to be on screen, or the only way to find
+    // out is to try scrolling and see whether anything happens.
+    let (mut harness, selected) = scrolling_strip(cx);
+    assert_eq!(
+        harness
+            .node("shell.spaces.fade")
+            .expect("a scrolling strip fades")
+            .value
+            .as_deref(),
+        Some("right"),
+        "at the start there is nothing behind the left edge"
+    );
+
+    *selected.borrow_mut() = "space-8".to_string();
+    harness.frame();
+    harness.frame();
+    // The fade is read from the offset the previous frame measured, so the
+    // frame that scrolls is not yet the frame that knows it did.
+    harness.frame();
+
+    assert_eq!(
+        harness
+            .node("shell.spaces.fade")
+            .expect("a scrolling strip fades")
+            .value
+            .as_deref(),
+        Some("left"),
+        "at the far end there is nothing further to reach"
+    );
+}
