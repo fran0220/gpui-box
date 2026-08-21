@@ -768,7 +768,7 @@ impl DataGrid {
     }
 
     /// Reports the current range as TSV. The grid writes nothing; a host that
-    /// wants the clipboard uses the same verified path [`CopyButton`] does.
+    /// wants the clipboard uses the same verified path [`CopyButton`](crate::controls::copy_button::CopyButton) does.
     pub fn on_copy(
         mut self,
         handler: impl Fn(SharedString, &mut Window, &mut App) + 'static,

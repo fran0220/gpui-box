@@ -554,6 +554,10 @@ impl RenderOnce for DiffView {
             let rendered = Rc::clone(&rows);
             let row_theme = theme.clone();
             let expand_label = cx.strings().text(StringKey::DiffExpandHunk);
+            let fit = match self.wrapping {
+                true => Fit::Wraps,
+                false => Fit::Clips,
+            };
             let mut list = List::new(list_ident.clone(), count, move |index, _, cx| {
                 let row = &rendered[index];
                 let label = cx.strings().text(row.kind.label_key());
@@ -562,7 +566,14 @@ impl RenderOnce for DiffView {
                     // The row's position in the flattened diff is its reading
                     // order. The list is virtualized, so a copy spanning rows
                     // that were never mounted reports itself incomplete.
-                    diff_row(&row.id, &row.kind, index as u64, &row_theme, &expand_label),
+                    diff_row(
+                        &row.id,
+                        &row.kind,
+                        index as u64,
+                        &row_theme,
+                        &expand_label,
+                        fit,
+                    ),
                 )
                 // Source and paths stay out of diagnostic snapshots. Stable
                 // business ids and the row kind remain addressable.
@@ -803,24 +814,67 @@ fn counts(changed: (usize, usize), theme: &Theme) -> Vec<AnyElement> {
     marks
 }
 
+/// Whether the list hands a row its height or asks the row what it is.
+///
+/// The difference reaches every element in the row. A slotted row can say
+/// `h_full`, because the slot is a height; a measured row's height *is* its
+/// content, so the same call resolves against nothing and a one-line header
+/// would collapse onto its text. And only a measured row can afford to let a
+/// long line wrap, since a wrapped line is taller than the slot a fixed-height
+/// list reserved for it.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Fit {
+    Clips,
+    Wraps,
+}
+
+/// The frame every row shares, holding whichever height its list can give.
+fn row_frame(theme: &Theme, fit: Fit) -> gpui::Div {
+    match fit {
+        Fit::Clips => div().row().w_full().h_full(),
+        Fit::Wraps => div()
+            .row()
+            .w_full()
+            .min_h(px(theme.control.get(ControlSize::Sm).height)),
+    }
+}
+
+/// The cell a line of code is laid out in, which is where wrapping is decided:
+/// `min_w_0` lets the cell be narrower than the line so the text has a width
+/// to wrap against, and only a clipping row refuses the breaks.
+fn code_cell(fit: Fit) -> gpui::Div {
+    match fit {
+        Fit::Clips => div()
+            .row()
+            .flex_1()
+            .min_w_0()
+            .overflow_hidden()
+            .whitespace_nowrap(),
+        // Not a row: a flex child is measured at its own max content width, so
+        // a line laid out as one would be handed all the width it asked for
+        // and would have nothing to wrap against. As a block it inherits the
+        // cell's width instead, and `min_w_0` is what lets that width be
+        // narrower than the line.
+        Fit::Wraps => div().flex_1().min_w_0(),
+    }
+}
+
 fn diff_row(
     id: &SharedString,
     kind: &FlatKind,
     order: u64,
     theme: &Theme,
     expand: &SharedString,
+    fit: Fit,
 ) -> AnyElement {
     match kind {
         FlatKind::File {
             label,
             changed,
             folded,
-        } => div()
-            .row()
+        } => row_frame(theme, fit)
             .items_center()
             .gap_token(theme, Space::Sm)
-            .w_full()
-            .h_full()
             .px_token(theme, Space::Sm)
             .type_scale(theme, TypeScale::Label)
             .text_color(theme.colors.text)
@@ -838,21 +892,15 @@ fn diff_row(
             .child(label.clone())
             .children(counts(*changed, theme))
             .into_any_element(),
-        FlatKind::Expand => div()
-            .row()
+        FlatKind::Expand => row_frame(theme, fit)
             .items_center()
-            .w_full()
-            .h_full()
             .px_token(theme, Space::Sm)
             .type_scale(theme, TypeScale::Caption)
             .text_color(theme.colors.accent)
             .child(expand.clone())
             .into_any_element(),
-        FlatKind::Hunk(header) => div()
-            .row()
+        FlatKind::Hunk(header) => row_frame(theme, fit)
             .items_center()
-            .w_full()
-            .h_full()
             .px_token(theme, Space::Sm)
             .font_family(theme.typography.mono.clone())
             .text_size(px(theme.typography.code.size))
@@ -867,8 +915,10 @@ fn diff_row(
             side,
             old_number,
             new_number,
-        } => unified_line(id, side, *old_number, *new_number, order * 2, theme),
-        FlatKind::Split { old, new } => split_line(id, old.as_ref(), new.as_ref(), order, theme),
+        } => unified_line(id, side, *old_number, *new_number, order * 2, theme, fit),
+        FlatKind::Split { old, new } => {
+            split_line(id, old.as_ref(), new.as_ref(), order, theme, fit)
+        }
     }
 }
 
@@ -879,13 +929,16 @@ fn unified_line(
     new_number: Option<usize>,
     order: u64,
     theme: &Theme,
+    fit: Fit,
 ) -> AnyElement {
     let color = side.mark.tone().color(theme);
-    div()
-        .row()
-        .items_center()
-        .w_full()
-        .h_full()
+    // A wrapped line grows downwards, so its number and mark belong beside the
+    // line's first row rather than beside the middle of everything it became.
+    row_frame(theme, fit)
+        .map(|frame| match fit {
+            Fit::Clips => frame.items_center(),
+            Fit::Wraps => frame.items_start(),
+        })
         .font_family(theme.typography.mono.clone())
         .text_size(px(theme.typography.code.size))
         .line_height(px(theme.typography.code.line_height))
@@ -903,21 +956,15 @@ fn unified_line(
                 .child(side.mark.prefix()),
         )
         .child(
-            div()
-                .row()
-                .flex_1()
-                .min_w_0()
-                .overflow_hidden()
-                .whitespace_nowrap()
-                .child(
-                    styled_code(theme, side.text.clone(), &side.spans)
-                        .selectable_in_document(
-                            SharedString::from(format!("{id}.text")),
-                            SharedString::from(format!("{id}.text")),
-                            order,
-                        )
-                        .virtualized_participant(true),
-                ),
+            code_cell(fit).child(
+                styled_code(theme, side.text.clone(), &side.spans)
+                    .selectable_in_document(
+                        SharedString::from(format!("{id}.text")),
+                        SharedString::from(format!("{id}.text")),
+                        order,
+                    )
+                    .virtualized_participant(true),
+            ),
         )
         .into_any_element()
 }
@@ -928,26 +975,23 @@ fn split_line(
     new: Option<&DiffSide>,
     order: u64,
     theme: &Theme,
+    fit: Fit,
 ) -> AnyElement {
-    div()
-        .row()
-        .items_center()
-        .w_full()
-        .h_full()
+    row_frame(theme, fit)
+        .items_stretch()
         .font_family(theme.typography.mono.clone())
         .text_size(px(theme.typography.code.size))
         .line_height(px(theme.typography.code.line_height))
         // Within one split row the left column reads before the right, so the
         // two columns take consecutive orders under the row's own.
-        .child(code_side(id, "old", old, order * 2, theme))
+        .child(code_side(id, "old", old, order * 2, theme, fit))
         .child(
             div()
                 .flex_none()
                 .w(px(theme.borders.hairline))
-                .h_full()
                 .bg(theme.colors.divider),
         )
-        .child(code_side(id, "new", new, order * 2 + 1, theme))
+        .child(code_side(id, "new", new, order * 2 + 1, theme, fit))
         .into_any_element()
 }
 
@@ -957,15 +1001,18 @@ fn code_side(
     side: Option<&DiffSide>,
     order: u64,
     theme: &Theme,
+    fit: Fit,
 ) -> AnyElement {
     let mark = side.map_or(DiffLineMark::Context, |side| side.mark);
     let color = mark.tone().color(theme);
     div()
         .row()
-        .items_center()
+        .map(|column| match fit {
+            Fit::Clips => column.items_center(),
+            Fit::Wraps => column.items_start(),
+        })
         .flex_1()
         .min_w_0()
-        .h_full()
         .when(side.is_some() && mark != DiffLineMark::Context, |element| {
             element.bg(color.opacity(theme.effects.selected_ring_alpha))
         })
@@ -978,20 +1025,12 @@ fn code_side(
                 .text_color(color)
                 .child(side.map_or("", |side| side.mark.prefix())),
         )
-        .child(
-            div()
-                .row()
-                .flex_1()
-                .min_w_0()
-                .overflow_hidden()
-                .whitespace_nowrap()
-                .children(side.map(|side| {
-                    let key = SharedString::from(format!("{id}.{slot}.text"));
-                    styled_code(theme, side.text.clone(), &side.spans)
-                        .selectable_in_document(key.clone(), key, order)
-                        .virtualized_participant(true)
-                })),
-        )
+        .child(code_cell(fit).children(side.map(|side| {
+            let key = SharedString::from(format!("{id}.{slot}.text"));
+            styled_code(theme, side.text.clone(), &side.spans)
+                .selectable_in_document(key.clone(), key, order)
+                .virtualized_participant(true)
+        })))
         .into_any_element()
 }
 

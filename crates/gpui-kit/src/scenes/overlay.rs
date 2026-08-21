@@ -289,8 +289,11 @@ pub(super) fn menu(window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)
         .w(px(560.0))
-        .h(px(360.0))
-        .child(menu)
+        .h(px(560.0))
+        // An open surface is an overlay and takes no room in the flow, so the
+        // scene reserves what the first menu occupies. Without it the caption
+        // below is drawn under that menu and cannot be read.
+        .child(div().h(px(230.0)).child(menu))
         .child(caption(
             &theme,
             "a trigger against the trailing edge hangs its surface from that edge instead",

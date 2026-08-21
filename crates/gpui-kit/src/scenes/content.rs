@@ -221,7 +221,7 @@ pub(super) fn diff_view(_window: &mut Window, cx: &mut App) -> AnyElement {
             div().w(px(420.0)).child(
                 DiffView::new("scene.diff.wrapping", scene_long_line())
                     .wrapping(true)
-                    .visible_rows(6)
+                    .visible_rows(5)
                     .on_event(|_, _, _| {}),
             ),
         )
@@ -588,7 +588,10 @@ pub(super) fn outline(_window: &mut Window, cx: &mut App) -> AnyElement {
                         ListItem::new(format!("row-{row}"), div().child(format!("{who}: {what}")))
                             .text(format!("{who}: {what}"))
                     })
-                    .flowing(),
+                    .flowing()
+                    // Bounded, or the list draws every row it has and the
+                    // outline has no viewport to be an outline of.
+                    .visible_rows(6),
                 ),
             )
     };

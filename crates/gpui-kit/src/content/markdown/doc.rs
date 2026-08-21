@@ -16,7 +16,7 @@
 //!
 //! The trade is that arbitrarily nested CommonMark does not survive a round
 //! trip here: a list inside a quote inside a list flattens. What is guaranteed
-//! is [`write`]'s fixed point — parse, serialize, parse again, and the
+//! is [`mod@write`]'s fixed point — parse, serialize, parse again, and the
 //! document is unchanged — so an edit/save cycle never drifts.
 //!
 //! Ported from the MIT-licensed `crabtalk/bezel` markdown crate; the import is

@@ -73,7 +73,7 @@ pub const STICK_BAND: f32 = 70.0;
 /// The scroll velocity of a surface being held against a moving end.
 ///
 /// Position and target are scroll offsets in pixels, larger meaning nearer the
-/// end. The integration is fixed-timestep at [`FRAME_MS`] so that behaviour is
+/// end. The integration is fixed-timestep at one 60Hz frame so that behaviour is
 /// a property of the spring rather than of the display it is running on, and a
 /// step is clamped at the target: this never overshoots, never oscillates, and
 /// lands exactly rather than asymptotically.

@@ -71,6 +71,7 @@ Element(..)
 EmptyState
 Emulator
 FailurePanel
+False
 FilterBar
 FindReplace
 FixtureTransport
@@ -102,6 +103,7 @@ Menubar
 MessageList
 ModelViewer
 NodeGraph
+None
 Notice
 Notification
 NotificationCenter
@@ -110,6 +112,7 @@ ObjectiveTracker
 OfferingCatalog
 OneTimeCodeInput
 Option::is_none
+Outline
 Overlay
 POSITION
 Pagination
@@ -132,6 +135,7 @@ ScrollFade
 SearchField
 SegmentedControl
 Select
+Self
 ServerList
 SettingsRow
 SettingsSection
@@ -154,6 +158,8 @@ Tag
 TagInput
 Text
 TextArea
+TextArea TextAreaSubmits
+TextAreaSubmits
 TextInput
 ThinkingBlock
 TimeInput
@@ -170,6 +176,7 @@ ToolbarItem
 TransportBar
 Tree
 TreeGrid
+True
 UndoHistory
 UploadList
 VEC3
@@ -179,6 +186,7 @@ Wizard
 [REDACTED]
 []
 […]
+]({PENDING_LINK})
 `{id}` appears more than once
 `{id}` names a parent `{parent}` that is absent
 a keyframe list is never empty
@@ -252,6 +260,8 @@ x1b[F
 x1b[H
 x1b[Z
 {:02X}{:02X}{:02X}
+{KEY_CONTEXT} && !{SUBMIT_CONTEXT}
+{KEY_CONTEXT} && {SUBMIT_CONTEXT}
 {chosen} of {loaded} loaded, {total} total
 {lines} lines
 {name} is not a slot this component names; it offers {:?}
@@ -261,6 +271,7 @@ x1b[Z
 {pad}{hashes} 
 {prefix}{number} {unit}
 {scrolled:.0} of {max:.0}
+{text}u{200B}
 {title} — {href}
 {}
 {} blocks
@@ -268,6 +279,8 @@ x1b[Z
 {} ranges
 {} rows
 {} — {detail}
+{}]({PENDING_LINK})
+{}{closers}{}u{200B}
 {…}
 •
 ••••••••

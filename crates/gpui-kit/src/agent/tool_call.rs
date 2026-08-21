@@ -364,7 +364,7 @@ impl ToolCallCard {
         self
     }
 
-    /// A caller-built intra-change view, typically a small [`DiffView`].
+    /// A caller-built intra-change view, typically a small [`DiffView`](crate::content::DiffView).
     pub fn diff(mut self, diff: impl IntoElement) -> Self {
         self.diff = Some(diff.into_any_element());
         self

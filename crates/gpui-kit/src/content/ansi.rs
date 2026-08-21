@@ -14,7 +14,7 @@ use gpui_kit_theme::Theme;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AnsiRun {
     pub range: Range<usize>,
-    /// An index into [`Theme::terminal_ansi`], when the run named a colour.
+    /// An index into [`Theme::terminal_ansi`](gpui_kit_theme::Colors::terminal_ansi), when the run named a colour.
     pub color: Option<u8>,
     pub bold: bool,
 }
