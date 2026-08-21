@@ -569,6 +569,7 @@ pub struct DiffView {
     files: Source,
     presentation: DiffPresentation,
     visible_rows: usize,
+    fills: bool,
     wrapping: bool,
     language: Option<SharedString>,
     cursor: Option<DiffCursor>,
@@ -583,6 +584,7 @@ impl std::fmt::Debug for DiffView {
             .field("files", &self.files.as_slice().len())
             .field("presentation", &self.presentation)
             .field("visible_rows", &self.visible_rows)
+            .field("fills", &self.fills)
             .field("wrapping", &self.wrapping)
             .field("language", &self.language)
             .field("cursor", &self.cursor)
@@ -630,6 +632,7 @@ impl DiffView {
             files,
             presentation: DiffPresentation::Unified,
             visible_rows: 18,
+            fills: false,
             wrapping: false,
             language: None,
             cursor: None,
@@ -659,6 +662,15 @@ impl DiffView {
     /// and hunk headers each occupy one row too.
     pub fn visible_rows(mut self, rows: usize) -> Self {
         self.visible_rows = rows.max(1);
+        self
+    }
+
+    /// Takes the height of whatever holds it, instead of a number of rows.
+    ///
+    /// A diff drawn in a pane is as tall as the pane, which the reader
+    /// resizes; a row count would be wrong at every size but one.
+    pub fn fills(mut self) -> Self {
+        self.fills = true;
         self
     }
 
@@ -847,6 +859,9 @@ impl RenderOnce for DiffView {
                 .text(label)
             })
             .visible_rows(self.visible_rows);
+            if self.fills {
+                list = list.fills();
+            }
             list = match self.wrapping {
                 true => list.flowing(),
                 false => list.row_height(theme.control.get(ControlSize::Sm).height),
@@ -892,6 +907,10 @@ impl RenderOnce for DiffView {
             .id(self.ident.element_id())
             .column()
             .w_full()
+            // A filling diff is as tall as the frame it was given, and its
+            // rows have to be allowed to be shorter than their content for
+            // the list inside to have a height to virtualize against.
+            .when(self.fills, |element| element.h_full().min_h_0())
             .font_fallbacks(gpui_kit_assets::text_fallbacks())
             .p_token(&theme, Space::Sm)
             .radius(&theme, Radius::Card)

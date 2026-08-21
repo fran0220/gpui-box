@@ -203,13 +203,15 @@ pub(super) fn diff_view(_window: &mut Window, cx: &mut App) -> AnyElement {
             &theme,
             "a review of several files: what happened to each file said above \
              its lines, two folded behind headers that say what they hold, and \
-             the hunk the reader stepped to marked and put on screen",
+             the hunk the reader stepped to marked and put on screen — as tall \
+             as the frame it was given rather than a number of rows",
         ))
         .child(
-            div().w(px(840.0)).child(
+            // Given a height rather than a row count, the way a pane gives one.
+            div().w(px(840.0)).h(px(320.0)).child(
                 DiffView::shared("scene.diff.review", std::sync::Arc::new(scene_review()))
                     .language("rust")
-                    .visible_rows(13)
+                    .fills()
                     .cursor(DiffCursor::Hunk {
                         file_id: "report".into(),
                         hunk_id: "summary".into(),

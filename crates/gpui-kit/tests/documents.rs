@@ -1729,6 +1729,33 @@ fn naming_the_language_colours_only_the_lines_that_arrived_uncoloured(cx: &mut T
 }
 
 #[gpui::test]
+fn a_diff_given_a_frame_fills_it_and_stays_virtual(cx: &mut TestAppContext) {
+    // A pane's height is the window's to decide and the reader drags it, so a
+    // diff in one is bounded by the frame rather than by a row count. What it
+    // must not lose by being bounded that way is virtualization: a frame that
+    // laid out every row to find its own height would be the whole diff.
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        div()
+            .h(gpui::px(200.0))
+            .child(DiffView::new("review", fixture_diff(1000)).fills())
+            .into_any_element()
+    });
+
+    assert!(
+        harness
+            .node("review.rows.file.report.hunk.body.line.line-0000")
+            .is_some(),
+        "the rows the frame has room for are drawn"
+    );
+    assert!(
+        harness
+            .node("review.rows.file.report.hunk.body.line.line-0900")
+            .is_none(),
+        "and a row far below it is neither laid out nor published"
+    );
+}
+
+#[gpui::test]
 fn each_file_is_read_in_its_own_language(cx: &mut TestAppContext) {
     // A review reaches Rust, a manifest and a note in one patch, and a
     // scanner given the wrong grammar does not fail to colour, it colours the

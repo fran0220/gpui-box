@@ -12,7 +12,8 @@
 //! itself carries the total in `value`, which is how a test states the honest
 //! version: a thousand items exist, twelve of them are rendered.
 //!
-//! Virtualization needs a bounded viewport. With [`List::visible_rows`] the
+//! Virtualization needs a bounded viewport, from a row count or from the
+//! surface that holds the list ([`List::fills`]). With [`List::visible_rows`] the
 //! list renders only the rows that fit; without it the list sizes itself to
 //! its content and every row is laid out.
 
@@ -102,6 +103,8 @@ pub struct List {
     /// Where a flowing list rests when its content does not fill it.
     alignment: ListAlignment,
     visible_rows: Option<usize>,
+    /// Whether the list takes the height of whatever holds it.
+    fills: bool,
     size: ControlSize,
     disabled: bool,
     on_select: Option<SelectHandler>,
@@ -140,6 +143,7 @@ impl List {
             keys: None,
             alignment: ListAlignment::Top,
             visible_rows: None,
+            fills: false,
             size: ControlSize::Md,
             disabled: false,
             on_select: None,
@@ -211,6 +215,19 @@ impl List {
     /// the rows it does not show.
     pub fn visible_rows(mut self, rows: usize) -> Self {
         self.visible_rows = Some(rows);
+        self
+    }
+
+    /// Takes the height of whatever holds it, which is what a list filling a
+    /// pane does.
+    ///
+    /// A pane's height is the window's to decide and changes as the reader
+    /// drags a splitter, so a list in one cannot be bounded by a number of
+    /// rows without being wrong at every other size. Like a row count and
+    /// unlike sizing to content, it still bounds the list, which is what lets
+    /// the rows out of view be skipped.
+    pub fn fills(mut self) -> Self {
+        self.fills = true;
         self
     }
 
@@ -290,7 +307,7 @@ impl RenderOnce for List {
         // the row it is moving away from without consulting the data set.
         let rendered: Rendered = Rc::new(RefCell::new(HashMap::new()));
 
-        let sizing = if self.visible_rows.is_some() {
+        let sizing = if self.visible_rows.is_some() || self.fills {
             ListSizingBehavior::Auto
         } else {
             ListSizingBehavior::Infer
@@ -332,7 +349,9 @@ impl RenderOnce for List {
             if let Some(keys) = self.keys.clone() {
                 flow = flow.keys(keys);
             }
-            if let Some(rows) = self.visible_rows {
+            if self.fills {
+                flow = flow.fills();
+            } else if let Some(rows) = self.visible_rows {
                 flow = flow.visible_rows(rows);
             }
             flow.into_any_element()
@@ -374,13 +393,18 @@ impl RenderOnce for List {
             .track_scroll(&scroll)
             .w_full()
             .with_sizing_behavior(sizing)
-            .when_some(self.visible_rows, |element, rows| {
-                element.h(px(row_height * rows as f32))
-            })
+            .when(self.fills, |element| element.h_full())
+            .when_some(
+                self.visible_rows.filter(|_| !self.fills),
+                |element, rows| element.h(px(row_height * rows as f32)),
+            )
             .into_any_element()
         };
 
         let mut container = div().id(ident.element_id()).column().w_full().child(rows);
+        if self.fills {
+            container = container.h_full().min_h_0();
+        }
 
         // A drag that reaches the edge of the viewport has run out of list to
         // aim at, so the list brings the next row to the pointer rather than
