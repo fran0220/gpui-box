@@ -5,6 +5,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use gpui::{IntoElement, SharedString, Styled, TestAppContext};
+use gpui_kit::data::glide_to_row;
 use gpui_kit::motion::engage_end;
 use gpui_kit::prelude::*;
 use gpui_kit_semantics::{Node, NodeSpec, Role, Semantic};
@@ -685,5 +686,40 @@ fn a_flow_is_followed_by_name_like_any_other_surface(cx: &mut TestAppContext) {
     assert!(
         harness.node("data.flow.record-new").is_some(),
         "a row arriving while the end is held is followed"
+    );
+}
+
+#[gpui::test]
+fn a_glide_travels_to_its_row_rather_than_arriving_at_it(cx: &mut TestAppContext) {
+    // The distance is unmeasured — two hundred rows nobody has laid out — so
+    // what this asserts is that the travel is spread over frames at all, and
+    // that whatever the estimate did on the way, the arrival is exact.
+    let data: Data = Rc::new(RefCell::new(records(200)));
+    let mut harness = turns(cx, data);
+    harness.frame();
+    assert!(
+        harness.node("data.flow.record-0199").is_some(),
+        "a flow anchored to its end opens there"
+    );
+
+    let flow = Ident::new("data.flow");
+    harness.update({
+        let flow = flow.clone();
+        move |_, cx| glide_to_row(&flow, 0, cx)
+    });
+    for _ in 0..8 {
+        harness.advance(std::time::Duration::from_millis(16));
+    }
+    assert!(
+        harness.node("data.flow.record-0199").is_none(),
+        "eight frames into a glide the end must be behind the reader"
+    );
+
+    for _ in 0..90 {
+        harness.advance(std::time::Duration::from_millis(16));
+    }
+    assert!(
+        harness.node("data.flow.record-0000").is_some(),
+        "however the travel went, it ends on the row that was asked for"
     );
 }

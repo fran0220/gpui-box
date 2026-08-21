@@ -237,7 +237,12 @@ pub fn glide_to_row(ident: &Ident, index: usize, cx: &mut App) {
     let total = GLIDE.total();
     cx.spawn(async move |cx| {
         let mut glide = Glide::new();
-        let started = std::time::Instant::now();
+        // The executor's clock rather than the wall clock, because they are
+        // the same thing everywhere except where they are not: a simulated
+        // frame moves the one the timers wait on, and a glide that measured
+        // itself against the wall would sit at frame zero for the whole of a
+        // test that advanced a second in a microsecond.
+        let started = cx.background_executor().now();
         // A bound rather than a `loop`, so a window that stops laying the list
         // out cannot leave a task asking for frames forever. The slack past
         // the duration covers frames that arrived late.
@@ -245,7 +250,12 @@ pub fn glide_to_row(ident: &Ident, index: usize, cx: &mut App) {
         let mut height = None;
         for _ in 0..frames {
             cx.background_executor().timer(FRAME).await;
-            let elapsed = started.elapsed().as_secs_f32() / total.as_secs_f32();
+            let elapsed = cx
+                .background_executor()
+                .now()
+                .saturating_duration_since(started)
+                .as_secs_f32()
+                / total.as_secs_f32();
             let share = glide.step(GLIDE.curve.eval(elapsed.min(1.0)));
             if glide.arrived() {
                 break;
