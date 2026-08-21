@@ -152,12 +152,15 @@ own; both are exercised through every control and overlay that uses them.
   a host can write it out, and this crate takes no serialization dependency to
   do it for them.
 - **Rich text and code editing.** `TextArea` edits plain text and `Markdown`
-  renders it read-only; neither edits rich text. Syntax highlighting, folding,
-  and multi-caret editing are an editor, not a control. `Markdown` will colour
-  a code block from spans a host computed and will not compute them: deciding
-  that a word is a keyword needs a grammar, which is the same kind of fact the
+  renders it read-only; neither edits rich text. Folding and multi-caret
+  editing are an editor, not a control. Syntax colouring stops at four classes
+  found by looking — keyword, string, comment, number — on the eight languages
+  `content::highlight` has a table for, chosen by the name the writer gave the
+  block. Anything past that (types, calls, scopes, errors) needs a grammar per
+  language and a resolver behind it, which is the same kind of fact the
   calendar is — answered correctly only by the library the application already
-  depends on.
+  depends on. A host that has one installs `Markdown::highlight` and its spans
+  win.
 - **Doing what a document says.** `Markdown` draws HTML as the characters
   somebody wrote, reports a link rather than opening it, and names an image
   rather than fetching it. There is no HTML renderer here, no URL policy, and

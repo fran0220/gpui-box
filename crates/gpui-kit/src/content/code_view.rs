@@ -1,15 +1,21 @@
 //! Read-only code, with line numbers and marked lines.
 //!
-//! # No grammar, and no new dependency
+//! # Colour comes from the name, or from the caller
 //!
-//! Deciding that a word is a keyword needs a grammar, which is the same kind
-//! of fact the calendar is: answered correctly only by the library the
-//! application already depends on. `docs/coverage.md` records syntax
-//! highlighting as out of scope, and this view keeps that line — it takes
-//! **pre-classified spans** from the caller, exactly as `Markdown` colours a
-//! fenced block.
+//! Naming the language with [`CodeView::language`] is the caller's own claim
+//! about what the code is, so it is read as well as shown: a name
+//! [`crate::content::highlight`] has a table for colours the lines that did
+//! not arrive with spans of their own. A name it does not know is displayed
+//! and nothing more — nothing here reads the code to work out what it probably
+//! is.
 //!
-//! What the caller owes, per line:
+//! Past the four classes a scanner can find, deciding that a word is a type or
+//! a call needs a grammar, which is the same kind of fact the calendar is:
+//! answered correctly only by the library the application already depends on.
+//! So a caller with one supplies **pre-classified spans** per line and they
+//! win outright, exactly as `Markdown` takes them for a fenced block.
+//!
+//! What such a caller owes, per line:
 //!
 //! 1. the line's own text, with no newline in it;
 //! 2. [`CodeSpan`] ranges in byte offsets into *that line's* text, not into
@@ -18,7 +24,8 @@
 //!
 //! A span that breaks any of those is skipped rather than drawn wrongly: the
 //! line stays readable without its colour, and colour that landed in the wrong
-//! place would be a lie about the code. This is the same boundary
+//! place would be a lie about the code. The same rule catches the scanner if
+//! it is ever wrong. This is the same boundary
 //! [`crate::display::highlight`] states for search hits, and it is deliberately
 //! the same one.
 //!
@@ -61,12 +68,14 @@ use gpui_kit_theme::{
     ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, Theme, TypeScale,
 };
 
+use crate::content::highlight::{Cache, Language};
 use crate::content::markdown::CodeSpan;
 use crate::controls::button::Button;
 use crate::data::{List, ListItem};
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
 use crate::layout::{ScrollArea, ScrollAxis};
+use crate::motion::keyed;
 use crate::strings::{ActiveStrings, StringKey};
 
 /// How wide the gutter is per digit, and how far a line's text sits from it.
@@ -216,7 +225,12 @@ impl CodeView {
         )
     }
 
-    /// The language's name, shown as written. Nothing here reads it.
+    /// The language's name, shown as written above the code.
+    ///
+    /// It is also the caller's claim about what the code is, so a name
+    /// [`crate::content::highlight`] recognises colours the lines that did not
+    /// arrive with spans of their own. A name it does not recognise is shown
+    /// and nothing more.
     pub fn language(mut self, language: impl Into<SharedString>) -> Self {
         self.language = Some(language.into());
         self
@@ -375,7 +389,7 @@ fn line_id(ident: &Ident, number: usize) -> SharedString {
     ident.child(format!("line-{number}")).semantic_id()
 }
 
-/// One shaped code value with caller-supplied tone ranges.
+/// One shaped code value with its syntax ranges, whoever classified them.
 ///
 /// Keeping the line as one text layout makes selection, bidirectional hit
 /// testing, and copying work across syntax-coloured boundaries.
@@ -407,7 +421,7 @@ fn code_highlights(
                 end = span.range.end;
                 (
                     span.range.clone(),
-                    HighlightStyle::color(span.tone.color(theme)),
+                    HighlightStyle::color(theme.colors.syntax.get(span.role)),
                 )
             })
         })
@@ -427,15 +441,35 @@ impl<A, B> UnzipOr<A, B> for Option<(A, B)> {
 }
 
 impl RenderOnce for CodeView {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(mut self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let gutter = self.gutter_width();
         let line_numbers = self.line_numbers;
         let total = self.lines.len();
         let body_ident = self.ident.child("lines");
 
+        // Naming the language is the caller's own claim about what the code
+        // is, so it is read as well as shown. A line that arrived with spans
+        // keeps them: the caller's grammar outranks this scanner. A line
+        // holding a newline is left alone entirely, because the joined source
+        // would no longer line up with the rows and colour would land on the
+        // wrong code.
+        let source = SharedString::from(self.text());
+        if let Some(known) = self.language.as_deref().and_then(Language::named)
+            && self
+                .lines
+                .iter()
+                .all(|line| line.spans.is_empty() && !line.text.contains('\n'))
+        {
+            let cache = keyed::slot::<Cache>(&self.ident.child("colour").semantic_id(), cx);
+            let coloured = cache.borrow_mut().lines(known, &source);
+            for (line, spans) in self.lines.iter_mut().zip(coloured.iter()) {
+                line.spans = spans.clone();
+            }
+        }
+
         let copy = self.copyable.then(|| {
-            let clipboard = self.text();
+            let clipboard = source.to_string();
             Button::new(self.ident.child("copy"))
                 .label(cx.strings().text(StringKey::Copy))
                 .ghost()
@@ -572,8 +606,9 @@ impl VisibleLines for List {
 
 #[cfg(test)]
 mod tests {
+    use gpui_kit_theme::SyntaxColor;
+
     use super::*;
-    use crate::display::badge::Tone;
 
     #[test]
     fn every_mark_publishes_a_name_of_its_own() {
@@ -596,7 +631,7 @@ mod tests {
         let theme = Theme::studio_dark();
         let line = CodeLine::new(1, "let x = 1;").spans([CodeSpan {
             range: 40..50,
-            tone: Tone::Accent,
+            role: SyntaxColor::Keyword,
         }]);
         assert!(code_highlights(&theme, line.text.as_ref(), &line.spans).is_empty());
     }

@@ -1364,3 +1364,39 @@ fn a_copy_across_a_virtualized_log_says_it_could_not_read_it_all(cx: &mut TestAp
         "a virtualized stream cannot promise it read every row it spanned"
     );
 }
+
+#[gpui::test]
+fn colouring_code_moves_nothing_on_the_page(cx: &mut TestAppContext) {
+    // Highlighting is paint and only paint. The same glyphs at the same size
+    // land in the same places whether or not the scanner ran, so a block that
+    // is being coloured while it streams never reflows under the reader.
+    let mut plain = Harness::new(cx, gpui_kit::install, |_, _| {
+        CodeView::new("hunk", code_lines()).into_any_element()
+    });
+    let unlit = plain.bounds("hunk.lines.line-41").expect("laid out");
+
+    let mut lit = Harness::new(cx, gpui_kit::install, |_, _| {
+        CodeView::new("hunk", code_lines())
+            .language("rust")
+            .into_any_element()
+    });
+    let coloured = lit.bounds("hunk.lines.line-41").expect("laid out");
+
+    assert_eq!(unlit, coloured);
+}
+
+#[gpui::test]
+fn a_language_nobody_here_can_read_is_still_the_language_it_was_called(cx: &mut TestAppContext) {
+    // The name is the caller's claim, so it is published whether or not this
+    // crate has a table for it. What it does not get is a guess at its
+    // grammar.
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        CodeView::new("hunk", code_lines())
+            .language("cobol")
+            .into_any_element()
+    });
+
+    let view = harness.node("hunk").expect("published");
+    assert_eq!(view.text.as_deref(), Some("cobol"));
+    assert!(harness.node("hunk.lines.line-41").is_some());
+}

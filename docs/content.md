@@ -73,15 +73,32 @@ by answering. A host that has the bytes returns an element from
 `Markdown::image`; a host that returns `None` has said it cannot, and the
 placeholder stays.
 
-### Code is never coloured by guessing
+### Code is coloured from what the writer said it is, and never from a guess
 
 A fenced block publishes its info string exactly as it was written — `rust`,
 `rust,no_run`, whatever it says — and a block with no info string publishes
-`plain text` rather than a language somebody inferred. Colour comes from
-`Markdown::highlight`, which hands the host the block and takes back byte
-ranges tagged with the library's existing `Tone` vocabulary. There are no
-syntax categories in this crate, because deciding a word is a keyword is a
-grammar's judgement and this crate has no grammar.
+`plain text` rather than a language somebody inferred. That name is the only
+thing colour is taken from: `content::highlight` has a table for eight
+languages, and a fence naming one of them is coloured. A fence naming anything
+else, or naming nothing, is drawn exactly as it was written. Nothing here reads
+the code to work out what it probably is.
+
+What the scanner finds is four classes — keyword, string, comment, number —
+tagged with `SyntaxColor` and drawn from the theme's syntax palette. It stops
+there on purpose. Types, calls, scopes and errors need a grammar per language
+and a resolver behind it, and a design system that shipped a half-right one
+would be putting a claim on the screen it cannot support. A host that has a
+real grammar installs `Markdown::highlight` and its spans win outright, in the
+same `SyntaxColor` vocabulary, so both sources say the same thing about the
+same code.
+
+Highlighting is paint and nothing else. Every span lands on the same glyphs at
+the same size in the same font, so a block looks identical whether or not the
+pass has run: no reflow when colour arrives, and nothing holding layout back
+while it is computed. Scanning is line by line with a small carry for what
+crosses lines, which is what lets a block still streaming be coloured as it
+arrives instead of once it stops, and a block's result is cached beside it so a
+frame that changed nothing scans nothing.
 
 Code blocks and prose runs use GPUI's document selection. Pointer dragging can
 cross separately mounted runs and blocks in reading order; reverse selection,

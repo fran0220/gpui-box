@@ -5353,6 +5353,20 @@
       "queries": []
     },
     {
+      "name": "Carry",
+      "path": "gpui_kit::content::Carry",
+      "summary": "What the scanner is in the middle of, carried from one line to the next.",
+      "variants": [
+        "None",
+        "Comment",
+        "Text"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "CascaderEvent",
       "path": "gpui_kit::controls::CascaderEvent",
       "summary": "",
@@ -7895,6 +7909,27 @@
         "RecordingCancelled"
       ],
       "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "Language",
+      "path": "gpui_kit::content::Language",
+      "summary": "A language this can scan.",
+      "variants": [
+        "Rust",
+        "TypeScript",
+        "Python",
+        "Go",
+        "Json",
+        "Shell",
+        "Toml",
+        "Markdown"
+      ],
+      "construct": [
+        "named(tag: &str) -> Option<Self>"
+      ],
       "options": [],
       "commands": [],
       "queries": []
@@ -13131,7 +13166,7 @@
       "uses": [
         "CodeView"
       ],
-      "example": "fn code_view(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    // Spans are the caller's, in byte offsets into each line. Nothing here\n    // parses anything.\n    let lines = [\n        CodeLine::new(40, \"fn report(&self) -> Outcome {\").spans([\n            CodeSpan {\n                range: 0..2,\n                tone: Tone::Accent,\n            },\n            CodeSpan {\n                range: 3..9,\n                tone: Tone::Success,\n            },\n        ]),\n        CodeLine::new(41, \"    let verified = self.check();\")\n            .spans([CodeSpan {\n                range: 4..7,\n                tone: Tone::Accent,\n            }])\n            .mark(LineMark::Added),\n        CodeLine::new(42, \"    let stale = self.cached();\").mark(LineMark::Removed),\n        CodeLine::new(43, \"    Outcome::from(verified)\").mark(LineMark::Changed),\n        CodeLine::new(\n            44,\n            \"    // this line runs off the edge rather than wrapping, because a column carries meaning in code\",\n        ),\n        CodeLine::new(45, \"}\").mark(LineMark::Error),\n    ];\n    stack(&theme)\n        .w(px(620.0))\n        .child(caption(\n            &theme,\n            \"line numbers are the file's, marks are the host's, colour is the caller's\",\n        ))\n        .child(CodeView::new(\"scene.code.report\", lines).language(\"rust\"))\n        .into_any_element()\n}"
+      "example": "fn code_view(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    // Spans are the caller's, in byte offsets into each line, and they\n    // outrank what the scanner would have found for the same line.\n    let lines = [\n        CodeLine::new(40, \"fn report(&self) -> Outcome {\").spans([CodeSpan {\n            range: 0..2,\n            role: SyntaxColor::Keyword,\n        }]),\n        CodeLine::new(41, \"    let verified = self.check();\")\n            .spans([CodeSpan {\n                range: 4..7,\n                role: SyntaxColor::Keyword,\n            }])\n            .mark(LineMark::Added),\n        CodeLine::new(42, \"    let stale = self.cached();\").mark(LineMark::Removed),\n        CodeLine::new(43, \"    Outcome::from(verified)\").mark(LineMark::Changed),\n        CodeLine::new(\n            44,\n            \"    // this line runs off the edge rather than wrapping, because a column carries meaning in code\",\n        ),\n        CodeLine::new(45, \"}\").mark(LineMark::Error),\n    ];\n    stack(&theme)\n        .w(px(620.0))\n        .child(caption(\n            &theme,\n            \"line numbers are the file's, marks are the host's, colour is the caller's\",\n        ))\n        .child(CodeView::new(\"scene.code.report\", lines).language(\"rust\"))\n        .child(caption(\n            &theme,\n            \"and where the caller says only what the language is, the four classes it can find\",\n        ))\n        .child(\n            CodeView::new(\n                \"scene.code.scanned\",\n                [\n                    CodeLine::new(1, \"def summarize(runs):  # every class in one line\"),\n                    CodeLine::new(2, \"    total = 0\"),\n                    CodeLine::new(3, \"    for run in runs:\"),\n                    CodeLine::new(4, \"        if run.status == \\\"passed\\\":\"),\n                    CodeLine::new(5, \"            total += 1\"),\n                    CodeLine::new(6, \"    return total\"),\n                ],\n            )\n            .language(\"python\"),\n        )\n        .child(caption(\n            &theme,\n            \"a language with no table is shown and left plain, never guessed at\",\n        ))\n        .child(\n            CodeView::new(\n                \"scene.code.unknown\",\n                [\n                    CodeLine::new(1, \"REPORT SECTION.\"),\n                    CodeLine::new(2, \"    MOVE 0 TO TOTAL.\"),\n                ],\n            )\n            .language(\"cobol\"),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "upload-list",

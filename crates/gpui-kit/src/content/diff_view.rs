@@ -31,7 +31,7 @@ use gpui::{
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{
-    ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, Theme, TypeScale,
+    ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, SyntaxColor, Theme, TypeScale,
 };
 
 use crate::content::code_view::styled_code;
@@ -820,8 +820,8 @@ pub fn word_spans(old: &str, new: &str) -> (Vec<CodeSpan>, Vec<CodeSpan>) {
     let keep_left = lcs_keep(&left, &right);
     let keep_right = lcs_keep(&right, &left);
     (
-        unmatched_spans(&left, &keep_left, Tone::Danger),
-        unmatched_spans(&right, &keep_right, Tone::Success),
+        unmatched_spans(&left, &keep_left, SyntaxColor::Removed),
+        unmatched_spans(&right, &keep_right, SyntaxColor::Added),
     )
 }
 
@@ -860,14 +860,18 @@ fn lcs_keep(side: &[(Range<usize>, String)], other: &[(Range<usize>, String)]) -
     keep
 }
 
-fn unmatched_spans(tokens: &[(Range<usize>, String)], keep: &[bool], tone: Tone) -> Vec<CodeSpan> {
+fn unmatched_spans(
+    tokens: &[(Range<usize>, String)],
+    keep: &[bool],
+    role: SyntaxColor,
+) -> Vec<CodeSpan> {
     tokens
         .iter()
         .zip(keep)
         .filter(|(_, keep)| !**keep)
         .map(|((range, _), _)| CodeSpan {
             range: range.clone(),
-            tone,
+            role,
         })
         .collect()
 }
@@ -968,7 +972,7 @@ mod tests {
                     "@@ fixture @@",
                     [DiffLine::new("context", "same").old_spans([CodeSpan {
                         range: 0..4,
-                        tone: Tone::Accent,
+                        role: SyntaxColor::Keyword,
                     }])],
                 )],
             )]
@@ -986,8 +990,8 @@ mod tests {
     #[test]
     fn word_spans_mark_tokens_that_have_no_counterpart() {
         let (old, new) = word_spans("old_cache.read()", "verified_cache.read()");
-        assert!(old.iter().any(|span| span.tone == Tone::Danger));
-        assert!(new.iter().any(|span| span.tone == Tone::Success));
+        assert!(old.iter().any(|span| span.role == SyntaxColor::Removed));
+        assert!(new.iter().any(|span| span.role == SyntaxColor::Added));
         assert!(
             old.iter()
                 .all(|span| span.range.end <= "old_cache.read()".len())

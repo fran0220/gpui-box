@@ -148,7 +148,7 @@ pub(super) fn scene_diff() -> Vec<DiffFile> {
                     .new_number(40)
                     .spans([CodeSpan {
                         range: 0..2,
-                        tone: Tone::Accent,
+                        role: SyntaxColor::Keyword,
                     }]),
                 DiffLine::paired("cache", "    old_cache.read()", "    verified_cache.read()")
                     .old_number(41)
@@ -204,23 +204,17 @@ pub(super) fn diff_view(_window: &mut Window, cx: &mut App) -> AnyElement {
 
 pub(super) fn code_view(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
-    // Spans are the caller's, in byte offsets into each line. Nothing here
-    // parses anything.
+    // Spans are the caller's, in byte offsets into each line, and they
+    // outrank what the scanner would have found for the same line.
     let lines = [
-        CodeLine::new(40, "fn report(&self) -> Outcome {").spans([
-            CodeSpan {
-                range: 0..2,
-                tone: Tone::Accent,
-            },
-            CodeSpan {
-                range: 3..9,
-                tone: Tone::Success,
-            },
-        ]),
+        CodeLine::new(40, "fn report(&self) -> Outcome {").spans([CodeSpan {
+            range: 0..2,
+            role: SyntaxColor::Keyword,
+        }]),
         CodeLine::new(41, "    let verified = self.check();")
             .spans([CodeSpan {
                 range: 4..7,
-                tone: Tone::Accent,
+                role: SyntaxColor::Keyword,
             }])
             .mark(LineMark::Added),
         CodeLine::new(42, "    let stale = self.cached();").mark(LineMark::Removed),
@@ -238,6 +232,38 @@ pub(super) fn code_view(_window: &mut Window, cx: &mut App) -> AnyElement {
             "line numbers are the file's, marks are the host's, colour is the caller's",
         ))
         .child(CodeView::new("scene.code.report", lines).language("rust"))
+        .child(caption(
+            &theme,
+            "and where the caller says only what the language is, the four classes it can find",
+        ))
+        .child(
+            CodeView::new(
+                "scene.code.scanned",
+                [
+                    CodeLine::new(1, "def summarize(runs):  # every class in one line"),
+                    CodeLine::new(2, "    total = 0"),
+                    CodeLine::new(3, "    for run in runs:"),
+                    CodeLine::new(4, "        if run.status == \"passed\":"),
+                    CodeLine::new(5, "            total += 1"),
+                    CodeLine::new(6, "    return total"),
+                ],
+            )
+            .language("python"),
+        )
+        .child(caption(
+            &theme,
+            "a language with no table is shown and left plain, never guessed at",
+        ))
+        .child(
+            CodeView::new(
+                "scene.code.unknown",
+                [
+                    CodeLine::new(1, "REPORT SECTION."),
+                    CodeLine::new(2, "    MOVE 0 TO TOTAL."),
+                ],
+            )
+            .language("cobol"),
+        )
         .into_any_element()
 }
 

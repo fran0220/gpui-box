@@ -39,12 +39,14 @@ use gpui::{
     StyledText, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, Theme, TypeScale};
+use gpui_kit_theme::{
+    ActiveTheme, Elevation, Radius, Space, Surface, SyntaxColor, Theme, TypeScale,
+};
 use web_time::Instant;
 
 use crate::content::code_view::styled_code;
+use crate::content::highlight::{Cache, Language};
 use crate::controls::button::Button;
-use crate::display::badge::Tone;
 use crate::foundation::{Ident, Sizable, StyledExt};
 use crate::motion::keyed;
 use crate::overlay::Tooltipped;
@@ -95,13 +97,14 @@ pub struct CodeBlock {
 
 /// One coloured run of a code block, in byte offsets into its text.
 ///
-/// The tone vocabulary is the library's existing one rather than a set of
-/// syntax categories, because deciding that a word is a keyword is the
-/// grammar's judgement and this crate has no grammar.
+/// The role is a syntax class, not a general tone, so the same span means the
+/// same thing whether [`crate::content::highlight`] found it or a host with a
+/// real grammar did, and both land on the theme's syntax colours rather than
+/// on whatever the caller thought a keyword should look like.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CodeSpan {
     pub range: Range<usize>,
-    pub tone: Tone,
+    pub role: SyntaxColor,
 }
 
 type EventHandler = Rc<dyn Fn(&MarkdownEvent, &mut Window, &mut App)>;
@@ -209,9 +212,10 @@ impl Markdown {
 
     /// Colours code blocks from spans the host computed.
     ///
-    /// Without this every fence renders plain. Guessing a language from its
-    /// text, or a grammar from its name, would put colour on a claim nobody
-    /// made.
+    /// A fence whose info string names a language
+    /// [`crate::content::highlight`] knows is coloured without this. Install a
+    /// highlighter to override that with a real grammar's judgement, or to
+    /// reach a language the built-in scanner has no table for.
     pub fn highlight(
         mut self,
         highlighter: impl Fn(&CodeBlock) -> Vec<CodeSpan> + 'static,
@@ -790,15 +794,22 @@ impl Painter {
         let label = language
             .clone()
             .unwrap_or_else(|| cx.strings().text(StringKey::MarkdownPlainText));
-        let block = CodeBlock {
-            language: language.clone(),
-            text: text.clone(),
+        // A host highlighter wins where there is one: it has a grammar and
+        // this crate has a scanner. Where there is not, a fence that named a
+        // language kit can read is coloured rather than left plain, and one
+        // that named anything else stays exactly as it was written.
+        let spans = match self.highlighter.as_ref() {
+            Some(highlight) => Rc::new(highlight(&CodeBlock {
+                language: language.clone(),
+                text: text.clone(),
+            })),
+            None => match language.as_deref().and_then(Language::named) {
+                Some(known) => keyed::slot::<Cache>(&ident.child("colour").semantic_id(), cx)
+                    .borrow_mut()
+                    .block(known, &text),
+                None => Rc::new(Vec::new()),
+            },
         };
-        let spans = self
-            .highlighter
-            .as_ref()
-            .map(|highlight| highlight(&block))
-            .unwrap_or_default();
         let lines = text.lines().count().max(1);
 
         let copied = self.report(MarkdownEvent::CodeCopied {

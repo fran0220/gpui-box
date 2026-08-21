@@ -12,7 +12,7 @@ pub(super) use gpui::{
 };
 pub(super) use gpui_kit_assets::Icon;
 pub(super) use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-pub(super) use gpui_kit_theme::{Radius, Space, Surface, TextTone, Theme, TypeScale};
+pub(super) use gpui_kit_theme::{Radius, Space, Surface, SyntaxColor, TextTone, Theme, TypeScale};
 pub(super) use std::rc::Rc;
 pub(super) use std::sync::{Arc, OnceLock};
 pub(super) use std::time::Duration;
