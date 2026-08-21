@@ -14,6 +14,9 @@
 //!   [`flick`], [`rubber_band`] and [`Transition::release`] need;
 //! - [`ScrollLink`] reads a scroll offset as a progress, which is motion with
 //!   no clock in it at all;
+//! - [`follow_end`] holds a growing surface against its own end, with a
+//!   [`Chase`] whose target keeps moving and which a gesture, not arriving
+//!   content, interrupts;
 //! - [`Presence`] keeps an element alive long enough to animate out, and plays
 //!   a phase backwards from where it had got to when the other cancels it;
 //! - [`Stagger`] spreads one specification across a group, forwards or in
@@ -37,6 +40,7 @@ mod animated;
 mod busy;
 mod easing;
 mod flip;
+mod follow;
 mod gesture;
 mod interpolate;
 pub(crate) mod keyed;
@@ -54,6 +58,7 @@ pub use animated::{Animated, Entrance};
 pub use busy::{Activity, breathe, breathe_as, breathing_dot, spin, sweep};
 pub use easing::{CubicBezier, Easing};
 pub use flip::{Flip, Flipped, Flipping, Shape, Shaping, flip, shared_flip, tracked_ids};
+pub use follow::{AtEnd, Chase, STICK_BAND, engage_end, follow_end, follows_end, release_end};
 pub use gesture::{
     Flick, VELOCITY_WINDOW, Velocity, VelocityTracker, flick, overscroll, rubber_band,
 };

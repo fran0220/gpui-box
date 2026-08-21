@@ -50,6 +50,7 @@ use crate::display::status::StatusDot;
 use crate::display::timeline::EntryTime;
 use crate::foundation::{Ident, Sizable, StyledExt};
 use crate::motion::keyed;
+use crate::motion::{engage_end, follow_end, follows_end};
 use crate::strings::{ActiveStrings, StringKey, Strings};
 
 /// What a host said about a message's journey.
@@ -382,7 +383,7 @@ impl MessageList {
 }
 
 impl RenderOnce for MessageList {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let ident = self.ident.clone();
         let count = self.messages.len();
@@ -392,9 +393,27 @@ impl RenderOnce for MessageList {
         let on_retry = self.on_retry.clone();
         let on_markdown = self.on_markdown.clone();
 
-        let follow = self.follow(count, cx);
+        // A conversation whose rows are as tall as their content is measured
+        // in pixels, so following it is a physical question — how far the view
+        // sits above the end, and how fast that end is receding. A conversation
+        // cut to a fixed number of lines per message has no such measurements,
+        // and follows by naming the row to bring into view.
+        let flowing = body_lines.is_none();
+        let held = flowing && follows_end(&ident, cx);
+
+        let follow = self.follow(count, held, cx);
         if follow.stick {
-            scroll_to_row(&ident, count.saturating_sub(1), cx);
+            if flowing {
+                engage_end(&ident, cx);
+            } else {
+                scroll_to_row(&ident, count.saturating_sub(1), cx);
+            }
+        }
+        if flowing {
+            // Runs every frame, not only when something arrived: the end keeps
+            // moving while a reply streams into the last message, and the
+            // travel toward it is spread over frames rather than taken at once.
+            follow_end(&ident, window, cx);
         }
         let pending = self.pending(&follow, &theme, cx);
 
@@ -502,7 +521,7 @@ impl MessageList {
     /// follow, which is the same rule
     /// [`ScrollArea`](crate::layout::ScrollArea) keeps — content continuing
     /// past the view is published rather than left to be noticed.
-    fn follow(&self, count: usize, cx: &mut App) -> Follow {
+    fn follow(&self, count: usize, held: bool, cx: &mut App) -> Follow {
         let cell = keyed::slot::<Following>(&self.ident.child("following").semantic_id(), cx);
         let mut following = cell.borrow_mut();
         following.previous = following.current.take();
@@ -517,7 +536,11 @@ impl MessageList {
             Some(highest) => highest + 1,
             None => self.visible_rows.unwrap_or(count),
         };
-        let at_bottom = reach(following.previous) >= following.count.max(1);
+        // A conversation that is holding its end is at the end even mid-glide,
+        // when the last row it has drawn is not yet the last row there is.
+        // Reading the rows alone would call that being away and start counting
+        // at a reader who has not gone anywhere.
+        let at_bottom = held || reach(following.previous) >= following.count.max(1);
 
         let mut stick = false;
         if !following.started {
@@ -538,7 +561,7 @@ impl MessageList {
         let arrived = following.arrived.min(below);
         // A frame that is following the newest message is not behind it, even
         // though the row it is scrolling to has not been drawn yet.
-        if stick {
+        if stick || held {
             below = 0;
         }
         drop(following);
@@ -574,6 +597,7 @@ impl MessageList {
         let ident = self.ident.child("pending");
         let list = self.ident.clone();
         let last = self.messages.len().saturating_sub(1);
+        let flowing = self.body_lines.is_none();
         let cell = follow.cell.clone();
 
         Some(
@@ -588,7 +612,15 @@ impl MessageList {
                         .control_size(ControlSize::Sm)
                         .on_click(move |window, cx| {
                             cell.borrow_mut().arrived = 0;
-                            scroll_to_row(&list, last, cx);
+                            // Going back to the newest message is a journey
+                            // with a direction, so it is travelled rather than
+                            // cut to: the reader sees what they are passing
+                            // and where they land.
+                            if flowing {
+                                engage_end(&list, cx);
+                            } else {
+                                scroll_to_row(&list, last, cx);
+                            }
                             window.refresh();
                         }),
                 )

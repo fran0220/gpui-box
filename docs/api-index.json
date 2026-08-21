@@ -5097,6 +5097,16 @@
       ]
     },
     {
+      "name": "AtEnd",
+      "path": "gpui_kit::motion::AtEnd",
+      "summary": "What one frame found out about a surface's relationship to its end.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "Attachment",
       "path": "gpui_kit::content::Attachment",
       "summary": "Something carried alongside a message. The list names it and fetches nothing.",
@@ -5558,6 +5568,24 @@
       "commands": [],
       "queries": [
         "name() -> &'static str"
+      ]
+    },
+    {
+      "name": "Chase",
+      "path": "gpui_kit::motion::Chase",
+      "summary": "The scroll velocity of a surface being held against a moving end.",
+      "variants": [],
+      "construct": [
+        "new() -> Self"
+      ],
+      "options": [],
+      "commands": [
+        "reset()",
+        "step(mut position: f32, target: f32, mut frames: f32) -> f32"
+      ],
+      "queries": [
+        "is_idle() -> bool",
+        "growth() -> f32"
       ]
     },
     {

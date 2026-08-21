@@ -7,6 +7,7 @@ use std::time::Duration;
 
 use gpui::{IntoElement, TestAppContext};
 use gpui_kit::content::message_list::streaming_since;
+use gpui_kit::motion::{engage_end, follows_end};
 use gpui_kit::prelude::*;
 use gpui_kit_testkit::harness::Harness;
 
@@ -358,6 +359,153 @@ fn a_message_that_grows_to_fit_leaves_nothing_out(cx: &mut TestAppContext) {
     assert!(
         harness.node("chat.msg-long.truncated").is_none(),
         "nothing was left out, so there is nothing to report"
+    );
+}
+
+/// A conversation long enough to scroll, measured in pixels rather than rows.
+fn flowing(cx: &mut TestAppContext, thread: Thread) -> Harness {
+    Harness::new(cx, gpui_kit::install, move |_, _| {
+        MessageList::new("chat", thread.borrow().iter().cloned())
+            .grows_to_fit()
+            .visible_rows(4)
+            .into_any_element()
+    })
+}
+
+fn history(count: usize) -> Vec<Message> {
+    (0..count)
+        .map(|index| {
+            Message::new(format!("msg-{index}"), format!("Message {index}"))
+                .author("Ada")
+                .time("09:15")
+        })
+        .collect()
+}
+
+/// Runs the follow loop for a while, the way a display would.
+fn settle(harness: &mut Harness) {
+    for _ in 0..90 {
+        harness.advance(Duration::from_millis(16));
+    }
+}
+
+#[gpui::test]
+fn a_conversation_travels_to_its_end_rather_than_cutting_to_it(cx: &mut TestAppContext) {
+    let thread: Thread = Rc::new(RefCell::new(history(40)));
+    let mut harness = flowing(cx, thread.clone());
+    harness.frame();
+
+    let list = Ident::new("chat");
+    harness.update({
+        let list = list.clone();
+        move |_, cx| engage_end(&list, cx)
+    });
+
+    // One frame of a glide is a step, not the whole distance: the reader can
+    // see where they are being taken.
+    harness.advance(Duration::from_millis(16));
+    assert!(
+        harness.node("chat.msg-39").is_none(),
+        "one frame must not deliver the whole journey"
+    );
+
+    settle(&mut harness);
+    assert!(
+        harness.node("chat.msg-39").is_some(),
+        "the glide has to actually arrive"
+    );
+    assert!(harness.update({
+        let list = list.clone();
+        move |_, cx| follows_end(&list, cx)
+    }));
+}
+
+#[gpui::test]
+fn a_message_arriving_while_the_end_is_held_is_followed(cx: &mut TestAppContext) {
+    let thread: Thread = Rc::new(RefCell::new(history(40)));
+    let mut harness = flowing(cx, thread.clone());
+    harness.frame();
+    harness.update(move |_, cx| engage_end(&Ident::new("chat"), cx));
+    settle(&mut harness);
+
+    thread
+        .borrow_mut()
+        .push(message("msg-new", "Grace", "One more thing"));
+    settle(&mut harness);
+
+    assert!(
+        harness.node("chat.msg-new").is_some(),
+        "content arriving is not an interruption"
+    );
+    assert!(
+        harness.node("chat.pending").is_none(),
+        "a reader who is being carried to it is not told it is below them"
+    );
+}
+
+#[gpui::test]
+fn a_wheel_upward_stops_the_conversation_following(cx: &mut TestAppContext) {
+    let thread: Thread = Rc::new(RefCell::new(history(40)));
+    let mut harness = flowing(cx, thread.clone());
+    harness.frame();
+    let list = Ident::new("chat");
+    harness.update({
+        let list = list.clone();
+        move |_, cx| engage_end(&list, cx)
+    });
+    settle(&mut harness);
+
+    // A gesture away from the end, and only a gesture, lets go.
+    harness.scroll("chat", -400.0);
+    settle(&mut harness);
+    assert!(
+        !harness.update({
+            let list = list.clone();
+            move |_, cx| follows_end(&list, cx)
+        }),
+        "a reader who scrolled up is reading, not following"
+    );
+
+    thread
+        .borrow_mut()
+        .push(message("msg-new", "Grace", "One more thing"));
+    settle(&mut harness);
+    assert!(
+        harness.node("chat.msg-new").is_none(),
+        "the conversation must not drag them back down to it"
+    );
+    assert!(
+        harness.node("chat.pending").is_some(),
+        "what it does instead is say something arrived"
+    );
+}
+
+#[gpui::test]
+fn scrolling_back_to_the_end_picks_following_up_again(cx: &mut TestAppContext) {
+    let thread: Thread = Rc::new(RefCell::new(history(40)));
+    let mut harness = flowing(cx, thread.clone());
+    harness.frame();
+    let list = Ident::new("chat");
+    harness.update({
+        let list = list.clone();
+        move |_, cx| engage_end(&list, cx)
+    });
+    settle(&mut harness);
+    harness.scroll("chat", -400.0);
+    settle(&mut harness);
+
+    // Back down to the end by hand. Arriving there is the whole signal.
+    for _ in 0..8 {
+        harness.scroll("chat", 200.0);
+    }
+    settle(&mut harness);
+
+    assert!(
+        harness.update({
+            let list = list.clone();
+            move |_, cx| follows_end(&list, cx)
+        }),
+        "a reader who came back to the end is following again"
     );
 }
 
