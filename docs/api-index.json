@@ -2173,6 +2173,7 @@
         "max_lines(lines: usize) -> Self",
         "on_event(handler: impl Fn(&MarkdownEvent, &mut Window, &mut App) + 'static) -> Self",
         "image(source: impl Fn(&ImageRequest, &mut Window, &mut App) -> Option<AnyElement> + 'static) -> Self",
+        "streaming(streaming: bool) -> Self",
         "highlight(highlighter: impl Fn(&CodeBlock) -> Vec<CodeSpan> + 'static) -> Self"
       ],
       "commands": [],

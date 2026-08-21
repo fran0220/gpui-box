@@ -839,7 +839,11 @@ fn body_element(
     let height = body_lines.map(|lines| theme.typography.body.line_height * lines as f32);
     match &message.body {
         MessageBody::Markdown(source) => {
-            let mut markdown = Markdown::new(ident.child("body"), source.clone());
+            // A message the host says is still being written is read as one:
+            // parsed from its tail, its half-finished markers held steady, and
+            // its newest words fading in rather than snapping into place.
+            let mut markdown =
+                Markdown::new(ident.child("body"), source.clone()).streaming(message.streaming);
             if let Some(lines) = body_lines {
                 markdown = markdown.max_lines(lines);
             }

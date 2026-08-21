@@ -171,15 +171,41 @@ impl Document {
     /// each change what a plain document means, and a reader who wrote three
     /// dots did not ask for an ellipsis.
     pub fn parse(source: &str) -> Self {
-        let mut options = Options::empty();
-        options.insert(Options::ENABLE_TABLES);
-        options.insert(Options::ENABLE_STRIKETHROUGH);
-        options.insert(Options::ENABLE_TASKLISTS);
-        build(Parser::new_ext(source, options))
+        build(Parser::new_ext(source, options()))
     }
 
     pub fn lines(&self) -> usize {
         self.blocks.iter().map(Block::lines).sum()
+    }
+
+    /// Where each top-level block of `source` begins, or `None` when the
+    /// offsets cannot be trusted to describe the blocks this parses to.
+    ///
+    /// A document that is still arriving is reparsed from the start of a block
+    /// rather than from the start of the document, and that only works if a
+    /// boundary means the same thing to both. Whenever the walker produces a
+    /// different number of blocks than there are boundaries — a container this
+    /// renderer flattens, an extension that arrives as bare events — the
+    /// answer is `None`, and the caller parses the whole thing rather than
+    /// splitting it in a place that might not be one.
+    pub(crate) fn block_starts(source: &str) -> Option<Vec<usize>> {
+        let mut starts = Vec::new();
+        let mut depth = 0usize;
+        for (event, range) in Parser::new_ext(source, options()).into_offset_iter() {
+            match event {
+                Event::Start(_) => {
+                    if depth == 0 {
+                        starts.push(range.start);
+                    }
+                    depth += 1;
+                }
+                Event::End(_) => depth = depth.saturating_sub(1),
+                // A rule is a block with no contents and so no container.
+                Event::Rule if depth == 0 => starts.push(range.start),
+                _ => {}
+            }
+        }
+        (starts.len() == Self::parse(source).blocks.len()).then_some(starts)
     }
 
     /// The first `max` lines, and how many lines were left behind.
@@ -208,6 +234,16 @@ impl Document {
         }
         (Self { blocks }, total.saturating_sub(kept))
     }
+}
+
+/// What this crate reads, kept in one place because the incremental path has
+/// to read a fragment exactly the way the whole document is read.
+fn options() -> Options {
+    let mut options = Options::empty();
+    options.insert(Options::ENABLE_TABLES);
+    options.insert(Options::ENABLE_STRIKETHROUGH);
+    options.insert(Options::ENABLE_TASKLISTS);
+    options
 }
 
 /// What the walker is currently inside.

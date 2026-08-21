@@ -23,19 +23,24 @@
 //! from host-supplied [`CodeSpan`]s or from nowhere.
 
 pub mod doc;
+mod mend;
 pub mod parse;
+mod stream;
+mod veil;
 
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, ClipboardItem, FontWeight, InteractiveElement, IntoElement, ParentElement,
-    RenderOnce, SharedString, StatefulInteractiveElement, Styled, StyledText, Window, div,
-    prelude::FluentBuilder, px,
+    AnyElement, App, ClipboardItem, FontWeight, HighlightStyle, Hsla, InteractiveElement,
+    IntoElement, ParentElement, RenderOnce, SharedString, StatefulInteractiveElement, Styled,
+    StyledText, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, Theme, TypeScale};
+use web_time::Instant;
 
 use crate::content::code_view::styled_code;
 use crate::controls::button::Button;
@@ -44,6 +49,8 @@ use crate::foundation::{Ident, Sizable, StyledExt};
 use crate::motion::keyed;
 use crate::overlay::Tooltipped;
 use crate::strings::{ActiveStrings, StringKey};
+use stream::Stream;
+use veil::Veil;
 
 pub use parse::{Block, CellAlign, Document, Inline, ListEntry};
 
@@ -113,6 +120,7 @@ pub struct Markdown {
     on_event: Option<EventHandler>,
     image: Option<ImageSource>,
     highlighter: Option<Highlighter>,
+    streaming: bool,
 }
 
 impl std::fmt::Debug for Markdown {
@@ -124,6 +132,7 @@ impl std::fmt::Debug for Markdown {
             .field("max_lines", &self.max_lines)
             .field("has_images", &self.image.is_some())
             .field("has_highlighter", &self.highlighter.is_some())
+            .field("streaming", &self.streaming)
             .finish()
     }
 }
@@ -138,6 +147,7 @@ impl Markdown {
             on_event: None,
             image: None,
             highlighter: None,
+            streaming: false,
         }
     }
 
@@ -180,6 +190,23 @@ impl Markdown {
         self
     }
 
+    /// Reads this document as one that is still being written.
+    ///
+    /// Three things change. The source is reparsed from the last block that
+    /// could still be affected rather than from the beginning, so a long reply
+    /// does not get slower as it gets longer. Inline markers that have opened
+    /// and not yet closed are read as though they had, so a paragraph does not
+    /// twitch every time a `**` finishes. And text that has just arrived fades
+    /// in over a fraction of a second, so a fast stream reads as a soft
+    /// leading edge instead of a stutter.
+    ///
+    /// None of it delays anything: every character is laid out the frame it
+    /// arrives, at the position it will keep.
+    pub fn streaming(mut self, streaming: bool) -> Self {
+        self.streaming = streaming;
+        self
+    }
+
     /// Colours code blocks from spans the host computed.
     ///
     /// Without this every fence renders plain. Guessing a language from its
@@ -198,11 +225,29 @@ impl RenderOnce for Markdown {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let ident = self.ident.clone();
-        let parsed = Document::parse(self.source.as_ref());
+        let now = cx.background_executor().now();
+
+        // Parsing goes through the incremental reader whether the document is
+        // streaming or not: a source that did not change costs nothing to read
+        // again, which is every settled document on screen.
+        let reader = keyed::slot::<Stream>(&ident.child("source").semantic_id(), cx);
+        let parsed = {
+            let mut reader = reader.borrow_mut();
+            reader.read(self.source.as_ref());
+            if self.streaming {
+                reader.mended().unwrap_or_else(|| reader.document().clone())
+            } else {
+                reader.document().clone()
+            }
+        };
         let (document, hidden) = match self.max_lines {
             Some(max) => parsed.truncate(max),
             None => (parsed, 0),
         };
+
+        let veil = self
+            .streaming
+            .then(|| keyed::slot::<Veil>(&ident.child("arriving").semantic_id(), cx));
 
         let mut painter = Painter {
             ident: ident.clone(),
@@ -213,6 +258,9 @@ impl RenderOnce for Markdown {
             used: HashMap::new(),
             reading_order: self.selection_order_start,
             requested: Vec::new(),
+            veil: veil.clone(),
+            now,
+            drawn: Vec::new(),
         };
 
         let mut column = div().column().w_full().gap_token(&theme, Space::Md);
@@ -226,6 +274,18 @@ impl RenderOnce for Markdown {
 
         let requests = std::mem::take(&mut painter.requested);
         report_images(&ident, requests, self.on_event.as_ref(), window, cx);
+
+        // The fade learns from the frame that has just been built, and is read
+        // by the next one. A frame of lag is a sixtieth of a second against a
+        // fade of a fifth, and it is what lets the record be of what was drawn
+        // rather than of what a second walk of the tree guessed was drawn.
+        if let Some(veil) = veil {
+            let mut veil = veil.borrow_mut();
+            veil.observe(std::mem::take(&mut painter.drawn), now);
+            if veil.is_fading(now) {
+                window.request_animation_frame();
+            }
+        }
 
         column.semantic_in(
             cx,
@@ -284,6 +344,13 @@ struct RunStyle {
     strong: bool,
     emphasis: bool,
     struck: bool,
+    /// The colour this run inherits, when something above it set one.
+    ///
+    /// Only a fading run needs to know. An opacity is applied by naming a
+    /// colour, so a run arriving inside a link has to name the link's colour
+    /// rather than the page's, or it would fade in the wrong colour and then
+    /// correct itself.
+    color: Option<Hsla>,
 }
 
 /// Walks the tree once, drawing it and minting one id per addressable part.
@@ -302,9 +369,35 @@ struct Painter {
     /// meets it.
     reading_order: u64,
     requested: Vec<ImageRequest>,
+    /// The fade over what has most recently arrived, while this document is
+    /// still arriving.
+    veil: Option<Rc<RefCell<Veil>>>,
+    /// One clock for the whole frame, so every fading run is at the same point
+    /// in its fade rather than at the point it was reached.
+    now: Instant,
+    /// The text of every run this frame drew, in the order it drew them.
+    ///
+    /// Recorded rather than derived, so what the fade believes is on screen is
+    /// exactly what was put there.
+    drawn: Vec<String>,
 }
 
 impl Painter {
+    /// Records that a run of text was drawn, and answers how much of it is
+    /// still arriving.
+    ///
+    /// Every run passes through here whether the document is streaming or not,
+    /// because the record is what the next frame compares against. A settled
+    /// document simply always gets an empty answer.
+    fn arriving(&mut self, text: &str) -> Vec<(Range<usize>, f32)> {
+        let index = self.drawn.len();
+        self.drawn.push(text.to_string());
+        let Some(veil) = &self.veil else {
+            return Vec::new();
+        };
+        veil.borrow().spans(index, self.now)
+    }
+
     /// An identity derived from what a part *is*, never from where it sits.
     ///
     /// Two links to the same destination are the same thing said twice, so the
@@ -442,11 +535,13 @@ impl Painter {
                 Inline::Text(text) => {
                     let ident = self.ident_for("text", text.as_ref());
                     let order = self.next_reading_order();
-                    elements.push(run(&theme, &ident, order, text.clone(), style));
+                    let fading = self.arriving(text.as_ref());
+                    elements.push(run(&theme, &ident, order, text.clone(), style, &fading));
                 }
                 Inline::Code(text) => {
                     let ident = self.ident_for("code", text.as_ref());
                     let order = self.next_reading_order();
+                    let fading = self.arriving(text.as_ref());
                     elements.push(
                         div()
                             .px(px(theme.space(Space::Xs)))
@@ -454,11 +549,15 @@ impl Painter {
                             .bg(theme.colors.raised)
                             .font_family(theme.typography.mono.clone())
                             .text_size(px(theme.typography.code.size))
-                            .child(StyledText::new(text.clone()).selectable_in_document(
-                                ident.element_id(),
-                                ident.semantic_id(),
-                                order,
-                            ))
+                            .child(
+                                StyledText::new(text.clone())
+                                    .with_highlights(fade(&fading, theme.colors.text))
+                                    .selectable_in_document(
+                                        ident.element_id(),
+                                        ident.semantic_id(),
+                                        order,
+                                    ),
+                            )
                             .into_any_element(),
                     );
                 }
@@ -501,7 +600,8 @@ impl Painter {
                 Inline::SoftBreak => {
                     let ident = self.ident_for("text", "soft break");
                     let order = self.next_reading_order();
-                    elements.push(run(&theme, &ident, order, " ".into(), style));
+                    let fading = self.arriving(" ");
+                    elements.push(run(&theme, &ident, order, " ".into(), style, &fading));
                 }
                 Inline::HardBreak => {
                     elements.push(div().w_full().h(px(0.0)).flex_none().into_any_element())
@@ -529,35 +629,61 @@ impl Painter {
                 text
             }
         };
-        let ident = self.ident_for("link", href.as_ref());
+        // A link whose address has not finished arriving is styled as a link
+        // and is nothing else: it says no destination, because none has been
+        // said, and it cannot be taken to one nobody named. It is named after
+        // its words, so the placeholder never reaches a reader or a report.
+        let unfinished = href.as_ref() == mend::PENDING_LINK;
+        let ident = self.ident_for(
+            "link",
+            if unfinished {
+                label.as_ref()
+            } else {
+                href.as_ref()
+            },
+        );
         // Hover help states the destination before the reader commits, and the
         // title the author wrote is shown beside it rather than instead of it.
-        let help = match title {
-            Some(title) => SharedString::from(format!("{title} — {href}")),
-            None => href.clone(),
+        let help = match (unfinished, title) {
+            (true, Some(title)) => title.clone(),
+            (true, None) => SharedString::default(),
+            (false, Some(title)) => SharedString::from(format!("{title} — {href}")),
+            (false, None) => href.clone(),
+        };
+        // Everything inside a link takes the link's colour, which a run that
+        // is still arriving has to name in order to fade in it.
+        let style = RunStyle {
+            color: Some(theme.colors.accent),
+            ..style
         };
         let runs = self.inlines(content, style, window, cx);
         // A link whose content produced no runs still reads at one place in
         // the document, so it claims an order of its own.
         let label_order = self.next_reading_order();
-        let taken = self.report(MarkdownEvent::LinkClicked { href: href.clone() });
+        let taken = (!unfinished)
+            .then(|| self.report(MarkdownEvent::LinkClicked { href: href.clone() }))
+            .flatten();
 
         div()
             .id(ident.element_id())
             .flex()
             .flex_row()
             .flex_wrap()
-            .cursor_pointer()
+            .when(!unfinished, |element| element.cursor_pointer())
             .text_color(theme.colors.accent)
             .underline()
-            .tip(ident.clone(), help)
+            .when(!help.is_empty(), |element| {
+                element.tip(ident.clone(), help.clone())
+            })
             .children(if runs.is_empty() {
+                let fading = self.arriving(label.as_ref());
                 vec![run(
                     &theme,
                     &ident.child("text"),
                     label_order,
                     label.clone(),
                     style,
+                    &fading,
                 )]
             } else {
                 runs
@@ -1050,7 +1176,13 @@ fn run(
     order: u64,
     text: SharedString,
     style: RunStyle,
+    fading: &[(Range<usize>, f32)],
 ) -> AnyElement {
+    let color = if style.struck {
+        theme.colors.text_muted
+    } else {
+        style.color.unwrap_or(theme.colors.text)
+    };
     div()
         .when(style.strong, |element| {
             element.font_weight(FontWeight::BOLD)
@@ -1059,12 +1191,32 @@ fn run(
         .when(style.struck, |element| {
             element.line_through().text_color(theme.colors.text_muted)
         })
-        .child(StyledText::new(text).selectable_in_document(
-            ident.element_id(),
-            ident.semantic_id(),
-            order,
-        ))
+        .child(
+            StyledText::new(text)
+                .with_highlights(fade(fading, color))
+                .selectable_in_document(ident.element_id(), ident.semantic_id(), order),
+        )
         .into_any_element()
+}
+
+/// Turns opacities into the colours that express them.
+///
+/// A fade is applied by naming the run's own colour at a lower alpha, so it
+/// touches nothing but transparency: the glyphs are already laid out, already
+/// where they will stay, and already the size they will be.
+fn fade(fading: &[(Range<usize>, f32)], color: Hsla) -> Vec<(Range<usize>, HighlightStyle)> {
+    fading
+        .iter()
+        .map(|(range, opacity)| {
+            (
+                range.clone(),
+                HighlightStyle {
+                    color: Some(color.opacity(*opacity)),
+                    ..Default::default()
+                },
+            )
+        })
+        .collect()
 }
 
 fn cell_frame(theme: &Theme, align: CellAlign) -> gpui::Div {

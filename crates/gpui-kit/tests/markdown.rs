@@ -324,3 +324,108 @@ fn two_links_to_one_destination_are_two_addressable_nodes(cx: &mut TestAppContex
         Some("second")
     );
 }
+
+/// A document whose source the test controls, drawn as one that is arriving.
+fn arriving(cx: &mut TestAppContext, source: Rc<RefCell<String>>) -> Harness {
+    Harness::new(cx, gpui_kit::install, move |_, _| {
+        Markdown::new("doc", source.borrow().clone())
+            .streaming(true)
+            .into_any_element()
+    })
+}
+
+#[gpui::test]
+fn a_marker_that_has_not_closed_yet_is_read_as_though_it_had(cx: &mut TestAppContext) {
+    // The alternative is four literal asterisks that vanish when the closer
+    // lands, taking every wrap point after them along.
+    let source = Rc::new(RefCell::new("A reply with **emphasis".to_string()));
+    let mut harness = arriving(cx, source.clone());
+
+    let hanging = harness.snapshot().ids().join(" ");
+    assert!(
+        !hanging.contains("**"),
+        "the markers should not be showing as text: {hanging}"
+    );
+
+    *source.borrow_mut() = "A reply with **emphasis** and more.".to_string();
+    harness.frame();
+    assert!(
+        harness.node("doc").is_some(),
+        "the document still reads once the marker closes"
+    );
+}
+
+#[gpui::test]
+fn a_document_that_is_still_arriving_reads_the_same_as_one_that_arrived(cx: &mut TestAppContext) {
+    // Every prefix is drawn, and the settled result has to be what a document
+    // handed over whole would have been. Being fast is worth nothing if the
+    // reader ends up with something else.
+    let whole = "# Notes\n\nA paragraph with `code`.\n\n- one\n- two\n";
+    let source = Rc::new(RefCell::new(String::new()));
+    let mut streamed = arriving(cx, source.clone());
+    for end in 1..=whole.len() {
+        if !whole.is_char_boundary(end) {
+            continue;
+        }
+        *source.borrow_mut() = whole[..end].to_string();
+        streamed.frame();
+    }
+    let streamed: Vec<String> = streamed
+        .snapshot()
+        .ids()
+        .iter()
+        .map(|id| id.to_string())
+        .collect();
+
+    let mut settled = Harness::new(cx, gpui_kit::install, move |_, _| {
+        Markdown::new("doc", whole).into_any_element()
+    });
+    let settled: Vec<String> = settled
+        .snapshot()
+        .ids()
+        .iter()
+        .map(|id| id.to_string())
+        .collect();
+
+    assert_eq!(streamed, settled, "watching it arrive changed what it says");
+}
+
+#[gpui::test]
+fn a_link_whose_address_is_still_arriving_leads_nowhere(cx: &mut TestAppContext) {
+    // Its words are readable straight away, because that is what a reader
+    // reads. Its destination is not, because nobody has said one yet, and a
+    // link to half an address is a link to somewhere else.
+    let (calls, into) = sink::<MarkdownEvent>();
+    let source = Rc::new(RefCell::new("Read [the notes](https://exa".to_string()));
+    let mut harness = Harness::new(cx, gpui_kit::install, {
+        let source = source.clone();
+        move |_, _| {
+            let into = into.clone();
+            Markdown::new("doc", source.borrow().clone())
+                .streaming(true)
+                .on_event(move |event, _, _| into.borrow_mut().push(event.clone()))
+                .into_any_element()
+        }
+    });
+
+    let ids = harness.snapshot().ids().join(" ");
+    assert!(
+        !ids.contains("pending"),
+        "the placeholder address must not reach the reader: {ids}"
+    );
+    assert!(
+        calls.borrow().is_empty(),
+        "an address that has not arrived cannot have been taken"
+    );
+
+    *source.borrow_mut() = "Read [the notes](https://example.com)".to_string();
+    harness.frame();
+    assert!(
+        harness
+            .snapshot()
+            .ids()
+            .iter()
+            .any(|id| id.contains("link")),
+        "the finished link is addressable"
+    );
+}
