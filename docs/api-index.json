@@ -3884,7 +3884,8 @@
         "is_disabled() -> bool",
         "selected_range() -> Range<usize>",
         "cursor_offset() -> usize",
-        "cursor_row() -> usize"
+        "cursor_row() -> usize",
+        "measured() -> Option<Measured>"
       ],
       "reports": [
         "Change",
@@ -8047,6 +8048,7 @@
         "line_height() -> Pixels",
         "total_rows() -> usize",
         "height() -> Pixels",
+        "text_width() -> Pixels",
         "painted_lines() -> impl Iterator<Item = (&WrappedLine, Pixels)>",
         "position_for_offset(offset: usize) -> Point<Pixels>",
         "row_for_offset(offset: usize) -> usize",
@@ -8265,6 +8267,16 @@
         "CodeCopied",
         "MoreRequested"
       ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "Measured",
+      "path": "gpui_kit::controls::Measured",
+      "summary": "What a text area measured the last time it was laid out.",
+      "variants": [],
       "construct": [],
       "options": [],
       "commands": [],
@@ -11864,7 +11876,7 @@
       "uses": [
         "TextArea"
       ],
-      "example": "fn textarea(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_inputs(window, cx);\n    let inputs = cx.global::<SceneInputs>();\n    let (notes, review, frozen, message) = (\n        inputs.notes.clone(),\n        inputs.review.clone(),\n        inputs.frozen.clone(),\n        inputs.message.clone(),\n    );\n    let theme = cx.theme().clone();\n\n    div()\n        .flex()\n        .flex_col()\n        .gap(px(theme.space(Space::Md)))\n        .p(px(theme.space(Space::Lg)))\n        .w(px(360.0))\n        .child(notes)\n        .child(review)\n        .child(frozen)\n        // The other enter policy, for text that is a message rather than a\n        // value. Nothing about it looks different, which is the point: what\n        // changes is which key is the common act.\n        .child(message)\n        .into_any_element()\n}"
+      "example": "fn textarea(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_inputs(window, cx);\n    let inputs = cx.global::<SceneInputs>();\n    let (notes, review, frozen, message, asked, told) = (\n        inputs.notes.clone(),\n        inputs.review.clone(),\n        inputs.frozen.clone(),\n        inputs.message.clone(),\n        inputs.asked.clone(),\n        inputs.told.clone(),\n    );\n    let theme = cx.theme().clone();\n\n    div()\n        .flex()\n        .flex_col()\n        .gap(px(theme.space(Space::Md)))\n        .p(px(theme.space(Space::Lg)))\n        .w(px(360.0))\n        .child(notes)\n        .child(review)\n        .child(frozen)\n        // The other enter policy, for text that is a message rather than a\n        // value. Nothing about it looks different, which is the point: what\n        // changes is which key is the common act.\n        .child(message)\n        .child(caption(\n            &theme,\n            \"a frame that measures its text rather than its rows: the same pill \\\n             holds one line, and becomes a panel for a message that outgrew it\",\n        ))\n        .child(asked)\n        .child(told)\n        .into_any_element()\n}"
     },
     {
       "name": "form",

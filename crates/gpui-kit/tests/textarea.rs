@@ -729,3 +729,53 @@ fn a_drop_lands_at_the_caret_as_one_undoable_step(cx: &mut TestAppContext) {
         "one drop is one undo"
     );
 }
+
+#[gpui::test]
+fn what_the_area_measured_says_what_a_narrower_frame_would_have_to_hold(cx: &mut TestAppContext) {
+    let (mut harness, slot) = area(cx, |area| {
+        area.text("A sentence long enough that this frame has to wrap it more than once.")
+            .rows(1)
+            .max_rows(4)
+    });
+    let entity = slot.borrow().clone().expect("area was built");
+    harness.frame();
+
+    let measured = harness
+        .update(|_, cx| entity.read(cx).measured())
+        .expect("the area has been laid out");
+    assert!(
+        measured.wrapped > px(0.0) && measured.wrapped < px(WIDTH),
+        "the text was wrapped against the area's own width, inside the {WIDTH}px          frame: {measured:?}"
+    );
+    assert!(
+        measured.text > measured.wrapped,
+        "the unwrapped text is wider than what wrapped it: {measured:?}"
+    );
+    assert!(measured.height > px(0.0), "the wrapped text has a height");
+
+    let before = measured.pass;
+    harness.click("form.notes");
+    harness.keystrokes("x");
+    let after = harness
+        .update(|_, cx| entity.read(cx).measured())
+        .expect("still laid out");
+    assert!(
+        after.pass > before,
+        "a later layout is a later pass, so a host can tell it apart from the one it acted on"
+    );
+}
+
+#[gpui::test]
+fn a_short_line_measures_narrower_than_the_frame_it_sits_in(cx: &mut TestAppContext) {
+    let (mut harness, slot) = area(cx, |area| area.text("Short.").rows(1));
+    let entity = slot.borrow().clone().expect("area was built");
+    harness.frame();
+
+    let measured = harness
+        .update(|_, cx| entity.read(cx).measured())
+        .expect("the area has been laid out");
+    assert!(
+        measured.text < measured.wrapped,
+        "text that fits reports that it fits, which is what keeps a pill a pill: {measured:?}"
+    );
+}

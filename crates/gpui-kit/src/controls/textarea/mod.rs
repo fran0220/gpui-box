@@ -255,6 +255,31 @@ pub enum Pasted {
     Paths(Vec<PathBuf>),
 }
 
+/// What a text area measured the last time it was laid out.
+///
+/// An area grows itself between `rows` and `max_rows`, which is the whole
+/// answer for a field that stands in a column. It is not the answer for a
+/// frame that changes shape around the text — a one-line pill that becomes a
+/// panel when the message outgrows it — because that host has to decide
+/// before it lays the area out, and at a width the area is not currently in.
+/// So the area publishes what it knows rather than the decision: how wide the
+/// text wants to be, how tall it came out, and the frame it was measured in.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Measured {
+    /// The widest line's width with nothing wrapping it, which is what a
+    /// narrower frame would have to hold to keep the text on one row.
+    pub text: Pixels,
+    /// The height of the wrapped text, before the frame clamps it.
+    pub height: Pixels,
+    /// The width the text was wrapped against, which is the area's own frame
+    /// less the padding the control keeps around it.
+    pub wrapped: Pixels,
+    /// Which layout pass this came from. A host that changes the frame should
+    /// wait for a pass later than the one it acted on, or it will read the old
+    /// shape and change its mind twice.
+    pub pass: u64,
+}
+
 /// What a text area reports to its owner.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TextAreaEvent {
@@ -313,6 +338,10 @@ pub struct TextArea {
     last_layout: Option<Layout>,
     last_layout_text: SharedString,
     last_bounds: Option<Bounds<Pixels>>,
+    /// Bumped once per layout pass, so a host that resizes the frame around
+    /// this area can tell a measurement taken after its last change from one
+    /// taken before it.
+    layout_pass: u64,
     accessibility_revision: u64,
     accessible_snapshot: Arc<Mutex<Option<text_edit::PublishedAccessibleText>>>,
     /// Held so the focus listeners live as long as the area does.
@@ -352,6 +381,7 @@ impl TextArea {
             last_layout: None,
             last_layout_text: SharedString::default(),
             last_bounds: None,
+            layout_pass: 0,
             accessibility_revision: 0,
             accessible_snapshot: Arc::default(),
             _subscriptions: subscriptions,
@@ -508,6 +538,18 @@ impl TextArea {
             .unwrap_or(0)
     }
 
+    /// What the last layout pass measured, or nothing before the first one.
+    pub fn measured(&self) -> Option<Measured> {
+        let layout = self.last_layout.as_ref()?;
+        let bounds = self.last_bounds?;
+        Some(Measured {
+            text: layout.text_width(),
+            height: layout.height(),
+            wrapped: bounds.size.width,
+            pass: self.layout_pass,
+        })
+    }
+
     pub(crate) fn placeholder_text(&self) -> &SharedString {
         &self.placeholder
     }
@@ -552,6 +594,7 @@ impl TextArea {
         self.last_layout = Some(layout);
         self.last_layout_text = text;
         self.last_bounds = Some(bounds);
+        self.layout_pass = self.layout_pass.wrapping_add(1);
         changed
     }
 

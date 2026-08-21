@@ -5,9 +5,9 @@
 //! that read it, so that moving a component moves its fixture with it.
 
 pub(super) use gpui::{
-    AnyElement, App, Corners, DevicePixels, Entity, Focusable, Global, IntoElement, RenderImage,
-    SharedString, SpriteBlendMode, SpriteColorMode, SpriteInstance, SpriteTransform, Window,
-    bounds, canvas, conic_gradient_stops, div, linear_color_stop, point, prelude::*, px,
+    AnyElement, App, Corners, DevicePixels, Entity, Focusable, Global, IntoElement, Pixels,
+    RenderImage, SharedString, SpriteBlendMode, SpriteColorMode, SpriteInstance, SpriteTransform,
+    Window, bounds, canvas, conic_gradient_stops, div, linear_color_stop, point, prelude::*, px,
     radial_gradient_stops, radians, size,
 };
 pub(super) use gpui_kit_assets::Icon;

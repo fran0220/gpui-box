@@ -745,6 +745,86 @@ pub(super) struct SceneInputs {
     review: Entity<TextArea>,
     frozen: Entity<TextArea>,
     message: Entity<TextArea>,
+    asked: Entity<Pill>,
+    told: Entity<Pill>,
+}
+
+/// A frame that changes shape around its text.
+///
+/// The area grows itself between `rows` and `max_rows`, which is all a field
+/// standing in a column needs. This is the other case: a one-line pill that
+/// becomes a panel once the message outgrows it. The decision belongs to the
+/// frame, is taken before the area is laid out, and is about a width the area
+/// is not currently in — so it is taken from [`Measured`] rather than from the
+/// rows the area settled on.
+pub(super) struct Pill {
+    ident: Ident,
+    area: Entity<TextArea>,
+    /// How wide the text may be and still be a pill. Measured while it was
+    /// one, because a panel is wider than the pill it replaced and cannot ask
+    /// what would fit back there.
+    room: Pixels,
+    panel: bool,
+    /// The pass the shape was last decided on. Changing shape changes the
+    /// width, so the measurement that caused a change describes a frame that
+    /// no longer exists.
+    decided: u64,
+}
+
+impl Pill {
+    fn new(
+        ident: impl Into<Ident>,
+        text: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        let ident = ident.into();
+        let area = cx.new(|cx| {
+            TextArea::new(ident.child("text"), window, cx)
+                .text(text.to_string())
+                .enter(Enter::Submits)
+                .rows(1)
+                .max_rows(6)
+        });
+        Self {
+            ident,
+            area,
+            room: px(0.0),
+            panel: false,
+            decided: 0,
+        }
+    }
+}
+
+impl Render for Pill {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = cx.theme().clone();
+        if let Some(measured) = self.area.read(cx).measured()
+            && measured.pass > self.decided
+        {
+            if !self.panel {
+                self.room = measured.wrapped;
+            }
+            let panel = measured.text > self.room;
+            if panel != self.panel {
+                self.panel = panel;
+                self.decided = measured.pass;
+            }
+        }
+        div()
+            .id(self.ident.element_id())
+            .w_full()
+            .p(px(theme.space(Space::Xs)))
+            .surface(&theme, Surface::Raised)
+            .radius(
+                &theme,
+                match self.panel {
+                    true => Radius::Card,
+                    false => Radius::Pill,
+                },
+            )
+            .child(self.area.clone())
+    }
 }
 
 impl Global for SceneInputs {}
@@ -815,6 +895,17 @@ pub(super) fn ensure_inputs(window: &mut Window, cx: &mut App) {
                     .rows(2)
                     .max_rows(8)
             }),
+            asked: cx
+                .new(|cx| Pill::new("scene.textarea.asked", "Rerun the failing test", window, cx)),
+            told: cx.new(|cx| {
+                Pill::new(
+                    "scene.textarea.told",
+                    "Rerun the failing test, and if it fails the same way again, \
+                     bisect back to the commit that changed the fixture.",
+                    window,
+                    cx,
+                )
+            }),
         };
         // A caret only paints where the keyboard is, so one area takes it:
         // otherwise a capture cannot show a caret at all.
@@ -850,11 +941,13 @@ pub(super) fn input(window: &mut Window, cx: &mut App) -> AnyElement {
 pub(super) fn textarea(window: &mut Window, cx: &mut App) -> AnyElement {
     ensure_inputs(window, cx);
     let inputs = cx.global::<SceneInputs>();
-    let (notes, review, frozen, message) = (
+    let (notes, review, frozen, message, asked, told) = (
         inputs.notes.clone(),
         inputs.review.clone(),
         inputs.frozen.clone(),
         inputs.message.clone(),
+        inputs.asked.clone(),
+        inputs.told.clone(),
     );
     let theme = cx.theme().clone();
 
@@ -871,6 +964,13 @@ pub(super) fn textarea(window: &mut Window, cx: &mut App) -> AnyElement {
         // value. Nothing about it looks different, which is the point: what
         // changes is which key is the common act.
         .child(message)
+        .child(caption(
+            &theme,
+            "a frame that measures its text rather than its rows: the same pill \
+             holds one line, and becomes a panel for a message that outgrew it",
+        ))
+        .child(asked)
+        .child(told)
         .into_any_element()
 }
 

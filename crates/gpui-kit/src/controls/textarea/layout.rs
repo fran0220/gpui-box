@@ -66,6 +66,19 @@ impl Layout {
         self.line_height * self.total_rows as f32
     }
 
+    /// How wide the widest line would be if nothing had wrapped it.
+    ///
+    /// The wrapped rows say what the text looks like at this width, which
+    /// cannot answer whether it would fit at another one. The unwrapped
+    /// layout is already shaped and kept, so this reads a measurement rather
+    /// than taking one.
+    pub fn text_width(&self) -> Pixels {
+        self.lines
+            .iter()
+            .map(|line| line.unwrapped_layout.width)
+            .fold(px(0.0), Pixels::max)
+    }
+
     /// Where each hard line should be painted, relative to the text origin.
     pub fn painted_lines(&self) -> impl Iterator<Item = (&WrappedLine, Pixels)> {
         self.lines
