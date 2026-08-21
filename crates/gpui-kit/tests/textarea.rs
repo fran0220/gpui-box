@@ -822,3 +822,49 @@ fn an_area_in_a_host_frame_still_edits(cx: &mut TestAppContext) {
         "the host took over the frame, not the editing"
     );
 }
+
+#[gpui::test]
+fn an_area_built_without_a_window_reports_focus_once_it_is_shown(cx: &mut TestAppContext) {
+    let slot: Rc<RefCell<Option<Entity<TextArea>>>> = Rc::new(RefCell::new(None));
+    let events: Rc<RefCell<Vec<TextAreaEvent>>> = Rc::new(RefCell::new(Vec::new()));
+    let build_slot = slot.clone();
+    let build_events = events.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, cx| {
+        let entity = build_slot
+            .borrow_mut()
+            .get_or_insert_with(|| {
+                // No window: this is the position a host is in inside a
+                // subscription, a task, or a test that never opened one.
+                let area = cx.new(|cx| TextArea::detached("form.notes", cx));
+                let seen = build_events.clone();
+                cx.subscribe(&area, move |_, event: &TextAreaEvent, _| {
+                    seen.borrow_mut().push(event.clone());
+                })
+                .detach();
+                area
+            })
+            .clone();
+        div().w(px(WIDTH)).child(entity).into_any_element()
+    });
+
+    harness.frame();
+    harness.frame();
+    harness.click("form.notes");
+    harness.keystrokes("h i");
+
+    assert_eq!(
+        value(&mut harness, &slot),
+        "hi",
+        "an area that started without a window is an ordinary area once it is shown"
+    );
+    assert_eq!(
+        events
+            .borrow()
+            .iter()
+            .filter(|event| matches!(event, TextAreaEvent::Change(_)))
+            .count(),
+        2,
+        "and it reports each change once: repeated frames do not subscribe it twice: {:?}",
+        events.borrow()
+    );
+}

@@ -3856,7 +3856,8 @@
       "source": "crates/gpui-kit/src/controls/textarea/mod.rs",
       "summary": "Wrapped, multi-line editable text.",
       "construct": [
-        "new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self"
+        "new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self",
+        "detached(ident: impl Into<Ident>, cx: &mut Context<Self>) -> Self"
       ],
       "options": [
         "placeholder(placeholder: impl Into<SharedString>) -> Self",

@@ -370,15 +370,22 @@ pub struct TextArea {
 
 impl TextArea {
     pub fn new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let mut area = Self::detached(ident, cx);
+        area.watch_focus(window, cx);
+        area
+    }
+
+    /// Builds an area where there is no window to hand.
+    ///
+    /// Focus belongs to a window, so an area normally takes one and starts
+    /// watching immediately. A host does not always have one: a view built
+    /// inside a subscription, a background task, or a test that never opened
+    /// a window has a `Context` and nothing else. Such an area starts
+    /// watching at its first render, which is the first moment a window
+    /// certainly exists, and reports focus from then on.
+    pub fn detached(ident: impl Into<Ident>, cx: &mut Context<Self>) -> Self {
         let focus_handle = cx.focus_handle();
-        let subscriptions = vec![
-            cx.on_focus(&focus_handle, window, |_, _, cx| {
-                cx.emit(TextAreaEvent::Focus)
-            }),
-            cx.on_blur(&focus_handle, window, |_, _, cx| {
-                cx.emit(TextAreaEvent::Blur)
-            }),
-        ];
+        let subscriptions = Vec::new();
         Self {
             ident: ident.into(),
             focus_handle,
@@ -412,6 +419,23 @@ impl TextArea {
     pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self {
         self.placeholder = placeholder.into();
         self
+    }
+
+    /// Starts reporting focus and blur. Idempotent: an area that is already
+    /// watching does not subscribe twice, so a render may call it freely.
+    fn watch_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self._subscriptions.is_empty() {
+            return;
+        }
+        let focus_handle = self.focus_handle.clone();
+        self._subscriptions = vec![
+            cx.on_focus(&focus_handle, window, |_, _, cx| {
+                cx.emit(TextAreaEvent::Focus)
+            }),
+            cx.on_blur(&focus_handle, window, |_, _, cx| {
+                cx.emit(TextAreaEvent::Blur)
+            }),
+        ];
     }
 
     /// Changes what the empty area suggests, after it was built.
@@ -1231,6 +1255,7 @@ impl Render for TextArea {
         if self.disabled && self.focus_handle.is_focused(window) {
             window.blur();
         }
+        self.watch_focus(window, cx);
         let theme = cx.theme().clone();
         let metrics = theme.control.get(self.size);
         let focused = self.focus_handle.is_focused(window);
