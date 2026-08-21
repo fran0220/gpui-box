@@ -14,6 +14,7 @@ use gpui::{
     AppContext as _, Entity, IntoElement, Modifiers, MouseButton, MouseDownEvent, SharedString,
     TestAppContext, div, prelude::*,
 };
+use gpui_kit::content::Document;
 use gpui_kit::prelude::*;
 use gpui_kit_semantics::Role;
 use gpui_kit_testkit::harness::Harness;
@@ -1316,6 +1317,127 @@ fn a_drag_inside_an_overlay_does_not_reach_the_page_behind_it(cx: &mut TestAppCo
     assert!(
         !copy.text.contains("page text nobody selected"),
         "the page behind a dialog is a different document: {:?}",
+        copy.text
+    );
+}
+
+/// An answer with four top-level blocks: prose, a fence, a list, and prose.
+const LONG_ANSWER: &str = "The opening paragraph of a long answer.\n\n\
+```rust\nfn main() {}\n```\n\n\
+- one\n- two\n\n\
+The closing paragraph of a long answer.\n";
+
+/// What the document calls the row it drew the block starting at `start` in.
+///
+/// The name is the offset rather than the ordinal, so this is how a caller
+/// finds a row too: from the ranges the parser cut.
+fn part_row(block: &str, start: usize) -> String {
+    format!("report.block.{block}.part-at-{start}")
+}
+
+/// Where each top-level block of the answer begins.
+fn answer_starts() -> Vec<usize> {
+    Document::block_ranges(LONG_ANSWER)
+        .expect("the fixture answer is cuttable")
+        .into_iter()
+        .map(|range| range.start)
+        .collect()
+}
+
+#[gpui::test]
+fn a_virtualized_document_draws_a_long_answer_as_a_row_per_block(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        AgentDocument::new("report")
+            .block(AgentDocumentBlock::markdown("answer", LONG_ANSWER))
+            .virtualized(8)
+            .into_any_element()
+    });
+
+    assert!(
+        harness.node("report.block.answer").is_none(),
+        "a split block is published as the rows it was drawn as, not as itself as well"
+    );
+    let starts = answer_starts();
+    assert_eq!(starts.len(), 4, "the fixture answer has four blocks");
+    for start in &starts {
+        assert!(
+            harness.node(&part_row("answer", *start)).is_some(),
+            "every top-level block of the answer is its own row"
+        );
+    }
+    assert!(
+        harness
+            .node(&part_row("answer", LONG_ANSWER.len()))
+            .is_none(),
+        "and there are no rows the answer does not have blocks for"
+    );
+}
+
+#[gpui::test]
+fn only_the_row_a_stream_is_writing_into_is_still_arriving(cx: &mut TestAppContext) {
+    // The blocks before the one being written closed the moment the next one
+    // opened. Reporting all of them as busy would say the whole answer is in
+    // motion when one paragraph of it is.
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        AgentDocument::new("report")
+            .block(AgentDocumentBlock::markdown("answer", LONG_ANSWER).streaming(true))
+            .virtualized(8)
+            .into_any_element()
+    });
+
+    let starts = answer_starts();
+    assert!(
+        !harness
+            .node(&part_row("answer", starts[0]))
+            .expect("drawn")
+            .busy
+    );
+    assert!(
+        harness
+            .node(&part_row("answer", starts[3]))
+            .expect("drawn")
+            .busy
+    );
+}
+
+#[gpui::test]
+fn a_drag_down_a_split_answer_reads_it_in_the_order_it_was_written(cx: &mut TestAppContext) {
+    // Each row is its own Markdown document, and a document draws its runs
+    // from its own reading order. Without a partition per row they would all
+    // start at zero and a copy would come back interleaved.
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        AgentDocument::new("report")
+            .block(AgentDocumentBlock::markdown("answer", LONG_ANSWER))
+            .virtualized(8)
+            .into_any_element()
+    });
+
+    let starts = answer_starts();
+    drag_between_blocks(
+        &mut harness,
+        (&part_row("answer", starts[0]), 0.0),
+        (&part_row("answer", starts[3]), 0.98),
+    );
+
+    let copy = harness
+        .update(|window, _| window.document_selection_text())
+        .expect("the rows of a split answer are selectable");
+    assert_eq!(
+        copy.participants, 5,
+        "every run of every row between the two ends took part: {:?}",
+        copy.text
+    );
+    let opening = copy
+        .text
+        .find("The opening paragraph")
+        .expect("the first row was copied");
+    let closing = copy
+        .text
+        .find("The closing paragraph")
+        .expect("the last row was copied");
+    assert!(
+        opening < closing,
+        "the rows are read in document order: {:?}",
         copy.text
     );
 }

@@ -165,10 +165,19 @@ impl Markdown {
         self
     }
 
-    /// Places this Markdown document inside a caller-owned reading-order
-    /// partition. Kept crate-private until a public composition contract needs
-    /// to expose hierarchical selection order directly.
-    pub(crate) fn selection_order_start(mut self, order: u64) -> Self {
+    /// Places this document inside a caller-owned reading-order partition.
+    ///
+    /// A window's document selection joins what it selected in reading order,
+    /// and a document that draws its own runs from zero claims the same order
+    /// as every other one. That is invisible while a Markdown is a whole
+    /// surface, and wrong the moment a caller draws several of them — one per
+    /// message, or one per block of a long answer split across rows — because
+    /// a drag over three of them would then read them back interleaved.
+    ///
+    /// Give each document a start far enough apart that its own runs cannot
+    /// reach the next one's: the count is emissions, so a stride per document
+    /// bounds how many selectable runs one document may contain.
+    pub fn selection_order_start(mut self, order: u64) -> Self {
         self.selection_order_start = order;
         self
     }

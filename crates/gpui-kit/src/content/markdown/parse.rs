@@ -208,6 +208,34 @@ impl Document {
         (starts.len() == Self::parse(source).blocks.len()).then_some(starts)
     }
 
+    /// The source ranges of the top-level blocks of `source`, or `None` when
+    /// the offsets cannot be trusted to describe the blocks this parses to.
+    ///
+    /// A surface that draws a long answer as scrollable rows needs a place to
+    /// cut it. Cutting by lines would put a fence's opening and closing halves
+    /// in different rows; cutting by rendered blocks would mean holding a
+    /// parsed tree per row and reparsing all of it whenever the answer grows.
+    /// A range is neither: the row holds the slice of source it is responsible
+    /// for, renders it as its own document, and a row whose slice did not
+    /// change has nothing to do when the next token arrives.
+    ///
+    /// `None` is the honest answer for a source whose boundaries this reader
+    /// cannot vouch for — a container it flattens, an extension that arrives
+    /// as bare events. A caller that gets it draws the whole source as one row
+    /// rather than cutting it somewhere that might not be a boundary.
+    pub fn block_ranges(source: &str) -> Option<Vec<std::ops::Range<usize>>> {
+        let starts = Self::block_starts(source)?;
+        Some(
+            starts
+                .iter()
+                .enumerate()
+                .map(|(index, start)| {
+                    *start..starts.get(index + 1).copied().unwrap_or(source.len())
+                })
+                .collect(),
+        )
+    }
+
     /// The first `max` lines, and how many lines were left behind.
     ///
     /// The count is the point. A document cut to fit says how much was cut, so
@@ -779,6 +807,32 @@ mod tests {
         let (kept, hidden) = document.truncate(10);
         assert_eq!(hidden, 0);
         assert_eq!(kept, document);
+    }
+
+    #[test]
+    fn a_source_cut_at_its_block_ranges_is_still_the_same_document() {
+        // What a caller drawing one row per block ends up with is the
+        // concatenation of the slices it drew. If that is not the source, a
+        // row somewhere is showing text that belongs to its neighbour.
+        let source =
+            "# Title\n\nA paragraph.\n\n```rust\nfn main() {}\n```\n\n- one\n- two\n\nTail.\n";
+        let ranges = Document::block_ranges(source).expect("ordinary blocks are cuttable");
+        assert_eq!(ranges.len(), Document::parse(source).blocks.len());
+
+        let rejoined: String = ranges
+            .iter()
+            .map(|range| &source[range.clone()])
+            .collect::<Vec<_>>()
+            .concat();
+        assert_eq!(rejoined, source);
+        for range in &ranges {
+            assert_eq!(
+                Document::parse(&source[range.clone()]).blocks.len(),
+                1,
+                "a slice holds exactly the one block it was cut for: {:?}",
+                &source[range.clone()]
+            );
+        }
     }
 
     #[test]

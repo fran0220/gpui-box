@@ -449,11 +449,23 @@ pub(super) fn agent_document(_window: &mut Window, cx: &mut App) -> AnyElement {
         .child(caption(
             &theme,
             "a conversation that has been running all day: only the blocks on \
-             screen are built and laid out, and the ones above are still there",
+             screen are built and laid out, and the ones above are still there. \
+             A long answer is drawn as a row per block of its own, so a token \
+             arriving in its last paragraph relays out that paragraph",
         ))
         .child(
             AgentDocument::new("scene.agent-thread")
                 .virtualized(5)
+                .block(
+                    AgentDocumentBlock::markdown(
+                        "answer",
+                        "**The answer.** It kept the verified result, and the run \
+                         below says why.\n\n\
+                         - the refresh failed\n- the last verified value stands\n\n\
+                         Nothing after that point was rewritten.",
+                    )
+                    .revision(1),
+                )
                 .blocks((0..120).map(|turn| {
                     AgentDocumentBlock::markdown(
                         format!("turn-{turn:03}"),

@@ -19,7 +19,7 @@ use gpui::{
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Space, TextTone, TypeScale};
 
-use crate::content::markdown::{Markdown, MarkdownEvent};
+use crate::content::markdown::{Markdown, MarkdownEvent, parse};
 use crate::data::{List, ListItem};
 use crate::display::badge::Tone;
 use crate::display::empty::{EmptyKind, EmptyState};
@@ -34,6 +34,11 @@ type EventHandler = Rc<dyn Fn(&AgentDocumentEvent, &mut Window, &mut App)>;
 /// by this component in practice; partitioning here keeps nested Markdown runs
 /// ordered inside their block instead of competing with sibling block orders.
 const SELECTION_ORDER_STRIDE: u64 = 1 << 32;
+
+/// Each row of a Markdown block drawn as rows receives this many reading-order
+/// values, partitioning a block's stride between its parts the same way the
+/// stride above partitions the document between its blocks.
+const PART_ORDER_STRIDE: u64 = 1 << 16;
 
 /// The semantic kind of one document block.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -455,28 +460,45 @@ impl RenderOnce for AgentDocument {
             AgentDocumentState::Ready => match self.visible_rows {
                 Some(rows) => {
                     let blocks = Rc::new(self.blocks);
+                    let plan = Rc::new(plan_rows(&blocks));
                     // Ids rather than a count, so a block that grew re-measures
                     // itself alone instead of discarding every height the list
                     // had learned.
-                    let keys: Vec<SharedString> =
-                        blocks.iter().map(|block| block.id.clone()).collect();
-                    let count = blocks.len();
+                    let keys: Vec<SharedString> = plan.iter().map(|row| row.key(&blocks)).collect();
+                    let count = plan.len();
                     let listed = Rc::clone(&blocks);
+                    let rows_plan = Rc::clone(&plan);
                     let list_ident = ident.child("blocks");
                     let document = ident.clone();
                     let on_event = self.on_event.clone();
                     List::new(list_ident, count, move |index, window, cx| {
-                        let block = &listed[index];
+                        let row = &rows_plan[index];
+                        let block = &listed[row.block];
+                        let theme = cx.theme().clone();
+                        // A row carries the space that follows it, because a
+                        // list of rows has no gap of its own to give them.
+                        // Between the blocks of one answer that is the space
+                        // Markdown sets its own blocks in; between one block
+                        // and the next it is the document's.
+                        let after = match &row.part {
+                            Some(part) if !part.last => Space::Md,
+                            _ => Space::Lg,
+                        };
                         ListItem::new(
-                            block.id.clone(),
-                            render_block(
-                                &document,
-                                block,
-                                index as u64,
-                                on_event.clone(),
-                                window,
-                                cx,
-                            ),
+                            row.key(&listed),
+                            div()
+                                .w_full()
+                                .pb(gpui::px(theme.space(after)))
+                                .child(render_block(
+                                    &document,
+                                    block,
+                                    row.block as u64,
+                                    row.part.as_ref(),
+                                    on_event.clone(),
+                                    window,
+                                    cx,
+                                ))
+                                .into_any_element(),
                         )
                     })
                     // Blocks are as tall as what is in them: a line of prose
@@ -495,6 +517,7 @@ impl RenderOnce for AgentDocument {
                             // A block's place in the document is its reading
                             // order.
                             order as u64,
+                            None,
                             self.on_event.clone(),
                             window,
                             cx,
@@ -514,18 +537,127 @@ impl RenderOnce for AgentDocument {
     }
 }
 
+/// One top-level Markdown block of a document block that was drawn as rows.
+#[derive(Debug, Clone)]
+struct Part {
+    /// Which of its block's reading-order slices this part takes.
+    index: usize,
+    /// Nothing follows it inside its block, so it is the part a stream is
+    /// still writing into.
+    last: bool,
+    range: std::ops::Range<usize>,
+}
+
+impl Part {
+    /// What this part is called inside its block: where it starts, rather than
+    /// which one it is.
+    ///
+    /// An answer grows at its end, so every part before the one being written
+    /// keeps its offset for the life of the answer. An ordinal would rename
+    /// every part after any block that is ever dropped, and a name that moves
+    /// is a height re-measured, a semantic node replaced, and a reader's
+    /// selection let go of.
+    fn name(&self) -> String {
+        format!("part-at-{}", self.range.start)
+    }
+}
+
+/// One row of a virtualized document.
+#[derive(Debug, Clone)]
+struct PlannedRow {
+    block: usize,
+    /// `None` when the row is the whole block.
+    part: Option<Part>,
+}
+
+impl PlannedRow {
+    /// What the list matches this row by across frames.
+    ///
+    /// A part is matched by where it sits in its block rather than by what it
+    /// says: a paragraph whose text grew is the same paragraph, and the row
+    /// that has to re-measure is that one alone.
+    fn key(&self, blocks: &[AgentDocumentBlock]) -> SharedString {
+        let id = &blocks[self.block].id;
+        match &self.part {
+            Some(part) => SharedString::from(format!("{id}#{}", part.name())),
+            None => id.clone(),
+        }
+    }
+}
+
+/// Which rows a virtualized document is drawn as.
+///
+/// Every block is a row, except a Markdown block long enough to have several
+/// top-level blocks of its own: that one becomes a row per paragraph, fence,
+/// list or table. It matters most for the block still arriving. Drawn whole, a
+/// four-thousand-word answer is relaid out from its first word on every token;
+/// drawn as rows, only the row the token landed in is, and the rest of the
+/// answer is not even on screen.
+///
+/// A source this reader cannot cut at trustworthy boundaries stays one row,
+/// because a fence split across two rows is worse than a long row.
+fn plan_rows(blocks: &[AgentDocumentBlock]) -> Vec<PlannedRow> {
+    let mut plan = Vec::with_capacity(blocks.len());
+    for (index, block) in blocks.iter().enumerate() {
+        let ranges = match &block.body {
+            AgentBlockBody::Markdown(source) => parse::Document::block_ranges(source),
+            _ => None,
+        };
+        match ranges {
+            Some(ranges) if ranges.len() > 1 => {
+                let last = ranges.len() - 1;
+                for (part, range) in ranges.into_iter().enumerate() {
+                    plan.push(PlannedRow {
+                        block: index,
+                        part: Some(Part {
+                            index: part,
+                            last: part == last,
+                            range,
+                        }),
+                    });
+                }
+            }
+            _ => plan.push(PlannedRow {
+                block: index,
+                part: None,
+            }),
+        }
+    }
+    plan
+}
+
 fn render_block(
     document: &Ident,
     block: &AgentDocumentBlock,
     order: u64,
+    part: Option<&Part>,
     on_event: Option<EventHandler>,
     window: &mut Window,
     cx: &mut App,
 ) -> AnyElement {
     let theme = cx.theme().clone();
     let ident = document.child(format!("block.{}", block.id));
-    let state = format!("{}:revision-{}", block.kind.as_str(), block.revision);
-    let selection_order = order.saturating_mul(SELECTION_ORDER_STRIDE);
+    let ident = match part {
+        Some(part) => ident.child(part.name()),
+        None => ident,
+    };
+    let state = match part {
+        Some(part) => format!(
+            "{}:revision-{}:{}",
+            block.kind.as_str(),
+            block.revision,
+            part.name()
+        ),
+        None => format!("{}:revision-{}", block.kind.as_str(), block.revision),
+    };
+    // A part takes its own slice of its block's partition, so a drag down a
+    // split answer reads it in the order it was written.
+    let selection_order = order
+        .saturating_mul(SELECTION_ORDER_STRIDE)
+        .saturating_add(part.map_or(0, |part| part.index as u64 * PART_ORDER_STRIDE));
+    // Only the last part of a block is still being written into; the ones
+    // before it settled the moment the block after them began.
+    let streaming = block.streaming && part.is_none_or(|part| part.last);
     let body = match &block.body {
         AgentBlockBody::Text(text) => div()
             .w_full()
@@ -542,8 +674,13 @@ fn render_block(
             .into_any_element(),
         AgentBlockBody::Markdown(source) => {
             let block_id = block.id.clone();
-            Markdown::new(ident.child("markdown"), source.clone())
+            let source = match part {
+                Some(part) => SharedString::from(source[part.range.clone()].to_string()),
+                None => source.clone(),
+            };
+            Markdown::new(ident.child("markdown"), source)
                 .selection_order_start(selection_order)
+                .streaming(streaming)
                 .when_some(on_event, |markdown, on_event| {
                     markdown.on_event(move |event, window, cx| {
                         on_event(
@@ -570,15 +707,23 @@ fn render_block(
         .w_full()
         .column()
         .gap_token(&theme, Space::Sm)
-        .children(block.label.clone().map(|label| {
-            div()
-                .type_scale(&theme, TypeScale::Label)
-                .text_tone(&theme, TextTone::Muted)
-                .child(label)
-        }))
+        // A block's heading names the block, so it belongs to the row the
+        // block starts in and not to every row it runs through.
+        .children(
+            block
+                .label
+                .clone()
+                .filter(|_| part.is_none_or(|part| part.index == 0))
+                .map(|label| {
+                    div()
+                        .type_scale(&theme, TypeScale::Label)
+                        .text_tone(&theme, TextTone::Muted)
+                        .child(label)
+                }),
+        )
         .child(body);
 
-    let frame = if block.streaming {
+    let frame = if streaming {
         motion::breathe(frame, ident.child("streaming").element_id(), &theme, cx)
     } else {
         frame.into_any_element()
@@ -592,7 +737,7 @@ fn render_block(
             NodeSpec::new(ident.semantic_id(), Role::Group)
                 .parent(document.semantic_id())
                 .value(state)
-                .busy(block.streaming),
+                .busy(streaming),
         )
         .into_any_element()
 }
