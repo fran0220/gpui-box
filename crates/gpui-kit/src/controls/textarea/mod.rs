@@ -30,6 +30,7 @@ mod element;
 pub(crate) mod layout;
 
 use std::ops::Range;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use gpui::{
@@ -93,6 +94,19 @@ actions!(
 /// bindings on top without re-declaring these.
 pub const KEY_CONTEXT: &str = "TextArea";
 
+/// The second identifier an area publishes when enter submits it.
+///
+/// What enter means is per-area policy and a keymap is global, so the policy
+/// is carried in the context the area declares and the two enter bindings are
+/// written against it. That is the only way round it: GPUI dispatches a bound
+/// key before any raw handler sees it, so an area cannot decide in its own
+/// handler which of the two it just got.
+const SUBMIT_CONTEXT: &str = "TextAreaSubmits";
+
+/// The whole context such an area declares: the shared one, so every other
+/// binding still reaches it, plus the marker.
+const SUBMIT_KEY_CONTEXT: &str = "TextArea TextAreaSubmits";
+
 /// The visible rows a text area occupies when the caller asks for none.
 const DEFAULT_ROWS: usize = 3;
 
@@ -135,8 +149,22 @@ pub(crate) fn install(cx: &mut App) {
         KeyBinding::new("end", LineEnd, Some(KEY_CONTEXT)),
         KeyBinding::new("shift-home", SelectToLineStart, Some(KEY_CONTEXT)),
         KeyBinding::new("shift-end", SelectToLineEnd, Some(KEY_CONTEXT)),
-        // Enter belongs to the text here; a submission is the modified chord.
-        KeyBinding::new("enter", Newline, Some(KEY_CONTEXT)),
+        // What enter does is the area's policy. In the default one it belongs
+        // to the text and a submission is the modified chord; in the other the
+        // two swap, and shift-enter opens a line.
+        KeyBinding::new(
+            "enter",
+            Newline,
+            Some(&format!("{KEY_CONTEXT} && !{SUBMIT_CONTEXT}")),
+        ),
+        KeyBinding::new(
+            "enter",
+            Submit,
+            Some(&format!("{KEY_CONTEXT} && {SUBMIT_CONTEXT}")),
+        ),
+        // Bound in both, because a modified enter means the same thing in
+        // both: the one that is not the common act.
+        KeyBinding::new("shift-enter", Newline, Some(KEY_CONTEXT)),
         KeyBinding::new(&format!("{primary}-enter"), Submit, Some(KEY_CONTEXT)),
         KeyBinding::new("escape", Cancel, Some(KEY_CONTEXT)),
         KeyBinding::new(&format!("{primary}-home"), DocumentStart, Some(KEY_CONTEXT)),
@@ -199,6 +227,34 @@ pub(crate) fn install(cx: &mut App) {
     cx.bind_keys(bindings);
 }
 
+/// What the enter key does.
+///
+/// Both are ordinary and neither is a preference: it depends on what the text
+/// is. A field in a form holds a value that is edited and then committed, and
+/// enter is part of editing it. A composer holds a message, where sending is
+/// the common act and a second line is the exception.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Enter {
+    /// Enter opens a line; the platform modifier plus enter submits.
+    #[default]
+    Opens,
+    /// Enter submits; shift plus enter opens a line.
+    Submits,
+}
+
+/// What a paste carried, when it was not text.
+///
+/// An area cannot put an image or a file into a string, so it says what
+/// arrived and stops there. Whether this text is a message that takes
+/// attachments, or a field that has no use for one, is the host's to know.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Pasted {
+    /// Image data, such as a screenshot or a copied picture.
+    Images(Vec<gpui::Image>),
+    /// Paths, from a file manager's copy.
+    Paths(Vec<PathBuf>),
+}
+
 /// What a text area reports to its owner.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TextAreaEvent {
@@ -208,6 +264,12 @@ pub enum TextAreaEvent {
     Submit,
     /// Editing was abandoned with the cancel key.
     Cancel,
+    /// A paste carried something the text cannot hold.
+    Pasted(Pasted),
+    /// Up, while the arrows belong to something else. The caret did not move.
+    MoveUp,
+    /// Down, on the same terms.
+    MoveDown,
     Focus,
     Blur,
 }
@@ -235,6 +297,11 @@ pub struct TextArea {
     max_length: Option<usize>,
     rows: usize,
     max_rows: Option<usize>,
+    enter: Enter,
+    /// Whether the vertical arrows belong to something other than the caret.
+    /// Set from the host's render while a surface over the area is listing
+    /// options, because that is the only thing that knows there is one.
+    arrows_claimed: bool,
     /// The rows the frame decided to occupy, which grows with the text until
     /// `max_rows` and is measured rather than guessed.
     visible_rows: usize,
@@ -276,6 +343,8 @@ impl TextArea {
             max_length: None,
             rows: DEFAULT_ROWS,
             max_rows: None,
+            enter: Enter::Opens,
+            arrows_claimed: false,
             visible_rows: DEFAULT_ROWS,
             scroll_offset: px(0.0),
             goal_x: None,
@@ -331,6 +400,31 @@ impl TextArea {
     }
 
     /// Truncates input past a length in bytes of UTF-8.
+    /// What the enter key does. See [`Enter`].
+    pub fn enter(mut self, enter: Enter) -> Self {
+        self.enter = enter;
+        self
+    }
+
+    /// Hands the vertical arrows to the host, or takes them back.
+    ///
+    /// While they are claimed, up and down report [`TextAreaEvent::MoveUp`]
+    /// and [`TextAreaEvent::MoveDown`] and the caret does not move. A menu
+    /// drawn over the area cannot take them for itself: GPUI dispatches a
+    /// bound key before any raw listener, so the area has to hand them over,
+    /// and it only does so while the host says there is something up there to
+    /// move through.
+    ///
+    /// There is no notify, because this is set from the host's own render and
+    /// asking for a frame from inside one would spin.
+    pub fn set_arrows_claimed(&mut self, claimed: bool) {
+        self.arrows_claimed = claimed;
+    }
+
+    pub fn arrows_claimed(&self) -> bool {
+        self.arrows_claimed
+    }
+
     pub fn max_length(mut self, max_length: usize) -> Self {
         self.max_length = Some(max_length);
         self.edit.rules_mut().max_length = Some(max_length);
@@ -355,6 +449,16 @@ impl TextArea {
         self.goal_x = None;
         cx.emit(TextAreaEvent::Change(self.edit.text().clone()));
         cx.notify();
+    }
+
+    /// Inserts text at the caret, replacing the selection, exactly as a paste
+    /// would.
+    ///
+    /// This is what a drop onto the area is: text that arrived from outside
+    /// with no keystroke behind it. It goes through the same edit as
+    /// everything else, so it is one undo step and it reports one change.
+    pub fn insert(&mut self, text: &str, cx: &mut Context<Self>) {
+        self.apply_edit(None, text, text_edit::Cause::Paste, cx);
     }
 
     pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
@@ -619,10 +723,18 @@ impl TextArea {
     }
 
     fn up(&mut self, _: &Up, _: &mut Window, cx: &mut Context<Self>) {
+        if self.arrows_claimed {
+            cx.emit(TextAreaEvent::MoveUp);
+            return;
+        }
         self.move_by_row(-1, false, cx);
     }
 
     fn down(&mut self, _: &Down, _: &mut Window, cx: &mut Context<Self>) {
+        if self.arrows_claimed {
+            cx.emit(TextAreaEvent::MoveDown);
+            return;
+        }
         self.move_by_row(1, false, cx);
     }
 
@@ -781,13 +893,22 @@ impl TextArea {
     }
 
     fn paste(&mut self, _: &Paste, _window: &mut Window, cx: &mut Context<Self>) {
-        let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) else {
+        let Some(item) = cx.read_from_clipboard() else {
             return;
         };
-        // Line breaks survive a paste here, but only in one shape, so the
-        // stored text never depends on where it was copied from.
-        let text = text.replace("\r\n", "\n").replace('\r', "\n");
-        self.apply_edit(None, &text, text_edit::Cause::Paste, cx);
+        if let Some(text) = item.text() {
+            // Line breaks survive a paste here, but only in one shape, so the
+            // stored text never depends on where it was copied from.
+            let text = text.replace("\r\n", "\n").replace('\r', "\n");
+            self.apply_edit(None, &text, text_edit::Cause::Paste, cx);
+            return;
+        }
+        // Not text. The area reports what arrived rather than dropping it
+        // silently or writing a path into the message as if somebody had
+        // typed one.
+        if let Some(pasted) = non_text(&item) {
+            cx.emit(TextAreaEvent::Pasted(pasted));
+        }
     }
 
     fn submit(&mut self, _: &Submit, _: &mut Window, cx: &mut Context<Self>) {
@@ -1048,7 +1169,13 @@ impl Render for TextArea {
 
         let field = div()
             .id(self.ident.element_id())
-            .key_context(KEY_CONTEXT)
+            // The second identifier is what the two enter bindings are written
+            // against, so what enter means travels with the area rather than
+            // with the keymap.
+            .key_context(match self.enter {
+                Enter::Opens => KEY_CONTEXT,
+                Enter::Submits => SUBMIT_KEY_CONTEXT,
+            })
             .when(!self.disabled, |element| {
                 element.track_focus(&self.focus_handle)
             })
@@ -1243,4 +1370,33 @@ impl Render for TextArea {
             None => field.into_any_element(),
         }
     }
+}
+
+/// The non-text half of a clipboard item, when there is one.
+///
+/// Every image entry, or every path entry, whichever the item leads with. A
+/// clipboard carrying both is one thing described two ways, and reporting it
+/// twice would stage it twice.
+fn non_text(item: &ClipboardItem) -> Option<Pasted> {
+    let images: Vec<gpui::Image> = item
+        .entries()
+        .iter()
+        .filter_map(|entry| match entry {
+            gpui::ClipboardEntry::Image(image) => Some(image.clone()),
+            _ => None,
+        })
+        .collect();
+    if !images.is_empty() {
+        return Some(Pasted::Images(images));
+    }
+    let paths: Vec<PathBuf> = item
+        .entries()
+        .iter()
+        .filter_map(|entry| match entry {
+            gpui::ClipboardEntry::ExternalPaths(paths) => Some(paths.paths().to_vec()),
+            _ => None,
+        })
+        .flatten()
+        .collect();
+    (!paths.is_empty()).then_some(Pasted::Paths(paths))
 }

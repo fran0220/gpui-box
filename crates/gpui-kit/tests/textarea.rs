@@ -583,3 +583,149 @@ fn unrepresentable_graphemes_omit_the_native_selection_pattern(cx: &mut TestAppC
     );
     assert_eq!(value(&mut harness, &slot), "ab\nc");
 }
+
+/// Collects everything an area reports, so a test reads the sequence rather
+/// than one flag per event kind.
+fn reported(
+    harness: &mut Harness,
+    slot: &Rc<RefCell<Option<Entity<TextArea>>>>,
+) -> Rc<RefCell<Vec<TextAreaEvent>>> {
+    let events: Rc<RefCell<Vec<TextAreaEvent>>> = Rc::new(RefCell::new(Vec::new()));
+    let into = events.clone();
+    let entity = slot.borrow().clone().expect("area was built");
+    harness.update(move |_, cx| {
+        cx.subscribe(&entity, move |_, event: &TextAreaEvent, _| {
+            into.borrow_mut().push(event.clone());
+        })
+        .detach();
+    });
+    events
+}
+
+#[gpui::test]
+fn a_composer_submits_on_enter_and_opens_a_line_on_shift_enter(cx: &mut TestAppContext) {
+    // The other convention, for text that is a message rather than a value.
+    let (mut harness, slot) = area(cx, |area| area.enter(Enter::Submits));
+    let events = reported(&mut harness, &slot);
+
+    harness.click("form.notes");
+    harness.keystrokes("a enter");
+    assert_eq!(
+        value(&mut harness, &slot),
+        "a",
+        "enter sent it rather than adding to it"
+    );
+    assert!(events.borrow().contains(&TextAreaEvent::Submit));
+
+    harness.keystrokes("shift-enter b");
+    assert_eq!(
+        value(&mut harness, &slot),
+        "a\nb",
+        "and the second line is still reachable"
+    );
+    assert_eq!(
+        events
+            .borrow()
+            .iter()
+            .filter(|event| **event == TextAreaEvent::Submit)
+            .count(),
+        1,
+        "shift-enter is not a second submission"
+    );
+}
+
+#[gpui::test]
+fn the_arrows_can_be_claimed_by_whatever_is_listing_over_the_area(cx: &mut TestAppContext) {
+    // A menu drawn over the composer cannot take the arrows for itself: a
+    // bound key never reaches a raw listener. So the area hands them over, and
+    // the caret stays where it is while they are gone.
+    let (mut harness, slot) = area(cx, |area| area.text("first\nsecond\nthird"));
+    let events = reported(&mut harness, &slot);
+    let entity = slot.borrow().clone().expect("area was built");
+
+    harness.click("form.notes");
+    harness.keystrokes("up");
+    let moved = caret_row(&mut harness, &slot);
+
+    let claimed = entity.clone();
+    harness.update(move |_, cx| {
+        claimed.update(cx, |area, _| area.set_arrows_claimed(true));
+    });
+    harness.keystrokes("up up");
+
+    assert_eq!(
+        caret_row(&mut harness, &slot),
+        moved,
+        "the caret did not move while the arrows belonged to something else"
+    );
+    assert_eq!(
+        events
+            .borrow()
+            .iter()
+            .filter(|event| **event == TextAreaEvent::MoveUp)
+            .count(),
+        2,
+        "and both keystrokes were reported"
+    );
+
+    let released = entity.clone();
+    harness.update(move |_, cx| {
+        released.update(cx, |area, _| area.set_arrows_claimed(false));
+    });
+    harness.keystrokes("down");
+    assert_ne!(
+        caret_row(&mut harness, &slot),
+        moved,
+        "taking them back moves the caret again"
+    );
+}
+
+#[gpui::test]
+fn a_paste_that_is_not_text_is_reported_rather_than_dropped(cx: &mut TestAppContext) {
+    let (mut harness, slot) = area(cx, |area| area);
+    let events = reported(&mut harness, &slot);
+
+    let image = gpui::Image::from_bytes(gpui::ImageFormat::Png, vec![1, 2, 3]);
+    harness.update({
+        let image = image.clone();
+        move |_, cx| cx.write_to_clipboard(gpui::ClipboardItem::new_image(&image))
+    });
+    harness.click("form.notes");
+    harness.keystrokes(&primary("v"));
+
+    assert_eq!(
+        value(&mut harness, &slot),
+        "",
+        "an image is not written into the text as if somebody typed it"
+    );
+    assert!(
+        events
+            .borrow()
+            .contains(&TextAreaEvent::Pasted(Pasted::Images(vec![image]))),
+        "the host is told what arrived: {:?}",
+        events.borrow()
+    );
+}
+
+#[gpui::test]
+fn a_drop_lands_at_the_caret_as_one_undoable_step(cx: &mut TestAppContext) {
+    let (mut harness, slot) = area(cx, |area| area.text("before AFTER"));
+    let entity = slot.borrow().clone().expect("area was built");
+
+    harness.click("form.notes");
+    let dropped = entity.clone();
+    harness.update(move |_, cx| {
+        dropped.update(cx, |area, cx| {
+            area.set_value("before AFTER", cx);
+            area.insert("drop", cx);
+        });
+    });
+
+    assert_eq!(value(&mut harness, &slot), "before AFTERdrop");
+    harness.keystrokes(&primary("z"));
+    assert_eq!(
+        value(&mut harness, &slot),
+        "before AFTER",
+        "one drop is one undo"
+    );
+}

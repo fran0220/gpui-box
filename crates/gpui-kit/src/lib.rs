@@ -174,7 +174,7 @@ pub mod prelude {
     pub use crate::controls::slider::Slider;
     pub use crate::controls::split_button::SplitButton;
     pub use crate::controls::tag_input::{TagInput, TagInputEvent};
-    pub use crate::controls::textarea::{TextArea, TextAreaEvent};
+    pub use crate::controls::textarea::{Enter, Pasted, TextArea, TextAreaEvent};
     pub use crate::controls::toggle::{Checkbox, Radio, Switch};
     pub use crate::controls::toggle_button::{Toggle, ToggleGroup, ToggleItem, ToggleSelection};
     pub use crate::controls::upload_list::{OverallProgress, Upload, UploadList, UploadState};

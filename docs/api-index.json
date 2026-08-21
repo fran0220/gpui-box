@@ -3838,15 +3838,19 @@
         "read_only(read_only: bool) -> Self",
         "rows(rows: usize) -> Self",
         "max_rows(max_rows: usize) -> Self",
+        "enter(enter: Enter) -> Self",
         "max_length(max_length: usize) -> Self"
       ],
       "commands": [
+        "set_arrows_claimed(claimed: bool)",
         "set_value(value: impl Into<SharedString>, cx: &mut Context<Self>)",
+        "insert(text: &str, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)",
         "set_read_only(read_only: bool, cx: &mut Context<Self>)",
         "set_invalid(invalid: bool, cx: &mut Context<Self>)"
       ],
       "queries": [
+        "arrows_claimed() -> bool",
         "value() -> &SharedString",
         "is_empty() -> bool",
         "is_disabled() -> bool",
@@ -3858,6 +3862,9 @@
         "Change",
         "Submit",
         "Cancel",
+        "Pasted",
+        "MoveUp",
+        "MoveDown",
         "Focus",
         "Blur"
       ],
@@ -6940,6 +6947,19 @@
       "queries": []
     },
     {
+      "name": "Enter",
+      "path": "gpui_kit::controls::Enter",
+      "summary": "What the enter key does.",
+      "variants": [
+        "Opens",
+        "Submits"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "Entrance",
       "path": "gpui_kit::motion::Entrance",
       "summary": "How an element arrives.",
@@ -9205,6 +9225,19 @@
       "queries": []
     },
     {
+      "name": "Pasted",
+      "path": "gpui_kit::controls::Pasted",
+      "summary": "What a paste carried, when it was not text.",
+      "variants": [
+        "Images",
+        "Paths"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "PermissionAction",
       "path": "gpui_kit::agent::PermissionAction",
       "summary": "One column: an action, addressed by a stable key.",
@@ -10894,6 +10927,9 @@
         "Change",
         "Submit",
         "Cancel",
+        "Pasted",
+        "MoveUp",
+        "MoveDown",
         "Focus",
         "Blur"
       ],
@@ -11773,7 +11809,7 @@
       "uses": [
         "TextArea"
       ],
-      "example": "fn textarea(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_inputs(window, cx);\n    let inputs = cx.global::<SceneInputs>();\n    let (notes, review, frozen) = (\n        inputs.notes.clone(),\n        inputs.review.clone(),\n        inputs.frozen.clone(),\n    );\n    let theme = cx.theme().clone();\n\n    div()\n        .flex()\n        .flex_col()\n        .gap(px(theme.space(Space::Md)))\n        .p(px(theme.space(Space::Lg)))\n        .w(px(360.0))\n        .child(notes)\n        .child(review)\n        .child(frozen)\n        .into_any_element()\n}"
+      "example": "fn textarea(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_inputs(window, cx);\n    let inputs = cx.global::<SceneInputs>();\n    let (notes, review, frozen, message) = (\n        inputs.notes.clone(),\n        inputs.review.clone(),\n        inputs.frozen.clone(),\n        inputs.message.clone(),\n    );\n    let theme = cx.theme().clone();\n\n    div()\n        .flex()\n        .flex_col()\n        .gap(px(theme.space(Space::Md)))\n        .p(px(theme.space(Space::Lg)))\n        .w(px(360.0))\n        .child(notes)\n        .child(review)\n        .child(frozen)\n        // The other enter policy, for text that is a message rather than a\n        // value. Nothing about it looks different, which is the point: what\n        // changes is which key is the common act.\n        .child(message)\n        .into_any_element()\n}"
     },
     {
       "name": "form",

@@ -744,6 +744,7 @@ pub(super) struct SceneInputs {
     notes: Entity<TextArea>,
     review: Entity<TextArea>,
     frozen: Entity<TextArea>,
+    message: Entity<TextArea>,
 }
 
 impl Global for SceneInputs {}
@@ -807,6 +808,13 @@ pub(super) fn ensure_inputs(window: &mut Window, cx: &mut App) {
                     .rows(2)
                     .disabled(true)
             }),
+            message: cx.new(|cx| {
+                TextArea::new("scene.textarea.message", window, cx)
+                    .placeholder("Ask anything. Enter sends, shift-enter opens a line.")
+                    .enter(Enter::Submits)
+                    .rows(2)
+                    .max_rows(8)
+            }),
         };
         // A caret only paints where the keyboard is, so one area takes it:
         // otherwise a capture cannot show a caret at all.
@@ -842,10 +850,11 @@ pub(super) fn input(window: &mut Window, cx: &mut App) -> AnyElement {
 pub(super) fn textarea(window: &mut Window, cx: &mut App) -> AnyElement {
     ensure_inputs(window, cx);
     let inputs = cx.global::<SceneInputs>();
-    let (notes, review, frozen) = (
+    let (notes, review, frozen, message) = (
         inputs.notes.clone(),
         inputs.review.clone(),
         inputs.frozen.clone(),
+        inputs.message.clone(),
     );
     let theme = cx.theme().clone();
 
@@ -858,6 +867,10 @@ pub(super) fn textarea(window: &mut Window, cx: &mut App) -> AnyElement {
         .child(notes)
         .child(review)
         .child(frozen)
+        // The other enter policy, for text that is a message rather than a
+        // value. Nothing about it looks different, which is the point: what
+        // changes is which key is the common act.
+        .child(message)
         .into_any_element()
 }
 
