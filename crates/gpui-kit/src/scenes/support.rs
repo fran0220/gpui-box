@@ -24,7 +24,7 @@ pub(super) use crate::controls::number_input::NumberInput;
 pub(super) use crate::controls::select::{Select, SelectOption};
 pub(super) use crate::controls::split_button::SplitButton;
 pub(super) use crate::controls::tag_input::TagInput;
-pub(super) use crate::controls::textarea::TextArea;
+pub(super) use crate::controls::textarea::{Frame, TextArea};
 pub(super) use crate::display::badge::Tone;
 pub(super) use crate::display::icon::{Icon as IconView, IconTone};
 pub(super) use crate::foundation::ActiveTheme;

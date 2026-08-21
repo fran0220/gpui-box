@@ -782,6 +782,7 @@ impl Pill {
         let area = cx.new(|cx| {
             TextArea::new(ident.child("text"), window, cx)
                 .text(text.to_string())
+                .frame(Frame::Host)
                 .enter(Enter::Submits)
                 .rows(1)
                 .max_rows(6)

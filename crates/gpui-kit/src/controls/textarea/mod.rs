@@ -255,6 +255,25 @@ pub enum Pasted {
     Paths(Vec<PathBuf>),
 }
 
+/// Who draws the frame the text sits in.
+///
+/// A field standing in a form is a control, and the area draws the whole of
+/// it. An area inside a composer's pill, or inside a row a settings page
+/// already framed, is not: drawing a second well inside the first is two
+/// surfaces where the reader sees one control, and the frame the host drew is
+/// the one they will aim at.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Frame {
+    /// The area draws its own well, radius, padding and focus ring.
+    #[default]
+    Own,
+    /// The host drew the frame. The area contributes text, caret, selection
+    /// and every editing behaviour, and inherits the type it is placed in, so
+    /// the frame around it can be any shape the host wants — including one
+    /// that changes shape from what [`Measured`] reports.
+    Host,
+}
+
 /// What a text area measured the last time it was laid out.
 ///
 /// An area grows itself between `rows` and `max_rows`, which is the whole
@@ -323,6 +342,7 @@ pub struct TextArea {
     rows: usize,
     max_rows: Option<usize>,
     enter: Enter,
+    frame: Frame,
     /// Whether the vertical arrows belong to something other than the caret.
     /// Set from the host's render while a surface over the area is listing
     /// options, because that is the only thing that knows there is one.
@@ -373,6 +393,7 @@ impl TextArea {
             rows: DEFAULT_ROWS,
             max_rows: None,
             enter: Enter::Opens,
+            frame: Frame::Own,
             arrows_claimed: false,
             visible_rows: DEFAULT_ROWS,
             scroll_offset: px(0.0),
@@ -390,6 +411,27 @@ impl TextArea {
 
     pub fn placeholder(mut self, placeholder: impl Into<SharedString>) -> Self {
         self.placeholder = placeholder.into();
+        self
+    }
+
+    /// Changes what the empty area suggests, after it was built.
+    ///
+    /// What an empty area is waiting for can change without the area being
+    /// rebuilt — the language it is read in, or a question the host is part
+    /// way through asking — and rebuilding it to say so would throw away
+    /// whatever had been typed.
+    pub fn set_placeholder(
+        &mut self,
+        placeholder: impl Into<SharedString>,
+        cx: &mut Context<Self>,
+    ) {
+        self.placeholder = placeholder.into();
+        cx.notify();
+    }
+
+    /// Who draws the frame around the text. See [`Frame`].
+    pub fn frame(mut self, frame: Frame) -> Self {
+        self.frame = frame;
         self
     }
 
@@ -1358,15 +1400,21 @@ impl Render for TextArea {
             })
             .w_full()
             .column()
-            .px(px(metrics.padding_x))
-            .py(px(theme.spacing.xs))
-            .radius(&theme, Radius::Control)
-            .well(&theme)
-            .when(self.invalid, |element| {
-                element.border_color(theme.colors.danger)
+            // In a host's frame the area contributes only the text: a well
+            // inside the host's well is two surfaces for one control, and the
+            // type belongs to whatever the host put the area in.
+            .when(self.frame == Frame::Own, |element| {
+                element
+                    .px(px(metrics.padding_x))
+                    .py(px(theme.spacing.xs))
+                    .radius(&theme, Radius::Control)
+                    .well(&theme)
+                    .when(self.invalid, |element| {
+                        element.border_color(theme.colors.danger)
+                    })
+                    .when(focused, |element| element.shadow(theme.focus_ring()))
+                    .text_size(px(metrics.font_size))
             })
-            .when(focused, |element| element.shadow(theme.focus_ring()))
-            .text_size(px(metrics.font_size))
             .font_fallbacks(gpui_kit_assets::text_fallbacks())
             .text_color(if self.disabled {
                 theme.colors.text_disabled

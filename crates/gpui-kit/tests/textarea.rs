@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use gpui::{AppContext as _, Entity, Focusable, IntoElement, TestAppContext, div, prelude::*, px};
-use gpui_kit::controls::textarea::{TextArea, TextAreaEvent};
+use gpui_kit::controls::textarea::{Frame, TextArea, TextAreaEvent};
 use gpui_kit::prelude::*;
 use gpui_kit_testkit::harness::Harness;
 use unicode_segmentation::UnicodeSegmentation;
@@ -777,5 +777,48 @@ fn a_short_line_measures_narrower_than_the_frame_it_sits_in(cx: &mut TestAppCont
     assert!(
         measured.text < measured.wrapped,
         "text that fits reports that it fits, which is what keeps a pill a pill: {measured:?}"
+    );
+}
+
+#[gpui::test]
+fn a_new_placeholder_does_not_disturb_what_was_typed(cx: &mut TestAppContext) {
+    let (mut harness, slot) = area(cx, |area| area.placeholder("Ask anything"));
+    let entity = slot.borrow().clone().expect("area was built");
+
+    harness.click("form.notes");
+    harness.keystrokes("h i");
+    let changed = entity.clone();
+    harness.update(move |_, cx| {
+        changed.update(cx, |area, cx| {
+            area.set_placeholder("Answer the question", cx)
+        });
+    });
+
+    assert_eq!(
+        value(&mut harness, &slot),
+        "hi",
+        "the area was told what to suggest when it is empty, not to empty itself"
+    );
+    assert_eq!(
+        harness
+            .node("form.notes")
+            .and_then(|node| node.placeholder.clone()),
+        Some("Answer the question".to_string()),
+        "and it suggests the new one"
+    );
+}
+
+#[gpui::test]
+fn an_area_in_a_host_frame_still_edits(cx: &mut TestAppContext) {
+    let (mut harness, slot) = area(cx, |area| area.frame(Frame::Host).text("draft"));
+
+    harness.click("form.notes");
+    harness.keystrokes(&primary("a"));
+    harness.keystrokes("s e n t");
+
+    assert_eq!(
+        value(&mut harness, &slot),
+        "sent",
+        "the host took over the frame, not the editing"
     );
 }

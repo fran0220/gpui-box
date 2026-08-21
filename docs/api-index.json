@@ -3860,6 +3860,7 @@
       ],
       "options": [
         "placeholder(placeholder: impl Into<SharedString>) -> Self",
+        "frame(frame: Frame) -> Self",
         "text(text: impl Into<SharedString>) -> Self",
         "invalid(invalid: bool) -> Self",
         "required(required: bool) -> Self",
@@ -3870,6 +3871,7 @@
         "max_length(max_length: usize) -> Self"
       ],
       "commands": [
+        "set_placeholder(placeholder: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_arrows_claimed(claimed: bool)",
         "set_value(value: impl Into<SharedString>, cx: &mut Context<Self>)",
         "insert(text: &str, cx: &mut Context<Self>)",
@@ -7281,6 +7283,19 @@
         "focus_prev(window: &mut Window, cx: &mut App)",
         "contains_focus(window: &Window, cx: &App) -> bool"
       ]
+    },
+    {
+      "name": "Frame",
+      "path": "gpui_kit::controls::Frame",
+      "summary": "Who draws the frame the text sits in.",
+      "variants": [
+        "Own",
+        "Host"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "GameFraction",
