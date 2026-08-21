@@ -1498,3 +1498,83 @@ fn a_wrapping_diff_keeps_every_row_addressable(cx: &mut TestAppContext) {
         );
     }
 }
+
+#[gpui::test]
+fn a_virtualized_document_lays_out_a_screenful_rather_than_a_conversation(cx: &mut TestAppContext) {
+    // The cost of drawing the newest block must not grow with everything said
+    // before it, which is what a plain column makes it.
+    let built = Rc::new(RefCell::new(0usize));
+    let counter = built.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let counter = counter.clone();
+        AgentDocument::new("thread")
+            .virtualized(4)
+            .blocks((0..200).map(move |index| {
+                let counter = counter.clone();
+                AgentDocumentBlock::code(format!("block-{index:03}"), move |_, _| {
+                    *counter.borrow_mut() += 1;
+                    div().child(format!("block {index}")).into_any_element()
+                })
+            }))
+            .into_any_element()
+    });
+
+    assert!(
+        harness.node("thread.block.block-000").is_some(),
+        "the first blocks are drawn"
+    );
+    assert!(
+        harness.node("thread.block.block-199").is_none(),
+        "and the two-hundredth, which nobody can see, is not"
+    );
+    let drawn = *built.borrow();
+    assert!(
+        drawn < 40,
+        "only a screenful of blocks was built, but {drawn} were"
+    );
+    assert_eq!(
+        harness.node("thread").expect("published").value.as_deref(),
+        Some("ready:200"),
+        "the document still says how much it holds, drawn or not"
+    );
+}
+
+#[gpui::test]
+fn a_block_that_grew_does_not_disturb_the_blocks_around_it(cx: &mut TestAppContext) {
+    // A streaming reply arrives a token at a time. If each token discarded
+    // every height the list had measured, the scrollbar would shudder for as
+    // long as the answer took.
+    let answer = Rc::new(RefCell::new(String::from("The")));
+    let text = answer.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let text = text.borrow().clone();
+        AgentDocument::new("thread")
+            .virtualized(6)
+            .block(AgentDocumentBlock::text(
+                "ask",
+                "What did the freeze cover?",
+            ))
+            .block(AgentDocumentBlock::markdown("reply", text).streaming(true))
+            .block(AgentDocumentBlock::text("after", "Anything else?"))
+            .into_any_element()
+    });
+
+    let before = harness
+        .bounds("thread.block.ask")
+        .expect("the question is drawn");
+
+    for token in [" freeze", " covered", " everything", " after the tag."] {
+        answer.borrow_mut().push_str(token);
+        harness.frame();
+    }
+
+    assert_eq!(
+        harness.bounds("thread.block.ask").expect("still drawn"),
+        before,
+        "the question moved while the answer below it was still arriving"
+    );
+    assert!(
+        harness.node("thread.block.reply").expect("drawn").busy,
+        "and the block that is still arriving says so"
+    );
+}

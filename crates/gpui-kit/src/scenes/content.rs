@@ -413,26 +413,26 @@ pub(super) fn agent_document(_window: &mut Window, cx: &mut App) -> AnyElement {
                     .revision(3),
                 )
                 .block(
-                    AgentDocumentBlock::code(
-                        "patch",
+                    AgentDocumentBlock::code("patch", |_, _| {
                         CodeView::from_text(
                             "scene.agent-document.patch",
                             "pub fn bounded_retry(attempt: usize) -> bool {\n    attempt < 3\n}",
                         )
-                        .language("rust"),
-                    )
+                        .language("rust")
+                        .into_any_element()
+                    })
                     .label("Proposed code")
                     .revision(2),
                 )
                 .block(
-                    AgentDocumentBlock::tool_call(
-                        "verification",
+                    AgentDocumentBlock::tool_call("verification", |_, _| {
                         ToolCallCard::new("scene.agent-document.tool", "cargo test")
                             .state(ToolCallState::Succeeded {
                                 output: ToolOutput::Silent,
                             })
-                            .elapsed("1.4 s"),
-                    )
+                            .elapsed("1.4 s")
+                            .into_any_element()
+                    })
                     .revision(1),
                 )
                 .block(AgentDocumentBlock::notice(
@@ -440,6 +440,30 @@ pub(super) fn agent_document(_window: &mut Window, cx: &mut App) -> AnyElement {
                     "The last refresh failed; the result above is the last verified value.",
                     Tone::Warning,
                 )),
+        )
+        .child(
+            Divider::new()
+                .id("scene.agent-document.long")
+                .label("The same document, virtualized"),
+        )
+        .child(caption(
+            &theme,
+            "a conversation that has been running all day: only the blocks on \
+             screen are built and laid out, and the ones above are still there",
+        ))
+        .child(
+            AgentDocument::new("scene.agent-thread")
+                .virtualized(5)
+                .blocks((0..120).map(|turn| {
+                    AgentDocumentBlock::markdown(
+                        format!("turn-{turn:03}"),
+                        format!(
+                            "**Turn {turn}.** The run kept its verified result while the \
+                             refresh failed, and the answer below says why."
+                        ),
+                    )
+                    .revision(turn as u64)
+                })),
         )
         .child(
             Divider::new()

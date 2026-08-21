@@ -20,6 +20,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Space, TextTone, TypeScale};
 
 use crate::content::markdown::{Markdown, MarkdownEvent};
+use crate::data::{List, ListItem};
 use crate::display::badge::Tone;
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::status::StatusLine;
@@ -70,11 +71,22 @@ impl AgentBlockKind {
     }
 }
 
+type Build = Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>;
+
 enum AgentBlockBody {
     Text(SharedString),
     Markdown(SharedString),
-    Notice { message: SharedString, tone: Tone },
-    Element(AnyElement),
+    Notice {
+        message: SharedString,
+        tone: Tone,
+    },
+    /// A typed block is a *way to build* its element rather than a built one.
+    ///
+    /// A finished element can be drawn once. A document that only lays out
+    /// what is on screen has to be able to draw a block when the reader
+    /// scrolls back to it, hours later, without having kept it laid out in
+    /// between — so what it holds has to be the recipe, not the result.
+    Element(Build),
 }
 
 impl std::fmt::Debug for AgentBlockBody {
@@ -146,10 +158,14 @@ impl AgentDocumentBlock {
     }
 
     /// A typed block whose existing component owns its presentation.
+    ///
+    /// Takes a way to build the element rather than a built one, so the block
+    /// can be drawn again when the reader scrolls back to it. See
+    /// [`AgentDocument::virtualized`] for why that is not optional.
     pub fn element(
         id: impl Into<SharedString>,
         kind: AgentBlockKind,
-        element: impl IntoElement,
+        build: impl Fn(&mut Window, &mut App) -> AnyElement + 'static,
     ) -> Self {
         Self {
             id: id.into(),
@@ -157,44 +173,71 @@ impl AgentDocumentBlock {
             kind,
             label: None,
             streaming: false,
-            body: AgentBlockBody::Element(element.into_any_element()),
+            body: AgentBlockBody::Element(Rc::new(build)),
         }
     }
 
-    pub fn code(id: impl Into<SharedString>, element: impl IntoElement) -> Self {
-        Self::element(id, AgentBlockKind::Code, element)
+    pub fn code(
+        id: impl Into<SharedString>,
+        build: impl Fn(&mut Window, &mut App) -> AnyElement + 'static,
+    ) -> Self {
+        Self::element(id, AgentBlockKind::Code, build)
     }
 
-    pub fn tool_call(id: impl Into<SharedString>, element: impl IntoElement) -> Self {
-        Self::element(id, AgentBlockKind::ToolCall, element)
+    pub fn tool_call(
+        id: impl Into<SharedString>,
+        build: impl Fn(&mut Window, &mut App) -> AnyElement + 'static,
+    ) -> Self {
+        Self::element(id, AgentBlockKind::ToolCall, build)
     }
 
-    pub fn diff(id: impl Into<SharedString>, element: impl IntoElement) -> Self {
-        Self::element(id, AgentBlockKind::Diff, element)
+    pub fn diff(
+        id: impl Into<SharedString>,
+        build: impl Fn(&mut Window, &mut App) -> AnyElement + 'static,
+    ) -> Self {
+        Self::element(id, AgentBlockKind::Diff, build)
     }
 
-    pub fn artifact(id: impl Into<SharedString>, element: impl IntoElement) -> Self {
-        Self::element(id, AgentBlockKind::Artifact, element)
+    pub fn artifact(
+        id: impl Into<SharedString>,
+        build: impl Fn(&mut Window, &mut App) -> AnyElement + 'static,
+    ) -> Self {
+        Self::element(id, AgentBlockKind::Artifact, build)
     }
 
-    pub fn schema(id: impl Into<SharedString>, element: impl IntoElement) -> Self {
-        Self::element(id, AgentBlockKind::Schema, element)
+    pub fn schema(
+        id: impl Into<SharedString>,
+        build: impl Fn(&mut Window, &mut App) -> AnyElement + 'static,
+    ) -> Self {
+        Self::element(id, AgentBlockKind::Schema, build)
     }
 
-    pub fn chart(id: impl Into<SharedString>, element: impl IntoElement) -> Self {
-        Self::element(id, AgentBlockKind::Chart, element)
+    pub fn chart(
+        id: impl Into<SharedString>,
+        build: impl Fn(&mut Window, &mut App) -> AnyElement + 'static,
+    ) -> Self {
+        Self::element(id, AgentBlockKind::Chart, build)
     }
 
-    pub fn image(id: impl Into<SharedString>, element: impl IntoElement) -> Self {
-        Self::element(id, AgentBlockKind::Image, element)
+    pub fn image(
+        id: impl Into<SharedString>,
+        build: impl Fn(&mut Window, &mut App) -> AnyElement + 'static,
+    ) -> Self {
+        Self::element(id, AgentBlockKind::Image, build)
     }
 
-    pub fn choice(id: impl Into<SharedString>, element: impl IntoElement) -> Self {
-        Self::element(id, AgentBlockKind::Choice, element)
+    pub fn choice(
+        id: impl Into<SharedString>,
+        build: impl Fn(&mut Window, &mut App) -> AnyElement + 'static,
+    ) -> Self {
+        Self::element(id, AgentBlockKind::Choice, build)
     }
 
-    pub fn custom(id: impl Into<SharedString>, element: impl IntoElement) -> Self {
-        Self::element(id, AgentBlockKind::Custom, element)
+    pub fn custom(
+        id: impl Into<SharedString>,
+        build: impl Fn(&mut Window, &mut App) -> AnyElement + 'static,
+    ) -> Self {
+        Self::element(id, AgentBlockKind::Custom, build)
     }
 
     /// A host-authored status or warning inside the document.
@@ -283,6 +326,7 @@ pub struct AgentDocument {
     ident: Ident,
     state: AgentDocumentState,
     blocks: Vec<AgentDocumentBlock>,
+    visible_rows: Option<usize>,
     on_event: Option<EventHandler>,
 }
 
@@ -293,6 +337,7 @@ impl std::fmt::Debug for AgentDocument {
             .field("ident", &self.ident)
             .field("state", &self.state)
             .field("blocks", &self.blocks.len())
+            .field("visible_rows", &self.visible_rows)
             .field("has_handler", &self.on_event.is_some())
             .finish()
     }
@@ -304,8 +349,39 @@ impl AgentDocument {
             ident: ident.into(),
             state: AgentDocumentState::Ready,
             blocks: Vec::new(),
+            visible_rows: None,
             on_event: None,
         }
+    }
+
+    /// Lays out only the blocks that are on screen, in a frame this many
+    /// blocks tall.
+    ///
+    /// A conversation is not a document that happens to be long. It is a
+    /// surface that grows all day, is scrolled back through, and whose oldest
+    /// blocks are a diff of four hundred lines and a tool call with a table in
+    /// it. Drawn as a column, every one of those is laid out on every frame,
+    /// including while the newest block is still arriving a token at a time —
+    /// so the cost of showing the *last* block grows with everything said
+    /// before it, which is the shape of a surface that gets slower the longer
+    /// the conversation is useful.
+    ///
+    /// Virtualized, the cost of a frame is the cost of the screenful. That is
+    /// why a block holds a way to build its element rather than a built one:
+    /// there is no other way to draw a block that scrolled off and came back.
+    ///
+    /// Blocks are matched across frames by their ids, so a block whose text
+    /// grew re-measures that block and nothing else. Without that a streaming
+    /// reply would discard every height the list had learned on every token,
+    /// and the scrollbar would shudder for as long as the answer took to
+    /// arrive.
+    ///
+    /// The trade is the usual one: a block that has never been on screen has
+    /// no bounds and publishes nothing, so a copy across the whole document
+    /// reaches what was mounted rather than everything that exists.
+    pub fn virtualized(mut self, rows: usize) -> Self {
+        self.visible_rows = Some(rows.max(1));
+        self
     }
 
     pub fn state(mut self, state: AgentDocumentState) -> Self {
@@ -349,7 +425,7 @@ impl AgentDocument {
 }
 
 impl RenderOnce for AgentDocument {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let state_name = self.state.as_str();
         let busy = matches!(&self.state, AgentDocumentState::Loading(_));
@@ -376,20 +452,57 @@ impl RenderOnce for AgentDocument {
             AgentDocumentState::Failed(reason) => EmptyState::new(ident.child("failed"), reason)
                 .kind(EmptyKind::Failed)
                 .into_any_element(),
-            AgentDocumentState::Ready => {
-                let mut column = div().w_full().column().gap_token(&theme, Space::Lg);
-                for (order, block) in self.blocks.into_iter().enumerate() {
-                    column = column.child(render_block(
-                        &ident,
-                        block,
-                        // A block's place in the document is its reading order.
-                        order as u64,
-                        self.on_event.clone(),
-                        cx,
-                    ));
+            AgentDocumentState::Ready => match self.visible_rows {
+                Some(rows) => {
+                    let blocks = Rc::new(self.blocks);
+                    // Ids rather than a count, so a block that grew re-measures
+                    // itself alone instead of discarding every height the list
+                    // had learned.
+                    let keys: Vec<SharedString> =
+                        blocks.iter().map(|block| block.id.clone()).collect();
+                    let count = blocks.len();
+                    let listed = Rc::clone(&blocks);
+                    let list_ident = ident.child("blocks");
+                    let document = ident.clone();
+                    let on_event = self.on_event.clone();
+                    List::new(list_ident, count, move |index, window, cx| {
+                        let block = &listed[index];
+                        ListItem::new(
+                            block.id.clone(),
+                            render_block(
+                                &document,
+                                block,
+                                index as u64,
+                                on_event.clone(),
+                                window,
+                                cx,
+                            ),
+                        )
+                    })
+                    // Blocks are as tall as what is in them: a line of prose
+                    // and a four-hundred-line diff are both one block.
+                    .flowing()
+                    .keys(keys)
+                    .visible_rows(rows)
+                    .into_any_element()
                 }
-                column.into_any_element()
-            }
+                None => {
+                    let mut column = div().w_full().column().gap_token(&theme, Space::Lg);
+                    for (order, block) in self.blocks.iter().enumerate() {
+                        column = column.child(render_block(
+                            &ident,
+                            block,
+                            // A block's place in the document is its reading
+                            // order.
+                            order as u64,
+                            self.on_event.clone(),
+                            window,
+                            cx,
+                        ));
+                    }
+                    column.into_any_element()
+                }
+            },
         };
 
         div().w_full().column().child(content).semantic_in(
@@ -403,23 +516,24 @@ impl RenderOnce for AgentDocument {
 
 fn render_block(
     document: &Ident,
-    block: AgentDocumentBlock,
+    block: &AgentDocumentBlock,
     order: u64,
     on_event: Option<EventHandler>,
+    window: &mut Window,
     cx: &mut App,
 ) -> AnyElement {
     let theme = cx.theme().clone();
     let ident = document.child(format!("block.{}", block.id));
     let state = format!("{}:revision-{}", block.kind.as_str(), block.revision);
     let selection_order = order.saturating_mul(SELECTION_ORDER_STRIDE);
-    let body = match block.body {
+    let body = match &block.body {
         AgentBlockBody::Text(text) => div()
             .w_full()
             .type_scale(&theme, TypeScale::Body)
             .text_tone(&theme, TextTone::Primary)
             .child({
                 let text_ident = ident.child("text");
-                StyledText::new(text).selectable_in_document(
+                StyledText::new(text.clone()).selectable_in_document(
                     text_ident.element_id(),
                     text_ident.semantic_id(),
                     selection_order,
@@ -428,7 +542,7 @@ fn render_block(
             .into_any_element(),
         AgentBlockBody::Markdown(source) => {
             let block_id = block.id.clone();
-            Markdown::new(ident.child("markdown"), source)
+            Markdown::new(ident.child("markdown"), source.clone())
                 .selection_order_start(selection_order)
                 .when_some(on_event, |markdown, on_event| {
                     markdown.on_event(move |event, window, cx| {
@@ -445,18 +559,18 @@ fn render_block(
                 .into_any_element()
         }
         AgentBlockBody::Notice { message, tone } => {
-            crate::display::status::Callout::new(message, tone)
+            crate::display::status::Callout::new(message.clone(), *tone)
                 .id(ident.child("notice"))
                 .into_any_element()
         }
-        AgentBlockBody::Element(element) => element,
+        AgentBlockBody::Element(build) => build(window, cx),
     };
 
     let frame = div()
         .w_full()
         .column()
         .gap_token(&theme, Space::Sm)
-        .children(block.label.map(|label| {
+        .children(block.label.clone().map(|label| {
             div()
                 .type_scale(&theme, TypeScale::Label)
                 .text_tone(&theme, TextTone::Muted)
