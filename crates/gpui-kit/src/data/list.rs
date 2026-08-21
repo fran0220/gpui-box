@@ -50,6 +50,8 @@ type Accepts = Rc<dyn Fn(&DragItem, &DropPosition) -> bool>;
 pub struct ListItem {
     id: SharedString,
     text: Option<SharedString>,
+    /// What the row belongs to, when that is something other than the list.
+    within: Option<SharedString>,
     disabled: bool,
     content: AnyElement,
 }
@@ -70,6 +72,7 @@ impl ListItem {
         Self {
             id: id.into(),
             text: None,
+            within: None,
             disabled: false,
             content: content.into_any_element(),
         }
@@ -79,6 +82,22 @@ impl ListItem {
     /// the tree to go on.
     pub fn text(mut self, text: impl Into<SharedString>) -> Self {
         self.text = Some(text.into());
+        self
+    }
+
+    /// The row this one belongs to.
+    ///
+    /// A flat list of rows is not always a flat structure: a diff's lines
+    /// belong to their hunk and the hunk to its file, and a list that reported
+    /// three thousand siblings would be describing an arrangement nobody has.
+    /// Whoever reads the tree — a screen reader, a driver picking out the
+    /// files — needs the structure that is actually on screen, and only the
+    /// caller knows it.
+    ///
+    /// The row named must be one of this list's own, and the list itself stays
+    /// the parent of everything that names nothing.
+    pub fn within(mut self, row: impl Into<SharedString>) -> Self {
+        self.within = Some(row.into());
         self
     }
 
@@ -591,8 +610,15 @@ fn row_element(
         );
     }
 
+    // A row that named the row it belongs to is published under it, so the
+    // tree carries the arrangement the reader can see rather than a list of
+    // siblings that share a screen.
+    let parent = match &item.within {
+        Some(row) => list.child(row.as_ref()).semantic_id(),
+        None => list.semantic_id(),
+    };
     let mut spec = NodeSpec::new(ident.semantic_id(), Role::Row)
-        .parent(list.semantic_id())
+        .parent(parent)
         .selected(selected)
         .disabled(item.disabled);
     if let Some(text) = item.text {

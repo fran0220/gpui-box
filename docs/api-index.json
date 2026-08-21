@@ -8210,6 +8210,7 @@
       ],
       "options": [
         "text(text: impl Into<SharedString>) -> Self",
+        "within(row: impl Into<SharedString>) -> Self",
         "disabled(disabled: bool) -> Self"
       ],
       "commands": [],

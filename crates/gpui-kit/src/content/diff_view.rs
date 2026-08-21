@@ -726,6 +726,9 @@ impl DiffView {
 #[derive(Debug, Clone)]
 struct FlatRow {
     id: SharedString,
+    /// The row this one is drawn under: its hunk, or its file. A file names
+    /// nothing, because a file belongs to the diff.
+    within: Option<SharedString>,
     event: DiffViewEvent,
     kind: FlatKind,
 }
@@ -847,7 +850,7 @@ impl RenderOnce for DiffView {
                     FlatKind::Note(note) => note.text(cx),
                     _ => SharedString::default(),
                 };
-                ListItem::new(
+                let mut item = ListItem::new(
                     row.id.clone(),
                     // The row's position in the flattened diff is its reading
                     // order. The list is virtualized, so a copy spanning rows
@@ -856,7 +859,15 @@ impl RenderOnce for DiffView {
                 )
                 // Source and paths stay out of diagnostic snapshots. Stable
                 // business ids and the row kind remain addressable.
-                .text(label)
+                .text(label);
+                // What a row belongs to is what makes the flattened diff
+                // readable as the diff it is: a line is under its hunk, a hunk
+                // and a note under their file, and only the files are directly
+                // under the list.
+                if let Some(within) = row.within.clone() {
+                    item = item.within(within);
+                }
+                item
             })
             .visible_rows(self.visible_rows);
             if self.fills {
@@ -976,6 +987,7 @@ fn flatten(files: Vec<DiffFile>, presentation: DiffPresentation) -> Vec<FlatRow>
         let changed = file.changed();
         rows.push(FlatRow {
             id: file_path.semantic_id(),
+            within: None,
             event: match file.folded {
                 true => DiffViewEvent::UnfoldFile {
                     file_id: file.id.clone(),
@@ -996,6 +1008,7 @@ fn flatten(files: Vec<DiffFile>, presentation: DiffPresentation) -> Vec<FlatRow>
         for note in file.notes {
             rows.push(FlatRow {
                 id: file_path.child("note").child(note.name()).semantic_id(),
+                within: Some(file_path.semantic_id()),
                 event: DiffViewEvent::FileActivated {
                     file_id: file.id.clone(),
                 },
@@ -1006,6 +1019,7 @@ fn flatten(files: Vec<DiffFile>, presentation: DiffPresentation) -> Vec<FlatRow>
             let hunk_path = file_path.child("hunk").child(hunk.id.as_ref());
             rows.push(FlatRow {
                 id: hunk_path.semantic_id(),
+                within: Some(file_path.semantic_id()),
                 event: DiffViewEvent::HunkActivated {
                     file_id: file.id.clone(),
                     hunk_id: hunk.id.clone(),
@@ -1015,6 +1029,7 @@ fn flatten(files: Vec<DiffFile>, presentation: DiffPresentation) -> Vec<FlatRow>
             if hunk.collapsed {
                 rows.push(FlatRow {
                     id: hunk_path.child("expand").semantic_id(),
+                    within: Some(hunk_path.semantic_id()),
                     event: DiffViewEvent::ExpandHunk {
                         file_id: file.id.clone(),
                         hunk_id: hunk.id.clone(),
@@ -1035,6 +1050,7 @@ fn flatten(files: Vec<DiffFile>, presentation: DiffPresentation) -> Vec<FlatRow>
                         let (old, new) = fill_word_spans(line.old, line.new);
                         rows.push(FlatRow {
                             id: line_path.semantic_id(),
+                            within: Some(hunk_path.semantic_id()),
                             event,
                             kind: FlatKind::Split { old, new },
                         });
@@ -1048,6 +1064,7 @@ fn flatten(files: Vec<DiffFile>, presentation: DiffPresentation) -> Vec<FlatRow>
                         {
                             rows.push(FlatRow {
                                 id: line_path.semantic_id(),
+                                within: Some(hunk_path.semantic_id()),
                                 event,
                                 kind: FlatKind::Unified {
                                     old_number: old.number,
@@ -1062,6 +1079,7 @@ fn flatten(files: Vec<DiffFile>, presentation: DiffPresentation) -> Vec<FlatRow>
                             let new = new.expect("paired new");
                             rows.push(FlatRow {
                                 id: line_path.child("old").semantic_id(),
+                                within: Some(hunk_path.semantic_id()),
                                 event: event.clone(),
                                 kind: FlatKind::Unified {
                                     old_number: old.number,
@@ -1071,6 +1089,7 @@ fn flatten(files: Vec<DiffFile>, presentation: DiffPresentation) -> Vec<FlatRow>
                             });
                             rows.push(FlatRow {
                                 id: line_path.child("new").semantic_id(),
+                                within: Some(hunk_path.semantic_id()),
                                 event,
                                 kind: FlatKind::Unified {
                                     old_number: None,
@@ -1081,6 +1100,7 @@ fn flatten(files: Vec<DiffFile>, presentation: DiffPresentation) -> Vec<FlatRow>
                         }
                         (Some(old), None) => rows.push(FlatRow {
                             id: line_path.semantic_id(),
+                            within: Some(hunk_path.semantic_id()),
                             event,
                             kind: FlatKind::Unified {
                                 old_number: old.number,
@@ -1090,6 +1110,7 @@ fn flatten(files: Vec<DiffFile>, presentation: DiffPresentation) -> Vec<FlatRow>
                         }),
                         (None, Some(new)) => rows.push(FlatRow {
                             id: line_path.semantic_id(),
+                            within: Some(hunk_path.semantic_id()),
                             event,
                             kind: FlatKind::Unified {
                                 old_number: None,

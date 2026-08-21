@@ -1729,6 +1729,33 @@ fn naming_the_language_colours_only_the_lines_that_arrived_uncoloured(cx: &mut T
 }
 
 #[gpui::test]
+fn a_line_is_published_under_the_hunk_it_belongs_to(cx: &mut TestAppContext) {
+    // A diff is not three thousand siblings. Whoever reads the tree — a
+    // screen reader, or a driver picking the changed files out of a review —
+    // is looking for the arrangement on screen, and a list that reported every
+    // row as a child of itself would be describing one nobody has.
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        DiffView::new("review", fixture_diff(2)).into_any_element()
+    });
+
+    let file = harness
+        .node("review.rows.file.report")
+        .expect("the file is drawn");
+    assert_eq!(file.parent.as_deref(), Some("review.rows"));
+    let hunk = harness
+        .node("review.rows.file.report.hunk.body")
+        .expect("the hunk is drawn");
+    assert_eq!(hunk.parent.as_deref(), Some("review.rows.file.report"));
+    let line = harness
+        .node("review.rows.file.report.hunk.body.line.line-0000")
+        .expect("the line is drawn");
+    assert_eq!(
+        line.parent.as_deref(),
+        Some("review.rows.file.report.hunk.body")
+    );
+}
+
+#[gpui::test]
 fn a_diff_given_a_frame_fills_it_and_stays_virtual(cx: &mut TestAppContext) {
     // A pane's height is the window's to decide and the reader drags it, so a
     // diff in one is bounded by the frame rather than by a row count. What it
