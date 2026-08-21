@@ -29,7 +29,7 @@ use gpui::{
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Theme};
 
-use crate::data::viewport::{list_state, scroll_handle};
+use crate::data::viewport::{Rows, list_state, scroll_handle};
 pub use crate::data::viewport::{reveal_row, scroll_to_row};
 use crate::foundation::direction::ActiveDirection;
 use crate::foundation::{
@@ -96,6 +96,8 @@ pub struct List {
     row_height: Option<f32>,
     /// Whether a row is as tall as its content rather than as tall as a slot.
     flowing: bool,
+    /// The rows in order, when the caller named them. See [`List::keys`].
+    keys: Option<Vec<SharedString>>,
     /// Where a flowing list rests when its content does not fill it.
     alignment: ListAlignment,
     visible_rows: Option<usize>,
@@ -134,6 +136,7 @@ impl List {
             selected: None,
             row_height: None,
             flowing: false,
+            keys: None,
             alignment: ListAlignment::Top,
             visible_rows: None,
             size: ControlSize::Md,
@@ -178,6 +181,28 @@ impl List {
     /// conversation or a log whose newest row is the one worth seeing.
     pub fn anchored_to_end(mut self) -> Self {
         self.alignment = ListAlignment::Bottom;
+        self
+    }
+
+    /// Names the rows, in the order they are drawn.
+    ///
+    /// A flowing list only learns a row's height by laying it out, and what it
+    /// has learned is addressed by index. So when the set changes, the
+    /// question is which indices still mean what they meant, and a count
+    /// cannot answer it: a row inserted at the top moves every row below it,
+    /// and a list told only that the count went up by one would keep every
+    /// height against the wrong row.
+    ///
+    /// Naming the rows answers it exactly. The list splices the range that
+    /// actually changed and keeps every measurement either side, so a
+    /// conversation whose newest block grew re-measures that block rather than
+    /// the conversation, and a reader's scroll position does not lurch.
+    ///
+    /// The names are the rows' own identities, the same ones
+    /// [`ListItem::new`] takes, and are ignored by a uniform list, which has
+    /// nothing measured to keep.
+    pub fn keys(mut self, keys: impl IntoIterator<Item = impl Into<SharedString>>) -> Self {
+        self.keys = Some(keys.into_iter().map(Into::into).collect());
         self
     }
 
@@ -271,7 +296,14 @@ impl RenderOnce for List {
         };
         let flowing = self.flowing;
         let rows: AnyElement = if flowing {
-            let state = list_state(&ident, count, self.alignment, px(row_height), cx);
+            let described = match &self.keys {
+                Some(keys) if keys.len() == count => Rows::Keyed(keys),
+                // A caller whose names do not cover the rows it says it has
+                // has described something other than this list, so the count
+                // is believed and the names are not.
+                _ => Rows::Counted(count),
+            };
+            let state = list_state(&ident, described, self.alignment, px(row_height), cx);
             let ident = ident.clone();
             let theme = theme.clone();
             let selected = self.selected.clone();

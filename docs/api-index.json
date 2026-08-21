@@ -2099,6 +2099,7 @@
         "row_height(height: f32) -> Self",
         "flowing() -> Self",
         "anchored_to_end() -> Self",
+        "keys(keys: impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
         "visible_rows(rows: usize) -> Self",
         "on_select(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self",
         "reorderable(reorderable: bool) -> Self",

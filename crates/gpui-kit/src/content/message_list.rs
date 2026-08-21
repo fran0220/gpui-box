@@ -402,6 +402,11 @@ impl RenderOnce for MessageList {
         let messages = Rc::new(self.messages);
         let seen = follow.cell.clone();
         let list_ident = ident.clone();
+        // A conversation that grows to fit is measured row by row, so it names
+        // its rows: a message arriving anywhere but the end then re-measures
+        // itself instead of every message after it.
+        let row_keys: Vec<SharedString> =
+            messages.iter().map(|message| message.id.clone()).collect();
         let rows = List::new(ident.clone(), count, move |index, window, cx| {
             if let Some(highest) = seen.borrow_mut().current.as_mut() {
                 *highest = (*highest).max(index);
@@ -432,7 +437,7 @@ impl RenderOnce for MessageList {
             .text(shown_author(message.author.as_ref()))
         })
         .row_height(row_height)
-        .when(body_lines.is_none(), List::flowing)
+        .when(body_lines.is_none(), |list| list.flowing().keys(row_keys))
         .when_some(self.visible_rows, List::visible_rows);
 
         div()
