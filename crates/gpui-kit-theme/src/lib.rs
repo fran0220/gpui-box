@@ -10,7 +10,8 @@ use gpui_kit_tokens::{
 
 pub use gpui_kit_tokens::{
     Appearance, ControlSize, Density, Elevation, Layer, MotionDuration, MotionEasing, Palette,
-    Radius, SemanticColor, Space, SpringPreset, SpringTokens, Surface, TextTone, TypeScale,
+    Radius, SemanticColor, Space, SpringPreset, SpringTokens, Surface, SyntaxColor, TextTone,
+    TypeScale,
 };
 
 /// Reads the active theme from any context that dereferences to [`App`].
@@ -82,6 +83,9 @@ pub struct Colors {
     pub success: Hsla,
     pub info: Hsla,
     pub loader_gradient: [Hsla; 3],
+    /// The vocabulary code is painted in, wherever this library draws code.
+    /// See `gpui_kit_tokens::SyntaxColors`.
+    pub syntax: SyntaxPalette,
     /// The plane a terminal grid paints on, and the achromatic wash over its
     /// selected cells. See `gpui_kit_tokens::TerminalColors`.
     pub terminal_background: Hsla,
@@ -89,6 +93,42 @@ pub struct Colors {
     /// ANSI slots 0-7 normal, 8-15 bright. Anything above 15 is the 6x6x6
     /// cube and the grey ramp, which are arithmetic rather than tokens.
     pub terminal_ansi: [Hsla; 16],
+}
+
+/// The resolved paint classes of code.
+///
+/// A struct rather than a lookup by name, so a renderer that asks for a class
+/// this library does not have fails to compile instead of falling back to a
+/// colour that happens to be there.
+#[derive(Debug, Clone, Copy)]
+pub struct SyntaxPalette {
+    pub keyword: Hsla,
+    pub string: Hsla,
+    pub comment: Hsla,
+    pub number: Hsla,
+    pub inline: Hsla,
+    pub inline_wash: Hsla,
+    pub added: Hsla,
+    pub added_wash: Hsla,
+    pub removed: Hsla,
+    pub removed_wash: Hsla,
+}
+
+impl SyntaxPalette {
+    pub fn get(&self, class: SyntaxColor) -> Hsla {
+        match class {
+            SyntaxColor::Keyword => self.keyword,
+            SyntaxColor::StringLiteral => self.string,
+            SyntaxColor::Comment => self.comment,
+            SyntaxColor::Number => self.number,
+            SyntaxColor::Inline => self.inline,
+            SyntaxColor::InlineWash => self.inline_wash,
+            SyntaxColor::Added => self.added,
+            SyntaxColor::AddedWash => self.added_wash,
+            SyntaxColor::Removed => self.removed,
+            SyntaxColor::RemovedWash => self.removed_wash,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -338,6 +378,18 @@ impl Theme {
                 success: color(tokens.semantic(SemanticColor::Success)),
                 info: color(tokens.semantic(SemanticColor::Info)),
                 loader_gradient: tokens.loader_gradient().map(color),
+                syntax: SyntaxPalette {
+                    keyword: color(tokens.syntax(SyntaxColor::Keyword)),
+                    string: color(tokens.syntax(SyntaxColor::StringLiteral)),
+                    comment: color(tokens.syntax(SyntaxColor::Comment)),
+                    number: color(tokens.syntax(SyntaxColor::Number)),
+                    inline: color(tokens.syntax(SyntaxColor::Inline)),
+                    inline_wash: color(tokens.syntax(SyntaxColor::InlineWash)),
+                    added: color(tokens.syntax(SyntaxColor::Added)),
+                    added_wash: color(tokens.syntax(SyntaxColor::AddedWash)),
+                    removed: color(tokens.syntax(SyntaxColor::Removed)),
+                    removed_wash: color(tokens.syntax(SyntaxColor::RemovedWash)),
+                },
                 terminal_background: color(tokens.terminal_background()),
                 terminal_selection: color(tokens.terminal_selection()),
                 terminal_ansi: tokens.terminal_ansi().map(color),

@@ -42,6 +42,7 @@
         "interactive",
         "semantic",
         "loader",
+        "syntax",
         "terminal"
       ],
       "properties": {
@@ -63,6 +64,7 @@
             }
           }
         },
+        "syntax": { "$ref": "#/$defs/syntaxColors" },
         "terminal": { "$ref": "#/$defs/terminalColors" }
       }
     },
@@ -159,6 +161,34 @@
         "warning": { "$ref": "#/$defs/color" },
         "success": { "$ref": "#/$defs/color" },
         "info": { "$ref": "#/$defs/color" }
+      }
+    },
+    "syntaxColors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "keyword",
+        "string",
+        "comment",
+        "number",
+        "inline",
+        "inlineWash",
+        "added",
+        "addedWash",
+        "removed",
+        "removedWash"
+      ],
+      "properties": {
+        "keyword": { "$ref": "#/$defs/color" },
+        "string": { "$ref": "#/$defs/color" },
+        "comment": { "$ref": "#/$defs/color" },
+        "number": { "$ref": "#/$defs/color" },
+        "inline": { "$ref": "#/$defs/color" },
+        "inlineWash": { "$ref": "#/$defs/color" },
+        "added": { "$ref": "#/$defs/color" },
+        "addedWash": { "$ref": "#/$defs/color" },
+        "removed": { "$ref": "#/$defs/color" },
+        "removedWash": { "$ref": "#/$defs/color" }
       }
     },
     "terminalColors": {

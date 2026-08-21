@@ -52,6 +52,11 @@ Appearance: `Dark`.
 | `color.palette.neutral.900` | `#ffffff` |
 | `color.palette.neutral.ink` | `#0e0e0e` |
 | `color.palette.red.400` | `#ff6467` |
+| `color.palette.syntax.inline` | `#c4b4ff` |
+| `color.palette.syntax.inlineWash` | `#a684ff` |
+| `color.palette.syntax.keyword` | `#e67e7f` |
+| `color.palette.syntax.number` | `#e0ae57` |
+| `color.palette.syntax.string` | `#65cba7` |
 | `color.palette.terminal.background` | `#0a0a0a` |
 | `color.palette.terminal.wash` | `#ffffff` |
 
@@ -352,6 +357,26 @@ Appearance: `Dark`.
 | `color.terminal.ansi.13` | `color.terminal.background` | 11.20 | 3.0 |
 | `color.terminal.ansi.14` | `color.terminal.background` | 13.66 | 3.0 |
 | `color.terminal.ansi.15` | `color.terminal.background` | 18.97 | 3.0 |
+| `color.syntax.keyword` | `color.surface.sunken` | 7.22 | 4.5 |
+| `color.syntax.string` | `color.surface.sunken` | 10.04 | 4.5 |
+| `color.syntax.number` | `color.surface.sunken` | 9.77 | 4.5 |
+| `color.syntax.inline` | `color.surface.sunken` | 10.67 | 4.5 |
+| `color.syntax.comment` | `color.surface.sunken` | 6.12 | 3.0 |
+| `color.text.primary` | `color.surface.sunken + color.syntax.addedWash` | 13.28 | 4.5 |
+| `color.syntax.added` | `color.surface.sunken` | 9.06 | 3.0 |
+| `color.text.primary` | `color.surface.sunken + color.syntax.removedWash` | 13.92 | 4.5 |
+| `color.syntax.removed` | `color.surface.sunken` | 6.85 | 3.0 |
+| `color.syntax.inline` | `color.surface.sunken + color.syntax.inlineWash` | 9.28 | 4.5 |
+| `color.syntax.keyword` | `color.surface.panel` | 6.28 | 4.5 |
+| `color.syntax.string` | `color.surface.panel` | 8.74 | 4.5 |
+| `color.syntax.number` | `color.surface.panel` | 8.50 | 4.5 |
+| `color.syntax.inline` | `color.surface.panel` | 9.28 | 4.5 |
+| `color.syntax.comment` | `color.surface.panel` | 5.33 | 3.0 |
+| `color.text.primary` | `color.surface.panel + color.syntax.addedWash` | 10.97 | 4.5 |
+| `color.syntax.added` | `color.surface.panel` | 7.88 | 3.0 |
+| `color.text.primary` | `color.surface.panel + color.syntax.removedWash` | 11.66 | 4.5 |
+| `color.syntax.removed` | `color.surface.panel` | 5.96 | 3.0 |
+| `color.syntax.inline` | `color.surface.panel + color.syntax.inlineWash` | 7.74 | 4.5 |
 | `color.text.onAccent` | `color.semantic.accent` | 6.17 | 4.5 |
 
 ### Surface separation
@@ -427,6 +452,11 @@ Appearance: `Light`.
 | `color.palette.neutral.900` | `#ffffff` |
 | `color.palette.neutral.ink` | `#ffffff` |
 | `color.palette.red.400` | `#d5322f` |
+| `color.palette.syntax.inline` | `#5b21b6` |
+| `color.palette.syntax.inlineWash` | `#7c3aed` |
+| `color.palette.syntax.keyword` | `#a83232` |
+| `color.palette.syntax.number` | `#8a5a00` |
+| `color.palette.syntax.string` | `#0f6b4f` |
 | `color.palette.terminal.background` | `#fafafa` |
 | `color.palette.terminal.wash` | `#000000` |
 
@@ -727,6 +757,26 @@ Appearance: `Light`.
 | `color.terminal.ansi.13` | `color.terminal.background` | 6.69 | 3.0 |
 | `color.terminal.ansi.14` | `color.terminal.background` | 6.96 | 3.0 |
 | `color.terminal.ansi.15` | `color.terminal.background` | 16.97 | 3.0 |
+| `color.syntax.keyword` | `color.surface.sunken` | 5.04 | 4.5 |
+| `color.syntax.string` | `color.surface.sunken` | 4.93 | 4.5 |
+| `color.syntax.number` | `color.surface.sunken` | 4.51 | 4.5 |
+| `color.syntax.inline` | `color.surface.sunken` | 6.83 | 4.5 |
+| `color.syntax.comment` | `color.surface.sunken` | 4.46 | 3.0 |
+| `color.text.primary` | `color.surface.sunken + color.syntax.addedWash` | 11.47 | 4.5 |
+| `color.syntax.added` | `color.surface.sunken` | 4.04 | 3.0 |
+| `color.text.primary` | `color.surface.sunken + color.syntax.removedWash` | 11.24 | 4.5 |
+| `color.syntax.removed` | `color.surface.sunken` | 3.69 | 3.0 |
+| `color.syntax.inline` | `color.surface.sunken + color.syntax.inlineWash` | 5.80 | 4.5 |
+| `color.syntax.keyword` | `color.surface.panel` | 6.09 | 4.5 |
+| `color.syntax.string` | `color.surface.panel` | 5.96 | 4.5 |
+| `color.syntax.number` | `color.surface.panel` | 5.45 | 4.5 |
+| `color.syntax.inline` | `color.surface.panel` | 8.25 | 4.5 |
+| `color.syntax.comment` | `color.surface.panel` | 5.40 | 3.0 |
+| `color.text.primary` | `color.surface.panel + color.syntax.addedWash` | 13.65 | 4.5 |
+| `color.syntax.added` | `color.surface.panel` | 4.89 | 3.0 |
+| `color.text.primary` | `color.surface.panel + color.syntax.removedWash` | 13.40 | 4.5 |
+| `color.syntax.removed` | `color.surface.panel` | 4.46 | 3.0 |
+| `color.syntax.inline` | `color.surface.panel + color.syntax.inlineWash` | 6.93 | 4.5 |
 | `color.text.onAccent` | `color.semantic.accent` | 6.30 | 4.5 |
 
 ### Surface separation

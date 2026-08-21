@@ -45,6 +45,13 @@
         "orange": "#edb185",
         "pink": "#f888a0"
       },
+      "syntax": {
+        "keyword": "#e67e7f",
+        "string": "#65cba7",
+        "number": "#e0ae57",
+        "inline": "#c4b4ff",
+        "inlineWash": "#a684ff"
+      },
       "terminal": {
         "background": "#0a0a0a",
         "wash": "#ffffff"
@@ -104,6 +111,18 @@
     },
     "loader": {
       "gradient": ["{loader.blue}", "{loader.orange}", "{loader.pink}"]
+    },
+    "syntax": {
+      "keyword": "{syntax.keyword}",
+      "string": "{syntax.string}",
+      "comment": "{neutral.600}",
+      "number": "{syntax.number}",
+      "inline": "{syntax.inline}",
+      "inlineWash": "{syntax.inlineWash}/1f",
+      "added": "{green.500}",
+      "addedWash": "{green.500}/24",
+      "removed": "{red.400}",
+      "removedWash": "{red.400}/24"
     },
     "terminal": {
       "background": "{terminal.background}",

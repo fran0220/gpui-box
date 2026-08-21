@@ -467,6 +467,23 @@ impl TokenDocument {
         ]
     }
 
+    /// One paint class of code, from this theme.
+    pub fn syntax(&self, class: SyntaxColor) -> Color {
+        let value = match class {
+            SyntaxColor::Keyword => self.color.syntax.keyword.as_str(),
+            SyntaxColor::StringLiteral => self.color.syntax.string.as_str(),
+            SyntaxColor::Comment => self.color.syntax.comment.as_str(),
+            SyntaxColor::Number => self.color.syntax.number.as_str(),
+            SyntaxColor::Inline => self.color.syntax.inline.as_str(),
+            SyntaxColor::InlineWash => self.color.syntax.inline_wash.as_str(),
+            SyntaxColor::Added => self.color.syntax.added.as_str(),
+            SyntaxColor::AddedWash => self.color.syntax.added_wash.as_str(),
+            SyntaxColor::Removed => self.color.syntax.removed.as_str(),
+            SyntaxColor::RemovedWash => self.color.syntax.removed_wash.as_str(),
+        };
+        self.resolved(class.path(), value)
+    }
+
     /// The plane a terminal grid is painted on.
     ///
     /// Its own value rather than a surface role, because the two appearances
@@ -755,6 +772,53 @@ pub enum SemanticColor {
     Warning,
     Success,
     Info,
+}
+
+/// One paint class of code. See [`SyntaxColors`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SyntaxColor {
+    Keyword,
+    StringLiteral,
+    Comment,
+    Number,
+    Inline,
+    InlineWash,
+    Added,
+    AddedWash,
+    Removed,
+    RemovedWash,
+}
+
+impl SyntaxColor {
+    /// Every class, so a caller building a palette map covers the set by
+    /// construction rather than by remembering it.
+    pub const ALL: [Self; 10] = [
+        Self::Keyword,
+        Self::StringLiteral,
+        Self::Comment,
+        Self::Number,
+        Self::Inline,
+        Self::InlineWash,
+        Self::Added,
+        Self::AddedWash,
+        Self::Removed,
+        Self::RemovedWash,
+    ];
+
+    pub fn path(self) -> &'static str {
+        match self {
+            Self::Keyword => "color.syntax.keyword",
+            Self::StringLiteral => "color.syntax.string",
+            Self::Comment => "color.syntax.comment",
+            Self::Number => "color.syntax.number",
+            Self::Inline => "color.syntax.inline",
+            Self::InlineWash => "color.syntax.inlineWash",
+            Self::Added => "color.syntax.added",
+            Self::AddedWash => "color.syntax.addedWash",
+            Self::Removed => "color.syntax.removed",
+            Self::RemovedWash => "color.syntax.removedWash",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1094,12 +1158,23 @@ pub struct ColorTokens {
     pub interactive: InteractiveColors,
     pub semantic: SemanticColors,
     pub loader: LoaderColors,
+    pub syntax: SyntaxColors,
     pub terminal: TerminalColors,
 }
 
 impl ColorTokens {
-    fn entries(&self) -> [(&'static str, &str); 29] {
+    fn entries(&self) -> [(&'static str, &str); 39] {
         [
+            ("color.syntax.keyword", &self.syntax.keyword),
+            ("color.syntax.string", &self.syntax.string),
+            ("color.syntax.comment", &self.syntax.comment),
+            ("color.syntax.number", &self.syntax.number),
+            ("color.syntax.inline", &self.syntax.inline),
+            ("color.syntax.inlineWash", &self.syntax.inline_wash),
+            ("color.syntax.added", &self.syntax.added),
+            ("color.syntax.addedWash", &self.syntax.added_wash),
+            ("color.syntax.removed", &self.syntax.removed),
+            ("color.syntax.removedWash", &self.syntax.removed_wash),
             ("color.surface.backdrop", &self.surface.backdrop),
             ("color.surface.canvas", &self.surface.canvas),
             ("color.surface.sunken", &self.surface.sunken),
@@ -1191,6 +1266,42 @@ pub struct SemanticColors {
 #[serde(deny_unknown_fields)]
 pub struct LoaderColors {
     pub gradient: [String; 3],
+}
+
+/// The vocabulary code is painted in, wherever this library draws code.
+///
+/// These are token roles rather than a component's constants for the same
+/// reason the ANSI table is: every one of them changes with the theme, and a
+/// renderer that branched on the appearance itself would be a second theme
+/// system. They are held to their own contrast floors against the surfaces
+/// code actually sits on; see [`contrast::report`].
+///
+/// The set is deliberately four classes and not a grammar. A tokenizer that
+/// distinguished forty kinds of thing would need forty tokens in every theme,
+/// and a reader scanning a block for a string literal is served by four.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SyntaxColors {
+    pub keyword: String,
+    pub string: String,
+    /// Quiet by contract: a comment is supporting detail inside code the way
+    /// `text.faint` is beside prose, and carries that role's floor.
+    pub comment: String,
+    pub number: String,
+    /// Inline code inside prose, and the wash it sits on. A span of code in a
+    /// sentence is not a code block: it keeps the paragraph's rhythm and only
+    /// changes face and tone, so it has its own pair rather than borrowing the
+    /// block's surface.
+    pub inline: String,
+    pub inline_wash: String,
+    /// A diff's two sides. The text tone is what the line's characters are
+    /// drawn in; the wash is the band under the whole line, which is why they
+    /// are separate values and not one colour at two alphas: the wash has to
+    /// stay quiet enough for the text on it to clear its own floor.
+    pub added: String,
+    pub added_wash: String,
+    pub removed: String,
+    pub removed_wash: String,
 }
 
 /// The vocabulary a terminal grid paints in.

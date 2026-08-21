@@ -11,7 +11,8 @@
 //! [`line_report`].
 
 use crate::{
-    Color, InteractiveColor, SemanticColor, Surface, TextTone, TokenDocument, contrast_ratio,
+    Color, InteractiveColor, SemanticColor, Surface, SyntaxColor, TextTone, TokenDocument,
+    contrast_ratio,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -176,6 +177,91 @@ pub fn report(tokens: &TokenDocument) -> Vec<ContrastCheck> {
         ));
     }
 
+    // Code is read, so its classes carry the body floor rather than the
+    // 3:1 an identity gets — a keyword nobody can read is not a highlight.
+    // The two surfaces are the ones code is drawn on: a fenced block sits in
+    // a well, and an inline span sits on whatever prose sits on.
+    //
+    // `comment` is the exception, and deliberately: it is supporting detail
+    // inside the code the way `text.faint` is beside prose, so it takes that
+    // role's floor. Holding it to the body minimum would make every comment
+    // shout as loudly as the code it annotates.
+    for (surface_name, surface) in [
+        ("color.surface.sunken", Surface::Sunken),
+        ("color.surface.panel", Surface::Panel),
+    ] {
+        let background = tokens.surface(surface);
+        for class in [
+            SyntaxColor::Keyword,
+            SyntaxColor::StringLiteral,
+            SyntaxColor::Number,
+            SyntaxColor::Inline,
+            SyntaxColor::Comment,
+        ] {
+            let minimum = if class == SyntaxColor::Comment {
+                NON_TEXT_MINIMUM
+            } else {
+                TEXT_MINIMUM
+            };
+            checks.push(check(
+                class.path(),
+                tokens.syntax(class),
+                surface_name,
+                background,
+                minimum,
+            ));
+        }
+
+        // A diff's washes are bands under whole lines, and the line's own
+        // characters are ordinary body text drawn on top. So the pair is
+        // checked the way it is actually stacked: primary text over the wash
+        // over the surface. A wash tuned until the sign was obvious, at the
+        // cost of the code on it, is the regression this catches.
+        for (wash_name, wash, sign_name, sign) in [
+            (
+                SyntaxColor::AddedWash.path(),
+                tokens.syntax(SyntaxColor::AddedWash),
+                SyntaxColor::Added.path(),
+                tokens.syntax(SyntaxColor::Added),
+            ),
+            (
+                SyntaxColor::RemovedWash.path(),
+                tokens.syntax(SyntaxColor::RemovedWash),
+                SyntaxColor::Removed.path(),
+                tokens.syntax(SyntaxColor::Removed),
+            ),
+        ] {
+            let washed = crate::over(wash, background);
+            checks.push(check(
+                "color.text.primary",
+                tokens.text(TextTone::Primary),
+                &format!("{surface_name} + {wash_name}"),
+                washed,
+                TEXT_MINIMUM,
+            ));
+            // The sign colour marks the side the line is on, in the gutter and
+            // the accent bar. It is an identity rather than prose.
+            checks.push(check(
+                sign_name,
+                sign,
+                surface_name,
+                background,
+                NON_TEXT_MINIMUM,
+            ));
+        }
+
+        // The wash under an inline span carries code that has to stay
+        // readable on it, in the middle of a sentence drawn on the surface.
+        let inline_washed = crate::over(tokens.syntax(SyntaxColor::InlineWash), background);
+        checks.push(check(
+            SyntaxColor::Inline.path(),
+            tokens.syntax(SyntaxColor::Inline),
+            &format!("{surface_name} + {}", SyntaxColor::InlineWash.path()),
+            inline_washed,
+            TEXT_MINIMUM,
+        ));
+    }
+
     // `accent` is the only accent that carries text. `accentStrong` is an
     // emphasis, border and hover color; it is held to the non-text minimum
     // against surfaces above, not to the body minimum against `onAccent`.
@@ -332,6 +418,16 @@ pub fn line_report(tokens: &TokenDocument) -> Vec<LineCheck> {
         ("color.interactive.hairline", InteractiveColor::Hairline),
         ("color.interactive.divider", InteractiveColor::Divider),
     ];
+    // The washes belong to this rule and not to the contrast one for the same
+    // reason a hairline does: they are translucent marks whose whole failure
+    // mode is being typed and never drawn. What they must carry *on top* of
+    // themselves is asked in `report`; what is asked here is whether the band
+    // exists at all.
+    let washes = [
+        SyntaxColor::AddedWash,
+        SyntaxColor::RemovedWash,
+        SyntaxColor::InlineWash,
+    ];
 
     let mut checks = Vec::new();
     for (surface_name, surface) in surfaces {
@@ -340,6 +436,15 @@ pub fn line_report(tokens: &TokenDocument) -> Vec<LineCheck> {
             let drawn = crate::over(tokens.interactive(line), background);
             checks.push(LineCheck {
                 line: line_name.into(),
+                surface: surface_name.into(),
+                distance: (drawn.lightness() - background.lightness()).abs(),
+                minimum: LINE_MINIMUM,
+            });
+        }
+        for wash in washes {
+            let drawn = crate::over(tokens.syntax(wash), background);
+            checks.push(LineCheck {
+                line: wash.path().into(),
                 surface: surface_name.into(),
                 distance: (drawn.lightness() - background.lightness()).abs(),
                 minimum: LINE_MINIMUM,
@@ -485,9 +590,49 @@ mod tests {
     #[test]
     fn the_report_covers_every_surface_and_tone() {
         let checks = report(crate::studio_dark());
-        // Nineteen tones against each of six surfaces, the sixteen ANSI slots
+        // Nineteen tones against each of six surfaces, ten code checks against
+        // each of the two surfaces code is drawn on, the sixteen ANSI slots
         // against the terminal background, and `onAccent` against `accent`.
-        assert_eq!(checks.len(), 6 * 19 + 16 + 1);
+        assert_eq!(checks.len(), 6 * 19 + 2 * 10 + 16 + 1);
+    }
+
+    #[test]
+    fn code_is_held_to_the_floor_it_is_read_at() {
+        // The four classes a reader scans for are body text and carry the body
+        // floor; a comment is supporting detail and carries the quieter one.
+        // A theme that made every class as loud as the code would pass a
+        // single shared floor and say nothing, which is what this pins.
+        let checks = report(crate::studio_dark());
+        let floor = |path: &str| {
+            checks
+                .iter()
+                .filter(|check| check.foreground == path)
+                .map(|check| check.minimum)
+                .fold(f32::INFINITY, f32::min)
+        };
+        for class in [
+            SyntaxColor::Keyword,
+            SyntaxColor::StringLiteral,
+            SyntaxColor::Number,
+        ] {
+            assert_eq!(floor(class.path()), TEXT_MINIMUM, "{}", class.path());
+        }
+        assert_eq!(floor(SyntaxColor::Comment.path()), NON_TEXT_MINIMUM);
+    }
+
+    #[test]
+    fn a_diff_wash_that_swallows_its_own_text_is_rejected() {
+        // The failure this catches is a wash tuned until the sign was obvious,
+        // at the cost of the code drawn on it.
+        let mut tokens = crate::studio_dark().clone();
+        tokens.color.syntax.added_wash = "{green.500}/f0".into();
+        let failures = failures(&tokens);
+        assert!(
+            failures
+                .iter()
+                .any(|check| check.background.contains("addedWash")),
+            "an opaque wash under body text must fail: {failures:#?}"
+        );
     }
 
     #[test]
