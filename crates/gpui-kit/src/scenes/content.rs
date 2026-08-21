@@ -267,6 +267,7 @@ fn scene_review() -> Vec<DiffFile> {
                 [DiffLine::added("line", "The cache is verified now.").new_number(1)],
             )],
         )
+        .language("markdown")
         .folded(true),
     );
     files
@@ -281,15 +282,20 @@ fn scene_long_line() -> Vec<DiffFile> {
         [DiffHunk::new(
             "one",
             "@@ -1,1 +1,1 @@",
-            [DiffLine::paired(
-                "targets",
-                "{\"targets\":[\"macos-arm64\",\"macos-x86\",\"windows-x86\"],\"strip\":false}",
-                "{\"targets\":[\"macos-arm64\",\"macos-x86\",\"windows-x86\",\"linux-arm64\"],\"strip\":true}",
-            )
-            .old_number(1)
-            .new_number(1)],
+            [
+                DiffLine::added("profile", "{\"profile\": \"release\", \"debug\": false}")
+                    .new_number(1),
+                DiffLine::paired(
+                    "targets",
+                    "{\"targets\":[\"macos-arm64\",\"macos-x86\",\"windows-x86\"],\"strip\":false}",
+                    "{\"targets\":[\"macos-arm64\",\"macos-x86\",\"windows-x86\",\"linux-arm64\"],\"strip\":true}",
+                )
+                .old_number(1)
+                .new_number(2),
+            ],
         )],
-    )]
+    )
+    .language("json")]
 }
 
 pub(super) fn code_view(_window: &mut Window, cx: &mut App) -> AnyElement {

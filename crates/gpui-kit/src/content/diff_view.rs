@@ -19,7 +19,8 @@
 //! [`word_spans`] marks the tokens with no counterpart on the other side,
 //! because on a row that exists because two versions differ, where they differ
 //! is the point. Everything else, when the caller named a language with
-//! [`DiffView::language`], is coloured by [`crate::content::highlight`] — a
+//! [`DiffFile::language`] or [`DiffView::language`], is coloured by
+//! [`crate::content::highlight`] — a
 //! scanner, not a parser, on a language this crate has a table for, changing
 //! colour and nothing else. Each side carries its own scan, since the old and
 //! new texts are two versions of one file and not one document.
@@ -369,6 +370,9 @@ pub struct DiffFile {
     pub hunks: Vec<DiffHunk>,
     /// What is true of the file itself, drawn under its header.
     pub notes: Vec<DiffNote>,
+    /// The language this file is written in, when it is not the one the view
+    /// named.
+    pub language: Option<SharedString>,
     /// When true the file's header stays and its hunks do not.
     pub folded: bool,
 }
@@ -384,6 +388,7 @@ impl DiffFile {
             label: label.into(),
             hunks: hunks.into_iter().collect(),
             notes: Vec::new(),
+            language: None,
             folded: false,
         }
     }
@@ -401,6 +406,19 @@ impl DiffFile {
             }
             self.notes.push(note);
         }
+        self
+    }
+
+    /// The language this file is written in.
+    ///
+    /// A review is not written in one language: a change reaches Rust, a
+    /// manifest and a note in the same patch, and a scanner given the wrong
+    /// grammar does not merely fail to colour — it colours the wrong things,
+    /// which reads as a claim about code that is not true. So the file says
+    /// what it is, and [`DiffView::language`] is the answer for the files that
+    /// do not.
+    pub fn language(mut self, language: impl Into<SharedString>) -> Self {
+        self.language = Some(language.into());
         self
     }
 
@@ -663,7 +681,8 @@ impl DiffView {
     }
 
     /// Colours code that arrived without colours, by the language the caller
-    /// says it is.
+    /// says it is, for every file that does not name one of its own with
+    /// [`DiffFile::language`].
     ///
     /// A diff of code is code, and reading it uncoloured next to a coloured
     /// editor is harder than it needs to be. The rule is the same one
@@ -751,9 +770,7 @@ impl DiffView {
         let presentation = self.presentation;
         let language = self.language.clone();
         let build = |mut files: Vec<DiffFile>| {
-            if let Some(known) = language.as_deref().and_then(Language::named) {
-                colour(&mut files, known);
-            }
+            colour(&mut files, language.as_deref().and_then(Language::named));
             Rc::new(flatten(files, presentation))
         };
         let shared = match &self.files {
@@ -900,8 +917,16 @@ impl RenderOnce for DiffView {
 /// bracket that only exists in the new version change how the old version is
 /// read. A removed line is scanned in the old file's sequence and an added
 /// line in the new file's, which is what each of them actually is.
-fn colour(files: &mut [DiffFile], language: Language) {
+fn colour(files: &mut [DiffFile], fallback: Option<Language>) {
     for file in files {
+        let Some(language) = file
+            .language
+            .as_deref()
+            .and_then(Language::named)
+            .or(fallback)
+        else {
+            continue;
+        };
         let (mut old, mut new) = (Carry::None, Carry::None);
         for line in file.hunks.iter_mut().flat_map(|hunk| hunk.lines.iter_mut()) {
             // Which words changed is settled before the syntax scan, so a

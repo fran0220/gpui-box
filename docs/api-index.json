@@ -6281,6 +6281,7 @@
       ],
       "options": [
         "notes(notes: impl IntoIterator<Item = DiffNote>) -> Self",
+        "language(language: impl Into<SharedString>) -> Self",
         "folded(folded: bool) -> Self"
       ],
       "commands": [],

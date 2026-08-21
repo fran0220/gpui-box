@@ -1729,6 +1729,52 @@ fn naming_the_language_colours_only_the_lines_that_arrived_uncoloured(cx: &mut T
 }
 
 #[gpui::test]
+fn each_file_is_read_in_its_own_language(cx: &mut TestAppContext) {
+    // A review reaches Rust, a manifest and a note in one patch, and a
+    // scanner given the wrong grammar does not fail to colour, it colours the
+    // wrong things. What a test can hold that to is that naming a language
+    // per file disturbs neither the identities nor the text.
+    let rust = DiffFile::new(
+        "src",
+        "src/main.rs",
+        [DiffHunk::new(
+            "body",
+            "@@ @@",
+            [DiffLine::added("added", "fn main() { /* start */ }")],
+        )],
+    )
+    .language("rust");
+    let json = DiffFile::new(
+        "config",
+        "config/build.json",
+        [DiffHunk::new(
+            "body",
+            "@@ @@",
+            [DiffLine::added("added", "{\"strip\": true}")],
+        )],
+    )
+    .language("json");
+
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        DiffView::new("review", [rust.clone(), json.clone()])
+            // The view's own language is the answer for files that name none,
+            // and must not overrule a file that does.
+            .language("rust")
+            .visible_rows(8)
+            .into_any_element()
+    });
+
+    for file in ["src", "config"] {
+        assert!(
+            harness
+                .node(&format!("review.rows.file.{file}.hunk.body.line.added"))
+                .is_some(),
+            "{file} keeps its row"
+        );
+    }
+}
+
+#[gpui::test]
 fn a_wrapping_diff_keeps_every_row_addressable(cx: &mut TestAppContext) {
     // Measured rows are the other half of the fixed-height trade. What must
     // not change is which rows exist and what they report.
