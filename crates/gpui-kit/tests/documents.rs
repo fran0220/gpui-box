@@ -1561,6 +1561,136 @@ fn a_folded_file_keeps_only_its_header_and_says_what_it_holds(cx: &mut TestAppCo
 }
 
 #[gpui::test]
+fn a_file_says_what_happened_to_it_above_its_lines(cx: &mut TestAppContext) {
+    // A reader cannot tell a new file from a large addition to an old one, or
+    // a rename from a deletion and a creation, by reading lines: those are
+    // facts about the file, and the file is where they are said.
+    let mut files = fixture_diff(3);
+    files.push(DiffFile::new("logo", "assets/logo.png", []).notes([
+        DiffNote::Added,
+        DiffNote::Binary,
+        // A second note of a kind the file already carries is dropped
+        // rather than drawn under the same name as the first.
+        DiffNote::Binary,
+    ]));
+    let folded: Vec<DiffFile> = files
+        .iter()
+        .cloned()
+        .map(|file| file.folded(true))
+        .collect();
+
+    let mut harness = Harness::new(cx, gpui_kit::install, {
+        let files = files.clone();
+        move |_, _| {
+            DiffView::new("review", files.clone())
+                .visible_rows(12)
+                .into_any_element()
+        }
+    });
+    assert!(
+        harness.node("review.rows.file.logo.note.added").is_some(),
+        "a file that did not exist before says so"
+    );
+    assert!(harness.node("review.rows.file.logo.note.binary").is_some());
+    assert_eq!(
+        harness
+            .node("review.rows.file.logo.note.binary")
+            .expect("published")
+            .text
+            .as_deref(),
+        Some("File note"),
+        "the sentence itself is the crate's to translate, so the diagnostic \
+         name is the kind"
+    );
+
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        DiffView::new("review", folded.clone())
+            .visible_rows(12)
+            .into_any_element()
+    });
+    assert!(
+        harness.node("review.rows.file.logo").is_some(),
+        "the folded file is still listed"
+    );
+    assert!(
+        harness.node("review.rows.file.logo.note.added").is_none(),
+        "a fold that left the notes standing would not be a fold"
+    );
+}
+
+#[gpui::test]
+fn stepping_to_a_change_marks_it_and_puts_it_on_screen(cx: &mut TestAppContext) {
+    // A large diff is walked, not scrolled. Without the cursor the line below
+    // is neither laid out nor published, which is the whole point of the
+    // virtualized list — and the whole reason a step has to move the viewport
+    // rather than only recolour a row.
+    let far = "review.rows.file.report.hunk.body.line.line-0900";
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        DiffView::new("review", fixture_diff(1000))
+            .visible_rows(6)
+            .into_any_element()
+    });
+    assert!(harness.node(far).is_none());
+
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        DiffView::new("review", fixture_diff(1000))
+            .visible_rows(6)
+            .cursor(DiffCursor::Line {
+                file_id: "report".into(),
+                hunk_id: "body".into(),
+                line_id: "line-0900".into(),
+            })
+            .into_any_element()
+    });
+    let stepped = harness.node(far).expect("the stepped-to line is on screen");
+    assert!(
+        stepped.selected,
+        "and says it is the one the reader asked for"
+    );
+}
+
+#[gpui::test]
+fn two_views_of_one_shared_diff_keep_their_own_arrangement(cx: &mut TestAppContext) {
+    // A shared diff is flattened once per version instead of once per frame,
+    // and the answer belongs to the view that asked: two views over one
+    // allocation arrange it differently, and neither may be handed the other's
+    // rows.
+    let shared = std::sync::Arc::new(fixture_diff(3));
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let shared = std::sync::Arc::clone(&shared);
+        div()
+            .child(
+                DiffView::shared("unified", std::sync::Arc::clone(&shared))
+                    .visible_rows(8)
+                    .presentation(DiffPresentation::Unified),
+            )
+            .child(
+                DiffView::shared("split", shared)
+                    .visible_rows(8)
+                    .presentation(DiffPresentation::Split),
+            )
+            .into_any_element()
+    });
+
+    assert_eq!(
+        harness.node("unified").expect("published").value.as_deref(),
+        Some("unified")
+    );
+    assert_eq!(
+        harness.node("split").expect("published").value.as_deref(),
+        Some("split")
+    );
+    for view in ["unified", "split"] {
+        assert!(
+            harness
+                .node(&format!("{view}.rows.file.report.hunk.body.line.line-0000"))
+                .is_some(),
+            "{view} draws the shared diff's own rows"
+        );
+    }
+}
+
+#[gpui::test]
 fn naming_the_language_colours_only_the_lines_that_arrived_uncoloured(cx: &mut TestAppContext) {
     // The same rule `CodeView` keeps: the caller's grammar outranks the
     // scanner, and a replacement keeps the more specific claim about which

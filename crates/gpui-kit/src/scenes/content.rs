@@ -201,14 +201,19 @@ pub(super) fn diff_view(_window: &mut Window, cx: &mut App) -> AnyElement {
         )
         .child(caption(
             &theme,
-            "a review of several files: two folded behind headers that say what \
-             they hold, one open and coloured by its named language",
+            "a review of several files: what happened to each file said above \
+             its lines, two folded behind headers that say what they hold, and \
+             the hunk the reader stepped to marked and put on screen",
         ))
         .child(
             div().w(px(840.0)).child(
-                DiffView::new("scene.diff.review", scene_review())
+                DiffView::shared("scene.diff.review", std::sync::Arc::new(scene_review()))
                     .language("rust")
-                    .visible_rows(9)
+                    .visible_rows(13)
+                    .cursor(DiffCursor::Hunk {
+                        file_id: "report".into(),
+                        hunk_id: "summary".into(),
+                    })
                     .on_event(|_, _, _| {}),
             ),
         )
@@ -231,6 +236,12 @@ pub(super) fn diff_view(_window: &mut Window, cx: &mut App) -> AnyElement {
 /// Three files, two of them folded: the shape the top of a real review has.
 fn scene_review() -> Vec<DiffFile> {
     let mut files = scene_diff();
+    files[0] = files[0].clone().notes([DiffNote::Mode {
+        to: "100755".into(),
+    }]);
+    files.push(
+        DiffFile::new("logo", "assets/logo.png", []).notes([DiffNote::Added, DiffNote::Binary]),
+    );
     files.push(
         DiffFile::new(
             "adapter",

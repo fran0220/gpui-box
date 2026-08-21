@@ -27,8 +27,13 @@
 //! # Size, and what it costs
 //!
 //! The hierarchy is flattened once per render, which walks all caller-owned
-//! files, hunks and lines. The resulting rows are handed to the virtualized
-//! [`List`], so only the viewport is laid out or published.
+//! files, hunks and lines, and the syntax scan walks them again. Both are
+//! linear in the whole diff while a builder runs on every frame, so a diff of
+//! any size belongs in [`DiffView::shared`], which does that work once per
+//! version of the diff rather than once per frame.
+//!
+//! The resulting rows are handed to the virtualized [`List`], so only the
+//! viewport is laid out or published.
 //!
 //! Rows are fixed-height by default, which is what makes a hundred-thousand
 //! row diff open instantly: no row has to be laid out for the list to know
@@ -40,10 +45,25 @@
 //! height. [`DiffFile::folded`] puts a file away behind a header that says how
 //! many lines it adds and removes, so the top of a large review is a list of
 //! files again.
+//!
+//! # Reading one
+//!
+//! A large diff is read by walking it rather than by scrolling it, so a host
+//! that steps from change to change says where the reader has got to with
+//! [`DiffView::cursor`], which marks that row and puts it on screen when it
+//! moves. What the walk is *for* — next hunk, next file, wrapping or clamping
+//! at the end — stays with the host, which is the only party that knows what
+//! it listed.
+//!
+//! [`DiffFile::notes`] carries what a diff says about a file rather than about
+//! its lines: that it is new, deleted, renamed, binary, or that its mode
+//! changed. Those are facts no hunk states, and without them a reader cannot
+//! tell a new file from a large addition to an old one.
 
 use std::collections::HashMap;
 use std::ops::Range;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use gpui::{
     AnyElement, App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
@@ -57,10 +77,11 @@ use gpui_kit_theme::{
 use crate::content::code_view::styled_code;
 use crate::content::highlight::{Carry, Language, line_spans};
 use crate::content::markdown::CodeSpan;
-use crate::data::{List, ListItem};
+use crate::data::{List, ListItem, reveal_row};
 use crate::display::badge::Tone;
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::foundation::{Ident, StyledExt};
+use crate::motion::keyed;
 use crate::strings::{ActiveStrings, StringKey};
 
 type EventHandler = Rc<dyn Fn(DiffViewEvent, &mut Window, &mut App)>;
@@ -293,11 +314,61 @@ impl DiffHunk {
 }
 
 /// One caller-supplied file and its hunks.
+/// Something a diff says about a file rather than about its lines.
+///
+/// A rename, a mode change or a file that arrived whole are facts no hunk
+/// states: they are true of the file, and a reader who only sees added lines
+/// cannot tell a new file from a large addition to an old one. Each kind is
+/// named rather than free text so this crate can say it in the reader's
+/// language, and so a host cannot put a path or a message of its own on a row
+/// that a diagnostic snapshot reads.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DiffNote {
+    /// The file did not exist before.
+    Added,
+    /// The file does not exist after.
+    Removed,
+    /// The file was moved, and this is where it came from.
+    Renamed { from: SharedString },
+    /// The file changed, but not in lines anybody can read.
+    Binary,
+    /// The file's permissions changed, and this is what they became.
+    Mode { to: SharedString },
+}
+
+impl DiffNote {
+    /// The name this note answers to under its file, which is its kind: a file
+    /// is renamed once, and a row named for its position would move whenever
+    /// another note was added above it.
+    fn name(&self) -> &'static str {
+        match self {
+            Self::Added => "added",
+            Self::Removed => "removed",
+            Self::Renamed { .. } => "renamed",
+            Self::Binary => "binary",
+            Self::Mode { .. } => "mode",
+        }
+    }
+
+    fn text(&self, cx: &App) -> SharedString {
+        let strings = cx.strings();
+        match self {
+            Self::Added => strings.text(StringKey::DiffNoteAdded),
+            Self::Removed => strings.text(StringKey::DiffNoteRemoved),
+            Self::Renamed { from } => strings.format(StringKey::DiffNoteRenamed, &[from.as_ref()]),
+            Self::Binary => strings.text(StringKey::DiffNoteBinary),
+            Self::Mode { to } => strings.format(StringKey::DiffNoteMode, &[to.as_ref()]),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiffFile {
     pub id: SharedString,
     pub label: SharedString,
     pub hunks: Vec<DiffHunk>,
+    /// What is true of the file itself, drawn under its header.
+    pub notes: Vec<DiffNote>,
     /// When true the file's header stays and its hunks do not.
     pub folded: bool,
 }
@@ -312,8 +383,25 @@ impl DiffFile {
             id: id.into(),
             label: label.into(),
             hunks: hunks.into_iter().collect(),
+            notes: Vec::new(),
             folded: false,
         }
+    }
+
+    /// What is true of the file rather than of its lines.
+    ///
+    /// A file carries at most one note of each kind, since that is what the
+    /// kinds mean — a file is renamed from one place and ends in one mode —
+    /// and a second note of a kind already present is dropped rather than
+    /// drawn under the same name as the first.
+    pub fn notes(mut self, notes: impl IntoIterator<Item = DiffNote>) -> Self {
+        for note in notes {
+            if self.notes.iter().any(|held| held.name() == note.name()) {
+                continue;
+            }
+            self.notes.push(note);
+        }
+        self
     }
 
     /// Puts the whole file away behind its header.
@@ -382,15 +470,90 @@ pub enum DiffViewEvent {
     },
 }
 
+/// Where the reader is in a diff they are stepping through.
+///
+/// Named the way the events are, because it is the other half of the same
+/// conversation: a host that hears [`DiffViewEvent::HunkActivated`] and a host
+/// that steps to the next hunk are pointing at the same row.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DiffCursor {
+    File {
+        file_id: SharedString,
+    },
+    Hunk {
+        file_id: SharedString,
+        hunk_id: SharedString,
+    },
+    Line {
+        file_id: SharedString,
+        hunk_id: SharedString,
+        line_id: SharedString,
+    },
+}
+
+impl DiffCursor {
+    /// The flattened row this cursor names.
+    fn row_id(&self) -> SharedString {
+        let path = match self {
+            Self::File { file_id } => Ident::new("file").child(file_id.as_ref()),
+            Self::Hunk { file_id, hunk_id } => Ident::new("file")
+                .child(file_id.as_ref())
+                .child("hunk")
+                .child(hunk_id.as_ref()),
+            Self::Line {
+                file_id,
+                hunk_id,
+                line_id,
+            } => Ident::new("file")
+                .child(file_id.as_ref())
+                .child("hunk")
+                .child(hunk_id.as_ref())
+                .child("line")
+                .child(line_id.as_ref()),
+        };
+        path.semantic_id()
+    }
+}
+
+/// The diff a view was handed, and whether the caller can promise it is the
+/// same one as last frame.
+enum Source {
+    Built(Vec<DiffFile>),
+    Shared(Arc<Vec<DiffFile>>),
+}
+
+/// What a shared diff was turned into, kept until the caller hands over a
+/// different one.
+///
+/// The files are held here as well as the rows, and not only to compare
+/// against: an [`Arc`] that was dropped can be allocated again at the same
+/// address, and a cache that compared addresses without keeping the thing
+/// alive would answer for the wrong diff.
+#[derive(Default)]
+struct Flattened {
+    files: Option<Arc<Vec<DiffFile>>>,
+    presentation: DiffPresentation,
+    language: Option<SharedString>,
+    rows: Option<Rc<Vec<FlatRow>>>,
+}
+
+/// Where a cursor was last time this view drew, so that moving it reveals the
+/// row and scrolling away from it does not drag the reader back.
+#[derive(Default)]
+struct Stepped {
+    at: Option<SharedString>,
+}
+
 /// A virtualized, read-only diff presentation.
 #[derive(IntoElement)]
 pub struct DiffView {
     ident: Ident,
-    files: Vec<DiffFile>,
+    files: Source,
     presentation: DiffPresentation,
     visible_rows: usize,
     wrapping: bool,
     language: Option<SharedString>,
+    cursor: Option<DiffCursor>,
     on_event: Option<EventHandler>,
 }
 
@@ -399,27 +562,74 @@ impl std::fmt::Debug for DiffView {
         formatter
             .debug_struct("DiffView")
             .field("ident", &self.ident)
-            .field("files", &self.files.len())
+            .field("files", &self.files.as_slice().len())
             .field("presentation", &self.presentation)
             .field("visible_rows", &self.visible_rows)
             .field("wrapping", &self.wrapping)
             .field("language", &self.language)
+            .field("cursor", &self.cursor)
             .field("has_handler", &self.on_event.is_some())
             .finish()
     }
 }
 
+impl Source {
+    fn as_slice(&self) -> &[DiffFile] {
+        match self {
+            Self::Built(files) => files,
+            Self::Shared(files) => files,
+        }
+    }
+}
+
 impl DiffView {
     pub fn new(ident: impl Into<Ident>, files: impl IntoIterator<Item = DiffFile>) -> Self {
+        Self::from_source(ident, Source::Built(files.into_iter().collect()))
+    }
+
+    /// The same view over a diff the caller keeps, and rebuilds only when it
+    /// changes.
+    ///
+    /// Flattening the hierarchy and scanning it for syntax are both linear in
+    /// the whole diff, and a builder runs on every frame — so on a diff of any
+    /// size, a view built from an iterator does that work again for every
+    /// animation frame, every hover, every keystroke elsewhere in the window.
+    /// The cost is invisible on the ten-line diff a component's own exhibit
+    /// shows and ruinous on a review of a thousand files.
+    ///
+    /// An [`Arc`] the caller holds on to is a promise this view can check:
+    /// while it is the same allocation, nothing in it can have changed, so the
+    /// flattened rows and their colours are still the answer. A caller that
+    /// folds a file or receives a new patch builds a new one, which is exactly
+    /// when the work should be done again.
+    pub fn shared(ident: impl Into<Ident>, files: Arc<Vec<DiffFile>>) -> Self {
+        Self::from_source(ident, Source::Shared(files))
+    }
+
+    fn from_source(ident: impl Into<Ident>, files: Source) -> Self {
         Self {
             ident: ident.into(),
-            files: files.into_iter().collect(),
+            files,
             presentation: DiffPresentation::Unified,
             visible_rows: 18,
             wrapping: false,
             language: None,
+            cursor: None,
             on_event: None,
         }
+    }
+
+    /// Marks the row the reader has stepped to, and puts it on screen when it
+    /// moves.
+    ///
+    /// A diff is read by walking it — next change, next file — and a step that
+    /// only scrolled would leave the reader guessing which of the rows now in
+    /// view is the one they asked for. The row is revealed when the cursor
+    /// changes and not on every frame, so a reader who then scrolls away with
+    /// the wheel is not dragged back to it.
+    pub fn cursor(mut self, cursor: DiffCursor) -> Self {
+        self.cursor = Some(cursor);
+        self
     }
 
     pub fn presentation(mut self, presentation: DiffPresentation) -> Self {
@@ -499,6 +709,7 @@ enum FlatKind {
         folded: bool,
     },
     Hunk(SharedString),
+    Note(DiffNote),
     Expand,
     Unified {
         side: DiffSide,
@@ -516,6 +727,7 @@ impl FlatKind {
         match self {
             Self::File { .. } => StringKey::DiffFile,
             Self::Hunk(_) => StringKey::DiffHunk,
+            Self::Note(_) => StringKey::DiffNote,
             Self::Expand => StringKey::DiffExpandHunk,
             Self::Unified { side, .. } => side.mark.key(),
             Self::Split { old, new } => match (old, new) {
@@ -533,13 +745,54 @@ impl FlatKind {
     }
 }
 
+impl DiffView {
+    /// The flattened rows, done again only when they cannot be reused.
+    fn rows(&mut self, cx: &mut App) -> Rc<Vec<FlatRow>> {
+        let presentation = self.presentation;
+        let language = self.language.clone();
+        let build = |mut files: Vec<DiffFile>| {
+            if let Some(known) = language.as_deref().and_then(Language::named) {
+                colour(&mut files, known);
+            }
+            Rc::new(flatten(files, presentation))
+        };
+        let shared = match &self.files {
+            Source::Built(_) => None,
+            Source::Shared(files) => Some(Arc::clone(files)),
+        };
+        let Some(shared) = shared else {
+            let Source::Built(files) =
+                std::mem::replace(&mut self.files, Source::Built(Vec::new()))
+            else {
+                unreachable!("a built source was just matched")
+            };
+            return build(files);
+        };
+
+        let cell = keyed::slot::<Flattened>(&self.ident.semantic_id(), cx);
+        let mut held = cell.borrow_mut();
+        let reusable = held
+            .files
+            .as_ref()
+            .is_some_and(|last| Arc::ptr_eq(last, &shared))
+            && held.presentation == self.presentation
+            && held.language == self.language;
+        if let (true, Some(rows)) = (reusable, held.rows.as_ref()) {
+            return Rc::clone(rows);
+        }
+        let rows = build(shared.as_ref().clone());
+        held.files = Some(shared);
+        held.presentation = self.presentation;
+        held.language = self.language.clone();
+        held.rows = Some(Rc::clone(&rows));
+        rows
+    }
+}
+
 impl RenderOnce for DiffView {
     fn render(mut self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        if let Some(known) = self.language.as_deref().and_then(Language::named) {
-            colour(&mut self.files, known);
-        }
-        let rows = Rc::new(flatten(self.files, self.presentation));
+        let rows = self.rows(cx);
         let count = rows.len();
         let list_ident = self.ident.child("rows");
 
@@ -553,7 +806,6 @@ impl RenderOnce for DiffView {
         } else {
             let rendered = Rc::clone(&rows);
             let row_theme = theme.clone();
-            let expand_label = cx.strings().text(StringKey::DiffExpandHunk);
             let fit = match self.wrapping {
                 true => Fit::Wraps,
                 false => Fit::Clips,
@@ -561,19 +813,17 @@ impl RenderOnce for DiffView {
             let mut list = List::new(list_ident.clone(), count, move |index, _, cx| {
                 let row = &rendered[index];
                 let label = cx.strings().text(row.kind.label_key());
+                let text = match &row.kind {
+                    FlatKind::Expand => cx.strings().text(StringKey::DiffExpandHunk),
+                    FlatKind::Note(note) => note.text(cx),
+                    _ => SharedString::default(),
+                };
                 ListItem::new(
                     row.id.clone(),
                     // The row's position in the flattened diff is its reading
                     // order. The list is virtualized, so a copy spanning rows
                     // that were never mounted reports itself incomplete.
-                    diff_row(
-                        &row.id,
-                        &row.kind,
-                        index as u64,
-                        &row_theme,
-                        &expand_label,
-                        fit,
-                    ),
+                    diff_row(&row.id, &row.kind, index as u64, &row_theme, &text, fit),
                 )
                 // Source and paths stay out of diagnostic snapshots. Stable
                 // business ids and the row kind remain addressable.
@@ -584,6 +834,25 @@ impl RenderOnce for DiffView {
                 true => list.flowing(),
                 false => list.row_height(theme.control.get(ControlSize::Sm).height),
             };
+
+            // A cursor names a file, hunk or line; in unified presentation a
+            // replacement is drawn as two rows, and the first of them is the
+            // one to mark, since that is where the change begins.
+            if let Some(at) = self.cursor.as_ref().map(DiffCursor::row_id) {
+                let prefix = SharedString::from(format!("{at}."));
+                let found = rows
+                    .iter()
+                    .position(|row| row.id == at || row.id.starts_with(prefix.as_ref()));
+                if let Some(index) = found {
+                    list = list.selected(rows[index].id.clone());
+                    let stepped = keyed::slot::<Stepped>(&self.ident.semantic_id(), cx);
+                    let mut stepped = stepped.borrow_mut();
+                    if stepped.at.as_ref() != Some(&at) {
+                        stepped.at = Some(at);
+                        reveal_row(&list_ident, index, cx);
+                    }
+                }
+            }
 
             if let Some(handler) = self.on_event.clone() {
                 let indices: Rc<HashMap<SharedString, usize>> = Rc::new(
@@ -679,6 +948,15 @@ fn flatten(files: Vec<DiffFile>, presentation: DiffPresentation) -> Vec<FlatRow>
         });
         if file.folded {
             continue;
+        }
+        for note in file.notes {
+            rows.push(FlatRow {
+                id: file_path.child("note").child(note.name()).semantic_id(),
+                event: DiffViewEvent::FileActivated {
+                    file_id: file.id.clone(),
+                },
+                kind: FlatKind::Note(note),
+            });
         }
         for hunk in file.hunks {
             let hunk_path = file_path.child("hunk").child(hunk.id.as_ref());
@@ -864,7 +1142,10 @@ fn diff_row(
     kind: &FlatKind,
     order: u64,
     theme: &Theme,
-    expand: &SharedString,
+    // The words a row that has none of its own is given: the expand row's
+    // offer and a note's sentence are both this crate's text, resolved where
+    // the catalogue is reachable.
+    text: &SharedString,
     fit: Fit,
 ) -> AnyElement {
     match kind {
@@ -897,7 +1178,18 @@ fn diff_row(
             .px_token(theme, Space::Sm)
             .type_scale(theme, TypeScale::Caption)
             .text_color(theme.colors.accent)
-            .child(expand.clone())
+            .child(text.clone())
+            .into_any_element(),
+        // Quieter than a hunk header and quieter than a line: a note is
+        // context for what follows, and a reader scanning the changes should
+        // pass over it unless they are asking what happened to the file.
+        FlatKind::Note(_) => row_frame(theme, fit)
+            .items_center()
+            .px_token(theme, Space::Sm)
+            .gap_token(theme, Space::Xs)
+            .type_scale(theme, TypeScale::Caption)
+            .text_color(theme.colors.text_muted)
+            .child(text.clone())
             .into_any_element(),
         FlatKind::Hunk(header) => row_frame(theme, fit)
             .items_center()

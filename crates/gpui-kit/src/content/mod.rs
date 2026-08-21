@@ -44,7 +44,8 @@ pub use ansi::{AnsiRun, strip_ansi};
 pub use browser::{BrowserPanel, ViewportState};
 pub use code_view::{CodeLine, CodeView, LineMark};
 pub use diff_view::{
-    DiffFile, DiffHunk, DiffLine, DiffPresentation, DiffView, DiffViewEvent, word_spans,
+    DiffCursor, DiffFile, DiffHunk, DiffLine, DiffNote, DiffPresentation, DiffView, DiffViewEvent,
+    word_spans,
 };
 pub use highlight::{Carry, Language};
 pub use image_viewer::{FitMode, ImageFrame, ImageSize, ImageState, ImageViewer, ImageViewerEvent};

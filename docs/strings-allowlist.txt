@@ -190,6 +190,7 @@ Wizard
 ]({PENDING_LINK})
 `{id}` appears more than once
 `{id}` names a parent `{parent}` that is absent
+a built source was just matched
 a keyframe list is never empty
 ability charge maximum must be positive
 ability charges cannot exceed their maximum

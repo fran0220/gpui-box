@@ -654,6 +654,13 @@ string_keys! {
     DiffChangedLine => "diff.changed-line", "Changed line";
     DiffEmpty => "diff.empty", "No differences";
     DiffExpandHunk => "diff.expand-hunk", "Show more context";
+    // What a diff says about a file rather than about its lines.
+    DiffNoteAdded => "diff.note.added", "New file";
+    DiffNoteRemoved => "diff.note.removed", "Deleted";
+    DiffNoteRenamed => "diff.note.renamed", "Renamed from {0}";
+    DiffNoteBinary => "diff.note.binary", "Binary file not shown";
+    DiffNoteMode => "diff.note.mode", "Mode changed to {0}";
+    DiffNote => "diff.note", "File note";
     TreeLoadingChildren => "tree.loading-children", "Loading";
     TreeChildrenUnavailable => "tree.children-unavailable", "Could not load this branch";
     TreeEmpty => "tree.empty", "No items";

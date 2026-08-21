@@ -138,12 +138,12 @@ pub mod prelude {
     pub use crate::content::{
         AgentBlockKind, AgentDocument, AgentDocumentBlock, AgentDocumentEvent, AgentDocumentState,
         AnsiRun, Attachment, BrowserPanel, BufferedRange, Carry, CodeBlock, CodeLine, CodeSpan,
-        CodeView, DeliveryState, DiffFile, DiffHunk, DiffLine, DiffPresentation, DiffView,
-        DiffViewEvent, FitMode, ImageFrame, ImageRequest, ImageSize, ImageState, ImageViewer,
-        ImageViewerEvent, Language, LineMark, LogEntry, LogStream, LogStreamState, Mark, Markdown,
-        MarkdownEvent, Message, MessageBody, MessageList, Outline, Reaction, TrackStep,
-        TransportBar, TransportDuration, TransportEvent, TransportState, ViewportState, strip_ansi,
-        word_spans,
+        CodeView, DeliveryState, DiffCursor, DiffFile, DiffHunk, DiffLine, DiffNote,
+        DiffPresentation, DiffView, DiffViewEvent, FitMode, ImageFrame, ImageRequest, ImageSize,
+        ImageState, ImageViewer, ImageViewerEvent, Language, LineMark, LogEntry, LogStream,
+        LogStreamState, Mark, Markdown, MarkdownEvent, Message, MessageBody, MessageList, Outline,
+        Reaction, TrackStep, TransportBar, TransportDuration, TransportEvent, TransportState,
+        ViewportState, strip_ansi, word_spans,
     };
     pub use crate::controls::auth::{
         OneTimeCodeInput, OneTimeCodeInputEvent, PasswordInput, PasswordInputEvent,
