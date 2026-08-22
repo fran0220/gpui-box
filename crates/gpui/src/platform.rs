@@ -1318,12 +1318,28 @@ pub struct TextGammaParams {
 }
 
 impl TextGammaParams {
-    /// Parameters used by Metal and the WGPU fallback path.
+    /// Parameters used by the WGPU fallback path.
     pub fn grayscale_default() -> Self {
         Self {
             gamma_ratios: get_gamma_correction_ratios(DEFAULT_TEXT_GAMMA),
             grayscale_enhanced_contrast: DEFAULT_GRAYSCALE_ENHANCED_CONTRAST,
             subpixel_enhanced_contrast: DEFAULT_SUBPIXEL_ENHANCED_CONTRAST,
+            pad: [0.0; 2],
+        }
+    }
+
+    /// Parameters that leave atlas coverage exactly as rasterized.
+    ///
+    /// Core Graphics bakes its own gamma handling into the coverage it
+    /// rasterizes, and the macOS text system already dilates strokes to match
+    /// AppleFontSmoothing per foreground luminance. Reshaping that coverage a
+    /// second time with the DirectWrite curve thickens and smudges glyphs, so
+    /// Metal composites it untouched.
+    pub fn identity() -> Self {
+        Self {
+            gamma_ratios: get_gamma_correction_ratios(1.0),
+            grayscale_enhanced_contrast: 0.0,
+            subpixel_enhanced_contrast: 0.0,
             pad: [0.0; 2],
         }
     }

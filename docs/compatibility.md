@@ -138,17 +138,21 @@ two Noto families to its type styles. Mixed RTL script output therefore does
 not depend on fonts installed by a downstream host. Locale-specific copy,
 number/date formatting, and language policy remain host-owned.
 
-Grayscale glyph compositing is the same renderer contract on Metal, Direct3D,
-and WGPU. Core Text, DirectWrite, and Cosmic still rasterize a tintable
-coverage mask into the sprite atlas; the monochrome sprite shader then applies
-the DirectWrite / Windows Terminal contrast and gamma reshape
-(`apply_contrast_and_gamma_correction`, default γ = 1.8 and grayscale contrast
-1.0) before the hardware blend. Metal no longer does a raw
-`color.a *= sample.a` multiply. The mask remains reusable across colors, so
-this is not destination-aware Core Text or AppKit font smoothing. macOS
-windows still report no subpixel support; subpixel mode stays a Windows / WGPU
-path. Linear atlas sampling and small geometric faces can still look softer
-than Safari or Notes.
+Grayscale glyph compositing shares one shader contract on Metal, Direct3D,
+and WGPU: a tintable coverage mask in the sprite atlas, reshaped by
+`apply_contrast_and_gamma_correction` before the hardware blend. The
+parameters are per platform. DirectWrite and Cosmic coverage takes the
+DirectWrite / Windows Terminal curve (default γ = 1.8, grayscale contrast
+1.0). Core Text coverage takes identity parameters
+(`TextGammaParams::identity`): Core Graphics bakes its gamma handling into
+the mask and the macOS text system already dilates strokes per foreground
+luminance to match AppleFontSmoothing, so a second reshape thickens and
+smudges glyphs. The mask remains reusable across colors, so this is not
+destination-aware Core Text or AppKit font smoothing. macOS windows still
+report no subpixel support; subpixel mode stays a Windows / WGPU path. The
+macOS swapchain layer is tagged `kCGColorSpaceSRGB`, so the window server
+color-matches it like AppKit content instead of scanning untagged pixels out
+in the display's native gamut.
 
 Browser checks are:
 

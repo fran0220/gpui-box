@@ -197,6 +197,17 @@ impl MetalRenderer {
         let layer = metal::MetalLayer::new();
         layer.set_device(device);
         layer.set_pixel_format(MTLPixelFormat::BGRA8Unorm);
+        // Tag the layer as sRGB so the window server color-matches it the way
+        // it matches AppKit content. An untagged layer is scanned out in the
+        // display's native space, which oversaturates sRGB-authored colors on
+        // wide-gamut panels.
+        unsafe {
+            if let Some(color_space) = core_graphics::color_space::CGColorSpace::create_with_name(
+                core_graphics::color_space::kCGColorSpaceSRGB,
+            ) {
+                let _: () = msg_send![&*layer, setColorspace: color_space.as_ptr()];
+            }
+        }
         layer.set_opaque(!transparent);
         layer.set_maximum_drawable_count(3);
         #[cfg(any(test, feature = "test-support"))]
@@ -450,7 +461,9 @@ impl MetalRenderer {
             path_intermediate_texture: None,
             path_intermediate_msaa_texture: None,
             path_sample_count: PATH_SAMPLE_COUNT,
-            text_gamma_params: TextGammaParams::grayscale_default(),
+            // CG coverage arrives pre-shaped (gamma + smoothing dilation);
+            // see `TextGammaParams::identity`.
+            text_gamma_params: TextGammaParams::identity(),
             #[cfg(any(test, feature = "test-support"))]
             headless_render_target: None,
         }
