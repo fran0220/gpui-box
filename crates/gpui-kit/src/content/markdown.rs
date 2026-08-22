@@ -1204,6 +1204,12 @@ fn run(
         style.color.unwrap_or(theme.colors.text)
     };
     div()
+        // A run is a flex item in a wrapping row, and gpui answers a
+        // min-content probe for text with the width the whole run would take
+        // unwrapped. Without this the item's automatic minimum is that width,
+        // so a paragraph written as one long run cannot shrink to the column
+        // it sits in and walks out past it instead of wrapping inside it.
+        .min_w_0()
         .when(style.strong, |element| {
             element.font_weight(FontWeight::BOLD)
         })

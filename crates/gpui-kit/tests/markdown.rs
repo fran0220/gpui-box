@@ -429,3 +429,42 @@ fn a_link_whose_address_is_still_arriving_leads_nowhere(cx: &mut TestAppContext)
         "the finished link is addressable"
     );
 }
+
+/// A paragraph written as one long run belongs to the column it was given,
+/// not to its own unwrapped width. GPUI answers a min-content probe for text
+/// with the width the whole run would take on one line, so a run that cannot
+/// shrink takes the column with it and the reader loses the end of every
+/// sentence off the edge of the pane.
+#[gpui::test]
+fn a_long_paragraph_wraps_inside_the_column_it_was_given(cx: &mut TestAppContext) {
+    const PARAGRAPH: &str = "Colour contrast is the luminance difference between the text and \
+the background behind it, and it has to be large enough that a person can read the words without \
+leaning into the screen.";
+
+    fn document(cx: &mut TestAppContext, width: f32) -> Harness {
+        Harness::new(cx, gpui_kit::install, move |_, _| {
+            gpui::div()
+                .w(gpui::px(width))
+                .child(Markdown::new("doc", PARAGRAPH).on_event(|_, _, _| {}))
+                .into_any_element()
+        })
+    }
+
+    let mut narrow = document(cx, 220.0);
+    let narrow = narrow.node("doc").expect("the document publishes itself");
+    let mut wide = document(cx, 1_600.0);
+    let wide = wide.node("doc").expect("the document publishes itself");
+
+    assert!(
+        narrow.bounds.width <= 220.0,
+        "the document grew past the column it was given: {}",
+        narrow.bounds.width
+    );
+    assert!(
+        narrow.bounds.height > wide.bounds.height,
+        "the same paragraph took {} in a 220px column and {} in a 1600px one, \
+so it never wrapped",
+        narrow.bounds.height,
+        wide.bounds.height
+    );
+}
