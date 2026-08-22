@@ -385,14 +385,14 @@ How far each surface reads from the one behind it, in CIE L\*. The WCAG ratio ca
 
 | Surface | Behind | Distance | Minimum |
 |---|---|---:|---:|
-| `color.surface.canvas` | `color.surface.backdrop` | 4.5 | 3.0 |
-| `color.surface.panel` | `color.surface.backdrop` | 8.4 | 3.0 |
-| `color.surface.canvas` | `color.surface.sunken` | 3.1 | 3.0 |
-| `color.surface.panel` | `color.surface.canvas` | 3.9 | 3.0 |
-| `color.surface.panel` | `color.surface.sunken` | 7.0 | 3.0 |
-| `color.surface.raised` | `color.surface.panel` | 6.3 | 3.0 |
-| `color.surface.overlay` | `color.surface.panel` | 4.4 | 3.0 |
-| `color.surface.overlay` | `color.surface.canvas` | 8.3 | 3.0 |
+| `color.surface.canvas` | `color.surface.backdrop` | 4.5 | 2.0 |
+| `color.surface.panel` | `color.surface.backdrop` | 8.4 | 2.0 |
+| `color.surface.canvas` | `color.surface.sunken` | 3.1 | 2.0 |
+| `color.surface.panel` | `color.surface.canvas` | 3.9 | 2.0 |
+| `color.surface.panel` | `color.surface.sunken` | 7.0 | 2.0 |
+| `color.surface.raised` | `color.surface.panel` | 6.3 | 2.0 |
+| `color.surface.overlay` | `color.surface.panel` | 4.4 | 2.0 |
+| `color.surface.overlay` | `color.surface.canvas` | 8.3 | 2.0 |
 
 ### Tone distinction
 
@@ -785,14 +785,14 @@ How far each surface reads from the one behind it, in CIE L\*. The WCAG ratio ca
 
 | Surface | Behind | Distance | Minimum |
 |---|---|---:|---:|
-| `color.surface.canvas` | `color.surface.backdrop` | 5.2 | 3.0 |
-| `color.surface.panel` | `color.surface.backdrop` | 8.7 | 3.0 |
-| `color.surface.canvas` | `color.surface.sunken` | 3.8 | 3.0 |
-| `color.surface.panel` | `color.surface.canvas` | 3.5 | 3.0 |
-| `color.surface.panel` | `color.surface.sunken` | 7.3 | 3.0 |
-| `color.surface.raised` | `color.surface.panel` | 3.4 | 3.0 |
-| `color.surface.overlay` | `color.surface.panel` | 3.4 | 3.0 |
-| `color.surface.overlay` | `color.surface.canvas` | 6.8 | 3.0 |
+| `color.surface.canvas` | `color.surface.backdrop` | 5.2 | 2.0 |
+| `color.surface.panel` | `color.surface.backdrop` | 8.7 | 2.0 |
+| `color.surface.canvas` | `color.surface.sunken` | 3.8 | 2.0 |
+| `color.surface.panel` | `color.surface.canvas` | 3.5 | 2.0 |
+| `color.surface.panel` | `color.surface.sunken` | 7.3 | 2.0 |
+| `color.surface.raised` | `color.surface.panel` | 3.4 | 2.0 |
+| `color.surface.overlay` | `color.surface.panel` | 3.4 | 2.0 |
+| `color.surface.overlay` | `color.surface.canvas` | 6.8 | 2.0 |
 
 ### Tone distinction
 

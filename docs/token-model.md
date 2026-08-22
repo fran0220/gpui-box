@@ -129,7 +129,7 @@ a reader can point at. Near white it fails the other way, by reporting a
 comfortable-looking number for a step nobody can see.
 
 So surfaces are compared in CIE L\*, which is uniform across the range, and
-every nesting two surfaces can form must gain at least **3 L\*** over the one
+every nesting two surfaces can form must gain at least **2 L\*** over the one
 behind it:
 
 | Surface | Behind |
@@ -148,10 +148,18 @@ which is how a native window already separates its background from its
 content. `backdrop` is the substrate behind the page, the plane a card can
 sit on when the page itself is not dark enough to carry the shadow. It is
 checked against `canvas` and `panel` and not against `sunken`: a well never
-sits on the substrate, it sits in a panel or on the page, and requiring
-three L\* between those two would collapse the dark ramp. `overlay` is
+sits on the substrate, it sits in a panel or on the page, and holding those
+two apart as well would collapse the dark ramp. `overlay` is
 checked against what it opens over rather than against `raised`, because a
 popover and a code block never touch.
+
+Two is a floor and not a ladder. Five rungs sit under one white ceiling, so
+every tenth added to this number is taken off the page: hold the step at three
+and the darkest plane of a light theme has to fall past 90 L\*, which is
+below where shipped chrome sits — a native window and the editors this
+library is compared to step about 2.4 L\* from their brightest plane to the
+one under it. A theme is free to spread its ramp wider; what the rule refuses
+is two planes a reader cannot tell apart at all.
 
 This rule exists because its absence was not theoretical. `studio-light` gave
 `panel`, `raised` and `overlay` the same `#ffffff`: a card, the code block

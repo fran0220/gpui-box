@@ -309,10 +309,20 @@ impl SeparationCheck {
 
 /// The perceptual lightness a surface must gain over the one behind it.
 ///
-/// Three is about where a step stops being a rendering artifact and starts
-/// being a boundary a reader can point at. It is deliberately modest: this is
-/// a floor under every theme, not a house style.
-pub const SEPARATION_MINIMUM: f32 = 3.0;
+/// Two is about where a step stops being a rendering artifact and starts
+/// being a boundary a reader can point at, and it is what shipped light
+/// chrome actually uses: measured against a native window and against the
+/// editors people compare this library to, the step from the brightest plane
+/// to the one under it lands near 2.4 L\*, not 3. A higher floor is not a
+/// stricter reading of the same rule, it is a house style — with five rungs
+/// under one white ceiling, every extra tenth of a floor is subtracted from
+/// the page, and a light theme built to clear it comes out visibly darker
+/// than the platform it sits on.
+///
+/// It is deliberately modest: a floor under every theme, not a ladder. What
+/// it rules out is what it was written for — two planes a reader cannot tell
+/// apart at all.
+pub const SEPARATION_MINIMUM: f32 = 2.0;
 
 /// Every stack of two surfaces a component can actually build, in order.
 ///
