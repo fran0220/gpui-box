@@ -218,7 +218,7 @@ fn a_code_block_publishes_the_info_string_it_was_given(cx: &mut TestAppContext) 
 
     let fenced = harness.node("doc.code-rust").expect("published");
     assert_eq!(fenced.text.as_deref(), Some("rust"));
-    assert_eq!(fenced.value.as_deref(), Some("1 lines"));
+    assert_eq!(fenced.value.as_deref(), Some("1 line"));
 
     let bare = harness.node("doc.code-plain-text").expect("published");
     assert_eq!(

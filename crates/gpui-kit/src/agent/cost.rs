@@ -45,7 +45,7 @@ use gpui_kit_theme::{ActiveTheme, Space, TextTone, TypeScale};
 
 use crate::display::badge::{Badge, Tone};
 use crate::foundation::{CardVariant, Ident, StyledExt, text};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// How a number was arrived at.
 ///
@@ -385,7 +385,7 @@ impl RenderOnce for CostMeter {
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::Group)
                     .when_label(self.label)
-                    .value(SharedString::from(self.lines.len().to_string())),
+                    .value(cx.numbers().count(self.lines.len())),
             )
     }
 }

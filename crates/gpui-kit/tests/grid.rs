@@ -213,7 +213,7 @@ fn a_virtualized_grid_publishes_its_total_and_only_the_rows_it_drew(cx: &mut Tes
     assert_eq!(node.role, Role::Table);
     assert_eq!(
         node.value.as_deref(),
-        Some("1000"),
+        Some("1,000"),
         "the grid must report the size of the data set it was given"
     );
 
@@ -455,7 +455,7 @@ fn the_header_box_says_what_it_can_speak_for(cx: &mut TestAppContext) {
     assert_eq!(box_node.checked, Some(false));
     assert_eq!(
         box_node.value.as_deref(),
-        Some("0 of 40 loaded, 12000 total"),
+        Some("0 of 40 loaded, 12,000 total"),
         "a box in a virtualized grid must not read as though it speaks for the whole data set"
     );
 
@@ -479,7 +479,7 @@ fn the_header_box_says_what_it_can_speak_for(cx: &mut TestAppContext) {
     assert_eq!(box_node.checked, None, "a partial selection is mixed");
     assert_eq!(
         box_node.value.as_deref(),
-        Some("2 of 40 loaded, 12000 total")
+        Some("2 of 40 loaded, 12,000 total")
     );
 
     let all: Vec<SharedString> = (0..loaded).map(|index| job(index).0).collect();
@@ -495,7 +495,7 @@ fn the_header_box_says_what_it_can_speak_for(cx: &mut TestAppContext) {
     assert_eq!(box_node.checked, Some(true));
     assert_eq!(
         box_node.value.as_deref(),
-        Some("40 of 40 loaded, 12000 total"),
+        Some("40 of 40 loaded, 12,000 total"),
         "every loaded row is selected, and eleven thousand nine hundred and sixty are not"
     );
     harness.click("data.grid.select-all");
@@ -535,7 +535,7 @@ fn the_bulk_bar_states_the_selection_it_actually_has(cx: &mut TestAppContext) {
     let wider = harness
         .node("data.bulk.select-all")
         .expect("a selection narrower than the data set offers the wider intent");
-    assert_eq!(wider.text.as_deref(), Some("Select all 12000"));
+    assert_eq!(wider.text.as_deref(), Some("Select all 12,000"));
 
     harness.click("data.bulk.select-all");
     assert_eq!(*reports.selections.borrow(), vec!["everything"]);
@@ -554,7 +554,7 @@ fn a_bulk_bar_over_the_whole_data_set_offers_nothing_wider(cx: &mut TestAppConte
             .expect("published")
             .text
             .as_deref(),
-        Some("12000 selected")
+        Some("12,000 selected")
     );
     assert!(
         harness.node("data.bulk.select-all").is_none(),

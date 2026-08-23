@@ -44,7 +44,7 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TypeScale};
 
 use crate::controls::button::Button;
 use crate::foundation::{Ident, Sizable, StyledExt};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type RetryHandler = Rc<dyn Fn(&mut Window, &mut App)>;
 
@@ -164,9 +164,10 @@ impl RenderOnce for FailurePanel {
         });
 
         let attempts = self.attempts.filter(|count| *count > 1).map(|count| {
+            let digits = cx.numbers().count(count);
             let wording = cx
                 .strings()
-                .format(StringKey::FailureAttempts, &[&count.to_string()]);
+                .format(StringKey::FailureAttempts, &[digits.as_ref()]);
             div()
                 .type_scale(&theme, TypeScale::Caption)
                 .text_color(theme.colors.text_faint)
@@ -176,7 +177,7 @@ impl RenderOnce for FailurePanel {
                     NodeSpec::new(self.ident.child("attempts").semantic_id(), Role::Text)
                         .parent(self.ident.semantic_id())
                         .text(wording)
-                        .value(count.to_string()),
+                        .value(digits),
                 )
         });
 

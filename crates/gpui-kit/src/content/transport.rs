@@ -309,7 +309,10 @@ impl TransportBar {
     /// The speeds the host offers, and which of them holds. Offering none
     /// leaves the control out entirely.
     pub fn speeds(mut self, speeds: impl IntoIterator<Item = f32>, current: f32) -> Self {
-        self.speeds = speeds.into_iter().filter(|speed| *speed > 0.0).collect();
+        self.speeds = speeds
+            .into_iter()
+            .filter(|speed| speed.is_finite() && *speed > 0.0)
+            .collect();
         self.speed = current;
         self
     }
@@ -392,8 +395,11 @@ fn speed_id(speed: f32) -> String {
     format!("speed-{}", format!("{speed}").replace('.', "-"))
 }
 
-fn speed_label(speed: f32) -> String {
-    format!("{speed}×")
+fn speed_precision(speed: f32) -> usize {
+    speed
+        .to_string()
+        .split_once('.')
+        .map_or(0, |(_, fraction)| fraction.len())
 }
 
 impl RenderOnce for TransportBar {
@@ -499,7 +505,12 @@ impl RenderOnce for TransportBar {
                                 .parent(ident.semantic_id())
                                 .text(cx.strings().text(StringKey::TransportBuffered))
                                 .range(0.0, 1.0, furthest)
-                                .value(format!("{} ranges", self.buffered.len())),
+                                .value(cx.strings().format_plural(
+                                    StringKey::TransportRangeOne,
+                                    StringKey::TransportRanges,
+                                    cx.numbers().plural(self.buffered.len()),
+                                    &[cx.numbers().count(self.buffered.len()).as_ref()],
+                                )),
                         ),
                 ),
             );
@@ -697,11 +708,13 @@ impl RenderOnce for TransportBar {
             let report = Rc::clone(&report);
             let mut control = SegmentedControl::new(ident.child("speed"))
                 .control_size(ControlSize::Xs)
-                .segments(
-                    offered
-                        .iter()
-                        .map(|speed| Segment::new(speed_id(*speed), speed_label(*speed))),
-                )
+                .segments(offered.iter().map(|speed| {
+                    Segment::new(
+                        speed_id(*speed),
+                        cx.numbers()
+                            .multiplier(f64::from(*speed), speed_precision(*speed)),
+                    )
+                }))
                 .selected(speed_id(self.speed))
                 .disabled(!actionable);
             if actionable {
@@ -951,7 +964,8 @@ mod tests {
     fn a_speed_addresses_by_its_value_rather_than_its_place() {
         assert_eq!(speed_id(1.5), "speed-1-5");
         assert_eq!(speed_id(2.0), "speed-2");
-        assert_eq!(speed_label(1.5), "1.5×");
+        assert_eq!(speed_precision(1.5), 1);
+        assert_eq!(speed_precision(2.0), 0);
     }
 }
 

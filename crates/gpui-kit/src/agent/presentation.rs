@@ -29,7 +29,7 @@ use crate::display::status::{Callout, StatusDot, StatusLine};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{FocusRing, Ident, Pressable, StyledExt};
 use crate::motion;
-use crate::strings::{ActiveStrings, StringKey, Strings};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey, Strings};
 
 type ActionHandler = Rc<dyn Fn(AgentUiAction, &mut Window, &mut App)>;
 type ToggleHandler = Rc<dyn Fn(AgentId, bool, &mut Window, &mut App)>;
@@ -686,7 +686,7 @@ impl RenderOnce for AgentGroup {
         if count > visible {
             row = row.child(
                 div().ms(direction, px(theme.space(Space::Xs))).child(
-                    Badge::new(format!("+{}", count - visible))
+                    Badge::new(cx.numbers().positive_count(count - visible))
                         .neutral()
                         .id(self.ident.child("overflow")),
                 ),
@@ -694,7 +694,7 @@ impl RenderOnce for AgentGroup {
         }
         row.semantic_in(
             cx,
-            NodeSpec::new(self.ident.semantic_id(), Role::Group).value(count.to_string()),
+            NodeSpec::new(self.ident.semantic_id(), Role::Group).value(cx.numbers().count(count)),
         )
         .into_any_element()
     }

@@ -23,7 +23,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Surface, Theme, TypeScale};
 
 use crate::foundation::{FocusRing, Ident, Pressable, StyledExt};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 const HEIGHT: f32 = 38.0;
 const CONTROL_WIDTH: f32 = 46.0;
@@ -291,7 +291,7 @@ impl RenderOnce for DesktopTitlebar {
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::Toolbar)
                     .text(self.title)
-                    .value(count.to_string()),
+                    .value(cx.numbers().count(count)),
             )
     }
 }

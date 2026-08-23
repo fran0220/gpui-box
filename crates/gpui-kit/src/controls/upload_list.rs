@@ -44,7 +44,7 @@ use crate::display::status::StatusDot;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text as foundation_text};
 use crate::state::{HasPhase, Phase};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type FileHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 
@@ -563,7 +563,7 @@ impl RenderOnce for UploadList {
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::List)
                     .disabled(self.disabled)
-                    .value(self.uploads.len().to_string()),
+                    .value(cx.numbers().count(self.uploads.len())),
             )
     }
 }

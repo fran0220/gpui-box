@@ -32,8 +32,9 @@
 //! - [`motion`] — token-driven animation.
 //! - [`effects`] — semantic visual events, quality policy, replay, and budgets.
 //! - [`state`] — the explicit async states a truthful surface distinguishes.
-//! - [`strings`] — every word this library shows, and the host's right to
-//!   replace any of them without losing the English behind the rest.
+//! - [`strings`] — every word and numeric shape this library shows, including
+//!   plural categories and editable decimal parsing, and the host's right to
+//!   replace them without losing the complete English fallback.
 //! - [`scenes`] — one canonical rendering per component, shared by the gallery,
 //!   the capture task, and the headless audit.
 //!
@@ -294,7 +295,8 @@ pub mod prelude {
     pub use crate::strings::{
         ActiveNumbers, ActiveSearch, ActiveStrings, EnglishNumbers, EnglishSearch, NumberAdapter,
         Plural, SearchMatcher, SharedNumberAdapter, SharedSearchMatcher, StringKey, Strings,
-        reset_numbers, reset_search, reset_strings, set_numbers, set_search, set_strings,
+        reset_numbers, reset_search, reset_strings, set_numbers, set_plural_strings, set_search,
+        set_strings,
     };
     pub use crate::structured::{
         DefaultSchemaFilePolicy, FieldValue, JsonValue, JsonView, NumberBounds, Schema,

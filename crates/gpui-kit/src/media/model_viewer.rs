@@ -43,7 +43,7 @@ use crate::media::gltf::{ModelBounds, ModelError, ModelScene};
 use crate::media::notice;
 use crate::motion::keyed;
 use crate::state::{HasPhase, Phase};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// How tall the frame is when the caller says nothing.
 const DEFAULT_HEIGHT: f32 = 320.0;
@@ -310,11 +310,19 @@ impl RenderOnce for ModelViewer {
                             cx,
                             NodeSpec::new(ident.child("camera").semantic_id(), Role::Status)
                                 .parent(ident.semantic_id())
-                                .value(format!(
-                                    "{} {}",
-                                    degrees(camera.yaw),
-                                    degrees(camera.pitch)
-                                )),
+                                .value(
+                                    strings.format(
+                                        StringKey::ModelCamera,
+                                        &[
+                                            cx.numbers()
+                                                .decimal(degrees(camera.yaw) as f64, 0)
+                                                .as_ref(),
+                                            cx.numbers()
+                                                .decimal(degrees(camera.pitch) as f64, 0)
+                                                .as_ref(),
+                                        ],
+                                    ),
+                                ),
                         ),
                 );
             }
@@ -341,7 +349,7 @@ impl RenderOnce for ModelViewer {
                     &theme,
                     theme.colors.danger,
                     strings.text(StringKey::ModelRefused),
-                    refusal(&strings, *error),
+                    refusal(&strings, *error, cx),
                 ));
             }
         }
@@ -579,7 +587,10 @@ fn count(
     text(
         theme,
         TypeScale::Caption,
-        strings.format(StringKey::ModelCount, &[&label, &value.to_string()]),
+        strings.format(
+            StringKey::ModelCount,
+            &[&label, cx.numbers().count(value).as_ref()],
+        ),
     )
     .text_tone(theme, TextTone::Muted)
     .semantic_in(
@@ -587,12 +598,12 @@ fn count(
         NodeSpec::new(ident.child(name).semantic_id(), Role::Text)
             .parent(ident.semantic_id())
             .text(label)
-            .value(value.to_string()),
+            .value(cx.numbers().count(value)),
     )
 }
 
 /// The host-facing sentence for a refusal, with the reader's own code in it.
-fn refusal(strings: &crate::strings::Strings, error: ModelError) -> SharedString {
+fn refusal(strings: &crate::strings::Strings, error: ModelError, cx: &App) -> SharedString {
     match error {
         ModelError::TooLarge {
             limit,
@@ -600,7 +611,11 @@ fn refusal(strings: &crate::strings::Strings, error: ModelError) -> SharedString
             allowed,
         } => strings.format(
             StringKey::ModelTooLarge,
-            &[limit.name(), &found.to_string(), &allowed.to_string()],
+            &[
+                limit.name(),
+                cx.numbers().count(found).as_ref(),
+                cx.numbers().count(allowed).as_ref(),
+            ],
         ),
         ModelError::Rejected(defect) => strings.format(StringKey::ModelRejected, &[defect.name()]),
     }

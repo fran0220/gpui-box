@@ -320,9 +320,16 @@ library's job. Box still refuses to invent calendar arithmetic, locale
 wording, transports, and OS window chrome; it no longer refuses the
 surfaces a downstream desktop app has to put on screen.
 
-**Number adapter.** Counts go through `NumberAdapter` the way dates go
-through `DateAdapter`. `ProgressBar` asks it for `3 of 12` instead of
-formatting Rust digits. The English adapter is a fallback, not a locale.
+**Complete number and plural adapters.** Library-authored numeric facts now go
+through `NumberAdapter` the way dates go through `DateAdapter`: grouped counts
+and decimals, editable decimal parsing, count-of-total, percentages,
+quantities and affixes, dimensions, ordinals, signed deltas, lower bounds, and
+playback multipliers. `NumberInput` parses through the same adapter that writes
+its value. `Strings` accepts `zero`, `one`, `two`, `few`, `many`, and `other`
+phrase overrides, so components no longer choose English plurals themselves.
+The built-in English adapter is a complete fallback, not locale discovery;
+caller-authored clock, currency, source, identifier, and diagnostic strings
+remain verbatim.
 
 **Schema shapes a settings page can name.** `SchemaKind` now includes
 `Date`, `Time`, `DateRange`, `Files`, and repeating `List`. Until a host

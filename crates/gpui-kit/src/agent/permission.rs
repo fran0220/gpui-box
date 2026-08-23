@@ -37,7 +37,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, TextTone, Theme, TypeScale};
 
 use crate::foundation::{CardVariant, FocusRing, Ident, StyledExt, text};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type ChangeHandler = Rc<dyn Fn(PermissionChange, &mut Window, &mut App)>;
 
@@ -364,7 +364,7 @@ impl RenderOnce for PermissionMatrix {
             .semantic_in(
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::Table)
-                    .value(SharedString::from(self.subjects.len().to_string())),
+                    .value(cx.numbers().count(self.subjects.len())),
             )
     }
 }

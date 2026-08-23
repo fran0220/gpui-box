@@ -48,6 +48,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 
 use crate::foundation::{Disableable, Ident};
 use crate::layout::split::{HANDLE, SplitAxis, SplitPane, SplitSide};
+use crate::strings::ActiveNumbers;
 
 type ChangeHandler = Rc<dyn Fn(SplitChange, &mut Window, &mut App)>;
 
@@ -762,7 +763,7 @@ impl RenderOnce for SplitTree {
             .semantic_in(
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::Group)
-                    .value(layout.panes().len().to_string()),
+                    .value(cx.numbers().count(layout.panes().len())),
             )
     }
 }

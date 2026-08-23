@@ -18,6 +18,7 @@ use gpui_kit_theme::{ActiveTheme, Radius, Space, TextTone, Theme, TypeScale};
 use crate::foundation::{
     Disableable, FocusRing, Ident, Pressable, StyledExt, text as foundation_text,
 };
+use crate::strings::ActiveNumbers;
 
 /// The local width reserved for the history rail.
 const RAIL_WIDTH: f32 = 20.0;
@@ -209,7 +210,7 @@ impl RenderOnce for UndoHistory {
             cx,
             NodeSpec::new(self.ident.semantic_id(), Role::List)
                 .text(self.label)
-                .value(count.to_string()),
+                .value(cx.numbers().count(count)),
         )
     }
 }

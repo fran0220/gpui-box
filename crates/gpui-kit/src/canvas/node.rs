@@ -18,6 +18,7 @@ use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Surface};
 
 use crate::foundation::{FocusRing, Ident, Pressable, Selectable, StyledExt};
 use crate::motion;
+use crate::strings::ActiveNumbers;
 
 use super::edge::PortSide;
 
@@ -597,12 +598,12 @@ impl RenderOnce for GraphNode {
                     .child(
                         div()
                             .text_color(theme.colors.success)
-                            .child(format!("+{}", diff.added)),
+                            .child(cx.numbers().positive_count(diff.added)),
                     )
                     .child(
                         div()
                             .text_color(theme.colors.danger)
-                            .child(format!("-{}", diff.removed)),
+                            .child(cx.numbers().negative_count(diff.removed)),
                     )
                     .into_any_element(),
             );

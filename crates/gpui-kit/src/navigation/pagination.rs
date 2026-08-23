@@ -297,8 +297,10 @@ impl RenderOnce for Pagination {
                                     NodeSpec::new(gap.semantic_id(), Role::Text)
                                         .parent(ident.semantic_id())
                                         .value(cx.numbers().count(hidden))
-                                        .text(strings.format(
+                                        .text(strings.format_plural(
+                                            StringKey::PaginationMorePageOne,
                                             StringKey::PaginationMorePages,
+                                            cx.numbers().plural(hidden),
                                             &[cx.numbers().count(hidden).as_ref()],
                                         )),
                                 ),

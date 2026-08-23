@@ -495,7 +495,7 @@ presentation contract downstream.
 | Complete copies across unmounted text | GPUI now coordinates one grapheme-safe selection across separately mounted `StyledText` participants in caller-declared reading order, with pointer capture, keyboard copy/select-all, AccessKit text runs, and overlay scope isolation. `AgentDocument`, `CodeView`, `Markdown`, `LogStream`, `DiffView`, and `HighlightedText` participate. A selection crossing virtualized rows copies the mounted text and reports that it is incomplete; whole-value component copy actions remain the path to content GPUI never laid out. |
 | Text range highlighting | `HighlightedText`, `LogStream`, `CodeView` and `DiffView` render caller-supplied ranges while constructing their text. GPUI still has no API that marks a substring of an arbitrary already-rendered text element, which blocks a generic find-in-page overlay. |
 | Writing direction | `LayoutDirection` supplies logical row order, start/end spacing and borders, text alignment, directional glyph mirroring, and reading-order keyboard traversal across controls, navigation, menus, calendars, trees, structured views, and schema forms. Unicode bidi shaping keeps mixed Arabic/Hebrew, Latin, punctuation, and numbers in logical order. Host-owned localized copy, locale formatting, and a larger language-specific bidi corpus remain integration work rather than component geometry. |
-| Number, date, and quantity formatting | Every word is now host-replaceable, but every *number* beside one is still formatted by Rust. See "Numbers a catalogue cannot fix" below. |
+| Number, date, and quantity formatting | `NumberAdapter` owns every library-authored numeric shape — grouped counts and decimals, editable parsing, plural category, count-of-total, percent, multiplier, dimensions, ordinals, signed deltas, lower bounds, and affix placement. `Strings` owns every phrase and its zero/one/two/few/many/other variants. Dates remain the parallel `DateAdapter` contract. See "Numbers a catalogue cannot fix alone" below. |
 | Assistive technology gaps | Basic semantics, grapheme-based editable and read-only text runs, read-only character geometry, selection actions, and explicit live-region properties now reach GPUI's AccessKit platform tree. Editable character geometry/native caret tracking, cross-tree relationships, native-child handoff, platform live-event verification, Windows UIA and Linux AT-SPI validation are active foundation work; see `docs/accessibility.md` and `docs/foundation-roadmap.md`. |
 | Validation vocabulary | `FormField` shows an error it is handed. When to validate, field against form, and validation still in flight have no shared shape. |
 | Composition | `Slotted` lets a caller replace a node a component authored rather than only configure it. A component publishes only positions its public state model can actually reach as `SLOTS`, and a name outside that list panics rather than silently rendering nothing. Surfaces with loading and failure phases offer those distinct slots; an empty-only collection offers only `empty`. No component yet slots a node that is not a whole-region state. |
@@ -503,33 +503,28 @@ presentation contract downstream.
 | Style escape hatch | `ThemeOverlay` installs a caller-adjusted `Theme` for one subtree and pops it afterwards, in every element phase, so an override cannot reach a sibling. What comes back is a whole `Theme`, so the subtree still reads a complete token set and a component inside it cannot tell it was overridden. There is still no way to override *one property of one instance* without constructing a theme for it, which is deliberate: a per-instance colour is how a library stops being one. |
 | Non-virtualized `Table` and `Tree` | `List`, `DataGrid`, and `MessageList` virtualize. These two lay out every row. |
 
-### Numbers a catalogue cannot fix
+### Numbers a catalogue cannot fix alone
 
-`gpui_kit::strings` closed the wording gap: no component holds a word a reader
-reads, and a host replaces any of them through `StringKey`. It did not close
-the formatting gap, and the two are not the same problem. A catalogue can move
-a value inside a sentence, because a template numbers its placeholders. It
-cannot change what the value looks like, which is decided by
-`usize::to_string` and by `format!` in the component.
+`gpui_kit::strings` closes both halves of localization without making a
+component infer either one. `Strings` places facts inside phrases and selects
+host-installed `zero`, `one`, `two`, `few`, `many`, or `other` variants.
+`NumberAdapter` shapes the facts themselves: grouped counts and decimals,
+editable decimal parsing, count-of-total, percentages, quantities and affixes,
+image dimensions, ordered-list markers, signed deltas, lower bounds, and
+playback multipliers. `NumberInput` writes and reads through the same adapter,
+so a localized value never becomes unparsable merely because the control drew
+it. Pagination, search, grids, document views, media, navigation, forms,
+canvas, game, and agent surfaces all use that boundary for the numeric facts
+they author.
 
-What is affected, found while converting the components:
-
-| Where | What is formatted | What a locale would change |
-|---|---|---|
-| `Pagination`, `ImageViewer`, `ProgressBar`, `ProgressCircle`, `TagInput`, `DataGrid` | counts and positions such as `2 of 9` | digits, grouping, and the ordinal form |
-| `Breadcrumb`, `MessageList`, `Markdown`, `DataGrid`, `Dropzone` | plurals, chosen by `if count == 1` at the call site | languages with zero, dual, few, and many forms need more than two keys |
-| `FilterBar`, `NumberInput`, `BulkBar` | `{count} {noun}` and `{number} {unit}` | the order of a number and its noun, and whether a space belongs between them |
-| `ImageViewer` | `1920 × 1080 · 150%` | the multiplication sign, the percent sign, and which side it takes |
-| `TransportBar` | `1.5×` and clock readouts | the speed mark, and a duration's own shape |
-| `DescriptionList` | `51 characters`, from `redacted_from` | the count, and the noun's agreement with it |
-| `Calendar`, `DateInput`, `RangePicker`, `TimeInput` | nothing: dates already come from the host `DateAdapter` | already correct, and the model the rest should follow |
-
-The shape of the answer is visible in the date components, which own no
-calendar and ask a host-supplied `DateAdapter` for every date they show.
-`NumberAdapter` is that reader: a host supplies digits, plural category,
-`count of total`, and percent marks. `ProgressBar` already asks it.
-Pagination, Transport, ImageViewer, and the remaining count sites still
-format Rust digits and are the rest of this batch.
+That does not make the library the owner of every number it receives.
+Caller-authored labels, clock readouts, currency and cost strings, source text,
+terminal output, paths, identifiers, and diagnostics remain verbatim because
+re-parsing them would change caller-owned meaning. Numeric geometry used only
+for layout, rendering, hit testing, stable ids, and debug output is not reader
+copy and is not localized. Date facts remain on the parallel `DateAdapter`;
+the host still owns its calendar, locale, and time zone. The built-in English
+adapter is a complete fallback, not a claim to discover the host locale.
 
 ### Delivery
 

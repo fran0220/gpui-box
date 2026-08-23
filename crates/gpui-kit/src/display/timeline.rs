@@ -23,7 +23,7 @@ use gpui_kit_theme::{ActiveTheme, Space, Theme, TypeScale};
 use crate::display::badge::Tone;
 use crate::display::status::StatusDot;
 use crate::foundation::{Ident, StyledExt};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// How wide the column holding the rail and its dots is.
 const RAIL: f32 = 16.0;
@@ -266,7 +266,7 @@ impl RenderOnce for Timeline {
                     NodeSpec::new(ident.child(group.id.as_ref()).semantic_id(), Role::Heading)
                         .parent(ident.semantic_id())
                         .text(group.label.clone())
-                        .value(group.entries.len().to_string()),
+                        .value(cx.numbers().count(group.entries.len())),
                 );
 
             let last = group.entries.len().saturating_sub(1);
@@ -287,7 +287,7 @@ impl RenderOnce for Timeline {
 
         feed.semantic_in(
             cx,
-            NodeSpec::new(ident.semantic_id(), Role::List).value(count.to_string()),
+            NodeSpec::new(ident.semantic_id(), Role::List).value(cx.numbers().count(count)),
         )
     }
 }

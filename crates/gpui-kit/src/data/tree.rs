@@ -55,7 +55,7 @@ use crate::interaction::dnd::{
     self, DragItem, DropAxis, DropIntent, DropPosition, MakingWay, RowTarget, SurfaceDrag,
 };
 use crate::motion::{self, keyed};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type ToggleHandler = Rc<dyn Fn(SharedString, bool, &mut Window, &mut App)>;
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
@@ -781,7 +781,8 @@ impl RenderOnce for Tree {
         stack
             .semantic_in(
                 cx,
-                NodeSpec::new(self.ident.semantic_id(), Role::Tree).value(count.to_string()),
+                NodeSpec::new(self.ident.semantic_id(), Role::Tree)
+                    .value(cx.numbers().count(count)),
             )
             .into_any_element()
     }

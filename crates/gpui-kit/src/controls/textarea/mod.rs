@@ -1477,8 +1477,8 @@ impl Render for TextArea {
                                     Role::Status,
                                 )
                                 .parent(self.ident.semantic_id())
-                                .text(count)
-                                .value(format!("{used}/{max}")),
+                                .text(count.clone())
+                                .value(count),
                             ),
                     )
                     .into_any_element()

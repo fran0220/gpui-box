@@ -45,7 +45,7 @@ use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
 use crate::motion::keyed;
 use crate::state::{HasPhase, Phase};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type EntryHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 
@@ -551,7 +551,7 @@ fn entry_row(
                     cx,
                     NodeSpec::new(entry_ident.child("hits").semantic_id(), Role::Status)
                         .parent(entry_ident.semantic_id())
-                        .value(drawn.to_string()),
+                        .value(cx.numbers().count(drawn)),
                 )
                 .into_any_element()
         } else {

@@ -51,7 +51,7 @@ use crate::display::timeline::EntryTime;
 use crate::foundation::{Ident, Sizable, StyledExt};
 use crate::motion::keyed;
 use crate::motion::{engage_end, follow_end, follows_end};
-use crate::strings::{ActiveStrings, StringKey, Strings};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey, Strings};
 
 /// What a host said about a message's journey.
 ///
@@ -597,12 +597,14 @@ impl MessageList {
             follow.below
         };
         let strings = cx.strings();
-        let label = match (follow.arrived, counted) {
-            (0, 1) => strings.text(StringKey::MessageMoreOne),
-            (0, more) => strings.format(StringKey::MessageMoreMany, &[&more.to_string()]),
-            (_, 1) => strings.text(StringKey::MessageNewOne),
-            (_, new) => strings.format(StringKey::MessageNewMany, &[&new.to_string()]),
+        let digits = cx.numbers().count(counted);
+        let (one, other) = if follow.arrived == 0 {
+            (StringKey::MessageMoreOne, StringKey::MessageMoreMany)
+        } else {
+            (StringKey::MessageNewOne, StringKey::MessageNewMany)
         };
+        let label =
+            strings.format_plural(one, other, cx.numbers().plural(counted), &[digits.as_ref()]);
         let ident = self.ident.child("pending");
         let list = self.ident.clone();
         let last = self.messages.len().saturating_sub(1);
@@ -638,7 +640,7 @@ impl MessageList {
                     NodeSpec::new(ident.semantic_id(), Role::Status)
                         .parent(self.ident.semantic_id())
                         .text(label)
-                        .value(counted.to_string()),
+                        .value(digits),
                 )
                 .into_any_element(),
         )
@@ -833,12 +835,13 @@ fn lines_left_out(message: &Message, body_lines: Option<usize>) -> Option<usize>
 }
 
 fn truncation_mark(ident: &Ident, hidden: usize, theme: &Theme, cx: &mut App) -> AnyElement {
-    let label = if hidden == 1 {
-        cx.strings().text(StringKey::MessageShowMoreOne)
-    } else {
-        cx.strings()
-            .format(StringKey::MessageShowMoreMany, &[&hidden.to_string()])
-    };
+    let digits = cx.numbers().count(hidden);
+    let label = cx.strings().format_plural(
+        StringKey::MessageShowMoreOne,
+        StringKey::MessageShowMoreMany,
+        cx.numbers().plural(hidden),
+        &[digits.as_ref()],
+    );
     div()
         .type_scale(theme, TypeScale::Caption)
         .text_color(theme.colors.text_faint)
@@ -848,7 +851,7 @@ fn truncation_mark(ident: &Ident, hidden: usize, theme: &Theme, cx: &mut App) ->
             NodeSpec::new(ident.child("truncated").semantic_id(), Role::Status)
                 .parent(ident.semantic_id())
                 .text(label)
-                .value(hidden.to_string()),
+                .value(digits),
         )
         .into_any_element()
 }
@@ -988,7 +991,10 @@ fn attachment_chip(
 }
 
 fn reaction_chip(ident: &Ident, reaction: &Reaction, theme: &Theme, cx: &mut App) -> AnyElement {
-    let text = SharedString::from(format!("{} {}", reaction.label, reaction.count));
+    let digits = cx.numbers().count(reaction.count);
+    let text = cx
+        .numbers()
+        .labelled_count(reaction.label.as_ref(), reaction.count);
     div()
         .px_token(theme, Space::Xs)
         .radius(theme, Radius::Pill)
@@ -1007,7 +1013,7 @@ fn reaction_chip(ident: &Ident, reaction: &Reaction, theme: &Theme, cx: &mut App
             )
             .parent(ident.semantic_id())
             .text(text)
-            .value(reaction.count.to_string()),
+            .value(digits),
         )
         .into_any_element()
 }

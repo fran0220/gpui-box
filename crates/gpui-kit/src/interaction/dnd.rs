@@ -70,7 +70,7 @@ use crate::display::icon::Icon as IconView;
 use crate::foundation::Sizable;
 use crate::foundation::StyledExt;
 use crate::motion::{Interpolate, Spring, Velocity, VelocityTracker, keyed};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// The semantic id of the node a drag publishes while it is in flight.
 pub const DRAG_NODE_ID: &str = "dnd.drag";
@@ -298,12 +298,12 @@ pub(crate) fn finish(cx: &mut App) {
 /// The label counts the files rather than naming them: a path is
 /// user-generated content and the label is published in the semantic tree.
 pub(crate) fn adopt_external(count: usize, cx: &mut App) {
-    let label = if count == 1 {
-        cx.strings().text(StringKey::DragFileOne)
-    } else {
-        cx.strings()
-            .format(StringKey::DragFileMany, &[&count.to_string()])
-    };
+    let label = cx.strings().format_plural(
+        StringKey::DragFileOne,
+        StringKey::DragFileMany,
+        cx.numbers().plural(count),
+        &[cx.numbers().count(count).as_ref()],
+    );
     let carried = read(cx, |state| state.item.clone()).flatten();
     if carried.is_some_and(|item| item.kind.as_ref() == FILE_KIND && item.label == label) {
         return;

@@ -24,7 +24,7 @@ use crate::foundation::{
     CardVariant, Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text,
 };
 use crate::state::{HasPhase, Phase};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type ActivateHandler = Rc<dyn Fn(OfferingIdentity, &mut Window, &mut App)>;
 
@@ -443,7 +443,7 @@ impl OfferingCatalog {
                 cx,
                 NodeSpec::new(list_ident.semantic_id(), Role::List)
                     .parent(self.ident.semantic_id())
-                    .value(filtered.len().to_string()),
+                    .value(cx.numbers().count(filtered.len())),
             )
             .into_any_element()
     }

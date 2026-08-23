@@ -13,6 +13,7 @@ use gpui_kit_theme::{ActiveTheme, TypeScale};
 
 use crate::foundation::{Ident, StyledExt};
 use crate::motion::{Easing, MotionSpec, Transition, keyed};
+use crate::strings::ActiveNumbers;
 
 type Format = Rc<dyn Fn(f64) -> String>;
 
@@ -31,11 +32,15 @@ pub struct AnimatedNumber {
 
 impl std::fmt::Debug for AnimatedNumber {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let formatted = self
+            .format
+            .as_ref()
+            .map_or_else(|| self.value.to_string(), |format| format(self.value));
         formatter
             .debug_struct("AnimatedNumber")
             .field("ident", &self.ident)
             .field("value", &self.value)
-            .field("formatted", &self.formatted(self.value))
+            .field("formatted", &formatted)
             .finish()
     }
 }
@@ -71,10 +76,10 @@ impl AnimatedNumber {
         self
     }
 
-    fn formatted(&self, value: f64) -> String {
+    fn formatted(&self, value: f64, cx: &App) -> SharedString {
         match &self.format {
-            Some(format) => format(value),
-            None => format!("{value}"),
+            Some(format) => SharedString::from(format(value)),
+            None => cx.numbers().number(value),
         }
     }
 }
@@ -105,15 +110,15 @@ impl RenderOnce for AnimatedNumber {
         };
 
         // The published value is the target, and only the glyphs count.
-        let announced = self.formatted(self.value);
-        let painted = self.formatted(shown as f64);
+        let announced = self.formatted(self.value, cx);
+        let painted = self.formatted(shown as f64, cx);
 
         div()
             .child(
                 div()
                     .type_scale(&theme, self.scale)
                     .text_color(theme.colors.text)
-                    .child(SharedString::from(painted)),
+                    .child(painted),
             )
             .semantic_in(
                 cx,

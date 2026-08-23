@@ -14,7 +14,7 @@ use crate::canvas::{
 };
 use crate::foundation::direction::ActiveDirection;
 use crate::foundation::{Ident, Selectable};
-use crate::strings::{ActiveStrings, StringKey, Strings};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey, Strings};
 
 use super::model::{
     AgentExecutionState, AgentOutcome, AgentRunSnapshot, RunLink, RunLinkKind, RunSubjectId,
@@ -179,12 +179,13 @@ impl RenderOnce for AgentRunCanvas {
             {
                 node = node.metric(
                     strings.text(StringKey::AgentRunCanvasResults),
-                    format!("{} / {}", aggregation.received, aggregation.expected),
+                    cx.numbers()
+                        .count_of_total(aggregation.received, aggregation.expected),
                 );
                 if aggregation.conflicts > 0 {
                     node = node.metric(
                         strings.text(StringKey::AgentRunCanvasConflicts),
-                        aggregation.conflicts.to_string(),
+                        cx.numbers().count(aggregation.conflicts),
                     );
                 }
             }

@@ -78,7 +78,7 @@ use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{
     Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedRow, Sizable, StyledExt, text,
 };
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type SortHandler = Rc<dyn Fn(SharedString, SortDirection, &mut Window, &mut App)>;
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
@@ -760,7 +760,8 @@ impl RenderOnce for Table {
             .child(body)
             .semantic_in(
                 cx,
-                NodeSpec::new(self.ident.semantic_id(), Role::Table).value(count.to_string()),
+                NodeSpec::new(self.ident.semantic_id(), Role::Table)
+                    .value(cx.numbers().count(count)),
             )
     }
 }

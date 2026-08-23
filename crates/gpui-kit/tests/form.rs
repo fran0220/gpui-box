@@ -6,8 +6,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use gpui::{
-    AppContext as _, Entity, InteractiveElement, IntoElement, ParentElement, TestAppContext, div,
-    prelude::*, px, size,
+    AppContext as _, Entity, InteractiveElement, IntoElement, ParentElement, SharedString,
+    TestAppContext, div, prelude::*, px, size,
 };
 use gpui_kit::prelude::*;
 use gpui_kit_testkit::harness::Harness;
@@ -248,6 +248,74 @@ fn typing_reports_the_number_that_was_typed(cx: &mut TestAppContext) {
     assert_eq!(
         events.borrow().last(),
         Some(&NumberInputEvent::Changed(7.0))
+    );
+}
+
+#[derive(Debug)]
+struct DecimalCommaNumbers;
+
+impl NumberAdapter for DecimalCommaNumbers {
+    fn count(&self, value: usize) -> SharedString {
+        EnglishNumbers.count(value)
+    }
+
+    fn plural(&self, value: usize) -> Plural {
+        EnglishNumbers.plural(value)
+    }
+
+    fn count_of_total(&self, done: usize, total: usize) -> SharedString {
+        EnglishNumbers.count_of_total(done, total)
+    }
+
+    fn percent(&self, value: f32) -> SharedString {
+        EnglishNumbers.percent(value)
+    }
+
+    fn decimal(&self, value: f64, precision: usize) -> SharedString {
+        EnglishNumbers
+            .decimal(value, precision)
+            .replace('.', ",")
+            .into()
+    }
+
+    fn parse_decimal(&self, text: &str) -> Option<f64> {
+        text.trim().replace(',', ".").parse().ok()
+    }
+}
+
+#[gpui::test]
+fn a_number_field_accepts_the_same_digits_its_adapter_writes(cx: &mut TestAppContext) {
+    let (mut harness, entity) = number(cx, |input| input.precision(2).unit("kg"));
+    let events = record::<NumberInputEvent, _>(&mut harness, &entity);
+    harness.update({
+        let entity = entity.clone();
+        move |_, cx| {
+            set_numbers(DecimalCommaNumbers, cx);
+            entity.update(cx, |number, cx| number.set_value(12.5, cx));
+        }
+    });
+    assert_eq!(
+        harness
+            .node("workspace.retention")
+            .expect("published")
+            .value
+            .as_deref(),
+        Some("12,50 kg")
+    );
+
+    harness.click("workspace.retention.field");
+    let select_all = if cfg!(target_os = "macos") {
+        "cmd-a"
+    } else {
+        "ctrl-a"
+    };
+    harness.keystrokes(select_all);
+    harness.keystrokes("12,75");
+
+    assert_eq!(
+        events.borrow().last(),
+        Some(&NumberInputEvent::Changed(12.75)),
+        "localized output must remain editable input"
     );
 }
 

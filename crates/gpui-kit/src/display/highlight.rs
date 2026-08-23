@@ -36,6 +36,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius};
 
 use crate::foundation::Ident;
+use crate::strings::ActiveNumbers;
 
 /// A run of text with some of it marked.
 ///
@@ -238,7 +239,7 @@ impl RenderOnce for HighlightedText {
                         cx,
                         NodeSpec::new(ident.semantic_id(), Role::Text)
                             .text(self.text.clone())
-                            .value(drawn.to_string()),
+                            .value(cx.numbers().count(drawn)),
                     )
                     .into_any_element()
             }

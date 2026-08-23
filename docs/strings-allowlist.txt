@@ -269,22 +269,14 @@ x1b[Z
 {:02X}{:02X}{:02X}
 {KEY_CONTEXT} && !{SUBMIT_CONTEXT}
 {KEY_CONTEXT} && {SUBMIT_CONTEXT}
-{chosen} of {loaded} loaded, {total} total
-{lines} lines
 {name} is not a slot this component names; it offers {:?}
-{number} {unit}
 {number}. 
 {pad}> 
 {pad}{hashes} 
-{prefix}{number} {unit}
-{scrolled:.0} of {max:.0}
 {text}u{200B}
 {title} — {href}
 {}
-{} blocks
 {} none
-{} ranges
-{} rows
 {} — {detail}
 {}]({PENDING_LINK})
 {}{closers}{}u{200B}

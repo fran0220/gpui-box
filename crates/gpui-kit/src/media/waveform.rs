@@ -13,7 +13,7 @@ use crate::display::empty::{EmptyKind, EmptyState};
 use crate::foundation::Ident;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::state::{HasPhase, Phase};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 const PEAK_GAP: f32 = 1.0;
 const PEAK_FLOOR: f32 = 0.08;
@@ -167,7 +167,7 @@ impl RenderOnce for AudioWaveform {
                         cx,
                         NodeSpec::new(self.ident.semantic_id(), Role::Image)
                             .text(cx.strings().text(StringKey::Waveform))
-                            .value(count.to_string()),
+                            .value(cx.numbers().count(count)),
                     )
                     .into_any_element()
             }

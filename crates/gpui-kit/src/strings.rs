@@ -151,6 +151,7 @@ string_keys! {
     PaginationPrevious => "pagination.previous", "Previous page";
     PaginationNext => "pagination.next", "Next page";
     PaginationLast => "pagination.last", "Last page";
+    PaginationMorePageOne => "pagination.more-page-one", "1 more page";
     PaginationMorePages => "pagination.more-pages", "{0} more pages";
     PaginationPageOfTotal => "pagination.page-of-total", "Page {0} of {1}";
     PaginationPage => "pagination.page", "Page {0}";
@@ -168,8 +169,7 @@ string_keys! {
     ImageViewerContain => "image-viewer.contain", "Contain";
     ImageViewerCover => "image-viewer.cover", "Cover";
     ImageViewerSizeUnknown => "image-viewer.size-unknown", "Size unknown";
-    ImageViewerMeasurement => "image-viewer.measurement", "{0} × {1} · {2}";
-    ImageViewerDimensions => "image-viewer.dimensions", "{0} × {1}";
+    ImageViewerDimensionsAndScale => "image-viewer.dimensions-and-scale", "{0} · {1}";
     ImageViewerEmpty => "image-viewer.empty", "No images";
 
     // Markdown.
@@ -178,6 +178,12 @@ string_keys! {
     MarkdownPlainText => "markdown.plain-text", "plain text";
     MarkdownTask => "markdown.task", "Task";
     MarkdownUnrenderedHtml => "markdown.unrendered-html", "unrendered html";
+    MarkdownBlockOne => "markdown.block-one", "1 block";
+    MarkdownBlocks => "markdown.blocks", "{0} blocks";
+    MarkdownLineOne => "markdown.line-one", "1 line";
+    MarkdownLines => "markdown.lines", "{0} lines";
+    MarkdownRowOne => "markdown.row-one", "1 row";
+    MarkdownRows => "markdown.rows", "{0} rows";
     MarkdownShowMoreOne => "markdown.show-more-one", "Show 1 more line";
     MarkdownShowMoreMany => "markdown.show-more-many", "Show {0} more lines";
 
@@ -212,6 +218,8 @@ string_keys! {
     TransportMute => "transport.mute", "Mute";
     TransportUnmute => "transport.unmute", "Unmute";
     TransportVolume => "transport.volume", "Volume";
+    TransportRangeOne => "transport.range-one", "1 range";
+    TransportRanges => "transport.ranges", "{0} ranges";
     TransportPreviousTrack => "transport.previous-track", "Previous track";
     TransportNextTrack => "transport.next-track", "Next track";
 
@@ -246,6 +254,7 @@ string_keys! {
     ModelMeshes => "model.meshes", "Meshes";
     ModelVertices => "model.vertices", "Vertices";
     ModelTriangles => "model.triangles", "Triangles";
+    ModelCamera => "model.camera", "{0}° yaw, {1}° pitch";
 
     // Combobox and select.
     SelectPlaceholder => "select.placeholder", "Select";
@@ -268,6 +277,7 @@ string_keys! {
     SchemaFilesChoose => "schema.files.choose", "Choose files";
     SchemaFilesDrop => "schema.files.drop", "Drop files here";
     SchemaFilesDropHint => "schema.files.drop-hint", "or choose them with the file picker";
+    SchemaFileMaximumOne => "schema.files.maximum-one", "This field holds at most 1 file.";
     SchemaFilesMaximum => "schema.files.maximum", "This field holds at most {0} files.";
     SchemaFilesRemove => "schema.files.remove", "Remove selected file";
     SchemaListAdd => "schema.list.add", "Add item";
@@ -281,7 +291,8 @@ string_keys! {
     FilterBarAdd => "filter-bar.add", "Add filter";
     FilterBarClear => "filter-bar.clear", "Clear all";
     FilterBarCounting => "filter-bar.counting", "Counting…";
-    FilterBarResultsNoun => "filter-bar.results-noun", "results";
+    FilterBarResultOne => "filter-bar.result-one", "1 result";
+    FilterBarResultsMany => "filter-bar.results-many", "{0} results";
     FilterBarResults => "filter-bar.results", "{0} {1}";
 
     // Inline edit and keybinding recorder.
@@ -293,6 +304,7 @@ string_keys! {
     KeymapReset => "keymap.reset", "Reset to defaults";
     KeymapEffective => "keymap.effective", "Current bindings";
     KeymapDefaults => "keymap.defaults", "Defaults";
+    KeymapResultOne => "keymap.result-one", "1 command";
     KeymapResultCount => "keymap.result-count", "{0} commands";
 
     // Number field.
@@ -317,6 +329,7 @@ string_keys! {
     DescriptionUnknown => "description.unknown", "Unknown";
     DescriptionNotApplicable => "description.not-applicable", "Not applicable";
     DescriptionCopy => "description.copy", "Copy {0}";
+    DescriptionCharacterOne => "description.character-one", "1 character";
     DescriptionCharacters => "description.characters", "{0} characters";
 
     // How a position in a run of things is worded. It is one key, because a
@@ -340,6 +353,7 @@ string_keys! {
     GridSelectedNoun => "grid.selected-noun", "selected";
     GridSelectAllLoaded => "grid.select-all-loaded", "Select all loaded rows";
     GridSelectAllTotal => "grid.select-all-total", "Select all {0}";
+    GridSelectionCounts => "grid.selection-counts", "{0} of {1} loaded, {2} total";
     GridClearSelection => "grid.clear-selection", "Clear selection";
     GridResizeColumn => "grid.resize-column", "Resize {0}";
     GridLoadingRows => "grid.loading-rows", "Loading rows";
@@ -423,7 +437,7 @@ string_keys! {
     GameAbilityCooldown => "game.ability.cooldown", "Cooldown: {0}";
     GameAbilityDisabled => "game.ability.disabled", "Disabled";
     GameAbilityUnavailable => "game.ability.unavailable", "Unavailable";
-    GameAbilityCharges => "game.ability.charges", "Charges: {0}/{1}";
+    GameAbilityCharges => "game.ability.charges", "Charges: {0}";
     GameAbilityCost => "game.ability.cost", "Cost: {0}";
     GameAbilityDuplicate => "game.ability.duplicate", "Ability {0} appears more than once.";
     GameRewardHidden => "game.reward.hidden", "Reward hidden";
@@ -440,7 +454,9 @@ string_keys! {
     // a document nobody could paste back.
     JsonWithheld => "json.withheld", "withheld";
     JsonRootValue => "json.root-value", "Value";
+    JsonShapeEntryOne => "json.shape-entry-one", "1 entry";
     JsonShapeEntries => "json.shape-entries", "{0} entries";
+    JsonShapeItemOne => "json.shape-item-one", "1 item";
     JsonShapeItems => "json.shape-items", "{0} items";
     JsonShapeValue => "json.shape-value", "a value";
 
@@ -622,8 +638,8 @@ string_keys! {
     NotificationsClearAll => "notifications.clear-all", "Clear all";
     NotificationsMarkAllRead => "notifications.mark-all-read", "Mark all as read";
     NotificationsUnread => "notifications.unread", "Unread";
+    NotificationsUnreadOne => "notifications.unread-one", "1 unread";
     NotificationsUnreadCount => "notifications.unread-count", "{0} unread";
-    NotificationsAtLeast => "notifications.at-least", "{0}+";
 
     // A panel whose contents the host could not produce.
     FailureTitle => "failure.title", "This panel could not be shown";
@@ -744,6 +760,7 @@ string_keys! {
 #[derive(Debug, Clone, Default)]
 pub struct Strings {
     overrides: BTreeMap<StringKey, SharedString>,
+    plural_overrides: BTreeMap<(StringKey, Plural), SharedString>,
 }
 
 impl Global for Strings {}
@@ -766,9 +783,29 @@ impl Strings {
         self
     }
 
+    /// Replaces one grammatical form of a counted phrase. The `other` key of
+    /// a one/other pair is the stable family identity; components still carry
+    /// the English one-form separately as their built-in fallback.
+    pub fn set_plural(
+        &mut self,
+        key: StringKey,
+        form: Plural,
+        text: impl Into<SharedString>,
+    ) -> &mut Self {
+        self.plural_overrides.insert((key, form), text.into());
+        self
+    }
+
+    /// Restores the built-in fallback for one grammatical form.
+    pub fn clear_plural(&mut self, key: StringKey, form: Plural) -> &mut Self {
+        self.plural_overrides.remove(&(key, form));
+        self
+    }
+
     /// Restores the English for every entry.
     pub fn clear_all(&mut self) -> &mut Self {
         self.overrides.clear();
+        self.plural_overrides.clear();
         self
     }
 
@@ -786,6 +823,11 @@ impl Strings {
         self.overrides.contains_key(&key)
     }
 
+    /// Whether one grammatical form was replaced.
+    pub fn is_plural_overridden(&self, key: StringKey, form: Plural) -> bool {
+        self.plural_overrides.contains_key(&(key, form))
+    }
+
     /// The text behind a key, which is always something a reader can read.
     pub fn text(&self, key: StringKey) -> SharedString {
         match self.overrides.get(&key) {
@@ -801,6 +843,27 @@ impl Strings {
     /// that quietly lost a fact.
     pub fn format(&self, key: StringKey, args: &[&str]) -> SharedString {
         SharedString::from(interpolate(self.text(key).as_ref(), args))
+    }
+
+    /// Formats a counted phrase without collapsing the host's plural system
+    /// to English's one/other distinction.
+    ///
+    /// `other` is the family key used for explicit zero/two/few/many/other
+    /// overrides. With no override, English falls back to `one` only for
+    /// [`Plural::One`] and to `other` for every remaining category.
+    pub fn format_plural(
+        &self,
+        one: StringKey,
+        other: StringKey,
+        form: Plural,
+        args: &[&str],
+    ) -> SharedString {
+        let template = self
+            .plural_overrides
+            .get(&(other, form))
+            .cloned()
+            .unwrap_or_else(|| self.text(if form == Plural::One { one } else { other }));
+        SharedString::from(interpolate(template.as_ref(), args))
     }
 }
 
@@ -845,9 +908,9 @@ impl ActiveStrings for App {
 /// Which plural form a count takes in the host's language.
 ///
 /// English only distinguishes one and other. A host with dual or few forms
-/// maps those onto [`Plural::Few`] and [`Plural::Many`]; components never
-/// branch on `count == 1` themselves.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// returns those exact categories and installs their phrase variants through
+/// [`Strings::set_plural`]; components never branch on `count == 1`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Plural {
     Zero,
     One,
@@ -861,6 +924,14 @@ pub enum Plural {
 pub trait NumberAdapter {
     /// The digits for a count, already grouped the way the host writes them.
     fn count(&self, value: usize) -> SharedString;
+
+    /// The digits for an unsigned document number that is not constrained by
+    /// the platform pointer width, such as a Markdown ordered-list start.
+    fn integer(&self, value: u64) -> SharedString {
+        usize::try_from(value)
+            .map(|value| self.count(value))
+            .unwrap_or_else(|_| SharedString::from(value.to_string()))
+    }
 
     /// Which plural form `value` takes.
     fn plural(&self, value: usize) -> Plural;
@@ -876,6 +947,96 @@ pub trait NumberAdapter {
     /// writes it. The component supplies the value and the decimal count;
     /// the adapter supplies the digits, the grouping, and the separator.
     fn decimal(&self, value: f64, precision: usize) -> SharedString;
+
+    /// A compact numeric readout whose precision is inherent in the value.
+    /// This serves animated counters; fixed-precision fields use
+    /// [`NumberAdapter::decimal`] instead.
+    fn number(&self, value: f64) -> SharedString {
+        let rendered = value.to_string();
+        if !value.is_finite() || rendered.contains(['e', 'E']) {
+            return SharedString::from(rendered);
+        }
+        let precision = rendered
+            .split_once('.')
+            .map_or(0, |(_, fraction)| fraction.len());
+        self.decimal(value, precision)
+    }
+
+    /// Reads an editable decimal written in the host's number system. Parsing
+    /// and formatting are one contract so `NumberInput` never shows localized
+    /// digits it cannot accept back from the typist.
+    fn parse_decimal(&self, text: &str) -> Option<f64> {
+        text.trim().parse().ok()
+    }
+
+    /// Places caller-owned affixes around an already formatted number. The
+    /// adapter owns order and spacing; the caller owns what the affixes mean.
+    fn decorate(&self, number: &str, prefix: Option<&str>, unit: Option<&str>) -> SharedString {
+        match (prefix, unit) {
+            (Some(prefix), Some(unit)) => SharedString::from(format!("{prefix}{number} {unit}")),
+            (Some(prefix), None) => SharedString::from(format!("{prefix}{number}")),
+            (None, Some(unit)) => SharedString::from(format!("{number} {unit}")),
+            (None, None) => SharedString::from(number.to_owned()),
+        }
+    }
+
+    /// A lower bound such as `1,000+`. The adapter owns the mark and which
+    /// side of the digits it occupies.
+    fn at_least(&self, value: usize) -> SharedString {
+        SharedString::from(format!("{}+", self.count(value)))
+    }
+
+    /// A count next to caller-owned words or a unit. The adapter owns their
+    /// order and spacing; the caller remains responsible for supplying the
+    /// right localized word for the quantity.
+    fn quantity(&self, value: usize, unit: &str) -> SharedString {
+        SharedString::from(format!("{} {unit}", self.count(value)))
+    }
+
+    /// A caller-owned label followed by a count, as used by reaction chips.
+    /// This remains separate from [`NumberAdapter::quantity`] because the
+    /// label's leading position is part of that control's visual meaning.
+    fn labelled_count(&self, label: &str, value: usize) -> SharedString {
+        SharedString::from(format!("{label} {}", self.count(value)))
+    }
+
+    /// Two dimensions as one localized measurement. The adapter owns the
+    /// multiplication mark, spacing, and reading order.
+    fn dimensions(&self, width: usize, height: usize) -> SharedString {
+        SharedString::from(format!("{} × {}", self.count(width), self.count(height)))
+    }
+
+    /// An ordered-list marker. The adapter owns the digits, punctuation, and
+    /// their order so document rendering does not assume an English marker.
+    fn ordinal(&self, value: u64) -> SharedString {
+        SharedString::from(format!("{}.", self.integer(value)))
+    }
+
+    /// A signed count used for deltas. Positive values carry a plus and
+    /// negative values use the mathematical minus rather than an ASCII dash.
+    fn signed_count(&self, value: isize) -> SharedString {
+        match value.cmp(&0) {
+            std::cmp::Ordering::Less => self.negative_count(value.unsigned_abs()),
+            std::cmp::Ordering::Equal => self.count(0),
+            std::cmp::Ordering::Greater => self.positive_count(value as usize),
+        }
+    }
+
+    /// A non-negative count explicitly marked as an increase.
+    fn positive_count(&self, value: usize) -> SharedString {
+        SharedString::from(format!("+{}", self.count(value)))
+    }
+
+    /// A non-negative count explicitly marked as a decrease.
+    fn negative_count(&self, value: usize) -> SharedString {
+        SharedString::from(format!("−{}", self.count(value)))
+    }
+
+    /// A playback multiplier such as `1.5×`. The adapter owns the decimal
+    /// separator, multiplier mark, and their order.
+    fn multiplier(&self, value: f64, precision: usize) -> SharedString {
+        SharedString::from(format!("{}×", self.decimal(value, precision)))
+    }
 }
 
 /// The adapter as the components hold it.
@@ -887,7 +1048,11 @@ pub struct EnglishNumbers;
 
 impl NumberAdapter for EnglishNumbers {
     fn count(&self, value: usize) -> SharedString {
-        SharedString::from(value.to_string())
+        SharedString::from(english_unsigned(value as u64))
+    }
+
+    fn integer(&self, value: u64) -> SharedString {
+        SharedString::from(english_unsigned(value))
     }
 
     fn plural(&self, value: usize) -> Plural {
@@ -899,16 +1064,42 @@ impl NumberAdapter for EnglishNumbers {
     }
 
     fn count_of_total(&self, done: usize, total: usize) -> SharedString {
-        SharedString::from(format!("{done} of {total}"))
+        SharedString::from(format!("{} of {}", self.count(done), self.count(total)))
     }
 
     fn percent(&self, value: f32) -> SharedString {
-        let rounded = (value * 100.0).round() as i32;
-        SharedString::from(format!("{rounded}%"))
+        SharedString::from(format!("{}%", self.decimal(f64::from(value) * 100.0, 0)))
     }
 
     fn decimal(&self, value: f64, precision: usize) -> SharedString {
         SharedString::from(english_decimal(value, precision))
+    }
+
+    fn parse_decimal(&self, text: &str) -> Option<f64> {
+        let text = text.trim();
+        if !text.contains(',') {
+            return text.parse().ok();
+        }
+        let unsigned = text.strip_prefix(['+', '-']).unwrap_or(text);
+        let (integer, fraction) = unsigned
+            .split_once('.')
+            .map_or((unsigned, None), |(integer, fraction)| {
+                (integer, Some(fraction))
+            });
+        let mut groups = integer.split(',');
+        let first = groups.next()?;
+        if first.is_empty()
+            || first.len() > 3
+            || !first.bytes().all(|digit| digit.is_ascii_digit())
+            || groups
+                .any(|group| group.len() != 3 || !group.bytes().all(|digit| digit.is_ascii_digit()))
+            || fraction.is_some_and(|fraction| {
+                fraction.is_empty() || !fraction.bytes().all(|digit| digit.is_ascii_digit())
+            })
+        {
+            return None;
+        }
+        text.replace(',', "").parse().ok()
     }
 }
 
@@ -917,27 +1108,37 @@ fn english_decimal(value: f64, precision: usize) -> String {
         return value.to_string();
     }
     let negative = value.is_sign_negative() && value != 0.0;
-    let abs = value.abs();
-    let integer = abs.trunc() as u64;
-    let digits = integer.to_string();
-    let mut grouped = String::with_capacity(digits.len() + digits.len() / 3 + precision + 2);
-    for (index, digit) in digits.chars().enumerate() {
-        if index > 0 && (digits.len() - index).is_multiple_of(3) {
-            grouped.push(',');
-        }
-        grouped.push(digit);
-    }
-    if precision > 0 {
-        let factor = 10f64.powi(precision as i32);
-        let scaled = (abs.fract() * factor).round() as u64;
+    let rendered = format!("{:.*}", precision, value.abs());
+    let (digits, fraction) = rendered
+        .split_once('.')
+        .map_or((rendered.as_str(), None), |(integer, fraction)| {
+            (integer, Some(fraction))
+        });
+    let mut grouped = english_grouped(digits, precision + 1);
+    if let Some(fraction) = fraction {
         grouped.push('.');
-        grouped.push_str(&format!("{scaled:0width$}", width = precision));
+        grouped.push_str(fraction);
     }
     if negative {
         format!("-{grouped}")
     } else {
         grouped
     }
+}
+
+fn english_unsigned(value: u64) -> String {
+    english_grouped(&value.to_string(), 0)
+}
+
+fn english_grouped(digits: &str, extra_capacity: usize) -> String {
+    let mut grouped = String::with_capacity(digits.len() + digits.len() / 3 + extra_capacity);
+    for (index, digit) in digits.chars().enumerate() {
+        if index > 0 && (digits.len() - index).is_multiple_of(3) {
+            grouped.push(',');
+        }
+        grouped.push(digit);
+    }
+    grouped
 }
 
 struct InstalledNumbers(SharedNumberAdapter);
@@ -1080,6 +1281,21 @@ pub fn set_strings(entries: impl IntoIterator<Item = (StringKey, SharedString)>,
     cx.refresh_windows();
 }
 
+/// Replaces grammatical forms and repaints every window. Each key is the
+/// `other` member of the phrase family passed to [`Strings::format_plural`].
+pub fn set_plural_strings(
+    entries: impl IntoIterator<Item = (StringKey, Plural, SharedString)>,
+    cx: &mut App,
+) {
+    install(cx);
+    cx.update_global::<Strings, ()>(|strings, _| {
+        for (key, form, text) in entries {
+            strings.set_plural(key, form, text);
+        }
+    });
+    cx.refresh_windows();
+}
+
 /// Restores the English for every entry and repaints every window.
 pub fn reset_strings(cx: &mut App) {
     install(cx);
@@ -1100,11 +1316,30 @@ mod tests {
         assert_eq!(numbers.plural(1), Plural::One);
         assert_eq!(numbers.plural(2), Plural::Other);
         assert_eq!(numbers.count(12).as_ref(), "12");
+        assert_eq!(numbers.count(1204).as_ref(), "1,204");
         assert_eq!(numbers.count_of_total(3, 12).as_ref(), "3 of 12");
         assert_eq!(numbers.percent(0.25).as_ref(), "25%");
         assert_eq!(numbers.decimal(1204.0, 0).as_ref(), "1,204");
         assert_eq!(numbers.decimal(12.5, 2).as_ref(), "12.50");
         assert_eq!(numbers.decimal(-4200.25, 2).as_ref(), "-4,200.25");
+        assert_eq!(numbers.decimal(12.999, 2).as_ref(), "13.00");
+        assert_eq!(numbers.number(1204.5).as_ref(), "1,204.5");
+        assert_eq!(numbers.parse_decimal(" 12.50 "), Some(12.5));
+        assert_eq!(numbers.parse_decimal("1,204.50"), Some(1204.5));
+        assert_eq!(numbers.parse_decimal("12,04.50"), None);
+        assert_eq!(numbers.parse_decimal("1,204,50"), None);
+        assert_eq!(
+            numbers.decorate("12.50", Some("$"), Some("kg")),
+            "$12.50 kg"
+        );
+        assert_eq!(numbers.at_least(1204).as_ref(), "1,204+");
+        assert_eq!(numbers.quantity(1204, "rows").as_ref(), "1,204 rows");
+        assert_eq!(numbers.labelled_count("👍", 1204).as_ref(), "👍 1,204");
+        assert_eq!(numbers.dimensions(1920, 1080).as_ref(), "1,920 × 1,080");
+        assert_eq!(numbers.ordinal(1204).as_ref(), "1,204.");
+        assert_eq!(numbers.signed_count(1204).as_ref(), "+1,204");
+        assert_eq!(numbers.signed_count(-1204).as_ref(), "−1,204");
+        assert_eq!(numbers.multiplier(1.5, 1).as_ref(), "1.5×");
     }
 
     #[test]
@@ -1135,6 +1370,32 @@ mod tests {
         assert_eq!(strings.text(StringKey::TryAgain), "Try again");
         strings.clear(StringKey::Copy);
         assert_eq!(strings.text(StringKey::Copy), "Copy");
+    }
+
+    #[test]
+    fn a_plural_override_preserves_categories_english_does_not_have() {
+        let mut strings = Strings::new();
+        strings.set_plural(StringKey::SearchHitMany, Plural::Few, "{0} wyniki");
+        assert_eq!(
+            strings.format_plural(
+                StringKey::SearchHitOne,
+                StringKey::SearchHitMany,
+                Plural::Few,
+                &["3"],
+            ),
+            "3 wyniki"
+        );
+        assert_eq!(
+            strings.format_plural(
+                StringKey::SearchHitOne,
+                StringKey::SearchHitMany,
+                Plural::One,
+                &["1"],
+            ),
+            "1 result"
+        );
+        strings.clear_all();
+        assert!(!strings.is_plural_overridden(StringKey::SearchHitMany, Plural::Few));
     }
 
     #[test]

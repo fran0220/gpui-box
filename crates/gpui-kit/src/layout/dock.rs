@@ -50,7 +50,7 @@ use crate::layout::tree::{SplitChange, SplitLayout, SplitPaneSpec, SplitTree};
 use crate::motion::{Flipping, flip};
 use crate::navigation::tabs::{TabItem, Tabs};
 use crate::overlay::Tooltipped;
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// How wide a collapsed region's rail is, and how deep a collapsed bottom
 /// region's is. The value occurs only here.
@@ -707,7 +707,7 @@ impl Dock {
                 NodeSpec::new(ident.semantic_id(), Role::List)
                     .parent(self.ident.child(region.name()).semantic_id())
                     .expanded(false)
-                    .value(state.panels.len().to_string()),
+                    .value(cx.numbers().count(state.panels.len())),
             )
             .into_any_element()
     }
@@ -748,7 +748,7 @@ impl Dock {
                 NodeSpec::new(ident.semantic_id(), Role::Region)
                     .parent(self.ident.semantic_id())
                     .expanded(!state.collapsed)
-                    .value(state.panels.len().to_string()),
+                    .value(cx.numbers().count(state.panels.len())),
             )
             .into_any_element()
     }

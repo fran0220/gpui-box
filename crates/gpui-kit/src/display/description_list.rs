@@ -17,7 +17,7 @@ use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::foundation::{FocusRing, Ident, Pressable, StyledExt};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type CopyHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 
@@ -53,9 +53,12 @@ impl DescriptionValue {
     /// The measurement is a sentence a reader reads, so it comes from the
     /// installed catalogue rather than from this file.
     pub fn redacted_from(secret: &str, cx: &App) -> Self {
-        Self::Redacted(cx.strings().format(
+        let count = secret.graphemes(true).count();
+        Self::Redacted(cx.strings().format_plural(
+            StringKey::DescriptionCharacterOne,
             StringKey::DescriptionCharacters,
-            &[&secret.graphemes(true).count().to_string()],
+            cx.numbers().plural(count),
+            &[cx.numbers().count(count).as_ref()],
         ))
     }
 
@@ -303,7 +306,8 @@ impl RenderOnce for DescriptionList {
             .children(rows)
             .semantic_in(
                 cx,
-                NodeSpec::new(self.ident.semantic_id(), Role::List).value(count.to_string()),
+                NodeSpec::new(self.ident.semantic_id(), Role::List)
+                    .value(cx.numbers().count(count)),
             )
     }
 }

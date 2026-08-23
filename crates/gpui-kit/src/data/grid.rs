@@ -70,7 +70,7 @@ use crate::interaction::dnd::{
 };
 use crate::layout::measure;
 use crate::motion::{Flipping, Presence, entrance, flip, state_change};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// How wide the grab area of a column edge is. The value occurs only here.
 const RESIZE_HANDLE: f32 = 7.0;
@@ -988,7 +988,7 @@ impl RenderOnce for DataGrid {
                     Role::Table
                 },
             )
-            .value(self.count.to_string()),
+            .value(cx.numbers().count(self.count)),
         )
     }
 }
@@ -1371,7 +1371,14 @@ impl DataGrid {
                         // the rows the host handed over, so it publishes both
                         // numbers rather than one that reads like the whole
                         // data set.
-                        .value(format!("{chosen} of {loaded} loaded, {total} total")),
+                        .value(cx.strings().format(
+                            StringKey::GridSelectionCounts,
+                            &[
+                                cx.numbers().count(chosen).as_ref(),
+                                cx.numbers().count(loaded).as_ref(),
+                                cx.numbers().count(total).as_ref(),
+                            ],
+                        )),
                 )
                 .into_any_element(),
         )
@@ -1597,7 +1604,7 @@ impl DataGrid {
                             cx.strings()
                                 .format(StringKey::GridResizeColumn, &[&column.header]),
                         )
-                        .value(format!("{width:.0}")),
+                        .value(cx.numbers().decimal(f64::from(width), 0)),
                 )
                 // `semantic_in` makes its host relative so the probe measures
                 // it, which would put the handle back in the flow.
@@ -2782,7 +2789,8 @@ impl RenderOnce for BulkBar {
             .noun
             .clone()
             .unwrap_or_else(|| cx.strings().text(StringKey::GridSelectedNoun));
-        let label = SharedString::from(format!("{} {}", self.count, noun));
+        let count = cx.numbers().count(self.count);
+        let label = cx.numbers().quantity(self.count, noun.as_ref());
         let wider = self
             .on_select_all
             .clone()
@@ -2814,8 +2822,10 @@ impl RenderOnce for BulkBar {
                         text(
                             &theme,
                             TypeScale::Label,
-                            cx.strings()
-                                .format(StringKey::GridSelectAllTotal, &[&total.to_string()]),
+                            cx.strings().format(
+                                StringKey::GridSelectAllTotal,
+                                &[cx.numbers().count(total).as_ref()],
+                            ),
                         )
                         .text_color(theme.colors.accent),
                     )
@@ -2824,11 +2834,11 @@ impl RenderOnce for BulkBar {
                         cx,
                         NodeSpec::new(ident.semantic_id(), Role::Button)
                             .parent(self.ident.semantic_id())
-                            .text(
-                                cx.strings()
-                                    .format(StringKey::GridSelectAllTotal, &[&total.to_string()]),
-                            )
-                            .value(total.to_string()),
+                            .text(cx.strings().format(
+                                StringKey::GridSelectAllTotal,
+                                &[cx.numbers().count(total).as_ref()],
+                            ))
+                            .value(cx.numbers().count(total)),
                     ),
             );
         }
@@ -2855,7 +2865,7 @@ impl RenderOnce for BulkBar {
             cx,
             NodeSpec::new(self.ident.semantic_id(), Role::Toolbar)
                 .text(label)
-                .value(self.count.to_string()),
+                .value(count),
         )
         .into_any_element()
     }

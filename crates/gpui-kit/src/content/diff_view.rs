@@ -84,7 +84,7 @@ use crate::display::empty::{EmptyKind, EmptyState};
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Ident, StyledExt};
 use crate::motion::keyed;
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type EventHandler = Rc<dyn Fn(DiffViewEvent, &mut Window, &mut App)>;
 
@@ -872,7 +872,7 @@ impl RenderOnce for DiffView {
                     // The row's position in the flattened diff is its reading
                     // order. The list is virtualized, so a copy spanning rows
                     // that were never mounted reports itself incomplete.
-                    diff_row(&row.id, &row.kind, index as u64, &row_theme, &text, fit),
+                    diff_row(&row.id, &row.kind, index as u64, &row_theme, &text, fit, cx),
                 )
                 // Source and paths stay out of diagnostic snapshots. Stable
                 // business ids and the row kind remain addressable.
@@ -1154,7 +1154,7 @@ fn flatten(files: Vec<DiffFile>, presentation: DiffPresentation) -> Vec<FlatRow>
 /// noise on every row of a large review, and the two counts are separate
 /// elements because they are separate colours: the eye reads how much was
 /// taken out against how much came in without reading either number.
-fn counts(changed: (usize, usize), theme: &Theme) -> Vec<AnyElement> {
+fn counts(changed: (usize, usize), theme: &Theme, cx: &App) -> Vec<AnyElement> {
     let (added, removed) = changed;
     let mut marks = Vec::new();
     if added > 0 {
@@ -1162,7 +1162,7 @@ fn counts(changed: (usize, usize), theme: &Theme) -> Vec<AnyElement> {
             div()
                 .type_scale(theme, TypeScale::Caption)
                 .text_color(theme.colors.syntax.get(SyntaxColor::Added))
-                .child(SharedString::from(format!("+{added}")))
+                .child(cx.numbers().positive_count(added))
                 .into_any_element(),
         );
     }
@@ -1171,7 +1171,7 @@ fn counts(changed: (usize, usize), theme: &Theme) -> Vec<AnyElement> {
             div()
                 .type_scale(theme, TypeScale::Caption)
                 .text_color(theme.colors.syntax.get(SyntaxColor::Removed))
-                .child(SharedString::from(format!("\u{2212}{removed}")))
+                .child(cx.numbers().negative_count(removed))
                 .into_any_element(),
         );
     }
@@ -1233,6 +1233,7 @@ fn diff_row(
     // the catalogue is reachable.
     text: &SharedString,
     fit: Fit,
+    cx: &App,
 ) -> AnyElement {
     match kind {
         FlatKind::File {
@@ -1257,7 +1258,7 @@ fn diff_row(
                 )
             })
             .child(label.clone())
-            .children(counts(*changed, theme))
+            .children(counts(*changed, theme, cx))
             .into_any_element(),
         FlatKind::Expand => row_frame(theme, fit)
             .items_center()
@@ -1293,13 +1294,23 @@ fn diff_row(
             side,
             old_number,
             new_number,
-        } => unified_line(id, side, *old_number, *new_number, order * 2, theme, fit),
+        } => unified_line(
+            id,
+            side,
+            *old_number,
+            *new_number,
+            order * 2,
+            theme,
+            fit,
+            cx,
+        ),
         FlatKind::Split { old, new } => {
-            split_line(id, old.as_ref(), new.as_ref(), order, theme, fit)
+            split_line(id, old.as_ref(), new.as_ref(), order, theme, fit, cx)
         }
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn unified_line(
     id: &SharedString,
     side: &DiffSide,
@@ -1308,6 +1319,7 @@ fn unified_line(
     order: u64,
     theme: &Theme,
     fit: Fit,
+    cx: &App,
 ) -> AnyElement {
     let color = side.mark.tone().color(theme);
     // A wrapped line grows downwards, so its number and mark belong beside the
@@ -1323,8 +1335,8 @@ fn unified_line(
         .when(side.mark != DiffLineMark::Context, |element| {
             element.bg(color.opacity(theme.effects.selected_ring_alpha))
         })
-        .child(number(old_number, theme))
-        .child(number(new_number, theme))
+        .child(number(old_number, theme, cx))
+        .child(number(new_number, theme, cx))
         .child(
             div()
                 .flex_none()
@@ -1354,6 +1366,7 @@ fn split_line(
     order: u64,
     theme: &Theme,
     fit: Fit,
+    cx: &App,
 ) -> AnyElement {
     row_frame(theme, fit)
         .items_stretch()
@@ -1362,14 +1375,14 @@ fn split_line(
         .line_height(px(theme.typography.code.line_height))
         // Within one split row the left column reads before the right, so the
         // two columns take consecutive orders under the row's own.
-        .child(code_side(id, "old", old, order * 2, theme, fit))
+        .child(code_side(id, "old", old, order * 2, theme, fit, cx))
         .child(
             div()
                 .flex_none()
                 .w(px(theme.borders.hairline))
                 .bg(theme.colors.divider),
         )
-        .child(code_side(id, "new", new, order * 2 + 1, theme, fit))
+        .child(code_side(id, "new", new, order * 2 + 1, theme, fit, cx))
         .into_any_element()
 }
 
@@ -1380,6 +1393,7 @@ fn code_side(
     order: u64,
     theme: &Theme,
     fit: Fit,
+    cx: &App,
 ) -> AnyElement {
     let mark = side.map_or(DiffLineMark::Context, |side| side.mark);
     let color = mark.tone().color(theme);
@@ -1394,7 +1408,7 @@ fn code_side(
         .when(side.is_some() && mark != DiffLineMark::Context, |element| {
             element.bg(color.opacity(theme.effects.selected_ring_alpha))
         })
-        .child(number(side.and_then(|side| side.number), theme))
+        .child(number(side.and_then(|side| side.number), theme, cx))
         .child(
             div()
                 .flex_none()
@@ -1412,7 +1426,7 @@ fn code_side(
         .into_any_element()
 }
 
-fn number(number: Option<usize>, theme: &Theme) -> AnyElement {
+fn number(number: Option<usize>, theme: &Theme, cx: &App) -> AnyElement {
     div()
         .flex_none()
         .w(px(44.0))
@@ -1420,9 +1434,7 @@ fn number(number: Option<usize>, theme: &Theme) -> AnyElement {
         .overflow_hidden()
         .text_align(gpui::TextAlign::Right)
         .text_color(theme.colors.text_faint)
-        .child(number.map_or_else(SharedString::default, |number| {
-            SharedString::from(number.to_string())
-        }))
+        .child(number.map_or_else(SharedString::default, |number| cx.numbers().count(number)))
         .into_any_element()
 }
 

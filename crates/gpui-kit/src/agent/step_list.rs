@@ -29,7 +29,7 @@ use crate::display::badge::Tone;
 use crate::display::progress::ProgressBar;
 use crate::display::status::StatusDot;
 use crate::foundation::{Ident, StyledExt, text};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// How wide the column holding the rail and its dots is.
 const RAIL: f32 = 16.0;
@@ -227,12 +227,12 @@ impl RenderOnce for StepList {
         let summary = ProgressBar::new(ident.child("progress"));
         let summary = match self.length {
             RunLength::Known => summary.count(done, total),
-            RunLength::Unknown => summary.display(if done == 1 {
-                cx.strings().text(StringKey::AgentStepsDoneOne)
-            } else {
-                cx.strings()
-                    .format(StringKey::AgentStepsDoneMany, &[&done.to_string()])
-            }),
+            RunLength::Unknown => summary.display(cx.strings().format_plural(
+                StringKey::AgentStepsDoneOne,
+                StringKey::AgentStepsDoneMany,
+                cx.numbers().plural(done),
+                &[cx.numbers().count(done).as_ref()],
+            )),
         };
 
         let last = total.saturating_sub(1);
@@ -252,7 +252,7 @@ impl RenderOnce for StepList {
                 NodeSpec::new(ident.semantic_id(), Role::List)
                     // The count is what the list holds, which under an unknown
                     // length is not the same as what the run contains.
-                    .value(total.to_string())
+                    .value(cx.numbers().count(total))
                     .busy(matches!(self.length, RunLength::Unknown)),
             )
     }

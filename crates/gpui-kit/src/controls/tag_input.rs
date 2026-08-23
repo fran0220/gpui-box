@@ -228,10 +228,10 @@ impl TagInput {
         }
         if self.is_full() {
             let max = self.max.unwrap_or_default();
-            self.refusal = Some(
-                cx.strings()
-                    .format(StringKey::TagInputFull, &[&max.to_string(), &value]),
-            );
+            self.refusal = Some(cx.strings().format(
+                StringKey::TagInputFull,
+                &[cx.numbers().count(max).as_ref(), &value],
+            ));
             cx.emit(TagInputEvent::Refused(value));
             cx.notify();
             return;

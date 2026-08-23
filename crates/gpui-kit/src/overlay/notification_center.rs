@@ -34,7 +34,7 @@ use crate::display::status::StatusDot;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{CardVariant, Ident, Sizable, StyledExt};
 use crate::overlay::toast::{self, Toast};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// How many records the centre holds before the oldest is dropped.
 const DEFAULT_CAPACITY: usize = 50;
@@ -180,10 +180,8 @@ impl UnreadCount {
 
     fn wording(self, cx: &App) -> SharedString {
         match self {
-            Self::Exact(count) => SharedString::from(count.to_string()),
-            Self::AtLeast(count) => cx
-                .strings()
-                .format(StringKey::NotificationsAtLeast, &[&count.to_string()]),
+            Self::Exact(count) => cx.numbers().count(count),
+            Self::AtLeast(count) => cx.numbers().at_least(count),
         }
     }
 }
@@ -525,10 +523,17 @@ impl Render for NotificationCenter {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let unread = self.unread();
+        let unread_wording = unread.wording(cx);
+        let unread_text = cx.strings().format_plural(
+            StringKey::NotificationsUnreadOne,
+            StringKey::NotificationsUnreadCount,
+            cx.numbers().plural(unread.value()),
+            &[unread_wording.as_ref()],
+        );
         let count_ident = self.ident.child("unread");
 
         let badge = (!unread.is_zero()).then(|| {
-            Badge::new(unread.wording(cx))
+            Badge::new(unread_wording.clone())
                 .tone(Tone::Accent)
                 .id(count_ident.clone())
         });
@@ -609,11 +614,8 @@ impl Render for NotificationCenter {
                 NodeSpec::new(self.ident.semantic_id(), Role::List)
                     // The value is the badge's own claim, so a test reads what
                     // the badge says rather than counting rows.
-                    .text(cx.strings().format(
-                        StringKey::NotificationsUnreadCount,
-                        &[unread.wording(cx).as_ref()],
-                    ))
-                    .value(unread.wording(cx)),
+                    .text(unread_text)
+                    .value(unread_wording),
             )
     }
 }

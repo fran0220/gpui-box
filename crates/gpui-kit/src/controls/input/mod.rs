@@ -43,6 +43,7 @@ use unicode_segmentation::UnicodeSegmentation;
 use crate::controls::field::{FieldState, field_shell};
 use crate::controls::text_edit;
 use crate::foundation::{ActiveDirection, Disableable, Ident, Sizable};
+use crate::strings::ActiveNumbers;
 use element::TextElement;
 
 actions!(
@@ -959,7 +960,7 @@ impl TextInput {
         text_edit::range_from_utf16(self.edit.text(), range)
     }
 
-    fn semantics(&self, window: &Window) -> NodeSpec {
+    fn semantics(&self, window: &Window, cx: &App) -> NodeSpec {
         let role = if self.secret {
             Role::PasswordInput
         } else {
@@ -986,11 +987,10 @@ impl TextInput {
                 spec = spec.value("[REDACTED]");
             }
             if let Some(slots) = self.visual_slots {
-                spec = spec.description(SharedString::from(format!(
-                    "{}/{}",
-                    self.edit.text().graphemes(true).count(),
-                    slots
-                )));
+                spec = spec.description(
+                    cx.numbers()
+                        .count_of_total(self.edit.text().graphemes(true).count(), slots),
+                );
             }
         } else if !self.edit.is_empty() {
             spec = spec.value(self.edit.text().clone());
@@ -1172,7 +1172,7 @@ impl Render for TextInput {
         let theme = cx.theme().clone();
         let metrics = theme.control.get(self.size);
         let focused = self.focus_handle.is_focused(window);
-        let spec = self.semantics(window);
+        let spec = self.semantics(window, cx);
         let shell = if self.bare {
             div().w_full().flex().flex_row().items_center()
         } else {

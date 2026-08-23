@@ -32,7 +32,7 @@ use crate::display::status::StatusDot;
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
 use crate::state::{AsyncStatus, AsyncValue};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// How tall the strip is. The value occurs only here.
 const HEIGHT: f32 = 26.0;
@@ -449,7 +449,7 @@ impl RenderOnce for StatusBar {
         }
 
         let mut spec =
-            NodeSpec::new(self.ident.semantic_id(), Role::Toolbar).value(count.to_string());
+            NodeSpec::new(self.ident.semantic_id(), Role::Toolbar).value(cx.numbers().count(count));
         if let Some(label) = self.label.clone() {
             spec = spec.text(label);
         }

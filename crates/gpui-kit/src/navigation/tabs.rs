@@ -43,7 +43,7 @@ use crate::interaction::dnd::{
 use crate::layout::ScrollFade;
 use crate::motion::{Flipping, flip, keyed};
 use crate::overlay::{Menu, MenuItem};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 type CloseHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
@@ -900,15 +900,15 @@ impl RenderOnce for Tabs {
                         NodeSpec::new(overflow_ident.semantic_id(), Role::Group)
                             .parent(self.ident.semantic_id())
                             .text(cx.strings().text(StringKey::TabMoreTabs))
-                            .value(hidden_count.to_string()),
+                            .value(cx.numbers().count(hidden_count)),
                     )
             });
 
         let strip = strip.children(overflow);
         // The strip holds every tab the caller declared, drawn or overflowed,
         // because the keyboard reaches all of them.
-        let published =
-            NodeSpec::new(self.ident.semantic_id(), Role::List).value(self.tabs.len().to_string());
+        let published = NodeSpec::new(self.ident.semantic_id(), Role::List)
+            .value(cx.numbers().count(self.tabs.len()));
 
         match scrolls {
             // A scrolling element's own bounds travel with its content, so the

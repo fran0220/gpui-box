@@ -44,7 +44,7 @@ use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Ident, StyledExt};
 use crate::motion::keyed;
 use crate::state::{HasPhase, Phase};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// The inset between the panel edge and the first glyph.
 ///
@@ -296,8 +296,10 @@ impl RenderOnce for Terminal {
                 // terminal a test can assert without reading the output
                 // somebody else's program wrote.
                 .value(match *geometry.borrow() {
-                    Some(measured) => format!("{}x{}", measured.cols, measured.rows),
-                    None => String::new(),
+                    Some(measured) => cx
+                        .numbers()
+                        .dimensions(usize::from(measured.cols), usize::from(measured.rows)),
+                    None => SharedString::default(),
                 }),
         )
     }

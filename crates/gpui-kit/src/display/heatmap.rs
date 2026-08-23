@@ -17,7 +17,7 @@ use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Ident, StyledExt};
 use crate::overlay::tooltip::Tooltipped;
 use crate::state::{HasPhase, Phase};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// One observation in the matrix, or the absence of one.
 #[derive(Debug, Clone, PartialEq)]
@@ -336,7 +336,7 @@ fn heat_cell(
         );
     if let Some(cell) = cell {
         if let Some(level) = cell.level {
-            spec = spec.value(level.to_string());
+            spec = spec.value(cx.numbers().count(usize::from(level)));
         } else {
             spec = spec.value("missing");
         }

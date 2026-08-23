@@ -755,20 +755,17 @@ impl RenderOnce for ImageViewer {
         let numbers = cx.numbers();
         let measurement = match (frame.natural, geometry) {
             (Some(natural), Some(geometry)) => strings.format(
-                StringKey::ImageViewerMeasurement,
+                StringKey::ImageViewerDimensionsAndScale,
                 &[
-                    numbers.count(natural.width as usize).as_ref(),
-                    numbers.count(natural.height as usize).as_ref(),
+                    numbers
+                        .dimensions(natural.width as usize, natural.height as usize)
+                        .as_ref(),
                     numbers.percent(geometry.scale).as_ref(),
                 ],
             ),
-            (Some(natural), None) => strings.format(
-                StringKey::ImageViewerDimensions,
-                &[
-                    numbers.count(natural.width as usize).as_ref(),
-                    numbers.count(natural.height as usize).as_ref(),
-                ],
-            ),
+            (Some(natural), None) => {
+                numbers.dimensions(natural.width as usize, natural.height as usize)
+            }
             _ => strings.text(StringKey::ImageViewerSizeUnknown),
         };
 

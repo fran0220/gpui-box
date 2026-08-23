@@ -5,7 +5,10 @@
 //! proved is that a component asked the catalogue for a string rather than
 //! that a particular English word appears somewhere in this repository.
 
-use gpui::{AppContext as _, IntoElement, TestAppContext};
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use gpui::{AppContext as _, Entity, IntoElement, SharedString, TestAppContext};
 use gpui_kit::prelude::*;
 use gpui_kit_testkit::harness::Harness;
 
@@ -64,6 +67,102 @@ fn a_translation_may_reorder_the_values_it_is_given(cx: &mut TestAppContext) {
         );
     });
     assert_eq!(shown(&mut harness, "results.pages.status"), "9 pages; on 2");
+}
+
+#[derive(Debug)]
+struct MarkedNumbers;
+
+impl NumberAdapter for MarkedNumbers {
+    fn count(&self, value: usize) -> SharedString {
+        format!("№{value}").into()
+    }
+
+    fn plural(&self, value: usize) -> Plural {
+        match value {
+            1 => Plural::One,
+            3 => Plural::Few,
+            _ => Plural::Other,
+        }
+    }
+
+    fn count_of_total(&self, done: usize, total: usize) -> SharedString {
+        format!("№{done} / №{total}").into()
+    }
+
+    fn percent(&self, value: f32) -> SharedString {
+        format!("{} pct", value * 100.0).into()
+    }
+
+    fn decimal(&self, value: f64, precision: usize) -> SharedString {
+        format!("{value:.*}", precision).into()
+    }
+
+    fn at_least(&self, value: usize) -> SharedString {
+        format!("≥№{value}").into()
+    }
+
+    fn dimensions(&self, width: usize, height: usize) -> SharedString {
+        format!("№{height} ↔ №{width}").into()
+    }
+
+    fn ordinal(&self, value: u64) -> SharedString {
+        format!("№{value}º").into()
+    }
+
+    fn signed_count(&self, value: isize) -> SharedString {
+        format!("Δ№{value}").into()
+    }
+}
+
+#[gpui::test]
+fn a_component_reads_numbers_from_the_installed_adapter(cx: &mut TestAppContext) {
+    let mut harness = pagination(cx);
+    harness.update(|_, cx| set_numbers(MarkedNumbers, cx));
+
+    assert_eq!(shown(&mut harness, "results.pages.status"), "Page №2 of №9");
+}
+
+#[gpui::test]
+fn plural_categories_the_component_does_not_name_reach_its_phrase(cx: &mut TestAppContext) {
+    let slot: Rc<RefCell<Option<Entity<SearchField>>>> = Rc::new(RefCell::new(None));
+    let build_slot = Rc::clone(&slot);
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
+        build_slot
+            .borrow_mut()
+            .get_or_insert_with(|| {
+                cx.new(|cx| {
+                    let mut field = SearchField::new("find", window, cx);
+                    field.set_count(
+                        HitCount::Known {
+                            total: 3,
+                            current: None,
+                        },
+                        cx,
+                    );
+                    field
+                })
+            })
+            .clone()
+            .into_any_element()
+    });
+    harness.update(|_, cx| {
+        set_numbers(MarkedNumbers, cx);
+        set_plural_strings(
+            [(StringKey::SearchHitMany, Plural::Few, "{0} wyniki".into())],
+            cx,
+        );
+    });
+
+    assert_eq!(shown(&mut harness, "find.count"), "№3 wyniki");
+}
+
+#[test]
+fn an_adapter_owns_each_reusable_number_shape() {
+    let numbers = MarkedNumbers;
+    assert_eq!(numbers.at_least(12).as_ref(), "≥№12");
+    assert_eq!(numbers.dimensions(1920, 1080).as_ref(), "№1080 ↔ №1920");
+    assert_eq!(numbers.ordinal(12).as_ref(), "№12º");
+    assert_eq!(numbers.signed_count(-12).as_ref(), "Δ№-12");
 }
 
 #[gpui::test]

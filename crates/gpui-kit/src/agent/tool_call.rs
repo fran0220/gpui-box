@@ -40,7 +40,7 @@ use crate::display::icon::{Icon as IconView, IconTone};
 use crate::display::status::Callout;
 use crate::foundation::{CardVariant, Ident, Sizable, StyledExt, text};
 use crate::state::{HasPhase, Phase};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type RetryHandler = Rc<dyn Fn(&mut Window, &mut App)>;
 
@@ -109,15 +109,18 @@ impl ToolBody {
         if self.is_truncated() {
             return cx.strings().format(
                 StringKey::AgentTruncated,
-                &[&self.shown_line_count().to_string(), &total.to_string()],
+                &[
+                    cx.numbers().count(self.shown_line_count()).as_ref(),
+                    cx.numbers().count(total).as_ref(),
+                ],
             );
         }
-        if total == 1 {
-            cx.strings().text(StringKey::AgentLinesOne)
-        } else {
-            cx.strings()
-                .format(StringKey::AgentLinesMany, &[&total.to_string()])
-        }
+        cx.strings().format_plural(
+            StringKey::AgentLinesOne,
+            StringKey::AgentLinesMany,
+            cx.numbers().plural(total),
+            &[cx.numbers().count(total).as_ref()],
+        )
     }
 }
 

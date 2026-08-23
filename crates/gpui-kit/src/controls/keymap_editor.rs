@@ -11,7 +11,7 @@ use crate::controls::button::Button;
 use crate::controls::keybinding_recorder::{KeybindingRecorder, KeybindingRecorderEvent};
 use crate::foundation::{Disableable, Ident, StyledExt, text as foundation_text};
 use crate::overlay::Kbd;
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// One effective binding, identified independently of its position.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -317,15 +317,19 @@ impl Render for KeymapEditor {
                 foundation_text(
                     &theme,
                     TypeScale::Caption,
-                    cx.strings()
-                        .format(StringKey::KeymapResultCount, &[&count.to_string()]),
+                    cx.strings().format_plural(
+                        StringKey::KeymapResultOne,
+                        StringKey::KeymapResultCount,
+                        cx.numbers().plural(count),
+                        &[cx.numbers().count(count).as_ref()],
+                    ),
                 )
                 .text_tone(&theme, gpui_kit_theme::TextTone::Muted)
                 .semantic_in(
                     cx,
                     NodeSpec::new(self.ident.child("status").semantic_id(), Role::Status)
                         .parent(root_id.clone())
-                        .value(count.to_string()),
+                        .value(cx.numbers().count(count)),
                 ),
             )
             .children(visible.into_iter().map(|command| {

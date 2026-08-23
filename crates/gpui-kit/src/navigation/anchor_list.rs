@@ -17,7 +17,7 @@ use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::stepping::bounded_step;
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, text};
 use crate::overlay::{Menu, MenuItem};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type NavigateHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 
@@ -295,7 +295,7 @@ impl RenderOnce for AnchorList {
                     NodeSpec::new(ident.semantic_id(), Role::Group)
                         .parent(self.ident.semantic_id())
                         .text(cx.strings().text(StringKey::AnchorMoreSections))
-                        .value(hidden_count.to_string()),
+                        .value(cx.numbers().count(hidden_count)),
                 )
             });
 
@@ -303,7 +303,7 @@ impl RenderOnce for AnchorList {
             cx,
             NodeSpec::new(self.ident.semantic_id(), Role::List)
                 .disabled(self.disabled)
-                .value(self.anchors.len().to_string()),
+                .value(cx.numbers().count(self.anchors.len())),
         )
     }
 }

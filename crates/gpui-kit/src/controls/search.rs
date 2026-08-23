@@ -25,7 +25,7 @@ use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{
     Disableable, Ident, Selectable, Sizable, StyledExt, text as foundation_text,
 };
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// How many hits the host says the query has.
 ///
@@ -97,21 +97,20 @@ impl HitCount {
             Self::Known {
                 total,
                 current: Some(current),
-            } => strings.format(
-                StringKey::CountOfTotal,
-                &[&(current + 1).to_string(), &total.to_string()],
-            ),
-            Self::Known {
-                total: 1,
-                current: None,
-            } => strings.text(StringKey::SearchHitOne),
+            } => cx.numbers().count_of_total(current + 1, *total),
             Self::Known {
                 total,
                 current: None,
-            } => strings.format(StringKey::SearchHitMany, &[&total.to_string()]),
-            Self::TooMany { counted } => {
-                strings.format(StringKey::SearchTooMany, &[&counted.to_string()])
-            }
+            } => strings.format_plural(
+                StringKey::SearchHitOne,
+                StringKey::SearchHitMany,
+                cx.numbers().plural(*total),
+                &[cx.numbers().count(*total).as_ref()],
+            ),
+            Self::TooMany { counted } => strings.format(
+                StringKey::SearchTooMany,
+                &[cx.numbers().count(*counted).as_ref()],
+            ),
             // The host's own words outrank the catalogue's.
             Self::Unavailable(reason) => reason.clone(),
         }
@@ -551,9 +550,10 @@ impl Render for FindReplace {
             // The label carries the number before the action is taken, so
             // nobody has to find out afterwards how much it changed.
             let label = match counted {
-                Some(total) => cx
-                    .strings()
-                    .format(StringKey::ReplaceAllCounted, &[&total.to_string()]),
+                Some(total) => cx.strings().format(
+                    StringKey::ReplaceAllCounted,
+                    &[cx.numbers().count(total).as_ref()],
+                ),
                 None => cx.strings().text(StringKey::ReplaceAllUncounted),
             };
             let live = !self.disabled && counted.is_some();
@@ -623,20 +623,20 @@ impl Render for FindReplace {
                     .disabled(self.disabled)
                     // The container publishes the number replace-all claims,
                     // so a snapshot shows the claim and not just the wording.
-                    .when_value(counted),
+                    .when_value(counted, cx),
             )
     }
 }
 
 /// Adds the counted total to a spec only when there is one.
 trait CountedSpec {
-    fn when_value(self, count: Option<usize>) -> Self;
+    fn when_value(self, count: Option<usize>, cx: &App) -> Self;
 }
 
 impl CountedSpec for NodeSpec {
-    fn when_value(self, count: Option<usize>) -> Self {
+    fn when_value(self, count: Option<usize>, cx: &App) -> Self {
         match count {
-            Some(count) => self.value(count.to_string()),
+            Some(count) => self.value(cx.numbers().count(count)),
             None => self,
         }
     }

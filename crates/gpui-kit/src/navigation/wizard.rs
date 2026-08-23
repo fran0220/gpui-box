@@ -26,7 +26,7 @@ use crate::foundation::{
     Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text as foundation_text,
 };
 use crate::motion;
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// How wide the marker beside a step is.
 const MARKER: f32 = 20.0;
@@ -605,7 +605,7 @@ impl RenderOnce for Wizard {
                 cx,
                 NodeSpec::new(ident.semantic_id(), Role::List)
                     .disabled(self.disabled)
-                    .value(count.to_string()),
+                    .value(cx.numbers().count(count)),
             )
     }
 }

@@ -77,7 +77,7 @@ use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
 use crate::layout::{ScrollArea, ScrollAxis};
 use crate::motion::keyed;
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// How wide the gutter is per digit, and how far a line's text sits from it.
 /// Both occur once, so they stay next to the component.
@@ -324,7 +324,7 @@ fn line_element(
                     .pr(px(GUTTER_GAP / 2.0))
                     .text_align(gpui::TextAlign::Right)
                     .text_color(theme.colors.text_faint)
-                    .child(SharedString::from(line.number.to_string())),
+                    .child(cx.numbers().count(line.number)),
             )
         })
         // The rail is what a reader in monochrome sees, and it is drawn even
@@ -591,7 +591,7 @@ impl RenderOnce for CodeView {
                     .when_language(self.language)
                     // A container publishes how much it holds, which here is
                     // the number of lines it was handed — not the number drawn.
-                    .value(total.to_string()),
+                    .value(cx.numbers().count(total)),
             )
     }
 }

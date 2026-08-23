@@ -94,14 +94,22 @@ impl ResultCount {
     }
 
     /// The words the bar shows, and the value it publishes.
-    fn sentence(&self, noun: &SharedString, cx: &App) -> Option<SharedString> {
+    fn sentence(&self, noun: Option<&SharedString>, cx: &App) -> Option<SharedString> {
         match self {
             Self::Unknown => None,
             Self::Counting => Some(cx.strings().text(StringKey::FilterBarCounting)),
-            Self::Known(count) => Some(cx.strings().format(
-                StringKey::FilterBarResults,
-                &[cx.numbers().count(*count).as_ref(), noun.as_ref()],
-            )),
+            Self::Known(count) => Some(match noun {
+                Some(noun) => cx.strings().format(
+                    StringKey::FilterBarResults,
+                    &[cx.numbers().count(*count).as_ref(), noun.as_ref()],
+                ),
+                None => cx.strings().format_plural(
+                    StringKey::FilterBarResultOne,
+                    StringKey::FilterBarResultsMany,
+                    cx.numbers().plural(*count),
+                    &[cx.numbers().count(*count).as_ref()],
+                ),
+            }),
             Self::Unavailable(reason) => Some(reason.clone()),
         }
     }
@@ -170,7 +178,10 @@ impl FilterBar {
         self
     }
 
-    /// What is being counted, for the sentence beside the number.
+    /// What is being counted, for the sentence beside the number. This is
+    /// caller-owned copy and must already agree with every count the caller
+    /// supplies. Without it, the catalogue selects the full localized result
+    /// phrase by plural category.
     pub fn noun(mut self, noun: impl Into<SharedString>) -> Self {
         self.noun = Some(noun.into());
         self
@@ -288,11 +299,7 @@ impl RenderOnce for FilterBar {
             });
 
         let count_ident = self.ident.child("count");
-        let noun = self
-            .noun
-            .clone()
-            .unwrap_or_else(|| cx.strings().text(StringKey::FilterBarResultsNoun));
-        let count = self.count.sentence(&noun, cx).map(|sentence| {
+        let count = self.count.sentence(self.noun.as_ref(), cx).map(|sentence| {
             foundation_text(&theme, TypeScale::Caption, sentence.clone())
                 .flex_none()
                 .text_color(match self.count {
@@ -335,7 +342,7 @@ impl RenderOnce for FilterBar {
                 NodeSpec::new(self.ident.semantic_id(), Role::Toolbar)
                     .text(cx.strings().text(StringKey::FilterBarLabel))
                     .disabled(self.disabled)
-                    .value(active.to_string()),
+                    .value(cx.numbers().count(active)),
             )
     }
 }

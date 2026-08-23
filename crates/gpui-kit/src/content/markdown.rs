@@ -50,7 +50,7 @@ use crate::controls::button::Button;
 use crate::foundation::{Ident, Sizable, StyledExt};
 use crate::motion::keyed;
 use crate::overlay::Tooltipped;
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 use stream::Stream;
 use veil::Veil;
 
@@ -308,10 +308,15 @@ impl RenderOnce for Markdown {
             }
         }
 
+        let blocks = document.blocks.len();
         column.semantic_in(
             cx,
-            NodeSpec::new(ident.semantic_id(), Role::Region)
-                .value(format!("{} blocks", document.blocks.len())),
+            NodeSpec::new(ident.semantic_id(), Role::Region).value(cx.strings().format_plural(
+                StringKey::MarkdownBlockOne,
+                StringKey::MarkdownBlocks,
+                cx.numbers().plural(blocks),
+                &[cx.numbers().count(blocks).as_ref()],
+            )),
         )
     }
 }
@@ -898,7 +903,12 @@ impl Painter {
                 NodeSpec::new(ident.semantic_id(), Role::Text)
                     .parent(self.ident.semantic_id())
                     .text(label)
-                    .value(format!("{lines} lines")),
+                    .value(cx.strings().format_plural(
+                        StringKey::MarkdownLineOne,
+                        StringKey::MarkdownLines,
+                        cx.numbers().plural(lines),
+                        &[cx.numbers().count(lines).as_ref()],
+                    )),
             )
             .into_any_element()
     }
@@ -963,7 +973,7 @@ impl Painter {
         let marker = match (entry.task, ordered) {
             (Some(true), _) => SharedString::new_static("☑"),
             (Some(false), _) => SharedString::new_static("☐"),
-            (None, true) => SharedString::from(format!("{}.", start + offset as u64)),
+            (None, true) => cx.numbers().ordinal(start + offset as u64),
             (None, false) => SharedString::new_static("•"),
         };
 
@@ -1089,7 +1099,12 @@ impl Painter {
                 NodeSpec::new(ident.semantic_id(), Role::Table)
                     .parent(self.ident.semantic_id())
                     .text(name)
-                    .value(format!("{} rows", rows.len())),
+                    .value(cx.strings().format_plural(
+                        StringKey::MarkdownRowOne,
+                        StringKey::MarkdownRows,
+                        cx.numbers().plural(rows.len()),
+                        &[cx.numbers().count(rows.len()).as_ref()],
+                    )),
             )
             .into_any_element()
     }
@@ -1163,12 +1178,13 @@ impl Painter {
     fn more(&mut self, hidden: usize, cx: &mut App) -> AnyElement {
         let theme = self.theme.clone();
         let ident = self.ident.child("truncated");
-        let label = if hidden == 1 {
-            cx.strings().text(StringKey::MarkdownShowMoreOne)
-        } else {
-            cx.strings()
-                .format(StringKey::MarkdownShowMoreMany, &[&hidden.to_string()])
-        };
+        let digits = cx.numbers().count(hidden);
+        let label = cx.strings().format_plural(
+            StringKey::MarkdownShowMoreOne,
+            StringKey::MarkdownShowMoreMany,
+            cx.numbers().plural(hidden),
+            &[digits.as_ref()],
+        );
         let asked = self.report(MarkdownEvent::MoreRequested { lines: hidden });
 
         div()
@@ -1190,7 +1206,7 @@ impl Painter {
                 NodeSpec::new(ident.semantic_id(), Role::Status)
                     .parent(self.ident.semantic_id())
                     .text(label)
-                    .value(hidden.to_string()),
+                    .value(digits),
             )
             .into_any_element()
     }

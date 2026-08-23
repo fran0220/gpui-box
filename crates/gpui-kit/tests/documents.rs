@@ -666,7 +666,7 @@ fn a_log_stream_virtualizes_stable_entries_and_reports_intents(cx: &mut TestAppC
 
     assert_eq!(
         harness.node("logs.entries").expect("published").value,
-        Some("1000".into())
+        Some("1,000".into())
     );
     assert!(harness.node("logs.entries.entry-0999").is_some());
     assert!(
@@ -873,7 +873,7 @@ fn split_diff_uses_the_same_stable_rows_and_large_diffs_stay_virtual(cx: &mut Te
     );
     assert_eq!(
         harness.node("review.rows").expect("published").value,
-        Some("1002".into())
+        Some("1,002".into())
     );
     assert!(
         harness

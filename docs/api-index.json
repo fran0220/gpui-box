@@ -11575,13 +11575,17 @@
       "commands": [
         "set(key: StringKey, text: impl Into<SharedString>) -> &mut Self",
         "clear(key: StringKey) -> &mut Self",
+        "set_plural(key: StringKey, form: Plural, text: impl Into<SharedString>) -> &mut Self",
+        "clear_plural(key: StringKey, form: Plural) -> &mut Self",
         "clear_all() -> &mut Self",
         "extend(entries: impl IntoIterator<Item = (StringKey, SharedString)>) -> &mut Self"
       ],
       "queries": [
         "is_overridden(key: StringKey) -> bool",
+        "is_plural_overridden(key: StringKey, form: Plural) -> bool",
         "text(key: StringKey) -> SharedString",
-        "format(key: StringKey, args: &[&str]) -> SharedString"
+        "format(key: StringKey, args: &[&str]) -> SharedString",
+        "format_plural(one: StringKey, other: StringKey, form: Plural, args: &[&str]) -> SharedString"
       ]
     },
     {

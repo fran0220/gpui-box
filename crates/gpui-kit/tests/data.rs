@@ -77,7 +77,7 @@ fn a_virtualized_list_publishes_its_total_and_only_the_rows_it_drew(cx: &mut Tes
     assert_eq!(list.role, Role::List);
     assert_eq!(
         list.value.as_deref(),
-        Some("1000"),
+        Some("1,000"),
         "the list must report the size of the data set it was given"
     );
 

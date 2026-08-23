@@ -67,7 +67,7 @@ use crate::display::icon::flips;
 use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
 use crate::foundation::window_state;
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type ToggleHandler = Rc<dyn Fn(SharedString, bool, &mut Window, &mut App)>;
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
@@ -124,16 +124,27 @@ impl JsonValue {
     pub fn redacted_from(value: &JsonValue, cx: &App) -> Self {
         let strings = cx.strings();
         let shape = match value {
-            JsonValue::String(text) => strings.format(
-                StringKey::DescriptionCharacters,
-                &[&text.graphemes(true).count().to_string()],
+            JsonValue::String(text) => {
+                let count = text.graphemes(true).count();
+                strings.format_plural(
+                    StringKey::DescriptionCharacterOne,
+                    StringKey::DescriptionCharacters,
+                    cx.numbers().plural(count),
+                    &[cx.numbers().count(count).as_ref()],
+                )
+            }
+            JsonValue::Object(members) => strings.format_plural(
+                StringKey::JsonShapeEntryOne,
+                StringKey::JsonShapeEntries,
+                cx.numbers().plural(members.len()),
+                &[cx.numbers().count(members.len()).as_ref()],
             ),
-            JsonValue::Object(members) => {
-                strings.format(StringKey::JsonShapeEntries, &[&members.len().to_string()])
-            }
-            JsonValue::Array(items) => {
-                strings.format(StringKey::JsonShapeItems, &[&items.len().to_string()])
-            }
+            JsonValue::Array(items) => strings.format_plural(
+                StringKey::JsonShapeItemOne,
+                StringKey::JsonShapeItems,
+                cx.numbers().plural(items.len()),
+                &[cx.numbers().count(items.len()).as_ref()],
+            ),
             _ => strings.text(StringKey::JsonShapeValue),
         };
         Self::Redacted(shape)
@@ -671,7 +682,7 @@ impl RenderOnce for JsonView {
 
         container.semantic_in(
             cx,
-            NodeSpec::new(view.ident.semantic_id(), Role::Tree).value(count.to_string()),
+            NodeSpec::new(view.ident.semantic_id(), Role::Tree).value(cx.numbers().count(count)),
         )
     }
 }

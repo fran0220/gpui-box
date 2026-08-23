@@ -39,7 +39,7 @@ use crate::media::notice;
 use crate::media::transport::{
     MediaAvailability, MediaCapabilities, MediaCommand, MediaEvent, MediaTransport,
 };
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// How tall the peak band is, and how much space is left between two bars.
 /// Neither value repeats anywhere else.
@@ -272,7 +272,7 @@ impl RenderOnce for AudioPlayer {
                                 NodeSpec::new(ident.child("peaks").semantic_id(), Role::Image)
                                     .parent(ident.semantic_id())
                                     .text(strings.text(StringKey::MediaWaveform))
-                                    .value(self.peaks.len().to_string()),
+                                    .value(cx.numbers().count(self.peaks.len())),
                             ),
                     );
                 }

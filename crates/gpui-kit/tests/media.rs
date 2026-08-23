@@ -77,7 +77,7 @@ fn a_supplied_image_is_ready_and_states_the_size_the_host_gave(cx: &mut TestAppC
         measurement
             .text
             .as_deref()
-            .is_some_and(|text| text.starts_with("1600 × 900")),
+            .is_some_and(|text| text.starts_with("1,600 × 900")),
         "the host's own dimensions, not the box it was drawn in: {:?}",
         measurement.text
     );
@@ -504,7 +504,7 @@ fn buffered_ranges_are_published_apart_from_the_position(cx: &mut TestAppContext
     });
 
     let buffered = harness.node("bar.buffered").expect("published");
-    assert_eq!(buffered.value.as_deref(), Some("1 ranges"));
+    assert_eq!(buffered.value.as_deref(), Some("1 range"));
     assert_eq!(
         buffered.value_now.map(|share| (share * 100.0).round()),
         Some(65.0)

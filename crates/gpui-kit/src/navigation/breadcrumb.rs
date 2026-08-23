@@ -16,7 +16,7 @@ use gpui_kit_theme::{ActiveTheme, Space, TypeScale};
 
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{FocusRing, Ident, Pressable, StyledExt, text as foundation_text};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 type RevealHandler = Rc<dyn Fn(Vec<SharedString>, &mut Window, &mut App)>;
@@ -224,12 +224,13 @@ impl Breadcrumb {
         let ident = self.ident.child("collapsed");
         let ids: Vec<SharedString> = hidden.iter().map(|crumb| crumb.id.clone()).collect();
         let count = ids.len();
-        let label = if count == 1 {
-            cx.strings().text(StringKey::BreadcrumbHiddenOne)
-        } else {
-            cx.strings()
-                .format(StringKey::BreadcrumbHiddenMany, &[&count.to_string()])
-        };
+        let digits = cx.numbers().count(count);
+        let label = cx.strings().format_plural(
+            StringKey::BreadcrumbHiddenOne,
+            StringKey::BreadcrumbHiddenMany,
+            cx.numbers().plural(count),
+            &[digits.as_ref()],
+        );
         let actionable = self.on_reveal.is_some();
         let hover_group = ident.child("hover").semantic_id();
 
@@ -273,7 +274,7 @@ impl Breadcrumb {
                 if actionable { Role::Button } else { Role::Text },
             )
             .parent(self.ident.semantic_id())
-            .value(count.to_string())
+            .value(digits)
             .text(label),
         )
     }

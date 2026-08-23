@@ -41,7 +41,7 @@ use gpui_kit_theme::{ActiveTheme, Theme};
 use crate::data::viewport::{glide_to_row, viewed_rows};
 use crate::foundation::Ident;
 use crate::overlay::Tooltipped;
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 
@@ -191,10 +191,10 @@ impl Outline {
         // about one place that is really about several.
         if held > 1 {
             text.push('\n');
-            text.push_str(
-                &cx.strings()
-                    .format(StringKey::OutlineMarks, &[&held.to_string()]),
-            );
+            text.push_str(&cx.strings().format(
+                StringKey::OutlineMarks,
+                &[cx.numbers().count(held).as_ref()],
+            ));
         }
         SharedString::from(text)
     }
@@ -266,7 +266,7 @@ impl Outline {
                     .text(mark.title.clone())
                     // How many places this mark stands for, so a snapshot
                     // shows that the outline condensed rather than lost them.
-                    .value(held.to_string())
+                    .value(cx.numbers().count(held))
                     .selected(reading),
             )
             .into_any_element()
@@ -308,7 +308,7 @@ impl RenderOnce for Outline {
             .semantic_in(
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::List)
-                    .value(self.marks.len().to_string()),
+                    .value(cx.numbers().count(self.marks.len())),
             )
             .into_any_element()
     }

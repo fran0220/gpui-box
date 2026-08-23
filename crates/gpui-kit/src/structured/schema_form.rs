@@ -905,9 +905,12 @@ impl SchemaForm {
             .is_some_and(|maximum| candidates.len() > maximum)
         {
             let maximum = files.request.max.expect("checked above");
-            let refusal = cx
-                .strings()
-                .format(StringKey::SchemaFilesMaximum, &[&maximum.to_string()]);
+            let refusal = cx.strings().format_plural(
+                StringKey::SchemaFileMaximumOne,
+                StringKey::SchemaFilesMaximum,
+                cx.numbers().plural(maximum),
+                &[cx.numbers().count(maximum).as_ref()],
+            );
             if let Some(field) = self.fields.iter_mut().find(|field| field.path == *path)
                 && let Control::Files(files) = &mut field.control
             {
@@ -1548,14 +1551,12 @@ impl Render for SchemaForm {
         let strings = cx.strings();
         let unrenderable_required = self.has_unrenderable_required();
         let summary = (!self.unrenderable.is_empty()).then(|| {
-            if self.unrenderable.len() == 1 {
-                strings.text(StringKey::SchemaUnrenderableOne)
-            } else {
-                strings.format(
-                    StringKey::SchemaUnrenderableMany,
-                    &[&self.unrenderable.len().to_string()],
-                )
-            }
+            strings.format_plural(
+                StringKey::SchemaUnrenderableOne,
+                StringKey::SchemaUnrenderableMany,
+                cx.numbers().plural(self.unrenderable.len()),
+                &[cx.numbers().count(self.unrenderable.len()).as_ref()],
+            )
         });
 
         let rows: Vec<AnyElement> = self
@@ -1602,7 +1603,8 @@ impl Render for SchemaForm {
             })
             .semantic_in(
                 cx,
-                NodeSpec::new(self.ident.semantic_id(), Role::Form).value(count.to_string()),
+                NodeSpec::new(self.ident.semantic_id(), Role::Form)
+                    .value(cx.numbers().count(count)),
             )
     }
 }

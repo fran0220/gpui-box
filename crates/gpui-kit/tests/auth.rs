@@ -356,7 +356,7 @@ fn whole_code_paste_counts_unicode_graphemes_and_replaces_the_selection(cx: &mut
             .expect("code node")
             .description
             .as_deref(),
-        Some("2/4")
+        Some("2 of 4")
     );
 }
 
@@ -431,7 +431,7 @@ fn one_time_code_publishes_only_redacted_length_shape_to_both_trees(cx: &mut Tes
     });
     let node = harness.node("auth.code").expect("one code input");
     assert_eq!(node.value.as_deref(), Some("[REDACTED]"));
-    assert_eq!(node.description.as_deref(), Some("11/11"));
+    assert_eq!(node.description.as_deref(), Some("11 of 11"));
     assert!(!semantic_text(&mut harness).contains(needle));
 
     let tree = harness.accessibility_tree();

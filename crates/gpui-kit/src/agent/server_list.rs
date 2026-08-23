@@ -47,7 +47,7 @@ use crate::foundation::{
     CardVariant, Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text,
 };
 use crate::state::{HasPhase, Phase};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 use std::f32::consts::FRAC_PI_2;
 
@@ -461,7 +461,8 @@ impl RenderOnce for ServerList {
             .children(body)
             .semantic_in(
                 cx,
-                NodeSpec::new(self.ident.semantic_id(), Role::List).value(count.to_string()),
+                NodeSpec::new(self.ident.semantic_id(), Role::List)
+                    .value(cx.numbers().count(count)),
             )
     }
 }
@@ -726,7 +727,7 @@ impl ServerList {
                                         NodeSpec::new(heading_ident.semantic_id(), Role::Heading)
                                             .parent(ident.semantic_id())
                                             .text(heading)
-                                            .value(members.len().to_string()),
+                                            .value(cx.numbers().count(members.len())),
                                     ),
                             )
                             .children(members.into_iter().map(|offering| {
@@ -743,7 +744,7 @@ impl ServerList {
                         cx,
                         NodeSpec::new(ident.semantic_id(), Role::List)
                             .parent(server_ident.semantic_id())
-                            .value(offerings.len().to_string()),
+                            .value(cx.numbers().count(offerings.len())),
                     )
                     .into_any_element()
             }

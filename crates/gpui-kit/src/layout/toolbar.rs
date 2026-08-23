@@ -38,7 +38,7 @@ use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{Ident, Sizable, StyledExt};
 use crate::layout::measure;
 use crate::overlay::{Menu, MenuItem};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// One action in the bar.
 ///
@@ -450,7 +450,7 @@ impl RenderOnce for Toolbar {
                         NodeSpec::new(overflow_ident.semantic_id(), Role::Group)
                             .parent(ident.semantic_id())
                             .text(cx.strings().text(StringKey::MoreActions))
-                            .value(hidden.to_string()),
+                            .value(cx.numbers().count(hidden)),
                     )
             }));
 
@@ -467,8 +467,8 @@ impl RenderOnce for Toolbar {
             .frame(&theme, Surface::Panel, Elevation::Raised)
             .child(row)
             .semantic_in(cx, {
-                let mut spec =
-                    NodeSpec::new(ident.semantic_id(), Role::Toolbar).value(total.to_string());
+                let mut spec = NodeSpec::new(ident.semantic_id(), Role::Toolbar)
+                    .value(cx.numbers().count(total));
                 if let Some(label) = self.label {
                     spec = spec.text(label);
                 }

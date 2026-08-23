@@ -118,7 +118,8 @@ impl RenderOnce for PartyRoster {
             .children(cards)
             .semantic_in(
                 cx,
-                NodeSpec::new(self.ident.semantic_id(), Role::List).value(count.to_string()),
+                NodeSpec::new(self.ident.semantic_id(), Role::List)
+                    .value(cx.numbers().count(count)),
             )
             .into_any_element()
     }
@@ -389,7 +390,7 @@ impl RenderOnce for ObjectiveTracker {
             .semantic_in(
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::List)
-                    .value(self.snapshot.objectives.len().to_string()),
+                    .value(cx.numbers().count(self.snapshot.objectives.len())),
             )
             .into_any_element()
     }
@@ -629,7 +630,8 @@ impl RenderOnce for AbilityBar {
             .children(abilities)
             .semantic_in(
                 cx,
-                NodeSpec::new(self.ident.semantic_id(), Role::Toolbar).value(count.to_string()),
+                NodeSpec::new(self.ident.semantic_id(), Role::Toolbar)
+                    .value(cx.numbers().count(count)),
             )
             .into_any_element()
     }
@@ -681,12 +683,13 @@ fn ability_control(
                 .tone(Tone::Neutral)
         }))
         .children(ability.charges.map(|charges| {
-            let current = cx.numbers().count(charges.current());
-            let maximum = cx.numbers().count(charges.maximum());
-            Badge::new(cx.strings().format(
-                StringKey::GameAbilityCharges,
-                &[current.as_ref(), maximum.as_ref()],
-            ))
+            let current = cx
+                .numbers()
+                .count_of_total(charges.current(), charges.maximum());
+            Badge::new(
+                cx.strings()
+                    .format(StringKey::GameAbilityCharges, &[current.as_ref()]),
+            )
             .id(ident.child("charges"))
             .tone(if charges.current() == 0 {
                 Tone::Warning

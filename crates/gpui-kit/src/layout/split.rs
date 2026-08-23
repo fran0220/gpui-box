@@ -20,7 +20,7 @@ use gpui_kit_theme::ActiveTheme;
 use crate::foundation::window_state;
 use crate::foundation::{Disableable, FocusRing, Ident};
 use crate::layout::measure;
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// How wide the grab area of the divider is, and how long the grip drawn
 /// inside it is. Neither value repeats anywhere else.
@@ -493,7 +493,7 @@ impl RenderOnce for SplitPane {
                 .semantic_in(
                     cx,
                     NodeSpec::new(self.ident.semantic_id(), Role::Group)
-                        .value(format!("{ratio:.3}")),
+                        .value(cx.numbers().decimal(f64::from(ratio), 3)),
                 ),
         )
     }

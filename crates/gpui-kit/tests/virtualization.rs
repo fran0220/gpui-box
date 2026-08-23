@@ -129,7 +129,7 @@ fn a_list_reports_its_total_so_an_off_screen_row_is_not_an_absent_one(cx: &mut T
 
     assert_eq!(
         harness.node("v.list").expect("published").value.as_deref(),
-        Some("10000"),
+        Some("10,000"),
         "the surface reports the size of the data set it was given"
     );
     assert!(harness.node("v.list.record-00000").is_some());
@@ -155,7 +155,7 @@ fn scrolling_a_list_changes_which_rows_it_builds(cx: &mut TestAppContext) {
     );
     assert_eq!(
         harness.node("v.list").expect("published").value.as_deref(),
-        Some("10000"),
+        Some("10,000"),
         "scrolling changes what is drawn, never how much there is"
     );
 }
@@ -242,7 +242,7 @@ fn a_table_built_from_a_source_builds_only_the_rows_its_viewport_holds(cx: &mut 
     );
     assert_eq!(
         harness.node("v.table").expect("published").value.as_deref(),
-        Some("10000"),
+        Some("10,000"),
         "the table reports the size of the collection, not the size of the viewport"
     );
     assert!(harness.node("v.table.record-00000").is_some());
@@ -390,7 +390,7 @@ fn a_bounded_tree_draws_a_viewport_and_counts_what_it_disclosed(cx: &mut TestApp
     let node = harness.node("v.tree").expect("published");
     assert_eq!(
         node.value.as_deref(),
-        Some("10100"),
+        Some("10,100"),
         "the tree reports how many rows it disclosed, which is what makes an \
          unrendered row different from a collapsed one"
     );
@@ -424,7 +424,7 @@ fn scrolling_a_tree_changes_which_nodes_it_draws(cx: &mut TestAppContext) {
     );
     assert_eq!(
         harness.node("v.tree").expect("published").value.as_deref(),
-        Some("10100"),
+        Some("10,100"),
         "scrolling changes what is drawn, never what is disclosed"
     );
 }
@@ -531,7 +531,7 @@ fn a_grid_of_ten_thousand_builds_a_viewport_and_not_a_data_set(cx: &mut TestAppC
     );
     assert_eq!(
         harness.node("v.grid").expect("published").value.as_deref(),
-        Some("10000")
+        Some("10,000")
     );
     assert!(
         harness.node("v.grid.record-09000").is_none(),

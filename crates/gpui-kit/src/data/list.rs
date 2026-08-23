@@ -40,6 +40,7 @@ use crate::foundation::{
 use crate::interaction::dnd::{
     self, DragItem, DropAxis, DropIntent, DropPosition, MakingWay, RowTarget, SurfaceDrag,
 };
+use crate::strings::ActiveNumbers;
 
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 type RenderRow = Rc<dyn Fn(usize, &mut Window, &mut App) -> ListItem>;
@@ -500,7 +501,7 @@ impl RenderOnce for List {
 
         container.semantic_in(
             cx,
-            NodeSpec::new(ident.semantic_id(), Role::List).value(count.to_string()),
+            NodeSpec::new(ident.semantic_id(), Role::List).value(cx.numbers().count(count)),
         )
     }
 }

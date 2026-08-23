@@ -203,7 +203,7 @@ impl NumberInput {
     }
 
     fn write(&mut self, value: f64, cx: &mut Context<Self>) {
-        let text = self.formatted(value);
+        let text = self.formatted(value, cx);
         self.field
             .update(cx, |field, cx| field.set_text_quietly(text, cx));
     }
@@ -233,7 +233,7 @@ impl NumberInput {
         if trimmed.is_empty() {
             return None;
         }
-        trimmed.parse::<f64>().ok()
+        cx.numbers().parse_decimal(trimmed)
     }
 
     fn is_empty(&self, cx: &App) -> bool {
@@ -266,13 +266,13 @@ impl NumberInput {
         if let Some(min) = self.min.filter(|min| value < *min) {
             return Some(strings.format(
                 StringKey::NumberBelowMinimum,
-                &[self.formatted(min).as_ref()],
+                &[self.formatted(min, cx).as_ref()],
             ));
         }
         if let Some(max) = self.max.filter(|max| value > *max) {
             return Some(strings.format(
                 StringKey::NumberAboveMaximum,
-                &[self.formatted(max).as_ref()],
+                &[self.formatted(max, cx).as_ref()],
             ));
         }
         None
@@ -282,8 +282,8 @@ impl NumberInput {
         self.min.is_some_and(|min| value < min) || self.max.is_some_and(|max| value > max)
     }
 
-    fn formatted(&self, value: f64) -> SharedString {
-        SharedString::from(format!("{value:.*}", self.precision))
+    fn formatted(&self, value: f64, cx: &App) -> SharedString {
+        cx.numbers().decimal(value, self.precision)
     }
 
     /// What the control publishes as its value: the number and what it counts.
@@ -296,12 +296,11 @@ impl NumberInput {
             Some(value) => cx.numbers().decimal(value, self.precision),
             None => number,
         };
-        match (&self.prefix, &self.unit) {
-            (Some(prefix), Some(unit)) => SharedString::from(format!("{prefix}{number} {unit}")),
-            (Some(prefix), None) => SharedString::from(format!("{prefix}{number}")),
-            (None, Some(unit)) => SharedString::from(format!("{number} {unit}")),
-            (None, None) => number,
-        }
+        cx.numbers().decorate(
+            number.as_ref(),
+            self.prefix.as_deref(),
+            self.unit.as_deref(),
+        )
     }
 
     /// Whether a step in this direction has anywhere to go.
@@ -372,9 +371,9 @@ impl NumberInput {
             cx.notify();
             return;
         }
-        match trimmed.parse::<f64>() {
-            Ok(value) => cx.emit(NumberInputEvent::Changed(value)),
-            Err(_) => cx.emit(NumberInputEvent::Unparsable(text)),
+        match cx.numbers().parse_decimal(trimmed) {
+            Some(value) => cx.emit(NumberInputEvent::Changed(value)),
+            None => cx.emit(NumberInputEvent::Unparsable(text)),
         }
         cx.notify();
     }

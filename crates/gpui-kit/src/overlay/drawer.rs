@@ -24,7 +24,7 @@ use crate::overlay::focus::FocusTrap;
 use crate::overlay::layer::{Edge, Overlay, surface};
 use crate::overlay::panel::{self, Body};
 use crate::overlay::stack;
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// How wide a left or right drawer is, and how tall a top or bottom one is,
 /// before the caller says otherwise. Neither value repeats elsewhere.
@@ -386,7 +386,7 @@ impl Drawer {
                     NodeSpec::new(ident.semantic_id(), Role::Button)
                         .parent(self.ident.semantic_id())
                         .text(label)
-                        .value(self.shown_size().to_string()),
+                        .value(cx.numbers().decimal(f64::from(self.shown_size()), 0)),
                 )
                 .into_any_element(),
         )

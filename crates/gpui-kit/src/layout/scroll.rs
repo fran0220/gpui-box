@@ -29,7 +29,7 @@ use gpui_kit_theme::{ActiveTheme, Theme};
 use crate::foundation::{Ident, window_state};
 use crate::layout::measure;
 use crate::motion::ScrollLink;
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// How wide the reserved gutter is and how thick the thumb inside it is drawn.
 /// Neither value repeats anywhere else.
@@ -488,7 +488,13 @@ fn bar(
                 } else {
                     StringKey::ScrollbarHorizontal
                 }))
-                .value(format!("{scrolled:.0} of {max:.0}"))
+                .value(cx.strings().format(
+                    StringKey::CountOfTotal,
+                    &[
+                        cx.numbers().decimal(f64::from(scrolled), 0).as_ref(),
+                        cx.numbers().decimal(f64::from(max), 0).as_ref(),
+                    ],
+                ))
                 .range(0.0, max, scrolled.clamp(0.0, max)),
         );
     }

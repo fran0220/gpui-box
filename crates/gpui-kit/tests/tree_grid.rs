@@ -54,7 +54,7 @@ fn publishes_bounded_treegrid_hierarchy(cx: &mut TestAppContext) {
         .node("data.tree-grid")
         .expect("treegrid root should publish");
     assert_eq!(root.role, Role::TreeGrid);
-    assert_eq!(root.value.as_deref(), Some("1000"));
+    assert_eq!(root.value.as_deref(), Some("1,000"));
     let rows = harness
         .snapshot()
         .children_of("data.tree-grid")
