@@ -52,6 +52,13 @@
         "inline": "#5b21b6",
         "inlineWash": "#7c3aed"
       },
+      "agent": {
+        "read": "#2b607d",
+        "network": "#565aa0",
+        "shell": "#80591f",
+        "edit": "#2f6653",
+        "external": "#765676"
+      },
       "terminal": {
         "background": "#fafafa",
         "wash": "#000000"
@@ -108,6 +115,14 @@
       "warning": "{amber.500}",
       "success": "{green.500}",
       "info": "{cyan.400}"
+    },
+    "agent": {
+      "read": "{agent.read}",
+      "network": "{agent.network}",
+      "shell": "{agent.shell}",
+      "edit": "{agent.edit}",
+      "external": "{agent.external}",
+      "evidenceWash": "{neutral.850}/08"
     },
     "loader": {
       "gradient": ["{loader.blue}", "{loader.orange}", "{loader.pink}"]

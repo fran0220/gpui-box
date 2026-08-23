@@ -391,6 +391,12 @@ fn main() {
 }
 ```
 
+```yaml
+release:
+  state: ready
+  retries: 3
+```
+
 | Stage | Result |
 |:------|-------:|
 | Build | passed |
@@ -445,7 +451,12 @@ pub(super) fn agent_document(_window: &mut Window, cx: &mut App) -> AnyElement {
                 )
                 .block(
                     AgentDocumentBlock::tool_call("verification", |_, _| {
-                        ToolCallCard::new("scene.agent-document.tool", "cargo test")
+                        ToolCall::new(
+                            "scene.agent-document.tool",
+                            ToolFamily::Shell,
+                            "cargo test",
+                        )
+                            .summary("-p gpui-box-kit")
                             .state(ToolCallState::Succeeded {
                                 output: ToolOutput::Silent,
                             })

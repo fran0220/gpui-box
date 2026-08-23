@@ -9,9 +9,9 @@ use gpui_kit_tokens::{
 };
 
 pub use gpui_kit_tokens::{
-    Appearance, ControlSize, Density, Elevation, Layer, MotionDuration, MotionEasing, Palette,
-    Radius, SemanticColor, Space, SpringPreset, SpringTokens, Surface, SyntaxColor, TextTone,
-    TypeScale,
+    AgentColor, Appearance, ControlSize, Density, Elevation, Layer, MotionDuration, MotionEasing,
+    Palette, Radius, SemanticColor, Space, SpringPreset, SpringTokens, Surface, SyntaxColor,
+    TextTone, TypeScale,
 };
 
 /// Reads the active theme from any context that dereferences to [`App`].
@@ -83,6 +83,9 @@ pub struct Colors {
     pub success: Hsla,
     pub info: Hsla,
     pub loader_gradient: [Hsla; 3],
+    /// Quiet tool-family tints and the wash behind expanded transcript
+    /// evidence. See `gpui_kit_tokens::AgentColors`.
+    pub agent: AgentPalette,
     /// The vocabulary code is painted in, wherever this library draws code.
     /// See `gpui_kit_tokens::SyntaxColors`.
     pub syntax: SyntaxPalette,
@@ -112,6 +115,29 @@ pub struct SyntaxPalette {
     pub added_wash: Hsla,
     pub removed: Hsla,
     pub removed_wash: Hsla,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct AgentPalette {
+    pub read: Hsla,
+    pub network: Hsla,
+    pub shell: Hsla,
+    pub edit: Hsla,
+    pub external: Hsla,
+    pub evidence_wash: Hsla,
+}
+
+impl AgentPalette {
+    pub fn get(&self, role: AgentColor) -> Hsla {
+        match role {
+            AgentColor::Read => self.read,
+            AgentColor::Network => self.network,
+            AgentColor::Shell => self.shell,
+            AgentColor::Edit => self.edit,
+            AgentColor::External => self.external,
+            AgentColor::EvidenceWash => self.evidence_wash,
+        }
+    }
 }
 
 impl SyntaxPalette {
@@ -378,6 +404,14 @@ impl Theme {
                 success: color(tokens.semantic(SemanticColor::Success)),
                 info: color(tokens.semantic(SemanticColor::Info)),
                 loader_gradient: tokens.loader_gradient().map(color),
+                agent: AgentPalette {
+                    read: color(tokens.agent(AgentColor::Read)),
+                    network: color(tokens.agent(AgentColor::Network)),
+                    shell: color(tokens.agent(AgentColor::Shell)),
+                    edit: color(tokens.agent(AgentColor::Edit)),
+                    external: color(tokens.agent(AgentColor::External)),
+                    evidence_wash: color(tokens.agent(AgentColor::EvidenceWash)),
+                },
                 syntax: SyntaxPalette {
                     keyword: color(tokens.syntax(SyntaxColor::Keyword)),
                     string: color(tokens.syntax(SyntaxColor::StringLiteral)),

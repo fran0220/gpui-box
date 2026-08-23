@@ -651,7 +651,7 @@ pub fn catalog() -> Vec<Scene> {
         Scene {
             name: "tool-call",
             build: tool_call,
-            shows: Shows::Subjects(&["ToolCallCard"]),
+            shows: Shows::Subjects(&["ToolCall"]),
         },
         Scene {
             name: "step-list",

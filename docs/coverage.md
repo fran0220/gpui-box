@@ -31,7 +31,7 @@ input, and an entry in `docs/components.md`.
 | Keymap | `KeybindingRecorder`, `KeymapEditor` |
 | Interaction | `Dropzone` |
 | Filtering | `FilterBar` |
-| Agent run and persona | `AgentAvatar`, `AgentActivityLine`, `AgentCard`, `AgentGroup`, `AgentRunIssues`, `ToolCallCard`, `StepList`, `ThinkingBlock`, `NodeGraph`, `GraphNode`, `NodeGroup`, `CanvasToolbar`, `Minimap`, `TraceView`, `SpanTimeline`, `AgentRoster`, `SubagentTree`, `AgentRunCanvas`, `PersonaPortrait`, `VoiceReactive`, `PersonaDialogue`, `FeedbackRating`, `PromptBuilder` |
+| Agent run and persona | `AgentAvatar`, `AgentActivityLine`, `AgentCard`, `AgentGroup`, `AgentRunIssues`, `ToolCall`, `StepList`, `ThinkingBlock`, `NodeGraph`, `GraphNode`, `NodeGroup`, `CanvasToolbar`, `Minimap`, `TraceView`, `SpanTimeline`, `AgentRoster`, `SubagentTree`, `AgentRunCanvas`, `PersonaPortrait`, `VoiceReactive`, `PersonaDialogue`, `FeedbackRating`, `PromptBuilder` |
 | Permission and cost | `ApprovalPrompt`, `PermissionMatrix`, `CostMeter`, `ContextGauge` |
 | Game experience | `PartyRoster`, `ObjectiveTracker`, `AbilityBar`, `RewardReveal` |
 | Visual effects | `EffectParticles`, `CinematicEffect` |

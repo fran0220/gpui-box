@@ -755,18 +755,21 @@ pub(super) fn tool_call(_window: &mut Window, cx: &mut App) -> AnyElement {
         .gap(px(theme.spacing.lg))
         .child(
             stack(&theme).w(px(460.0)).child(
-            ToolCallCard::new("scene.tool.pending", "workspace.search")
-                .arguments(scene_arguments())
+            ToolCall::new("scene.tool.pending", ToolFamily::External, "mcp.dispatch")
+                .summary("designer review")
+                .arguments("{ \"target\": \"designer-review\" }")
                 .state(ToolCallState::PendingApproval),
         )
         .child(
-            ToolCallCard::new("scene.tool.running", "workspace.index")
-                .arguments("{ \"root\": \"crates\" }")
+            ToolCall::new("scene.tool.running", ToolFamily::Network, "web.fetch")
+                .summary("ampcode.com/manual")
+                .arguments("{ \"url\": \"https://ampcode.com/manual\" }")
                 .state(ToolCallState::Running)
                 .elapsed("4.2 s"),
         )
         .child(
-            ToolCallCard::new("scene.tool.succeeded", "workspace.read")
+            ToolCall::new("scene.tool.succeeded", ToolFamily::Read, "workspace.read")
+                .summary("README.md")
                 .arguments("{ \"path\": \"README.md\" }")
                 .state(ToolCallState::succeeded(
                     ToolBody::new(
@@ -774,10 +777,13 @@ pub(super) fn tool_call(_window: &mut Window, cx: &mut App) -> AnyElement {
                     )
                     .max_lines(2),
                 ))
+                .expanded(true)
+                .on_toggle(|_, _, _| {})
                 .elapsed("0.3 s"),
         )
         .child(
-            ToolCallCard::new("scene.tool.silent", "workspace.touch")
+            ToolCall::new("scene.tool.silent", ToolFamily::Edit, "workspace.touch")
+                .summary("notes.md")
                 .arguments("{ \"path\": \"notes.md\" }")
                 .state(ToolCallState::succeeded_silently())
                 .elapsed("0.1 s"),
@@ -787,22 +793,20 @@ pub(super) fn tool_call(_window: &mut Window, cx: &mut App) -> AnyElement {
             stack(&theme)
                 .w(px(460.0))
                 .child(
-                    ToolCallCard::new("scene.tool.failed", "workspace.write")
+                    ToolCall::new("scene.tool.failed", ToolFamily::Edit, "workspace.write")
+                        .summary("notes.md")
                         .arguments("{ \"path\": \"/read-only/notes.md\" }")
-                        .state(ToolCallState::failed(
-                            "The file system reported that the path is read only.",
-                        ))
+                        .state(ToolCallState::failed("Read only."))
                         .elapsed("0.2 s")
                         .on_retry(|_, _| {}),
                 )
                 // A refusal reads as a decision: it is not the failure above
                 // it, and not the silent success in the other column.
                 .child(
-                    ToolCallCard::new("scene.tool.refused", "shell.run")
+                    ToolCall::new("scene.tool.refused", ToolFamily::Shell, "shell.run")
+                        .summary("rm -rf build")
                         .arguments("{ \"command\": \"rm -rf build\" }")
-                        .state(ToolCallState::refused(
-                            "This workspace does not allow shell commands.",
-                        )),
+                        .state(ToolCallState::refused("Shell commands are not allowed.")),
                 ),
         )
         .into_any_element()
@@ -819,10 +823,15 @@ pub(super) fn step_list(_window: &mut Window, cx: &mut App) -> AnyElement {
                     Step::new("search", "Search the workspace")
                         .state(StepState::Running)
                         .body(
-                            ToolCallCard::new("scene.steps.search.call", "workspace.search")
-                                .arguments(scene_arguments())
-                                .state(ToolCallState::Running)
-                                .elapsed("1.1 s"),
+                            ToolCall::new(
+                                "scene.steps.search.call",
+                                ToolFamily::Read,
+                                "workspace.search",
+                            )
+                            .summary("unknown · docs/coverage.md")
+                            .arguments(scene_arguments())
+                            .state(ToolCallState::Running)
+                            .elapsed("1.1 s"),
                         ),
                 )
                 .step(Step::new("summarise", "Summarise what was found"))
@@ -853,10 +862,14 @@ pub(super) fn step_list(_window: &mut Window, cx: &mut App) -> AnyElement {
 pub(super) fn thinking(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)
-        .child(ThinkingBlock::new(
-            "scene.thinking.collapsed",
-            Reasoning::present("The brief asks for two files, so read both before answering."),
-        ))
+        .w(px(640.0))
+        .child(
+            ThinkingBlock::new(
+                "scene.thinking.collapsed",
+                Reasoning::present("The brief asks for two files, so read both before answering."),
+            )
+            .elapsed("2.1 s"),
+        )
         // Reasoning that has finished and reasoning still arriving are the
         // same words in the same place, so the difference has to be shown.
         .child(
@@ -864,8 +877,7 @@ pub(super) fn thinking(_window: &mut Window, cx: &mut App) -> AnyElement {
                 "scene.thinking.working",
                 Reasoning::present("Reading the second file before answering."),
             )
-            .thinking(true)
-            .elapsed("12s"),
+            .thinking(true),
         )
         .child(
             ThinkingBlock::new(
@@ -875,6 +887,7 @@ pub(super) fn thinking(_window: &mut Window, cx: &mut App) -> AnyElement {
                 ),
             )
             .expanded(true)
+            .elapsed("8.4 s")
             .on_toggle(|_, _, _| {}),
         )
         // Withheld and absent are two different facts, and neither is the

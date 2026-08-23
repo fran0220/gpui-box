@@ -31,6 +31,18 @@ is the counterpart to `FailurePanel`. `StaleMark` names a stale verified value.
 
 ### Changed
 
+**Agent transcript evidence no longer competes with the answer.**
+`ToolCall` replaces the card-shaped `ToolCallCard` with a caption-sized mono
+row, a required `ToolFamily`, a display-safe key-argument summary, a state dot,
+inline failures/refusals, and controlled expansion. Expanded arguments and
+results are unlabelled, borderless mono washes, bounded to four lines by
+default with an explicit remaining-line count. `ThinkingBlock` uses the same
+quiet row language and expands to muted italic text. `AgentDocument` groups
+adjacent evidence more tightly and gives its labels the caption/faint tier.
+Markdown's existing built-in scanner now includes YAML/YML alongside JSON,
+Rust, TypeScript/JavaScript, shell, TOML, Python, Go, and Markdown; a host
+highlighter still overrides it.
+
 **`EmptyKind` gained `Unauthorized`.** An authorization refusal is no longer
 folded into `Unavailable`. Exhaustive matches on `EmptyKind` will not compile
 until they name the new variant.

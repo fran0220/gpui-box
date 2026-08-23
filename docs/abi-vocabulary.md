@@ -336,8 +336,8 @@ agent product model to GPUI Box Kit.
 
 - `RunLength`, `StepState`, `Step`, and `StepList` in
   `crates/gpui-kit/src/agent/step_list.rs`;
-- `ToolBody`, `ToolOutput`, `ToolCallState`, `Elapsed`, and `ToolCallCard` in
-  `agent/tool_call.rs`;
+- `ToolBody`, `ToolOutput`, `ToolCallState`, `ToolFamily`, `Elapsed`, and
+  `ToolCall` in `agent/tool_call.rs`;
 - `Reasoning` and `ThinkingBlock` in `agent/thinking.rs`;
 - `AlwaysScope`, `ApprovalDecision`, `ApprovalStatus`, `ApprovalEvent`, and
   `ApprovalPrompt` in `agent/approval.rs`;
@@ -361,8 +361,8 @@ different facts. None derives serde. `Step` and `TimelineEntry` contain
 `AnyElement` details. `ApprovalPrompt` is an entity view with focus handles;
 the remaining interactive builders store callbacks over `Window` and `App`.
 
-**Emitted actions.** `ToolCallCard` reports retry; `ThinkingBlock` reports the
-requested expanded state; `ApprovalEvent` reports approved scope or declined;
+**Emitted actions.** `ToolCall` reports retry and the requested expanded state;
+`ThinkingBlock` reports the requested expanded state; `ApprovalEvent` reports approved scope or declined;
 `PermissionMatrix` reports `PermissionChange`; and `ServerList` reports select,
 retry, and expanded state. `PersonaDialogue` reports choices and unchanged
 Markdown events with turn identity. `StepList`, cost views, portraits, voice

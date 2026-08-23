@@ -16,7 +16,7 @@
 //! Which step is running, which failed, and why one was skipped are the
 //! caller's facts. A step's reason is the host's own words, shown verbatim,
 //! and a step may carry any body the caller builds — usually a
-//! [`ToolCallCard`](crate::agent::tool_call::ToolCallCard).
+//! [`ToolCall`](crate::agent::tool_call::ToolCall).
 
 use gpui::{
     AnyElement, App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div,
@@ -128,7 +128,7 @@ impl Step {
     }
 
     /// What the step is made of, usually a
-    /// [`ToolCallCard`](crate::agent::tool_call::ToolCallCard).
+    /// [`ToolCall`](crate::agent::tool_call::ToolCall).
     pub fn body(mut self, body: impl IntoElement) -> Self {
         self.body = Some(body.into_any_element());
         self

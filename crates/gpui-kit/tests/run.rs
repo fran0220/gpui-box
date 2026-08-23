@@ -1,4 +1,4 @@
-//! What a run is allowed to claim: `ToolCallCard`, `StepList`, `ThinkingBlock`.
+//! What a run is allowed to claim: `ToolCall`, `StepList`, `ThinkingBlock`.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -18,31 +18,31 @@ fn five_states(cx: &mut TestAppContext) -> Harness {
     Harness::new(cx, gpui_kit::install, |_, _| {
         gpui::div()
             .child(
-                ToolCallCard::new("call.pending", "workspace.search")
+                ToolCall::new("call.pending", ToolFamily::Read, "workspace.search")
                     .state(ToolCallState::PendingApproval),
             )
             .child(
-                ToolCallCard::new("call.running", "workspace.index")
+                ToolCall::new("call.running", ToolFamily::Read, "workspace.index")
                     .state(ToolCallState::Running)
                     .elapsed("4.2 s"),
             )
             .child(
-                ToolCallCard::new("call.succeeded", "workspace.read")
+                ToolCall::new("call.succeeded", ToolFamily::Read, "workspace.read")
                     .state(ToolCallState::succeeded("one line"))
                     .elapsed("0.3 s"),
             )
             .child(
-                ToolCallCard::new("call.silent", "workspace.touch")
+                ToolCall::new("call.silent", ToolFamily::Edit, "workspace.touch")
                     .state(ToolCallState::succeeded_silently())
                     .elapsed("0.1 s"),
             )
             .child(
-                ToolCallCard::new("call.failed", "workspace.write")
+                ToolCall::new("call.failed", ToolFamily::Edit, "workspace.write")
                     .state(ToolCallState::failed("The path is read only."))
                     .elapsed("0.2 s"),
             )
             .child(
-                ToolCallCard::new("call.refused", "shell.run")
+                ToolCall::new("call.refused", ToolFamily::Shell, "shell.run")
                     .state(ToolCallState::refused("This workspace allows no shell.")),
             )
             .into_any_element()
@@ -79,23 +79,26 @@ fn each_of_the_five_states_presents_as_itself(cx: &mut TestAppContext) {
         "nothing is in flight while approval is outstanding"
     );
 
-    // The words beside each card differ too, so the states are not five
-    // identical cards distinguished only by a colour.
-    let mut labels: Vec<String> = states
-        .iter()
-        .map(|(id, _)| {
-            harness
-                .node(&format!("{id}.state"))
-                .expect("published")
-                .text
-                .clone()
-                .expect("a state is named")
-        })
-        .collect();
-    let before = labels.len();
-    labels.sort();
-    labels.dedup();
-    assert_eq!(labels.len(), before, "two states share their wording");
+    assert_eq!(
+        harness
+            .node("call.pending.state")
+            .expect("pending is named")
+            .value
+            .as_deref(),
+        Some("pending-approval")
+    );
+    assert_eq!(
+        harness
+            .node("call.running.state")
+            .expect("running is named")
+            .value
+            .as_deref(),
+        Some("running")
+    );
+    assert!(
+        harness.node("call.succeeded.state").is_none(),
+        "a completed row is quiet; its root still publishes the exact state"
+    );
 }
 
 #[gpui::test]
@@ -121,7 +124,7 @@ fn a_refusal_is_not_an_error_and_not_an_empty_result(cx: &mut TestAppContext) {
         "nothing ran, so there is no duration to claim"
     );
 
-    // The call that did run and returned nothing is a different card in a
+    // The call that did run and returned nothing is a different row in a
     // different state, which is the confusion this component exists to stop.
     let silent = harness.node("call.silent").expect("published");
     assert_eq!(silent.value.as_deref(), Some("succeeded"));
@@ -160,18 +163,14 @@ fn a_failed_call_keeps_its_error_on_screen(cx: &mut TestAppContext) {
 #[gpui::test]
 fn a_duration_nobody_stated_says_so_rather_than_reading_zero(cx: &mut TestAppContext) {
     let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
-        ToolCallCard::new("call.running", "workspace.index")
+        ToolCall::new("call.running", ToolFamily::Read, "workspace.index")
             .state(ToolCallState::Running)
             .into_any_element()
     });
 
-    assert_eq!(
-        harness
-            .node("call.running.elapsed")
-            .expect("published")
-            .value
-            .as_deref(),
-        Some("unknown")
+    assert!(
+        harness.node("call.running.elapsed").is_none(),
+        "an unstated duration renders no zero or invented estimate"
     );
 }
 
@@ -180,16 +179,18 @@ fn a_truncated_body_says_how_much_it_left_out(cx: &mut TestAppContext) {
     let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
         gpui::div()
             .child(
-                ToolCallCard::new("call.cut", "workspace.read")
+                ToolCall::new("call.cut", ToolFamily::Read, "workspace.read")
                     .arguments(ToolBody::new("one\ntwo\nthree\nfour").max_lines(2))
                     .state(ToolCallState::succeeded(
                         ToolBody::new("alpha\nbeta\ngamma").max_lines(1),
-                    )),
+                    ))
+                    .expanded(true),
             )
             .child(
-                ToolCallCard::new("call.whole", "workspace.read")
+                ToolCall::new("call.whole", ToolFamily::Read, "workspace.read")
                     .arguments(ToolBody::new("one\ntwo"))
-                    .state(ToolCallState::succeeded("only this")),
+                    .state(ToolCallState::succeeded("only this"))
+                    .expanded(true),
             )
             .into_any_element()
     });
@@ -233,9 +234,10 @@ fn a_truncated_body_says_how_much_it_left_out(cx: &mut TestAppContext) {
 #[gpui::test]
 fn no_argument_or_result_content_reaches_the_semantic_tree(cx: &mut TestAppContext) {
     let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
-        ToolCallCard::new("call.secret", "workspace.connect")
+        ToolCall::new("call.secret", ToolFamily::Network, "workspace.connect")
             .arguments(format!("{{ \"token\": \"{SECRET}\" }}"))
             .state(ToolCallState::succeeded(format!("connected with {SECRET}")))
+            .expanded(true)
             .into_any_element()
     });
 
@@ -275,17 +277,17 @@ fn only_a_failed_call_installs_the_retry_handler(cx: &mut TestAppContext) {
         let refused = Rc::clone(&sink);
         gpui::div()
             .child(
-                ToolCallCard::new("call.failed", "workspace.write")
+                ToolCall::new("call.failed", ToolFamily::Edit, "workspace.write")
                     .state(ToolCallState::failed("The path is read only."))
                     .on_retry(move |_, _| failed.borrow_mut().push("failed".to_string())),
             )
             .child(
-                ToolCallCard::new("call.succeeded", "workspace.read")
+                ToolCall::new("call.succeeded", ToolFamily::Read, "workspace.read")
                     .state(ToolCallState::succeeded("one line"))
                     .on_retry(move |_, _| succeeded.borrow_mut().push("succeeded".to_string())),
             )
             .child(
-                ToolCallCard::new("call.refused", "shell.run")
+                ToolCall::new("call.refused", ToolFamily::Shell, "shell.run")
                     .state(ToolCallState::refused("No shell here."))
                     .on_retry(move |_, _| refused.borrow_mut().push("refused".to_string())),
             )
@@ -302,6 +304,34 @@ fn only_a_failed_call_installs_the_retry_handler(cx: &mut TestAppContext) {
     );
     harness.click("call.failed.retry");
     assert_eq!(*calls.borrow(), vec!["failed".to_string()]);
+}
+
+#[gpui::test]
+fn a_tool_row_reports_its_family_summary_and_requested_disclosure(cx: &mut TestAppContext) {
+    let calls: Calls = Rc::new(RefCell::new(Vec::new()));
+    let sink = Rc::clone(&calls);
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let sink = Rc::clone(&sink);
+        ToolCall::new("call.search", ToolFamily::Read, "workspace.search")
+            .summary("docs · validation")
+            .arguments("{ \"query\": \"validation\" }")
+            .on_toggle(move |open, _, _| sink.borrow_mut().push(format!("open:{open}")))
+            .into_any_element()
+    });
+
+    let call = harness.node("call.search").expect("published");
+    assert_eq!(call.description.as_deref(), Some("read"));
+    assert_eq!(
+        call.text.as_deref(),
+        Some("workspace.search docs · validation")
+    );
+    let toggle = harness.node("call.search.toggle").expect("published");
+    assert_eq!(toggle.role, Role::Button);
+    assert_eq!(toggle.expanded, Some(false));
+    assert!(harness.node("call.search.arguments").is_none());
+
+    harness.click("call.search.toggle");
+    assert_eq!(*calls.borrow(), vec!["open:true".to_string()]);
 }
 
 // ------------------------------------------------------------------ step list
@@ -408,9 +438,13 @@ fn a_step_carries_the_tool_call_it_is_made_of(cx: &mut TestAppContext) {
                 Step::new("search", "Search the workspace")
                     .state(StepState::Running)
                     .body(
-                        ToolCallCard::new("run.steps.search.call", "workspace.search")
-                            .arguments("{ \"query\": \"budget\" }")
-                            .state(ToolCallState::Running),
+                        ToolCall::new(
+                            "run.steps.search.call",
+                            ToolFamily::Read,
+                            "workspace.search",
+                        )
+                        .arguments("{ \"query\": \"budget\" }")
+                        .state(ToolCallState::Running),
                     ),
             )
             .into_any_element()

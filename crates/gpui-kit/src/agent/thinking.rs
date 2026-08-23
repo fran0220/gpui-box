@@ -30,8 +30,11 @@ use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Space, TextTone, TypeScale};
 
+use crate::display::badge::Tone;
 use crate::display::icon::{Icon as IconView, IconTone};
-use crate::foundation::{CardVariant, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
+use crate::display::status::StatusDot;
+use crate::foundation::{FocusRing, Ident, Pressable, Sizable, StyledExt, text};
+use crate::motion;
 use crate::strings::{ActiveStrings, StringKey};
 
 type ToggleHandler = Rc<dyn Fn(bool, &mut Window, &mut App)>;
@@ -157,7 +160,7 @@ impl ThinkingBlock {
         self
     }
 
-    /// A host-formatted duration shown while the block is thinking.
+    /// A host-formatted duration shown as “Thought for …” when known.
     pub fn elapsed(mut self, elapsed: impl Into<SharedString>) -> Self {
         self.elapsed = Some(elapsed.into());
         self
@@ -184,75 +187,72 @@ impl RenderOnce for ThinkingBlock {
         let ident = self.ident.clone();
         let open = self.open();
         let actionable = self.actionable();
-        let label = cx.strings().text(StringKey::AgentReasoning);
-
-        let (mark, tone) = match self.reasoning {
-            // Still arriving outranks the settled word, because the breathing
-            // glyph that also reports it is not there for a reader who has
-            // animation turned off, and two states that look identical are
-            // one state as far as that reader is concerned.
-            Reasoning::Present(_) if self.thinking => {
-                (StringKey::AgentReasoningThinking, IconTone::Accent)
-            }
-            Reasoning::Present(_) => (StringKey::AgentReasoning, IconTone::Muted),
-            Reasoning::Withheld(_) => (StringKey::AgentReasoningWithheld, IconTone::Warning),
-            Reasoning::Absent => (StringKey::AgentReasoningAbsent, IconTone::Faint),
+        let label = match self.reasoning {
+            Reasoning::Present(_) if self.thinking => cx.strings().text(StringKey::AgentThinking),
+            Reasoning::Present(_) => match &self.elapsed {
+                Some(elapsed) => cx
+                    .strings()
+                    .format(StringKey::AgentThoughtFor, &[elapsed.as_ref()]),
+                None => cx.strings().text(StringKey::AgentThought),
+            },
+            Reasoning::Withheld(_) => cx.strings().text(StringKey::AgentReasoningWithheld),
+            Reasoning::Absent => cx.strings().text(StringKey::AgentReasoningAbsent),
         };
-        let mark = cx.strings().text(mark);
+        let mut dot = match self.reasoning {
+            Reasoning::Present(_) if self.thinking => StatusDot::new(Tone::Accent),
+            Reasoning::Present(_) | Reasoning::Absent => StatusDot::new(Tone::Neutral),
+            Reasoning::Withheld(_) => StatusDot::new(Tone::Warning),
+        };
+        if self.thinking {
+            dot = dot
+                .busy(ident.child("mark"))
+                .activity(motion::Activity::Deliberating);
+        }
 
         let mut header = div()
             .id(ident.element_id())
             .row()
             .w_full()
+            .min_w_0()
+            .items_center()
             .gap_token(&theme, Space::Sm)
-            .px_token(&theme, Space::Sm)
-            .py(px(theme.space(Space::Xs)))
-            .child({
-                let mark = IconView::new(Glyph::Chat).small().tone(tone);
-                // Deliberation breathes rather than turns: a turn claims work
-                // is being got through, and this one has nothing to report
-                // beyond that it is still going.
-                if self.thinking {
-                    mark.breathing(ident.child("mark"))
-                } else {
-                    mark
-                }
+            .py(px(2.0))
+            .child(dot)
+            .child(
+                text(&theme, TypeScale::Caption, label.clone())
+                    .flex_none()
+                    .text_tone(&theme, TextTone::Muted),
+            )
+            .children(match &self.reasoning {
+                Reasoning::Withheld(reason) => Some(
+                    text(&theme, TypeScale::Caption, reason.clone())
+                        .min_w_0()
+                        .truncate()
+                        .text_color(theme.colors.warning)
+                        .semantic_in(
+                            cx,
+                            NodeSpec::new(ident.child("withheld").semantic_id(), Role::Status)
+                                .parent(ident.semantic_id())
+                                .text(reason.clone())
+                                .value("withheld"),
+                        ),
+                ),
+                _ => None,
             })
-            .child(
-                text(&theme, TypeScale::Label, label.clone())
-                    .flex_1()
-                    .min_w_0()
-                    .text_tone(&theme, gpui_kit_theme::TextTone::Muted),
-            )
-            // Which of the three states holds is on screen without opening
-            // anything, because two of them can never be opened.
-            .child(
-                text(&theme, TypeScale::Caption, mark)
-                    .flex_none()
-                    .text_color(match self.reasoning {
-                        Reasoning::Withheld(_) => theme.colors.warning,
-                        _ if self.thinking => theme.colors.accent,
-                        _ => theme.colors.text_faint,
-                    }),
-            )
-            .children(self.elapsed.clone().map(|elapsed| {
-                text(&theme, TypeScale::Caption, elapsed.clone())
-                    .flex_none()
-                    .text_color(theme.colors.text_faint)
-                    .semantic_in(
-                        cx,
-                        NodeSpec::new(ident.child("elapsed").semantic_id(), Role::Status)
-                            .parent(ident.semantic_id())
-                            .text(elapsed)
-                            .value("elapsed"),
-                    )
+            .children(actionable.then(|| {
+                IconView::new(if open {
+                    Glyph::AltArrowDown
+                } else {
+                    Glyph::AltArrowRight
+                })
+                .small()
+                .tone(IconTone::Faint)
             }))
             .when(actionable, |element| {
                 element
                     .cursor_pointer()
                     .tab_index(0)
                     .pressable(cx)
-                    .hover(|style| style.bg(theme.colors.hover))
                     .focus_ring(&theme)
             });
 
@@ -282,23 +282,22 @@ impl RenderOnce for ThinkingBlock {
             .expanded(open),
         );
 
-        // A withheld or absent block has no body to open, so it says which of
-        // the two it is where a body would be. Neither is drawn as the other,
-        // and neither is drawn as a shut disclosure.
+        // Present reasoning stays caller-owned and out of semantic snapshots.
+        // Withheld and absent are already reported inline, so neither gets a
+        // second, heavier block underneath the row.
         let body = match &self.reasoning {
-            // A closed section renders no body at all, the rule `Accordion`
-            // keeps: nothing invisible stays addressable.
             Reasoning::Present(text) if open => Some(
                 div()
                     .w_full()
-                    .px_token(&theme, Space::Sm)
-                    .pb(px(theme.space(Space::Xs)))
+                    .pl(px(theme.space(Space::Lg)))
+                    .py(px(2.0))
                     .children(text.lines().map(|line| {
                         crate::foundation::text(
                             &theme,
-                            TypeScale::Body,
+                            TypeScale::Caption,
                             SharedString::from(line.to_string()),
                         )
+                        .italic()
                         .text_tone(&theme, TextTone::Muted)
                     }))
                     .semantic_in(
@@ -309,33 +308,13 @@ impl RenderOnce for ThinkingBlock {
                     ),
             ),
             Reasoning::Present(_) => None,
-            Reasoning::Withheld(reason) => Some(
-                text(&theme, TypeScale::Body, reason.clone())
-                    .w_full()
-                    .px_token(&theme, Space::Sm)
-                    .pb(px(theme.space(Space::Xs)))
-                    .text_color(theme.colors.warning)
-                    .semantic_in(
-                        cx,
-                        NodeSpec::new(ident.child("withheld").semantic_id(), Role::Status)
-                            .parent(ident.semantic_id())
-                            .text(reason.clone())
-                            .value("withheld"),
-                    ),
-            ),
-            Reasoning::Absent => None,
+            Reasoning::Withheld(_) | Reasoning::Absent => None,
         };
 
         div()
             .w_full()
             .column()
-            .card_surface(&theme, CardVariant::Elevated)
-            .overflow_hidden()
-            .when(self.thinking, |element| {
-                element
-                    .border(px(theme.borders.hairline))
-                    .border_color(theme.colors.accent)
-            })
+            .gap(px(2.0))
             .child(header)
             .children(body)
     }

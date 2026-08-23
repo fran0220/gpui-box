@@ -4591,19 +4591,22 @@
       ]
     },
     {
-      "name": "ToolCallCard",
+      "name": "ToolCall",
       "kind": "builder",
-      "path": "gpui_kit::agent::ToolCallCard",
+      "path": "gpui_kit::agent::ToolCall",
       "source": "crates/gpui-kit/src/agent/tool_call.rs",
-      "summary": "One tool invocation, in whichever of its five states holds.",
+      "summary": "One quiet evidence row for a tool invocation.",
       "construct": [
-        "new(ident: impl Into<Ident>, tool: impl Into<SharedString>) -> Self"
+        "new(ident: impl Into<Ident>, family: ToolFamily, tool: impl Into<SharedString>) -> Self"
       ],
       "options": [
+        "summary(summary: impl Into<SharedString>) -> Self",
         "arguments(arguments: impl Into<ToolBody>) -> Self",
         "state(state: ToolCallState) -> Self",
         "elapsed(elapsed: impl Into<Elapsed>) -> Self",
         "diff(diff: impl IntoElement) -> Self",
+        "expanded(expanded: bool) -> Self",
+        "on_toggle(handler: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self",
         "on_retry(handler: impl Fn(&mut Window, &mut App) + 'static) -> Self"
       ],
       "commands": [],
@@ -5135,7 +5138,8 @@
       ],
       "construct": [],
       "options": [
-        "as_str() -> &'static str"
+        "as_str() -> &'static str",
+        "is_evidence() -> bool"
       ],
       "commands": [],
       "queries": []
@@ -8606,6 +8610,7 @@
         "Json",
         "Shell",
         "Toml",
+        "Yaml",
         "Markdown"
       ],
       "construct": [
@@ -11918,7 +11923,8 @@
         "new(text: impl Into<SharedString>) -> Self"
       ],
       "options": [
-        "max_lines(lines: usize) -> Self"
+        "max_lines(lines: usize) -> Self",
+        "all_lines() -> Self"
       ],
       "commands": [],
       "queries": [
@@ -11926,6 +11932,7 @@
         "line_count() -> usize",
         "shown_line_count() -> usize",
         "is_truncated() -> bool",
+        "remaining_line_count() -> usize",
         "shape(cx: &App) -> SharedString"
       ]
     },
@@ -11952,6 +11959,24 @@
         "as_str() -> &'static str",
         "reason() -> Option<&SharedString>"
       ]
+    },
+    {
+      "name": "ToolFamily",
+      "path": "gpui_kit::agent::ToolFamily",
+      "summary": "The family of work one tool performs.",
+      "variants": [
+        "Read",
+        "Network",
+        "Shell",
+        "Edit",
+        "External"
+      ],
+      "construct": [],
+      "options": [
+        "as_str() -> &'static str"
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "ToolOutput",
@@ -13377,7 +13402,7 @@
       "uses": [
         "AgentDocument"
       ],
-      "example": "fn agent_document(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(680.0))\n        .child(\n            AgentDocument::new(\"scene.agent-document\")\n                .block(\n                    AgentDocumentBlock::markdown(\n                        \"summary\",\n                        \"## Review complete\\n\\nThe run kept its **verified result** while the refresh failed.\",\n                    )\n                    .revision(3),\n                )\n                .block(\n                    AgentDocumentBlock::code(\"patch\", |_, _| {\n                        CodeView::from_text(\n                            \"scene.agent-document.patch\",\n                            \"pub fn bounded_retry(attempt: usize) -> bool {\\n    attempt < 3\\n}\",\n                        )\n                        .language(\"rust\")\n                        .into_any_element()\n                    })\n                    .label(\"Proposed code\")\n                    .revision(2),\n                )\n                .block(\n                    AgentDocumentBlock::tool_call(\"verification\", |_, _| {\n                        ToolCallCard::new(\"scene.agent-document.tool\", \"cargo test\")\n                            .state(ToolCallState::Succeeded {\n                                output: ToolOutput::Silent,\n                            })\n                            .elapsed(\"1.4 s\")\n                            .into_any_element()\n                    })\n                    .revision(1),\n                )\n                .block(AgentDocumentBlock::notice(\n                    \"refresh\",\n                    \"The last refresh failed; the result above is the last verified value.\",\n                    Tone::Warning,\n                )),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.agent-document.long\")\n                .label(\"The same document, virtualized\"),\n        )\n        .child(caption(\n            &theme,\n            \"a conversation that has been running all day: only the blocks on \\\n             screen are built and laid out, and the ones above are still there. \\\n             A long answer is drawn as a row per block of its own, so a token \\\n             arriving in its last paragraph relays out that paragraph\",\n        ))\n        .child(\n            AgentDocument::new(\"scene.agent-thread\")\n                .virtualized(5)\n                .block(\n                    AgentDocumentBlock::markdown(\n                        \"answer\",\n                        \"**The answer.** It kept the verified result, and the run \\\n                         below says why.\\n\\n\\\n                         - the refresh failed\\n- the last verified value stands\\n\\n\\\n                         Nothing after that point was rewritten.\",\n                    )\n                    .revision(1),\n                )\n                .blocks((0..120).map(|turn| {\n                    AgentDocumentBlock::markdown(\n                        format!(\"turn-{turn:03}\"),\n                        format!(\n                            \"**Turn {turn}.** The run kept its verified result while the \\\n                             refresh failed, and the answer below says why.\"\n                        ),\n                    )\n                    .revision(turn as u64)\n                })),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.agent-document.rule\")\n                .label(\"Document states\"),\n        )\n        .child(\n            div()\n                .row_reading(cx.layout_direction())\n                .gap_token(&theme, Space::Lg)\n                .child(\n                    div().flex_1().child(\n                        AgentDocument::new(\"scene.agent-document.empty\")\n                            .state(AgentDocumentState::Empty(\"No results were returned.\".into())),\n                    ),\n                )\n                .child(\n                    div().flex_1().child(\n                        AgentDocument::new(\"scene.agent-document.unavailable\").state(\n                            AgentDocumentState::Unavailable(\n                                \"The host refused to provide this document.\".into(),\n                            ),\n                        ),\n                    ),\n                ),\n        )\n        .into_any_element()\n}"
+      "example": "fn agent_document(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(680.0))\n        .child(\n            AgentDocument::new(\"scene.agent-document\")\n                .block(\n                    AgentDocumentBlock::markdown(\n                        \"summary\",\n                        \"## Review complete\\n\\nThe run kept its **verified result** while the refresh failed.\",\n                    )\n                    .revision(3),\n                )\n                .block(\n                    AgentDocumentBlock::code(\"patch\", |_, _| {\n                        CodeView::from_text(\n                            \"scene.agent-document.patch\",\n                            \"pub fn bounded_retry(attempt: usize) -> bool {\\n    attempt < 3\\n}\",\n                        )\n                        .language(\"rust\")\n                        .into_any_element()\n                    })\n                    .label(\"Proposed code\")\n                    .revision(2),\n                )\n                .block(\n                    AgentDocumentBlock::tool_call(\"verification\", |_, _| {\n                        ToolCall::new(\n                            \"scene.agent-document.tool\",\n                            ToolFamily::Shell,\n                            \"cargo test\",\n                        )\n                            .summary(\"-p gpui-box-kit\")\n                            .state(ToolCallState::Succeeded {\n                                output: ToolOutput::Silent,\n                            })\n                            .elapsed(\"1.4 s\")\n                            .into_any_element()\n                    })\n                    .revision(1),\n                )\n                .block(AgentDocumentBlock::notice(\n                    \"refresh\",\n                    \"The last refresh failed; the result above is the last verified value.\",\n                    Tone::Warning,\n                )),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.agent-document.long\")\n                .label(\"The same document, virtualized\"),\n        )\n        .child(caption(\n            &theme,\n            \"a conversation that has been running all day: only the blocks on \\\n             screen are built and laid out, and the ones above are still there. \\\n             A long answer is drawn as a row per block of its own, so a token \\\n             arriving in its last paragraph relays out that paragraph\",\n        ))\n        .child(\n            AgentDocument::new(\"scene.agent-thread\")\n                .virtualized(5)\n                .block(\n                    AgentDocumentBlock::markdown(\n                        \"answer\",\n                        \"**The answer.** It kept the verified result, and the run \\\n                         below says why.\\n\\n\\\n                         - the refresh failed\\n- the last verified value stands\\n\\n\\\n                         Nothing after that point was rewritten.\",\n                    )\n                    .revision(1),\n                )\n                .blocks((0..120).map(|turn| {\n                    AgentDocumentBlock::markdown(\n                        format!(\"turn-{turn:03}\"),\n                        format!(\n                            \"**Turn {turn}.** The run kept its verified result while the \\\n                             refresh failed, and the answer below says why.\"\n                        ),\n                    )\n                    .revision(turn as u64)\n                })),\n        )\n        .child(\n            Divider::new()\n                .id(\"scene.agent-document.rule\")\n                .label(\"Document states\"),\n        )\n        .child(\n            div()\n                .row_reading(cx.layout_direction())\n                .gap_token(&theme, Space::Lg)\n                .child(\n                    div().flex_1().child(\n                        AgentDocument::new(\"scene.agent-document.empty\")\n                            .state(AgentDocumentState::Empty(\"No results were returned.\".into())),\n                    ),\n                )\n                .child(\n                    div().flex_1().child(\n                        AgentDocument::new(\"scene.agent-document.unavailable\").state(\n                            AgentDocumentState::Unavailable(\n                                \"The host refused to provide this document.\".into(),\n                            ),\n                        ),\n                    ),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "agent-roster",
@@ -13656,12 +13681,12 @@
       "capture": "cargo run -p xtask -- headless capture tool-call",
       "kind": "exhibit",
       "subjects": [
-        "ToolCallCard"
+        "ToolCall"
       ],
       "uses": [
-        "ToolCallCard"
+        "ToolCall"
       ],
-      "example": "fn tool_call(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    div()\n        .flex()\n        .gap(px(theme.spacing.lg))\n        .child(\n            stack(&theme).w(px(460.0)).child(\n            ToolCallCard::new(\"scene.tool.pending\", \"workspace.search\")\n                .arguments(scene_arguments())\n                .state(ToolCallState::PendingApproval),\n        )\n        .child(\n            ToolCallCard::new(\"scene.tool.running\", \"workspace.index\")\n                .arguments(\"{ \\\"root\\\": \\\"crates\\\" }\")\n                .state(ToolCallState::Running)\n                .elapsed(\"4.2 s\"),\n        )\n        .child(\n            ToolCallCard::new(\"scene.tool.succeeded\", \"workspace.read\")\n                .arguments(\"{ \\\"path\\\": \\\"README.md\\\" }\")\n                .state(ToolCallState::succeeded(\n                    ToolBody::new(\n                        \"# GPUI Box\\n\\nProduct-neutral components.\\n\\nEvery word is replaceable.\",\n                    )\n                    .max_lines(2),\n                ))\n                .elapsed(\"0.3 s\"),\n        )\n        .child(\n            ToolCallCard::new(\"scene.tool.silent\", \"workspace.touch\")\n                .arguments(\"{ \\\"path\\\": \\\"notes.md\\\" }\")\n                .state(ToolCallState::succeeded_silently())\n                .elapsed(\"0.1 s\"),\n        ),\n        )\n        .child(\n            stack(&theme)\n                .w(px(460.0))\n                .child(\n                    ToolCallCard::new(\"scene.tool.failed\", \"workspace.write\")\n                        .arguments(\"{ \\\"path\\\": \\\"/read-only/notes.md\\\" }\")\n                        .state(ToolCallState::failed(\n                            \"The file system reported that the path is read only.\",\n                        ))\n                        .elapsed(\"0.2 s\")\n                        .on_retry(|_, _| {}),\n                )\n                // A refusal reads as a decision: it is not the failure above\n                // it, and not the silent success in the other column.\n                .child(\n                    ToolCallCard::new(\"scene.tool.refused\", \"shell.run\")\n                        .arguments(\"{ \\\"command\\\": \\\"rm -rf build\\\" }\")\n                        .state(ToolCallState::refused(\n                            \"This workspace does not allow shell commands.\",\n                        )),\n                ),\n        )\n        .into_any_element()\n}"
+      "example": "fn tool_call(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    div()\n        .flex()\n        .gap(px(theme.spacing.lg))\n        .child(\n            stack(&theme).w(px(460.0)).child(\n            ToolCall::new(\"scene.tool.pending\", ToolFamily::External, \"mcp.dispatch\")\n                .summary(\"designer review\")\n                .arguments(\"{ \\\"target\\\": \\\"designer-review\\\" }\")\n                .state(ToolCallState::PendingApproval),\n        )\n        .child(\n            ToolCall::new(\"scene.tool.running\", ToolFamily::Network, \"web.fetch\")\n                .summary(\"ampcode.com/manual\")\n                .arguments(\"{ \\\"url\\\": \\\"https://ampcode.com/manual\\\" }\")\n                .state(ToolCallState::Running)\n                .elapsed(\"4.2 s\"),\n        )\n        .child(\n            ToolCall::new(\"scene.tool.succeeded\", ToolFamily::Read, \"workspace.read\")\n                .summary(\"README.md\")\n                .arguments(\"{ \\\"path\\\": \\\"README.md\\\" }\")\n                .state(ToolCallState::succeeded(\n                    ToolBody::new(\n                        \"# GPUI Box\\n\\nProduct-neutral components.\\n\\nEvery word is replaceable.\",\n                    )\n                    .max_lines(2),\n                ))\n                .expanded(true)\n                .on_toggle(|_, _, _| {})\n                .elapsed(\"0.3 s\"),\n        )\n        .child(\n            ToolCall::new(\"scene.tool.silent\", ToolFamily::Edit, \"workspace.touch\")\n                .summary(\"notes.md\")\n                .arguments(\"{ \\\"path\\\": \\\"notes.md\\\" }\")\n                .state(ToolCallState::succeeded_silently())\n                .elapsed(\"0.1 s\"),\n        ),\n        )\n        .child(\n            stack(&theme)\n                .w(px(460.0))\n                .child(\n                    ToolCall::new(\"scene.tool.failed\", ToolFamily::Edit, \"workspace.write\")\n                        .summary(\"notes.md\")\n                        .arguments(\"{ \\\"path\\\": \\\"/read-only/notes.md\\\" }\")\n                        .state(ToolCallState::failed(\"Read only.\"))\n                        .elapsed(\"0.2 s\")\n                        .on_retry(|_, _| {}),\n                )\n                // A refusal reads as a decision: it is not the failure above\n                // it, and not the silent success in the other column.\n                .child(\n                    ToolCall::new(\"scene.tool.refused\", ToolFamily::Shell, \"shell.run\")\n                        .summary(\"rm -rf build\")\n                        .arguments(\"{ \\\"command\\\": \\\"rm -rf build\\\" }\")\n                        .state(ToolCallState::refused(\"Shell commands are not allowed.\")),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "step-list",
@@ -13673,7 +13698,7 @@
       "uses": [
         "StepList"
       ],
-      "example": "fn step_list(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(caption(&theme, \"A run somebody counted\"))\n        .child(\n            StepList::new(\"scene.steps.counted\")\n                .step(Step::new(\"read\", \"Read the brief\").state(StepState::Done))\n                .step(\n                    Step::new(\"search\", \"Search the workspace\")\n                        .state(StepState::Running)\n                        .body(\n                            ToolCallCard::new(\"scene.steps.search.call\", \"workspace.search\")\n                                .arguments(scene_arguments())\n                                .state(ToolCallState::Running)\n                                .elapsed(\"1.1 s\"),\n                        ),\n                )\n                .step(Step::new(\"summarise\", \"Summarise what was found\"))\n                .step(\n                    Step::new(\"publish\", \"Publish the summary\").state(StepState::Skipped(\n                        \"Publishing is turned off for this workspace.\".into(),\n                    )),\n                )\n                .step(\n                    // A failure, not a refusal: the skipped step above is what\n                    // a refusal looks like, and the two must not be worded\n                    // into each other.\n                    Step::new(\"notify\", \"Notify the reviewers\").state(StepState::Failed(\n                        \"The notification service did not respond.\".into(),\n                    )),\n                ),\n        )\n        .child(caption(&theme, \"A run still being decided\"))\n        .child(\n            StepList::new(\"scene.steps.open\")\n                .length(RunLength::Unknown)\n                .step(Step::new(\"read\", \"Read the brief\").state(StepState::Done))\n                .step(Step::new(\"plan\", \"Decide what to do next\").state(StepState::Running)),\n        )\n        .into_any_element()\n}"
+      "example": "fn step_list(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(caption(&theme, \"A run somebody counted\"))\n        .child(\n            StepList::new(\"scene.steps.counted\")\n                .step(Step::new(\"read\", \"Read the brief\").state(StepState::Done))\n                .step(\n                    Step::new(\"search\", \"Search the workspace\")\n                        .state(StepState::Running)\n                        .body(\n                            ToolCall::new(\n                                \"scene.steps.search.call\",\n                                ToolFamily::Read,\n                                \"workspace.search\",\n                            )\n                            .summary(\"unknown · docs/coverage.md\")\n                            .arguments(scene_arguments())\n                            .state(ToolCallState::Running)\n                            .elapsed(\"1.1 s\"),\n                        ),\n                )\n                .step(Step::new(\"summarise\", \"Summarise what was found\"))\n                .step(\n                    Step::new(\"publish\", \"Publish the summary\").state(StepState::Skipped(\n                        \"Publishing is turned off for this workspace.\".into(),\n                    )),\n                )\n                .step(\n                    // A failure, not a refusal: the skipped step above is what\n                    // a refusal looks like, and the two must not be worded\n                    // into each other.\n                    Step::new(\"notify\", \"Notify the reviewers\").state(StepState::Failed(\n                        \"The notification service did not respond.\".into(),\n                    )),\n                ),\n        )\n        .child(caption(&theme, \"A run still being decided\"))\n        .child(\n            StepList::new(\"scene.steps.open\")\n                .length(RunLength::Unknown)\n                .step(Step::new(\"read\", \"Read the brief\").state(StepState::Done))\n                .step(Step::new(\"plan\", \"Decide what to do next\").state(StepState::Running)),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "node-graph",
@@ -13727,7 +13752,7 @@
       "uses": [
         "ThinkingBlock"
       ],
-      "example": "fn thinking(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(ThinkingBlock::new(\n            \"scene.thinking.collapsed\",\n            Reasoning::present(\"The brief asks for two files, so read both before answering.\"),\n        ))\n        // Reasoning that has finished and reasoning still arriving are the\n        // same words in the same place, so the difference has to be shown.\n        .child(\n            ThinkingBlock::new(\n                \"scene.thinking.working\",\n                Reasoning::present(\"Reading the second file before answering.\"),\n            )\n            .thinking(true)\n            .elapsed(\"12s\"),\n        )\n        .child(\n            ThinkingBlock::new(\n                \"scene.thinking.open\",\n                Reasoning::present(\n                    \"The brief asks for two files.\\nRead both before answering.\\nThen summarise.\",\n                ),\n            )\n            .expanded(true)\n            .on_toggle(|_, _, _| {}),\n        )\n        // Withheld and absent are two different facts, and neither is the\n        // collapsed block above.\n        .child(ThinkingBlock::new(\n            \"scene.thinking.withheld\",\n            Reasoning::withheld(\"This connection does not hand over reasoning.\"),\n        ))\n        .child(ThinkingBlock::new(\n            \"scene.thinking.absent\",\n            Reasoning::Absent,\n        ))\n        .into_any_element()\n}"
+      "example": "fn thinking(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(640.0))\n        .child(\n            ThinkingBlock::new(\n                \"scene.thinking.collapsed\",\n                Reasoning::present(\"The brief asks for two files, so read both before answering.\"),\n            )\n            .elapsed(\"2.1 s\"),\n        )\n        // Reasoning that has finished and reasoning still arriving are the\n        // same words in the same place, so the difference has to be shown.\n        .child(\n            ThinkingBlock::new(\n                \"scene.thinking.working\",\n                Reasoning::present(\"Reading the second file before answering.\"),\n            )\n            .thinking(true),\n        )\n        .child(\n            ThinkingBlock::new(\n                \"scene.thinking.open\",\n                Reasoning::present(\n                    \"The brief asks for two files.\\nRead both before answering.\\nThen summarise.\",\n                ),\n            )\n            .expanded(true)\n            .elapsed(\"8.4 s\")\n            .on_toggle(|_, _, _| {}),\n        )\n        // Withheld and absent are two different facts, and neither is the\n        // collapsed block above.\n        .child(ThinkingBlock::new(\n            \"scene.thinking.withheld\",\n            Reasoning::withheld(\"This connection does not hand over reasoning.\"),\n        ))\n        .child(ThinkingBlock::new(\n            \"scene.thinking.absent\",\n            Reasoning::Absent,\n        ))\n        .into_any_element()\n}"
     },
     {
       "name": "json-view",
@@ -13952,7 +13977,7 @@
       "uses": [
         "FailurePanel"
       ],
-      "example": "fn failure_panel(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    // A failure, not a refusal. Retrying a refusal would only be refused\n    // again, so the retry here is offered against something that can succeed\n    // on a second attempt; refusals are shown by ToolCallCard instead.\n    let failed: Result<(), &str> = Err(\"The runs service did not respond.\");\n    stack(&theme)\n        .w(px(560.0))\n        .child(caption(\n            &theme,\n            \"the host's own words, kept on screen; the retry belongs to the host\",\n        ))\n        .children(\n            FailurePanel::from_result(\"scene.failure.query\", &failed).map(|panel| {\n                panel\n                    .title(\"Runs\")\n                    .detail(\"The connection timed out after 30 seconds.\")\n                    .attempts(3)\n                    .on_retry(|_, _| {})\n            }),\n        )\n        .into_any_element()\n}"
+      "example": "fn failure_panel(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    // A failure, not a refusal. Retrying a refusal would only be refused\n    // again, so the retry here is offered against something that can succeed\n    // on a second attempt; refusals are shown by ToolCall instead.\n    let failed: Result<(), &str> = Err(\"The runs service did not respond.\");\n    stack(&theme)\n        .w(px(560.0))\n        .child(caption(\n            &theme,\n            \"the host's own words, kept on screen; the retry belongs to the host\",\n        ))\n        .children(\n            FailurePanel::from_result(\"scene.failure.query\", &failed).map(|panel| {\n                panel\n                    .title(\"Runs\")\n                    .detail(\"The connection timed out after 30 seconds.\")\n                    .attempts(3)\n                    .on_retry(|_, _| {})\n            }),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "log-stream",

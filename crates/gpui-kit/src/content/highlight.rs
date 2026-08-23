@@ -38,6 +38,7 @@ pub enum Language {
     Json,
     Shell,
     Toml,
+    Yaml,
     Markdown,
 }
 
@@ -58,6 +59,7 @@ impl Language {
             "json" | "jsonc" => Some(Self::Json),
             "bash" | "sh" | "shell" | "zsh" | "console" => Some(Self::Shell),
             "toml" => Some(Self::Toml),
+            "yaml" | "yml" => Some(Self::Yaml),
             "md" | "markdown" => Some(Self::Markdown),
             _ => None,
         }
@@ -578,6 +580,24 @@ fn grammar(language: Language) -> &'static Grammar {
             ],
             keywords: &["true", "false"],
         },
+        Language::Yaml => &Grammar {
+            line_comments: &["#"],
+            comment_needs_boundary: true,
+            block_comment: None,
+            texts: &[
+                DOUBLE,
+                Text {
+                    open: "'",
+                    close: "'",
+                    multiline: false,
+                    escapes: false,
+                },
+            ],
+            keywords: &[
+                "false", "False", "FALSE", "true", "True", "TRUE", "null", "Null", "NULL", "yes",
+                "Yes", "YES", "no", "No", "NO", "on", "On", "ON", "off", "Off", "OFF",
+            ],
+        },
         Language::Markdown => &Grammar {
             line_comments: &[],
             comment_needs_boundary: false,
@@ -610,10 +630,43 @@ mod tests {
         assert_eq!(Language::named("rs"), Some(Language::Rust));
         assert_eq!(Language::named("TypeScript"), Some(Language::TypeScript));
         assert_eq!(Language::named(" python "), Some(Language::Python));
+        assert_eq!(Language::named("yml"), Some(Language::Yaml));
         assert_eq!(
             Language::named("brainfuck"),
             None,
             "a language with no table is left plain rather than guessed at"
+        );
+    }
+
+    #[test]
+    fn every_default_language_requested_by_markdown_has_a_table() {
+        for tag in [
+            "json",
+            "rust",
+            "rs",
+            "typescript",
+            "ts",
+            "shell",
+            "bash",
+            "toml",
+            "yaml",
+            "yml",
+        ] {
+            assert!(
+                Language::named(tag).is_some(),
+                "missing built-in table for {tag}"
+            );
+        }
+    }
+
+    #[test]
+    fn yaml_scalars_and_comments_use_the_shared_palette_roles() {
+        let read = read(Language::Yaml, "enabled: true # host policy");
+        assert!(read.contains(&("true".into(), SyntaxColor::Keyword)));
+        assert!(
+            read.iter().any(|(text, role)| {
+                *role == SyntaxColor::Comment && text.contains("host policy")
+            })
         );
     }
 

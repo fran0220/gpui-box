@@ -129,7 +129,9 @@ pub mod prelude {
     };
     pub use crate::agent::step_list::{RunLength, Step, StepList, StepState};
     pub use crate::agent::thinking::{Reasoning, ThinkingBlock};
-    pub use crate::agent::tool_call::{Elapsed, ToolBody, ToolCallCard, ToolCallState, ToolOutput};
+    pub use crate::agent::tool_call::{
+        Elapsed, ToolBody, ToolCall, ToolCallState, ToolFamily, ToolOutput,
+    };
     pub use crate::canvas::{
         CanvasToolbar, CanvasToolbarAction, CanvasToolbarEvent, Diff, EdgeKind, GraphEdge,
         GraphEndpoint, GraphInteraction, GraphNode, GraphPort, GraphState, GraphViewport, Minimap,

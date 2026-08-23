@@ -343,7 +343,7 @@ pub(super) fn failure_panel(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     // A failure, not a refusal. Retrying a refusal would only be refused
     // again, so the retry here is offered against something that can succeed
-    // on a second attempt; refusals are shown by ToolCallCard instead.
+    // on a second attempt; refusals are shown by ToolCall instead.
     let failed: Result<(), &str> = Err("The runs service did not respond.");
     stack(&theme)
         .w(px(560.0))

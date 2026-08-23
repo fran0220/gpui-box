@@ -11,8 +11,8 @@
 //! [`line_report`].
 
 use crate::{
-    Color, InteractiveColor, SemanticColor, Surface, SyntaxColor, TextTone, TokenDocument,
-    contrast_ratio,
+    AgentColor, Color, InteractiveColor, SemanticColor, Surface, SyntaxColor, TextTone,
+    TokenDocument, contrast_ratio,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -98,6 +98,29 @@ pub fn report(tokens: &TokenDocument) -> Vec<ContrastCheck> {
                 NON_TEXT_MINIMUM,
             ));
         }
+        for family in [
+            AgentColor::Read,
+            AgentColor::Network,
+            AgentColor::Shell,
+            AgentColor::Edit,
+            AgentColor::External,
+        ] {
+            checks.push(check(
+                family.path(),
+                tokens.agent(family),
+                surface_name,
+                background,
+                TEXT_MINIMUM,
+            ));
+        }
+        let evidence_wash = crate::over(tokens.agent(AgentColor::EvidenceWash), background);
+        checks.push(check(
+            "color.text.muted",
+            tokens.text(TextTone::Muted),
+            &format!("{surface_name} + {}", AgentColor::EvidenceWash.path()),
+            evidence_wash,
+            TEXT_MINIMUM,
+        ));
         // Only the lines that carry a *control's* boundary are held here:
         // the rail a slider runs in, the edge of a switch, the gutter a
         // scrollbar thumb sits in. Those are part of an interactive
@@ -460,6 +483,14 @@ pub fn line_report(tokens: &TokenDocument) -> Vec<LineCheck> {
                 minimum: LINE_MINIMUM,
             });
         }
+        let evidence_wash = AgentColor::EvidenceWash;
+        let drawn = crate::over(tokens.agent(evidence_wash), background);
+        checks.push(LineCheck {
+            line: evidence_wash.path().into(),
+            surface: surface_name.into(),
+            distance: (drawn.lightness() - background.lightness()).abs(),
+            minimum: LINE_MINIMUM,
+        });
     }
     checks
 }
@@ -600,10 +631,41 @@ mod tests {
     #[test]
     fn the_report_covers_every_surface_and_tone() {
         let checks = report(crate::studio_dark());
-        // Nineteen tones against each of six surfaces, ten code checks against
-        // each of the two surfaces code is drawn on, the sixteen ANSI slots
-        // against the terminal background, and `onAccent` against `accent`.
-        assert_eq!(checks.len(), 6 * 19 + 2 * 10 + 16 + 1);
+        // Twenty-five tones against each of six surfaces, ten code checks
+        // against each of the two surfaces code is drawn on, the sixteen ANSI
+        // slots against the terminal background, and `onAccent` against
+        // `accent`.
+        assert_eq!(checks.len(), 6 * 25 + 2 * 10 + 16 + 1);
+    }
+
+    #[test]
+    fn agent_family_tints_are_readable_but_quieter_than_primary_text() {
+        for tokens in crate::bundled() {
+            let canvas = tokens.surface(Surface::Canvas);
+            let primary_distance =
+                (tokens.text(TextTone::Primary).lightness() - canvas.lightness()).abs();
+            for family in [
+                AgentColor::Read,
+                AgentColor::Network,
+                AgentColor::Shell,
+                AgentColor::Edit,
+                AgentColor::External,
+            ] {
+                let color = tokens.agent(family);
+                assert!(
+                    contrast_ratio(color, canvas) >= TEXT_MINIMUM,
+                    "{} makes {} unreadable",
+                    tokens.meta.id,
+                    family.path()
+                );
+                assert!(
+                    (color.lightness() - canvas.lightness()).abs() < primary_distance,
+                    "{} makes {} compete with primary prose",
+                    tokens.meta.id,
+                    family.path()
+                );
+            }
+        }
     }
 
     #[test]

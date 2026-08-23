@@ -41,6 +41,7 @@
         "text",
         "interactive",
         "semantic",
+        "agent",
         "loader",
         "syntax",
         "terminal"
@@ -51,6 +52,7 @@
         "text": { "$ref": "#/$defs/textColors" },
         "interactive": { "$ref": "#/$defs/interactiveColors" },
         "semantic": { "$ref": "#/$defs/semanticColors" },
+        "agent": { "$ref": "#/$defs/agentColors" },
         "loader": {
           "type": "object",
           "additionalProperties": false,
@@ -161,6 +163,19 @@
         "warning": { "$ref": "#/$defs/color" },
         "success": { "$ref": "#/$defs/color" },
         "info": { "$ref": "#/$defs/color" }
+      }
+    },
+    "agentColors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["read", "network", "shell", "edit", "external", "evidenceWash"],
+      "properties": {
+        "read": { "$ref": "#/$defs/color" },
+        "network": { "$ref": "#/$defs/color" },
+        "shell": { "$ref": "#/$defs/color" },
+        "edit": { "$ref": "#/$defs/color" },
+        "external": { "$ref": "#/$defs/color" },
+        "evidenceWash": { "$ref": "#/$defs/color" }
       }
     },
     "syntaxColors": {

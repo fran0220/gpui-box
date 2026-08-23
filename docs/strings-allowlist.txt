@@ -72,6 +72,7 @@ Dropzone
 Element(..)
 EmptyState
 Emulator
+FALSE
 FailurePanel
 False
 FilterBar
@@ -105,14 +106,22 @@ Menu
 Menubar
 MessageList
 ModelViewer
+NO
+NULL
+No
 NodeGraph
 None
 Notice
 Notification
 NotificationCenter
+Null
 NumberInput
+OFF
+ON
 ObjectiveTracker
+Off
 OfferingCatalog
+On
 OneTimeCodeInput
 Option::is_none
 OutcomePanel
@@ -160,6 +169,7 @@ StepList
 SubagentTree
 Submit
 Switch
+TRUE
 Table
 Tabs
 Tag
@@ -178,7 +188,7 @@ Toast
 ToastLayer
 Toggle
 ToggleGroup
-ToolCallCard
+ToolCall
 Toolbar
 ToolbarItem
 TransportBar
@@ -191,6 +201,8 @@ VEC3
 Vec::is_empty
 VideoPlayer
 Wizard
+YES
+Yes
 [REDACTED]
 []
 […]

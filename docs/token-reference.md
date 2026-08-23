@@ -12,6 +12,11 @@ Appearance: `Dark`.
 
 | Token | Value |
 |---|---|
+| `color.palette.agent.edit` | `#77ae9a` |
+| `color.palette.agent.external` | `#bd91b7` |
+| `color.palette.agent.network` | `#9fa1d2` |
+| `color.palette.agent.read` | `#7da8bf` |
+| `color.palette.agent.shell` | `#c19a69` |
 | `color.palette.amber.500` | `#ffb900` |
 | `color.palette.ansi.0` | `#242424` |
 | `color.palette.ansi.1` | `#f87171` |
@@ -239,6 +244,12 @@ Appearance: `Dark`.
 | `color.semantic.warning` | `color.surface.backdrop` | 11.83 | 3.0 |
 | `color.semantic.success` | `color.surface.backdrop` | 9.32 | 3.0 |
 | `color.semantic.info` | `color.surface.backdrop` | 8.98 | 3.0 |
+| `color.agent.read` | `color.surface.backdrop` | 7.98 | 4.5 |
+| `color.agent.network` | `color.surface.backdrop` | 8.25 | 4.5 |
+| `color.agent.shell` | `color.surface.backdrop` | 7.86 | 4.5 |
+| `color.agent.edit` | `color.surface.backdrop` | 8.06 | 4.5 |
+| `color.agent.external` | `color.surface.backdrop` | 7.67 | 4.5 |
+| `color.text.muted` | `color.surface.backdrop + color.agent.evidenceWash` | 7.43 | 4.5 |
 | `color.interactive.hairlineStrong` | `color.surface.backdrop` | 3.71 | 3.0 |
 | `color.interactive.track` | `color.surface.backdrop` | 3.71 | 3.0 |
 | `color.interactive.focus @ effect.focusRingAlpha` | `color.surface.backdrop` | 3.61 | 3.0 |
@@ -258,6 +269,12 @@ Appearance: `Dark`.
 | `color.semantic.warning` | `color.surface.canvas` | 10.79 | 3.0 |
 | `color.semantic.success` | `color.surface.canvas` | 8.50 | 3.0 |
 | `color.semantic.info` | `color.surface.canvas` | 8.19 | 3.0 |
+| `color.agent.read` | `color.surface.canvas` | 7.28 | 4.5 |
+| `color.agent.network` | `color.surface.canvas` | 7.52 | 4.5 |
+| `color.agent.shell` | `color.surface.canvas` | 7.16 | 4.5 |
+| `color.agent.edit` | `color.surface.canvas` | 7.35 | 4.5 |
+| `color.agent.external` | `color.surface.canvas` | 6.99 | 4.5 |
+| `color.text.muted` | `color.surface.canvas + color.agent.evidenceWash` | 6.58 | 4.5 |
 | `color.interactive.hairlineStrong` | `color.surface.canvas` | 3.83 | 3.0 |
 | `color.interactive.track` | `color.surface.canvas` | 3.83 | 3.0 |
 | `color.interactive.focus @ effect.focusRingAlpha` | `color.surface.canvas` | 3.50 | 3.0 |
@@ -277,6 +294,12 @@ Appearance: `Dark`.
 | `color.semantic.warning` | `color.surface.sunken` | 11.49 | 3.0 |
 | `color.semantic.success` | `color.surface.sunken` | 9.06 | 3.0 |
 | `color.semantic.info` | `color.surface.sunken` | 8.72 | 3.0 |
+| `color.agent.read` | `color.surface.sunken` | 7.75 | 4.5 |
+| `color.agent.network` | `color.surface.sunken` | 8.02 | 4.5 |
+| `color.agent.shell` | `color.surface.sunken` | 7.63 | 4.5 |
+| `color.agent.edit` | `color.surface.sunken` | 7.83 | 4.5 |
+| `color.agent.external` | `color.surface.sunken` | 7.45 | 4.5 |
+| `color.text.muted` | `color.surface.sunken + color.agent.evidenceWash` | 7.15 | 4.5 |
 | `color.interactive.hairlineStrong` | `color.surface.sunken` | 3.77 | 3.0 |
 | `color.interactive.track` | `color.surface.sunken` | 3.77 | 3.0 |
 | `color.interactive.focus @ effect.focusRingAlpha` | `color.surface.sunken` | 3.59 | 3.0 |
@@ -296,6 +319,12 @@ Appearance: `Dark`.
 | `color.semantic.warning` | `color.surface.panel` | 10.00 | 3.0 |
 | `color.semantic.success` | `color.surface.panel` | 7.88 | 3.0 |
 | `color.semantic.info` | `color.surface.panel` | 7.59 | 3.0 |
+| `color.agent.read` | `color.surface.panel` | 6.75 | 4.5 |
+| `color.agent.network` | `color.surface.panel` | 6.97 | 4.5 |
+| `color.agent.shell` | `color.surface.panel` | 6.64 | 4.5 |
+| `color.agent.edit` | `color.surface.panel` | 6.81 | 4.5 |
+| `color.agent.external` | `color.surface.panel` | 6.48 | 4.5 |
+| `color.text.muted` | `color.surface.panel + color.agent.evidenceWash` | 6.01 | 4.5 |
 | `color.interactive.hairlineStrong` | `color.surface.panel` | 3.80 | 3.0 |
 | `color.interactive.track` | `color.surface.panel` | 3.80 | 3.0 |
 | `color.interactive.focus @ effect.focusRingAlpha` | `color.surface.panel` | 3.36 | 3.0 |
@@ -315,6 +344,12 @@ Appearance: `Dark`.
 | `color.semantic.warning` | `color.surface.raised` | 8.56 | 3.0 |
 | `color.semantic.success` | `color.surface.raised` | 6.75 | 3.0 |
 | `color.semantic.info` | `color.surface.raised` | 6.50 | 3.0 |
+| `color.agent.read` | `color.surface.raised` | 5.77 | 4.5 |
+| `color.agent.network` | `color.surface.raised` | 5.97 | 4.5 |
+| `color.agent.shell` | `color.surface.raised` | 5.68 | 4.5 |
+| `color.agent.edit` | `color.surface.raised` | 5.83 | 4.5 |
+| `color.agent.external` | `color.surface.raised` | 5.54 | 4.5 |
+| `color.text.muted` | `color.surface.raised + color.agent.evidenceWash` | 5.08 | 4.5 |
 | `color.interactive.hairlineStrong` | `color.surface.raised` | 3.63 | 3.0 |
 | `color.interactive.track` | `color.surface.raised` | 3.63 | 3.0 |
 | `color.interactive.focus @ effect.focusRingAlpha` | `color.surface.raised` | 3.04 | 3.0 |
@@ -334,6 +369,12 @@ Appearance: `Dark`.
 | `color.semantic.warning` | `color.surface.overlay` | 9.01 | 3.0 |
 | `color.semantic.success` | `color.surface.overlay` | 7.10 | 3.0 |
 | `color.semantic.info` | `color.surface.overlay` | 6.84 | 3.0 |
+| `color.agent.read` | `color.surface.overlay` | 6.08 | 4.5 |
+| `color.agent.network` | `color.surface.overlay` | 6.29 | 4.5 |
+| `color.agent.shell` | `color.surface.overlay` | 5.98 | 4.5 |
+| `color.agent.edit` | `color.surface.overlay` | 6.14 | 4.5 |
+| `color.agent.external` | `color.surface.overlay` | 5.84 | 4.5 |
+| `color.text.muted` | `color.surface.overlay + color.agent.evidenceWash` | 5.36 | 4.5 |
 | `color.interactive.hairlineStrong` | `color.surface.overlay` | 3.70 | 3.0 |
 | `color.interactive.track` | `color.surface.overlay` | 3.70 | 3.0 |
 | `color.interactive.focus @ effect.focusRingAlpha` | `color.surface.overlay` | 3.15 | 3.0 |
@@ -412,6 +453,11 @@ Appearance: `Light`.
 
 | Token | Value |
 |---|---|
+| `color.palette.agent.edit` | `#2f6653` |
+| `color.palette.agent.external` | `#765676` |
+| `color.palette.agent.network` | `#565aa0` |
+| `color.palette.agent.read` | `#2b607d` |
+| `color.palette.agent.shell` | `#80591f` |
 | `color.palette.amber.500` | `#a76a00` |
 | `color.palette.ansi.0` | `#1f1f1f` |
 | `color.palette.ansi.1` | `#dc2626` |
@@ -639,6 +685,12 @@ Appearance: `Light`.
 | `color.semantic.warning` | `color.surface.backdrop` | 3.27 | 3.0 |
 | `color.semantic.success` | `color.surface.backdrop` | 3.89 | 3.0 |
 | `color.semantic.info` | `color.surface.backdrop` | 4.08 | 3.0 |
+| `color.agent.read` | `color.surface.backdrop` | 5.01 | 4.5 |
+| `color.agent.network` | `color.surface.backdrop` | 4.57 | 4.5 |
+| `color.agent.shell` | `color.surface.backdrop` | 4.57 | 4.5 |
+| `color.agent.edit` | `color.surface.backdrop` | 4.89 | 4.5 |
+| `color.agent.external` | `color.surface.backdrop` | 4.57 | 4.5 |
+| `color.text.muted` | `color.surface.backdrop + color.agent.evidenceWash` | 5.08 | 4.5 |
 | `color.interactive.hairlineStrong` | `color.surface.backdrop` | 4.02 | 3.0 |
 | `color.interactive.track` | `color.surface.backdrop` | 4.02 | 3.0 |
 | `color.interactive.focus @ effect.focusRingAlpha` | `color.surface.backdrop` | 3.29 | 3.0 |
@@ -658,6 +710,12 @@ Appearance: `Light`.
 | `color.semantic.warning` | `color.surface.canvas` | 3.75 | 3.0 |
 | `color.semantic.success` | `color.surface.canvas` | 4.47 | 3.0 |
 | `color.semantic.info` | `color.surface.canvas` | 4.69 | 3.0 |
+| `color.agent.read` | `color.surface.canvas` | 5.75 | 4.5 |
+| `color.agent.network` | `color.surface.canvas` | 5.25 | 4.5 |
+| `color.agent.shell` | `color.surface.canvas` | 5.25 | 4.5 |
+| `color.agent.edit` | `color.surface.canvas` | 5.61 | 4.5 |
+| `color.agent.external` | `color.surface.canvas` | 5.25 | 4.5 |
+| `color.text.muted` | `color.surface.canvas + color.agent.evidenceWash` | 5.83 | 4.5 |
 | `color.interactive.hairlineStrong` | `color.surface.canvas` | 4.18 | 3.0 |
 | `color.interactive.track` | `color.surface.canvas` | 4.18 | 3.0 |
 | `color.interactive.focus @ effect.focusRingAlpha` | `color.surface.canvas` | 3.63 | 3.0 |
@@ -677,6 +735,12 @@ Appearance: `Light`.
 | `color.semantic.warning` | `color.surface.sunken` | 3.39 | 3.0 |
 | `color.semantic.success` | `color.surface.sunken` | 4.04 | 3.0 |
 | `color.semantic.info` | `color.surface.sunken` | 4.24 | 3.0 |
+| `color.agent.read` | `color.surface.sunken` | 5.20 | 4.5 |
+| `color.agent.network` | `color.surface.sunken` | 4.74 | 4.5 |
+| `color.agent.shell` | `color.surface.sunken` | 4.74 | 4.5 |
+| `color.agent.edit` | `color.surface.sunken` | 5.07 | 4.5 |
+| `color.agent.external` | `color.surface.sunken` | 4.75 | 4.5 |
+| `color.text.muted` | `color.surface.sunken + color.agent.evidenceWash` | 5.27 | 4.5 |
 | `color.interactive.hairlineStrong` | `color.surface.sunken` | 4.07 | 3.0 |
 | `color.interactive.track` | `color.surface.sunken` | 4.07 | 3.0 |
 | `color.interactive.focus @ effect.focusRingAlpha` | `color.surface.sunken` | 3.38 | 3.0 |
@@ -696,6 +760,12 @@ Appearance: `Light`.
 | `color.semantic.warning` | `color.surface.panel` | 4.10 | 3.0 |
 | `color.semantic.success` | `color.surface.panel` | 4.89 | 3.0 |
 | `color.semantic.info` | `color.surface.panel` | 5.12 | 3.0 |
+| `color.agent.read` | `color.surface.panel` | 6.28 | 4.5 |
+| `color.agent.network` | `color.surface.panel` | 5.73 | 4.5 |
+| `color.agent.shell` | `color.surface.panel` | 5.73 | 4.5 |
+| `color.agent.edit` | `color.surface.panel` | 6.13 | 4.5 |
+| `color.agent.external` | `color.surface.panel` | 5.74 | 4.5 |
+| `color.text.muted` | `color.surface.panel + color.agent.evidenceWash` | 6.36 | 4.5 |
 | `color.interactive.hairlineStrong` | `color.surface.panel` | 4.29 | 3.0 |
 | `color.interactive.track` | `color.surface.panel` | 4.29 | 3.0 |
 | `color.interactive.focus @ effect.focusRingAlpha` | `color.surface.panel` | 3.86 | 3.0 |
@@ -715,6 +785,12 @@ Appearance: `Light`.
 | `color.semantic.warning` | `color.surface.raised` | 4.46 | 3.0 |
 | `color.semantic.success` | `color.surface.raised` | 5.32 | 3.0 |
 | `color.semantic.info` | `color.surface.raised` | 5.57 | 3.0 |
+| `color.agent.read` | `color.surface.raised` | 6.84 | 4.5 |
+| `color.agent.network` | `color.surface.raised` | 6.24 | 4.5 |
+| `color.agent.shell` | `color.surface.raised` | 6.24 | 4.5 |
+| `color.agent.edit` | `color.surface.raised` | 6.67 | 4.5 |
+| `color.agent.external` | `color.surface.raised` | 6.24 | 4.5 |
+| `color.text.muted` | `color.surface.raised + color.agent.evidenceWash` | 6.92 | 4.5 |
 | `color.interactive.hairlineStrong` | `color.surface.raised` | 4.38 | 3.0 |
 | `color.interactive.track` | `color.surface.raised` | 4.38 | 3.0 |
 | `color.interactive.focus @ effect.focusRingAlpha` | `color.surface.raised` | 4.09 | 3.0 |
@@ -734,6 +810,12 @@ Appearance: `Light`.
 | `color.semantic.warning` | `color.surface.overlay` | 4.46 | 3.0 |
 | `color.semantic.success` | `color.surface.overlay` | 5.32 | 3.0 |
 | `color.semantic.info` | `color.surface.overlay` | 5.57 | 3.0 |
+| `color.agent.read` | `color.surface.overlay` | 6.84 | 4.5 |
+| `color.agent.network` | `color.surface.overlay` | 6.24 | 4.5 |
+| `color.agent.shell` | `color.surface.overlay` | 6.24 | 4.5 |
+| `color.agent.edit` | `color.surface.overlay` | 6.67 | 4.5 |
+| `color.agent.external` | `color.surface.overlay` | 6.24 | 4.5 |
+| `color.text.muted` | `color.surface.overlay + color.agent.evidenceWash` | 6.92 | 4.5 |
 | `color.interactive.hairlineStrong` | `color.surface.overlay` | 4.38 | 3.0 |
 | `color.interactive.track` | `color.surface.overlay` | 4.38 | 3.0 |
 | `color.interactive.focus @ effect.focusRingAlpha` | `color.surface.overlay` | 4.09 | 3.0 |

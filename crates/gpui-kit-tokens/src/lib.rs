@@ -459,6 +459,18 @@ impl TokenDocument {
         self.resolved(path, value)
     }
 
+    pub fn agent(&self, role: AgentColor) -> Color {
+        let value = match role {
+            AgentColor::Read => self.color.agent.read.as_str(),
+            AgentColor::Network => self.color.agent.network.as_str(),
+            AgentColor::Shell => self.color.agent.shell.as_str(),
+            AgentColor::Edit => self.color.agent.edit.as_str(),
+            AgentColor::External => self.color.agent.external.as_str(),
+            AgentColor::EvidenceWash => self.color.agent.evidence_wash.as_str(),
+        };
+        self.resolved(role.path(), value)
+    }
+
     pub fn loader_gradient(&self) -> [Color; 3] {
         [
             self.resolved("color.loader.gradient.0", &self.color.loader.gradient[0]),
@@ -772,6 +784,43 @@ pub enum SemanticColor {
     Warning,
     Success,
     Info,
+}
+
+/// Paint roles used by quiet evidence inside an agent transcript.
+///
+/// The five families classify a tool without colouring the tool's arguments
+/// or result. `EvidenceWash` is the optional, deliberately faint plane under
+/// expanded caller-owned text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AgentColor {
+    Read,
+    Network,
+    Shell,
+    Edit,
+    External,
+    EvidenceWash,
+}
+
+impl AgentColor {
+    pub const ALL: [Self; 6] = [
+        Self::Read,
+        Self::Network,
+        Self::Shell,
+        Self::Edit,
+        Self::External,
+        Self::EvidenceWash,
+    ];
+
+    pub fn path(self) -> &'static str {
+        match self {
+            Self::Read => "color.agent.read",
+            Self::Network => "color.agent.network",
+            Self::Shell => "color.agent.shell",
+            Self::Edit => "color.agent.edit",
+            Self::External => "color.agent.external",
+            Self::EvidenceWash => "color.agent.evidenceWash",
+        }
+    }
 }
 
 /// One paint class of code. See [`SyntaxColors`].
@@ -1157,14 +1206,21 @@ pub struct ColorTokens {
     pub text: TextColors,
     pub interactive: InteractiveColors,
     pub semantic: SemanticColors,
+    pub agent: AgentColors,
     pub loader: LoaderColors,
     pub syntax: SyntaxColors,
     pub terminal: TerminalColors,
 }
 
 impl ColorTokens {
-    fn entries(&self) -> [(&'static str, &str); 39] {
+    fn entries(&self) -> [(&'static str, &str); 45] {
         [
+            ("color.agent.read", &self.agent.read),
+            ("color.agent.network", &self.agent.network),
+            ("color.agent.shell", &self.agent.shell),
+            ("color.agent.edit", &self.agent.edit),
+            ("color.agent.external", &self.agent.external),
+            ("color.agent.evidenceWash", &self.agent.evidence_wash),
             ("color.syntax.keyword", &self.syntax.keyword),
             ("color.syntax.string", &self.syntax.string),
             ("color.syntax.comment", &self.syntax.comment),
@@ -1260,6 +1316,21 @@ pub struct SemanticColors {
     pub warning: String,
     pub success: String,
     pub info: String,
+}
+
+/// Quiet classification paint for evidence in an agent transcript.
+///
+/// These are not state severities. A failed shell call still uses danger for
+/// its failure mark; `shell` only identifies what kind of work the row did.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AgentColors {
+    pub read: String,
+    pub network: String,
+    pub shell: String,
+    pub edit: String,
+    pub external: String,
+    pub evidence_wash: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

@@ -155,13 +155,13 @@ icon or a badge. A row takes the press response and not the hover lift: a row
 that rose would leave the card it belongs to.
 
 A component that is already a card but owns a richer semantic node than a
-grouping — `ToolCallCard` is a tool invocation, `ApprovalRequest` is a form —
-cannot be wrapped in one, so the shell itself is the shared piece:
+grouping — `ApprovalPrompt` is a form — cannot be wrapped in one, so the shell
+itself is the shared piece:
 `StyledExt::card_surface(theme, variant)` is the single definition of what a
 card is made of, and `Card` is a caller-facing composition on top of it. That
-is the whole of the fix: those components each drew the shell by hand before,
-and a card that means the same thing and is drawn two ways is two components
-wearing one name.
+is the whole of the fix. Transcript evidence is deliberately not a card:
+`ToolCall` is a caption-sized row, while media and durable results remain the
+places where an agent transcript earns a card surface.
 
 ## Agent experience
 
@@ -859,9 +859,9 @@ plainer component would have to collapse two facts into one.
 
 | Component | Kind | Reports | Notes |
 |---|---|---|---|
-| `ToolCallCard` | builder | a failed call that should be tried again | One invocation of one tool: what it was called with, which of its five states holds, its result or its error, and how long it took. Arguments and results publish their shape and never their text |
-| `StepList` | builder | — | An ordered run of steps, each with its own state, each able to hold a `ToolCallCard`. A run whose length nobody knows gets an indeterminate summary rather than an invented fraction |
-| `ThinkingBlock` | builder | the state the disclosure should take | Model reasoning, collapsed by default. Withheld, absent, and collapsed are three states and three presentations |
+| `ToolCall`, `ToolFamily` | builder, data | retry and the requested expanded state | One caption-sized evidence row. The required family selects a shared low-saturation tool tint; the host supplies a display-safe summary. Arguments and results are collapsed, bounded to four lines by default, and publish their shape rather than their text |
+| `StepList` | builder | — | An ordered run of steps, each with its own state, each able to hold a `ToolCall`. A run whose length nobody knows gets an indeterminate summary rather than an invented fraction |
+| `ThinkingBlock` | builder | the state the disclosure should take | A quiet “Thinking…” or “Thought for …” row. Expanded reasoning is muted italic text; withheld, absent, and collapsed remain three different facts |
 | `NodeGraph`, `GraphInteraction` | builder, policy | viewport and selection; Arrange adds node moves; Edit adds node deletion and connection/disconnection proposals | A controlled run canvas over caller-positioned `GraphNode`s and caller-owned `GraphEdge`s. Loading, refusal, failure, and a ready graph with no nodes use the shared state surface and truthful replaceable slots instead of canvas text. `Inspect` never installs topology-edit actions, while the default `Edit` preserves the complete editor. A node thumbnail is a caller-rendered element slot; the graph fetches and decodes nothing |
 | `CanvasToolbar` | builder | zoom in, zoom out, fit, and snap requests | Compact canvas chrome over one host-formatted zoom value. It applies no viewport or snapping policy |
 | `Minimap` | builder | a normalized pan request | A compact overview over caller-owned marks and viewport. It infers no graph layout and reports movement without applying it |

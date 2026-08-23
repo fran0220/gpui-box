@@ -26,7 +26,6 @@ use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::status::StatusLine;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Ident, StyledExt};
-use crate::motion;
 use crate::state::{HasPhase, Phase};
 
 type EventHandler = Rc<dyn Fn(&AgentDocumentEvent, &mut Window, &mut App)>;
@@ -75,6 +74,15 @@ impl AgentBlockKind {
             Self::Choice => "choice",
             Self::Custom => "custom",
         }
+    }
+
+    /// Supporting evidence in a transcript, rather than the answer or a
+    /// media/result surface that deserves its own presentation.
+    pub fn is_evidence(self) -> bool {
+        matches!(
+            self,
+            Self::Code | Self::ToolCall | Self::Diff | Self::Schema | Self::Notice
+        )
     }
 }
 
@@ -534,7 +542,10 @@ impl RenderOnce for AgentDocument {
                         // and the next it is the document's.
                         let after = match &row.part {
                             Some(part) if !part.last => Space::Md,
-                            _ => Space::Lg,
+                            _ => rows_plan
+                                .get(index + 1)
+                                .map(|next| block_space(block.kind, listed[next.block].kind))
+                                .unwrap_or(Space::Lg),
                         };
                         ListItem::new(
                             row.key(&listed),
@@ -561,9 +572,9 @@ impl RenderOnce for AgentDocument {
                     .into_any_element()
                 }
                 None => {
-                    let mut column = div().w_full().column().gap_token(&theme, Space::Lg);
+                    let mut column = div().w_full().column();
                     for (order, block) in self.blocks.iter().enumerate() {
-                        column = column.child(render_block(
+                        let rendered = render_block(
                             &ident,
                             block,
                             // A block's place in the document is its reading
@@ -573,7 +584,16 @@ impl RenderOnce for AgentDocument {
                             self.on_event.clone(),
                             window,
                             cx,
-                        ));
+                        );
+                        column = match self.blocks.get(order + 1) {
+                            Some(next) => column.child(
+                                div()
+                                    .w_full()
+                                    .pb(gpui::px(theme.space(block_space(block.kind, next.kind))))
+                                    .child(rendered),
+                            ),
+                            None => column.child(rendered),
+                        };
                     }
                     column.into_any_element()
                 }
@@ -586,6 +606,14 @@ impl RenderOnce for AgentDocument {
                 .value(format!("{state_name}:{block_count}"))
                 .busy(busy),
         )
+    }
+}
+
+fn block_space(current: AgentBlockKind, next: AgentBlockKind) -> Space {
+    match (current.is_evidence(), next.is_evidence()) {
+        (true, true) => Space::Sm,
+        (true, false) | (false, true) => Space::Md,
+        (false, false) => Space::Lg,
     }
 }
 
@@ -758,7 +786,14 @@ fn render_block(
     let frame = div()
         .w_full()
         .column()
-        .gap_token(&theme, Space::Sm)
+        .gap_token(
+            &theme,
+            if block.kind.is_evidence() {
+                Space::Xs
+            } else {
+                Space::Sm
+            },
+        )
         // A block's heading names the block, so it belongs to the row the
         // block starts in and not to every row it runs through.
         .children(
@@ -768,18 +803,26 @@ fn render_block(
                 .filter(|_| part.is_none_or(|part| part.index == 0))
                 .map(|label| {
                     div()
-                        .type_scale(&theme, TypeScale::Label)
-                        .text_tone(&theme, TextTone::Muted)
+                        .type_scale(
+                            &theme,
+                            if block.kind.is_evidence() {
+                                TypeScale::Caption
+                            } else {
+                                TypeScale::Label
+                            },
+                        )
+                        .text_tone(
+                            &theme,
+                            if block.kind.is_evidence() {
+                                TextTone::Faint
+                            } else {
+                                TextTone::Muted
+                            },
+                        )
                         .child(label)
                 }),
         )
         .child(body);
-
-    let frame = if streaming {
-        motion::breathe(frame, ident.child("streaming").element_id(), &theme, cx)
-    } else {
-        frame.into_any_element()
-    };
 
     div()
         .w_full()
