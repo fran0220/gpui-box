@@ -4708,6 +4708,8 @@
         "muted(muted: bool) -> Self",
         "speeds(speeds: impl IntoIterator<Item = f32>, current: f32) -> Self",
         "step_seconds(seconds: f32) -> Self",
+        "seekable(seekable: bool) -> Self",
+        "volume_control(available: bool) -> Self",
         "has_previous(has_previous: bool) -> Self",
         "has_next(has_next: bool) -> Self",
         "on_event(handler: impl Fn(&TransportEvent, &mut Window, &mut App) + 'static) -> Self"
@@ -7773,6 +7775,7 @@
         "no_backend(reason: impl Into<SharedString>) -> Self",
         "failed(reason: impl Into<SharedString>) -> Self",
         "refusing(reason: impl Into<SharedString>) -> Self",
+        "with_capabilities(capabilities: MediaCapabilities) -> Self",
         "unsupported(commands: impl IntoIterator<Item = &'static str>) -> Self",
         "shared() -> Rc<dyn MediaTransport>"
       ],
@@ -8891,8 +8894,19 @@
       "queries": [
         "name() -> &'static str",
         "is_ready() -> bool",
-        "reason() -> Option<SharedString>"
+        "reason() -> Option<SharedString>",
+        "error() -> Option<&MediaError>"
       ]
+    },
+    {
+      "name": "MediaCapabilities",
+      "path": "gpui_kit::media::MediaCapabilities",
+      "summary": "Playback features one transport can actually honor.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "MediaCommand",
@@ -8911,6 +8925,37 @@
       "options": [
         "name() -> &'static str"
       ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "MediaError",
+      "path": "gpui_kit::media::MediaError",
+      "summary": "A machine-readable media category and a caller-facing diagnostic.",
+      "variants": [],
+      "construct": [
+        "new(kind: MediaErrorKind, detail: impl Into<SharedString>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "detail() -> &str"
+      ]
+    },
+    {
+      "name": "MediaErrorKind",
+      "path": "gpui_kit::media::MediaErrorKind",
+      "summary": "Stable category for a media backend failure or refusal.",
+      "variants": [
+        "NoBackend",
+        "InvalidSource",
+        "Open",
+        "Playback",
+        "Refused",
+        "Failed"
+      ],
+      "construct": [],
+      "options": [],
       "commands": [],
       "queries": []
     },

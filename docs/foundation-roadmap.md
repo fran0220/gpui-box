@@ -201,6 +201,11 @@ visual contract.
 - Add an explicit `MediaCapabilities` snapshot (audio/video, rates, seek,
   native tracks, output selection) so a control is absent or disabled when the
   backend cannot honor it. Capability refusal is never idle media.
+- The shared transport and native service already carry that capability
+  snapshot, and `MediaErrorKind` preserves no-backend, invalid-source, open,
+  playback and command-refusal categories through the Kit boundary. Linux and
+  Web adapters extend these types rather than introducing target-specific
+  state or string parsing.
 - Feature and build policy is target-specific but the default `native-playback`
   feature selects the normal backend on macOS, Windows, Linux, and Web. Linux
   distribution builds install GStreamer development/runtime packages; a build

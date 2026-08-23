@@ -35,7 +35,9 @@ use crate::display::badge::Badge;
 use crate::foundation::{Disableable, Ident, StyledExt, text};
 use crate::layout::{AspectFit, AspectRatio};
 use crate::media::audio_player::{command_for, unready};
-use crate::media::transport::{MediaAvailability, MediaEvent, MediaSnapshot, MediaTransport};
+use crate::media::transport::{
+    MediaAvailability, MediaCapabilities, MediaEvent, MediaSnapshot, MediaTransport,
+};
 use crate::media::{NoticePlace, notice_at};
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -218,6 +220,11 @@ impl RenderOnce for VideoPlayer {
             .transport
             .as_ref()
             .map(|transport| transport.snapshot());
+        let capabilities = self
+            .transport
+            .as_ref()
+            .map(|transport| transport.capabilities())
+            .unwrap_or_else(MediaCapabilities::none);
         let origin = self.transport.as_ref().map(|transport| transport.origin());
         let availability = snapshot.as_ref().map(|snapshot| &snapshot.availability);
         let state = match availability {
@@ -329,6 +336,7 @@ impl RenderOnce for VideoPlayer {
         };
 
         let actionable = !self.disabled
+            && capabilities.video
             && snapshot
                 .as_ref()
                 .is_some_and(|snapshot| snapshot.availability.is_ready());
@@ -347,6 +355,7 @@ impl RenderOnce for VideoPlayer {
                 &ident,
                 &self,
                 snapshot,
+                capabilities,
                 Rc::clone(transport),
                 actionable,
             )),
@@ -375,6 +384,7 @@ fn bar(
     ident: &Ident,
     player: &VideoPlayer,
     snapshot: &MediaSnapshot,
+    capabilities: MediaCapabilities,
     transport: Rc<dyn MediaTransport>,
     actionable: bool,
 ) -> TransportBar {
@@ -384,6 +394,8 @@ fn bar(
         .volume(snapshot.volume)
         .muted(snapshot.muted)
         .buffered(snapshot.buffered.iter().copied())
+        .seekable(capabilities.seek)
+        .volume_control(capabilities.volume)
         .disabled(!actionable);
     bar = match snapshot.duration {
         TransportDuration::Known(seconds) => bar.duration(seconds),
@@ -398,7 +410,7 @@ fn bar(
     if let Some(step) = player.step {
         bar = bar.step_seconds(step);
     }
-    if !player.speeds.is_empty() {
+    if capabilities.rates && !player.speeds.is_empty() {
         bar = bar.speeds(player.speeds.iter().copied(), snapshot.speed);
     }
     if actionable {

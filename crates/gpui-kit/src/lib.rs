@@ -268,11 +268,11 @@ pub mod prelude {
     };
     pub use crate::media::{
         AudioPlayer, AudioWaveform, AudioWaveformState, FixtureTransport, MediaAvailability,
-        MediaCommand, MediaEvent, MediaOrigin, MediaOutcome, MediaSnapshot, MediaSource,
-        MediaTransport, ModelBounds, ModelDefect, ModelError, ModelLimit, ModelMesh, ModelScene,
-        ModelShading, ModelState, ModelViewer, ModelViewerEvent, NativeMediaError,
-        NativeMediaEvent, NativeMediaPlayer, NativeMediaSubscription, PlatformMediaTransport,
-        VideoPlayer,
+        MediaCapabilities, MediaCommand, MediaError, MediaErrorKind, MediaEvent, MediaOrigin,
+        MediaOutcome, MediaSnapshot, MediaSource, MediaTransport, ModelBounds, ModelDefect,
+        ModelError, ModelLimit, ModelMesh, ModelScene, ModelShading, ModelState, ModelViewer,
+        ModelViewerEvent, NativeMediaCapabilities, NativeMediaError, NativeMediaEvent,
+        NativeMediaPlayer, NativeMediaSubscription, PlatformMediaTransport, VideoPlayer,
     };
     pub use crate::motion::{
         Flip, Flipping, Keyframe, Keyframes, Micro, MicroMark, MicroMotion, Presence, ScrollLink,

@@ -422,7 +422,11 @@ springs described as a duration and a bounce. Two things are left.
 ### Media capabilities beyond native playback
 
 `PlatformMediaTransport` closes the ordinary macOS/Windows decoder, output,
-clock and native-view gap. The remaining media work is additive capability,
+clock and native-view gap. `MediaCapabilities` now makes audio/video, seek,
+volume, rates, native-track and output-selection support explicit at runtime;
+unsupported controls are absent or inert. `MediaErrorKind` preserves no-backend,
+invalid-source, open, playback and refusal categories through the Kit seam, so
+downstream code never parses a platform diagnostic. The remaining media work is additive capability,
 not basic playback: playlist/queue ownership; audio, subtitle and accessibility
 description track selection; audio output-device switching; DRM; application
 cache/retry and authentication policy; picture-in-picture and fullscreen;

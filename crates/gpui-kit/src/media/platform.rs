@@ -15,17 +15,20 @@ use std::rc::Rc;
 use gpui::{AnyElement, IntoElement, PlatformViewHandle, Styled, platform_view};
 use media::{
     MediaAvailability as NativeAvailability, MediaCommand as NativeCommand,
-    MediaCommandOutcome as NativeOutcome, MediaKind, PlaybackState,
+    MediaCommandOutcome as NativeOutcome, MediaErrorKind as NativeErrorKind, MediaKind,
+    PlaybackState,
 };
 pub use media::{
-    MediaError as NativeMediaError, MediaEvent as NativeMediaEvent,
-    MediaPlayer as NativeMediaPlayer, MediaSource, MediaSubscription as NativeMediaSubscription,
+    MediaCapabilities as NativeMediaCapabilities, MediaError as NativeMediaError,
+    MediaEvent as NativeMediaEvent, MediaPlayer as NativeMediaPlayer, MediaSource,
+    MediaSubscription as NativeMediaSubscription,
 };
 
 use crate::content::transport::{BufferedRange, TransportDuration, TransportState};
 
 use super::{
-    MediaAvailability, MediaCommand, MediaOrigin, MediaOutcome, MediaSnapshot, MediaTransport,
+    MediaAvailability, MediaCapabilities, MediaCommand, MediaError, MediaErrorKind, MediaOrigin,
+    MediaOutcome, MediaSnapshot, MediaTransport,
 };
 
 /// The AVFoundation or Media Foundation player used by media components.
@@ -116,6 +119,19 @@ impl MediaTransport for PlatformMediaTransport {
         MediaOrigin::Platform
     }
 
+    fn capabilities(&self) -> MediaCapabilities {
+        let native = self.player.capabilities();
+        MediaCapabilities {
+            audio: native.audio,
+            video: native.video,
+            seek: native.seek,
+            volume: native.volume,
+            rates: native.rates,
+            native_tracks: native.native_tracks,
+            output_selection: native.output_selection,
+        }
+    }
+
     fn snapshot(&self) -> MediaSnapshot {
         snapshot(self.player.snapshot())
     }
@@ -132,9 +148,7 @@ impl MediaTransport for PlatformMediaTransport {
         };
         match self.player.command(native) {
             NativeOutcome::Applied => MediaOutcome::Applied,
-            NativeOutcome::Refused(error) => {
-                MediaOutcome::Refused(error.message().to_owned().into())
-            }
+            NativeOutcome::Refused(error) => MediaOutcome::Refused(media_error(error)),
             NativeOutcome::Unsupported => MediaOutcome::Unsupported,
         }
     }
@@ -147,11 +161,9 @@ fn snapshot(native: media::MediaSnapshot) -> MediaSnapshot {
             NativeAvailability::Loading => MediaAvailability::Loading,
             NativeAvailability::Ready => MediaAvailability::Ready,
             NativeAvailability::NoBackend(error) => {
-                MediaAvailability::NoBackend(error.message().to_owned().into())
+                MediaAvailability::NoBackend(media_error(error))
             }
-            NativeAvailability::Failed(error) => {
-                MediaAvailability::Failed(error.message().to_owned().into())
-            }
+            NativeAvailability::Failed(error) => MediaAvailability::Failed(media_error(error)),
         },
         state: match native.state {
             PlaybackState::Playing => TransportState::Playing,
@@ -172,6 +184,16 @@ fn snapshot(native: media::MediaSnapshot) -> MediaSnapshot {
             .map(|range| BufferedRange::new(seconds(range.start), seconds(range.end)))
             .collect(),
     }
+}
+
+fn media_error(native: NativeMediaError) -> MediaError {
+    let kind = match native.kind() {
+        NativeErrorKind::NoBackend => MediaErrorKind::NoBackend,
+        NativeErrorKind::InvalidSource => MediaErrorKind::InvalidSource,
+        NativeErrorKind::Open => MediaErrorKind::Open,
+        NativeErrorKind::Playback => MediaErrorKind::Playback,
+    };
+    MediaError::new(kind, native.message().to_owned())
 }
 
 fn seconds(value: f64) -> f32 {
@@ -211,5 +233,9 @@ mod tests {
             ..NativeSnapshot::default()
         });
         assert_eq!(mapped.availability.name(), "no-backend");
+        assert_eq!(
+            mapped.availability.error().map(MediaError::category),
+            Some(MediaErrorKind::NoBackend)
+        );
     }
 }

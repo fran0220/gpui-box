@@ -39,6 +39,7 @@ use std::rc::Rc;
 use gpui::SharedString;
 
 use crate::content::transport::{BufferedRange, TrackStep, TransportDuration, TransportState};
+use crate::state::{HasPhase, Phase};
 
 /// Where a surface's playback facts came from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -65,6 +66,122 @@ impl MediaOrigin {
     }
 }
 
+/// Playback features one transport can actually honor.
+///
+/// This is runtime data. Components use it instead of target checks, so a
+/// compiled-in backend that failed to initialize does not leave dead controls
+/// on screen and a future adapter can expose only the operations it supports.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MediaCapabilities {
+    pub audio: bool,
+    pub video: bool,
+    pub seek: bool,
+    pub volume: bool,
+    pub rates: bool,
+    pub native_tracks: bool,
+    pub output_selection: bool,
+}
+
+impl MediaCapabilities {
+    pub const fn none() -> Self {
+        Self {
+            audio: false,
+            video: false,
+            seek: false,
+            volume: false,
+            rates: false,
+            native_tracks: false,
+            output_selection: false,
+        }
+    }
+
+    /// The operations the original transport contract promised before
+    /// capabilities became explicit. This default preserves custom transport
+    /// implementations while letting them override any unsupported operation.
+    pub const fn standard() -> Self {
+        Self {
+            audio: true,
+            video: true,
+            seek: true,
+            volume: true,
+            rates: true,
+            native_tracks: false,
+            output_selection: false,
+        }
+    }
+
+    pub const fn can_play(self) -> bool {
+        self.audio || self.video
+    }
+}
+
+impl Default for MediaCapabilities {
+    fn default() -> Self {
+        Self::standard()
+    }
+}
+
+/// Stable category for a media backend failure or refusal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum MediaErrorKind {
+    NoBackend,
+    InvalidSource,
+    Open,
+    Playback,
+    Refused,
+    Failed,
+}
+
+impl MediaErrorKind {
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::NoBackend => "no-backend",
+            Self::InvalidSource => "invalid-source",
+            Self::Open => "open",
+            Self::Playback => "playback",
+            Self::Refused => "refused",
+            Self::Failed => "failed",
+        }
+    }
+}
+
+/// A machine-readable media category and a caller-facing diagnostic.
+///
+/// Consumers branch on [`MediaErrorKind`] and may show `detail`; they never
+/// need to parse a platform sentence to decide whether a backend is missing,
+/// a source is invalid, or playback failed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MediaError {
+    kind: MediaErrorKind,
+    detail: SharedString,
+}
+
+impl MediaError {
+    pub fn new(kind: MediaErrorKind, detail: impl Into<SharedString>) -> Self {
+        Self {
+            kind,
+            detail: detail.into(),
+        }
+    }
+
+    pub const fn category(&self) -> MediaErrorKind {
+        self.kind
+    }
+
+    pub fn detail(&self) -> &str {
+        self.detail.as_ref()
+    }
+}
+
+impl std::fmt::Display for MediaError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.detail())
+    }
+}
+
+impl std::error::Error for MediaError {}
+
 /// Whether there is anything to play, and whether anything could play it.
 ///
 /// This is [`crate::state::Loadable`]'s vocabulary with the one distinction a
@@ -80,9 +197,9 @@ pub enum MediaAvailability {
     Loading,
     /// There is no backend on this machine that can play it, in the
     /// backend's own words.
-    NoBackend(SharedString),
+    NoBackend(MediaError),
     /// The media was opened and could not be read, in the backend's words.
-    Failed(SharedString),
+    Failed(MediaError),
     /// The transport holds the media and can move it.
     Ready,
 }
@@ -106,9 +223,32 @@ impl MediaAvailability {
     /// The backend's own sentence, when it gave one.
     pub fn reason(&self) -> Option<SharedString> {
         match self {
-            Self::NoBackend(reason) | Self::Failed(reason) => Some(reason.clone()),
+            Self::NoBackend(error) | Self::Failed(error) => Some(error.detail.clone()),
             _ => None,
         }
+    }
+
+    pub fn error(&self) -> Option<&MediaError> {
+        match self {
+            Self::NoBackend(error) | Self::Failed(error) => Some(error),
+            Self::Idle | Self::Loading | Self::Ready => None,
+        }
+    }
+}
+
+impl HasPhase for MediaAvailability {
+    fn phase(&self) -> Phase {
+        match self {
+            Self::Idle => Phase::Idle,
+            Self::Loading => Phase::Loading,
+            Self::NoBackend(_) => Phase::Unavailable,
+            Self::Failed(_) => Phase::Error,
+            Self::Ready => Phase::Ready,
+        }
+    }
+
+    fn reason(&self) -> Option<&str> {
+        self.error().map(MediaError::detail)
     }
 }
 
@@ -178,7 +318,7 @@ pub enum MediaOutcome {
     /// nothing here promises the change is already visible.
     Applied,
     /// The transport declined, in its own words.
-    Refused(SharedString),
+    Refused(MediaError),
     /// This backend does not implement this command at all. It is not a
     /// failure and not a refusal, and a surface may drop the control instead
     /// of offering one that never works.
@@ -204,6 +344,11 @@ pub trait MediaTransport: std::fmt::Debug {
     /// Whether these facts come from a real player or from a fixture.
     fn origin(&self) -> MediaOrigin;
 
+    /// Operations this transport can currently honor.
+    fn capabilities(&self) -> MediaCapabilities {
+        MediaCapabilities::standard()
+    }
+
     /// What is true now. Called once per frame; it must not block.
     fn snapshot(&self) -> MediaSnapshot;
 
@@ -218,7 +363,7 @@ pub enum MediaEvent {
     /// The transport took the command.
     Applied(MediaCommand),
     /// The transport declined, and this is why.
-    Refused(MediaCommand, SharedString),
+    Refused(MediaCommand, MediaError),
     /// The transport does not implement the command.
     Unsupported(MediaCommand),
 }
@@ -255,8 +400,9 @@ impl MediaEvent {
 pub struct FixtureTransport {
     snapshot: RefCell<MediaSnapshot>,
     commands: RefCell<Vec<MediaCommand>>,
+    capabilities: MediaCapabilities,
     /// Set when the fixture is standing in for a backend that says no.
-    refusal: Option<SharedString>,
+    refusal: Option<MediaError>,
     unsupported: Vec<&'static str>,
 }
 
@@ -283,6 +429,7 @@ impl FixtureTransport {
         Self {
             snapshot: RefCell::new(MediaSnapshot::default()),
             commands: RefCell::new(Vec::new()),
+            capabilities: MediaCapabilities::standard(),
             refusal: None,
             unsupported: Vec::new(),
         }
@@ -348,20 +495,29 @@ impl FixtureTransport {
 
     /// Stands in for a machine with no backend that can play this.
     pub fn no_backend(mut self, reason: impl Into<SharedString>) -> Self {
-        self.snapshot.get_mut().availability = MediaAvailability::NoBackend(reason.into());
+        self.snapshot.get_mut().availability =
+            MediaAvailability::NoBackend(MediaError::new(MediaErrorKind::NoBackend, reason));
+        self.capabilities = MediaCapabilities::none();
         self
     }
 
     /// Stands in for media that was opened and could not be read.
     pub fn failed(mut self, reason: impl Into<SharedString>) -> Self {
-        self.snapshot.get_mut().availability = MediaAvailability::Failed(reason.into());
+        self.snapshot.get_mut().availability =
+            MediaAvailability::Failed(MediaError::new(MediaErrorKind::Failed, reason));
         self
     }
 
     /// Makes every command answer [`MediaOutcome::Refused`], which is how a
     /// test proves a refused control changes nothing on screen.
     pub fn refusing(mut self, reason: impl Into<SharedString>) -> Self {
-        self.refusal = Some(reason.into());
+        self.refusal = Some(MediaError::new(MediaErrorKind::Refused, reason));
+        self
+    }
+
+    /// Overrides the operations this deterministic transport accepts.
+    pub fn with_capabilities(mut self, capabilities: MediaCapabilities) -> Self {
+        self.capabilities = capabilities;
         self
     }
 
@@ -386,6 +542,10 @@ impl FixtureTransport {
 impl MediaTransport for FixtureTransport {
     fn origin(&self) -> MediaOrigin {
         MediaOrigin::Fixture
+    }
+
+    fn capabilities(&self) -> MediaCapabilities {
+        self.capabilities
     }
 
     fn snapshot(&self) -> MediaSnapshot {
@@ -462,7 +622,10 @@ mod tests {
         let outcome = fixture.apply(MediaCommand::Play);
         assert_eq!(
             outcome,
-            MediaOutcome::Refused(SharedString::from("The device is in use."))
+            MediaOutcome::Refused(MediaError::new(
+                MediaErrorKind::Refused,
+                "The device is in use."
+            ))
         );
         assert_eq!(
             fixture.snapshot().state,
@@ -495,10 +658,25 @@ mod tests {
         );
         let refused = MediaEvent::of(
             MediaCommand::Seek(4.0),
-            MediaOutcome::Refused(SharedString::from("Seeking a live stream is refused.")),
+            MediaOutcome::Refused(MediaError::new(
+                MediaErrorKind::Refused,
+                "Seeking a live stream is refused.",
+            )),
         );
         assert_eq!(refused.command(), MediaCommand::Seek(4.0));
         assert!(matches!(refused, MediaEvent::Refused(_, _)));
+    }
+
+    #[test]
+    fn availability_preserves_a_typed_repair_category() {
+        let unavailable = FixtureTransport::new().no_backend("Install the media runtime.");
+        let snapshot = unavailable.snapshot();
+        assert_eq!(snapshot.availability.phase(), Phase::Unavailable);
+        assert_eq!(
+            snapshot.availability.error().map(MediaError::category),
+            Some(MediaErrorKind::NoBackend)
+        );
+        assert_eq!(unavailable.capabilities(), MediaCapabilities::none());
     }
 
     #[test]

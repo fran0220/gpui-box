@@ -5,9 +5,9 @@ mod bindings;
 mod player;
 
 pub use player::{
-    MediaAvailability, MediaCommand, MediaCommandOutcome, MediaError, MediaErrorKind, MediaEvent,
-    MediaKind, MediaPlayer, MediaSnapshot, MediaSource, MediaSubscription, NativeVideoView,
-    PlaybackState, TimeRange,
+    MediaAvailability, MediaCapabilities, MediaCommand, MediaCommandOutcome, MediaError,
+    MediaErrorKind, MediaEvent, MediaKind, MediaPlayer, MediaSnapshot, MediaSource,
+    MediaSubscription, NativeVideoView, PlaybackState, TimeRange,
 };
 
 #[cfg(all(feature = "native-playback", target_os = "macos"))]

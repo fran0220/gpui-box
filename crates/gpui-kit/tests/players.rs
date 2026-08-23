@@ -160,7 +160,7 @@ fn a_refused_command_is_reported_as_a_refusal_and_moves_nothing(cx: &mut TestApp
         *events.borrow(),
         vec![MediaEvent::Refused(
             MediaCommand::Play,
-            "The output device is in use.".into()
+            MediaError::new(MediaErrorKind::Refused, "The output device is in use.")
         )]
     );
     assert_eq!(
@@ -171,6 +171,33 @@ fn a_refused_command_is_reported_as_a_refusal_and_moves_nothing(cx: &mut TestApp
             .as_deref(),
         Some("paused"),
         "a refusal must leave the state that still holds"
+    );
+}
+
+#[gpui::test]
+fn unsupported_transport_controls_are_absent_or_inert(cx: &mut TestAppContext) {
+    let capabilities = MediaCapabilities {
+        seek: false,
+        volume: false,
+        rates: false,
+        ..MediaCapabilities::standard()
+    };
+    let fixture = Rc::new(
+        FixtureTransport::ready(240.0)
+            .position(72.0)
+            .with_capabilities(capabilities),
+    );
+    let (mut harness, _events) = audio(cx, Some(fixture), vec![0.5, 1.0, 2.0]);
+
+    assert!(harness.node("player.transport.mute").is_none());
+    assert!(harness.node("player.transport.volume").is_none());
+    assert!(harness.node("player.transport.speed").is_none());
+    assert!(
+        harness
+            .node("player.transport.scrubber")
+            .expect("position remains visible")
+            .disabled,
+        "an unsupported seek is displayed as a reading, not an operable slider"
     );
 }
 

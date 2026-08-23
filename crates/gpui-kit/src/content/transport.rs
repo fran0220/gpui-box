@@ -198,6 +198,8 @@ pub struct TransportBar {
     speed: f32,
     speeds: Vec<f32>,
     step: f32,
+    seekable: bool,
+    volume_control: bool,
     has_previous: bool,
     has_next: bool,
     disabled: bool,
@@ -235,6 +237,8 @@ impl TransportBar {
             speed: 1.0,
             speeds: Vec::new(),
             step: DEFAULT_STEP,
+            seekable: true,
+            volume_control: true,
             has_previous: false,
             has_next: false,
             disabled: false,
@@ -317,6 +321,22 @@ impl TransportBar {
     /// nothing about the media.
     pub fn step_seconds(mut self, seconds: f32) -> Self {
         self.step = seconds.max(0.0);
+        self
+    }
+
+    /// Whether the transport accepts seeks.
+    ///
+    /// A false capability keeps the position visible but installs no pointer,
+    /// keyboard, or native slider action for moving it.
+    pub fn seekable(mut self, seekable: bool) -> Self {
+        self.seekable = seekable;
+        self
+    }
+
+    /// Whether mute and volume controls are meaningful for this transport.
+    /// Unsupported controls are absent rather than disabled forever.
+    pub fn volume_control(mut self, available: bool) -> Self {
+        self.volume_control = available;
         self
     }
 
@@ -415,7 +435,7 @@ impl RenderOnce for TransportBar {
         });
 
         let measured = measure::cell(&ident.child("scrubber").semantic_id(), window, cx);
-        let scrubbable = actionable && total.is_some();
+        let scrubbable = actionable && self.seekable && total.is_some();
 
         let mut track = div()
             .id(ident.child("scrubber").element_id())
@@ -635,7 +655,7 @@ impl RenderOnce for TransportBar {
             }
         };
 
-        let mute = {
+        let mute = self.volume_control.then(|| {
             let report = Rc::clone(&report);
             let mut control = Button::new(ident.child("mute"))
                 .label(strings.text(if self.muted {
@@ -653,9 +673,9 @@ impl RenderOnce for TransportBar {
                     .on_click(move |window, cx| report(TransportEvent::MuteToggled, window, cx));
             }
             control
-        };
+        });
 
-        let volume = {
+        let volume = self.volume_control.then(|| {
             let report = Rc::clone(&report);
             let mut control = Slider::new(ident.child("volume"))
                 .label(strings.text(StringKey::TransportVolume))
@@ -670,7 +690,7 @@ impl RenderOnce for TransportBar {
                 });
             }
             div().flex_none().w(px(VOLUME_WIDTH)).child(control)
-        };
+        });
 
         let speeds = (!self.speeds.is_empty()).then(|| {
             let offered = self.speeds.clone();
@@ -735,8 +755,8 @@ impl RenderOnce for TransportBar {
                 div()
                     .row()
                     .gap_token(&theme, Space::Sm)
-                    .child(mute)
-                    .child(volume)
+                    .children(mute)
+                    .children(volume)
                     .children(speeds),
             );
 
@@ -758,7 +778,7 @@ impl RenderOnce for TransportBar {
             // A scrub is followed across the whole bar rather than the few
             // pixels of the track, so letting go outside it still commits
             // once instead of leaving the scrub running.
-            if let Some(total) = total {
+            if let (true, Some(total)) = (self.seekable, total) {
                 let drag = Rc::clone(&report);
                 let drag_bounds = Rc::clone(&measured);
                 let drag_held = Rc::clone(&scrubbing);
@@ -801,7 +821,8 @@ impl RenderOnce for TransportBar {
             }
 
             let keys = Rc::clone(&report);
-            let (position, step, state) = (self.position, self.step, self.state);
+            let (position, step, state, seekable) =
+                (self.position, self.step, self.state, self.seekable);
             root.interactivity().on_key_down(move |event, window, cx| {
                 let event = match event.keystroke.key.as_str() {
                     "space" => {
@@ -814,8 +835,12 @@ impl RenderOnce for TransportBar {
                     // The forward end of a stream nobody measured is the
                     // host's to clamp, because only the host knows where the
                     // live edge is.
-                    "left" => TransportEvent::SeekRequested(clamp_to(position - step, total)),
-                    "right" => TransportEvent::SeekRequested(clamp_to(position + step, total)),
+                    "left" if seekable => {
+                        TransportEvent::SeekRequested(clamp_to(position - step, total))
+                    }
+                    "right" if seekable => {
+                        TransportEvent::SeekRequested(clamp_to(position + step, total))
+                    }
                     _ => return,
                 };
                 cx.stop_propagation();

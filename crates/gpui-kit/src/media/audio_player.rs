@@ -36,7 +36,9 @@ use crate::content::transport::{TransportBar, TransportDuration, TransportEvent}
 use crate::display::badge::Badge;
 use crate::foundation::{Disableable, Ident, StyledExt, text};
 use crate::media::notice;
-use crate::media::transport::{MediaAvailability, MediaCommand, MediaEvent, MediaTransport};
+use crate::media::transport::{
+    MediaAvailability, MediaCapabilities, MediaCommand, MediaEvent, MediaTransport,
+};
 use crate::strings::{ActiveStrings, StringKey};
 
 /// How tall the peak band is, and how much space is left between two bars.
@@ -182,6 +184,11 @@ impl RenderOnce for AudioPlayer {
             .transport
             .as_ref()
             .map(|transport| transport.snapshot());
+        let capabilities = self
+            .transport
+            .as_ref()
+            .map(|transport| transport.capabilities())
+            .unwrap_or_else(MediaCapabilities::none);
         let origin = self.transport.as_ref().map(|transport| transport.origin());
         let state = match &snapshot {
             Some(snapshot) => snapshot.availability.name(),
@@ -237,6 +244,7 @@ impl RenderOnce for AudioPlayer {
         };
 
         let actionable = !self.disabled
+            && capabilities.audio
             && snapshot
                 .as_ref()
                 .is_some_and(|snapshot| snapshot.availability.is_ready());
@@ -273,6 +281,7 @@ impl RenderOnce for AudioPlayer {
                         &ident,
                         &self,
                         snapshot,
+                        capabilities,
                         Rc::clone(transport),
                         actionable,
                     ))
@@ -337,6 +346,7 @@ fn bar(
     ident: &Ident,
     player: &AudioPlayer,
     snapshot: &crate::media::transport::MediaSnapshot,
+    capabilities: MediaCapabilities,
     transport: Rc<dyn MediaTransport>,
     actionable: bool,
 ) -> TransportBar {
@@ -346,6 +356,8 @@ fn bar(
         .volume(snapshot.volume)
         .muted(snapshot.muted)
         .buffered(snapshot.buffered.iter().copied())
+        .seekable(capabilities.seek)
+        .volume_control(capabilities.volume)
         .disabled(!actionable);
     bar = match snapshot.duration {
         TransportDuration::Known(seconds) => bar.duration(seconds),
@@ -360,7 +372,7 @@ fn bar(
     if let Some(step) = player.step {
         bar = bar.step_seconds(step);
     }
-    if !player.speeds.is_empty() {
+    if capabilities.rates && !player.speeds.is_empty() {
         bar = bar.speeds(player.speeds.iter().copied(), snapshot.speed);
     }
     if actionable {

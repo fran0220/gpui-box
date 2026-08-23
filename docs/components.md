@@ -677,8 +677,8 @@ still offers the control that would stop it, because nothing has stopped.
 | `AudioWaveform` | builder | — | A waveform over finite normalized peaks the host already sampled. Empty, unavailable, and ready stay distinct, and the playhead is an already-normalized caller fact |
 | `VideoPlayer` | builder | the same, over the same transport | The audio player plus a frame surface. A frame the host supplied publishes `frame`; a still standing in for one publishes `poster` with the reason no picture is arriving over it; neither is `none`. Frames are not asked for from a transport that has said it cannot open the media, and a player with no transport carries no controls |
 | `ModelViewer` | builder | the orbit a drag asked for, and the shading a control asked for | A bounded glTF 2.0 viewer. The document is read by `ModelScene::parse` inside `ModelBounds`, drawn flat-shaded or as a wireframe with an orbit camera, and published as the counts the reader counted. A refusal names the limit or the defect; a viewer holding nothing publishes no counts |
-| `MediaTransport`, `FixtureTransport` | type | — | The seam between a player and an operating-system backend, and the deterministic stand-in that decodes nothing. Every surface publishes `MediaOrigin`, so a fixture is never mistaken for a player |
-| `PlatformMediaTransport` | type | native media change signals through `subscribe`; component controls still report `MediaEvent` | The product-neutral native implementation of `MediaTransport`: AVFoundation on macOS and Media Foundation on Windows. `audio()` owns a decoder, output and clock; `video()` additionally owns a platform view, returned by `frame()`. `load` accepts a local file or URL, and snapshot state includes duration, position, buffered ranges, volume, mute, rate, buffering, end and native failures. Linux and Web construct the same API in explicit no-backend state |
+| `MediaTransport`, `FixtureTransport` | type | — | The seam between a player and an operating-system backend, and the deterministic stand-in that decodes nothing. `MediaCapabilities` states audio/video, seek, volume, rates, native-track and output-selection support at runtime; unsupported controls are absent or inert. `MediaErrorKind` keeps no-backend, invalid-source, open, playback, refusal and other failures machine-readable without parsing diagnostics. Every surface publishes `MediaOrigin`, so a fixture is never mistaken for a player |
+| `PlatformMediaTransport` | type | native media change signals through `subscribe`; component controls still report `MediaEvent` | The product-neutral native implementation of `MediaTransport`: AVFoundation on macOS and Media Foundation on Windows. `audio()` owns a decoder, output and clock; `video()` additionally owns a platform view, returned by `frame()`. `load` accepts a local file or URL, and snapshot state includes duration, position, buffered ranges, volume, mute, rate, buffering, end and typed native failures. Capabilities are read from the selected runtime backend rather than inferred from the target. Linux and Web currently construct the same API in explicit no-backend state |
 
 ### Native playback lands behind the component seam
 
@@ -715,11 +715,14 @@ policy, playlists, track/subtitle selection, output-device routing, capture,
 or Linux/Web playback.
 
 A control asks the transport and reports what came back: `MediaEvent::Applied`,
-`Refused` with the backend's own sentence, or `Unsupported`. The next frame
-draws the transport's snapshot, which is what makes a refused seek leave the
-head where it was. `FixtureTransport` takes commands and advances no clock, so
-a scene renders the same bytes on every run; it reports `MediaOrigin::Fixture`
-and every surface publishes and draws that.
+`Refused` with a stable `MediaErrorKind` and the backend's own sentence, or
+`Unsupported`. Consumers branch on the kind rather than parsing platform text.
+The transport's `MediaCapabilities` independently decides whether seek,
+volume, and rate controls exist or accept input. The next frame draws the
+transport's snapshot, which is what makes a refused seek leave the head where
+it was. `FixtureTransport` takes commands and advances no clock, so a scene
+renders the same bytes on every run; it reports `MediaOrigin::Fixture` and
+every surface publishes and draws that.
 
 ### A model is read inside a fence
 

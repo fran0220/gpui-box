@@ -10,6 +10,13 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ### Added
 
+**Media capability and failure vocabulary survives the platform seam.**
+`MediaCapabilities` reports audio/video, seek, volume, rate, native-track, and
+output-selection support at runtime. Player controls omit or disable operations
+the selected backend cannot honor. `MediaErrorKind` keeps no-backend,
+invalid-source, open, playback, and refusal categories machine-readable while
+preserving the backend's diagnostic text.
+
 **A shared `Phase` projects every per-surface state enum.** `HasPhase` reports
 which of ten phases a surface is in, the host's reason, and whether a failed
 refresh left a verified value on screen. Construction APIs are unchanged.

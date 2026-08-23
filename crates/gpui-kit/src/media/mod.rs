@@ -40,12 +40,12 @@ pub use audio_player::AudioPlayer;
 pub use gltf::{ModelBounds, ModelDefect, ModelError, ModelLimit, ModelMesh, ModelScene};
 pub use model_viewer::{ModelShading, ModelState, ModelViewer, ModelViewerEvent};
 pub use platform::{
-    MediaSource, NativeMediaError, NativeMediaEvent, NativeMediaPlayer, NativeMediaSubscription,
-    PlatformMediaTransport,
+    MediaSource, NativeMediaCapabilities, NativeMediaError, NativeMediaEvent, NativeMediaPlayer,
+    NativeMediaSubscription, PlatformMediaTransport,
 };
 pub use transport::{
-    FixtureTransport, MediaAvailability, MediaCommand, MediaEvent, MediaOrigin, MediaOutcome,
-    MediaSnapshot, MediaTransport,
+    FixtureTransport, MediaAvailability, MediaCapabilities, MediaCommand, MediaError,
+    MediaErrorKind, MediaEvent, MediaOrigin, MediaOutcome, MediaSnapshot, MediaTransport,
 };
 pub use video_player::VideoPlayer;
 pub use waveform::{AudioWaveform, AudioWaveformState};

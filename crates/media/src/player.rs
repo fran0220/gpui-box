@@ -45,6 +45,54 @@ pub enum MediaKind {
     Video,
 }
 
+/// Playback features the selected native backend can actually honor.
+///
+/// This is a snapshot rather than a target check. A build may include native
+/// playback while the runtime service or codecs are unavailable, and callers
+/// must not offer controls based on the operating-system name alone.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct MediaCapabilities {
+    pub audio: bool,
+    pub video: bool,
+    pub seek: bool,
+    pub volume: bool,
+    pub rates: bool,
+    pub native_tracks: bool,
+    pub output_selection: bool,
+}
+
+impl MediaCapabilities {
+    pub const fn none() -> Self {
+        Self {
+            audio: false,
+            video: false,
+            seek: false,
+            volume: false,
+            rates: false,
+            native_tracks: false,
+            output_selection: false,
+        }
+    }
+
+    #[cfg(all(
+        feature = "native-playback",
+        any(target_os = "macos", target_os = "windows")
+    ))]
+    const fn native(kind: MediaKind) -> Self {
+        Self {
+            audio: true,
+            video: matches!(kind, MediaKind::Video),
+            seek: true,
+            volume: true,
+            rates: true,
+            // The current AVFoundation and Media Foundation adapters do not
+            // expose either operation through this service yet.
+            native_tracks: false,
+            output_selection: false,
+        }
+    }
+}
+
 /// A local file or an operating-system-supported media URL.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MediaSource {
@@ -369,6 +417,7 @@ impl fmt::Debug for MediaPlayer {
         formatter
             .debug_struct("MediaPlayer")
             .field("kind", &self.kind)
+            .field("capabilities", &self.capabilities())
             .field("snapshot", &self.snapshot())
             .finish()
     }
@@ -404,6 +453,22 @@ impl MediaPlayer {
 
     pub fn kind(&self) -> MediaKind {
         self.kind
+    }
+
+    /// Reports supported operations for this player and its selected backend.
+    ///
+    /// An unavailable backend reports no capabilities even if this target
+    /// normally ships one. Runtime availability, not a compile-time target
+    /// check, is the authority.
+    pub fn capabilities(&self) -> MediaCapabilities {
+        match &self.backend {
+            #[cfg(all(
+                feature = "native-playback",
+                any(target_os = "macos", target_os = "windows")
+            ))]
+            Backend::Native(_) => MediaCapabilities::native(self.kind),
+            Backend::Unavailable(_) => MediaCapabilities::none(),
+        }
     }
 
     /// Replaces the current source and begins opening it asynchronously.
@@ -485,6 +550,24 @@ mod tests {
             MediaAvailability::NoBackend(_)
         ));
         assert_eq!(snapshot.state, PlaybackState::Paused);
+    }
+
+    #[test]
+    fn capabilities_follow_runtime_backend_availability() {
+        let player = MediaPlayer::new(MediaKind::Video);
+        match player.snapshot().availability {
+            MediaAvailability::NoBackend(_) | MediaAvailability::Failed(_) => {
+                assert_eq!(player.capabilities(), MediaCapabilities::none());
+            }
+            MediaAvailability::Idle | MediaAvailability::Loading | MediaAvailability::Ready => {
+                let capabilities = player.capabilities();
+                assert!(capabilities.audio);
+                assert!(capabilities.video);
+                assert!(capabilities.seek);
+                assert!(capabilities.volume);
+                assert!(capabilities.rates);
+            }
+        }
     }
 
     #[test]
