@@ -60,6 +60,12 @@ Box work, not part of either imported lane. It changes no native hosting or
 renderer behavior; it retains caller-owned native controller state until the
 existing host has detached and released its final handle clone.
 
+Window-control hit testing that gives a later-painted nested caption control
+precedence over its enclosing drag area, together with corrected Windows
+horizontal/vertical resize-frame metrics for transparent title bars, is also
+subsequent GPUI Box work. It changes only framework-owned hit testing and uses
+the existing operating-system window APIs; it imports no additional source.
+
 The renderer-backed linear, elliptical radial, and conic gradient primitives
 with up to eight ordered color stops are also subsequent GPUI Box work. Their
 shared inline scene representation and Metal, Direct3D, WGPU, and WebGL shader

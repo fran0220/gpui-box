@@ -21,6 +21,9 @@ scripts/sync-zed/ and provenance.toml and are verified entirely offline; they
 are attribution records, not active update lanes. The later platform-view lifetime
 attachment, full-frame clipping, and macOS restacking are GPUI Box work and are
 not represented as imported Zed source.
+Nested window-control precedence and corrected Windows transparent-titlebar
+resize-frame metrics are GPUI Box work over existing platform APIs and import
+no additional source.
 The renderer-backed linear, elliptical radial, and conic gradient primitives
 for up to eight ordered stops, including their Metal, Direct3D, WGPU, and
 WebGL shaders, are GPUI Box work and import no additional source.

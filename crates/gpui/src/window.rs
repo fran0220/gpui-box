@@ -964,6 +964,18 @@ pub(crate) struct Frame {
     pub(crate) tab_stops: TabStopMap,
 }
 
+fn window_control_at_mouse(frame: &Frame, mouse_hit_test: &HitTest) -> Option<WindowControlArea> {
+    // Window controls follow paint order just like every other overlapping
+    // interactive surface. A title bar commonly marks its whole container as
+    // Drag and then paints Min/Max/Close controls inside it, so the nested,
+    // later-painted control must win over its enclosing drag area.
+    frame
+        .window_control_hitboxes
+        .iter()
+        .rev()
+        .find_map(|(area, hitbox)| mouse_hit_test.ids.contains(&hitbox.id).then_some(*area))
+}
+
 #[derive(Clone, Default)]
 pub(crate) struct PrepaintStateIndex {
     hitboxes_index: usize,
@@ -1874,12 +1886,7 @@ impl Window {
             Box::new(move || {
                 handle
                     .update(&mut cx, |_, window, _cx| {
-                        for (area, hitbox) in &window.rendered_frame.window_control_hitboxes {
-                            if window.mouse_hit_test.ids.contains(&hitbox.id) {
-                                return Some(*area);
-                            }
-                        }
-                        None
+                        window_control_at_mouse(&window.rendered_frame, &window.mouse_hit_test)
                     })
                     .log_err()
                     .unwrap_or(None)
@@ -7658,9 +7665,11 @@ mod tests {
         ExternalImage, ExternalPaths, FileDragPaths, FileDropEvent, FocusHandle, ImageFormat,
         InputEvent as _, InteractiveElement as _, IntoElement, MouseButton, MouseDownEvent,
         MouseMoveEvent, ParentElement, Pixels, Point, Render, StatefulInteractiveElement as _,
-        Styled, TestAppContext, Window, WindowAppearance, WindowOptions, canvas, div, point, px,
-        size,
+        Styled, TestAppContext, Window, WindowAppearance, WindowControlArea, WindowOptions, canvas,
+        div, point, px, size,
     };
+
+    use super::window_control_at_mouse;
 
     struct EmptyView;
 
@@ -7668,6 +7677,45 @@ mod tests {
         fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
             div()
         }
+    }
+
+    struct NestedWindowControls;
+
+    impl Render for NestedWindowControls {
+        fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+            div()
+                .size_full()
+                .window_control_area(WindowControlArea::Drag)
+                .child(
+                    div()
+                        .absolute()
+                        .top_0()
+                        .left_0()
+                        .size(px(40.))
+                        .window_control_area(WindowControlArea::Close),
+                )
+        }
+    }
+
+    #[gpui::test]
+    fn nested_window_control_wins_over_its_enclosing_drag_area(cx: &mut TestAppContext) {
+        let window: AnyWindowHandle = cx.add_window(|_, _| NestedWindowControls).into();
+
+        cx.update_window(window, |_, window, cx| {
+            window.draw(cx).clear(cx);
+            window.simulate_mouse_move(point(px(20.), px(20.)), cx);
+            assert_eq!(
+                window_control_at_mouse(&window.rendered_frame, &window.mouse_hit_test),
+                Some(WindowControlArea::Close)
+            );
+
+            window.simulate_mouse_move(point(px(60.), px(60.)), cx);
+            assert_eq!(
+                window_control_at_mouse(&window.rendered_frame, &window.mouse_hit_test),
+                Some(WindowControlArea::Drag)
+            );
+        })
+        .expect("window remains available");
     }
 
     struct ExternalDropView(Rc<Cell<bool>>);
