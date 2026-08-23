@@ -46,6 +46,7 @@ use crate::display::status::StatusLine;
 use crate::foundation::{Disableable, FocusRing, Ident, Selectable, Sizable, StyledExt};
 use crate::layout::measure;
 use crate::motion::{self, keyed};
+use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// How tall the scrubber's track is, and how wide the volume control is.
@@ -104,6 +105,15 @@ impl TransportState {
 
     fn is_playing(self) -> bool {
         matches!(self, Self::Playing | Self::Buffering)
+    }
+}
+
+impl HasPhase for TransportState {
+    fn phase(&self) -> Phase {
+        match self {
+            Self::Playing | Self::Paused => Phase::Ready,
+            Self::Buffering => Phase::Refreshing,
+        }
     }
 }
 
@@ -913,5 +923,21 @@ mod tests {
         assert_eq!(speed_id(1.5), "speed-1-5");
         assert_eq!(speed_id(2.0), "speed-2");
         assert_eq!(speed_label(1.5), "1.5×");
+    }
+}
+
+#[cfg(test)]
+mod transport_phase_tests {
+    use super::*;
+
+    #[test]
+    fn playing_and_paused_are_ready_buffering_is_refreshing() {
+        assert_eq!(TransportState::Playing.phase(), Phase::Ready);
+        assert_eq!(TransportState::Paused.phase(), Phase::Ready);
+        assert_eq!(TransportState::Buffering.phase(), Phase::Refreshing);
+        assert_ne!(
+            TransportState::Playing.name(),
+            TransportState::Paused.name()
+        );
     }
 }

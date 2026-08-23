@@ -17,6 +17,7 @@ use gpui::{App, IntoElement, RenderOnce, SharedString, Window};
 use crate::data::grid::{DataGrid, GridRow, HierarchyRow};
 use crate::data::{Cell, GridColumn, GridLines, SelectionChange, SelectionMode};
 use crate::display::empty::{EmptyKind, EmptyState};
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Disableable, Ident};
 
 type RenderRow = Rc<dyn Fn(usize, &mut Window, &mut App) -> TreeGridRow>;
@@ -98,6 +99,7 @@ pub struct TreeGrid {
     disabled: bool,
     on_select: Option<SelectHandler>,
     on_expand: Option<ExpandHandler>,
+    slots: Slots,
 }
 
 impl std::fmt::Debug for TreeGrid {
@@ -132,6 +134,7 @@ impl TreeGrid {
             disabled: false,
             on_select: None,
             on_expand: None,
+            slots: Slots::default(),
         }
     }
 
@@ -200,6 +203,14 @@ impl Disableable for TreeGrid {
     }
 }
 
+impl Slotted for TreeGrid {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl RenderOnce for TreeGrid {
     fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
         let render = self.render_row;
@@ -234,6 +245,15 @@ impl RenderOnce for TreeGrid {
         }
         if let Some(handler) = self.on_expand {
             grid = grid.on_expand(move |id, open, window, cx| handler(id, open, window, cx));
+        }
+        let slots = self.slots;
+        for name in [slot::EMPTY, slot::FAILED, slot::LOADING] {
+            if slots.holds(name) {
+                let slots = slots.clone();
+                grid = grid.slot(name, move |window, cx| {
+                    slots.render(name, window, cx).expect("slot was filled")
+                });
+            }
         }
         grid
     }

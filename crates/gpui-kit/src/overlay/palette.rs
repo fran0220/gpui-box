@@ -17,6 +17,7 @@ use gpui_kit_theme::{ActiveTheme, Elevation, Space, TypeScale};
 
 use crate::controls::input::{TextInput, TextInputEvent};
 use crate::display::empty::{EmptyKind, EmptyState};
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Ident, Pressable, StyledExt};
 use crate::motion;
 use crate::overlay::kbd::Kbd;
@@ -163,6 +164,7 @@ pub struct CommandPalette {
     /// The highlighted command, by identity, so filtering does not move the
     /// highlight onto whatever happens to sit at the same position.
     active: Option<SharedString>,
+    slots: Slots,
     /// Held so the query subscription lives as long as the palette does.
     _subscriptions: Vec<Subscription>,
 }
@@ -204,6 +206,7 @@ impl CommandPalette {
             query,
             commands: Vec::new(),
             active: None,
+            slots: Slots::default(),
             _subscriptions: vec![subscription],
         }
     }
@@ -427,8 +430,16 @@ impl Focusable for CommandPalette {
     }
 }
 
+impl Slotted for CommandPalette {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl Render for CommandPalette {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let query = self.query.read(cx).value().clone();
         let rows = self.results(cx);
@@ -437,13 +448,15 @@ impl Render for CommandPalette {
         let body = if rows.is_empty() {
             // A query that answered nothing is a fact about the query, not an
             // application without commands, so it says which query it was.
-            EmptyState::new(
-                self.ident.child("empty"),
-                cx.strings().format(StringKey::PaletteNoMatch, &[&query]),
-            )
-            .kind(EmptyKind::Empty)
-            .detail(cx.strings().text(StringKey::PaletteEmptyDetail))
-            .into_any_element()
+            self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                EmptyState::new(
+                    self.ident.child("empty"),
+                    cx.strings().format(StringKey::PaletteNoMatch, &[&query]),
+                )
+                .kind(EmptyKind::Empty)
+                .detail(cx.strings().text(StringKey::PaletteEmptyDetail))
+                .into_any_element()
+            })
         } else {
             div()
                 .id(self.ident.child("results").element_id())

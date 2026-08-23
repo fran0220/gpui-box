@@ -25,7 +25,9 @@ use crate::display::badge::Tone;
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::loading::PulseLoader;
 use crate::display::status::StatusDot;
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Ident, StyledExt};
+use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
 /// One point already normalized by the caller.
@@ -109,12 +111,38 @@ impl SparklineState {
     }
 }
 
+impl HasPhase for SparklineState {
+    fn phase(&self) -> Phase {
+        match self {
+            Self::Loading => Phase::Loading,
+            Self::Ready(_) => Phase::Ready,
+            Self::Empty => Phase::Empty,
+            Self::Unavailable(_) => Phase::Unavailable,
+            Self::Error(_) | Self::Stale { .. } => Phase::Error,
+        }
+    }
+
+    fn reason(&self) -> Option<&str> {
+        match self {
+            Self::Unavailable(reason) | Self::Error(reason) | Self::Stale { reason, .. } => {
+                Some(reason.as_ref())
+            }
+            _ => None,
+        }
+    }
+
+    fn is_stale(&self) -> bool {
+        matches!(self, Self::Stale { .. })
+    }
+}
+
 /// A compact, accessible trend reading.
 #[derive(Debug, IntoElement)]
 pub struct Sparkline {
     ident: Ident,
     label: SharedString,
     state: SparklineState,
+    slots: Slots,
 }
 
 impl Sparkline {
@@ -127,26 +155,37 @@ impl Sparkline {
             ident: ident.into(),
             label: label.into(),
             state,
+            slots: Slots::default(),
         }
     }
 }
 
+impl Slotted for Sparkline {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl RenderOnce for Sparkline {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let (body, spec): (AnyElement, NodeSpec) = match &self.state {
             SparklineState::Loading => (
-                div()
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .w_full()
-                    .p(px(24.0))
-                    .child(
-                        PulseLoader::new(self.ident.child("loading"))
-                            .label(cx.strings().text(StringKey::Loading)),
-                    )
-                    .into_any_element(),
+                self.slots.or_else(slot::LOADING, window, cx, |_, cx| {
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .w_full()
+                        .p(px(24.0))
+                        .child(
+                            PulseLoader::new(self.ident.child("loading"))
+                                .label(cx.strings().text(StringKey::Loading)),
+                        )
+                        .into_any_element()
+                }),
                 NodeSpec::new(self.ident.semantic_id(), Role::Region)
                     .text(self.label.clone())
                     .value("loading")
@@ -162,38 +201,44 @@ impl RenderOnce for Sparkline {
                 reading_spec(&self.ident, &self.label, reading, cx),
             ),
             SparklineState::Empty => (
-                EmptyState::new(
-                    self.ident.child("empty"),
-                    cx.strings().text(StringKey::SparklineEmpty),
-                )
-                .kind(EmptyKind::Empty)
-                .into_any_element(),
+                self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                    EmptyState::new(
+                        self.ident.child("empty"),
+                        cx.strings().text(StringKey::SparklineEmpty),
+                    )
+                    .kind(EmptyKind::Empty)
+                    .into_any_element()
+                }),
                 NodeSpec::new(self.ident.semantic_id(), Role::Region)
                     .text(self.label.clone())
                     .value("empty")
                     .read_only(true),
             ),
             SparklineState::Unavailable(reason) => (
-                EmptyState::new(
-                    self.ident.child("unavailable"),
-                    cx.strings().text(StringKey::SparklineUnavailable),
-                )
-                .kind(EmptyKind::Unavailable)
-                .detail(reason.clone())
-                .into_any_element(),
+                self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                    EmptyState::new(
+                        self.ident.child("unavailable"),
+                        cx.strings().text(StringKey::SparklineUnavailable),
+                    )
+                    .kind(EmptyKind::Unavailable)
+                    .detail(reason.clone())
+                    .into_any_element()
+                }),
                 NodeSpec::new(self.ident.semantic_id(), Role::Region)
                     .text(self.label.clone())
                     .value("unavailable")
                     .read_only(true),
             ),
             SparklineState::Error(reason) => (
-                EmptyState::new(
-                    self.ident.child("error"),
-                    cx.strings().text(StringKey::SparklineError),
-                )
-                .kind(EmptyKind::Failed)
-                .detail(reason.clone())
-                .into_any_element(),
+                self.slots.or_else(slot::FAILED, window, cx, |_, cx| {
+                    EmptyState::new(
+                        self.ident.child("error"),
+                        cx.strings().text(StringKey::SparklineError),
+                    )
+                    .kind(EmptyKind::Failed)
+                    .detail(reason.clone())
+                    .into_any_element()
+                }),
                 NodeSpec::new(self.ident.semantic_id(), Role::Region)
                     .text(self.label.clone())
                     .value("error")
@@ -366,5 +411,26 @@ mod tests {
     fn non_finite_points_are_not_bounded() {
         assert!(!SparklinePoint::new(f32::NAN, 0.5).is_bounded());
         assert!(!SparklinePoint::new(0.5, f32::INFINITY).is_bounded());
+    }
+}
+
+#[cfg(test)]
+mod sparkline_phase_tests {
+    use super::*;
+
+    #[test]
+    fn stale_projects_as_error_and_keeps_the_verified_reading() {
+        let state = SparklineState::Stale {
+            reading: SparklineReading {
+                points: Vec::new(),
+                current: SharedString::from("0"),
+                minimum: SharedString::from("0"),
+                maximum: SharedString::from("0"),
+            },
+            reason: "offline".into(),
+        };
+        assert_eq!(state.phase(), Phase::Error);
+        assert!(state.is_stale());
+        assert_eq!(state.reason(), Some("offline"));
     }
 }

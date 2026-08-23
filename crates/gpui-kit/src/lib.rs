@@ -209,14 +209,19 @@ pub mod prelude {
     pub use crate::display::heatmap::{HeatCell, Heatmap, HeatmapState};
     pub use crate::display::highlight::HighlightedText;
     pub use crate::display::icon::{Icon, IconTone};
-    pub use crate::display::loading::{GradientSpinner, PulseLoader, Skeleton};
+    pub use crate::display::loading::{
+        GradientSpinner, PulseLoader, RefreshVeil, Skeleton, SkeletonShape, Spinner,
+    };
     pub use crate::display::metric::{MetricCard, MetricReading, MetricState};
+    pub use crate::display::outcome::{OutcomeKind, OutcomePanel};
     pub use crate::display::progress::ProgressBar;
     pub use crate::display::progress_circle::ProgressCircle;
     pub use crate::display::sparkline::{
         Sparkline, SparklinePoint, SparklineReading, SparklineState,
     };
-    pub use crate::display::status::{Callout, StatusDot, StatusLine};
+    pub use crate::display::stage_progress::{ProgressStage, StageProgress, StageStatus};
+    pub use crate::display::state_view::StateView;
+    pub use crate::display::status::{Banner, Callout, StaleMark, StatusDot, StatusLine};
     pub use crate::display::tag::Tag;
     pub use crate::display::timeline::{EntryTime, Timeline, TimelineEntry, TimelineGroup};
     pub use crate::display::trace::{SpanState, SpanTimeline, TraceSpan, TraceView};
@@ -285,7 +290,7 @@ pub mod prelude {
         MenubarMenu, Notification, NotificationCenter, NotificationCenterEvent, Overlay, Placement,
         Popover, PopoverEvent, Toast, ToastCorner, ToastLayer, Tooltip, Tooltipped, UnreadCount,
     };
-    pub use crate::state::{AsyncStatus, AsyncValue, Loadable};
+    pub use crate::state::{AsyncStatus, AsyncValue, HasPhase, Loadable, Phase};
     pub use crate::strings::{
         ActiveNumbers, ActiveSearch, ActiveStrings, EnglishNumbers, EnglishSearch, NumberAdapter,
         Plural, SearchMatcher, SharedNumberAdapter, SharedSearchMatcher, StringKey, Strings,

@@ -19,9 +19,11 @@ use crate::agent::server_list::{Offering, OfferingKind};
 use crate::display::badge::{Badge, Tone};
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::status::StatusDot;
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{
     CardVariant, Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text,
 };
+use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
 type ActivateHandler = Rc<dyn Fn(OfferingIdentity, &mut Window, &mut App)>;
@@ -98,6 +100,31 @@ impl OfferingSourceState {
     }
 }
 
+impl HasPhase for OfferingSourceState {
+    fn phase(&self) -> Phase {
+        match self {
+            Self::Loading => Phase::Loading,
+            Self::Empty => Phase::Empty,
+            Self::Unavailable(_) => Phase::Unavailable,
+            Self::Error(_) | Self::Stale { .. } => Phase::Error,
+            Self::Ready(_) => Phase::Ready,
+        }
+    }
+
+    fn reason(&self) -> Option<&str> {
+        match self {
+            Self::Unavailable(reason) | Self::Error(reason) | Self::Stale { reason, .. } => {
+                Some(reason.as_ref())
+            }
+            _ => None,
+        }
+    }
+
+    fn is_stale(&self) -> bool {
+        matches!(self, Self::Stale { .. })
+    }
+}
+
 /// One attributed source and its independently truthful state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OfferingSource {
@@ -139,6 +166,7 @@ pub struct OfferingCatalog {
     size: ControlSize,
     disabled: bool,
     on_activate: Option<ActivateHandler>,
+    slots: Slots,
 }
 
 impl std::fmt::Debug for OfferingCatalog {
@@ -166,6 +194,7 @@ impl OfferingCatalog {
             size: ControlSize::Md,
             disabled: false,
             on_activate: None,
+            slots: Slots::default(),
         }
     }
 
@@ -220,8 +249,16 @@ impl Sizable for OfferingCatalog {
     }
 }
 
+impl Slotted for OfferingCatalog {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl RenderOnce for OfferingCatalog {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let state_name = self.aggregate_state();
         let busy = self
@@ -238,7 +275,7 @@ impl RenderOnce for OfferingCatalog {
             .filter(|source| source.state.name() != "ready")
             .map(|source| self.source_status(source, &theme, cx))
             .collect();
-        let body = self.results(&theme, cx);
+        let body = self.results(&theme, window, cx);
 
         div()
             .id(self.ident.element_id())
@@ -341,7 +378,12 @@ impl OfferingCatalog {
             .into_any_element()
     }
 
-    fn results(&self, theme: &gpui_kit_theme::Theme, cx: &mut App) -> AnyElement {
+    fn results(
+        &self,
+        theme: &gpui_kit_theme::Theme,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> AnyElement {
         let query = self.query.to_lowercase();
         let filtered: Vec<(&OfferingSource, &SearchableOffering)> = self
             .sources
@@ -370,9 +412,11 @@ impl OfferingCatalog {
             } else {
                 StringKey::OfferingCatalogEmpty
             };
-            return EmptyState::new(self.ident.child("empty"), cx.strings().text(key))
-                .kind(EmptyKind::Empty)
-                .into_any_element();
+            return self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                EmptyState::new(self.ident.child("empty"), cx.strings().text(key))
+                    .kind(EmptyKind::Empty)
+                    .into_any_element()
+            });
         }
 
         let list_ident = self.ident.child("results");
@@ -505,4 +549,20 @@ impl OfferingCatalog {
 
 fn encoded_segment(value: &str) -> String {
     value.replace('%', "%25").replace('.', "%2E")
+}
+
+#[cfg(test)]
+mod offering_phase_tests {
+    use super::*;
+
+    #[test]
+    fn stale_projects_as_error_and_keeps_the_verified_offerings() {
+        let state = OfferingSourceState::Stale {
+            offerings: Vec::new(),
+            reason: "offline".into(),
+        };
+        assert_eq!(state.phase(), Phase::Error);
+        assert!(state.is_stale());
+        assert_eq!(state.reason(), Some("offline"));
+    }
 }

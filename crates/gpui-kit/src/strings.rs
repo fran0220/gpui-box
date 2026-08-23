@@ -630,6 +630,23 @@ string_keys! {
     FailureAttempts => "failure.attempts", "Tried {0} times";
     FailureRetrying => "failure.retrying", "Trying again";
 
+    StateViewIdle => "state.idle", "Nothing has been asked for yet";
+    StateViewQueued => "state.queued", "Waiting to start";
+    StateViewBlocked => "state.blocked", "Waiting for an answer";
+    StateViewCancelled => "state.cancelled", "Withdrawn";
+    StateViewEmpty => "state.empty", "Nothing here";
+    StateViewUnavailable => "state.unavailable", "Unavailable";
+    StateViewStillWorking => "state.still-working", "This is taking longer than usual";
+    StateViewRefreshing => "state.refreshing", "Refreshing";
+    EmptyUnauthorized => "empty.unauthorized", "Not authorized";
+    ProgressCancel => "progress.cancel", "Cancel";
+    ProgressPaused => "progress.paused", "Paused";
+    ProgressStalled => "progress.stalled", "Stalled";
+    OutcomeSuccess => "outcome.success", "Finished";
+    OutcomePartial => "outcome.partial", "Finished, with failures";
+    OutcomeFailed => "outcome.failed", "Did not finish";
+    StaleUpdated => "stale.updated", "Last verified: {0}";
+
     // Read-only code.
     CodeLineNumbers => "code.line-numbers", "Line numbers";
     CodeLineAdded => "code.line-added", "Added";

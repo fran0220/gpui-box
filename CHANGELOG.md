@@ -8,7 +8,25 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ## [Unreleased]
 
+### Added
+
+**A shared `Phase` projects every per-surface state enum.** `HasPhase` reports
+which of ten phases a surface is in, the host's reason, and whether a failed
+refresh left a verified value on screen. Construction APIs are unchanged.
+`StateView` renders the phase; `RefreshVeil` covers last-verified content
+during a refresh.
+
+**Loading and status vocabulary for downstream waits.** `Spinner` is the inline
+turn. `Skeleton` takes a sequence of shapes. `ProgressBar` and `ProgressCircle`
+distinguish stalled and paused work and can report cancel. `StageProgress` is
+a host-owned multi-stage run. `Banner` is the page-level callout. `OutcomePanel`
+is the counterpart to `FailurePanel`. `StaleMark` names a stale verified value.
+
 ### Changed
+
+**`EmptyKind` gained `Unauthorized`.** An authorization refusal is no longer
+folded into `Unavailable`. Exhaustive matches on `EmptyKind` will not compile
+until they name the new variant.
 
 **The public site is three destinations, not one catalog dump.** `/` is the
 Box: thesis, a live specimen in both themes, the six surfaces the library

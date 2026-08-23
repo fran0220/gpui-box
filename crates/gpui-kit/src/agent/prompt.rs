@@ -14,7 +14,9 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TypeScale};
 
 use crate::display::empty::{EmptyKind, EmptyState};
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Disableable, FocusRing, Ident, StyledExt};
+use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
 type SlotHandler = Rc<dyn Fn(&PromptSlot, &mut Window, &mut App)>;
@@ -50,6 +52,33 @@ pub enum PromptBuilderState {
     Unavailable(SharedString),
 }
 
+impl PromptBuilderState {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Ready => "ready",
+            Self::Empty => "empty",
+            Self::Unavailable(_) => "unavailable",
+        }
+    }
+}
+
+impl HasPhase for PromptBuilderState {
+    fn phase(&self) -> Phase {
+        match self {
+            Self::Ready => Phase::Ready,
+            Self::Empty => Phase::Empty,
+            Self::Unavailable(_) => Phase::Unavailable,
+        }
+    }
+
+    fn reason(&self) -> Option<&str> {
+        match self {
+            Self::Unavailable(reason) => Some(reason.as_ref()),
+            _ => None,
+        }
+    }
+}
+
 /// What a slot activation reports.
 #[derive(Debug, Clone, PartialEq)]
 pub enum PromptBuilderEvent {
@@ -63,6 +92,7 @@ pub struct PromptBuilder {
     label: SharedString,
     body: SharedString,
     slots: Vec<PromptSlot>,
+    replacements: Slots,
     state: PromptBuilderState,
     disabled: bool,
     on_slot: Option<SlotHandler>,
@@ -75,6 +105,7 @@ impl PromptBuilder {
             label: label.into(),
             body: SharedString::default(),
             slots: Vec::new(),
+            replacements: Slots::default(),
             state: PromptBuilderState::Ready,
             disabled: false,
             on_slot: None,
@@ -105,6 +136,14 @@ impl PromptBuilder {
     }
 }
 
+impl Slotted for PromptBuilder {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.replacements
+    }
+}
+
 impl Disableable for PromptBuilder {
     fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
@@ -113,31 +152,35 @@ impl Disableable for PromptBuilder {
 }
 
 impl RenderOnce for PromptBuilder {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let (body, spec): (gpui::AnyElement, NodeSpec) = match &self.state {
             PromptBuilderState::Empty => (
-                EmptyState::new(
-                    self.ident.child("empty"),
-                    cx.strings().text(StringKey::PromptEmpty),
-                )
-                .kind(EmptyKind::Empty)
-                .into_any_element(),
+                self.replacements.or_else(slot::EMPTY, window, cx, |_, cx| {
+                    EmptyState::new(
+                        self.ident.child("empty"),
+                        cx.strings().text(StringKey::PromptEmpty),
+                    )
+                    .kind(EmptyKind::Empty)
+                    .into_any_element()
+                }),
                 NodeSpec::new(self.ident.semantic_id(), Role::Region)
                     .text(self.label.clone())
-                    .value("empty"),
+                    .value(self.state.name()),
             ),
             PromptBuilderState::Unavailable(reason) => (
-                EmptyState::new(
-                    self.ident.child("unavailable"),
-                    cx.strings().text(StringKey::PromptUnavailable),
-                )
-                .kind(EmptyKind::Unavailable)
-                .detail(reason.clone())
-                .into_any_element(),
+                self.replacements.or_else(slot::EMPTY, window, cx, |_, cx| {
+                    EmptyState::new(
+                        self.ident.child("unavailable"),
+                        cx.strings().text(StringKey::PromptUnavailable),
+                    )
+                    .kind(EmptyKind::Unavailable)
+                    .detail(reason.clone())
+                    .into_any_element()
+                }),
                 NodeSpec::new(self.ident.semantic_id(), Role::Region)
                     .text(self.label.clone())
-                    .value("unavailable"),
+                    .value(self.state.name()),
             ),
             PromptBuilderState::Ready => {
                 let slots = self
@@ -203,10 +246,22 @@ impl RenderOnce for PromptBuilder {
                         .into_any_element(),
                     NodeSpec::new(self.ident.semantic_id(), Role::Region)
                         .text(self.label.clone())
-                        .value("ready"),
+                        .value(self.state.name()),
                 )
             }
         };
         div().w_full().child(body).semantic_in(cx, spec)
+    }
+}
+
+#[cfg(test)]
+mod prompt_phase_tests {
+    use super::*;
+
+    #[test]
+    fn unavailable_is_not_empty() {
+        let state = PromptBuilderState::Unavailable("denied".into());
+        assert_eq!(state.phase(), Phase::Unavailable);
+        assert_eq!(state.name(), "unavailable");
     }
 }

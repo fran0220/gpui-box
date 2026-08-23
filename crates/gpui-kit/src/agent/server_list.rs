@@ -42,9 +42,11 @@ use crate::display::icon::flips;
 use crate::display::loading::PulseLoader;
 use crate::display::status::{Callout, StatusDot};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{
     CardVariant, Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text,
 };
+use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
 use std::f32::consts::FRAC_PI_2;
@@ -112,6 +114,22 @@ impl ServerState {
             Self::Disabled { reason } => reason.as_ref(),
             _ => None,
         }
+    }
+}
+
+impl HasPhase for ServerState {
+    fn phase(&self) -> Phase {
+        match self {
+            Self::Connected => Phase::Ready,
+            Self::Connecting => Phase::Loading,
+            Self::Disconnected => Phase::Idle,
+            Self::Failed { .. } => Phase::Error,
+            Self::Disabled { .. } => Phase::Unavailable,
+        }
+    }
+
+    fn reason(&self) -> Option<&str> {
+        ServerState::reason(self).map(|reason| reason.as_ref())
     }
 }
 
@@ -301,6 +319,7 @@ pub struct ServerList {
     on_select: Option<SelectHandler>,
     on_retry: Option<RetryHandler>,
     on_toggle: Option<ToggleHandler>,
+    slots: Slots,
 }
 
 impl std::fmt::Debug for ServerList {
@@ -328,6 +347,7 @@ impl ServerList {
             on_select: None,
             on_retry: None,
             on_toggle: None,
+            slots: Slots::default(),
         }
     }
 
@@ -403,25 +423,33 @@ impl Sizable for ServerList {
     }
 }
 
+impl Slotted for ServerList {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl RenderOnce for ServerList {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let count = self.servers.len();
 
         let body: Vec<AnyElement> = if self.servers.is_empty() {
-            vec![
+            vec![self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
                 EmptyState::new(
                     self.ident.child("empty"),
                     cx.strings().text(StringKey::ServerEmpty),
                 )
                 .kind(EmptyKind::Empty)
                 .detail(cx.strings().text(StringKey::ServerEmptyDetail))
-                .into_any_element(),
-            ]
+                .into_any_element()
+            })]
         } else {
             self.servers
                 .iter()
-                .map(|server| self.server_element(server, &theme, cx))
+                .map(|server| self.server_element(server, &theme, window, cx))
                 .collect()
         };
 
@@ -439,7 +467,13 @@ impl RenderOnce for ServerList {
 }
 
 impl ServerList {
-    fn server_element(&self, server: &ServerEntry, theme: &Theme, cx: &mut App) -> AnyElement {
+    fn server_element(
+        &self,
+        server: &ServerEntry,
+        theme: &Theme,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> AnyElement {
         let direction = cx.layout_direction();
         let ident = self.ident.child(server.id.as_ref());
         let metrics = theme.control.get(self.size);
@@ -597,7 +631,7 @@ impl ServerList {
                 )
             });
 
-        let offerings = open.then(|| self.offerings_element(server, &ident, theme, cx));
+        let offerings = open.then(|| self.offerings_element(server, &ident, theme, window, cx));
 
         div()
             .column()
@@ -616,17 +650,18 @@ impl ServerList {
         server: &ServerEntry,
         server_ident: &Ident,
         theme: &Theme,
+        window: &mut Window,
         cx: &mut App,
     ) -> AnyElement {
         let ident = server_ident.child("offerings");
         match &server.catalog {
-            Catalog::Unasked => {
+            Catalog::Unasked => self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
                 EmptyState::new(ident, cx.strings().text(StringKey::ServerOfferingsUnasked))
                     .kind(EmptyKind::Unstarted)
                     .detail(cx.strings().text(StringKey::ServerOfferingsUnaskedDetail))
                     .into_any_element()
-            }
-            Catalog::Asking => {
+            }),
+            Catalog::Asking => self.slots.or_else(slot::LOADING, window, cx, |_, cx| {
                 let label = cx.strings().text(StringKey::ServerOfferingsAsking);
                 div()
                     .p_token(theme, Space::Sm)
@@ -640,22 +675,26 @@ impl ServerList {
                             .value("asking"),
                     )
                     .into_any_element()
-            }
-            Catalog::Unavailable(reason) => EmptyState::new(
-                ident,
-                cx.strings().text(StringKey::ServerOfferingsUnavailable),
-            )
-            .kind(EmptyKind::Unavailable)
-            .detail(reason.clone())
-            .into_any_element(),
+            }),
+            Catalog::Unavailable(reason) => self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                EmptyState::new(
+                    ident,
+                    cx.strings().text(StringKey::ServerOfferingsUnavailable),
+                )
+                .kind(EmptyKind::Unavailable)
+                .detail(reason.clone())
+                .into_any_element()
+            }),
             // The answer was empty, which is an answer. It is drawn as one:
             // the reader is told the server offers nothing, not that nobody
             // has looked.
             Catalog::Offers(offerings) if offerings.is_empty() => {
-                EmptyState::new(ident, cx.strings().text(StringKey::ServerOfferingsNone))
-                    .kind(EmptyKind::Empty)
-                    .detail(cx.strings().text(StringKey::ServerOfferingsNoneDetail))
-                    .into_any_element()
+                self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                    EmptyState::new(ident, cx.strings().text(StringKey::ServerOfferingsNone))
+                        .kind(EmptyKind::Empty)
+                        .detail(cx.strings().text(StringKey::ServerOfferingsNoneDetail))
+                        .into_any_element()
+                })
             }
             Catalog::Offers(offerings) => {
                 let mut groups: Vec<AnyElement> = Vec::new();
@@ -812,5 +851,29 @@ mod tests {
             .reason()
             .is_some()
         );
+    }
+}
+
+#[cfg(test)]
+mod server_phase_tests {
+    use super::*;
+
+    #[test]
+    fn connected_is_ready_and_disabled_is_unavailable() {
+        assert_eq!(ServerState::Connected.phase(), Phase::Ready);
+        assert_eq!(ServerState::Connecting.phase(), Phase::Loading);
+        assert_eq!(ServerState::Disconnected.phase(), Phase::Idle);
+        assert_eq!(
+            ServerState::Failed {
+                reason: "timeout".into()
+            }
+            .phase(),
+            Phase::Error
+        );
+        let disabled = ServerState::Disabled {
+            reason: Some("reader turned it off".into()),
+        };
+        assert_eq!(disabled.phase(), Phase::Unavailable);
+        assert_eq!(HasPhase::reason(&disabled), Some("reader turned it off"));
     }
 }

@@ -446,3 +446,151 @@ fn chart_semantics_take_new_text_before_pixels_settle(cx: &mut TestAppContext) {
         Some("refresh failed")
     );
 }
+
+#[gpui::test]
+fn a_state_view_does_not_render_a_refusal_as_empty(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        StateView::new(
+            "panel",
+            Loadable::<(), String>::Unavailable("the host refused".into()),
+        )
+        .into_any_element()
+    });
+
+    let node = harness.node("panel").expect("published");
+    assert_eq!(node.value.as_deref(), Some("unavailable"));
+    assert_eq!(
+        harness
+            .node("panel.empty")
+            .expect("refusal surface")
+            .value
+            .as_deref(),
+        Some("unavailable")
+    );
+}
+
+#[gpui::test]
+fn a_refreshing_state_view_keeps_the_verified_value(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        let mut value = AsyncValue::<_, String>::ready("12 runs");
+        value.refresh();
+        StateView::from_async("panel", &value, |text| {
+            div().child(*text).into_any_element()
+        })
+        .into_any_element()
+    });
+
+    let node = harness.node("panel").expect("published");
+    assert_eq!(node.value.as_deref(), Some("refreshing"));
+    assert!(node.busy);
+    assert!(
+        harness.node("panel.veil").is_some(),
+        "a refresh must veil the last verified value, not erase it"
+    );
+    assert!(
+        harness.node("panel.stale").is_none(),
+        "a refresh in flight is not a failed refresh"
+    );
+}
+
+#[gpui::test]
+fn an_unauthorized_empty_state_is_not_unavailable(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        EmptyState::new("workspace", "This workspace is locked")
+            .kind(EmptyKind::Unauthorized)
+            .into_any_element()
+    });
+
+    assert_eq!(
+        harness
+            .node("workspace")
+            .expect("published")
+            .value
+            .as_deref(),
+        Some("unauthorized")
+    );
+}
+
+#[gpui::test]
+fn a_paused_bar_is_not_busy(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        ProgressBar::new("upload")
+            .label("Uploading")
+            .count(6, 12)
+            .paused(true)
+            .on_cancel(|_, _| {})
+            .into_any_element()
+    });
+
+    let node = harness.node("upload").expect("published");
+    assert!(!node.busy, "paused work must not claim it is still moving");
+    assert!(harness.node("upload.cancel").is_some());
+}
+
+#[gpui::test]
+fn a_banner_reports_its_dismissal(cx: &mut TestAppContext) {
+    let dismissed = Rc::new(Cell::new(false));
+    let sink = dismissed.clone();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let sink = sink.clone();
+        Banner::new("notice", "The last refresh failed.", Tone::Warning)
+            .title("Stale")
+            .on_dismiss(move |_, _| sink.set(true))
+            .into_any_element()
+    });
+
+    harness.click("notice.dismiss");
+    assert!(dismissed.get());
+}
+
+#[gpui::test]
+fn an_outcome_panel_names_a_partial_success(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        OutcomePanel::new("import", OutcomeKind::Partial)
+            .count("47 succeeded, 3 failed")
+            .into_any_element()
+    });
+
+    assert_eq!(
+        harness.node("import").expect("published").value.as_deref(),
+        Some("partial")
+    );
+}
+
+#[gpui::test]
+fn a_stage_progress_publishes_each_stage(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        StageProgress::new("install")
+            .stages([
+                ProgressStage::new("download", "Download", StageStatus::Done),
+                ProgressStage::new("verify", "Verify", StageStatus::Active),
+            ])
+            .into_any_element()
+    });
+
+    assert_eq!(
+        harness.node("install").expect("published").value.as_deref(),
+        Some("active")
+    );
+    assert!(harness.node("install").expect("published").busy);
+    assert_eq!(
+        harness
+            .node("install.verify")
+            .expect("published")
+            .value
+            .as_deref(),
+        Some("active")
+    );
+}
+
+#[gpui::test]
+fn a_spinner_publishes_a_busy_progress_node(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        Spinner::new("wait")
+            .label("Contacting host")
+            .into_any_element()
+    });
+
+    let node = harness.node("wait").expect("published");
+    assert!(node.busy);
+}

@@ -80,8 +80,8 @@ actions. They define no account, provider, network, or credential policy.
 | `Tag` | builder | Removal exists only when removal is allowed. Accepts a caller-owned `tint` the way `Badge` does; the published tone name is unchanged |
 | `Avatar` | builder | Initials fallback, blank when there is no name |
 | `Divider` | builder | Optional caption |
-| `EmptyState` | builder | Names which of empty, unstarted, unavailable, or failed holds |
-| `PulseLoader`, `GradientSpinner`, `Skeleton` | builder | Publish a busy indeterminate node. All three paint the working signature |
+| `EmptyState` | builder | Names which of empty, unstarted, unavailable, failed, or unauthorized holds |
+| `PulseLoader`, `GradientSpinner`, `Skeleton`, `Spinner`, `RefreshVeil` | builder | Publish a busy indeterminate node. The first three paint the working signature. `Spinner` is the inline turn; `RefreshVeil` covers last-verified content without erasing it. `Skeleton` also takes a sequence of shapes |
 | `ProgressCircle` | builder | The ring form of `ProgressBar`, over the same state and the same working signature. A position only when the extent is known; an unknown extent travels a short arc rather than tinting part of the ring |
 | `DescriptionList` | builder | Term and value pairs for a detail page. Unknown, not applicable, and redacted are three different facts, and a redacted value carries only its shape |
 | `Timeline` | builder | A chronological feed. Every time and every day heading is a string the caller already formatted, and an entry whose time nobody knows says so |
@@ -90,6 +90,11 @@ actions. They define no account, provider, network, or credential policy.
 | `LineChart` | builder | A cartesian reading over one or more host-owned series. `ChartPoint` carries stable business identity plus exact host-formatted label/value text. Keyed transitions and presence animate geometry while semantics update immediately; `area` supplies the renderer-backed gradient fill and `crosshair` supplies pointer/keyboard navigation with a business-id callback. Loading, empty, unavailable, error, stale-with-last-verified-data, and ready stay distinct |
 | `BarChart` | builder | Categorized bars over one host-owned series. Bars enter, update, and exit by `ChartPoint` identity and expose the same truthful state contract as `LineChart` |
 | `FailurePanel` | builder | A region the host could not produce, in the host's own words. Not an error boundary and deliberately not named one: GPUI has no fallible render and no catchable render panic, so this takes a failure the host is already holding, through `from_result`. It publishes `failed`, never empty |
+| `StateView` | builder | Renders one `Phase` without inventing one. Loading, empty, unavailable, and error go through the existing slots; Refreshing keeps the last verified content under a veil; a stale error keeps it and marks it |
+| `Banner` | builder | The page-level form of `Callout`: title, action, dismiss. The callout stays the inline form |
+| `OutcomePanel` | builder | The counterpart to `FailurePanel`: success, partial success, or failure. Counts are host-worded strings |
+| `StaleMark` | builder | Marks a verified value that is still on screen after a failed refresh |
+| `StageProgress` | builder | Named stages the host already owns. The component invents no ETA |
 | `Icon` | builder | A glyph from the bundled catalog, sized from the `control.*` glyph step and coloured from a semantic role rather than an `Hsla`. Emits nothing: a glyph that can be clicked is `IconButton`. Decorative by default and published only when named, so a glyph that repeats the label beside it is not announced twice |
 
 ### The card is the container, and there is one of it

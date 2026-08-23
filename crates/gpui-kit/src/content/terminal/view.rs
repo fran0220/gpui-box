@@ -40,8 +40,10 @@ use super::input::{CellHit, SELECTION_DRAG_THRESHOLD, cell_at};
 use super::palette::resolve;
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::loading::PulseLoader;
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Ident, StyledExt};
 use crate::motion::keyed;
+use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
 /// The inset between the panel edge and the first glyph.
@@ -83,6 +85,35 @@ pub enum TerminalState {
     Error(SharedString),
     #[default]
     Ready,
+}
+
+impl TerminalState {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Loading => "loading",
+            Self::Unavailable(_) => "unavailable",
+            Self::Error(_) => "error",
+            Self::Ready => "ready",
+        }
+    }
+}
+
+impl HasPhase for TerminalState {
+    fn phase(&self) -> Phase {
+        match self {
+            Self::Loading => Phase::Loading,
+            Self::Unavailable(_) => Phase::Unavailable,
+            Self::Error(_) => Phase::Error,
+            Self::Ready => Phase::Ready,
+        }
+    }
+
+    fn reason(&self) -> Option<&str> {
+        match self {
+            Self::Unavailable(reason) | Self::Error(reason) => Some(reason.as_ref()),
+            _ => None,
+        }
+    }
 }
 
 /// What the grid reports. Every variant is the host's to act on.
@@ -134,6 +165,7 @@ pub struct Terminal {
     on_event: Option<EventHandler>,
     focused: bool,
     scrollback: bool,
+    slots: Slots,
 }
 
 impl Terminal {
@@ -145,6 +177,7 @@ impl Terminal {
             on_event: None,
             focused: false,
             scrollback: true,
+            slots: Slots::default(),
         }
     }
 
@@ -201,8 +234,16 @@ struct Gesture {
     dragging: bool,
 }
 
+impl Slotted for Terminal {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl RenderOnce for Terminal {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let ident = self.ident.clone();
         let state = self.state.clone();
@@ -236,7 +277,7 @@ impl RenderOnce for Terminal {
             panel = wire_pointer(panel, &geometry, &gesture, &handler, self.scrollback);
         }
 
-        let overlay = state_overlay(&ident, &state, cx);
+        let overlay = state_overlay(&ident, &state, &self.slots, window, cx);
 
         panel.children(overlay).semantic_in(
             cx,
@@ -256,11 +297,16 @@ impl RenderOnce for Terminal {
 }
 
 /// The reason overlay, or nothing when the grid speaks for itself.
-fn state_overlay(ident: &Ident, state: &TerminalState, cx: &App) -> Option<AnyElement> {
-    let strings = cx.strings();
+fn state_overlay(
+    ident: &Ident,
+    state: &TerminalState,
+    slots: &Slots,
+    window: &mut Window,
+    cx: &mut App,
+) -> Option<AnyElement> {
     match state {
         TerminalState::Ready => None,
-        TerminalState::Loading => Some(
+        TerminalState::Loading => Some(slots.or_else(slot::LOADING, window, cx, |_, cx| {
             div()
                 .absolute()
                 .inset_0()
@@ -269,42 +315,47 @@ fn state_overlay(ident: &Ident, state: &TerminalState, cx: &App) -> Option<AnyEl
                 .justify_center()
                 .child(
                     PulseLoader::new(ident.child("loading"))
-                        .label(strings.text(StringKey::TerminalStarting)),
+                        .label(cx.strings().text(StringKey::TerminalStarting)),
                 )
-                .into_any_element(),
-        ),
-        TerminalState::Unavailable(reason) => Some(
-            div()
-                .absolute()
-                .inset_0()
-                .flex()
-                .items_center()
-                .justify_center()
-                .child(
-                    EmptyState::new(
-                        ident.child("unavailable"),
-                        strings.text(StringKey::TerminalUnavailable),
+                .into_any_element()
+        })),
+        TerminalState::Unavailable(reason) => {
+            Some(slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                div()
+                    .absolute()
+                    .inset_0()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child(
+                        EmptyState::new(
+                            ident.child("unavailable"),
+                            cx.strings().text(StringKey::TerminalUnavailable),
+                        )
+                        .kind(EmptyKind::Unavailable)
+                        .detail(reason.clone()),
                     )
-                    .kind(EmptyKind::Unavailable)
-                    .detail(reason.clone()),
-                )
-                .into_any_element(),
-        ),
+                    .into_any_element()
+            }))
+        }
         // An ended session keeps its output on screen and says so underneath,
         // because the last thing the program printed is usually the reason.
-        TerminalState::Error(reason) => Some(
+        TerminalState::Error(reason) => Some(slots.or_else(slot::FAILED, window, cx, |_, cx| {
             div()
                 .absolute()
                 .bottom_0()
                 .left_0()
                 .right_0()
                 .child(
-                    EmptyState::new(ident.child("error"), strings.text(StringKey::TerminalError))
-                        .kind(EmptyKind::Failed)
-                        .detail(reason.clone()),
+                    EmptyState::new(
+                        ident.child("error"),
+                        cx.strings().text(StringKey::TerminalError),
+                    )
+                    .kind(EmptyKind::Failed)
+                    .detail(reason.clone()),
                 )
-                .into_any_element(),
-        ),
+                .into_any_element()
+        })),
     }
 }
 
@@ -846,5 +897,18 @@ mod tests {
     #[test]
     fn a_terminal_without_a_handler_reports_nothing() {
         assert!(Terminal::new("session.shell").on_event.is_none());
+    }
+}
+
+#[cfg(test)]
+mod terminal_phase_tests {
+    use super::*;
+
+    #[test]
+    fn a_session_that_never_started_is_not_a_failed_one() {
+        let unavailable = TerminalState::Unavailable("no pty".into());
+        assert_eq!(unavailable.phase(), Phase::Unavailable);
+        assert_eq!(unavailable.name(), "unavailable");
+        assert_eq!(TerminalState::Error("exited".into()).phase(), Phase::Error);
     }
 }

@@ -43,6 +43,7 @@ use crate::display::progress::ProgressBar;
 use crate::display::status::StatusDot;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text as foundation_text};
+use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
 type FileHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
@@ -92,7 +93,29 @@ impl UploadState {
             Self::Done | Self::Failed { .. } | Self::Cancelled | Self::Refused { .. }
         )
     }
+}
 
+impl HasPhase for UploadState {
+    fn phase(&self) -> Phase {
+        match self {
+            Self::Queued => Phase::Queued,
+            Self::Uploading { .. } => Phase::Loading,
+            Self::Done => Phase::Ready,
+            Self::Failed { .. } => Phase::Error,
+            Self::Cancelled => Phase::Cancelled,
+            Self::Refused { .. } => Phase::Unavailable,
+        }
+    }
+
+    fn reason(&self) -> Option<&str> {
+        match self {
+            Self::Failed { reason } | Self::Refused { reason } => Some(reason.as_ref()),
+            _ => None,
+        }
+    }
+}
+
+impl UploadState {
     /// Whether trying again could end differently. A refusal could not.
     pub fn is_retryable(&self) -> bool {
         matches!(self, Self::Failed { .. } | Self::Cancelled)
@@ -609,5 +632,25 @@ mod tests {
         // Half of the one file that is actually being sent, not a quarter of
         // two files one of which was never taken.
         assert_eq!(batch.overall(), OverallProgress::Known(0.5));
+    }
+}
+
+#[cfg(test)]
+mod upload_phase_tests {
+    use super::*;
+
+    #[test]
+    fn queued_cancelled_and_refused_are_three_phases() {
+        assert_eq!(UploadState::Queued.phase(), Phase::Queued);
+        assert_eq!(UploadState::Cancelled.phase(), Phase::Cancelled);
+        let refused = UploadState::Refused {
+            reason: "too large".into(),
+        };
+        assert_eq!(refused.phase(), Phase::Unavailable);
+        assert_eq!(refused.reason(), Some("too large"));
+        assert_eq!(
+            UploadState::Uploading { fraction: None }.phase(),
+            Phase::Loading
+        );
     }
 }

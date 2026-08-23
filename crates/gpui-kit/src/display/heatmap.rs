@@ -13,8 +13,10 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TypeScale};
 
 use crate::display::empty::{EmptyKind, EmptyState};
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Ident, StyledExt};
 use crate::overlay::tooltip::Tooltipped;
+use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
 /// One observation in the matrix, or the absence of one.
@@ -75,6 +77,33 @@ pub enum HeatmapState {
     Unavailable(SharedString),
 }
 
+impl HeatmapState {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Ready => "ready",
+            Self::Empty => "empty",
+            Self::Unavailable(_) => "unavailable",
+        }
+    }
+}
+
+impl HasPhase for HeatmapState {
+    fn phase(&self) -> Phase {
+        match self {
+            Self::Ready => Phase::Ready,
+            Self::Empty => Phase::Empty,
+            Self::Unavailable(_) => Phase::Unavailable,
+        }
+    }
+
+    fn reason(&self) -> Option<&str> {
+        match self {
+            Self::Unavailable(reason) => Some(reason.as_ref()),
+            _ => None,
+        }
+    }
+}
+
 /// A labelled grid of intensity cells.
 #[derive(Debug, IntoElement)]
 pub struct Heatmap {
@@ -84,6 +113,7 @@ pub struct Heatmap {
     columns: Vec<SharedString>,
     cells: Vec<HeatCell>,
     state: HeatmapState,
+    slots: Slots,
 }
 
 impl Heatmap {
@@ -95,6 +125,7 @@ impl Heatmap {
             columns: Vec::new(),
             cells: Vec::new(),
             state: HeatmapState::Ready,
+            slots: Slots::default(),
         }
     }
 
@@ -119,37 +150,51 @@ impl Heatmap {
     }
 }
 
+impl Slotted for Heatmap {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl RenderOnce for Heatmap {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let (body, value): (gpui::AnyElement, SharedString) = match &self.state {
             HeatmapState::Empty => (
-                EmptyState::new(
-                    self.ident.child("empty"),
-                    cx.strings().text(StringKey::HeatmapEmpty),
-                )
-                .kind(EmptyKind::Empty)
-                .into_any_element(),
-                SharedString::from("empty"),
+                self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                    EmptyState::new(
+                        self.ident.child("empty"),
+                        cx.strings().text(StringKey::HeatmapEmpty),
+                    )
+                    .kind(EmptyKind::Empty)
+                    .into_any_element()
+                }),
+                SharedString::from(self.state.name()),
             ),
             HeatmapState::Unavailable(reason) => (
-                EmptyState::new(
-                    self.ident.child("unavailable"),
-                    cx.strings().text(StringKey::HeatmapUnavailable),
-                )
-                .kind(EmptyKind::Unavailable)
-                .detail(reason.clone())
-                .into_any_element(),
-                SharedString::from("unavailable"),
+                self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                    EmptyState::new(
+                        self.ident.child("unavailable"),
+                        cx.strings().text(StringKey::HeatmapUnavailable),
+                    )
+                    .kind(EmptyKind::Unavailable)
+                    .detail(reason.clone())
+                    .into_any_element()
+                }),
+                SharedString::from(self.state.name()),
             ),
             HeatmapState::Ready if self.rows.is_empty() || self.columns.is_empty() => (
-                EmptyState::new(
-                    self.ident.child("empty"),
-                    cx.strings().text(StringKey::HeatmapEmpty),
-                )
-                .kind(EmptyKind::Empty)
-                .into_any_element(),
-                SharedString::from("empty"),
+                self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                    EmptyState::new(
+                        self.ident.child("empty"),
+                        cx.strings().text(StringKey::HeatmapEmpty),
+                    )
+                    .kind(EmptyKind::Empty)
+                    .into_any_element()
+                }),
+                SharedString::from(HeatmapState::Empty.name()),
             ),
             HeatmapState::Ready => (
                 matrix(
@@ -160,7 +205,7 @@ impl RenderOnce for Heatmap {
                     &theme,
                     cx,
                 ),
-                SharedString::from("ready"),
+                SharedString::from(self.state.name()),
             ),
         };
 
@@ -321,5 +366,19 @@ mod tests {
     fn intensity_stops_at_the_fifth_step() {
         let cell = HeatCell::new("hot", "Fri", "W4").level(9);
         assert_eq!(cell.level, Some(4));
+    }
+}
+
+#[cfg(test)]
+mod heatmap_phase_tests {
+    use super::*;
+
+    #[test]
+    fn unavailable_is_not_empty() {
+        let state = HeatmapState::Unavailable("offline".into());
+        assert_eq!(state.phase(), Phase::Unavailable);
+        assert_eq!(state.name(), "unavailable");
+        assert_eq!(state.reason(), Some("offline"));
+        assert_ne!(HeatmapState::Empty.phase(), state.phase());
     }
 }

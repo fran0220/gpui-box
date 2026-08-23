@@ -12,6 +12,7 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TypeScale};
 use crate::controls::button::{Button, ButtonVariant};
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::loading::PulseLoader;
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{
     ActiveDirection, DirectionalExt, Disableable, Ident, LayoutDirection, Pressable, Sizable,
     StyledExt, text as foundation_text,
@@ -97,6 +98,7 @@ pub struct Cascader {
     open: bool,
     open_path: Vec<SharedString>,
     active: Option<SharedString>,
+    slots: Slots,
 }
 
 impl std::fmt::Debug for Cascader {
@@ -127,6 +129,7 @@ impl Cascader {
             open: false,
             open_path: Vec::new(),
             active: None,
+            slots: Slots::default(),
         }
     }
 
@@ -464,66 +467,93 @@ impl Cascader {
             .into_any_element()
     }
 
-    fn state_column(&self, parent: &CascaderOption, cx: &mut Context<Self>) -> AnyElement {
+    fn state_column(
+        &self,
+        parent: &CascaderOption,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let ident = self.ident.child(parent.id.as_ref()).child("state");
-        let strings = cx.strings();
+        let weak = cx.entity().downgrade();
         let state = parent.children.as_ref().expect("branch");
         let content: AnyElement = match state {
             Loadable::Ready(children) if children.is_empty() => {
-                EmptyState::new(ident, strings.text(StringKey::CascaderEmpty))
-                    .kind(EmptyKind::Empty)
-                    .into_any_element()
+                self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                    EmptyState::new(ident, cx.strings().text(StringKey::CascaderEmpty))
+                        .kind(EmptyKind::Empty)
+                        .into_any_element()
+                })
             }
             Loadable::Ready(children) => self.option_column(children, &ident, cx),
-            Loadable::Loading => div()
-                .p(px(24.0))
-                .child(PulseLoader::new(ident.clone()).label(strings.text(StringKey::Loading)))
-                .into_any_element(),
-            Loadable::Idle => EmptyState::new(ident, strings.text(StringKey::CascaderUnstarted))
-                .kind(EmptyKind::Unstarted)
-                .into_any_element(),
-            Loadable::Empty => EmptyState::new(ident, strings.text(StringKey::CascaderEmpty))
-                .kind(EmptyKind::Empty)
-                .into_any_element(),
+            Loadable::Loading => self.slots.or_else(slot::LOADING, window, cx, |_, cx| {
+                div()
+                    .p(px(24.0))
+                    .child(
+                        PulseLoader::new(ident.clone())
+                            .label(cx.strings().text(StringKey::Loading)),
+                    )
+                    .into_any_element()
+            }),
+            Loadable::Idle => self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                EmptyState::new(ident, cx.strings().text(StringKey::CascaderUnstarted))
+                    .kind(EmptyKind::Unstarted)
+                    .into_any_element()
+            }),
+            Loadable::Empty => self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                EmptyState::new(ident, cx.strings().text(StringKey::CascaderEmpty))
+                    .kind(EmptyKind::Empty)
+                    .into_any_element()
+            }),
             Loadable::Unavailable(reason) => {
-                let weak = cx.entity().downgrade();
                 let parent_id = parent.id.clone();
-                let action_id = ident.child("retry");
-                EmptyState::new(ident.clone(), strings.text(StringKey::CascaderUnavailable))
+                self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                    let action_id = ident.child("retry");
+                    EmptyState::new(
+                        ident.clone(),
+                        cx.strings().text(StringKey::CascaderUnavailable),
+                    )
                     .kind(EmptyKind::Unavailable)
                     .detail(reason.as_str())
                     .action(
                         Button::new(action_id)
                             .semantic_parent(ident.semantic_id())
                             .variant(ButtonVariant::Secondary)
-                            .label(strings.text(StringKey::TryAgain))
-                            .on_click(move |_, cx| {
-                                let _ = weak.update(cx, |_, cx| {
-                                    cx.emit(CascaderEvent::Retry(parent_id.clone()))
-                                });
+                            .label(cx.strings().text(StringKey::TryAgain))
+                            .on_click({
+                                let weak = weak.clone();
+                                move |_, cx| {
+                                    let _ = weak.update(cx, |_, cx| {
+                                        cx.emit(CascaderEvent::Retry(parent_id.clone()))
+                                    });
+                                }
                             }),
                     )
                     .into_any_element()
+                })
             }
             Loadable::Error(reason) => {
-                let weak = cx.entity().downgrade();
                 let parent_id = parent.id.clone();
-                let action_id = ident.child("retry");
-                EmptyState::new(ident.clone(), strings.text(StringKey::CascaderError))
-                    .kind(EmptyKind::Failed)
-                    .detail(reason.clone())
-                    .action(
-                        Button::new(action_id)
-                            .semantic_parent(ident.semantic_id())
-                            .variant(ButtonVariant::Secondary)
-                            .label(strings.text(StringKey::TryAgain))
-                            .on_click(move |_, cx| {
-                                let _ = weak.update(cx, |_, cx| {
-                                    cx.emit(CascaderEvent::Retry(parent_id.clone()))
-                                });
-                            }),
-                    )
-                    .into_any_element()
+                self.slots.or_else(slot::FAILED, window, cx, |_, cx| {
+                    let action_id = ident.child("retry");
+                    EmptyState::new(ident.clone(), cx.strings().text(StringKey::CascaderError))
+                        .kind(EmptyKind::Failed)
+                        .detail(reason.clone())
+                        .action(
+                            Button::new(action_id)
+                                .semantic_parent(ident.semantic_id())
+                                .variant(ButtonVariant::Secondary)
+                                .label(cx.strings().text(StringKey::TryAgain))
+                                .on_click({
+                                    let weak = weak.clone();
+                                    move |_, cx| {
+                                        let _ = weak.update(cx, |_, cx| {
+                                            cx.emit(CascaderEvent::Retry(parent_id.clone()))
+                                        });
+                                    }
+                                }),
+                        )
+                        .into_any_element()
+                })
             }
         };
         content
@@ -551,7 +581,7 @@ impl Cascader {
             .into_any_element()
     }
 
-    fn menu(&self, cx: &mut Context<Self>) -> AnyElement {
+    fn menu(&self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let root = self.ident.child("menu.root");
         let mut columns = vec![self.option_column(&self.options, &root, cx)];
@@ -560,7 +590,7 @@ impl Cascader {
             let Some(parent) = options.iter().find(|option| &option.id == id) else {
                 break;
             };
-            columns.push(self.state_column(parent, cx));
+            columns.push(self.state_column(parent, window, cx));
             match &parent.children {
                 Some(Loadable::Ready(children)) => options = children,
                 _ => break,
@@ -604,6 +634,14 @@ impl Focusable for Cascader {
     }
 }
 
+impl Slotted for Cascader {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl Render for Cascader {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
@@ -630,7 +668,7 @@ impl Render for Cascader {
             spec = spec.value(option.label.clone());
         }
         let label = selected.map(|o| o.label.clone()).unwrap_or(placeholder);
-        let menu = self.open.then(|| self.menu(cx));
+        let menu = self.open.then(|| self.menu(window, cx));
         let trigger = div()
             .w_full()
             .row_reading(direction)

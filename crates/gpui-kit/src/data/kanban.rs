@@ -14,7 +14,9 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TypeScale};
 
 use crate::display::empty::{EmptyKind, EmptyState};
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Disableable, Ident, StyledExt};
+use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
 type CardHandler = Rc<dyn Fn(&KanbanCard, &mut Window, &mut App)>;
@@ -73,6 +75,33 @@ pub enum KanbanState {
     Unavailable(SharedString),
 }
 
+impl KanbanState {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Ready => "ready",
+            Self::Empty => "empty",
+            Self::Unavailable(_) => "unavailable",
+        }
+    }
+}
+
+impl HasPhase for KanbanState {
+    fn phase(&self) -> Phase {
+        match self {
+            Self::Ready => Phase::Ready,
+            Self::Empty => Phase::Empty,
+            Self::Unavailable(_) => Phase::Unavailable,
+        }
+    }
+
+    fn reason(&self) -> Option<&str> {
+        match self {
+            Self::Unavailable(reason) => Some(reason.as_ref()),
+            _ => None,
+        }
+    }
+}
+
 /// What the board reported.
 #[derive(Debug, Clone, PartialEq)]
 pub enum KanbanEvent {
@@ -94,6 +123,7 @@ pub struct KanbanBoard {
     disabled: bool,
     on_card: Option<CardHandler>,
     on_move: Option<MoveHandler>,
+    slots: Slots,
 }
 
 impl KanbanBoard {
@@ -107,6 +137,7 @@ impl KanbanBoard {
             disabled: false,
             on_card: None,
             on_move: None,
+            slots: Slots::default(),
         }
     }
 
@@ -148,6 +179,14 @@ impl KanbanBoard {
     }
 }
 
+impl Slotted for KanbanBoard {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl Disableable for KanbanBoard {
     fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
@@ -156,22 +195,28 @@ impl Disableable for KanbanBoard {
 }
 
 impl RenderOnce for KanbanBoard {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         match &self.state {
-            KanbanState::Empty => EmptyState::new(
-                self.ident.child("empty"),
-                cx.strings().text(StringKey::KanbanEmpty),
-            )
-            .kind(EmptyKind::Empty)
-            .into_any_element(),
-            KanbanState::Unavailable(reason) => EmptyState::new(
-                self.ident.child("unavailable"),
-                cx.strings().text(StringKey::KanbanUnavailable),
-            )
-            .kind(EmptyKind::Unavailable)
-            .detail(reason.clone())
-            .into_any_element(),
+            KanbanState::Empty => self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                EmptyState::new(
+                    self.ident.child("empty"),
+                    cx.strings().text(StringKey::KanbanEmpty),
+                )
+                .kind(EmptyKind::Empty)
+                .into_any_element()
+            }),
+            KanbanState::Unavailable(reason) => {
+                self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                    EmptyState::new(
+                        self.ident.child("unavailable"),
+                        cx.strings().text(StringKey::KanbanUnavailable),
+                    )
+                    .kind(EmptyKind::Unavailable)
+                    .detail(reason.clone())
+                    .into_any_element()
+                })
+            }
             KanbanState::Ready => {
                 let held = self.held.clone();
                 let columns = self
@@ -283,5 +328,18 @@ impl RenderOnce for KanbanBoard {
                     .into_any_element()
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod kanban_phase_tests {
+    use super::*;
+
+    #[test]
+    fn unavailable_is_not_empty() {
+        let state = KanbanState::Unavailable("offline".into());
+        assert_eq!(state.phase(), Phase::Unavailable);
+        assert_eq!(state.name(), "unavailable");
+        assert_eq!(state.reason(), Some("offline"));
     }
 }

@@ -43,6 +43,7 @@ use crate::controls::segmented::{Segment, SegmentedControl};
 use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
 use crate::layout::measure;
 use crate::motion::keyed;
+use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// How tall the frame is when the caller says nothing. The value occurs once.
@@ -114,12 +115,30 @@ pub enum ImageState {
 }
 
 impl ImageState {
-    fn name(&self) -> &'static str {
+    pub fn name(&self) -> &'static str {
         match self {
             Self::Loading => "loading",
             Self::Unavailable(_) => "unavailable",
             Self::Failed(_) => "failed",
             Self::Ready => "ready",
+        }
+    }
+}
+
+impl HasPhase for ImageState {
+    fn phase(&self) -> Phase {
+        match self {
+            Self::Loading => Phase::Loading,
+            Self::Unavailable(_) => Phase::Unavailable,
+            Self::Failed(_) => Phase::Error,
+            Self::Ready => Phase::Ready,
+        }
+    }
+
+    fn reason(&self) -> Option<&str> {
+        match self {
+            Self::Unavailable(reason) | Self::Failed(reason) => Some(reason.as_ref()),
+            _ => None,
         }
     }
 }
@@ -1098,5 +1117,18 @@ mod tests {
             wheel_notches(ScrollDelta::Pixels(point(px(0.0), px(40.0)))),
             1.0
         );
+    }
+}
+
+#[cfg(test)]
+mod image_phase_tests {
+    use super::*;
+
+    #[test]
+    fn a_decode_failure_projects_as_error() {
+        let state = ImageState::Failed("truncated".into());
+        assert_eq!(state.phase(), Phase::Error);
+        assert_eq!(state.name(), "failed");
+        assert_eq!(state.reason(), Some("truncated"));
     }
 }

@@ -17,6 +17,7 @@ use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TypeScale};
 use crate::display::badge::Tone;
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::status::StatusDot;
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Ident, StyledExt};
 use crate::motion;
 use crate::strings::{ActiveStrings, StringKey};
@@ -121,6 +122,7 @@ pub struct TraceView {
     axis_end: Option<SharedString>,
     current: Option<SharedString>,
     on_select: Option<SelectHandler>,
+    slots: Slots,
 }
 
 impl TraceView {
@@ -133,6 +135,7 @@ impl TraceView {
             axis_end: None,
             current: None,
             on_select: None,
+            slots: Slots::default(),
         }
     }
 
@@ -162,17 +165,27 @@ impl TraceView {
     }
 }
 
+impl Slotted for TraceView {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl RenderOnce for TraceView {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let empty = self.spans.is_empty();
         let body = if empty {
-            EmptyState::new(
-                self.ident.child("empty"),
-                cx.strings().text(StringKey::TraceEmpty),
-            )
-            .kind(EmptyKind::Empty)
-            .into_any_element()
+            self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                EmptyState::new(
+                    self.ident.child("empty"),
+                    cx.strings().text(StringKey::TraceEmpty),
+                )
+                .kind(EmptyKind::Empty)
+                .into_any_element()
+            })
         } else {
             let rows: Vec<_> = self
                 .spans
@@ -234,6 +247,7 @@ pub struct SpanTimeline {
     axis_end: Option<SharedString>,
     current: Option<SharedString>,
     on_select: Option<SelectHandler>,
+    slots: Slots,
 }
 
 impl SpanTimeline {
@@ -246,6 +260,7 @@ impl SpanTimeline {
             axis_end: None,
             current: None,
             on_select: None,
+            slots: Slots::default(),
         }
     }
 
@@ -274,17 +289,27 @@ impl SpanTimeline {
     }
 }
 
+impl Slotted for SpanTimeline {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl RenderOnce for SpanTimeline {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let empty = self.spans.is_empty();
         let body = if empty {
-            EmptyState::new(
-                self.ident.child("empty"),
-                cx.strings().text(StringKey::TraceEmpty),
-            )
-            .kind(EmptyKind::Empty)
-            .into_any_element()
+            self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                EmptyState::new(
+                    self.ident.child("empty"),
+                    cx.strings().text(StringKey::TraceEmpty),
+                )
+                .kind(EmptyKind::Empty)
+                .into_any_element()
+            })
         } else {
             let rows: Vec<_> = self
                 .spans

@@ -25,6 +25,7 @@ use crate::datetime::range::DayRange;
 use crate::display::badge::Tone;
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{
     Disableable, FocusRing, Ident, Sizable, StyledExt, text as foundation_text,
 };
@@ -102,6 +103,7 @@ pub struct Calendar {
     /// arrives without motion so a capture of a settled calendar is settled.
     travel: i32,
     navigations: usize,
+    slots: Slots,
 }
 
 impl std::fmt::Debug for Calendar {
@@ -140,6 +142,7 @@ impl Calendar {
             disabled: false,
             travel: 0,
             navigations: 0,
+            slots: Slots::default(),
         }
     }
 
@@ -645,8 +648,16 @@ impl Focusable for Calendar {
     }
 }
 
+impl Slotted for Calendar {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl Render for Calendar {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let direction = cx.layout_direction();
         let month = self.shown_month();
@@ -669,13 +680,15 @@ impl Render for Calendar {
                     .into_any_element()
                 }
             }
-            _ => EmptyState::new(
-                self.ident.child("unknown-month"),
-                cx.strings().text(StringKey::CalendarUnknownMonth),
-            )
-            .kind(EmptyKind::Unavailable)
-            .detail(cx.strings().text(StringKey::CalendarUnknownMonthDetail))
-            .into_any_element(),
+            _ => self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                EmptyState::new(
+                    self.ident.child("unknown-month"),
+                    cx.strings().text(StringKey::CalendarUnknownMonth),
+                )
+                .kind(EmptyKind::Unavailable)
+                .detail(cx.strings().text(StringKey::CalendarUnknownMonthDetail))
+                .into_any_element()
+            }),
         };
 
         let today_marker = today

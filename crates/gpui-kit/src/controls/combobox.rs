@@ -22,6 +22,7 @@ use crate::controls::field::{FieldState, field_shell};
 use crate::controls::input::{LineEnd, LineStart, TextInput, TextInputEvent};
 use crate::controls::select::SelectOption;
 use crate::display::empty::{EmptyKind, EmptyState};
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{
     Disableable, Ident, Pressable, Sizable, StyledExt, text as foundation_text,
 };
@@ -77,6 +78,7 @@ pub struct Combobox {
     trigger_bounds: Rc<Cell<Bounds<Pixels>>>,
     reveal_active: bool,
     menu_geometry: Option<popover::MenuGeometry>,
+    slots: Slots,
     /// Held so the query subscription lives as long as the combobox does.
     _subscriptions: Vec<Subscription>,
 }
@@ -123,6 +125,7 @@ impl Combobox {
             trigger_bounds: Rc::default(),
             reveal_active: false,
             menu_geometry: None,
+            slots: Slots::default(),
             _subscriptions: vec![subscription],
         }
     }
@@ -472,7 +475,12 @@ impl Combobox {
             .unwrap_or_else(|| cx.strings().text(StringKey::SelectPlaceholder))
     }
 
-    fn menu(&mut self, geometry: popover::MenuGeometry, cx: &mut Context<Self>) -> AnyElement {
+    fn menu(
+        &mut self,
+        geometry: popover::MenuGeometry,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let theme = cx.theme().clone();
         let matches = self.matches(cx);
         let highlighted = self.resolved(&matches);
@@ -482,7 +490,7 @@ impl Combobox {
 
         let rows = if matches.is_empty() {
             let query = self.filter(cx);
-            vec![
+            vec![self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
                 EmptyState::new(
                     self.ident.child("empty"),
                     cx.strings()
@@ -494,8 +502,8 @@ impl Combobox {
                 } else {
                     StringKey::ComboboxClosedHint
                 }))
-                .into_any_element(),
-            ]
+                .into_any_element()
+            })]
         } else {
             let mut rows = Vec::new();
             let mut last_group: Option<SharedString> = None;
@@ -665,6 +673,14 @@ impl Focusable for Combobox {
     }
 }
 
+impl Slotted for Combobox {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl Render for Combobox {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
@@ -702,7 +718,7 @@ impl Render for Combobox {
         });
         let placement = geometry.map_or(Placement::Below, |geometry| geometry.placement);
         let hang = geometry.map_or(Hang::Start, |geometry| geometry.hang);
-        let menu = geometry.map(|geometry| self.menu(geometry, cx));
+        let menu = geometry.map(|geometry| self.menu(geometry, window, cx));
         let mut spec = NodeSpec::new(self.ident.semantic_id(), Role::Combobox)
             .disabled(self.disabled)
             .invalid(self.invalid)

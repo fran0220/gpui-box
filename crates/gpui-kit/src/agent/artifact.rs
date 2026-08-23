@@ -11,7 +11,9 @@ use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TypeScale};
 
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::loading::PulseLoader;
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Ident, StyledExt};
+use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
 /// What kind of artifact the host is showing.
@@ -42,6 +44,37 @@ pub enum ArtifactPreviewState {
     Error(SharedString),
 }
 
+impl ArtifactPreviewState {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Loading => "loading",
+            Self::Ready => "ready",
+            Self::Empty => "empty",
+            Self::Unavailable(_) => "unavailable",
+            Self::Error(_) => "error",
+        }
+    }
+}
+
+impl HasPhase for ArtifactPreviewState {
+    fn phase(&self) -> Phase {
+        match self {
+            Self::Loading => Phase::Loading,
+            Self::Ready => Phase::Ready,
+            Self::Empty => Phase::Empty,
+            Self::Unavailable(_) => Phase::Unavailable,
+            Self::Error(_) => Phase::Error,
+        }
+    }
+
+    fn reason(&self) -> Option<&str> {
+        match self {
+            Self::Unavailable(reason) | Self::Error(reason) => Some(reason.as_ref()),
+            _ => None,
+        }
+    }
+}
+
 /// A titled pane for a generated artifact.
 #[derive(IntoElement)]
 pub struct ArtifactPreview {
@@ -50,6 +83,7 @@ pub struct ArtifactPreview {
     kind: ArtifactKind,
     body: SharedString,
     state: ArtifactPreviewState,
+    slots: Slots,
 }
 
 impl ArtifactPreview {
@@ -60,6 +94,7 @@ impl ArtifactPreview {
             kind: ArtifactKind::Document,
             body: SharedString::default(),
             state: ArtifactPreviewState::Ready,
+            slots: Slots::default(),
         }
     }
 
@@ -79,40 +114,56 @@ impl ArtifactPreview {
     }
 }
 
+impl Slotted for ArtifactPreview {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl RenderOnce for ArtifactPreview {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let (inner, value): (AnyElement, SharedString) = match &self.state {
             ArtifactPreviewState::Loading => (
-                PulseLoader::new(self.ident.child("loading"))
-                    .label(cx.strings().text(StringKey::ArtifactLoading))
-                    .into_any_element(),
-                "loading".into(),
+                self.slots.or_else(slot::LOADING, window, cx, |_, cx| {
+                    PulseLoader::new(self.ident.child("loading"))
+                        .label(cx.strings().text(StringKey::ArtifactLoading))
+                        .into_any_element()
+                }),
+                self.state.name().into(),
             ),
             ArtifactPreviewState::Empty => (
-                EmptyState::new(
-                    self.ident.child("empty"),
-                    cx.strings().text(StringKey::ArtifactEmpty),
-                )
-                .kind(EmptyKind::Empty)
-                .into_any_element(),
-                "empty".into(),
+                self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                    EmptyState::new(
+                        self.ident.child("empty"),
+                        cx.strings().text(StringKey::ArtifactEmpty),
+                    )
+                    .kind(EmptyKind::Empty)
+                    .into_any_element()
+                }),
+                self.state.name().into(),
             ),
             ArtifactPreviewState::Unavailable(reason) => (
-                EmptyState::new(
-                    self.ident.child("unavailable"),
-                    cx.strings().text(StringKey::ArtifactUnavailable),
-                )
-                .kind(EmptyKind::Unavailable)
-                .detail(reason.clone())
-                .into_any_element(),
-                "unavailable".into(),
+                self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                    EmptyState::new(
+                        self.ident.child("unavailable"),
+                        cx.strings().text(StringKey::ArtifactUnavailable),
+                    )
+                    .kind(EmptyKind::Unavailable)
+                    .detail(reason.clone())
+                    .into_any_element()
+                }),
+                self.state.name().into(),
             ),
             ArtifactPreviewState::Error(reason) => (
-                EmptyState::new(self.ident.child("error"), reason.clone())
-                    .kind(EmptyKind::Failed)
-                    .into_any_element(),
-                "error".into(),
+                self.slots.or_else(slot::FAILED, window, cx, |_, _cx| {
+                    EmptyState::new(self.ident.child("error"), reason.clone())
+                        .kind(EmptyKind::Failed)
+                        .into_any_element()
+                }),
+                self.state.name().into(),
             ),
             ArtifactPreviewState::Ready => (
                 div()
@@ -120,7 +171,7 @@ impl RenderOnce for ArtifactPreview {
                     .text_color(theme.colors.text)
                     .child(self.body.clone())
                     .into_any_element(),
-                "ready".into(),
+                self.state.name().into(),
             ),
         };
         div()
@@ -152,5 +203,21 @@ impl RenderOnce for ArtifactPreview {
                     .text(self.title)
                     .value(value),
             )
+    }
+}
+
+#[cfg(test)]
+mod artifact_phase_tests {
+    use super::*;
+
+    #[test]
+    fn error_is_not_unavailable() {
+        let error = ArtifactPreviewState::Error("parse failed".into());
+        assert_eq!(error.phase(), Phase::Error);
+        assert_eq!(error.name(), "error");
+        assert_eq!(
+            ArtifactPreviewState::Unavailable("denied".into()).phase(),
+            Phase::Unavailable
+        );
     }
 }

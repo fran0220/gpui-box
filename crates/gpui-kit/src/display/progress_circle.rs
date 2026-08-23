@@ -5,6 +5,7 @@
 //! extent rather than as a ring that happens to be a quarter full.
 
 use std::f32::consts::{FRAC_PI_2, TAU};
+use std::rc::Rc;
 
 use gpui::{
     AnimationExt as _, AnyElement, App, Hsla, IntoElement, ParentElement, PathBuilder, Pixels,
@@ -13,16 +14,20 @@ use gpui::{
 use gpui_kit_semantics::Semantic;
 use gpui_kit_theme::{ActiveTheme, ControlSize, TypeScale};
 
-use crate::display::progress::ProgressValue;
+use crate::controls::button::Button;
+use crate::display::progress::{ProgressPace, ProgressValue};
 use crate::display::signature;
 use crate::foundation::{Ident, Sizable, StyledExt};
 use crate::motion::{self, MotionSpec};
+use crate::strings::{ActiveStrings, StringKey};
+
+type CancelHandler = Rc<dyn Fn(&mut Window, &mut App)>;
 
 /// How much larger the ring is than the control step it is sized from.
 const RING_SCALE: f32 = 1.4;
 
 /// A ring for work in a place too tight for a bar.
-#[derive(Debug, IntoElement)]
+#[derive(IntoElement)]
 pub struct ProgressCircle {
     ident: Ident,
     label: Option<SharedString>,
@@ -30,6 +35,18 @@ pub struct ProgressCircle {
     centre: Option<SharedString>,
     value: ProgressValue,
     size: ControlSize,
+    on_cancel: Option<CancelHandler>,
+}
+
+impl std::fmt::Debug for ProgressCircle {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("ProgressCircle")
+            .field("ident", &self.ident)
+            .field("label", &self.label)
+            .field("value", &self.value)
+            .finish()
+    }
 }
 
 impl ProgressCircle {
@@ -40,6 +57,7 @@ impl ProgressCircle {
             centre: None,
             value: ProgressValue::default(),
             size: ControlSize::Md,
+            on_cancel: None,
         }
     }
 
@@ -72,6 +90,25 @@ impl ProgressCircle {
     /// invents no percentage of its own.
     pub fn centre(mut self, centre: impl Into<SharedString>) -> Self {
         self.centre = Some(centre.into());
+        self
+    }
+
+    pub fn stalled(mut self, stalled: bool) -> Self {
+        if stalled {
+            self.value.pace = ProgressPace::Stalled;
+        }
+        self
+    }
+
+    pub fn paused(mut self, paused: bool) -> Self {
+        if paused {
+            self.value.pace = ProgressPace::Paused;
+        }
+        self
+    }
+
+    pub fn on_cancel(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
+        self.on_cancel = Some(Rc::new(handler));
         self
     }
 }
@@ -112,7 +149,7 @@ impl RenderOnce for ProgressCircle {
         // reads as a position, because a position does not lap itself. Under
         // reduced motion there is no travel to rely on, so it falls back to
         // tinting the whole ring, which claims nothing either.
-        let still = motion::reduce_motion(cx);
+        let still = motion::reduce_motion(cx) || !self.value.is_moving();
         let ring: AnyElement = if drawn.is_none() && !still {
             let period = MotionSpec::new(
                 motion::Activity::Working.period_ms(&theme),
@@ -155,13 +192,28 @@ impl RenderOnce for ProgressCircle {
                 .text_color(theme.colors.text_muted)
                 .child(reading)
         });
+        let cancel = self.on_cancel.map(|handler| {
+            Button::new(self.ident.child("cancel"))
+                .label(cx.strings().text(StringKey::ProgressCancel))
+                .ghost()
+                .control_size(ControlSize::Xs)
+                .semantic_parent(self.ident.semantic_id())
+                .on_click(move |window, cx| handler(window, cx))
+        });
 
         div()
-            .flex_none()
-            .relative()
-            .size(px(diameter))
-            .child(ring)
-            .children(centre)
+            .flex()
+            .flex_col()
+            .items_center()
+            .child(
+                div()
+                    .flex_none()
+                    .relative()
+                    .size(px(diameter))
+                    .child(ring)
+                    .children(centre),
+            )
+            .children(cancel)
             .semantic_in(
                 cx,
                 self.value.spec(self.ident.semantic_id(), self.label, cx),

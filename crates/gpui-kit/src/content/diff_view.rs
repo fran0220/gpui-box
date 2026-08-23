@@ -81,6 +81,7 @@ use crate::content::markdown::CodeSpan;
 use crate::data::{List, ListItem, reveal_row};
 use crate::display::badge::Tone;
 use crate::display::empty::{EmptyKind, EmptyState};
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Ident, StyledExt};
 use crate::motion::keyed;
 use crate::strings::{ActiveStrings, StringKey};
@@ -574,6 +575,7 @@ pub struct DiffView {
     language: Option<SharedString>,
     cursor: Option<DiffCursor>,
     on_event: Option<EventHandler>,
+    slots: Slots,
 }
 
 impl std::fmt::Debug for DiffView {
@@ -637,6 +639,7 @@ impl DiffView {
             language: None,
             cursor: None,
             on_event: None,
+            slots: Slots::default(),
         }
     }
 
@@ -821,20 +824,30 @@ impl DiffView {
     }
 }
 
+impl Slotted for DiffView {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl RenderOnce for DiffView {
-    fn render(mut self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let rows = self.rows(cx);
         let count = rows.len();
         let list_ident = self.ident.child("rows");
 
         let body: AnyElement = if rows.is_empty() {
-            EmptyState::new(
-                self.ident.child("empty"),
-                cx.strings().text(StringKey::DiffEmpty),
-            )
-            .kind(EmptyKind::Empty)
-            .into_any_element()
+            self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                EmptyState::new(
+                    self.ident.child("empty"),
+                    cx.strings().text(StringKey::DiffEmpty),
+                )
+                .kind(EmptyKind::Empty)
+                .into_any_element()
+            })
         } else {
             let rendered = Rc::clone(&rows);
             let row_theme = theme.clone();

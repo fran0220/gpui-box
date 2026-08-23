@@ -282,6 +282,25 @@ pub(super) fn loading(_window: &mut Window, cx: &mut App) -> AnyElement {
                 )),
         )
         .child(
+            row(&theme)
+                .gap_token(&theme, Space::Md)
+                .child(indicator(
+                    "Inline wait",
+                    Spinner::new("scene.loading.inline")
+                        .label("Inline wait")
+                        .into_any_element(),
+                ))
+                .child(indicator(
+                    "Refreshing in place",
+                    RefreshVeil::new(
+                        "scene.loading.veil",
+                        crate::foundation::text(&theme, TypeScale::Body, "Last verified list"),
+                    )
+                    .label("Refreshing")
+                    .into_any_element(),
+                )),
+        )
+        .child(
             div()
                 .column()
                 .gap_token(&theme, Space::Sm)
@@ -295,6 +314,26 @@ pub(super) fn loading(_window: &mut Window, cx: &mut App) -> AnyElement {
                     Skeleton::new("scene.loading.skeleton")
                         .rows(3)
                         .label("Loading list"),
+                ),
+        )
+        .child(
+            div()
+                .column()
+                .gap_token(&theme, Space::Sm)
+                .w_full()
+                .child(crate::foundation::text(
+                    &theme,
+                    TypeScale::Label,
+                    "Card and paragraph placeholders",
+                ))
+                .child(
+                    Skeleton::new("scene.loading.shapes")
+                        .shapes([
+                            SkeletonShape::Card,
+                            SkeletonShape::Paragraph { lines: 3 },
+                            SkeletonShape::Circle { size: 28.0 },
+                        ])
+                        .label("Loading card"),
                 ),
         )
         .into_any_element()
@@ -687,6 +726,20 @@ pub(super) fn progress_bar(_window: &mut Window, cx: &mut App) -> AnyElement {
             "No count yet. The bar says it is working, and does not invent a fraction",
         ))
         .child(ProgressBar::new("scene.progress-bar.unknown").label("Contacting host"))
+        .child(caption(&theme, "Stopped, without inventing a fraction"))
+        .child(
+            ProgressBar::new("scene.progress-bar.stalled")
+                .label("Indexing workspace")
+                .count(3, 12)
+                .stalled(true),
+        )
+        .child(
+            ProgressBar::new("scene.progress-bar.paused")
+                .label("Uploading")
+                .count(6, 12)
+                .paused(true)
+                .on_cancel(|_, _| {}),
+        )
         .into_any_element()
 }
 
@@ -847,6 +900,181 @@ pub(super) fn empty_state(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .on_click(|_, _| {}),
                 ),
         )
+        .child(caption(
+            &theme,
+            "The host refused because the reader is not allowed",
+        ))
+        .child(
+            EmptyState::new("scene.empty-state.unauthorized", "This workspace is locked")
+                .kind(EmptyKind::Unauthorized)
+                .detail("Ask an owner to grant access."),
+        )
+        .into_any_element()
+}
+
+pub(super) fn state_ladder(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let pane = |title: &'static str, view: StateView| {
+        div()
+            .column()
+            .gap_token(&theme, Space::Xs)
+            .w(px(240.0))
+            .child(crate::foundation::text(&theme, TypeScale::Caption, title))
+            .child(view)
+    };
+    stack(&theme)
+        .w_full()
+        .child(caption(
+            &theme,
+            "Ten phases, one surface. A refusal is not an empty list.",
+        ))
+        .child(
+            row(&theme)
+                .child(pane(
+                    "Idle",
+                    StateView::new("scene.state.idle", Phase::Idle),
+                ))
+                .child(pane(
+                    "Queued",
+                    StateView::new("scene.state.queued", Phase::Queued),
+                ))
+                .child(pane(
+                    "Blocked",
+                    StateView::new("scene.state.blocked", Phase::Blocked),
+                )),
+        )
+        .child(
+            row(&theme)
+                .child(pane(
+                    "Loading",
+                    StateView::new("scene.state.loading", Phase::Loading),
+                ))
+                .child(pane(
+                    "Empty",
+                    StateView::new("scene.state.empty", Phase::Empty),
+                ))
+                .child(pane(
+                    "Cancelled",
+                    StateView::new("scene.state.cancelled", Phase::Cancelled).content(div()),
+                )),
+        )
+        .child(
+            row(&theme)
+                .child(pane(
+                    "Unavailable",
+                    StateView::new(
+                        "scene.state.unavailable",
+                        Loadable::<(), String>::Unavailable("the host refused".into()),
+                    ),
+                ))
+                .child(pane(
+                    "Error",
+                    StateView::new(
+                        "scene.state.error",
+                        AsyncValue::<(), String>::error("the index is still building".into()),
+                    ),
+                ))
+                .child(pane(
+                    "Ready",
+                    StateView::from_async(
+                        "scene.state.ready",
+                        &AsyncValue::<_, String>::ready("12 runs"),
+                        |value| {
+                            crate::foundation::text(&theme, TypeScale::Body, *value)
+                                .into_any_element()
+                        },
+                    ),
+                )),
+        )
+        .child(pane("Refreshing, last value kept", {
+            let mut value = AsyncValue::<_, String>::ready("12 runs");
+            value.refresh();
+            StateView::from_async("scene.state.refreshing", &value, |text| {
+                crate::foundation::text(&theme, TypeScale::Body, *text).into_any_element()
+            })
+        }))
+        .child(
+            StaleMark::new(
+                "scene.state.stale",
+                "Refreshing failed. The last verified value remains.",
+            )
+            .updated("a moment ago"),
+        )
+        .into_any_element()
+}
+
+pub(super) fn banner(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(560.0))
+        .child(caption(&theme, "A page-level report, dismissable"))
+        .child(
+            Banner::new(
+                "scene.banner.warning",
+                "The last refresh failed. The verified list is still on screen.",
+                Tone::Warning,
+            )
+            .title("Stale workspace")
+            .action(
+                Button::new("scene.banner.retry")
+                    .label("Try again")
+                    .secondary()
+                    .small(),
+            )
+            .on_dismiss(|_, _| {}),
+        )
+        .child(
+            Banner::new(
+                "scene.banner.danger",
+                "The host refused this action.",
+                Tone::Danger,
+            )
+            .title("Refused"),
+        )
+        .into_any_element()
+}
+
+pub(super) fn outcome_panel(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(560.0))
+        .child(caption(&theme, "Finished"))
+        .child(
+            OutcomePanel::new("scene.outcome.success", OutcomeKind::Success)
+                .title("Import finished")
+                .count("50 files imported"),
+        )
+        .child(caption(&theme, "Finished, with failures the host numbered"))
+        .child(
+            OutcomePanel::new("scene.outcome.partial", OutcomeKind::Partial)
+                .title("Import finished, with failures")
+                .count("47 succeeded, 3 failed")
+                .detail("The three that failed are still in the queue."),
+        )
+        .child(caption(&theme, "Did not finish"))
+        .child(
+            OutcomePanel::new("scene.outcome.failed", OutcomeKind::Failed)
+                .detail("The host closed the connection before any file landed."),
+        )
+        .into_any_element()
+}
+
+pub(super) fn stage_progress(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(420.0))
+        .child(caption(&theme, "Download, then verify, then install"))
+        .child(StageProgress::new("scene.stage.running").stages([
+            ProgressStage::new("download", "Download", StageStatus::Done),
+            ProgressStage::new("verify", "Verify", StageStatus::Active),
+            ProgressStage::new("install", "Install", StageStatus::Pending),
+        ]))
+        .child(caption(&theme, "A stage that failed keeps its name"))
+        .child(StageProgress::new("scene.stage.failed").stages([
+            ProgressStage::new("download", "Download", StageStatus::Done),
+            ProgressStage::new("verify", "Verify", StageStatus::Failed),
+            ProgressStage::new("install", "Install", StageStatus::Pending),
+        ]))
         .into_any_element()
 }
 

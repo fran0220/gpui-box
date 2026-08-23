@@ -66,7 +66,9 @@ Use:
 
 - skeletons when the eventual content has known row geometry;
 - pulse loader for a neutral wait;
-- gradient spinner for compact active work.
+- gradient spinner for compact active work;
+- spinner for an inline wait next to a label;
+- refresh veil when a verified value must stay on screen.
 
 ## Long content
 

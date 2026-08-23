@@ -23,6 +23,7 @@ use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
 use crate::foundation::{Disableable, Ident, StyledExt, text as foundation_text};
 use crate::interaction::dnd::{self, DragItem, FILE_KIND};
 use crate::layout::measure;
+use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
 type DropHandler = Rc<dyn Fn(&DragItem, &mut Window, &mut App)>;
@@ -42,6 +43,16 @@ impl DropzoneState {
             Self::Idle => "idle",
             Self::Accepting => "accepting",
             Self::Refusing => "refusing",
+        }
+    }
+}
+
+impl HasPhase for DropzoneState {
+    fn phase(&self) -> Phase {
+        match self {
+            Self::Idle => Phase::Idle,
+            Self::Accepting => Phase::Ready,
+            Self::Refusing => Phase::Unavailable,
         }
     }
 }
@@ -282,5 +293,17 @@ impl RenderOnce for Dropzone {
                 }
             })
             .child(zone)
+    }
+}
+
+#[cfg(test)]
+mod dropzone_phase_tests {
+    use super::*;
+
+    #[test]
+    fn accepting_is_ready_and_refusing_is_unavailable() {
+        assert_eq!(DropzoneState::Idle.phase(), Phase::Idle);
+        assert_eq!(DropzoneState::Accepting.phase(), Phase::Ready);
+        assert_eq!(DropzoneState::Refusing.phase(), Phase::Unavailable);
     }
 }

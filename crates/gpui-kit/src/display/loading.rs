@@ -3,12 +3,17 @@
 //! Every animation here runs through GPUI's `with_animation`, which holds a
 //! single static frame when the platform asks for reduced motion.
 
-use gpui::{App, IntoElement, ParentElement, RenderOnce, Styled, Window, div, px, relative};
+use gpui::{
+    AnyElement, App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div, px,
+    relative,
+};
+use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::ActiveTheme;
+use gpui_kit_theme::{ActiveTheme, ControlSize, Surface};
 
+use crate::display::icon::{Icon, IconTone};
 use crate::display::signature;
-use crate::foundation::Ident;
+use crate::foundation::{Ident, Sizable};
 use crate::motion::{self, AnimationExt as _, MotionSpec};
 
 const PULSE_CELLS: usize = 5;
@@ -160,6 +165,36 @@ impl RenderOnce for GradientSpinner {
     }
 }
 
+/// One placeholder a skeleton can draw.
+///
+/// A row is the list case. The others exist so a card, an avatar, or a
+/// paragraph can wait as themselves rather than as three identical bars.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum SkeletonShape {
+    Row { width: f32, height: f32 },
+    Paragraph { lines: usize },
+    Circle { size: f32 },
+    Rect { width: f32, height: f32 },
+    Card,
+}
+
+impl SkeletonShape {
+    fn rows(self) -> Vec<(f32, f32, bool)> {
+        match self {
+            Self::Row { width, height } => vec![(width.clamp(0.16, 1.0), height, false)],
+            Self::Paragraph { lines } => (0..lines.max(1))
+                .map(|index| {
+                    let width = if index + 1 == lines.max(1) { 0.62 } else { 1.0 };
+                    (width, 12.0, false)
+                })
+                .collect(),
+            Self::Circle { size } => vec![(size, size, true)],
+            Self::Rect { width, height } => vec![(width.clamp(0.16, 1.0), height, false)],
+            Self::Card => vec![(1.0, 72.0, false)],
+        }
+    }
+}
+
 /// Placeholder rows shown while a list's real shape is unknown.
 #[derive(Debug, IntoElement)]
 pub struct Skeleton {
@@ -170,6 +205,7 @@ pub struct Skeleton {
     /// still loading rarely has every row the same length; the pattern is
     /// the claim, not a measurement of content that does not exist yet.
     widths: Vec<f32>,
+    shapes: Vec<SkeletonShape>,
     label: Option<gpui::SharedString>,
 }
 
@@ -180,6 +216,7 @@ impl Skeleton {
             rows: 3,
             row_height: 28.0,
             widths: Vec::new(),
+            shapes: Vec::new(),
             label: None,
         }
     }
@@ -210,6 +247,14 @@ impl Skeleton {
             .collect();
         self
     }
+
+    /// Replaces the row list with an explicit sequence of shapes.
+    ///
+    /// [`Skeleton::rows`] and [`Skeleton::widths`] stay as the list case.
+    pub fn shapes(mut self, shapes: impl IntoIterator<Item = SkeletonShape>) -> Self {
+        self.shapes = shapes.into_iter().collect();
+        self
+    }
 }
 
 impl RenderOnce for Skeleton {
@@ -224,41 +269,167 @@ impl RenderOnce for Skeleton {
         );
         let ident = self.ident.clone();
         let spec = busy_spec(&self.ident, self.label.clone());
-        let widths = self.widths;
-        let rows = self.rows;
+        let bands: Vec<(f32, f32, bool)> = if self.shapes.is_empty() {
+            (0..self.rows)
+                .map(|index| {
+                    let width = self
+                        .widths
+                        .get(index)
+                        .copied()
+                        .or_else(|| self.widths.last().copied())
+                        .unwrap_or(1.0);
+                    (width, row_height, false)
+                })
+                .collect()
+        } else {
+            self.shapes
+                .into_iter()
+                .flat_map(SkeletonShape::rows)
+                .collect()
+        };
         div()
             .flex()
             .flex_col()
             .gap(px(6.0))
             .semantic_in(cx, spec)
-            .children((0..rows).map(move |index| {
-                let width = widths
-                    .get(index)
-                    .copied()
-                    .or_else(|| widths.last().copied())
-                    .unwrap_or(1.0);
+            .children(
+                bands
+                    .into_iter()
+                    .enumerate()
+                    .map(move |(index, (width, height, circle))| {
+                        let mut row = div()
+                            .h(px(height))
+                            .rounded(px(if circle { height / 2.0 } else { radius }))
+                            .bg(color)
+                            .relative()
+                            .overflow_hidden();
+                        row = if circle {
+                            row.size(px(height))
+                        } else {
+                            row.w(relative(width))
+                        };
+                        row.child(signature::shimmer_band(theme).with_animation(
+                            ident.indexed_element_id(index),
+                            period.repeating(),
+                            move |element, delta| {
+                                let phase =
+                                    motion::staggered_phase(delta, index, SHIMMER_ROW_OFFSET);
+                                element.left(relative(motion::shimmer_offset(phase, SHIMMER_BAND)))
+                            },
+                        ))
+                    }),
+            )
+    }
+}
+
+/// An inline turn, for a wait that sits next to a label.
+///
+/// Smaller than [`GradientSpinner`]: that one is a three-by-three matrix for
+/// longer work. This is the mark a button or a status line already uses.
+#[derive(Debug, IntoElement)]
+pub struct Spinner {
+    ident: Ident,
+    size: ControlSize,
+    label: Option<SharedString>,
+}
+
+impl Spinner {
+    pub fn new(ident: impl Into<Ident>) -> Self {
+        Self {
+            ident: ident.into(),
+            size: ControlSize::Sm,
+            label: None,
+        }
+    }
+
+    pub fn label(mut self, label: impl Into<SharedString>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
+}
+
+impl Sizable for Spinner {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.size = size;
+        self
+    }
+}
+
+impl RenderOnce for Spinner {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let spec = busy_spec(&self.ident, self.label.clone());
+        div()
+            .flex()
+            .flex_none()
+            .items_center()
+            .child(
+                Icon::new(Glyph::Refresh)
+                    .control_size(self.size)
+                    .tone(IconTone::Accent)
+                    .spinning(self.ident.child("turn")),
+            )
+            .semantic_in(cx, spec)
+    }
+}
+
+/// A veil over content that is still the last verified value.
+///
+/// The content stays. The veil says a refresh is in flight. Erasing the
+/// content would be the lie [`crate::state::AsyncValue`] exists to prevent.
+#[derive(IntoElement)]
+pub struct RefreshVeil {
+    ident: Ident,
+    content: AnyElement,
+    label: Option<SharedString>,
+}
+
+impl std::fmt::Debug for RefreshVeil {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("RefreshVeil")
+            .field("ident", &self.ident)
+            .field("label", &self.label)
+            .finish()
+    }
+}
+
+impl RefreshVeil {
+    pub fn new(ident: impl Into<Ident>, content: impl IntoElement) -> Self {
+        Self {
+            ident: ident.into(),
+            content: content.into_any_element(),
+            label: None,
+        }
+    }
+
+    pub fn label(mut self, label: impl Into<SharedString>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
+}
+
+impl RenderOnce for RefreshVeil {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let theme = cx.theme().clone();
+        let spec = busy_spec(&self.ident, self.label.clone());
+        div()
+            .relative()
+            .w_full()
+            .child(self.content)
+            .child(
                 div()
-                    .h(px(row_height))
-                    .w(relative(width))
-                    .rounded(px(radius))
-                    .bg(color)
-                    .relative()
-                    .overflow_hidden()
-                    // A band of the working signature sweeping the row,
-                    // rather than the whole row breathing: a sweep reads as
-                    // work moving through the list. Under reduced motion the
-                    // repeating animation holds delta zero, which parks the
-                    // band off the leading edge and leaves a plain
-                    // placeholder behind.
-                    .child(signature::shimmer_band(theme).with_animation(
-                        ident.indexed_element_id(index),
-                        period.repeating(),
-                        move |element, delta| {
-                            let phase = motion::staggered_phase(delta, index, SHIMMER_ROW_OFFSET);
-                            element.left(relative(motion::shimmer_offset(phase, SHIMMER_BAND)))
-                        },
-                    ))
-            }))
+                    .absolute()
+                    .inset_0()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .bg(theme.surface(Surface::Panel).opacity(theme.opacity.scrim))
+                    .child(
+                        Spinner::new(self.ident.child("spin"))
+                            .label(self.label.clone().unwrap_or_default()),
+                    ),
+            )
+            .semantic_in(cx, spec)
     }
 }
 

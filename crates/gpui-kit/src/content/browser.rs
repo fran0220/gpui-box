@@ -32,7 +32,9 @@ use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
 use crate::controls::button::IconButton;
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
+use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
 /// What is behind the panel right now.
@@ -64,7 +66,7 @@ impl Default for ViewportState {
 
 impl ViewportState {
     /// What the panel publishes as its value.
-    fn value(&self) -> &'static str {
+    pub fn value(&self) -> &'static str {
         match self {
             Self::Loading => "loading",
             Self::Empty => "empty",
@@ -74,8 +76,31 @@ impl ViewportState {
         }
     }
 
+    pub fn name(&self) -> &'static str {
+        self.value()
+    }
+
     fn shows_page(&self) -> bool {
         matches!(self, Self::Ready)
+    }
+}
+
+impl HasPhase for ViewportState {
+    fn phase(&self) -> Phase {
+        match self {
+            Self::Loading => Phase::Loading,
+            Self::Empty => Phase::Empty,
+            Self::Unavailable(_) => Phase::Unavailable,
+            Self::Error(_) => Phase::Error,
+            Self::Ready => Phase::Ready,
+        }
+    }
+
+    fn reason(&self) -> Option<&str> {
+        match self {
+            Self::Unavailable(reason) | Self::Error(reason) => Some(reason.as_ref()),
+            _ => None,
+        }
     }
 }
 
@@ -102,6 +127,7 @@ pub struct BrowserPanel {
     on_reload: Option<Action>,
     /// The host's own painted surface for the page.
     viewport: Option<AnyElement>,
+    slots: Slots,
 }
 
 impl std::fmt::Debug for BrowserPanel {
@@ -131,6 +157,7 @@ impl BrowserPanel {
             on_forward: None,
             on_reload: None,
             viewport: None,
+            slots: Slots::default(),
         }
     }
 
@@ -170,8 +197,16 @@ impl BrowserPanel {
     }
 }
 
+impl Slotted for BrowserPanel {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl RenderOnce for BrowserPanel {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let direction = cx.layout_direction();
         let strings = cx.strings().clone();
@@ -265,56 +300,68 @@ impl RenderOnce for BrowserPanel {
                 // Ready with nothing to draw is a host that said the page was
                 // there and did not hand one over. That is a mistake worth
                 // seeing rather than an empty rectangle worth ignoring.
+                self.slots.or_else(slot::FAILED, window, cx, |_, _| {
+                    EmptyState::new(
+                        viewport_ident.child("status"),
+                        strings.text(StringKey::BrowserNoViewport),
+                    )
+                    .kind(EmptyKind::Failed)
+                    .detail(strings.text(StringKey::BrowserNoViewportDetail))
+                    .into_any_element()
+                })
+            }),
+            ViewportState::Loading => self.slots.or_else(slot::LOADING, window, cx, |_, cx| {
+                div()
+                    .size_full()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .type_scale(&theme, TypeScale::Caption)
+                    .text_color(theme.colors.text_muted)
+                    .child(strings.text(StringKey::Loading))
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(viewport_ident.child("status").semantic_id(), Role::Status)
+                            .parent(viewport_ident.semantic_id())
+                            .text(strings.text(StringKey::Loading))
+                            .value("loading")
+                            .busy(true),
+                    )
+                    .into_any_element()
+            }),
+            ViewportState::Empty => self.slots.or_else(slot::EMPTY, window, cx, |_, _| {
                 EmptyState::new(
                     viewport_ident.child("status"),
-                    strings.text(StringKey::BrowserNoViewport),
+                    strings.text(StringKey::BrowserEmpty),
                 )
-                .kind(EmptyKind::Failed)
-                .detail(strings.text(StringKey::BrowserNoViewportDetail))
+                .kind(EmptyKind::Empty)
+                .detail(strings.text(StringKey::BrowserEmptyDetail))
                 .into_any_element()
             }),
-            ViewportState::Loading => div()
-                .size_full()
-                .flex()
-                .items_center()
-                .justify_center()
-                .type_scale(&theme, TypeScale::Caption)
-                .text_color(theme.colors.text_muted)
-                .child(strings.text(StringKey::Loading))
-                .semantic_in(
-                    cx,
-                    NodeSpec::new(viewport_ident.child("status").semantic_id(), Role::Status)
-                        .parent(viewport_ident.semantic_id())
-                        .text(strings.text(StringKey::Loading))
-                        .value("loading")
-                        .busy(true),
+            ViewportState::Unavailable(reason) => {
+                self.slots.or_else(slot::EMPTY, window, cx, |_, _| {
+                    EmptyState::new(
+                        viewport_ident.child("status"),
+                        strings.text(StringKey::BrowserUnavailable),
+                    )
+                    .kind(EmptyKind::Unavailable)
+                    .detail(if reason.is_empty() {
+                        strings.text(StringKey::BrowserNoEngineDetail)
+                    } else {
+                        reason.clone()
+                    })
+                    .into_any_element()
+                })
+            }
+            ViewportState::Error(reason) => self.slots.or_else(slot::FAILED, window, cx, |_, _| {
+                EmptyState::new(
+                    viewport_ident.child("status"),
+                    strings.text(StringKey::BrowserError),
                 )
-                .into_any_element(),
-            ViewportState::Empty => EmptyState::new(
-                viewport_ident.child("status"),
-                strings.text(StringKey::BrowserEmpty),
-            )
-            .kind(EmptyKind::Empty)
-            .detail(strings.text(StringKey::BrowserEmptyDetail))
-            .into_any_element(),
-            ViewportState::Unavailable(reason) => EmptyState::new(
-                viewport_ident.child("status"),
-                strings.text(StringKey::BrowserUnavailable),
-            )
-            .kind(EmptyKind::Unavailable)
-            .detail(if reason.is_empty() {
-                strings.text(StringKey::BrowserNoEngineDetail)
-            } else {
-                reason.clone()
-            })
-            .into_any_element(),
-            ViewportState::Error(reason) => EmptyState::new(
-                viewport_ident.child("status"),
-                strings.text(StringKey::BrowserError),
-            )
-            .kind(EmptyKind::Failed)
-            .detail(reason.clone())
-            .into_any_element(),
+                .kind(EmptyKind::Failed)
+                .detail(reason.clone())
+                .into_any_element()
+            }),
         };
 
         div()
@@ -411,5 +458,19 @@ mod tests {
         let panel = BrowserPanel::new("browser").url("https://example.com");
         assert!(panel.url_set);
         assert_eq!(panel.url, "https://example.com");
+    }
+}
+
+#[cfg(test)]
+mod viewport_phase_tests {
+    use super::*;
+
+    #[test]
+    fn a_refusal_is_not_an_empty_page() {
+        let state = ViewportState::Unavailable("no engine".into());
+        assert_eq!(state.phase(), Phase::Unavailable);
+        assert_eq!(state.name(), "unavailable");
+        assert_eq!(state.reason(), Some("no engine"));
+        assert_ne!(ViewportState::Empty.phase(), state.phase());
     }
 }

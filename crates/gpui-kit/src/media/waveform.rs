@@ -11,6 +11,8 @@ use gpui_kit_theme::ActiveTheme;
 
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::foundation::Ident;
+use crate::foundation::slot::{self, Slots, Slotted};
+use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
 const PEAK_GAP: f32 = 1.0;
@@ -24,6 +26,33 @@ pub enum AudioWaveformState {
     Unavailable(SharedString),
 }
 
+impl AudioWaveformState {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Ready => "ready",
+            Self::Empty => "empty",
+            Self::Unavailable(_) => "unavailable",
+        }
+    }
+}
+
+impl HasPhase for AudioWaveformState {
+    fn phase(&self) -> Phase {
+        match self {
+            Self::Ready => Phase::Ready,
+            Self::Empty => Phase::Empty,
+            Self::Unavailable(_) => Phase::Unavailable,
+        }
+    }
+
+    fn reason(&self) -> Option<&str> {
+        match self {
+            Self::Unavailable(reason) => Some(reason.as_ref()),
+            _ => None,
+        }
+    }
+}
+
 /// A measured waveform the host already sampled.
 #[derive(IntoElement)]
 pub struct AudioWaveform {
@@ -31,6 +60,7 @@ pub struct AudioWaveform {
     peaks: Vec<f32>,
     playhead: Option<f32>,
     state: AudioWaveformState,
+    slots: Slots,
 }
 
 impl AudioWaveform {
@@ -40,6 +70,7 @@ impl AudioWaveform {
             peaks: Vec::new(),
             playhead: None,
             state: AudioWaveformState::Ready,
+            slots: Slots::default(),
         }
     }
 
@@ -60,22 +91,34 @@ impl AudioWaveform {
     }
 }
 
+impl Slotted for AudioWaveform {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl RenderOnce for AudioWaveform {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         match &self.state {
             AudioWaveformState::Empty | AudioWaveformState::Ready if self.peaks.is_empty() => {
-                EmptyState::new(
-                    self.ident.child("empty"),
-                    cx.strings().text(StringKey::WaveformEmpty),
-                )
-                .kind(EmptyKind::Empty)
-                .into_any_element()
+                self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                    EmptyState::new(
+                        self.ident.child("empty"),
+                        cx.strings().text(StringKey::WaveformEmpty),
+                    )
+                    .kind(EmptyKind::Empty)
+                    .into_any_element()
+                })
             }
             AudioWaveformState::Unavailable(reason) => {
-                EmptyState::new(self.ident.child("unavailable"), reason.clone())
-                    .kind(EmptyKind::Unavailable)
-                    .into_any_element()
+                self.slots.or_else(slot::EMPTY, window, cx, |_, _| {
+                    EmptyState::new(self.ident.child("unavailable"), reason.clone())
+                        .kind(EmptyKind::Unavailable)
+                        .into_any_element()
+                })
             }
             AudioWaveformState::Ready | AudioWaveformState::Empty => {
                 let peaks = self.peaks;
@@ -129,5 +172,18 @@ impl RenderOnce for AudioWaveform {
                     .into_any_element()
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod waveform_phase_tests {
+    use super::*;
+
+    #[test]
+    fn unavailable_is_not_empty() {
+        let state = AudioWaveformState::Unavailable("no samples".into());
+        assert_eq!(state.phase(), Phase::Unavailable);
+        assert_eq!(state.name(), "unavailable");
+        assert_eq!(state.reason(), Some("no samples"));
     }
 }

@@ -1,12 +1,20 @@
-use gpui::{
-    App, Hsla, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div, px,
-};
-use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
+use std::rc::Rc;
 
+use gpui::{
+    AnyElement, App, Hsla, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window,
+    div, prelude::FluentBuilder, px,
+};
+use gpui_kit_assets::Icon as Glyph;
+use gpui_kit_semantics::{NodeSpec, Role, Semantic};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TypeScale};
+
+use crate::controls::button::IconButton;
 use crate::display::badge::Tone;
-use crate::foundation::{Ident, StyledExt};
+use crate::foundation::{Ident, Sizable, StyledExt};
 use crate::motion;
+use crate::strings::{ActiveStrings, StringKey};
+
+type DismissHandler = Rc<dyn Fn(&mut Window, &mut App)>;
 
 /// A tone-colored dot, the smallest state indicator in the system.
 #[derive(Debug, IntoElement)]
@@ -247,5 +255,165 @@ impl RenderOnce for Callout {
                 .into_any_element(),
             None => frame.child(content).into_any_element(),
         }
+    }
+}
+
+/// A page-level tinted report: title, action, and a way to close it.
+///
+/// [`Callout`] stays the inline form. This one is for a strip that sits
+/// above a page and can be dismissed.
+#[derive(IntoElement)]
+pub struct Banner {
+    ident: Ident,
+    message: SharedString,
+    title: Option<SharedString>,
+    tone: Tone,
+    action: Option<AnyElement>,
+    on_dismiss: Option<DismissHandler>,
+}
+
+impl std::fmt::Debug for Banner {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Banner")
+            .field("ident", &self.ident)
+            .field("tone", &self.tone)
+            .finish()
+    }
+}
+
+impl Banner {
+    pub fn new(ident: impl Into<Ident>, message: impl Into<SharedString>, tone: Tone) -> Self {
+        Self {
+            ident: ident.into(),
+            message: message.into(),
+            title: None,
+            tone,
+            action: None,
+            on_dismiss: None,
+        }
+    }
+
+    pub fn title(mut self, title: impl Into<SharedString>) -> Self {
+        self.title = Some(title.into());
+        self
+    }
+
+    pub fn action(mut self, action: impl IntoElement) -> Self {
+        self.action = Some(action.into_any_element());
+        self
+    }
+
+    pub fn on_dismiss(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
+        self.on_dismiss = Some(Rc::new(handler));
+        self
+    }
+}
+
+impl RenderOnce for Banner {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let theme = cx.theme().clone();
+        let color = self.tone.color(&theme);
+        let dismiss = self.on_dismiss.map(|handler| {
+            IconButton::new(
+                self.ident.child("dismiss"),
+                Glyph::Close,
+                cx.strings().text(StringKey::Dismiss),
+            )
+            .control_size(ControlSize::Sm)
+            .semantic_parent(self.ident.semantic_id())
+            .on_click(move |window, cx| handler(window, cx))
+        });
+
+        div()
+            .w_full()
+            .row()
+            .items_start()
+            .gap_token(&theme, Space::Sm)
+            .px_token(&theme, Space::Lg)
+            .py_token(&theme, Space::Md)
+            .radius(&theme, Radius::Card)
+            .bg(color.opacity(0.14))
+            .child(div().mt(px(5.0)).child(StatusDot::new(self.tone)))
+            .child(
+                div()
+                    .column()
+                    .gap_token(&theme, Space::Xs)
+                    .flex_1()
+                    .min_w_0()
+                    .when_some(self.title.clone(), |element, title| {
+                        element.child(
+                            div()
+                                .type_scale(&theme, TypeScale::Label)
+                                .text_color(color)
+                                .child(title),
+                        )
+                    })
+                    .child(
+                        div()
+                            .type_scale(&theme, TypeScale::Body)
+                            .text_color(color.opacity(0.92))
+                            .child(self.message.clone()),
+                    )
+                    .children(self.action),
+            )
+            .children(dismiss)
+            .semantic_in(
+                cx,
+                NodeSpec::new(self.ident.semantic_id(), Role::Status)
+                    .text(self.message)
+                    .value(self.tone.name()),
+            )
+    }
+}
+
+/// The mark that a verified value is still on screen after a failed refresh.
+#[derive(Debug, IntoElement)]
+pub struct StaleMark {
+    ident: Ident,
+    reason: SharedString,
+    updated: Option<SharedString>,
+}
+
+impl StaleMark {
+    pub fn new(ident: impl Into<Ident>, reason: impl Into<SharedString>) -> Self {
+        Self {
+            ident: ident.into(),
+            reason: reason.into(),
+            updated: None,
+        }
+    }
+
+    /// The host's own wording for when the value was last verified.
+    pub fn updated(mut self, updated: impl Into<SharedString>) -> Self {
+        self.updated = Some(updated.into());
+        self
+    }
+}
+
+impl RenderOnce for StaleMark {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let theme = cx.theme().clone();
+        div()
+            .column()
+            .gap_token(&theme, Space::Xs)
+            .child(StatusLine::new(self.reason.clone(), Tone::Warning).id(self.ident.child("line")))
+            .when_some(self.updated.clone(), |element, updated| {
+                element.child(
+                    div()
+                        .type_scale(&theme, TypeScale::Caption)
+                        .text_color(theme.colors.text_faint)
+                        .child(
+                            cx.strings()
+                                .format(StringKey::StaleUpdated, &[updated.as_ref()]),
+                        ),
+                )
+            })
+            .semantic_in(
+                cx,
+                NodeSpec::new(self.ident.semantic_id(), Role::Status)
+                    .text(self.reason)
+                    .value("stale"),
+            )
     }
 }

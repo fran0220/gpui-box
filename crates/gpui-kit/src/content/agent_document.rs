@@ -24,8 +24,10 @@ use crate::data::{List, ListItem};
 use crate::display::badge::Tone;
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::status::StatusLine;
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Ident, StyledExt};
 use crate::motion;
+use crate::state::{HasPhase, Phase};
 
 type EventHandler = Rc<dyn Fn(&AgentDocumentEvent, &mut Window, &mut App)>;
 
@@ -316,6 +318,30 @@ impl AgentDocumentState {
     }
 }
 
+impl HasPhase for AgentDocumentState {
+    fn phase(&self) -> Phase {
+        match self {
+            Self::Idle(_) => Phase::Idle,
+            Self::Loading(_) => Phase::Loading,
+            Self::Ready => Phase::Ready,
+            Self::Empty(_) => Phase::Empty,
+            Self::Unavailable(_) => Phase::Unavailable,
+            Self::Failed(_) => Phase::Error,
+        }
+    }
+
+    fn reason(&self) -> Option<&str> {
+        match self {
+            Self::Idle(reason)
+            | Self::Loading(reason)
+            | Self::Empty(reason)
+            | Self::Unavailable(reason)
+            | Self::Failed(reason) => Some(reason.as_ref()),
+            Self::Ready => None,
+        }
+    }
+}
+
 /// An action originating in a typed document block.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AgentDocumentEvent {
@@ -333,6 +359,7 @@ pub struct AgentDocument {
     blocks: Vec<AgentDocumentBlock>,
     visible_rows: Option<usize>,
     on_event: Option<EventHandler>,
+    slots: Slots,
 }
 
 impl std::fmt::Debug for AgentDocument {
@@ -356,6 +383,7 @@ impl AgentDocument {
             blocks: Vec::new(),
             visible_rows: None,
             on_event: None,
+            slots: Slots::default(),
         }
     }
 
@@ -429,6 +457,14 @@ impl AgentDocument {
     }
 }
 
+impl Slotted for AgentDocument {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl RenderOnce for AgentDocument {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
@@ -438,25 +474,41 @@ impl RenderOnce for AgentDocument {
         let block_count = self.blocks.len();
 
         let content = match self.state {
-            AgentDocumentState::Idle(label) => EmptyState::new(ident.child("idle"), label)
-                .kind(EmptyKind::Unstarted)
-                .into_any_element(),
-            AgentDocumentState::Loading(label) => div()
-                .w_full()
-                .py_token(&theme, Space::Lg)
-                .child(StatusLine::new(label, Tone::Info).busy(ident.child("loading")))
-                .into_any_element(),
+            AgentDocumentState::Idle(label) => {
+                self.slots.or_else(slot::EMPTY, window, cx, |_, _| {
+                    EmptyState::new(ident.child("idle"), label)
+                        .kind(EmptyKind::Unstarted)
+                        .into_any_element()
+                })
+            }
+            AgentDocumentState::Loading(label) => {
+                self.slots.or_else(slot::LOADING, window, cx, |_, _| {
+                    div()
+                        .w_full()
+                        .py_token(&theme, Space::Lg)
+                        .child(StatusLine::new(label, Tone::Info).busy(ident.child("loading")))
+                        .into_any_element()
+                })
+            }
             AgentDocumentState::Empty(reason) => {
-                EmptyState::new(ident.child("empty"), reason).into_any_element()
+                self.slots.or_else(slot::EMPTY, window, cx, |_, _| {
+                    EmptyState::new(ident.child("empty"), reason).into_any_element()
+                })
             }
             AgentDocumentState::Unavailable(reason) => {
-                EmptyState::new(ident.child("unavailable"), reason)
-                    .kind(EmptyKind::Unavailable)
-                    .into_any_element()
+                self.slots.or_else(slot::EMPTY, window, cx, |_, _| {
+                    EmptyState::new(ident.child("unavailable"), reason)
+                        .kind(EmptyKind::Unavailable)
+                        .into_any_element()
+                })
             }
-            AgentDocumentState::Failed(reason) => EmptyState::new(ident.child("failed"), reason)
-                .kind(EmptyKind::Failed)
-                .into_any_element(),
+            AgentDocumentState::Failed(reason) => {
+                self.slots.or_else(slot::FAILED, window, cx, |_, _| {
+                    EmptyState::new(ident.child("failed"), reason)
+                        .kind(EmptyKind::Failed)
+                        .into_any_element()
+                })
+            }
             AgentDocumentState::Ready => match self.visible_rows {
                 Some(rows) => {
                     let blocks = Rc::new(self.blocks);
@@ -761,5 +813,20 @@ mod tests {
 
         assert_eq!(document.blocks.len(), 2);
         assert_eq!(document.duplicate_ids(), vec![SharedString::from("same")]);
+    }
+}
+
+#[cfg(test)]
+mod agent_document_phase_tests {
+    use super::*;
+
+    #[test]
+    fn idle_and_failed_keep_their_host_sentences() {
+        let idle = AgentDocumentState::Idle("nobody asked".into());
+        assert_eq!(idle.phase(), Phase::Idle);
+        assert_eq!(idle.reason(), Some("nobody asked"));
+        let failed = AgentDocumentState::Failed("offline".into());
+        assert_eq!(failed.phase(), Phase::Error);
+        assert_eq!(failed.reason(), Some("offline"));
     }
 }

@@ -31,6 +31,7 @@ use crate::controls::button::{Button, IconButton};
 use crate::display::badge::{Badge, Tone};
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::status::StatusDot;
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{CardVariant, Ident, Sizable, StyledExt};
 use crate::overlay::toast::{self, Toast};
 use crate::strings::{ActiveStrings, StringKey};
@@ -213,6 +214,7 @@ pub struct NotificationCenter {
     /// whether what it dropped had been read.
     dropped: bool,
     size: ControlSize,
+    slots: Slots,
 }
 
 impl std::fmt::Debug for NotificationCenter {
@@ -236,6 +238,7 @@ impl NotificationCenter {
             capacity: DEFAULT_CAPACITY,
             dropped: false,
             size: ControlSize::Sm,
+            slots: Slots::default(),
         }
     }
 
@@ -505,8 +508,16 @@ impl Sizable for NotificationCenter {
     }
 }
 
+impl Slotted for NotificationCenter {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl Render for NotificationCenter {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let unread = self.unread();
         let count_ident = self.ident.child("unread");
@@ -551,13 +562,15 @@ impl Render for NotificationCenter {
             .collect();
 
         let body = if rows.is_empty() {
-            EmptyState::new(
-                self.ident.child("empty"),
-                cx.strings().text(StringKey::NotificationsEmpty),
-            )
-            .kind(EmptyKind::Empty)
-            .detail(cx.strings().text(StringKey::NotificationsEmptyDetail))
-            .into_any_element()
+            self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                EmptyState::new(
+                    self.ident.child("empty"),
+                    cx.strings().text(StringKey::NotificationsEmpty),
+                )
+                .kind(EmptyKind::Empty)
+                .detail(cx.strings().text(StringKey::NotificationsEmptyDetail))
+                .into_any_element()
+            })
         } else {
             div().column().w_full().children(rows).into_any_element()
         };

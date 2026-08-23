@@ -44,6 +44,7 @@ use crate::display::status::StatusDot;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
 use crate::motion::keyed;
+use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
 type EntryHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
@@ -144,6 +145,31 @@ impl LogStreamState {
 
     fn shows_entries(&self) -> bool {
         matches!(self, Self::Ready | Self::Stale(_))
+    }
+}
+
+impl HasPhase for LogStreamState {
+    fn phase(&self) -> Phase {
+        match self {
+            Self::Loading => Phase::Loading,
+            Self::Empty => Phase::Empty,
+            Self::Unavailable(_) => Phase::Unavailable,
+            Self::Error(_) | Self::Stale(_) => Phase::Error,
+            Self::Ready => Phase::Ready,
+        }
+    }
+
+    fn reason(&self) -> Option<&str> {
+        match self {
+            Self::Unavailable(reason) | Self::Error(reason) | Self::Stale(reason) => {
+                Some(reason.as_ref())
+            }
+            _ => None,
+        }
+    }
+
+    fn is_stale(&self) -> bool {
+        matches!(self, Self::Stale(_))
     }
 }
 
@@ -573,7 +599,6 @@ fn state_body(
     window: &mut Window,
     cx: &mut App,
 ) -> AnyElement {
-    let strings = cx.strings();
     match state {
         LogStreamState::Loading => slots.or_else(slot::LOADING, window, cx, |_, cx| {
             div()
@@ -593,13 +618,15 @@ fn state_body(
                 .kind(EmptyKind::Empty)
                 .into_any_element()
         }),
-        LogStreamState::Unavailable(reason) => EmptyState::new(
-            ident.child("unavailable"),
-            strings.text(StringKey::LogUnavailable),
-        )
-        .kind(EmptyKind::Unavailable)
-        .detail(reason.clone())
-        .into_any_element(),
+        LogStreamState::Unavailable(reason) => slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+            EmptyState::new(
+                ident.child("unavailable"),
+                cx.strings().text(StringKey::LogUnavailable),
+            )
+            .kind(EmptyKind::Unavailable)
+            .detail(reason.clone())
+            .into_any_element()
+        }),
         LogStreamState::Error(reason) => slots.or_else(slot::FAILED, window, cx, |_, cx| {
             EmptyState::new(ident.child("error"), cx.strings().text(StringKey::LogError))
                 .kind(EmptyKind::Failed)
@@ -607,5 +634,19 @@ fn state_body(
                 .into_any_element()
         }),
         LogStreamState::Ready | LogStreamState::Stale(_) => div().into_any_element(),
+    }
+}
+
+#[cfg(test)]
+mod log_stream_phase_tests {
+    use super::*;
+
+    #[test]
+    fn stale_projects_as_error_and_keeps_the_verified_entries() {
+        let state = LogStreamState::Stale("offline".into());
+        assert_eq!(state.phase(), Phase::Error);
+        assert!(state.is_stale());
+        assert_eq!(state.reason(), Some("offline"));
+        assert!(state.shows_entries());
     }
 }

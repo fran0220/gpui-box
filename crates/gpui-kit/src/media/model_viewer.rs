@@ -42,6 +42,7 @@ use crate::layout::measure;
 use crate::media::gltf::{ModelBounds, ModelError, ModelScene};
 use crate::media::notice;
 use crate::motion::keyed;
+use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
 /// How tall the frame is when the caller says nothing.
@@ -112,6 +113,24 @@ impl ModelState {
             Self::Loading => "loading",
             Self::Ready(_) => "ready",
             Self::Rejected(error) => error.name(),
+        }
+    }
+}
+
+impl HasPhase for ModelState {
+    fn phase(&self) -> Phase {
+        match self {
+            Self::Empty => Phase::Empty,
+            Self::Loading => Phase::Loading,
+            Self::Ready(_) => Phase::Ready,
+            Self::Rejected(_) => Phase::Unavailable,
+        }
+    }
+
+    fn reason(&self) -> Option<&str> {
+        match self {
+            Self::Rejected(error) => Some(error.name()),
+            _ => None,
         }
     }
 }
@@ -861,5 +880,16 @@ mod tests {
             .name(),
             "too-large"
         );
+    }
+}
+
+#[cfg(test)]
+mod model_phase_tests {
+    use super::*;
+
+    #[test]
+    fn a_rejected_document_is_unavailable() {
+        assert_eq!(ModelState::Empty.phase(), Phase::Empty);
+        assert_eq!(ModelState::Loading.phase(), Phase::Loading);
     }
 }

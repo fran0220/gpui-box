@@ -16,6 +16,7 @@ use crate::data::list::{List, ListItem};
 use crate::display::badge::{Badge, Tone};
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::loading::PulseLoader;
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text};
 use crate::state::Loadable;
 use crate::strings::{ActiveStrings, StringKey};
@@ -237,6 +238,7 @@ pub struct DiagnosticsList {
     on_select: Option<SelectHandler>,
     on_action: Option<ActionHandler>,
     on_retry: Option<RetryHandler>,
+    slots: Slots,
 }
 
 impl std::fmt::Debug for DiagnosticsList {
@@ -270,6 +272,7 @@ impl DiagnosticsList {
             on_select: None,
             on_action: None,
             on_retry: None,
+            slots: Slots::default(),
         }
     }
     pub fn filter(mut self, filter: DiagnosticFilter) -> Self {
@@ -324,33 +327,51 @@ impl Sizable for DiagnosticsList {
     }
 }
 
+impl Slotted for DiagnosticsList {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl RenderOnce for DiagnosticsList {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let ident = self.ident.clone();
         let state = match self.diagnostics {
-            Loadable::Idle => EmptyState::new(
-                ident.child("idle"),
-                cx.strings().text(StringKey::DiagnosticsUnstarted),
-            )
-            .kind(EmptyKind::Unstarted)
-            .into_any_element(),
-            Loadable::Loading => PulseLoader::new(ident.child("loading"))
-                .label(cx.strings().text(StringKey::Loading))
-                .into_any_element(),
-            Loadable::Empty => EmptyState::new(
-                ident.child("empty"),
-                cx.strings().text(StringKey::DiagnosticsEmpty),
-            )
-            .kind(EmptyKind::Empty)
-            .into_any_element(),
-            Loadable::Unavailable(reason) => EmptyState::new(
-                ident.child("unavailable"),
-                cx.strings().text(StringKey::DiagnosticsUnavailable),
-            )
-            .kind(EmptyKind::Unavailable)
-            .detail(reason)
-            .into_any_element(),
-            Loadable::Error(reason) => {
+            Loadable::Idle => self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                EmptyState::new(
+                    ident.child("idle"),
+                    cx.strings().text(StringKey::DiagnosticsUnstarted),
+                )
+                .kind(EmptyKind::Unstarted)
+                .into_any_element()
+            }),
+            Loadable::Loading => self.slots.or_else(slot::LOADING, window, cx, |_, cx| {
+                PulseLoader::new(ident.child("loading"))
+                    .label(cx.strings().text(StringKey::Loading))
+                    .into_any_element()
+            }),
+            Loadable::Empty => self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                EmptyState::new(
+                    ident.child("empty"),
+                    cx.strings().text(StringKey::DiagnosticsEmpty),
+                )
+                .kind(EmptyKind::Empty)
+                .into_any_element()
+            }),
+            Loadable::Unavailable(reason) => {
+                self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                    EmptyState::new(
+                        ident.child("unavailable"),
+                        cx.strings().text(StringKey::DiagnosticsUnavailable),
+                    )
+                    .kind(EmptyKind::Unavailable)
+                    .detail(reason)
+                    .into_any_element()
+                })
+            }
+            Loadable::Error(reason) => self.slots.or_else(slot::FAILED, window, cx, |_, cx| {
                 let mut empty = EmptyState::new(
                     ident.child("error"),
                     cx.strings().text(StringKey::DiagnosticsError),
@@ -367,13 +388,17 @@ impl RenderOnce for DiagnosticsList {
                     );
                 }
                 empty.into_any_element()
+            }),
+            Loadable::Ready(diagnostics) if diagnostics.is_empty() => {
+                self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                    EmptyState::new(
+                        ident.child("empty"),
+                        cx.strings().text(StringKey::DiagnosticsEmpty),
+                    )
+                    .kind(EmptyKind::Empty)
+                    .into_any_element()
+                })
             }
-            Loadable::Ready(diagnostics) if diagnostics.is_empty() => EmptyState::new(
-                ident.child("empty"),
-                cx.strings().text(StringKey::DiagnosticsEmpty),
-            )
-            .kind(EmptyKind::Empty)
-            .into_any_element(),
             Loadable::Ready(diagnostics) => {
                 let rows: Vec<_> = diagnostics
                     .into_iter()

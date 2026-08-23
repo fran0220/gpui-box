@@ -16,6 +16,52 @@ layer knows.
 
 These states are not interchangeable.
 
+## Phase
+
+Per-surface enums keep the typed payload they already carry. `Phase` is the
+shared projection: what a surface knows about its own content, not what that
+surface is doing. `HasPhase` is how those enums, and `Loadable` / `AsyncValue`,
+answer the same question.
+
+`Phase` is:
+
+- `Idle`: never requested;
+- `Queued`: accepted, and not yet started;
+- `Blocked`: waiting for an answer (approval, credentials);
+- `Loading`: in flight, with no verified value;
+- `Refreshing`: in flight, keeping a verified value on screen;
+- `Ready`: a verified value;
+- `Empty`: a successful result with nothing in it;
+- `Unavailable`: a refusal, or a capability that does not exist;
+- `Error`: the attempt failed;
+- `Cancelled`: withdrawn.
+
+A transport that is playing and one that is paused are both `Ready`. The
+difference belongs to the transport.
+
+`StateView` renders a `Phase` without inventing one. A refresh keeps the last
+verified content under `RefreshVeil`. `is_stale()` is true only after a
+failed refresh that still holds a verified value. `EmptyKind::Unauthorized`
+is the authorization refusal; it is not `Unavailable`.
+
+The projection for each surface enum, asserted next to the `HasPhase` impl:
+
+| Surface | Mapping |
+|---|---|
+| `ChartState` / `SparklineState` / `MetricState` / `OfferingSourceState` | `Stale` → `Error` + `is_stale()`; other variants keep their name |
+| `LogStreamState` | `Stale(reason)` → `Error` + `is_stale()` |
+| `HeatmapState` / `KanbanState` / `AudioWaveformState` / `PromptBuilderState` | three-phase direct |
+| `ImageState` | `Failed` → `Error` |
+| `AgentDocumentState` | `Idle` → `Idle`, `Failed` → `Error` |
+| `ViewportState` / `TerminalState` / `ArtifactPreviewState` | same-name direct |
+| `GraphState` | `Refused` → `Unavailable`, `Failed` → `Error` |
+| `ModelState` | `Rejected` → `Unavailable`, reason from `ModelError` |
+| `ServerState` | `Connected` → `Ready`, `Connecting` → `Loading`, `Disconnected` → `Idle`, `Failed` → `Error`, `Disabled` → `Unavailable` |
+| `TransportState` | `Playing` / `Paused` → `Ready`, `Buffering` → `Refreshing` |
+| `UploadState` | `Queued` → `Queued`, `Uploading` → `Loading`, `Done` → `Ready`, `Cancelled` → `Cancelled`, `Refused` → `Unavailable` |
+| `ToolCallState` | `PendingApproval` → `Blocked`, `Running` → `Loading`, `Succeeded` → `Ready`, `Refused` → `Unavailable` |
+| `DropzoneState` | `Idle` → `Idle`, `Accepting` → `Ready`, `Refusing` → `Unavailable` |
+
 ## Refresh without erasure
 
 `AsyncValue<T, E>` keeps the last verified value separately from request
@@ -27,8 +73,9 @@ Ready(value)
   → Error(error) + value
 ```
 
-The UI continues showing `value`, marks it stale, and reports the refresh
-error. It does not replace verified content with an empty card.
+The UI continues showing `value`. `Refreshing` covers it with `RefreshVeil`.
+A failed refresh keeps the same value, marks it stale, and reports the error.
+It does not replace verified content with an empty card.
 
 ## Actions
 

@@ -470,6 +470,27 @@
       ]
     },
     {
+      "name": "Banner",
+      "kind": "builder",
+      "path": "gpui_kit::display::Banner",
+      "source": "crates/gpui-kit/src/display/status.rs",
+      "summary": "A page-level tinted report: title, action, and a way to close it.",
+      "construct": [
+        "new(ident: impl Into<Ident>, message: impl Into<SharedString>, tone: Tone) -> Self"
+      ],
+      "options": [
+        "title(title: impl Into<SharedString>) -> Self",
+        "action(action: impl IntoElement) -> Self",
+        "on_dismiss(handler: impl Fn(&mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "banner"
+      ]
+    },
+    {
       "name": "BarChart",
       "kind": "builder",
       "path": "gpui_kit::display::BarChart",
@@ -2657,6 +2678,28 @@
       ]
     },
     {
+      "name": "OutcomePanel",
+      "kind": "builder",
+      "path": "gpui_kit::display::OutcomePanel",
+      "source": "crates/gpui-kit/src/display/outcome.rs",
+      "summary": "A panel that states what finished, including a partial success.",
+      "construct": [
+        "new(ident: impl Into<Ident>, kind: OutcomeKind) -> Self"
+      ],
+      "options": [
+        "title(title: impl Into<SharedString>) -> Self",
+        "detail(detail: impl Into<SharedString>) -> Self",
+        "count(count: impl Into<SharedString>) -> Self",
+        "action(action: impl IntoElement) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "outcome-panel"
+      ]
+    },
+    {
       "name": "Outline",
       "kind": "builder",
       "path": "gpui_kit::content::Outline",
@@ -2937,7 +2980,10 @@
         "label(label: impl Into<SharedString>) -> Self",
         "fraction(fraction: f32) -> Self",
         "count(done: usize, total: usize) -> Self",
-        "display(display: impl Into<SharedString>) -> Self"
+        "display(display: impl Into<SharedString>) -> Self",
+        "stalled(stalled: bool) -> Self",
+        "paused(paused: bool) -> Self",
+        "on_cancel(handler: impl Fn(&mut Window, &mut App) + 'static) -> Self"
       ],
       "commands": [],
       "queries": [],
@@ -2960,7 +3006,10 @@
         "fraction(fraction: f32) -> Self",
         "count(done: usize, total: usize) -> Self",
         "display(display: impl Into<SharedString>) -> Self",
-        "centre(centre: impl Into<SharedString>) -> Self"
+        "centre(centre: impl Into<SharedString>) -> Self",
+        "stalled(stalled: bool) -> Self",
+        "paused(paused: bool) -> Self",
+        "on_cancel(handler: impl Fn(&mut Window, &mut App) + 'static) -> Self"
       ],
       "commands": [],
       "queries": [],
@@ -3080,6 +3129,25 @@
       ],
       "scenes": [
         "date-range"
+      ]
+    },
+    {
+      "name": "RefreshVeil",
+      "kind": "builder",
+      "path": "gpui_kit::display::RefreshVeil",
+      "source": "crates/gpui-kit/src/display/loading.rs",
+      "summary": "A veil over content that is still the last verified value.",
+      "construct": [
+        "new(ident: impl Into<Ident>, content: impl IntoElement) -> Self"
+      ],
+      "options": [
+        "label(label: impl Into<SharedString>) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "loading"
       ]
     },
     {
@@ -3441,7 +3509,8 @@
         "label(label: impl Into<gpui::SharedString>) -> Self",
         "rows(rows: usize) -> Self",
         "row_height(row_height: f32) -> Self",
-        "widths(widths: impl IntoIterator<Item = f32>) -> Self"
+        "widths(widths: impl IntoIterator<Item = f32>) -> Self",
+        "shapes(shapes: impl IntoIterator<Item = SkeletonShape>) -> Self"
       ],
       "commands": [],
       "queries": [],
@@ -3515,6 +3584,25 @@
       "reports": [],
       "scenes": [
         "sparkline"
+      ]
+    },
+    {
+      "name": "Spinner",
+      "kind": "builder",
+      "path": "gpui_kit::display::Spinner",
+      "source": "crates/gpui-kit/src/display/loading.rs",
+      "summary": "An inline turn, for a wait that sits next to a label.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "label(label: impl Into<SharedString>) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "loading"
       ]
     },
     {
@@ -3618,6 +3706,65 @@
       "reports": [],
       "scenes": [
         "chart"
+      ]
+    },
+    {
+      "name": "StageProgress",
+      "kind": "builder",
+      "path": "gpui_kit::display::StageProgress",
+      "source": "crates/gpui-kit/src/display/stage_progress.rs",
+      "summary": "A run of named stages, all of them supplied by the caller.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "stages(stages: impl IntoIterator<Item = ProgressStage>) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "stage-progress"
+      ]
+    },
+    {
+      "name": "StaleMark",
+      "kind": "builder",
+      "path": "gpui_kit::display::StaleMark",
+      "source": "crates/gpui-kit/src/display/status.rs",
+      "summary": "The mark that a verified value is still on screen after a failed refresh.",
+      "construct": [
+        "new(ident: impl Into<Ident>, reason: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "updated(updated: impl Into<SharedString>) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "state-ladder"
+      ]
+    },
+    {
+      "name": "StateView",
+      "kind": "builder",
+      "path": "gpui_kit::display::StateView",
+      "source": "crates/gpui-kit/src/display/state_view.rs",
+      "summary": "A region that picks the truthful waiting, empty, failed, or ready surface.",
+      "construct": [
+        "new(ident: impl Into<Ident>, phase: impl HasPhase) -> Self",
+        "from_async<T, E: AsRef<str>>(ident: impl Into<Ident>, value: &AsyncValue<T, E>, ready: impl FnOnce(&T) -> AnyElement) -> Self"
+      ],
+      "options": [
+        "content(content: impl IntoElement) -> Self",
+        "elapsed(elapsed: Duration) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [],
+      "scenes": [
+        "state-ladder"
       ]
     },
     {
@@ -5145,7 +5292,9 @@
       "construct": [],
       "options": [],
       "commands": [],
-      "queries": []
+      "queries": [
+        "name() -> &'static str"
+      ]
     },
     {
       "name": "AspectFit",
@@ -5184,13 +5333,18 @@
       "summary": "A value and, separately, what is currently happening to it.",
       "variants": [],
       "construct": [
+        "idle() -> Self",
         "loading() -> Self",
-        "ready(value: T) -> Self"
+        "ready(value: T) -> Self",
+        "empty() -> Self",
+        "refused(reason: impl Into<String>) -> Self",
+        "error(error: E) -> Self"
       ],
       "options": [],
       "commands": [
         "refresh()",
-        "fail_refresh(error: E)"
+        "fail_refresh(error: E)",
+        "record_attempt()"
       ],
       "queries": [
         "is_stale() -> bool"
@@ -5232,7 +5386,9 @@
       "construct": [],
       "options": [],
       "commands": [],
-      "queries": []
+      "queries": [
+        "name() -> &'static str"
+      ]
     },
     {
       "name": "Basis",
@@ -7023,7 +7179,8 @@
         "Empty",
         "Unstarted",
         "Unavailable",
-        "Failed"
+        "Failed",
+        "Unauthorized"
       ],
       "construct": [],
       "options": [],
@@ -7547,7 +7704,9 @@
       "construct": [],
       "options": [],
       "commands": [],
-      "queries": []
+      "queries": [
+        "name() -> &'static str"
+      ]
     },
     {
       "name": "GraphViewport",
@@ -7705,7 +7864,9 @@
       "construct": [],
       "options": [],
       "commands": [],
-      "queries": []
+      "queries": [
+        "name() -> &'static str"
+      ]
     },
     {
       "name": "HistoryEntry",
@@ -7871,7 +8032,9 @@
       "construct": [],
       "options": [],
       "commands": [],
-      "queries": []
+      "queries": [
+        "name() -> &'static str"
+      ]
     },
     {
       "name": "ImageViewerEvent",
@@ -8015,7 +8178,9 @@
       "construct": [],
       "options": [],
       "commands": [],
-      "queries": []
+      "queries": [
+        "name() -> &'static str"
+      ]
     },
     {
       "name": "KeybindingRecorderEvent",
@@ -8274,7 +8439,8 @@
       ],
       "construct": [],
       "options": [
-        "map<U>(map: impl FnOnce(T) -> U) -> Loadable<U, E>"
+        "map<U>(map: impl FnOnce(T) -> U) -> Loadable<U, E>",
+        "into_async() -> AsyncValue<T, E>"
       ],
       "commands": [],
       "queries": [
@@ -9262,6 +9428,22 @@
       "queries": []
     },
     {
+      "name": "OutcomeKind",
+      "path": "gpui_kit::display::OutcomeKind",
+      "summary": "Which of the three outcomes the host is reporting.",
+      "variants": [
+        "Success",
+        "Partial",
+        "Failed"
+      ],
+      "construct": [],
+      "options": [
+        "name() -> &'static str"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "OverallProgress",
       "path": "gpui_kit::controls::OverallProgress",
       "summary": "How much of the whole batch is done, if anybody knows.",
@@ -9553,13 +9735,19 @@
     },
     {
       "name": "Phase",
-      "path": "gpui_kit::motion::Phase",
-      "summary": "Where an element is in its arrival or departure.",
+      "path": "gpui_kit::state::Phase",
+      "summary": "What a surface knows about its own content.",
       "variants": [
-        "Entering",
-        "Present",
-        "Exiting",
-        "Gone"
+        "Idle",
+        "Queued",
+        "Blocked",
+        "Loading",
+        "Refreshing",
+        "Ready",
+        "Empty",
+        "Unavailable",
+        "Error",
+        "Cancelled"
       ],
       "construct": [],
       "options": [],
@@ -9747,6 +9935,18 @@
       ]
     },
     {
+      "name": "ProgressStage",
+      "path": "gpui_kit::display::ProgressStage",
+      "summary": "One host-owned stage of a longer piece of work.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, label: impl Into<SharedString>, status: StageStatus) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "PromptBuilderEvent",
       "path": "gpui_kit::agent::PromptBuilderEvent",
       "summary": "What a slot activation reports.",
@@ -9770,7 +9970,9 @@
       "construct": [],
       "options": [],
       "commands": [],
-      "queries": []
+      "queries": [
+        "name() -> &'static str"
+      ]
     },
     {
       "name": "PromptSlot",
@@ -10556,6 +10758,22 @@
       "queries": []
     },
     {
+      "name": "SkeletonShape",
+      "path": "gpui_kit::display::SkeletonShape",
+      "summary": "One placeholder a skeleton can draw.",
+      "variants": [
+        "Row",
+        "Paragraph",
+        "Circle",
+        "Rect",
+        "Card"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "Slots",
       "path": "gpui_kit::foundation::Slots",
       "summary": "The nodes a caller has replaced inside one component.",
@@ -10811,6 +11029,23 @@
         "settle_time_at_for(velocity: f32, span: f32) -> Duration",
         "is_visually_settled(elapsed: Duration, velocity: f32, span: f32) -> bool",
         "animation() -> Animation"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "StageStatus",
+      "path": "gpui_kit::display::StageStatus",
+      "summary": "Where one stage stands.",
+      "variants": [
+        "Pending",
+        "Active",
+        "Done",
+        "Failed"
+      ],
+      "construct": [],
+      "options": [
+        "name() -> &'static str"
       ],
       "commands": [],
       "queries": []
@@ -11080,7 +11315,9 @@
       "construct": [],
       "options": [],
       "commands": [],
-      "queries": []
+      "queries": [
+        "name() -> &'static str"
+      ]
     },
     {
       "name": "Text",
@@ -11690,7 +11927,10 @@
       "construct": [],
       "options": [],
       "commands": [],
-      "queries": []
+      "queries": [
+        "value() -> &'static str",
+        "name() -> &'static str"
+      ]
     },
     {
       "name": "VisualCue",
@@ -11933,14 +12173,18 @@
       "subjects": [
         "GradientSpinner",
         "PulseLoader",
-        "Skeleton"
+        "RefreshVeil",
+        "Skeleton",
+        "Spinner"
       ],
       "uses": [
         "GradientSpinner",
         "PulseLoader",
-        "Skeleton"
+        "RefreshVeil",
+        "Skeleton",
+        "Spinner"
       ],
-      "example": "fn loading(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let indicator = |title: &'static str, loader: AnyElement| {\n        div()\n            .column()\n            .items_center()\n            .justify_center()\n            .gap_token(&theme, Space::Md)\n            .w(px(220.0))\n            .h(px(112.0))\n            .p_token(&theme, Space::Md)\n            .radius(&theme, Radius::Card)\n            .surface(&theme, gpui_kit_theme::Surface::Panel)\n            .child(crate::foundation::text(&theme, TypeScale::Label, title))\n            .child(loader)\n    };\n    stack(&theme)\n        .w_full()\n        .max_w(px(520.0))\n        .child(\n            row(&theme)\n                .gap_token(&theme, Space::Md)\n                .child(indicator(\n                    \"Loading providers\",\n                    PulseLoader::new(\"scene.loading.pulse\")\n                        .label(\"Loading providers\")\n                        .into_any_element(),\n                ))\n                .child(indicator(\n                    \"Contacting host\",\n                    GradientSpinner::new(\"scene.loading.spinner\")\n                        .label(\"Contacting host\")\n                        .into_any_element(),\n                )),\n        )\n        .child(\n            div()\n                .column()\n                .gap_token(&theme, Space::Sm)\n                .w_full()\n                .child(crate::foundation::text(\n                    &theme,\n                    TypeScale::Label,\n                    \"Loading list\",\n                ))\n                .child(\n                    Skeleton::new(\"scene.loading.skeleton\")\n                        .rows(3)\n                        .label(\"Loading list\"),\n                ),\n        )\n        .into_any_element()\n}"
+      "example": "fn loading(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let indicator = |title: &'static str, loader: AnyElement| {\n        div()\n            .column()\n            .items_center()\n            .justify_center()\n            .gap_token(&theme, Space::Md)\n            .w(px(220.0))\n            .h(px(112.0))\n            .p_token(&theme, Space::Md)\n            .radius(&theme, Radius::Card)\n            .surface(&theme, gpui_kit_theme::Surface::Panel)\n            .child(crate::foundation::text(&theme, TypeScale::Label, title))\n            .child(loader)\n    };\n    stack(&theme)\n        .w_full()\n        .max_w(px(520.0))\n        .child(\n            row(&theme)\n                .gap_token(&theme, Space::Md)\n                .child(indicator(\n                    \"Loading providers\",\n                    PulseLoader::new(\"scene.loading.pulse\")\n                        .label(\"Loading providers\")\n                        .into_any_element(),\n                ))\n                .child(indicator(\n                    \"Contacting host\",\n                    GradientSpinner::new(\"scene.loading.spinner\")\n                        .label(\"Contacting host\")\n                        .into_any_element(),\n                )),\n        )\n        .child(\n            row(&theme)\n                .gap_token(&theme, Space::Md)\n                .child(indicator(\n                    \"Inline wait\",\n                    Spinner::new(\"scene.loading.inline\")\n                        .label(\"Inline wait\")\n                        .into_any_element(),\n                ))\n                .child(indicator(\n                    \"Refreshing in place\",\n                    RefreshVeil::new(\n                        \"scene.loading.veil\",\n                        crate::foundation::text(&theme, TypeScale::Body, \"Last verified list\"),\n                    )\n                    .label(\"Refreshing\")\n                    .into_any_element(),\n                )),\n        )\n        .child(\n            div()\n                .column()\n                .gap_token(&theme, Space::Sm)\n                .w_full()\n                .child(crate::foundation::text(\n                    &theme,\n                    TypeScale::Label,\n                    \"Loading list\",\n                ))\n                .child(\n                    Skeleton::new(\"scene.loading.skeleton\")\n                        .rows(3)\n                        .label(\"Loading list\"),\n                ),\n        )\n        .child(\n            div()\n                .column()\n                .gap_token(&theme, Space::Sm)\n                .w_full()\n                .child(crate::foundation::text(\n                    &theme,\n                    TypeScale::Label,\n                    \"Card and paragraph placeholders\",\n                ))\n                .child(\n                    Skeleton::new(\"scene.loading.shapes\")\n                        .shapes([\n                            SkeletonShape::Card,\n                            SkeletonShape::Paragraph { lines: 3 },\n                            SkeletonShape::Circle { size: 28.0 },\n                        ])\n                        .label(\"Loading card\"),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "visual-effects",
@@ -12080,7 +12324,57 @@
       "uses": [
         "ProgressBar"
       ],
-      "example": "fn progress_bar(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(420.0))\n        .child(caption(&theme, \"A count the host reported\"))\n        .child(\n            ProgressBar::new(\"scene.progress-bar.counted\")\n                .label(\"Indexing workspace\")\n                .count(3, 12),\n        )\n        .child(\n            ProgressBar::new(\"scene.progress-bar.nearly\")\n                .label(\"Uploading\")\n                .count(11, 12),\n        )\n        .child(caption(\n            &theme,\n            \"No count yet. The bar says it is working, and does not invent a fraction\",\n        ))\n        .child(ProgressBar::new(\"scene.progress-bar.unknown\").label(\"Contacting host\"))\n        .into_any_element()\n}"
+      "example": "fn progress_bar(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(420.0))\n        .child(caption(&theme, \"A count the host reported\"))\n        .child(\n            ProgressBar::new(\"scene.progress-bar.counted\")\n                .label(\"Indexing workspace\")\n                .count(3, 12),\n        )\n        .child(\n            ProgressBar::new(\"scene.progress-bar.nearly\")\n                .label(\"Uploading\")\n                .count(11, 12),\n        )\n        .child(caption(\n            &theme,\n            \"No count yet. The bar says it is working, and does not invent a fraction\",\n        ))\n        .child(ProgressBar::new(\"scene.progress-bar.unknown\").label(\"Contacting host\"))\n        .child(caption(&theme, \"Stopped, without inventing a fraction\"))\n        .child(\n            ProgressBar::new(\"scene.progress-bar.stalled\")\n                .label(\"Indexing workspace\")\n                .count(3, 12)\n                .stalled(true),\n        )\n        .child(\n            ProgressBar::new(\"scene.progress-bar.paused\")\n                .label(\"Uploading\")\n                .count(6, 12)\n                .paused(true)\n                .on_cancel(|_, _| {}),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "state-ladder",
+      "capture": "cargo run -p xtask -- headless capture state-ladder",
+      "kind": "exhibit",
+      "subjects": [
+        "StateView",
+        "StaleMark"
+      ],
+      "uses": [
+        "StateView",
+        "StaleMark"
+      ],
+      "example": "fn state_ladder(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let pane = |title: &'static str, view: StateView| {\n        div()\n            .column()\n            .gap_token(&theme, Space::Xs)\n            .w(px(240.0))\n            .child(crate::foundation::text(&theme, TypeScale::Caption, title))\n            .child(view)\n    };\n    stack(&theme)\n        .w_full()\n        .child(caption(\n            &theme,\n            \"Ten phases, one surface. A refusal is not an empty list.\",\n        ))\n        .child(\n            row(&theme)\n                .child(pane(\n                    \"Idle\",\n                    StateView::new(\"scene.state.idle\", Phase::Idle),\n                ))\n                .child(pane(\n                    \"Queued\",\n                    StateView::new(\"scene.state.queued\", Phase::Queued),\n                ))\n                .child(pane(\n                    \"Blocked\",\n                    StateView::new(\"scene.state.blocked\", Phase::Blocked),\n                )),\n        )\n        .child(\n            row(&theme)\n                .child(pane(\n                    \"Loading\",\n                    StateView::new(\"scene.state.loading\", Phase::Loading),\n                ))\n                .child(pane(\n                    \"Empty\",\n                    StateView::new(\"scene.state.empty\", Phase::Empty),\n                ))\n                .child(pane(\n                    \"Cancelled\",\n                    StateView::new(\"scene.state.cancelled\", Phase::Cancelled).content(div()),\n                )),\n        )\n        .child(\n            row(&theme)\n                .child(pane(\n                    \"Unavailable\",\n                    StateView::new(\n                        \"scene.state.unavailable\",\n                        Loadable::<(), String>::Unavailable(\"the host refused\".into()),\n                    ),\n                ))\n                .child(pane(\n                    \"Error\",\n                    StateView::new(\n                        \"scene.state.error\",\n                        AsyncValue::<(), String>::error(\"the index is still building\".into()),\n                    ),\n                ))\n                .child(pane(\n                    \"Ready\",\n                    StateView::from_async(\n                        \"scene.state.ready\",\n                        &AsyncValue::<_, String>::ready(\"12 runs\"),\n                        |value| {\n                            crate::foundation::text(&theme, TypeScale::Body, *value)\n                                .into_any_element()\n                        },\n                    ),\n                )),\n        )\n        .child(pane(\"Refreshing, last value kept\", {\n            let mut value = AsyncValue::<_, String>::ready(\"12 runs\");\n            value.refresh();\n            StateView::from_async(\"scene.state.refreshing\", &value, |text| {\n                crate::foundation::text(&theme, TypeScale::Body, *text).into_any_element()\n            })\n        }))\n        .child(\n            StaleMark::new(\n                \"scene.state.stale\",\n                \"Refreshing failed. The last verified value remains.\",\n            )\n            .updated(\"a moment ago\"),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "banner",
+      "capture": "cargo run -p xtask -- headless capture banner",
+      "kind": "exhibit",
+      "subjects": [
+        "Banner"
+      ],
+      "uses": [
+        "Banner"
+      ],
+      "example": "fn banner(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(560.0))\n        .child(caption(&theme, \"A page-level report, dismissable\"))\n        .child(\n            Banner::new(\n                \"scene.banner.warning\",\n                \"The last refresh failed. The verified list is still on screen.\",\n                Tone::Warning,\n            )\n            .title(\"Stale workspace\")\n            .action(\n                Button::new(\"scene.banner.retry\")\n                    .label(\"Try again\")\n                    .secondary()\n                    .small(),\n            )\n            .on_dismiss(|_, _| {}),\n        )\n        .child(\n            Banner::new(\n                \"scene.banner.danger\",\n                \"The host refused this action.\",\n                Tone::Danger,\n            )\n            .title(\"Refused\"),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "outcome-panel",
+      "capture": "cargo run -p xtask -- headless capture outcome-panel",
+      "kind": "exhibit",
+      "subjects": [
+        "OutcomePanel"
+      ],
+      "uses": [
+        "OutcomePanel"
+      ],
+      "example": "fn outcome_panel(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(560.0))\n        .child(caption(&theme, \"Finished\"))\n        .child(\n            OutcomePanel::new(\"scene.outcome.success\", OutcomeKind::Success)\n                .title(\"Import finished\")\n                .count(\"50 files imported\"),\n        )\n        .child(caption(&theme, \"Finished, with failures the host numbered\"))\n        .child(\n            OutcomePanel::new(\"scene.outcome.partial\", OutcomeKind::Partial)\n                .title(\"Import finished, with failures\")\n                .count(\"47 succeeded, 3 failed\")\n                .detail(\"The three that failed are still in the queue.\"),\n        )\n        .child(caption(&theme, \"Did not finish\"))\n        .child(\n            OutcomePanel::new(\"scene.outcome.failed\", OutcomeKind::Failed)\n                .detail(\"The host closed the connection before any file landed.\"),\n        )\n        .into_any_element()\n}"
+    },
+    {
+      "name": "stage-progress",
+      "capture": "cargo run -p xtask -- headless capture stage-progress",
+      "kind": "exhibit",
+      "subjects": [
+        "StageProgress"
+      ],
+      "uses": [
+        "StageProgress"
+      ],
+      "example": "fn stage_progress(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(420.0))\n        .child(caption(&theme, \"Download, then verify, then install\"))\n        .child(StageProgress::new(\"scene.stage.running\").stages([\n            ProgressStage::new(\"download\", \"Download\", StageStatus::Done),\n            ProgressStage::new(\"verify\", \"Verify\", StageStatus::Active),\n            ProgressStage::new(\"install\", \"Install\", StageStatus::Pending),\n        ]))\n        .child(caption(&theme, \"A stage that failed keeps its name\"))\n        .child(StageProgress::new(\"scene.stage.failed\").stages([\n            ProgressStage::new(\"download\", \"Download\", StageStatus::Done),\n            ProgressStage::new(\"verify\", \"Verify\", StageStatus::Failed),\n            ProgressStage::new(\"install\", \"Install\", StageStatus::Pending),\n        ]))\n        .into_any_element()\n}"
     },
     {
       "name": "divider",
@@ -12128,7 +12422,7 @@
       "uses": [
         "EmptyState"
       ],
-      "example": "fn empty_state(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(560.0))\n        .child(caption(&theme, \"Nothing has been started yet\"))\n        .child(\n            EmptyState::new(\"scene.empty-state.unstarted\", \"No runs yet\")\n                .kind(EmptyKind::Unstarted)\n                .detail(\"A run appears here once one has been started.\"),\n        )\n        .child(caption(&theme, \"The host refused, and says so\"))\n        .child(\n            EmptyState::new(\n                \"scene.empty-state.unavailable\",\n                \"The host refused the request\",\n            )\n            .kind(EmptyKind::Unavailable)\n            .detail(\"Approval is required for this workspace.\")\n            .action(\n                Button::new(\"scene.empty-state.retry\")\n                    .label(\"Try again\")\n                    .secondary()\n                    .on_click(|_, _| {}),\n            ),\n        )\n        .child(caption(&theme, \"A collection that really is empty\"))\n        .child(\n            EmptyState::new(\"scene.empty-state.empty\", \"No runs match “failing”\")\n                .kind(EmptyKind::Empty)\n                .detail(\"Clear the filter to see every run.\"),\n        )\n        .child(caption(&theme, \"It was tried, and it failed\"))\n        .child(\n            EmptyState::new(\"scene.empty-state.failed\", \"The run could not be read\")\n                .kind(EmptyKind::Failed)\n                .detail(\"The snapshot on disk is from a newer version of the format.\")\n                .action(\n                    Button::new(\"scene.empty-state.reload\")\n                        .label(\"Reload\")\n                        .secondary()\n                        .on_click(|_, _| {}),\n                ),\n        )\n        .into_any_element()\n}"
+      "example": "fn empty_state(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(560.0))\n        .child(caption(&theme, \"Nothing has been started yet\"))\n        .child(\n            EmptyState::new(\"scene.empty-state.unstarted\", \"No runs yet\")\n                .kind(EmptyKind::Unstarted)\n                .detail(\"A run appears here once one has been started.\"),\n        )\n        .child(caption(&theme, \"The host refused, and says so\"))\n        .child(\n            EmptyState::new(\n                \"scene.empty-state.unavailable\",\n                \"The host refused the request\",\n            )\n            .kind(EmptyKind::Unavailable)\n            .detail(\"Approval is required for this workspace.\")\n            .action(\n                Button::new(\"scene.empty-state.retry\")\n                    .label(\"Try again\")\n                    .secondary()\n                    .on_click(|_, _| {}),\n            ),\n        )\n        .child(caption(&theme, \"A collection that really is empty\"))\n        .child(\n            EmptyState::new(\"scene.empty-state.empty\", \"No runs match “failing”\")\n                .kind(EmptyKind::Empty)\n                .detail(\"Clear the filter to see every run.\"),\n        )\n        .child(caption(&theme, \"It was tried, and it failed\"))\n        .child(\n            EmptyState::new(\"scene.empty-state.failed\", \"The run could not be read\")\n                .kind(EmptyKind::Failed)\n                .detail(\"The snapshot on disk is from a newer version of the format.\")\n                .action(\n                    Button::new(\"scene.empty-state.reload\")\n                        .label(\"Reload\")\n                        .secondary()\n                        .on_click(|_, _| {}),\n                ),\n        )\n        .child(caption(\n            &theme,\n            \"The host refused because the reader is not allowed\",\n        ))\n        .child(\n            EmptyState::new(\"scene.empty-state.unauthorized\", \"This workspace is locked\")\n                .kind(EmptyKind::Unauthorized)\n                .detail(\"Ask an owner to grant access.\"),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "kbd",

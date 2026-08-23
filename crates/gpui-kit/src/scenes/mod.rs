@@ -68,9 +68,9 @@ use data::{
 #[cfg(feature = "fixtures")]
 use datetime::{calendar, date_range, date_time};
 use display::{
-    animated_number, avatar, badge, card, chart, detail, divider, empty_state, failure_panel,
-    heatmap, icon, loading, metric_card, progress_bar, progress_circle, sparkline, status, tag,
-    trace,
+    animated_number, avatar, badge, banner, card, chart, detail, divider, empty_state,
+    failure_panel, heatmap, icon, loading, metric_card, outcome_panel, progress_bar,
+    progress_circle, sparkline, stage_progress, state_ladder, status, tag, trace,
 };
 use effects::{cinematic_effects, visual_effects};
 use game::game_ui;
@@ -180,7 +180,13 @@ pub fn catalog() -> Vec<Scene> {
         Scene {
             name: "loading",
             build: loading,
-            shows: Shows::Subjects(&["GradientSpinner", "PulseLoader", "Skeleton"]),
+            shows: Shows::Subjects(&[
+                "GradientSpinner",
+                "PulseLoader",
+                "RefreshVeil",
+                "Skeleton",
+                "Spinner",
+            ]),
         },
         Scene {
             name: "visual-effects",
@@ -237,6 +243,26 @@ pub fn catalog() -> Vec<Scene> {
             name: "progress-bar",
             build: progress_bar,
             shows: Shows::Subjects(&["ProgressBar"]),
+        },
+        Scene {
+            name: "state-ladder",
+            build: state_ladder,
+            shows: Shows::Subjects(&["StateView", "StaleMark"]),
+        },
+        Scene {
+            name: "banner",
+            build: banner,
+            shows: Shows::Subjects(&["Banner"]),
+        },
+        Scene {
+            name: "outcome-panel",
+            build: outcome_panel,
+            shows: Shows::Subjects(&["OutcomePanel"]),
+        },
+        Scene {
+            name: "stage-progress",
+            build: stage_progress,
+            shows: Shows::Subjects(&["StageProgress"]),
         },
         Scene {
             name: "divider",

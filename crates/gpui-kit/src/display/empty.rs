@@ -27,6 +27,8 @@ pub enum EmptyKind {
     Unavailable,
     /// The attempt failed.
     Failed,
+    /// The host refused because the reader is not allowed.
+    Unauthorized,
 }
 
 /// A centred explanation with an optional action.
@@ -88,6 +90,7 @@ impl RenderOnce for EmptyState {
             EmptyKind::Unstarted => (Icon::Document, theme.colors.text_faint),
             EmptyKind::Unavailable => (Icon::CloseCircle, theme.colors.warning),
             EmptyKind::Failed => (Icon::Danger, theme.colors.danger),
+            EmptyKind::Unauthorized => (Icon::Key, theme.colors.warning),
         };
 
         let content = div()
@@ -140,6 +143,7 @@ impl RenderOnce for EmptyState {
                         EmptyKind::Unstarted => "unstarted",
                         EmptyKind::Unavailable => "unavailable",
                         EmptyKind::Failed => "failed",
+                        EmptyKind::Unauthorized => "unauthorized",
                     }),
             )
     }

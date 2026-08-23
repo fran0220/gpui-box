@@ -23,6 +23,7 @@ use crate::display::empty::EmptyState;
 use crate::foundation::{FocusRing, Ident, Pressable, StyledExt};
 use crate::layout::measure;
 use crate::motion::keyed;
+use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
 use super::edge::{
@@ -390,6 +391,35 @@ pub enum GraphState {
     Refused(SharedString),
     /// The graph could not be loaded, in the host's own words.
     Failed(SharedString),
+}
+
+impl GraphState {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Ready => "ready",
+            Self::Loading => "loading",
+            Self::Refused(_) => "refused",
+            Self::Failed(_) => "failed",
+        }
+    }
+}
+
+impl HasPhase for GraphState {
+    fn phase(&self) -> Phase {
+        match self {
+            Self::Ready => Phase::Ready,
+            Self::Loading => Phase::Loading,
+            Self::Refused(_) => Phase::Unavailable,
+            Self::Failed(_) => Phase::Error,
+        }
+    }
+
+    fn reason(&self) -> Option<&str> {
+        match self {
+            Self::Refused(reason) | Self::Failed(reason) => Some(reason.as_ref()),
+            _ => None,
+        }
+    }
 }
 
 /// A run drawn as connected steps.
@@ -930,17 +960,7 @@ impl RenderOnce for NodeGraph {
                         .text_color(color)
                         .child(text),
                 )
-                .semantic_in(
-                    cx,
-                    spec.value(viewport_value(
-                        match self.state {
-                            GraphState::Loading => "loading",
-                            GraphState::Refused(_) => "refused",
-                            _ => "failed",
-                        },
-                        viewport,
-                    )),
-                )
+                .semantic_in(cx, spec.value(viewport_value(self.state.name(), viewport)))
                 .into_any_element();
         }
 
@@ -2073,5 +2093,18 @@ mod tests {
             GraphState::Failed("no".into())
         );
         assert_ne!(GraphState::Loading, GraphState::Ready);
+    }
+}
+
+#[cfg(test)]
+mod graph_phase_tests {
+    use super::*;
+
+    #[test]
+    fn a_refusal_is_unavailable_and_a_load_failure_is_error() {
+        let refused = GraphState::Refused("policy".into());
+        assert_eq!(refused.phase(), Phase::Unavailable);
+        assert_eq!(refused.name(), "refused");
+        assert_eq!(GraphState::Failed("offline".into()).phase(), Phase::Error);
     }
 }

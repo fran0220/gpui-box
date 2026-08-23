@@ -39,6 +39,7 @@ use crate::display::badge::{Badge, Tone};
 use crate::display::icon::{Icon as IconView, IconTone};
 use crate::display::status::Callout;
 use crate::foundation::{CardVariant, Ident, Sizable, StyledExt, text};
+use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
 type RetryHandler = Rc<dyn Fn(&mut Window, &mut App)>;
@@ -220,7 +221,25 @@ impl ToolCallState {
             _ => None,
         }
     }
+}
 
+impl HasPhase for ToolCallState {
+    fn phase(&self) -> Phase {
+        match self {
+            Self::PendingApproval => Phase::Blocked,
+            Self::Running => Phase::Loading,
+            Self::Succeeded { .. } => Phase::Ready,
+            Self::Failed { .. } => Phase::Error,
+            Self::Refused { .. } => Phase::Unavailable,
+        }
+    }
+
+    fn reason(&self) -> Option<&str> {
+        ToolCallState::reason(self).map(|reason| reason.as_ref())
+    }
+}
+
+impl ToolCallState {
     /// Whether anything ran, which is what makes an elapsed time meaningful.
     fn ran(&self) -> bool {
         matches!(
@@ -646,5 +665,21 @@ mod tests {
         assert!(ToolCallState::Running.ran());
         assert!(ToolCallState::succeeded_silently().ran());
         assert!(ToolCallState::failed("boom").ran());
+    }
+}
+
+#[cfg(test)]
+mod tool_call_phase_tests {
+    use super::*;
+
+    #[test]
+    fn approval_is_blocked_and_a_refusal_is_unavailable() {
+        assert_eq!(ToolCallState::PendingApproval.phase(), Phase::Blocked);
+        assert_eq!(ToolCallState::Running.phase(), Phase::Loading);
+        assert_eq!(ToolCallState::succeeded_silently().phase(), Phase::Ready);
+        assert_eq!(ToolCallState::failed("boom").phase(), Phase::Error);
+        let refused = ToolCallState::refused("not allowed");
+        assert_eq!(refused.phase(), Phase::Unavailable);
+        assert_eq!(HasPhase::reason(&refused), Some("not allowed"));
     }
 }

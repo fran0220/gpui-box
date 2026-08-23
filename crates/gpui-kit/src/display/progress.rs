@@ -1,16 +1,40 @@
 //! Progress that reports what is actually known.
 
+use std::rc::Rc;
+
 use gpui::{
     App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Space};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Space};
 
+use crate::controls::button::Button;
 use crate::display::signature;
-use crate::foundation::Ident;
+use crate::foundation::{Ident, Sizable};
 use crate::motion;
-use crate::strings::ActiveNumbers;
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
+
+type CancelHandler = Rc<dyn Fn(&mut Window, &mut App)>;
+
+/// Whether the work is still moving.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) enum ProgressPace {
+    #[default]
+    Running,
+    Stalled,
+    Paused,
+}
+
+impl ProgressPace {
+    pub(crate) fn name(self) -> Option<&'static str> {
+        match self {
+            Self::Running => None,
+            Self::Stalled => Some("stalled"),
+            Self::Paused => Some("paused"),
+        }
+    }
+}
 
 /// What a progress surface knows about the work, and how it says so.
 ///
@@ -28,6 +52,7 @@ pub(crate) struct ProgressValue {
     /// It stays a pair of numbers until render, because the sentence around
     /// them belongs to the installed catalogue and not to this struct.
     pub count: Option<(usize, usize)>,
+    pub pace: ProgressPace,
 }
 
 impl ProgressValue {
@@ -46,6 +71,10 @@ impl ProgressValue {
         self.fraction.is_none()
     }
 
+    pub(crate) fn is_moving(&self) -> bool {
+        matches!(self.pace, ProgressPace::Running)
+    }
+
     /// The node both surfaces publish: busy always, a position only when the
     /// extent is known.
     /// What a reader sees beside the label: the caller's own wording first,
@@ -58,7 +87,7 @@ impl ProgressValue {
     }
 
     pub(crate) fn spec(&self, id: SharedString, label: Option<SharedString>, cx: &App) -> NodeSpec {
-        let mut spec = NodeSpec::new(id, Role::Progress).busy(true);
+        let mut spec = NodeSpec::new(id, Role::Progress).busy(self.is_moving());
         if let Some(fraction) = self.fraction {
             spec = spec.range(0.0, 1.0, fraction);
         }
@@ -67,6 +96,8 @@ impl ProgressValue {
         }
         if let Some(display) = self.shown(cx) {
             spec = spec.value(display);
+        } else if let Some(pace) = self.pace.name() {
+            spec = spec.value(pace);
         }
         spec
     }
@@ -76,11 +107,22 @@ impl ProgressValue {
 ///
 /// A bar without a value is indeterminate and says so, rather than crawling
 /// to ninety percent and waiting there.
-#[derive(Debug, IntoElement)]
+#[derive(IntoElement)]
 pub struct ProgressBar {
     ident: Ident,
     label: Option<SharedString>,
     value: ProgressValue,
+    on_cancel: Option<CancelHandler>,
+}
+
+impl std::fmt::Debug for ProgressBar {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("ProgressBar")
+            .field("ident", &self.ident)
+            .field("value", &self.value)
+            .finish()
+    }
 }
 
 impl ProgressBar {
@@ -89,6 +131,7 @@ impl ProgressBar {
             ident: ident.into(),
             label: None,
             value: ProgressValue::default(),
+            on_cancel: None,
         }
     }
 
@@ -114,6 +157,27 @@ impl ProgressBar {
         self.value.display = Some(display.into());
         self
     }
+
+    /// The work has a known position but is no longer advancing.
+    pub fn stalled(mut self, stalled: bool) -> Self {
+        if stalled {
+            self.value.pace = ProgressPace::Stalled;
+        }
+        self
+    }
+
+    /// The work was paused. Distinct from stalled: somebody asked it to stop.
+    pub fn paused(mut self, paused: bool) -> Self {
+        if paused {
+            self.value.pace = ProgressPace::Paused;
+        }
+        self
+    }
+
+    pub fn on_cancel(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
+        self.on_cancel = Some(Rc::new(handler));
+        self
+    }
 }
 
 impl RenderOnce for ProgressBar {
@@ -132,10 +196,25 @@ impl RenderOnce for ProgressBar {
             )
         });
 
+        let moving = self.value.is_moving();
         let spec = self
             .value
             .spec(self.ident.semantic_id(), self.label.clone(), cx);
         let display = self.value.shown(cx);
+        let pace = self.value.pace.name().map(|name| {
+            cx.strings().text(match name {
+                "stalled" => StringKey::ProgressStalled,
+                _ => StringKey::ProgressPaused,
+            })
+        });
+        let cancel = self.on_cancel.map(|handler| {
+            Button::new(self.ident.child("cancel"))
+                .label(cx.strings().text(StringKey::ProgressCancel))
+                .ghost()
+                .control_size(ControlSize::Sm)
+                .semantic_parent(self.ident.semantic_id())
+                .on_click(move |window, cx| handler(window, cx))
+        });
 
         div()
             .flex()
@@ -149,12 +228,17 @@ impl RenderOnce for ProgressBar {
                         .flex()
                         .flex_row()
                         .justify_between()
+                        .items_center()
                         .text_size(px(theme.typography.body.size))
                         .text_color(theme.colors.text_muted)
                         .child(label)
                         .when_some(display, |element, display| {
                             element.child(div().text_color(theme.colors.text).child(display))
-                        }),
+                        })
+                        .when_some(pace, |element, pace| {
+                            element.child(div().text_color(theme.colors.warning).child(pace))
+                        })
+                        .children(cancel),
                 )
             })
             .child(
@@ -168,11 +252,10 @@ impl RenderOnce for ProgressBar {
                     .when_some(drawn, |element, fraction| {
                         element.child(signature::determined(&theme, fraction))
                     })
-                    // An unknown extent sweeps the working signature across
-                    // the track and tints nothing behind it. A partly filled
-                    // bar would be read as a position and there is none, and
-                    // a filled one reads as the position at the end.
-                    .when(indeterminate, |element| {
+                    // An unknown extent sweeps only while the work is moving.
+                    // A still sweep would be read as a position, and a stalled
+                    // or paused bar is not claiming one.
+                    .when(indeterminate && moving, |element| {
                         element.child(signature::unknown(
                             self.ident.child("sweep").element_id(),
                             &theme,

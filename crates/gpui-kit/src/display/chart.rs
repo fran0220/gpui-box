@@ -30,9 +30,11 @@ use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::loading::PulseLoader;
 use crate::display::sparkline::SparklinePoint;
 use crate::display::status::StatusDot;
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{FocusRing, Ident, StyledExt};
 use crate::layout::measure;
 use crate::motion::{self, Presence, Stagger, Transition, keyed};
+use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
 /// One host-owned point in a chart series.
@@ -182,6 +184,31 @@ impl ChartState {
     }
 }
 
+impl HasPhase for ChartState {
+    fn phase(&self) -> Phase {
+        match self {
+            Self::Loading => Phase::Loading,
+            Self::Ready(_) => Phase::Ready,
+            Self::Empty => Phase::Empty,
+            Self::Unavailable(_) => Phase::Unavailable,
+            Self::Error(_) | Self::Stale { .. } => Phase::Error,
+        }
+    }
+
+    fn reason(&self) -> Option<&str> {
+        match self {
+            Self::Unavailable(reason) | Self::Error(reason) | Self::Stale { reason, .. } => {
+                Some(reason.as_ref())
+            }
+            _ => None,
+        }
+    }
+
+    fn is_stale(&self) -> bool {
+        matches!(self, Self::Stale { .. })
+    }
+}
+
 /// The business identity of the point under the crosshair.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ChartSelection {
@@ -207,6 +234,7 @@ pub struct BarChart {
     label: SharedString,
     axes: ChartAxes,
     state: ChartState,
+    slots: Slots,
 }
 
 impl BarChart {
@@ -216,12 +244,21 @@ impl BarChart {
             label: label.into(),
             axes: ChartAxes::default(),
             state,
+            slots: Slots::default(),
         }
     }
 
     pub fn axes(mut self, axes: ChartAxes) -> Self {
         self.axes = axes;
         self
+    }
+}
+
+impl Slotted for BarChart {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
     }
 }
 
@@ -249,7 +286,14 @@ impl RenderOnce for BarChart {
                     chart_spec(&self.ident, &self.label, &self.state, count, stale),
                 )
             }
-            None => line_like_state(&self.ident, &self.label, &self.state, cx),
+            None => line_like_state(
+                &self.ident,
+                &self.label,
+                &self.state,
+                &self.slots,
+                window,
+                cx,
+            ),
         };
         div()
             .w_full()
@@ -280,54 +324,64 @@ fn line_like_state(
     ident: &Ident,
     label: &SharedString,
     state: &ChartState,
-    cx: &App,
+    slots: &Slots,
+    window: &mut Window,
+    cx: &mut App,
 ) -> (AnyElement, NodeSpec) {
     let theme = cx.theme().clone();
     match state {
         ChartState::Loading => (
-            non_ready_body(
-                label,
-                PulseLoader::new(ident.child("loading"))
-                    .label(cx.strings().text(StringKey::Loading)),
-                &theme,
-            ),
+            slots.or_else(slot::LOADING, window, cx, |_, cx| {
+                non_ready_body(
+                    label,
+                    PulseLoader::new(ident.child("loading"))
+                        .label(cx.strings().text(StringKey::Loading)),
+                    &theme,
+                )
+            }),
             NodeSpec::new(ident.semantic_id(), Role::Status)
                 .text(label.clone())
                 .busy(true)
                 .value(state.name()),
         ),
         ChartState::Empty => (
-            non_ready_body(
-                label,
-                EmptyState::new(
-                    ident.child("empty"),
-                    cx.strings().text(StringKey::ChartEmpty),
+            slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                non_ready_body(
+                    label,
+                    EmptyState::new(
+                        ident.child("empty"),
+                        cx.strings().text(StringKey::ChartEmpty),
+                    )
+                    .kind(EmptyKind::Empty),
+                    &theme,
                 )
-                .kind(EmptyKind::Empty),
-                &theme,
-            ),
+            }),
             NodeSpec::new(ident.semantic_id(), Role::Status)
                 .text(label.clone())
                 .value(state.name()),
         ),
         ChartState::Unavailable(reason) => (
-            non_ready_body(
-                label,
-                EmptyState::new(ident.child("unavailable"), reason.clone())
-                    .kind(EmptyKind::Unavailable),
-                &theme,
-            ),
+            slots.or_else(slot::EMPTY, window, cx, |_, _| {
+                non_ready_body(
+                    label,
+                    EmptyState::new(ident.child("unavailable"), reason.clone())
+                        .kind(EmptyKind::Unavailable),
+                    &theme,
+                )
+            }),
             NodeSpec::new(ident.semantic_id(), Role::Status)
                 .text(label.clone())
                 .description(reason.clone())
                 .value(state.name()),
         ),
         ChartState::Error(reason) => (
-            non_ready_body(
-                label,
-                EmptyState::new(ident.child("error"), reason.clone()).kind(EmptyKind::Failed),
-                &theme,
-            ),
+            slots.or_else(slot::FAILED, window, cx, |_, _| {
+                non_ready_body(
+                    label,
+                    EmptyState::new(ident.child("error"), reason.clone()).kind(EmptyKind::Failed),
+                    &theme,
+                )
+            }),
             NodeSpec::new(ident.semantic_id(), Role::Status)
                 .text(label.clone())
                 .description(reason.clone())
@@ -377,6 +431,7 @@ pub struct LineChart {
     crosshair: bool,
     current: Option<ChartSelection>,
     on_current: Option<CurrentHandler>,
+    slots: Slots,
 }
 
 impl LineChart {
@@ -391,6 +446,7 @@ impl LineChart {
             crosshair: false,
             current: None,
             on_current: None,
+            slots: Slots::default(),
         }
     }
 
@@ -443,6 +499,14 @@ impl LineChart {
     }
 }
 
+impl Slotted for LineChart {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl RenderOnce for LineChart {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
@@ -471,7 +535,14 @@ impl RenderOnce for LineChart {
                     chart_spec(&self.ident, &self.label, &self.state, count, stale),
                 )
             }
-            None => line_like_state(&self.ident, &self.label, &self.state, cx),
+            None => line_like_state(
+                &self.ident,
+                &self.label,
+                &self.state,
+                &self.slots,
+                window,
+                cx,
+            ),
         };
 
         div()
@@ -496,6 +567,7 @@ pub struct AreaChart {
     crosshair: bool,
     current: Option<ChartSelection>,
     on_current: Option<CurrentHandler>,
+    slots: Slots,
 }
 
 impl AreaChart {
@@ -509,6 +581,7 @@ impl AreaChart {
             crosshair: false,
             current: None,
             on_current: None,
+            slots: Slots::default(),
         }
     }
 
@@ -547,6 +620,14 @@ impl AreaChart {
     }
 }
 
+impl Slotted for AreaChart {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl RenderOnce for AreaChart {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
@@ -575,7 +656,14 @@ impl RenderOnce for AreaChart {
                     chart_spec(&self.ident, &self.label, &self.state, count, stale),
                 )
             }
-            None => line_like_state(&self.ident, &self.label, &self.state, cx),
+            None => line_like_state(
+                &self.ident,
+                &self.label,
+                &self.state,
+                &self.slots,
+                window,
+                cx,
+            ),
         };
         div()
             .w_full()
@@ -598,6 +686,7 @@ pub struct ScatterChart {
     crosshair: bool,
     current: Option<ChartSelection>,
     on_current: Option<CurrentHandler>,
+    slots: Slots,
 }
 
 impl ScatterChart {
@@ -610,6 +699,7 @@ impl ScatterChart {
             crosshair: false,
             current: None,
             on_current: None,
+            slots: Slots::default(),
         }
     }
 
@@ -643,6 +733,14 @@ impl ScatterChart {
     }
 }
 
+impl Slotted for ScatterChart {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl RenderOnce for ScatterChart {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
@@ -671,7 +769,14 @@ impl RenderOnce for ScatterChart {
                     chart_spec(&self.ident, &self.label, &self.state, count, stale),
                 )
             }
-            None => line_like_state(&self.ident, &self.label, &self.state, cx),
+            None => line_like_state(
+                &self.ident,
+                &self.label,
+                &self.state,
+                &self.slots,
+                window,
+                cx,
+            ),
         };
         div()
             .w_full()
@@ -1645,6 +1750,7 @@ pub struct PieChart {
     label: SharedString,
     state: ChartState,
     donut: bool,
+    slots: Slots,
 }
 
 impl PieChart {
@@ -1654,12 +1760,21 @@ impl PieChart {
             label: label.into(),
             state,
             donut: false,
+            slots: Slots::default(),
         }
     }
 
     pub fn donut(mut self) -> Self {
         self.donut = true;
         self
+    }
+}
+
+impl Slotted for PieChart {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
     }
 }
 
@@ -1687,7 +1802,14 @@ impl RenderOnce for PieChart {
                     chart_spec(&self.ident, &self.label, &self.state, count, stale),
                 )
             }
-            None => line_like_state(&self.ident, &self.label, &self.state, cx),
+            None => line_like_state(
+                &self.ident,
+                &self.label,
+                &self.state,
+                &self.slots,
+                window,
+                cx,
+            ),
         };
         div()
             .w_full()
@@ -1704,6 +1826,7 @@ pub struct StackedBarChart {
     label: SharedString,
     axes: ChartAxes,
     state: ChartState,
+    slots: Slots,
 }
 
 impl StackedBarChart {
@@ -1713,12 +1836,21 @@ impl StackedBarChart {
             label: label.into(),
             axes: ChartAxes::default(),
             state,
+            slots: Slots::default(),
         }
     }
 
     pub fn axes(mut self, axes: ChartAxes) -> Self {
         self.axes = axes;
         self
+    }
+}
+
+impl Slotted for StackedBarChart {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
     }
 }
 
@@ -1744,7 +1876,14 @@ impl RenderOnce for StackedBarChart {
                     chart_spec(&self.ident, &self.label, &self.state, count, stale),
                 )
             }
-            None => line_like_state(&self.ident, &self.label, &self.state, cx),
+            None => line_like_state(
+                &self.ident,
+                &self.label,
+                &self.state,
+                &self.slots,
+                window,
+                cx,
+            ),
         };
         div()
             .w_full()
@@ -2082,6 +2221,7 @@ pub struct RadarChart {
     ident: Ident,
     label: SharedString,
     state: ChartState,
+    slots: Slots,
 }
 
 impl RadarChart {
@@ -2090,12 +2230,21 @@ impl RadarChart {
             ident: ident.into(),
             label: label.into(),
             state,
+            slots: Slots::default(),
         }
     }
 }
 
+impl Slotted for RadarChart {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl RenderOnce for RadarChart {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let (body, spec): (AnyElement, NodeSpec) = match self.state.visible_series() {
             Some((series, stale)) => {
@@ -2107,20 +2256,29 @@ impl RenderOnce for RadarChart {
             }
             None => match &self.state {
                 ChartState::Empty => (
-                    non_ready_body(
-                        &self.label,
-                        EmptyState::new(
-                            self.ident.child("empty"),
-                            cx.strings().text(StringKey::RadarEmpty),
+                    self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                        non_ready_body(
+                            &self.label,
+                            EmptyState::new(
+                                self.ident.child("empty"),
+                                cx.strings().text(StringKey::RadarEmpty),
+                            )
+                            .kind(EmptyKind::Empty),
+                            &theme,
                         )
-                        .kind(EmptyKind::Empty),
-                        &theme,
-                    ),
+                    }),
                     NodeSpec::new(self.ident.semantic_id(), Role::Status)
                         .text(self.label.clone())
                         .value("empty"),
                 ),
-                _ => line_like_state(&self.ident, &self.label, &self.state, cx),
+                _ => line_like_state(
+                    &self.ident,
+                    &self.label,
+                    &self.state,
+                    &self.slots,
+                    window,
+                    cx,
+                ),
             },
         };
         div().w_full().child(body).semantic_in(cx, spec)
@@ -2256,6 +2414,7 @@ pub struct GaugeChart {
     ident: Ident,
     label: SharedString,
     state: ChartState,
+    slots: Slots,
 }
 
 impl GaugeChart {
@@ -2264,12 +2423,21 @@ impl GaugeChart {
             ident: ident.into(),
             label: label.into(),
             state,
+            slots: Slots::default(),
         }
     }
 }
 
+impl Slotted for GaugeChart {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl RenderOnce for GaugeChart {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let (body, spec): (AnyElement, NodeSpec) = match self.state.visible_series() {
             Some((series, stale)) => {
@@ -2300,7 +2468,14 @@ impl RenderOnce for GaugeChart {
                     ),
                 )
             }
-            None => line_like_state(&self.ident, &self.label, &self.state, cx),
+            None => line_like_state(
+                &self.ident,
+                &self.label,
+                &self.state,
+                &self.slots,
+                window,
+                cx,
+            ),
         };
         div().w_full().child(body).semantic_in(cx, spec)
     }
@@ -2467,5 +2642,21 @@ mod tests {
             step_point(&active, Some(&ChartSelection::new("cpu", "late")), "down"),
             Some(ChartSelection::new("memory", "nearest"))
         );
+    }
+}
+
+#[cfg(test)]
+mod chart_phase_tests {
+    use super::*;
+
+    #[test]
+    fn stale_projects_as_error_and_keeps_the_verified_series() {
+        let state = ChartState::Stale {
+            series: Vec::new(),
+            reason: "offline".into(),
+        };
+        assert_eq!(state.phase(), Phase::Error);
+        assert!(state.is_stale());
+        assert_eq!(state.reason(), Some("offline"));
     }
 }

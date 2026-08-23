@@ -73,6 +73,7 @@ use crate::content::markdown::CodeSpan;
 use crate::controls::button::Button;
 use crate::data::{List, ListItem};
 use crate::display::empty::{EmptyKind, EmptyState};
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
 use crate::layout::{ScrollArea, ScrollAxis};
 use crate::motion::keyed;
@@ -186,6 +187,7 @@ pub struct CodeView {
     line_numbers: bool,
     visible_lines: Option<usize>,
     copyable: bool,
+    slots: Slots,
 }
 
 impl std::fmt::Debug for CodeView {
@@ -209,6 +211,7 @@ impl CodeView {
             line_numbers: true,
             visible_lines: None,
             copyable: true,
+            slots: Slots::default(),
         }
     }
 
@@ -440,8 +443,16 @@ impl<A, B> UnzipOr<A, B> for Option<(A, B)> {
     }
 }
 
+impl Slotted for CodeView {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl RenderOnce for CodeView {
-    fn render(mut self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let gutter = self.gutter_width();
         let line_numbers = self.line_numbers;
@@ -482,12 +493,14 @@ impl RenderOnce for CodeView {
         });
 
         let body: AnyElement = if total == 0 {
-            EmptyState::new(
-                self.ident.child("empty"),
-                cx.strings().text(StringKey::CodeEmpty),
-            )
-            .kind(EmptyKind::Empty)
-            .into_any_element()
+            self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                EmptyState::new(
+                    self.ident.child("empty"),
+                    cx.strings().text(StringKey::CodeEmpty),
+                )
+                .kind(EmptyKind::Empty)
+                .into_any_element()
+            })
         } else if let Some(visible) = self.visible_lines {
             let lines = std::rc::Rc::new(self.lines);
             let list_ident = body_ident.clone();
