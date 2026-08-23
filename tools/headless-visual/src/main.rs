@@ -95,7 +95,7 @@ mod imp {
         prelude::*, px, size,
     };
     use gpui_kit::prelude::set_layout_direction;
-    use gpui_kit_semantics::SemanticRegistry;
+    use gpui_kit_semantics::SemanticCoordinator;
     use gpui_kit_theme::{Theme, activate_theme};
 
     use crate::Shard;
@@ -225,7 +225,7 @@ mod imp {
 
     impl Render for Host {
         fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-            SemanticRegistry::global(cx).begin_frame();
+            SemanticCoordinator::global(cx).begin_frame(window);
             let theme = Theme::get(cx).clone();
             let root = div().size_full().bg(theme.colors.canvas);
             let Some(name) = *SCENE.lock().expect("scene name is never poisoned") else {

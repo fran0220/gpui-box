@@ -16,11 +16,14 @@ app.run(|cx| {
 ```rust
 impl Render for View {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        self.semantics.begin_frame();
+        SemanticCoordinator::global(cx).begin_frame(window);
         // Render and attach NodeSpec values.
     }
 }
 ```
+
+The coordinator isolates generations and snapshots by `WindowId`; call it once
+per root render, not from mounted component or plugin subtrees.
 
 ## Disabled action
 

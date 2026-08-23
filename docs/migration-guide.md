@@ -127,9 +127,11 @@ After each move, delete the application copy. Do not retain two primitive sets.
 
 ## 6. Add semantic IDs
 
-Create a `SemanticRegistry` per product window. Begin a frame before render and
-attach `NodeSpec` to every action and assertion target. Keep application IDs in
-the application; the library does not define product vocabulary.
+Install Kit once. Its `SemanticCoordinator` creates and removes one semantic
+context per GPUI window. At the top of each root render call
+`SemanticCoordinator::global(cx).begin_frame(window)`, then attach `NodeSpec`
+to every action and assertion target with `semantic_in`. Keep application IDs
+in the application; the library does not define product vocabulary.
 
 ## 7. Preserve the host boundary
 

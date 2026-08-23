@@ -4,12 +4,12 @@
 //! elements; prepaint records the bounds GPUI actually produced. Nodes absent
 //! from the next frame disappear instead of lingering as stale claims.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use gpui::{
     App, Bounds, FocusHandle, Global, InteractiveElement, IntoElement, ParentElement, Pixels,
-    SharedString, StatefulInteractiveElement, Styled, Toggled, canvas,
+    SharedString, StatefulInteractiveElement, Styled, Toggled, Window, WindowId, canvas,
 };
 use serde::{Deserialize, Serialize};
 
@@ -287,20 +287,6 @@ impl SemanticRegistry {
         }
     }
 
-    /// The registry components self-register into.
-    ///
-    /// Panics when [`install`] has not run, because a missing registry would
-    /// otherwise silently produce empty snapshots that tests read as passes.
-    pub fn global(cx: &App) -> Self {
-        Self::try_global(cx)
-            .expect("call gpui_kit_semantics::install(cx) before rendering components")
-    }
-
-    pub fn try_global(cx: &App) -> Option<Self> {
-        cx.try_global::<GlobalRegistry>()
-            .map(|global| global.0.clone())
-    }
-
     fn record(&self, node: Node) {
         let mut inner = self.lock();
         let generation = inner.generation;
@@ -308,6 +294,164 @@ impl SemanticRegistry {
     }
 
     fn lock(&self) -> MutexGuard<'_, Inner> {
+        self.inner
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+}
+
+/// One window's semantic frame and diagnostic tree.
+///
+/// A context is stable for the lifetime of its GPUI window. It can be retained
+/// by a test or host without exposing the installed coordinator to components.
+#[derive(Clone)]
+pub struct WindowSemanticContext {
+    window_id: WindowId,
+    registry: SemanticRegistry,
+}
+
+impl std::fmt::Debug for WindowSemanticContext {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("WindowSemanticContext")
+            .field("window_id", &self.window_id.as_u64())
+            .field("generation", &self.generation())
+            .finish()
+    }
+}
+
+impl WindowSemanticContext {
+    pub fn window_id(&self) -> WindowId {
+        self.window_id
+    }
+
+    fn begin_frame(&self) {
+        self.registry.begin_frame();
+    }
+
+    pub fn generation(&self) -> u64 {
+        self.registry.generation()
+    }
+
+    pub fn snapshot(&self) -> Snapshot {
+        self.registry.snapshot()
+    }
+}
+
+#[derive(Default)]
+struct CoordinatorInner {
+    windows: HashMap<WindowId, SemanticRegistry>,
+    // Some Kit transient state predates window-scoped storage and needs a
+    // monotonically increasing application clock while it is migrated. This
+    // counter never owns or clears semantic nodes.
+    frame_clock: u64,
+}
+
+/// Routes semantic probes to a registry owned by the GPUI window they paint in.
+///
+/// Components continue to publish through [`Semantic::semantic_in`]; only a
+/// window root opens a frame. Rendering one window therefore cannot clear,
+/// collide with, or advance the semantic generation of another window.
+#[derive(Clone, Default)]
+pub struct SemanticCoordinator {
+    inner: Arc<Mutex<CoordinatorInner>>,
+}
+
+impl std::fmt::Debug for SemanticCoordinator {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let inner = self.lock();
+        formatter
+            .debug_struct("SemanticCoordinator")
+            .field("windows", &inner.windows.len())
+            .field("frame_clock", &inner.frame_clock)
+            .finish()
+    }
+}
+
+impl SemanticCoordinator {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The coordinator installed for this application.
+    ///
+    /// Panics when [`install`] has not run, because a missing coordinator would
+    /// otherwise silently produce empty snapshots that tests read as passes.
+    pub fn global(cx: &App) -> Self {
+        Self::try_global(cx)
+            .expect("call gpui_kit_semantics::install(cx) before rendering components")
+    }
+
+    pub fn try_global(cx: &App) -> Option<Self> {
+        cx.try_global::<GlobalCoordinator>()
+            .map(|global| global.0.clone())
+    }
+
+    /// Returns the stable semantic context for `window`, creating it on the
+    /// first frame or probe.
+    pub fn context(&self, window: &Window) -> WindowSemanticContext {
+        self.context_for(window.window_handle().window_id())
+    }
+
+    pub fn begin_frame(&self, window: &Window) -> WindowSemanticContext {
+        self.begin_window_frame(window.window_handle().window_id())
+    }
+
+    /// Opens a frame when a host owns an [`gpui::AnyWindowHandle`] rather than
+    /// a borrowed [`Window`]. Window roots should prefer [`Self::begin_frame`].
+    pub fn begin_window_frame(&self, window_id: WindowId) -> WindowSemanticContext {
+        let context = self.context_for(window_id);
+        context.begin_frame();
+        let mut inner = self.lock();
+        inner.frame_clock = inner.frame_clock.saturating_add(1);
+        context
+    }
+
+    /// Returns the latest snapshot for a known live window.
+    pub fn snapshot(&self, window_id: WindowId) -> Option<Snapshot> {
+        self.known_context(window_id)
+            .map(|context| context.snapshot())
+    }
+
+    pub fn generation(&self, window_id: WindowId) -> Option<u64> {
+        self.known_context(window_id)
+            .map(|context| context.generation())
+    }
+
+    /// A compatibility clock for application-global transient visual state.
+    /// Semantic generations themselves are always per-window.
+    pub fn frame_clock(&self) -> u64 {
+        self.lock().frame_clock
+    }
+
+    fn context_for(&self, window_id: WindowId) -> WindowSemanticContext {
+        let registry = self.lock().windows.entry(window_id).or_default().clone();
+        WindowSemanticContext {
+            window_id,
+            registry,
+        }
+    }
+
+    fn known_context(&self, window_id: WindowId) -> Option<WindowSemanticContext> {
+        self.lock()
+            .windows
+            .get(&window_id)
+            .cloned()
+            .map(|registry| WindowSemanticContext {
+                window_id,
+                registry,
+            })
+    }
+
+    fn record(&self, window: &Window, node: Node) {
+        self.context(window).registry.record(node);
+    }
+
+    fn remove_window(&self, window_id: WindowId) {
+        self.lock().windows.remove(&window_id);
+    }
+
+    fn lock(&self) -> MutexGuard<'_, CoordinatorInner> {
         self.inner
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -517,14 +661,17 @@ impl NodeSpec {
 }
 
 #[derive(Debug, Clone, Default)]
-struct GlobalRegistry(SemanticRegistry);
+struct GlobalCoordinator(SemanticCoordinator);
 
-impl Global for GlobalRegistry {}
+impl Global for GlobalCoordinator {}
 
-/// Installs the process-wide registry that components self-register into.
+/// Installs the process-wide coordinator that owns one registry per window.
 pub fn install(cx: &mut App) {
-    if !cx.has_global::<GlobalRegistry>() {
-        cx.set_global(GlobalRegistry(SemanticRegistry::new()));
+    if !cx.has_global::<GlobalCoordinator>() {
+        let coordinator = SemanticCoordinator::new();
+        cx.set_global(GlobalCoordinator(coordinator.clone()));
+        cx.on_window_closed(move |_, window_id| coordinator.remove_window(window_id))
+            .detach();
     }
 }
 
@@ -533,8 +680,9 @@ pub trait Semantic: Sized {
 
     fn semantic(self, registry: &SemanticRegistry, spec: NodeSpec) -> Self::Output;
 
-    /// Registers into the global registry when installed. Platform
-    /// accessibility remains active when a host opts out of test semantics.
+    /// Registers into the current window's installed context. Platform
+    /// accessibility remains active when a host opts out of diagnostic
+    /// semantics.
     fn semantic_in(self, cx: &App, spec: NodeSpec) -> Self::Output;
 }
 
@@ -547,7 +695,10 @@ impl Semantic for gpui::Div {
             self_ = self_.relative();
         }
         self_ = platform_accessible(self_, &spec);
-        self_.child(diagnostic_probe(Some(registry), spec))
+        self_.child(diagnostic_probe(
+            Some(DiagnosticTarget::Direct(registry.clone())),
+            spec,
+        ))
     }
 
     fn semantic_in(self, cx: &App, spec: NodeSpec) -> Self::Output {
@@ -556,8 +707,8 @@ impl Semantic for gpui::Div {
             self_ = self_.relative();
         }
         self_ = platform_accessible(self_, &spec);
-        let registry = SemanticRegistry::try_global(cx);
-        self_.child(diagnostic_probe(registry.as_ref(), spec))
+        let coordinator = SemanticCoordinator::try_global(cx).map(DiagnosticTarget::Installed);
+        self_.child(diagnostic_probe(coordinator, spec))
     }
 }
 
@@ -569,7 +720,10 @@ impl Semantic for gpui::Stateful<gpui::Div> {
             self = self.relative();
         }
         self = platform_accessible(self, &spec);
-        self.child(diagnostic_probe(Some(registry), spec))
+        self.child(diagnostic_probe(
+            Some(DiagnosticTarget::Direct(registry.clone())),
+            spec,
+        ))
     }
 
     fn semantic_in(mut self, cx: &App, spec: NodeSpec) -> Self::Output {
@@ -577,8 +731,8 @@ impl Semantic for gpui::Stateful<gpui::Div> {
             self = self.relative();
         }
         self = platform_accessible(self, &spec);
-        let registry = SemanticRegistry::try_global(cx);
-        self.child(diagnostic_probe(registry.as_ref(), spec))
+        let coordinator = SemanticCoordinator::try_global(cx).map(DiagnosticTarget::Installed);
+        self.child(diagnostic_probe(coordinator, spec))
     }
 }
 
@@ -703,11 +857,25 @@ fn platform_role(role: Role) -> Option<gpui::Role> {
     })
 }
 
-fn diagnostic_probe(registry: Option<&SemanticRegistry>, spec: NodeSpec) -> impl IntoElement {
-    let registry = registry.cloned();
+#[derive(Clone)]
+enum DiagnosticTarget {
+    Direct(SemanticRegistry),
+    Installed(SemanticCoordinator),
+}
+
+impl DiagnosticTarget {
+    fn record(&self, window: &Window, node: Node) {
+        match self {
+            Self::Direct(registry) => registry.record(node),
+            Self::Installed(coordinator) => coordinator.record(window, node),
+        }
+    }
+}
+
+fn diagnostic_probe(target: Option<DiagnosticTarget>, spec: NodeSpec) -> impl IntoElement {
     canvas(
         move |bounds: Bounds<Pixels>, window, _| {
-            let Some(registry) = &registry else {
+            let Some(target) = &target else {
                 return;
             };
             let rect = Rect {
@@ -716,46 +884,49 @@ fn diagnostic_probe(registry: Option<&SemanticRegistry>, spec: NodeSpec) -> impl
                 width: f32::from(bounds.size.width),
                 height: f32::from(bounds.size.height),
             };
-            registry.record(Node {
-                id: spec.id.to_string(),
-                role: spec.role,
-                parent: spec.parent.as_ref().map(ToString::to_string),
-                labels: spec.labels.as_ref().map(ToString::to_string),
-                describes: spec.describes.as_ref().map(ToString::to_string),
-                text: spec.text.as_ref().map(|text| redact_sensitive_text(text)),
-                description: spec
-                    .description
-                    .as_ref()
-                    .map(|description| redact_sensitive_text(description)),
-                bounds: rect,
-                visible: rect.area() > 0.0,
-                focused: spec
-                    .focus
-                    .as_ref()
-                    .is_some_and(|handle| handle.is_focused(window)),
-                disabled: spec.disabled,
-                read_only: spec.read_only,
-                selected: spec.selected,
-                hovered: spec.hovered,
-                pressed: spec.pressed,
-                checked: spec.checked,
-                expanded: spec.expanded,
-                value: spec
-                    .value
-                    .as_ref()
-                    .map(|value| redact_sensitive_text(value)),
-                placeholder: spec.placeholder.as_ref().map(ToString::to_string),
-                value_min: spec.range.map(|(min, _, _)| min),
-                value_max: spec.range.map(|(_, max, _)| max),
-                value_now: spec.range.map(|(_, _, now)| now),
-                level: spec.level,
-                busy: spec.busy,
-                invalid: spec.invalid,
-                required: spec.required,
-                live: spec.live,
-                live_atomic: spec.live_atomic,
-                modal: spec.modal,
-            });
+            target.record(
+                window,
+                Node {
+                    id: spec.id.to_string(),
+                    role: spec.role,
+                    parent: spec.parent.as_ref().map(ToString::to_string),
+                    labels: spec.labels.as_ref().map(ToString::to_string),
+                    describes: spec.describes.as_ref().map(ToString::to_string),
+                    text: spec.text.as_ref().map(|text| redact_sensitive_text(text)),
+                    description: spec
+                        .description
+                        .as_ref()
+                        .map(|description| redact_sensitive_text(description)),
+                    bounds: rect,
+                    visible: rect.area() > 0.0,
+                    focused: spec
+                        .focus
+                        .as_ref()
+                        .is_some_and(|handle| handle.is_focused(window)),
+                    disabled: spec.disabled,
+                    read_only: spec.read_only,
+                    selected: spec.selected,
+                    hovered: spec.hovered,
+                    pressed: spec.pressed,
+                    checked: spec.checked,
+                    expanded: spec.expanded,
+                    value: spec
+                        .value
+                        .as_ref()
+                        .map(|value| redact_sensitive_text(value)),
+                    placeholder: spec.placeholder.as_ref().map(ToString::to_string),
+                    value_min: spec.range.map(|(min, _, _)| min),
+                    value_max: spec.range.map(|(_, max, _)| max),
+                    value_now: spec.range.map(|(_, _, now)| now),
+                    level: spec.level,
+                    busy: spec.busy,
+                    invalid: spec.invalid,
+                    required: spec.required,
+                    live: spec.live,
+                    live_atomic: spec.live_atomic,
+                    modal: spec.modal,
+                },
+            );
         },
         |_, _, _, _| {},
     )
@@ -1044,13 +1215,96 @@ mod tests {
     struct DiagnosticFixture;
 
     impl Render for DiagnosticFixture {
-        fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-            SemanticRegistry::global(cx).begin_frame();
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            SemanticCoordinator::global(cx).begin_frame(window);
             div().w(px(120.0)).h(px(24.0)).semantic_in(
                 cx,
                 NodeSpec::new("diagnostic", Role::Status).text("Diagnostic"),
             )
         }
+    }
+
+    struct WindowFixture(&'static str);
+
+    impl Render for WindowFixture {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            SemanticCoordinator::global(cx).begin_frame(window);
+            div()
+                .w(px(120.0))
+                .h(px(24.0))
+                .semantic_in(cx, NodeSpec::new("shared", Role::Status).text(self.0))
+        }
+    }
+
+    #[gpui::test]
+    fn windows_keep_independent_generations_and_nodes(cx: &mut TestAppContext) {
+        cx.update(install);
+        let left = AnyWindowHandle::from(cx.add_window(|_, _| WindowFixture("Left")));
+        let right = AnyWindowHandle::from(cx.add_window(|_, _| WindowFixture("Right")));
+
+        cx.update_window(left, |_, window, cx| window.draw(cx).clear(cx))
+            .expect("left window");
+        cx.update_window(right, |_, window, cx| window.draw(cx).clear(cx))
+            .expect("right window");
+
+        let (left_generation, right_generation) = cx.update(|cx| {
+            let coordinator = SemanticCoordinator::global(cx);
+            let left_snapshot = coordinator
+                .snapshot(left.window_id())
+                .expect("left semantics");
+            let right_snapshot = coordinator
+                .snapshot(right.window_id())
+                .expect("right semantics");
+            assert!(left_snapshot.generation > 0);
+            assert!(right_snapshot.generation > 0);
+            assert_eq!(
+                left_snapshot
+                    .find("shared")
+                    .and_then(|node| node.text.as_deref()),
+                Some("Left")
+            );
+            assert_eq!(
+                right_snapshot
+                    .find("shared")
+                    .and_then(|node| node.text.as_deref()),
+                Some("Right")
+            );
+            (left_snapshot.generation, right_snapshot.generation)
+        });
+
+        cx.update_window(left, |_, window, cx| window.draw(cx).clear(cx))
+            .expect("left redraw");
+        cx.update(|cx| {
+            let coordinator = SemanticCoordinator::global(cx);
+            assert_eq!(
+                coordinator.generation(left.window_id()),
+                Some(left_generation + 1)
+            );
+            assert_eq!(
+                coordinator.generation(right.window_id()),
+                Some(right_generation)
+            );
+            assert_eq!(
+                coordinator
+                    .snapshot(right.window_id())
+                    .and_then(|snapshot| snapshot.find("shared").cloned())
+                    .and_then(|node| node.text),
+                Some("Right".into()),
+                "redrawing the left window must not clear the right window"
+            );
+        });
+
+        cx.update_window(left, |_, window, _| window.remove_window())
+            .expect("close left window");
+        cx.run_until_parked();
+        cx.update(|cx| {
+            let coordinator = SemanticCoordinator::global(cx);
+            assert_eq!(coordinator.generation(left.window_id()), None);
+            assert_eq!(
+                coordinator.generation(right.window_id()),
+                Some(right_generation)
+            );
+        });
     }
 
     #[gpui::test]
@@ -1062,8 +1316,9 @@ mod tests {
             assert!(!window.is_a11y_active());
             window.draw(cx).clear(cx);
             assert!(
-                SemanticRegistry::global(cx)
-                    .snapshot()
+                SemanticCoordinator::global(cx)
+                    .snapshot(window.window_handle().window_id())
+                    .expect("window semantics")
                     .contains("diagnostic")
             );
             assert!(window.debug_a11y_tree_json().is_none());
@@ -1075,8 +1330,9 @@ mod tests {
             window.draw(cx).clear(cx);
             assert!(window.is_a11y_active());
             assert!(
-                SemanticRegistry::global(cx)
-                    .snapshot()
+                SemanticCoordinator::global(cx)
+                    .snapshot(window.window_handle().window_id())
+                    .expect("window semantics")
                     .contains("diagnostic")
             );
             let tree = window

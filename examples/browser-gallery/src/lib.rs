@@ -10,7 +10,7 @@ use gpui_kit::prelude::{
     Badge, Button, EmptyKind, EmptyState, HitCount, List, ListItem, ScrollArea, SearchField,
     SearchFieldEvent, Selectable, set_layout_direction, text,
 };
-use gpui_kit_semantics::{NodeSpec, Role, Semantic, SemanticRegistry};
+use gpui_kit_semantics::{NodeSpec, Role, Semantic, SemanticCoordinator, WindowSemanticContext};
 use gpui_kit_theme::{Theme, ThemeRegistry, TypeScale, activate_theme};
 use wasm_bindgen::prelude::*;
 
@@ -305,9 +305,7 @@ impl BrowserGallery {
 
 impl Render for BrowserGallery {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let registry = SemanticRegistry::global(cx);
-        registry.begin_frame();
-        let publish = registry.clone();
+        let publish = SemanticCoordinator::global(cx).begin_frame(window);
         let theme = Theme::get(cx).clone();
         let content = if self.mode == BrowserMode::Playground {
             self.playground(window, cx)
@@ -366,8 +364,8 @@ fn config(key: &str, default: &'static str) -> String {
         .unwrap_or_else(|| default.to_owned())
 }
 
-fn publish_snapshot(registry: &SemanticRegistry) {
-    let snapshot = registry.snapshot();
+fn publish_snapshot(context: &WindowSemanticContext) {
+    let snapshot = context.snapshot();
     if !snapshot.contains("browser.gallery.root") {
         return;
     }

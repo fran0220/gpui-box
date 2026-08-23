@@ -12,7 +12,7 @@ use gpui::{
     Point, Render, ScrollDelta, ScrollWheelEvent, TestAppContext, TouchPhase, VisualTestContext,
     Window, WindowBounds, WindowOptions, div, point, prelude::*, px, size,
 };
-use gpui_kit_semantics::{Node, SemanticRegistry, Snapshot};
+use gpui_kit_semantics::{Node, SemanticCoordinator, Snapshot};
 
 type Build = Box<dyn Fn(&mut Window, &mut App) -> AnyElement>;
 
@@ -22,7 +22,7 @@ struct Scene {
 
 impl Render for Scene {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        SemanticRegistry::global(cx).begin_frame();
+        SemanticCoordinator::global(cx).begin_frame(window);
         let content = (self.build.borrow())(window, cx);
         div().size_full().child(content)
     }
@@ -94,8 +94,11 @@ impl Harness {
         // updates, this deliberately rebuilds cached GPUI views so diagnostic
         // probes and the committed AccessKit tree describe the same draw.
         self.frame();
-        self.cx
-            .update(|_, cx| SemanticRegistry::global(cx).snapshot())
+        self.cx.update(|window, cx| {
+            SemanticCoordinator::global(cx)
+                .snapshot(window.window_handle().window_id())
+                .expect("this window published a semantic frame")
+        })
     }
 
     pub fn node(&mut self, id: &str) -> Option<Node> {

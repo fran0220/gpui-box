@@ -485,13 +485,13 @@ form, field, image, and drag. `Node` uses `#[serde(default)]` and omits many
 newer optional or false fields, which is a useful additive snapshot practice.
 
 That contract describes what the host rendered. It is not a plugin input
-schema. `SemanticRegistry` is application-global in the current implementation,
-not per-window: `install` puts one registry into `App`, and every window shares
-its generation and node map. Replacing that with a per-window context and a
-GPUI-free namespace/action envelope is committed foundation work in
-`docs/foundation-roadmap.md`. `NodeSpec` contains `SharedString` and optional
-`FocusHandle`; the `Semantic` trait records actual bounds during GPUI prepaint.
-Those remain renderer-side.
+schema. The installed `SemanticCoordinator` now owns a stable
+`WindowSemanticContext` per GPUI `WindowId`; generations, duplicate evidence,
+snapshots, and close cleanup cannot cross windows. `NodeSpec` contains
+`SharedString` and optional `FocusHandle`; the `Semantic` trait records actual
+bounds during GPUI prepaint. Those remain renderer-side. A GPUI-free
+namespace/action envelope remains committed foundation work in
+`docs/foundation-roadmap.md`.
 
 `gpui-box-kit-testkit` now provides `present`, `visible`, `actionable`, and `text`
 in `crates/gpui-kit-testkit/src/lib.rs`; `Finding`, `Problem`, and `audit` in
@@ -716,10 +716,11 @@ namespace contract.
    prefix. Two mounted nodes may not alias. Business identity, not list
    position, render order, or a random id, names repeated rows and cells.
 4. Plugin subtrees participate in the host window's semantic frame. They
-   neither install a competing registry nor call `begin_frame`. The current
-   application-global `SemanticRegistry` does not isolate windows, so a
-   multi-window host needs per-window registry ownership or an explicit window
-   namespace plus coordinated frame generation before this is safe.
+   neither install a competing coordinator nor call `begin_frame`. The host
+   root opens the installed coordinator's per-window frame once. Identical
+   local component ids in different windows therefore cannot collide, while
+   repeated plugin mounts in one window still require the namespace contract
+   below.
 5. The host assigns the mount root. Parent ids stay under that root; a plugin
    cannot parent into another plugin or arbitrary host UI.
 6. Every user-visible action and assertion target receives a semantic node.
@@ -736,16 +737,12 @@ namespace contract.
    unrestricted user text do not enter semantic text. Redaction is a second
    line of defence, not permission to publish the value first.
 
-Current semantic gaps:
+Current plugin-semantic gaps:
 
 - There is no validated semantic-id or plugin-namespace type.
   `NodeSpec::new` accepts an unchecked string.
-- The registry is application-global. Independent windows share generation,
-  ids, and frame clearing, so one window can collide with or invalidate another
-  without per-window ownership or explicit partitioning.
-- `SemanticRegistry` stores nodes by id, so a duplicate publication replaces
-  the earlier node. `audit` can report `Problem::DuplicateId` in a constructed
-  `Snapshot`, but a registry collision has already erased its evidence.
+- Duplicate publications remain in registration order so `audit` can report
+  every owner, but there is not yet a mount owner field in that diagnostic.
 - `Snapshot::under` is raw prefix matching, not segment-aware namespace
   matching.
 - `audit` catches empty ids, a narrow trailing-number positional pattern,
@@ -782,9 +779,9 @@ invariants; source text assertions are not evidence.
    several event enums and callback signatures. The wire needs stable node and
    action ids, typed bounded payloads, disabled/refusal rules, and one adapter
    path back to the plugin.
-4. **No enforced plugin semantic namespace, collision ownership, or window
-   isolation.** The semantic/testkit foundation is strong, but unchecked ids,
-   application-global frame state, and replacement on collision prevent
+4. **No enforced plugin semantic namespace or mount ownership.** The
+   semantic/testkit foundation now isolates windows and preserves duplicate
+   evidence, but unchecked ids and unowned same-window collisions prevent
    reliable end-to-end assertions for independently mounted plugins.
 5. **No DataGrid wire projection and loaded-row protocol.** For a v1 that
    promises operational tables, arbitrary cells, row/detail closures, drag

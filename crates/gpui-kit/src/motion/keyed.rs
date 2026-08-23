@@ -17,7 +17,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use gpui::{App, Global, SharedString};
-use gpui_kit_semantics::SemanticRegistry;
+use gpui_kit_semantics::SemanticCoordinator;
 
 /// How many frames an untouched entry survives.
 ///
@@ -225,13 +225,14 @@ fn frame(cx: &App) -> u64 {
 /// The current frame, or `None` where the host installed no semantic registry
 /// and there is therefore no frame boundary to count.
 pub(crate) fn frame_counter(cx: &App) -> Option<u64> {
-    SemanticRegistry::try_global(cx).map(|registry| registry.generation())
+    SemanticCoordinator::try_global(cx).map(|coordinator| coordinator.frame_clock())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gpui_kit_semantics::SemanticRegistry;
+    use gpui::WindowId;
+    use gpui_kit_semantics::SemanticCoordinator;
 
     /// The state a virtualized row would keep: something that must not start
     /// over when the row comes back.
@@ -253,7 +254,7 @@ mod tests {
 
     /// Ends the frame the way a host does at the top of a root render.
     fn next_frame(cx: &mut App) {
-        SemanticRegistry::global(cx).begin_frame();
+        SemanticCoordinator::global(cx).begin_window_frame(WindowId::from(1));
     }
 
     fn mark(container: &SharedString, id: &str, cx: &mut App) {

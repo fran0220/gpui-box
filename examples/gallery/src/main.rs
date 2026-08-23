@@ -16,7 +16,7 @@ use gpui_kit::datetime::fixture::FixtureDateAdapter;
 use gpui_kit::overlay::{popover, toast};
 use gpui_kit::prelude::set_layout_direction;
 use gpui_kit::prelude::*;
-use gpui_kit_semantics::{NodeSpec, Role, Semantic, SemanticRegistry};
+use gpui_kit_semantics::{NodeSpec, Role, Semantic, SemanticCoordinator};
 use gpui_kit_theme::{Theme, ThemeRegistry, activate_theme, set_density};
 use serde::Deserialize;
 
@@ -218,7 +218,7 @@ fn gallery_commands() -> Vec<Command> {
 
 impl Render for Gallery {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        SemanticRegistry::global(cx).begin_frame();
+        SemanticCoordinator::global(cx).begin_frame(window);
         let theme = Theme::get(cx).clone();
         if let Some(name) = self.scene {
             let scene = gpui_kit::scenes::find(name).expect("scene is registered");

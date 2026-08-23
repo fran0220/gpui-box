@@ -6,10 +6,11 @@ provides a small, transport-independent semantic tree.
 ## Registration
 
 ```rust
-use gpui_kit_semantics::{NodeSpec, Role, Semantic};
+use gpui_kit_semantics::{NodeSpec, Role, Semantic, SemanticCoordinator};
 
-button.semantic(
-    &registry,
+SemanticCoordinator::global(cx).begin_frame(window);
+button.semantic_in(
+    cx,
     NodeSpec::new("settings.account.sign-out", Role::Button)
         .text("Sign out")
         .disabled(saving),
@@ -24,9 +25,12 @@ platform capability matrix and unsupported boundaries.
 
 ## Frame lifecycle
 
-Call `registry.begin_frame()` before rendering a product frame. Nodes
-registered during that frame form the next snapshot. A node not rendered in
-the next frame disappears.
+Call `SemanticCoordinator::global(cx).begin_frame(window)` once at the top of
+each window root render. The installed coordinator owns a stable
+`WindowSemanticContext` for every GPUI `WindowId`; nodes registered during that
+window's frame form its next snapshot. A node not rendered in the next frame
+disappears. Rendering or closing another window cannot clear this tree, advance
+its generation, or collide with its local ids.
 
 This prevents closed dialogs, hidden panels, and removed rows from remaining as
 stale automation targets.
@@ -69,13 +73,14 @@ container holds, the name of a state, or the reason a row was refused. The
 cases are spelled out in `docs/components.md`; a component that publishes
 `value` for anything else is a bug in that component, not a new case.
 
-The deterministic tree is not itself a network server and is not the
-screen-reader transport. In this repository, `headless-visual serve` is the
-debug-only session host: it serializes the snapshot, injects input by
-semantic id, and captures the same offscreen frames the visual gate uses.
-The stdio MCP `session_*` tools are a thin proxy over that host. GPUI's
-AccessKit adapter owns the separate platform tree. Applications may also
-read the snapshot in-process or in unit tests.
+Read a tree with `coordinator.snapshot(window_id)` and wait on
+`coordinator.generation(window_id)`. The deterministic tree is not itself a
+network server and is not the screen-reader transport. In this repository,
+`headless-visual serve` is the debug-only session host: it serializes the
+snapshot, injects input by semantic id, and captures the same offscreen frames
+the visual gate uses. The stdio MCP `session_*` tools are a thin proxy over
+that host. GPUI's AccessKit adapter owns the separate platform tree.
+Applications may also read the snapshot in-process or in unit tests.
 
 ## Security
 
@@ -87,6 +92,7 @@ unless that is an explicit product feature with its own security review.
 
 ## Waiting
 
-Automation waits for `generation()` to advance after input. Sleeping for a
-guessed delay does not prove the action produced a frame. Animations and native
-composition may require an additional settle interval before capture.
+Automation waits for that window's `generation(window_id)` to advance after
+input. Sleeping for a guessed delay does not prove the action produced a frame.
+Animations and native composition may require an additional settle interval
+before capture.

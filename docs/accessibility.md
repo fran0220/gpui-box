@@ -69,8 +69,8 @@ each `NodeSpec` into GPUI's AccessKit tree as well as the deterministic semantic
 registry. A stateful GPUI host keeps its existing click and accessibility action
 handlers. A `Div` without an id becomes the stateful role-bearing host itself,
 so its rendered semantic descendants remain its native descendants. The
-semantic id and GPUI element id are required to match. Installing the test
-registry is not a condition of platform accessibility.
+semantic id and GPUI element id are required to match. Installing the
+diagnostic coordinator is not a condition of platform accessibility.
 
 GPUI can forward that AccessKit tree to NSAccessibility on macOS, UI Automation
 on Windows, AT-SPI on Linux, and an invisible semantic DOM mirror in browsers.

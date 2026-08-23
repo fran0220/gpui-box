@@ -19,7 +19,7 @@ use gpui::{
     TouchPhase, Window, div, point, prelude::*, px, size,
 };
 use gpui_kit::prelude::set_layout_direction;
-use gpui_kit_semantics::SemanticRegistry;
+use gpui_kit_semantics::SemanticCoordinator;
 use gpui_kit_testkit::audit_or_error;
 use gpui_kit_theme::{Theme, activate_theme};
 use serde_json::{Value, json};
@@ -65,7 +65,7 @@ struct Host {
 
 impl Render for Host {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        SemanticRegistry::global(cx).begin_frame();
+        SemanticCoordinator::global(cx).begin_frame(window);
         let theme = Theme::get(cx).clone();
         let root = div().size_full().bg(theme.colors.canvas);
         let Some(name) = self.scene.as_deref() else {
@@ -158,7 +158,7 @@ impl Server {
             "session": id,
             "scene": scene,
             "theme": theme,
-            "generation": self.generation(),
+            "generation": self.generation(window)?,
         }))
     }
 
@@ -166,9 +166,12 @@ impl Server {
         let session = self.lookup(params)?;
         self.activate(&session.scene, &session.theme)?;
         self.draw(session.window)?;
-        let snapshot = self
-            .cx
-            .update(|cx| SemanticRegistry::global(cx).snapshot().redacted());
+        let snapshot = self.cx.update(|cx| {
+            SemanticCoordinator::global(cx)
+                .snapshot(session.window.window_id())
+                .expect("draw published this window's semantics")
+                .redacted()
+        });
         Ok(serde_json::to_value(snapshot)?)
     }
 
@@ -184,7 +187,7 @@ impl Server {
         match kind {
             "click" => {
                 let id = required_str(action, "id")?;
-                let at = self.point_in(id)?;
+                let at = self.point_in(session.window, id)?;
                 self.cx.update_window(session.window, |_, window, cx| {
                     window.dispatch_event(
                         MouseDownEvent {
@@ -247,7 +250,7 @@ impl Server {
                     .get("pixels")
                     .and_then(Value::as_f64)
                     .context("scroll needs pixels")?;
-                let at = self.point_in(id)?;
+                let at = self.point_in(session.window, id)?;
                 self.cx.update_window(session.window, |_, window, cx| {
                     window.dispatch_event(
                         ScrollWheelEvent {
@@ -265,7 +268,7 @@ impl Server {
         }
         self.cx.run_until_parked();
         self.draw(session.window)?;
-        Ok(json!({ "generation": self.generation() }))
+        Ok(json!({ "generation": self.generation(session.window)? }))
     }
 
     fn advance(&mut self, params: &Value) -> Result<Value> {
@@ -281,7 +284,7 @@ impl Server {
         })?;
         self.cx.run_until_parked();
         self.draw(session.window)?;
-        Ok(json!({ "generation": self.generation() }))
+        Ok(json!({ "generation": self.generation(session.window)? }))
     }
 
     fn screenshot(&mut self, params: &Value) -> Result<Value> {
@@ -323,7 +326,11 @@ impl Server {
         let session = self.lookup(params)?;
         self.activate(&session.scene, &session.theme)?;
         self.draw(session.window)?;
-        let snapshot = self.cx.update(|cx| SemanticRegistry::global(cx).snapshot());
+        let snapshot = self.cx.update(|cx| {
+            SemanticCoordinator::global(cx)
+                .snapshot(session.window.window_id())
+                .expect("draw published this window's semantics")
+        });
         match audit_or_error(&snapshot) {
             Ok(()) => Ok(json!({ "ok": true, "findings": [] })),
             Err(error) => Ok(json!({
@@ -400,13 +407,24 @@ impl Server {
         bail!("the scene did not settle within 32 draws")
     }
 
-    fn generation(&mut self) -> u64 {
-        self.cx
-            .update(|cx| SemanticRegistry::global(cx).generation())
+    fn generation(&mut self, window: AnyWindowHandle) -> Result<u64> {
+        self.cx.update(|cx| {
+            SemanticCoordinator::global(cx)
+                .generation(window.window_id())
+                .context("window has not published a semantic frame")
+        })
     }
 
-    fn point_in(&mut self, id: &str) -> Result<gpui::Point<gpui::Pixels>> {
-        let snapshot = self.cx.update(|cx| SemanticRegistry::global(cx).snapshot());
+    fn point_in(
+        &mut self,
+        window: AnyWindowHandle,
+        id: &str,
+    ) -> Result<gpui::Point<gpui::Pixels>> {
+        let snapshot = self.cx.update(|cx| {
+            SemanticCoordinator::global(cx)
+                .snapshot(window.window_id())
+                .context("window has not published a semantic frame")
+        })?;
         let node = snapshot
             .find(id)
             .with_context(|| format!("semantic node `{id}` is missing"))?;
