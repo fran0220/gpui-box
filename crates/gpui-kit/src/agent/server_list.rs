@@ -424,7 +424,7 @@ impl Sizable for ServerList {
 }
 
 impl Slotted for ServerList {
-    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::LOADING];
 
     fn slots_mut(&mut self) -> &mut Slots {
         &mut self.slots

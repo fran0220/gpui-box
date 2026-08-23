@@ -27,6 +27,8 @@
 //!   `&self` only answers;
 //! - a `pub enum` named `<Component>Event` is what the component **reports**,
 //!   so the variants are listed against the component rather than adrift;
+//! - an `impl Slotted for <Component>` publishes the exact named replacement
+//!   positions accepted by `Slotted::slot`;
 //! - every other `pub struct` or `pub enum` in a component source is a
 //!   supporting type, listed separately because a signature mentions it.
 //!
@@ -117,6 +119,7 @@ struct Item {
     options: Vec<String>,
     commands: Vec<String>,
     queries: Vec<String>,
+    slots: Vec<String>,
 }
 
 #[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
@@ -423,6 +426,17 @@ fn read_source(
             continue;
         }
 
+        if let Some(name) = implemented(line, "Slotted") {
+            let slots = read_slots(&lines, at);
+            if let Some(entry) = items.get_mut(&name) {
+                entry.slots = slots;
+            }
+            docs.clear();
+            derives.clear();
+            at += 1;
+            continue;
+        }
+
         if !line.is_empty() {
             docs.clear();
             derives.clear();
@@ -476,6 +490,60 @@ fn inherent(line: &str) -> Option<String> {
         .take_while(|character| character.is_alphanumeric() || *character == '_')
         .collect();
     (name.chars().next().is_some_and(char::is_uppercase)).then_some(name)
+}
+
+/// The public type in `impl Trait for Name`.
+fn implemented(line: &str, trait_name: &str) -> Option<String> {
+    let rest = line.strip_prefix(&format!("impl {trait_name} for "))?;
+    let name: String = rest
+        .chars()
+        .take_while(|character| character.is_alphanumeric() || *character == '_')
+        .collect();
+    (!name.is_empty()).then_some(name)
+}
+
+/// The names in a `Slotted::SLOTS` declaration.
+///
+/// Kit slot constants are uppercase spellings of their public snake-case
+/// values. String literals remain accepted so a product-neutral component can
+/// publish a local slot without adding a global constant first.
+fn read_slots(lines: &[&str], at: usize) -> Vec<String> {
+    let mut declaration = String::new();
+    let mut depth = 0usize;
+    let mut index = at;
+    let mut collecting = false;
+    while index < lines.len() {
+        let line = lines[index].trim();
+        let opens = line.matches('{').count();
+        let closes = line.matches('}').count();
+        if depth == 1 && line.starts_with("const SLOTS:") {
+            collecting = true;
+        }
+        if collecting {
+            declaration.push_str(line);
+            declaration.push(' ');
+            if line.contains(';') {
+                break;
+            }
+        }
+        depth = depth + opens - closes.min(depth + opens);
+        index += 1;
+        if depth == 0 && index > at {
+            break;
+        }
+    }
+
+    let mut slots = Vec::new();
+    for part in declaration.split(|character: char| {
+        character.is_whitespace() || matches!(character, '[' | ']' | '&' | ',' | ';')
+    }) {
+        if let Some(name) = part.strip_prefix("slot::") {
+            slots.push(name.to_ascii_lowercase());
+        } else if part.starts_with('"') && part.ends_with('"') && part.len() >= 2 {
+            slots.push(part[1..part.len() - 1].to_string());
+        }
+    }
+    slots
 }
 
 fn read_variants(lines: &[&str], at: usize) -> (Vec<String>, usize) {
@@ -913,6 +981,7 @@ fn render(
         out.push_str(&list("options", &item.options));
         out.push_str(&list("commands", &item.commands));
         out.push_str(&list("queries", &item.queries));
+        out.push_str(&list("slots", &item.slots));
         out.push_str(&list(
             "reports",
             events.get(&item.name).map(Vec::as_slice).unwrap_or(&[]),
@@ -1125,6 +1194,32 @@ impl Select {
         assert_eq!(select.options.len(), 1);
         assert_eq!(select.commands.len(), 1);
         assert_eq!(select.queries.len(), 1);
+    }
+
+    #[test]
+    fn declared_slots_are_indexed_by_their_public_names() {
+        let source = strip(
+            r#"
+#[derive(IntoElement)]
+pub struct Panel;
+impl Slotted for Panel {
+    const SLOTS: &'static [&'static str] = &[
+        slot::EMPTY,
+        slot::HEADER_EXTRA,
+        "local_action",
+    ];
+    fn slots_mut(&mut self) -> &mut Slots { todo!() }
+}
+"#,
+        );
+        let mut items = BTreeMap::new();
+        let mut events = BTreeMap::new();
+        read_source(&source, "display", "panel.rs", &mut items, &mut events);
+
+        assert_eq!(
+            items["Panel"].slots,
+            vec!["empty", "header_extra", "local_action"]
+        );
     }
 
     #[test]

@@ -92,7 +92,7 @@ impl AudioWaveform {
 }
 
 impl Slotted for AudioWaveform {
-    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY];
 
     fn slots_mut(&mut self) -> &mut Slots {
         &mut self.slots

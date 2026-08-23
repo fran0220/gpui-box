@@ -384,6 +384,16 @@ impl OfferingCatalog {
         window: &mut Window,
         cx: &mut App,
     ) -> AnyElement {
+        let aggregate = self.aggregate_state();
+        let replacement = match aggregate {
+            "loading" => self.slots.render(slot::LOADING, window, cx),
+            "error" => self.slots.render(slot::FAILED, window, cx),
+            _ => None,
+        };
+        if let Some(replacement) = replacement {
+            return replacement;
+        }
+
         let query = self.query.to_lowercase();
         let filtered: Vec<(&OfferingSource, &SearchableOffering)> = self
             .sources

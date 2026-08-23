@@ -73,7 +73,7 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)
         .child(
-            div().w(px(860.0)).h(px(500.0)).child(
+            div().w(px(860.0)).h(px(420.0)).child(
                 NodeGraph::new("scene.graph")
                     .viewport(viewport)
                     .zoom_range(0.55, 1.8)
@@ -232,6 +232,26 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                         cx.refresh_windows();
                     }),
             ),
+        )
+        .child(
+            div()
+                .row()
+                .w(px(860.0))
+                .gap_token(&theme, Space::Sm)
+                .children([
+                    div()
+                        .flex_1()
+                        .h(px(132.0))
+                        .child(NodeGraph::new("scene.graph.loading").state(GraphState::Loading)),
+                    div().flex_1().h(px(132.0)).child(
+                        NodeGraph::new("scene.graph.refused")
+                            .state(GraphState::Refused("Graph access was refused".into())),
+                    ),
+                    div().flex_1().h(px(132.0)).child(
+                        NodeGraph::new("scene.graph.failed")
+                            .state(GraphState::Failed("Graph data could not be loaded".into())),
+                    ),
+                ]),
         )
         .into_any_element()
 }

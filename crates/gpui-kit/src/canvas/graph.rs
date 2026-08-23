@@ -16,10 +16,12 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface};
 use web_time::Instant;
 
 use crate::display::empty::EmptyState;
+use crate::display::state_view::StateView;
+use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{FocusRing, Ident, Pressable, StyledExt};
 use crate::layout::measure;
 use crate::motion::keyed;
@@ -430,6 +432,7 @@ pub struct NodeGraph {
     edges: Vec<GraphEdge>,
     state: GraphState,
     empty: Option<EmptyState>,
+    slots: Slots,
     grid: bool,
     viewport: GraphViewport,
     zoom_range: (f32, f32),
@@ -450,6 +453,14 @@ impl std::fmt::Debug for NodeGraph {
     }
 }
 
+impl Slotted for NodeGraph {
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+
+    fn slots_mut(&mut self) -> &mut Slots {
+        &mut self.slots
+    }
+}
+
 impl NodeGraph {
     pub fn new(ident: impl Into<Ident>) -> Self {
         Self {
@@ -458,6 +469,7 @@ impl NodeGraph {
             edges: Vec::new(),
             state: GraphState::Ready,
             empty: None,
+            slots: Slots::default(),
             grid: true,
             viewport: GraphViewport::default(),
             zoom_range: (0.5, 2.0),
@@ -935,18 +947,19 @@ impl RenderOnce for NodeGraph {
             });
         }
 
-        // A canvas that is not ready draws its reason and nothing else. Steps
-        // left underneath a failure would read as a run that is still going.
-        let message = match &self.state {
-            GraphState::Loading => Some((
-                theme.colors.text_muted,
-                cx.strings().text(StringKey::Loading),
-            )),
-            GraphState::Refused(reason) => Some((theme.colors.warning, reason.clone())),
-            GraphState::Failed(reason) => Some((theme.colors.danger, reason.clone())),
+        // A canvas that is not ready uses the same complete state surface as
+        // every other region. Steps left underneath a failure would read as a
+        // run that is still going, so this replaces the canvas body.
+        let state_slot = match &self.state {
+            GraphState::Loading => Some(slot::LOADING),
+            GraphState::Refused(_) => Some(slot::EMPTY),
+            GraphState::Failed(_) => Some(slot::FAILED),
             GraphState::Ready => None,
         };
-        if let Some((color, text)) = message {
+        if let Some(state_slot) = state_slot {
+            let state = self.slots.or_else(state_slot, window, cx, |_, _| {
+                StateView::new(self.ident.child("state"), self.state.clone()).into_any_element()
+            });
             return frame
                 .child(
                     div()
@@ -956,26 +969,29 @@ impl RenderOnce for NodeGraph {
                         .items_center()
                         .justify_center()
                         .p_token(&theme, Space::Lg)
-                        .type_scale(&theme, TypeScale::Label)
-                        .text_color(color)
-                        .child(text),
+                        .child(state),
                 )
                 .semantic_in(cx, spec.value(viewport_value(self.state.name(), viewport)))
                 .into_any_element();
         }
 
         if self.nodes.is_empty() {
-            let empty = self.empty.map(|empty| {
-                div()
-                    .absolute()
-                    .inset_0()
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .child(empty)
+            let empty = self.slots.or_else(slot::EMPTY, window, cx, |_, _| {
+                self.empty
+                    .map(IntoElement::into_any_element)
+                    .unwrap_or_else(|| {
+                        StateView::new(self.ident.child("state"), Phase::Empty).into_any_element()
+                    })
             });
+            let empty = div()
+                .absolute()
+                .inset_0()
+                .flex()
+                .items_center()
+                .justify_center()
+                .child(empty);
             return frame
-                .children(empty)
+                .child(empty)
                 .semantic_in(cx, spec.value(viewport_value("empty", viewport)))
                 .into_any_element();
         }

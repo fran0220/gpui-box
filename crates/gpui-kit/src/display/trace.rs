@@ -166,7 +166,7 @@ impl TraceView {
 }
 
 impl Slotted for TraceView {
-    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY];
 
     fn slots_mut(&mut self) -> &mut Slots {
         &mut self.slots
@@ -290,7 +290,7 @@ impl SpanTimeline {
 }
 
 impl Slotted for SpanTimeline {
-    const SLOTS: &'static [&'static str] = &[slot::EMPTY, slot::FAILED, slot::LOADING];
+    const SLOTS: &'static [&'static str] = &[slot::EMPTY];
 
     fn slots_mut(&mut self) -> &mut Slots {
         &mut self.slots

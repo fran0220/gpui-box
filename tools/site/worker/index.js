@@ -210,6 +210,7 @@ function component(index, name) {
     out += section("options (chain onto the value)", found.options);
     out += section("commands (need a Context)", found.commands);
     out += section("queries", found.queries);
+    out += section("replaceable slots", found.slots);
     out += section("reports", found.reports);
     if (found.scenes && found.scenes.length) {
       out += `\nreviewed in: ${found.scenes.join(", ")}\nThat scene is the review of this component: it lays out its states so they can be compared. Call scene(name) for verified example code, or render_scene(name) to look at it.\n`;

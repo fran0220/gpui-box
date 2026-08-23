@@ -312,6 +312,7 @@ fn format_mountable(component: &Value) -> String {
         &component["commands"],
     );
     section(&mut out, "queries", &component["queries"]);
+    section(&mut out, "replaceable slots", &component["slots"]);
     section(&mut out, "reports", &component["reports"]);
 
     let scenes = names(&component["scenes"]);

@@ -66,6 +66,54 @@ fn editor(cx: &mut TestAppContext) -> (Harness, Calls) {
     (harness, calls)
 }
 
+#[gpui::test]
+fn graph_states_use_the_shared_state_surface_and_declared_slots(cx: &mut TestAppContext) {
+    let mut defaults = Harness::new(cx, gpui_kit::install, |_, _| {
+        div()
+            .w(px(480.0))
+            .h(px(240.0))
+            .child(NodeGraph::new("failed-graph").state(GraphState::Failed("offline".into())))
+            .into_any_element()
+    });
+    assert_eq!(
+        defaults
+            .node("failed-graph.state")
+            .and_then(|node| node.value)
+            .as_deref(),
+        Some("error")
+    );
+    assert!(defaults.node("failed-graph.state.failed").is_some());
+
+    let mut replacements = Harness::new(cx, gpui_kit::install, |_, _| {
+        div()
+            .child(
+                div().w(px(480.0)).h(px(240.0)).child(
+                    NodeGraph::new("loading-graph")
+                        .state(GraphState::Loading)
+                        .slot(slot::LOADING, |_, _| {
+                            Callout::new("Custom loading", Tone::Info)
+                                .id("loading-graph.custom")
+                                .into_any_element()
+                        }),
+                ),
+            )
+            .child(
+                div().w(px(480.0)).h(px(240.0)).child(
+                    NodeGraph::new("refused-graph")
+                        .state(GraphState::Refused("policy".into()))
+                        .slot(slot::EMPTY, |_, _| {
+                            Callout::new("Custom refusal", Tone::Neutral)
+                                .id("refused-graph.custom")
+                                .into_any_element()
+                        }),
+                ),
+            )
+            .into_any_element()
+    });
+    assert!(replacements.node("loading-graph.custom").is_some());
+    assert!(replacements.node("refused-graph.custom").is_some());
+}
+
 fn controlled_editor(cx: &mut TestAppContext) -> (Harness, Calls, Rc<Cell<usize>>) {
     let calls = Calls::default();
     let position = Rc::new(Cell::new(point(80.0, 80.0)));

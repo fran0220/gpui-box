@@ -3,7 +3,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use gpui::{IntoElement, TestAppContext};
+use gpui::{IntoElement, ParentElement, TestAppContext, div};
 use gpui_kit::prelude::*;
 use gpui_kit_semantics::Role;
 use gpui_kit_testkit::harness::Harness;
@@ -198,6 +198,43 @@ fn mixed_sources_keep_each_state_and_verified_results(cx: &mut TestAppContext) {
     }
     assert!(harness.node("catalog.results.ready.current").is_some());
     assert!(harness.node("catalog.results.stale.verified").is_some());
+}
+
+#[gpui::test]
+fn homogeneous_source_states_reach_their_declared_slots(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        div()
+            .child(
+                OfferingCatalog::new("loading-catalog")
+                    .source(OfferingSource::new(
+                        "loading",
+                        "Loading",
+                        OfferingSourceState::Loading,
+                    ))
+                    .slot(slot::LOADING, |_, _| {
+                        Callout::new("Custom loading", Tone::Info)
+                            .id("loading-catalog.custom")
+                            .into_any_element()
+                    }),
+            )
+            .child(
+                OfferingCatalog::new("failed-catalog")
+                    .source(OfferingSource::new(
+                        "failed",
+                        "Failed",
+                        OfferingSourceState::Error("offline".into()),
+                    ))
+                    .slot(slot::FAILED, |_, _| {
+                        Callout::new("Custom failure", Tone::Danger)
+                            .id("failed-catalog.custom")
+                            .into_any_element()
+                    }),
+            )
+            .into_any_element()
+    });
+
+    assert!(harness.node("loading-catalog.custom").is_some());
+    assert!(harness.node("failed-catalog.custom").is_some());
 }
 
 #[gpui::test]
