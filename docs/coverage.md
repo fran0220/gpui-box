@@ -17,25 +17,27 @@ input, and an entry in `docs/components.md`.
 | Family | Components |
 |---|---|
 | Action | `Button`, `IconButton`, `ButtonGroup`, `SplitButton`, `Toggle`, `ToggleGroup`, `CopyButton` |
-| Text entry | `TextInput`, `PasswordInput`, `OneTimeCodeInput`, `TextArea`, `NumberInput`, `TagInput`, `InlineEdit` |
-| Choice | `Select`, `Combobox`, `Checkbox`, `Radio`, `Switch`, `Slider`, `SegmentedControl` |
+| Text entry | `TextInput`, `PasswordInput`, `OneTimeCodeInput`, `TextArea`, `NumberInput`, `TagInput`, `InlineEdit`, `SearchField`, `FindReplace`, `UploadList` |
+| Choice | `Select`, `Cascader`, `Combobox`, `Checkbox`, `Radio`, `Switch`, `Slider`, `SegmentedControl`, `ColorPicker`, `ColorSwatch` |
 | Form | `FormField`, `SettingsRow`, `SettingsSection` |
-| Navigation | `Tabs`, `Accordion`, `Collapsible`, `Breadcrumb`, `Sidebar`, `Pagination`, `Wizard`, `UndoHistory` |
-| Data | `List` (virtualized), `Table`, `DataGrid` (virtualized), `BulkBar`, `Tree`, `KanbanBoard` |
+| Navigation | `Tabs`, `Accordion`, `Collapsible`, `Breadcrumb`, `Sidebar`, `AnchorList`, `Pagination`, `Wizard`, `UndoHistory` |
+| Data | `List` (virtualized), `Flow` (virtualized), `Table`, `DataGrid` (virtualized), `TreeGrid` (virtualized), `BulkBar`, `Tree`, `KanbanBoard`, `DiagnosticsList` |
 | Date and time | `Calendar`, `DateInput`, `RangePicker`, `TimeInput` |
-| Content | `Markdown`, `AgentDocument`, `MessageList`, `ImageViewer`, `TransportBar`, `BrowserPanel` (shell only), `LogStream`, `DiffView` |
-| Display | `Badge`, `Tag`, `Avatar`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `StatusDot`, `StatusLine`, `Callout`, `Banner`, `StaleMark`, `PulseLoader`, `GradientSpinner`, `Skeleton`, `Spinner`, `RefreshVeil`, `ProgressCircle`, `StageProgress`, `StateView`, `OutcomePanel`, `DescriptionList`, `Timeline`, `Sparkline`, `LineChart`, `BarChart`, `Heatmap` |
-| Overlay | `Overlay`, `Dialog`, `Drawer`, `Popover`, `Menu`, `ContextMenu`, `Menubar`, `CommandPalette`, `Tooltip`, `HoverCard`, `Toast`, `ToastLayer`, `Kbd` |
-| Layout | `DesktopTitlebar`, `SplitPane`, `SplitTree`, `ScrollArea`, `Toolbar`, `AspectRatio` |
+| Content | `Markdown`, `AgentDocument`, `MessageList`, `ImageViewer`, `CodeView`, `TransportBar`, `BrowserPanel` (shell only), `LogStream`, `DiffView`, `ArtifactPreview`, `Terminal` |
+| Display | `Icon`, `Badge`, `Tag`, `Avatar`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `FailurePanel`, `StatusDot`, `StatusLine`, `Callout`, `Banner`, `StaleMark`, `PulseLoader`, `GradientSpinner`, `Skeleton`, `Spinner`, `RefreshVeil`, `ProgressCircle`, `StageProgress`, `StateView`, `OutcomePanel`, `DescriptionList`, `Timeline`, `HighlightedText`, `AnimatedNumber`, `MetricCard`, `Sparkline`, `MicroMark`, `LineChart`, `BarChart`, `AreaChart`, `ScatterChart`, `PieChart`, `StackedBarChart`, `RadarChart`, `GaugeChart`, `ChartLegend`, `Heatmap` |
+| Overlay | `Overlay`, `Frost`, `Glass`, `Dialog`, `Drawer`, `Popover`, `Menu`, `ContextMenu`, `Menubar`, `CommandPalette`, `Tooltip`, `HoverCard`, `Toast`, `ToastLayer`, `NotificationCenter`, `Kbd` |
+| Layout | `DesktopTitlebar`, `SplitPane`, `SplitTree`, `ScrollArea`, `ScrollFade`, `Toolbar`, `AspectRatio`, `Responsive` |
 | Shell | `Dock`, `StatusBar` |
 | Keymap | `KeybindingRecorder`, `KeymapEditor` |
 | Interaction | `Dropzone` |
 | Filtering | `FilterBar` |
-| Agent run and persona | `ToolCallCard`, `StepList`, `ThinkingBlock`, `NodeGraph`, `AgentRoster`, `SubagentTree`, `AgentRunCanvas`, `PersonaPortrait`, `VoiceReactive`, `PersonaDialogue` |
+| Agent run and persona | `AgentAvatar`, `AgentActivityLine`, `AgentCard`, `AgentGroup`, `AgentRunIssues`, `ToolCallCard`, `StepList`, `ThinkingBlock`, `NodeGraph`, `GraphNode`, `NodeGroup`, `CanvasToolbar`, `Minimap`, `TraceView`, `SpanTimeline`, `AgentRoster`, `SubagentTree`, `AgentRunCanvas`, `PersonaPortrait`, `VoiceReactive`, `PersonaDialogue`, `FeedbackRating`, `PromptBuilder` |
+| Permission and cost | `ApprovalPrompt`, `PermissionMatrix`, `CostMeter`, `ContextGauge` |
 | Game experience | `PartyRoster`, `ObjectiveTracker`, `AbilityBar`, `RewardReveal` |
 | Visual effects | `EffectParticles`, `CinematicEffect` |
-| Structured data | `JsonView`, `SchemaForm` |
+| Structured data | `JsonView`, `Outline`, `SchemaForm` |
 | Connections | `ServerList`, `OfferingCatalog` |
+| Media | `AudioPlayer`, `AudioWaveform`, `VideoPlayer`, `ModelViewer` |
 
 `Tooltipped` is an extension trait rather than a component: it attaches a
 `Tooltip` to any element, and is covered wherever that `Tooltip` is.
