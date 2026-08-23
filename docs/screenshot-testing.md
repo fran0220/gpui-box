@@ -262,14 +262,14 @@ tone-distinction retune re-rendered all 216 macOS baselines and all 214 that
 WARP can produce; a baseline is never copied between renderers, because one
 from the wrong renderer verifies nothing.
 
-`visual-effects` has no Windows baseline. WARP does not bring it to a stable
-frame within the 32 draws the harness allows, so it is captured on macOS only
-and `headless capture` with no arguments fails on Windows at that scene. Name
-the scenes, or capture the rest and leave this one, until either the scene
-settles under a software rasterizer or the harness is given a documented
-per-renderer exclusion. Silently accepting an unsettled frame is not an
-option: the whole point of the baseline is that the same input produces the
-same bytes.
+Procedural scene images retain their `RenderImage` identity across redraws.
+Rebuilding an identical image with a fresh identity repeatedly uploads it into
+the atlas; WARP can then choose different texture coordinates on consecutive
+draws even though the source pixels did not change. The visual-effects scene
+caches its theme-colored sprite atlas by the colors that produce its bytes, so
+both bundled themes settle without making same-name theme overrides stale.
+Silently accepting an unsettled frame is not an option: the whole point of the
+baseline is that the same input produces the same bytes.
 
 The harness is its own Cargo workspace because its renderer dependencies and
 lockfile are platform-specific. It resolves the same local GPUI Box package

@@ -1,8 +1,37 @@
 //! What the renderer can do to a surface.
 
+use std::{cell::RefCell, collections::HashMap};
+
 use super::support::*;
 
+thread_local! {
+    static COMPOSITED_SPRITE_ATLASES: RefCell<HashMap<[u32; 8], Arc<RenderImage>>> =
+        RefCell::new(HashMap::new());
+}
+
 pub(super) fn composited_sprite_atlas(theme: &Theme) -> Arc<RenderImage> {
+    let accent = theme.colors.accent_strong.to_rgb();
+    let info = theme.colors.info.to_rgb();
+    let key = [
+        accent.r.to_bits(),
+        accent.g.to_bits(),
+        accent.b.to_bits(),
+        accent.a.to_bits(),
+        info.r.to_bits(),
+        info.g.to_bits(),
+        info.b.to_bits(),
+        info.a.to_bits(),
+    ];
+    COMPOSITED_SPRITE_ATLASES.with(|atlases| {
+        let mut atlases = atlases.borrow_mut();
+        atlases
+            .entry(key)
+            .or_insert_with(|| Arc::new(build_composited_sprite_atlas(theme)))
+            .clone()
+    })
+}
+
+fn build_composited_sprite_atlas(theme: &Theme) -> RenderImage {
     const TILE: i32 = 48;
     const TILES: i32 = 3;
 
@@ -45,10 +74,8 @@ pub(super) fn composited_sprite_atlas(theme: &Theme) -> Arc<RenderImage> {
         }
     }
 
-    Arc::new(
-        RenderImage::from_rgba(size(DevicePixels(TILE * TILES), DevicePixels(TILE)), pixels)
-            .expect("the procedural sprite atlas has exact RGBA8 dimensions"),
-    )
+    RenderImage::from_rgba(size(DevicePixels(TILE * TILES), DevicePixels(TILE)), pixels)
+        .expect("the procedural sprite atlas has exact RGBA8 dimensions")
 }
 
 pub(super) fn visual_effects(_window: &mut Window, cx: &mut App) -> AnyElement {
@@ -708,4 +735,27 @@ pub(super) fn cinematic_effects(_window: &mut Window, cx: &mut App) -> AnyElemen
                 )),
         )
         .into_any_element()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn composited_sprite_atlas_is_stable_for_the_same_colors() {
+        let theme = Theme::studio_dark();
+
+        let first = composited_sprite_atlas(&theme);
+        let second = composited_sprite_atlas(&theme);
+
+        assert!(Arc::ptr_eq(&first, &second));
+    }
+
+    #[test]
+    fn composited_sprite_atlas_keeps_different_colors_separate() {
+        let dark = composited_sprite_atlas(&Theme::studio_dark());
+        let light = composited_sprite_atlas(&Theme::studio_light());
+
+        assert!(!Arc::ptr_eq(&dark, &light));
+    }
 }
