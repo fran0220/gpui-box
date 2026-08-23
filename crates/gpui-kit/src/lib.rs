@@ -255,10 +255,11 @@ pub mod prelude {
         ActiveDrag, DragItem, DropAxis, DropIntent, DropPosition, StagedDrag,
     };
     pub use crate::layout::{
-        AspectFit, AspectRatio, ContainerSize, Dock, DockEvent, DockPanel, DockRegion, FadeEdges,
-        Responsive, ScrollArea, ScrollAxis, ScrollFade, SplitAxis, SplitChange, SplitKind,
-        SplitLayout, SplitPane, SplitPaneSpec, SplitRecord, SplitRecordError, SplitSide, SplitTree,
-        StatusBar, StatusGroup, StatusItem, Toolbar, ToolbarItem, scroll_offset,
+        AspectFit, AspectRatio, ContainerSize, DesktopTitlebar, DesktopTitlebarEvent, Dock,
+        DockEvent, DockPanel, DockRegion, FadeEdges, Responsive, ScrollArea, ScrollAxis,
+        ScrollFade, SplitAxis, SplitChange, SplitKind, SplitLayout, SplitPane, SplitPaneSpec,
+        SplitRecord, SplitRecordError, SplitSide, SplitTree, StatusBar, StatusGroup, StatusItem,
+        Toolbar, ToolbarItem, scroll_offset,
     };
     pub use crate::media::{
         AudioPlayer, AudioWaveform, AudioWaveformState, FixtureTransport, MediaAvailability,

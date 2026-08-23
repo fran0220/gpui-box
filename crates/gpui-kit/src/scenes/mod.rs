@@ -75,8 +75,8 @@ use display::{
 use effects::{cinematic_effects, visual_effects};
 use game::game_ui;
 use layout::{
-    aspect_ratio, ide_shell, responsive, scroll_area, scroll_fade, scroll_shadow, split_pane,
-    split_tree, toolbar,
+    aspect_ratio, desktop_titlebar, ide_shell, responsive, scroll_area, scroll_fade, scroll_shadow,
+    split_pane, split_tree, toolbar,
 };
 use media::{audio_player, audio_waveform, model_viewer, video_player};
 use motion::micro;
@@ -387,6 +387,11 @@ pub fn catalog() -> Vec<Scene> {
             name: "toolbar",
             build: toolbar,
             shows: Shows::Subjects(&["Toolbar"]),
+        },
+        Scene {
+            name: "desktop-titlebar",
+            build: desktop_titlebar,
+            shows: Shows::Subjects(&["DesktopTitlebar"]),
         },
         Scene {
             name: "sidebar",

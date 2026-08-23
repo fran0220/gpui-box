@@ -133,6 +133,12 @@ string_keys! {
     ScrollbarVertical => "scrollbar.vertical", "Vertical";
     ScrollbarHorizontal => "scrollbar.horizontal", "Horizontal";
 
+    // Client-rendered desktop titlebar.
+    WindowMinimize => "window.minimize", "Minimize";
+    WindowMaximize => "window.maximize", "Maximize";
+    WindowRestore => "window.restore", "Restore";
+    WindowClose => "window.close", "Close";
+
     // Breadcrumb.
     BreadcrumbHiddenOne => "breadcrumb.hidden-one", "1 hidden level";
     BreadcrumbHiddenMany => "breadcrumb.hidden-many", "{0} hidden levels";

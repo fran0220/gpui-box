@@ -59,6 +59,7 @@ CopyButton
 DataGrid
 DateInput
 DescriptionList
+DesktopTitlebar
 DiagnosticsList
 Dialog
 DiffView

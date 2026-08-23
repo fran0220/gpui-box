@@ -5,8 +5,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use gpui::{
-    Entity, IntoElement, Modifiers, MouseButton, Pixels, Point, SharedString, TestAppContext, div,
-    prelude::*, px,
+    Entity, IntoElement, Modifiers, MouseButton, Pixels, Point, SharedString, TestAppContext,
+    WindowControlArea, div, prelude::*, px,
 };
 use gpui_kit::assets::Icon;
 use gpui_kit::prelude::*;
@@ -435,6 +435,141 @@ fn a_frozen_dock_reports_nothing(cx: &mut TestAppContext) {
             .node("shell.left.tabs.search")
             .expect("published")
             .disabled
+    );
+}
+
+// --------------------------------------------------------- desktop titlebar
+
+#[gpui::test]
+fn a_titlebar_keeps_caller_content_in_the_client_area(cx: &mut TestAppContext) {
+    let (calls, sink) = recorder::<()>();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let sink = sink.clone();
+        div()
+            .w(px(720.0))
+            .child(
+                DesktopTitlebar::new("shell.titlebar", "Workspace")
+                    .subtitle("main.rs")
+                    .right(
+                        Button::new("shell.titlebar.command")
+                            .label("Command palette")
+                            .small()
+                            .on_click(move |_, _| sink.borrow_mut().push(())),
+                    ),
+            )
+            .into_any_element()
+    });
+
+    let titlebar = harness.node("shell.titlebar").expect("published");
+    assert_eq!(titlebar.role, Role::Toolbar);
+    assert_eq!(titlebar.text.as_deref(), Some("Workspace"));
+    let title = harness
+        .node("shell.titlebar.title")
+        .expect("the title is independently addressable");
+    assert_eq!(title.role, Role::Heading);
+    assert_eq!(title.text.as_deref(), Some("Workspace"));
+    assert_eq!(
+        harness
+            .node("shell.titlebar.subtitle")
+            .expect("the caller-owned subtitle is published")
+            .text
+            .as_deref(),
+        Some("main.rs")
+    );
+
+    let title_point = harness.point_in("shell.titlebar.title");
+    assert_eq!(
+        harness.update(|window, _| window.window_control_area_at(title_point)),
+        Some(WindowControlArea::Drag),
+        "the title remains draggable"
+    );
+    let command_point = harness.point_in("shell.titlebar.command");
+    assert_eq!(
+        harness.update(|window, _| window.window_control_area_at(command_point)),
+        Some(WindowControlArea::Client),
+        "caller content overrides its enclosing drag strip"
+    );
+    harness.click("shell.titlebar.command");
+    assert_eq!(
+        calls.borrow().len(),
+        1,
+        "caller content remains interactive"
+    );
+}
+
+#[cfg(not(any(target_os = "macos", target_family = "wasm")))]
+#[gpui::test]
+fn titlebar_controls_report_requests_and_close_can_be_refused(cx: &mut TestAppContext) {
+    let (events, sink) = recorder::<DesktopTitlebarEvent>();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let sink = sink.clone();
+        div()
+            .w(px(720.0))
+            .child(
+                DesktopTitlebar::new("shell.titlebar", "Workspace")
+                    .button_layout(gpui::WindowButtonLayout {
+                        left: [None; gpui::MAX_BUTTONS_PER_SIDE],
+                        right: [
+                            Some(gpui::WindowButton::Minimize),
+                            Some(gpui::WindowButton::Maximize),
+                            Some(gpui::WindowButton::Close),
+                        ],
+                    })
+                    .on_event(move |event, window, _| {
+                        sink.borrow_mut().push(event);
+                        if event == DesktopTitlebarEvent::Close {
+                            window.request_close();
+                        }
+                    }),
+            )
+            .into_any_element()
+    });
+    let close_checks = Rc::new(RefCell::new(0));
+    harness.update({
+        let close_checks = close_checks.clone();
+        move |window, cx| {
+            window.on_window_should_close(cx, move |_, _| {
+                *close_checks.borrow_mut() += 1;
+                false
+            });
+        }
+    });
+
+    for (id, area) in [
+        ("shell.titlebar.minimize", WindowControlArea::Min),
+        ("shell.titlebar.maximize", WindowControlArea::Max),
+        ("shell.titlebar.close", WindowControlArea::Close),
+    ] {
+        let node = harness
+            .node(id)
+            .unwrap_or_else(|| panic!("`{id}` published"));
+        assert_eq!(node.role, Role::Button);
+        let point = harness.point_in(id);
+        assert_eq!(
+            harness.update(|window, _| window.window_control_area_at(point)),
+            Some(area),
+            "`{id}` keeps its native hit-test identity"
+        );
+        harness.click(id);
+    }
+
+    assert_eq!(
+        events.borrow().as_slice(),
+        [
+            DesktopTitlebarEvent::Minimize,
+            DesktopTitlebarEvent::ToggleMaximize,
+            DesktopTitlebarEvent::Close,
+        ],
+        "the component reports intent without owning window state"
+    );
+    assert_eq!(
+        *close_checks.borrow(),
+        1,
+        "a host-applied close request preserves the refusal callback"
+    );
+    assert!(
+        harness.node("shell.titlebar.close").is_some(),
+        "the refused window remains open"
     );
 }
 

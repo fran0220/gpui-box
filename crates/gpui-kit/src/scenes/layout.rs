@@ -133,6 +133,42 @@ pub(super) fn scroll_fade(_window: &mut Window, cx: &mut App) -> AnyElement {
         .into_any_element()
 }
 
+/// A complete client titlebar: product content remains clickable inside the
+/// drag strip, and platform controls keep their native hit-test identities.
+pub(super) fn desktop_titlebar(_window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(720.0))
+        .child(
+            div()
+                .surface(&theme, Surface::Panel)
+                .radius(&theme, Radius::Card)
+                .overflow_hidden()
+                .child(
+                    DesktopTitlebar::new("scene.desktop-titlebar", "Workspace")
+                        .subtitle("main.rs")
+                        .left(
+                            Button::new("scene.desktop-titlebar.workspace")
+                                .label("Workspace menu")
+                                .ghost()
+                                .small()
+                                .on_click(|_, _| {}),
+                        )
+                        .right(
+                            Badge::new("Connected")
+                                .success()
+                                .id("scene.desktop-titlebar.status"),
+                        )
+                        .on_event(|_, _, _| {}),
+                )
+                .child(div().h(px(112.0)).p_token(&theme, Space::Lg).child(caption(
+                    &theme,
+                    "Host content is client input; maximize remains native Snap chrome.",
+                ))),
+        )
+        .into_any_element()
+}
+
 /// The overflow menu of the toolbar scene, kept across frames.
 pub(super) struct SceneToolbar {
     overflow: Entity<Menu>,

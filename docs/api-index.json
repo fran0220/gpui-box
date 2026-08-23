@@ -1220,6 +1220,34 @@
       ]
     },
     {
+      "name": "DesktopTitlebar",
+      "kind": "builder",
+      "path": "gpui_kit::layout::DesktopTitlebar",
+      "source": "crates/gpui-kit/src/layout/titlebar.rs",
+      "summary": "A client-rendered desktop titlebar with native window-control hit testing.",
+      "construct": [
+        "new(ident: impl Into<Ident>, title: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "subtitle(subtitle: impl Into<SharedString>) -> Self",
+        "left(content: impl IntoElement) -> Self",
+        "right(content: impl IntoElement) -> Self",
+        "button_layout(layout: WindowButtonLayout) -> Self",
+        "controls(controls: WindowControls) -> Self",
+        "on_event(handler: impl Fn(DesktopTitlebarEvent, &mut Window, &mut App) + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "reports": [
+        "Minimize",
+        "ToggleMaximize",
+        "Close"
+      ],
+      "scenes": [
+        "desktop-titlebar"
+      ]
+    },
+    {
       "name": "DiagnosticsList",
       "kind": "builder",
       "path": "gpui_kit::data::DiagnosticsList",
@@ -6091,6 +6119,22 @@
       "queries": [
         "as_str() -> &'static str"
       ]
+    },
+    {
+      "name": "DesktopTitlebarEvent",
+      "path": "gpui_kit::layout::DesktopTitlebarEvent",
+      "summary": "A standard desktop-window request.",
+      "variants": [
+        "Minimize",
+        "ToggleMaximize",
+        "Close"
+      ],
+      "construct": [],
+      "options": [
+        "apply(window: &mut Window)"
+      ],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "Diagnostic",
@@ -12399,6 +12443,18 @@
         "Toolbar"
       ],
       "example": "fn toolbar(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneToolbar>() {\n        let overflow = cx.new(|cx| {\n            Menu::new(\"scene.toolbar.overflow\", window, cx)\n                .trigger_icon(Icon::List)\n                .trigger_name(\"More actions\")\n        });\n        cx.set_global(SceneToolbar { overflow });\n    }\n    let overflow = cx.global::<SceneToolbar>().overflow.clone();\n    let theme = cx.theme().clone();\n\n    stack(&theme)\n        .w(px(620.0))\n        .child(\n            Toolbar::new(\"scene.toolbar.editor\")\n                .label(\"Editor actions\")\n                .group(\n                    \"history\",\n                    [\n                        ToolbarItem::new(\n                            \"editor.undo\",\n                            \"Undo\",\n                            IconButton::new(\"scene.toolbar.undo\", Icon::ArrowLeft, \"Undo\")\n                                .ghost()\n                                .small()\n                                .on_click(|_, _| {}),\n                        )\n                        .icon(Icon::ArrowLeft)\n                        .shortcut(\"cmd-z\"),\n                        ToolbarItem::new(\n                            \"editor.redo\",\n                            \"Redo\",\n                            IconButton::new(\"scene.toolbar.redo\", Icon::ArrowRight, \"Redo\")\n                                .ghost()\n                                .small()\n                                .on_click(|_, _| {}),\n                        )\n                        .icon(Icon::ArrowRight),\n                    ],\n                )\n                .group(\n                    \"view\",\n                    [ToolbarItem::new(\n                        \"editor.view\",\n                        \"View\",\n                        SegmentedControl::new(\"scene.toolbar.view\")\n                            .label(\"View\")\n                            .segments([\n                                Segment::new(\"code\", \"Code\"),\n                                Segment::new(\"split\", \"Split\"),\n                                Segment::new(\"preview\", \"Preview\"),\n                            ])\n                            .selected(\"split\")\n                            .small()\n                            .on_select(|_, _, _| {}),\n                    )],\n                )\n                .spacer()\n                .group(\n                    \"publish\",\n                    [\n                        ToolbarItem::new(\n                            \"editor.share\",\n                            \"Share\",\n                            Button::new(\"scene.toolbar.share\")\n                                .label(\"Share\")\n                                .secondary()\n                                .small()\n                                .on_click(|_, _| {}),\n                        )\n                        .icon(Icon::Copy),\n                        ToolbarItem::new(\n                            \"editor.publish\",\n                            \"Publish\",\n                            Button::new(\"scene.toolbar.publish\")\n                                .label(\"Publish\")\n                                .primary()\n                                .small()\n                                .on_click(|_, _| {}),\n                        )\n                        .icon(Icon::ArchiveUp),\n                        ToolbarItem::new(\n                            \"editor.archive\",\n                            \"Archive\",\n                            Button::new(\"scene.toolbar.archive\")\n                                .label(\"Archive\")\n                                .secondary()\n                                .small()\n                                .on_click(|_, _| {}),\n                        )\n                        .icon(Icon::Archive)\n                        .disabled(true),\n                    ],\n                )\n                .overflow_after(4)\n                .overflow_menu(overflow),\n        )\n        .child(crate::foundation::text(\n            &theme,\n            TypeScale::Body,\n            \"The last two actions moved into the overflow menu.\",\n        ))\n        .into_any_element()\n}"
+    },
+    {
+      "name": "desktop-titlebar",
+      "capture": "cargo run -p xtask -- headless capture desktop-titlebar",
+      "kind": "exhibit",
+      "subjects": [
+        "DesktopTitlebar"
+      ],
+      "uses": [
+        "DesktopTitlebar"
+      ],
+      "example": "fn desktop_titlebar(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(720.0))\n        .child(\n            div()\n                .surface(&theme, Surface::Panel)\n                .radius(&theme, Radius::Card)\n                .overflow_hidden()\n                .child(\n                    DesktopTitlebar::new(\"scene.desktop-titlebar\", \"Workspace\")\n                        .subtitle(\"main.rs\")\n                        .left(\n                            Button::new(\"scene.desktop-titlebar.workspace\")\n                                .label(\"Workspace menu\")\n                                .ghost()\n                                .small()\n                                .on_click(|_, _| {}),\n                        )\n                        .right(\n                            Badge::new(\"Connected\")\n                                .success()\n                                .id(\"scene.desktop-titlebar.status\"),\n                        )\n                        .on_event(|_, _, _| {}),\n                )\n                .child(div().h(px(112.0)).p_token(&theme, Space::Lg).child(caption(\n                    &theme,\n                    \"Host content is client input; maximize remains native Snap chrome.\",\n                ))),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "sidebar",

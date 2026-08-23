@@ -285,6 +285,7 @@ page would be a number nobody counted.
 
 | Component | Kind | Reports | Notes |
 |---|---|---|---|
+| `DesktopTitlebar` | builder | minimize, toggle-maximize, and close requests | A custom client titlebar with an optional subtitle and caller-owned left and right content. The strip is draggable, supplied content explicitly remains client input, and caption buttons retain native control identities. macOS leaves controls to the native traffic lights; browser builds publish no desktop controls |
 | `SplitPane` | builder | the ratio a drag or a keystroke asked for, and the side a double-click would collapse | Minimum sizes become a travel range published on the divider, and a drag past a minimum reports the minimum rather than a value the caller would have to clamp. A pane at ratio 0 or 1 drops its content instead of drawing it at zero size |
 | `AspectRatio` | builder | — | A frame that keeps a ratio. `AspectFit` names which dimension the parent decides and the ratio computes the other; when the parent constrains both, `fit` still wins and the overflow is visible rather than silently switched to a contain box |
 | `ScrollArea` | builder | — | Scroll position is transient view state, held per identity like `List`. It can instead bind its gutter to any GPUI `ScrollTarget`, so a virtualized list keeps the only scroll position rather than being wrapped in a second one. A gutter is reserved for every enabled axis whether or not a thumb is drawn, so turning a scrollbar on never reflows the content that decided it was needed. The gutter paints nothing and the thumb rises to full weight under the pointer. A soft band fades in at the top once the content is off the top, read straight off the offset rather than animated |
@@ -293,6 +294,18 @@ page would be a number nobody counted.
 | `SplitTree` | builder | the ratio a divider asked for, and the pane a double-click would collapse | However many nested splits the caller declares, as a `SplitLayout` the caller owns. Minimums propagate up the tree, so a divider stops where a leaf far below it would run out of room, and a collapsed leaf is drawn at its rail with no divider beside it |
 | `Dock` | builder | a panel that was picked, a panel that was dragged somewhere, a region asked to collapse, and a region divider's share | Panels in a left, centre, right, and bottom region around one another. Region sizes go through `SplitTree` and panel headers are `Tabs` strips, so resizing and dragging are the same two systems used elsewhere. It moves nothing |
 | `StatusBar` | builder | a click on an item that has an action | Text, a toned state dot, a progress ring, an action, or a caller-supplied element, in a start, centre, and end group. An item the host gave no state claims none |
+
+### A titlebar asks; the window decides
+
+`DesktopTitlebar` consumes the title and optional subtitle while reading the
+window's current maximized state and available platform controls. Clicking a
+caption control reports a `DesktopTitlebarEvent`; it does not mutate or remove
+the window. A host that accepts `Close` calls `Window::request_close`, which
+preserves the window's `on_window_should_close` refusal path. On Windows the
+maximize button keeps `WindowControlArea::Max`, so the operating system still
+owns Snap Layout; ordinary elements mounted in the titlebar are
+`WindowControlArea::Client` and remain clickable instead of becoming drag
+handles.
 
 ### A layout the host can write down
 

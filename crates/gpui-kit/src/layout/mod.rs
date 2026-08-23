@@ -19,6 +19,7 @@ pub mod scroll;
 pub mod scroll_fade;
 pub mod split;
 pub mod status_bar;
+pub mod titlebar;
 pub mod toolbar;
 pub mod tree;
 
@@ -29,6 +30,7 @@ pub use scroll::{ScrollArea, ScrollAxis, scroll_offset, scroll_to};
 pub use scroll_fade::{FadeEdges, ScrollFade};
 pub use split::{SplitAxis, SplitPane, SplitSide};
 pub use status_bar::{StatusBar, StatusGroup, StatusItem};
+pub use titlebar::{DesktopTitlebar, DesktopTitlebarEvent};
 pub use toolbar::{Toolbar, ToolbarItem};
 pub use tree::{
     SplitChange, SplitKind, SplitLayout, SplitPaneSpec, SplitRecord, SplitRecordError, SplitTree,
