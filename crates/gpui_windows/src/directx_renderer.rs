@@ -2024,6 +2024,10 @@ impl<T> PipelineState<T> {
         Ok(())
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the draw call receives one explicit binding for each Direct3D pipeline input"
+    )]
     fn draw_range_with_texture_and_blend(
         &self,
         device_context: &ID3D11DeviceContext,

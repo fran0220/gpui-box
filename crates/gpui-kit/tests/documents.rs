@@ -1233,7 +1233,11 @@ fn selecting_all_reaches_the_whole_document(cx: &mut TestAppContext) {
     // document rather than on the pressed block.
     harness.drag_start("report.block.second");
     harness.drop_here();
-    harness.keystrokes("cmd-a");
+    harness.keystrokes(if cfg!(target_os = "macos") {
+        "cmd-a"
+    } else {
+        "ctrl-a"
+    });
 
     let copy = harness
         .update(|window, _| window.document_selection_text())

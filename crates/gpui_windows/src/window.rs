@@ -1224,8 +1224,7 @@ impl IDropTarget_Impl for WindowsDragDropHandler_Impl {
                     paths: ExternalPaths(paths),
                 });
                 self.handle_drag_drop(input);
-            } else if let Some((drop, read_permitted)) = external_drop_from_data_object(&idata_obj)
-            {
+            } else if let Some((drop, read_permitted)) = external_drop_from_data_object(idata_obj) {
                 self.accepted.set(true);
                 *self.external_drop_read_permitted.borrow_mut() = Some(read_permitted);
                 *pdweffect = DROPEFFECT_COPY;
@@ -1542,7 +1541,7 @@ fn deferred_file_contents(
             };
             let mut medium = unsafe { data_object.GetData(&config)? };
             let result = if medium.tymed == TYMED_ISTREAM.0 as u32 {
-                let stream = unsafe { (&*medium.u.pstm).clone() }
+                let stream = unsafe { (*medium.u.pstm).clone() }
                     .ok_or_else(|| anyhow::anyhow!("virtual file returned no stream"))?;
                 read_stream_bounded(&stream, limit)
             } else if medium.tymed == TYMED_HGLOBAL.0 as u32 {
