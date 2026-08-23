@@ -850,7 +850,7 @@ impl WindowsWindowInner {
             (*params).rgrc[0].top = saved_top;
             if self.state.is_maximized() {
                 let dpi = GetDpiForWindow(handle);
-                (*params).rgrc[0].top += get_frame_thicknessx(dpi);
+                (*params).rgrc[0].top += get_frame_thicknessy(dpi);
             }
             Some(result.0 as isize)
         }
