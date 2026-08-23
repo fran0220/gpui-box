@@ -263,7 +263,7 @@ impl Sidebar {
         } else {
             NESTING_INDENT
         };
-        let glyph_slot = flip(ident.child("glyph").semantic_id(), cx);
+        let glyph_slot = flip(ident.child("glyph").semantic_id(), window, cx);
 
         let mut row = div()
             .id(ident.element_id())

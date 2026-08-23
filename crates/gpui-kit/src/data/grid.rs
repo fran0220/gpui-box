@@ -45,9 +45,9 @@ use std::ops::Range;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, AppContext, ClickEvent, Entity, Focusable, Global, InteractiveElement,
-    IntoElement, ListSizingBehavior, MouseButton, ParentElement, RenderOnce, ScrollStrategy,
-    SharedString, StatefulInteractiveElement, Styled, UniformListScrollHandle, Window, div,
+    AnyElement, App, AppContext, ClickEvent, Entity, Focusable, InteractiveElement, IntoElement,
+    ListSizingBehavior, MouseButton, ParentElement, RenderOnce, ScrollStrategy, SharedString,
+    StatefulInteractiveElement, Styled, UniformListScrollHandle, Window, div,
     prelude::FluentBuilder, px, uniform_list,
 };
 use gpui_kit_assets::{Icon, icon};
@@ -61,6 +61,7 @@ use crate::data::table::{Align, Cell, ColumnWidth, SortDirection};
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::slot::{self, Slots, Slotted};
+use crate::foundation::window_state;
 use crate::foundation::{
     Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedRow, Sizable, StyledExt, text,
 };
@@ -913,17 +914,14 @@ struct Memory {
     range_cover: RefCell<Option<RangeCover>>,
 }
 
-#[derive(Default)]
-struct Memories(RefCell<HashMap<SharedString, Rc<Memory>>>);
+type Memories = HashMap<SharedString, Rc<Memory>>;
 
-impl Global for Memories {}
-
-fn memory(id: &SharedString, cx: &mut App) -> Rc<Memory> {
-    if !cx.has_global::<Memories>() {
-        cx.set_global(Memories::default());
-    }
-    let mut memories = cx.global::<Memories>().0.borrow_mut();
-    Rc::clone(memories.entry(id.clone()).or_default())
+fn memory(id: &SharedString, window: &Window, cx: &mut App) -> Rc<Memory> {
+    window_state::with(
+        window.window_handle().window_id(),
+        cx,
+        |memories: &mut Memories| Rc::clone(memories.entry(id.clone()).or_default()),
+    )
 }
 
 /// Which index published which row id on the last frame.
@@ -937,7 +935,7 @@ impl RenderOnce for DataGrid {
         let metrics = theme.control.get(self.size);
         let row_height = self.row_height.unwrap_or(metrics.height);
         let ident = self.ident.clone();
-        let state = memory(&ident.semantic_id(), cx);
+        let state = memory(&ident.semantic_id(), window, cx);
         let columns: Vec<GridColumn> = self.ordered_columns().into_iter().cloned().collect();
         let expanded = self.expanded_indices();
         let detail_rows = self.detail_rows;
@@ -977,7 +975,7 @@ impl RenderOnce for DataGrid {
             .child(body)
             .children(footer);
 
-        frame = self.wire_resize_drag(frame, &state, &columns, cx);
+        frame = self.wire_resize_drag(frame, &state, &columns, window, cx);
         frame = self.wire_keyboard(frame, &state, &drawn, &expanded, &columns);
 
         frame.semantic_in(
@@ -1409,7 +1407,7 @@ impl DataGrid {
 
         // The header cell is measured so a drag on its trailing edge can turn
         // a pointer position into a width.
-        let measured = measure::cell(&ident.semantic_id(), cx);
+        let measured = measure::cell(&ident.semantic_id(), window, cx);
 
         let content = div()
             .row()
@@ -1479,7 +1477,7 @@ impl DataGrid {
                 });
         }
 
-        if let Some(handle) = self.resize_handle(theme, height, column, &measured, cx) {
+        if let Some(handle) = self.resize_handle(theme, height, column, &measured, window, cx) {
             cell = cell.child(handle);
         }
 
@@ -1526,7 +1524,7 @@ impl DataGrid {
 
         // A column that moved slides from where it was; the layout already
         // put it where the caller says it belongs.
-        let handle = flip(ident.child("slide").semantic_id(), cx);
+        let handle = flip(ident.child("slide").semantic_id(), window, cx);
         cell.flip(&handle, window, cx).into_any_element()
     }
 
@@ -1537,6 +1535,7 @@ impl DataGrid {
         height: f32,
         column: &GridColumn,
         measured: &Rc<StdCell<gpui::Bounds<gpui::Pixels>>>,
+        window: &Window,
         cx: &mut App,
     ) -> Option<AnyElement> {
         if self.disabled || !column.resizable {
@@ -1547,7 +1546,7 @@ impl DataGrid {
             .child("header")
             .child(column.key.as_ref())
             .child("resize");
-        let state = memory(&self.ident.semantic_id(), cx);
+        let state = memory(&self.ident.semantic_id(), window, cx);
 
         let mut handle = div()
             .id(ident.element_id())
@@ -1617,6 +1616,7 @@ impl DataGrid {
         frame: gpui::Stateful<gpui::Div>,
         state: &Rc<Memory>,
         columns: &[GridColumn],
+        window: &Window,
         cx: &mut App,
     ) -> gpui::Stateful<gpui::Div> {
         let Some(handler) = self.on_resize.clone().filter(|_| !self.disabled) else {
@@ -1629,7 +1629,10 @@ impl DataGrid {
                 let ident = self.ident.child("header").child(column.key.as_ref());
                 (
                     column.key.clone(),
-                    (measure::cell(&ident.semantic_id(), cx), column.min_width),
+                    (
+                        measure::cell(&ident.semantic_id(), window, cx),
+                        column.min_width,
+                    ),
                 )
             })
             .collect();
@@ -2751,7 +2754,7 @@ impl BulkBar {
 impl RenderOnce for BulkBar {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let state = memory(&self.ident.semantic_id(), cx);
+        let state = memory(&self.ident.semantic_id(), window, cx);
         let progress = {
             let mut held = state.bulk.borrow_mut();
             let presence = held.get_or_insert_with(|| {

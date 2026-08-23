@@ -15,19 +15,18 @@
 //! is transient view state, so it is held in an application global keyed by
 //! semantic identity rather than by the caller.
 
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, Global, InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels,
-    Point, RenderOnce, ScrollHandle, ScrollTarget, SharedString, StatefulInteractiveElement,
-    Styled, Window, div, prelude::FluentBuilder, px, relative,
+    AnyElement, App, InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels, Point,
+    RenderOnce, ScrollHandle, ScrollTarget, SharedString, StatefulInteractiveElement, Styled,
+    Window, div, prelude::FluentBuilder, px, relative,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Theme};
 
-use crate::foundation::Ident;
+use crate::foundation::{Ident, window_state};
 use crate::layout::measure;
 use crate::motion::ScrollLink;
 use crate::strings::{ActiveStrings, StringKey};
@@ -171,13 +170,13 @@ impl ScrollArea {
 }
 
 impl RenderOnce for ScrollArea {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let bound = self.target.is_some();
         // The area's own handle exists whether or not it is used, because the
         // viewport element has to be told about it before the branch below
         // decides whether it scrolls.
-        let own_handle = scroll_handle(&self.ident, cx);
+        let own_handle = scroll_handle(&self.ident, window, cx);
         let target: Rc<dyn ScrollTarget> = match self.target.clone() {
             Some(target) => target,
             None => Rc::new(own_handle.clone()),
@@ -187,7 +186,7 @@ impl RenderOnce for ScrollArea {
         // Whether a scrollbar is needed depends on a size only layout knows,
         // so the viewport is measured during prepaint and the frame that
         // learns a new size asks for one more.
-        let measured = measure::cell(&self.ident.child("viewport").semantic_id(), cx);
+        let measured = measure::cell(&self.ident.child("viewport").semantic_id(), window, cx);
         let viewport = measured.get().size;
 
         let content = div()
@@ -296,6 +295,7 @@ impl RenderOnce for ScrollArea {
                 &target,
                 offset,
                 &theme,
+                window,
                 cx,
             )
         });
@@ -310,6 +310,7 @@ impl RenderOnce for ScrollArea {
                 &target,
                 offset,
                 &theme,
+                window,
                 cx,
             )
         });
@@ -364,12 +365,13 @@ fn bar(
     target: &Rc<dyn ScrollTarget>,
     offset: Point<Pixels>,
     theme: &Theme,
+    window: &Window,
     cx: &mut App,
 ) -> AnyElement {
     let bar_ident = ident.child("scrollbar").child(axis);
     let content = viewport + max;
     let overflowing = max > 0.5 && viewport > 0.0;
-    let track = measure::cell(&bar_ident.semantic_id(), cx);
+    let track = measure::cell(&bar_ident.semantic_id(), window, cx);
 
     let fraction = if content > 0.0 {
         (viewport / content).clamp(0.0, 1.0)
@@ -508,10 +510,7 @@ fn bar(
         .into_any_element()
 }
 
-#[derive(Default)]
-struct ScrollHandles(RefCell<HashMap<SharedString, ScrollHandle>>);
-
-impl Global for ScrollHandles {}
+type ScrollHandles = HashMap<SharedString, ScrollHandle>;
 
 /// How far the region with this identity has been scrolled, in pixels down
 /// and across from the start of its content.
@@ -520,8 +519,8 @@ impl Global for ScrollHandles {}
 /// [`ScrollLink`] to collapse a header or fade a
 /// heading as the content moves under it. A region that has never rendered
 /// reports zero, which is where it will be when it does.
-pub fn scroll_offset(ident: impl Into<Ident>, cx: &mut App) -> Point<Pixels> {
-    let offset = scroll_handle(&ident.into(), cx).offset();
+pub fn scroll_offset(ident: impl Into<Ident>, window: &Window, cx: &mut App) -> Point<Pixels> {
+    let offset = scroll_handle(&ident.into(), window, cx).offset();
     gpui::point(-offset.x, -offset.y)
 }
 
@@ -532,17 +531,17 @@ pub fn scroll_offset(ident: impl Into<Ident>, cx: &mut App) -> Point<Pixels> {
 /// reopened document belongs where they left it, not at the top. It takes
 /// effect on the next frame, and a region that has never rendered remembers
 /// the position until it does.
-pub fn scroll_to(ident: impl Into<Ident>, offset: Point<Pixels>, cx: &mut App) {
-    scroll_handle(&ident.into(), cx).set_offset(gpui::point(-offset.x, -offset.y));
+pub fn scroll_to(ident: impl Into<Ident>, offset: Point<Pixels>, window: &Window, cx: &mut App) {
+    scroll_handle(&ident.into(), window, cx).set_offset(gpui::point(-offset.x, -offset.y));
 }
 
 /// The scroll position of the region with this identity.
-fn scroll_handle(ident: &Ident, cx: &mut App) -> ScrollHandle {
-    if !cx.has_global::<ScrollHandles>() {
-        cx.set_global(ScrollHandles::default());
-    }
-    let mut handles = cx.global::<ScrollHandles>().0.borrow_mut();
-    handles.entry(ident.semantic_id()).or_default().clone()
+fn scroll_handle(ident: &Ident, window: &Window, cx: &mut App) -> ScrollHandle {
+    window_state::with(
+        window.window_handle().window_id(),
+        cx,
+        |handles: &mut ScrollHandles| handles.entry(ident.semantic_id()).or_default().clone(),
+    )
 }
 
 #[cfg(test)]

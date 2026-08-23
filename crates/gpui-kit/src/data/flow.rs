@@ -160,7 +160,7 @@ impl Flow {
 }
 
 impl RenderOnce for Flow {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let estimate = self
             .estimate
@@ -172,7 +172,14 @@ impl RenderOnce for Flow {
             // believed and the names are not.
             _ => Rows::Counted(self.count),
         };
-        let state = list_state(&self.ident, described, self.alignment, px(estimate), cx);
+        let state = list_state(
+            &self.ident,
+            described,
+            self.alignment,
+            px(estimate),
+            window,
+            cx,
+        );
         let render_row = Rc::clone(&self.render_row);
         let extent = self.extent;
 

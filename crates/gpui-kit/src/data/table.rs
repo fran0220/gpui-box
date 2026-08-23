@@ -698,7 +698,7 @@ impl RenderOnce for Table {
             match self.source.take() {
                 Some(source) => {
                     let ident = self.ident.child("body");
-                    let scroll = scroll_handle(&ident, cx);
+                    let scroll = scroll_handle(&ident, window, cx);
                     let theme = theme.clone();
                     uniform_list(
                         ident.element_id(),

@@ -269,7 +269,7 @@ pub(crate) fn tracked_or_snap<T>(
 where
     T: Interpolate + PartialEq + 'static,
 {
-    let cell = keyed::slot::<Tracked<T>>(id, cx);
+    let cell = keyed::slot::<Tracked<T>>(id, window.window_handle().window_id(), cx);
     let mut tracked = cell.borrow_mut();
     let mut transition = tracked
         .0

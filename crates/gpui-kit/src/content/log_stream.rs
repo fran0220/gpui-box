@@ -295,8 +295,11 @@ impl RenderOnce for LogStream {
         let count = entries.len();
         let shows_entries = self.state.shows_entries();
         let list_ident = self.ident.child("entries");
-        let follow =
-            keyed::slot::<FollowState>(&self.ident.child("follow-state").semantic_id(), cx);
+        let follow = keyed::slot::<FollowState>(
+            &self.ident.child("follow-state").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
         let (paused, should_follow) = {
             let mut state = follow.borrow_mut();
             let newest = entries.last().map(|entry| entry.id.clone());
@@ -312,7 +315,7 @@ impl RenderOnce for LogStream {
             (state.paused, should_follow)
         };
         if should_follow {
-            scroll_to_row(&list_ident, count - 1, cx);
+            scroll_to_row(&list_ident, count - 1, window, cx);
         }
 
         let extra = self.slots.render(slot::HEADER_EXTRA, window, cx);
@@ -351,7 +354,7 @@ impl RenderOnce for LogStream {
                     let resumes = !state.paused;
                     drop(state);
                     if resumes && count > 0 {
-                        scroll_to_row(&scroll_ident, last, cx);
+                        scroll_to_row(&scroll_ident, last, window, cx);
                     }
                     window.refresh();
                 });

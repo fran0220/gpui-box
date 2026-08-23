@@ -935,7 +935,7 @@ pub(crate) trait MakingWay: IntoElement + Sized {
         cx: &mut App,
     ) -> MakeWay {
         let id = id.into();
-        let state = keyed::slot::<SlideState>(&id, cx);
+        let state = keyed::slot::<SlideState>(&id, window.window_handle().window_id(), cx);
         let spring = Spring::preset(cx.theme(), SpringPreset::Grab);
         let instant = cx.reduce_motion() || is_staged(cx);
         if state.borrow().current != offset {

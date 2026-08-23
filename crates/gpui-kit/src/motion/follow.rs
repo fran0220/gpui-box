@@ -22,15 +22,14 @@
 //! toward it, or a reader nudging up from the bottom would be snapped back
 //! down by their own gesture and the pin would be unbreakable.
 
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::time::Duration;
 
-use gpui::{App, Global, ListState, Pixels, SharedString, Window, px};
+use gpui::{App, ListState, Pixels, SharedString, Window, WindowId, px};
 use web_time::Instant;
 
 use crate::data::viewport::flow_state;
-use crate::foundation::Ident;
+use crate::foundation::{Ident, window_state};
 use crate::motion::reduce_motion;
 
 /// How much velocity survives a frame — higher glides longer.
@@ -207,18 +206,17 @@ impl Default for Follower {
     }
 }
 
-#[derive(Default)]
-struct Followers(RefCell<HashMap<SharedString, Follower>>);
+type Followers = HashMap<SharedString, Follower>;
 
-impl Global for Followers {}
-
-fn with_follower<R>(ident: &Ident, cx: &mut App, act: impl FnOnce(&mut Follower) -> R) -> R {
-    if !cx.has_global::<Followers>() {
-        cx.set_global(Followers::default());
-    }
-    let followers = cx.global::<Followers>();
-    let mut entries = followers.0.borrow_mut();
-    act(entries.entry(ident.semantic_id()).or_default())
+fn with_follower<R>(
+    ident: &Ident,
+    window_id: WindowId,
+    cx: &mut App,
+    act: impl FnOnce(&mut Follower) -> R,
+) -> R {
+    window_state::with(window_id, cx, |followers: &mut Followers| {
+        act(followers.entry(ident.semantic_id()).or_default())
+    })
 }
 
 /// How far above its end this list is sitting.
@@ -238,8 +236,9 @@ fn distance_from_end(state: &ListState) -> f32 {
 /// A surface that has not yet drawn as a variable-height list has nothing to
 /// follow and is reported as settled where it is.
 pub fn follow_end(ident: &Ident, window: &mut Window, cx: &mut App) -> AtEnd {
-    let Some(state) = flow_state(ident, cx) else {
-        let pinned = with_follower(ident, cx, |follower| follower.pinned);
+    let window_id = window.window_handle().window_id();
+    let Some(state) = flow_state(ident, window_id, cx) else {
+        let pinned = with_follower(ident, window_id, cx, |follower| follower.pinned);
         return AtEnd {
             pinned,
             distance: px(0.0),
@@ -247,7 +246,7 @@ pub fn follow_end(ident: &Ident, window: &mut Window, cx: &mut App) -> AtEnd {
         };
     };
 
-    let listening = with_follower(ident, cx, |follower| {
+    let listening = with_follower(ident, window_id, cx, |follower| {
         std::mem::replace(&mut follower.listening, true)
     });
     if !listening {
@@ -255,13 +254,13 @@ pub fn follow_end(ident: &Ident, window: &mut Window, cx: &mut App) -> AtEnd {
     }
 
     let distance = distance_from_end(&state);
-    let pinned = with_follower(ident, cx, |follower| {
+    let pinned = with_follower(ident, window_id, cx, |follower| {
         follower.distance = distance;
         follower.pinned
     });
 
     if !pinned {
-        with_follower(ident, cx, |follower| {
+        with_follower(ident, window_id, cx, |follower| {
             follower.chase.reset();
             follower.ticked = None;
             follower.settled = None;
@@ -279,7 +278,7 @@ pub fn follow_end(ident: &Ident, window: &mut Window, cx: &mut App) -> AtEnd {
         if distance > 0.0 {
             state.scroll_to_end();
         }
-        with_follower(ident, cx, |follower| {
+        with_follower(ident, window_id, cx, |follower| {
             follower.chase.reset();
             follower.distance = 0.0;
         });
@@ -305,7 +304,7 @@ pub fn follow_end(ident: &Ident, window: &mut Window, cx: &mut App) -> AtEnd {
         distance = glide_max;
     }
 
-    let (moved, remaining, settled) = with_follower(ident, cx, |follower| {
+    let (moved, remaining, settled) = with_follower(ident, window_id, cx, |follower| {
         let woken = std::mem::take(&mut follower.woken);
         let frames = match follower.ticked {
             Some(last) => ((now.saturating_duration_since(last).as_secs_f32() * 1000.0) / FRAME_MS)
@@ -359,8 +358,8 @@ pub fn follow_end(ident: &Ident, window: &mut Window, cx: &mut App) -> AtEnd {
 /// what arriving content does: content that arrives while the surface is
 /// already following is followed, and content that arrives while it is not
 /// following must not drag the reader anywhere.
-pub fn engage_end(ident: &Ident, cx: &mut App) {
-    with_follower(ident, cx, |follower| {
+pub fn engage_end(ident: &Ident, window: &Window, cx: &mut App) {
+    with_follower(ident, window.window_handle().window_id(), cx, |follower| {
         follower.pinned = true;
         follower.woken = true;
         follower.settled = None;
@@ -373,8 +372,8 @@ pub fn engage_end(ident: &Ident, cx: &mut App) {
 }
 
 /// Stop holding the end, leaving the view exactly where it is.
-pub fn release_end(ident: &Ident, cx: &mut App) {
-    with_follower(ident, cx, |follower| {
+pub fn release_end(ident: &Ident, window: &Window, cx: &mut App) {
+    with_follower(ident, window.window_handle().window_id(), cx, |follower| {
         follower.pinned = false;
         follower.chase.reset();
         follower.ticked = None;
@@ -383,16 +382,17 @@ pub fn release_end(ident: &Ident, cx: &mut App) {
 }
 
 /// Whether this surface is currently holding its end.
-pub fn follows_end(ident: &Ident, cx: &App) -> bool {
-    cx.try_global::<Followers>()
-        .and_then(|followers| {
+pub fn follows_end(ident: &Ident, window: &Window, cx: &App) -> bool {
+    window_state::read(
+        window.window_handle().window_id(),
+        cx,
+        |followers: &Followers| {
             followers
-                .0
-                .borrow()
                 .get(&ident.semantic_id())
-                .map(|follower| follower.pinned)
-        })
-        .unwrap_or(false)
+                .is_some_and(|follower| follower.pinned)
+        },
+    )
+    .unwrap_or(false)
 }
 
 /// Whether a gesture that ended up this far from the end should re-engage.
@@ -413,17 +413,18 @@ fn should_restick(distance: f32, previous: f32) -> bool {
 /// reader leaving.
 fn listen(ident: &Ident, state: &ListState) {
     let ident = ident.clone();
-    state.set_scroll_handler(move |_event, _window, cx| {
+    state.set_scroll_handler(move |_event, window, cx| {
         // The list is holding its own borrow while it calls this, so reading
         // the position back now would panic. By the end of the effect cycle it
         // has let go.
         let ident = ident.clone();
+        let window_id = window.window_handle().window_id();
         cx.defer(move |cx| {
-            let Some(state) = flow_state(&ident, cx) else {
+            let Some(state) = flow_state(&ident, window_id, cx) else {
                 return;
             };
             let distance = distance_from_end(&state);
-            let changed = with_follower(&ident, cx, |follower| {
+            let changed = with_follower(&ident, window_id, cx, |follower| {
                 let previous = follower.distance;
                 follower.distance = distance;
                 let was = follower.pinned;

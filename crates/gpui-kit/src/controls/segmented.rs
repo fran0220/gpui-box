@@ -181,7 +181,7 @@ impl RenderOnce for SegmentedControl {
         // One background for the whole strip, drawn inside whichever segment
         // holds. Because it is the same element from frame to frame, changing
         // the choice moves it rather than redrawing it somewhere else.
-        let selection = flip(self.ident.child("selection").semantic_id(), cx);
+        let selection = flip(self.ident.child("selection").semantic_id(), window, cx);
 
         let segments = self
             .segments

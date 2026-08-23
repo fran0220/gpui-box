@@ -256,7 +256,7 @@ impl Disableable for ModelViewer {
 }
 
 impl RenderOnce for ModelViewer {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let ident = self.ident.clone();
         let strings = cx.strings().clone();
@@ -273,8 +273,9 @@ impl RenderOnce for ModelViewer {
             )
         };
 
-        let measured = measure::cell(&ident.child("frame").semantic_id(), cx);
-        let dragging = keyed::slot::<Orbiting>(&ident.semantic_id(), cx);
+        let measured = measure::cell(&ident.child("frame").semantic_id(), window, cx);
+        let dragging =
+            keyed::slot::<Orbiting>(&ident.semantic_id(), window.window_handle().window_id(), cx);
 
         let camera = Camera {
             yaw: self.yaw,

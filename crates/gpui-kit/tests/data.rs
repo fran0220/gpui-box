@@ -668,7 +668,7 @@ fn a_flow_is_followed_by_name_like_any_other_surface(cx: &mut TestAppContext) {
     let flow = Ident::new("data.flow");
     harness.update({
         let flow = flow.clone();
-        move |_, cx| engage_end(&flow, cx)
+        move |window, cx| engage_end(&flow, window, cx)
     });
     for _ in 0..90 {
         harness.advance(std::time::Duration::from_millis(16));
@@ -705,7 +705,7 @@ fn a_glide_travels_to_its_row_rather_than_arriving_at_it(cx: &mut TestAppContext
     let flow = Ident::new("data.flow");
     harness.update({
         let flow = flow.clone();
-        move |_, cx| glide_to_row(&flow, 0, cx)
+        move |window, cx| glide_to_row(&flow, 0, window, cx)
     });
     for _ in 0..8 {
         harness.advance(std::time::Duration::from_millis(16));

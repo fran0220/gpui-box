@@ -501,8 +501,9 @@ impl RenderOnce for ImageViewer {
         let count = self.frames.len();
         let position = cx.numbers().count_of_total(index + 1, count);
 
-        let measured = measure::cell(&ident.child("frame").semantic_id(), cx);
-        let state = keyed::slot::<Viewport>(&ident.semantic_id(), cx);
+        let measured = measure::cell(&ident.child("frame").semantic_id(), window, cx);
+        let state =
+            keyed::slot::<Viewport>(&ident.semantic_id(), window.window_handle().window_id(), cx);
         let bounds = measured.get();
         let extent = size(f32::from(bounds.size.width), f32::from(bounds.size.height));
         let pin = state.borrow().pin;
@@ -912,7 +913,11 @@ fn report_missing(
     let Some(handler) = handler.cloned() else {
         return;
     };
-    let cell = keyed::slot::<Requested>(&ident.child("requested").semantic_id(), cx);
+    let cell = keyed::slot::<Requested>(
+        &ident.child("requested").semantic_id(),
+        window.window_handle().window_id(),
+        cx,
+    );
     if !cell.borrow_mut().0.insert(frame.id.clone()) {
         return;
     }

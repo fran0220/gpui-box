@@ -6,29 +6,28 @@
 //! the measurement across rebuilds, and a measurement that changed asks for the
 //! frame that publishes it.
 
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use gpui::{App, Bounds, Global, Pixels, SharedString, Window};
+use gpui::{App, Bounds, Pixels, SharedString, Window};
+
+use crate::foundation::window_state;
 
 /// How much a measurement has to move before it is worth another frame.
 ///
 /// Sub-pixel drift would otherwise ask for a redraw on every frame forever.
 const EPSILON: f32 = 0.5;
 
-#[derive(Default)]
-struct Measurements(RefCell<HashMap<SharedString, Rc<Cell<Bounds<Pixels>>>>>);
-
-impl Global for Measurements {}
+type Measurements = HashMap<SharedString, Rc<Cell<Bounds<Pixels>>>>;
 
 /// The cell holding the bounds last measured for `id`.
-pub(crate) fn cell(id: &SharedString, cx: &mut App) -> Rc<Cell<Bounds<Pixels>>> {
-    if !cx.has_global::<Measurements>() {
-        cx.set_global(Measurements::default());
-    }
-    let mut cells = cx.global::<Measurements>().0.borrow_mut();
-    Rc::clone(cells.entry(id.clone()).or_default())
+pub(crate) fn cell(id: &SharedString, window: &Window, cx: &mut App) -> Rc<Cell<Bounds<Pixels>>> {
+    window_state::with(
+        window.window_handle().window_id(),
+        cx,
+        |cells: &mut Measurements| Rc::clone(cells.entry(id.clone()).or_default()),
+    )
 }
 
 /// Records `bounds` and asks for another frame when they moved, because the

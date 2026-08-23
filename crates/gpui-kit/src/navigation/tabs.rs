@@ -642,7 +642,8 @@ impl Tabs {
                     .relative()
                     .h(px(theme.effects.selection_rail_width))
                     .children(selected.then(|| {
-                        let indicator = flip(self.ident.child("indicator").semantic_id(), cx);
+                        let indicator =
+                            flip(self.ident.child("indicator").semantic_id(), window, cx);
                         // Inset from the tab's own padding and rounded at the
                         // top, so the mark sits under the label rather than
                         // under the gap between two labels.
@@ -784,7 +785,13 @@ impl RenderOnce for Tabs {
         let direction = cx.layout_direction();
         let scrolls = self.overflow == Overflow::Scrolls;
         // Where the reader left the strip, and what it has already shown them.
-        let state = scrolls.then(|| keyed::slot::<Strip>(&self.ident.semantic_id(), cx));
+        let state = scrolls.then(|| {
+            keyed::slot::<Strip>(
+                &self.ident.semantic_id(),
+                window.window_handle().window_id(),
+                cx,
+            )
+        });
         let mut fades = (false, false);
         let mut scroll = None;
         if let Some(state) = &state {

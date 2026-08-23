@@ -155,7 +155,7 @@ impl Dialog {
         }
         self.open = true;
         self.pending_focus = true;
-        stack::push(self.ident.semantic_id(), cx);
+        stack::push(self.ident.semantic_id(), window, cx);
         self.trap.engage(window, cx);
         cx.emit(DialogEvent::Opened);
         cx.notify();
@@ -169,7 +169,7 @@ impl Dialog {
         }
         self.open = false;
         self.pending_focus = false;
-        stack::pop(&self.ident.semantic_id(), cx);
+        stack::pop(&self.ident.semantic_id(), window, cx);
         self.trap.release(window, cx);
         cx.emit(DialogEvent::Closed);
         cx.notify();
@@ -244,7 +244,7 @@ impl Dialog {
         if !self.open || event.keystroke.key.as_str() != "escape" {
             return;
         }
-        if !stack::is_top(&self.ident.semantic_id(), cx) {
+        if !stack::is_top(&self.ident.semantic_id(), window, cx) {
             return;
         }
         self.dismiss(window, cx);
@@ -364,9 +364,9 @@ impl Render for Dialog {
             .semantic_in(cx, spec);
 
         let mut overlay = Overlay::modal(self.ident.child("overlay"))
-            .stack(stack::depth(&self.ident.semantic_id(), cx))
+            .stack(stack::depth(&self.ident.semantic_id(), window, cx))
             .child(card);
-        if self.dismissable && stack::is_top(&self.ident.semantic_id(), cx) {
+        if self.dismissable && stack::is_top(&self.ident.semantic_id(), window, cx) {
             let dialog = cx.entity().downgrade();
             overlay = overlay.on_dismiss(move |window, cx| {
                 dialog

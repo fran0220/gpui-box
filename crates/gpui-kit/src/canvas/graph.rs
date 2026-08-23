@@ -767,7 +767,11 @@ impl RenderOnce for NodeGraph {
                     .iter()
                     .any(|placed| placed.node.node_state().is_busy()));
         let graph_busy = matches!(self.state, GraphState::Loading) || moving_effects;
-        let gesture = keyed::slot::<GestureState>(&self.ident.semantic_id(), cx);
+        let gesture = keyed::slot::<GestureState>(
+            &self.ident.semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
         let animation_phase = if moving_effects && !cx.reduce_motion() {
             let now = cx.background_executor().now();
             let mut state = gesture.borrow_mut();
@@ -782,7 +786,7 @@ impl RenderOnce for NodeGraph {
         }
         let spec = NodeSpec::new(self.ident.semantic_id(), Role::Group).busy(graph_busy);
 
-        let measured = measure::cell(&self.ident.child("viewport").semantic_id(), cx);
+        let measured = measure::cell(&self.ident.child("viewport").semantic_id(), window, cx);
         let record = Rc::clone(&measured);
         let mut frame = div()
             .on_children_prepainted(move |bounds, window, _| {
@@ -1002,7 +1006,7 @@ impl RenderOnce for NodeGraph {
             .map(|placed| {
                 let id = placed.node.ident().semantic_id();
                 let measurement_id = composite_id("node-measure", &[id.as_ref()]);
-                (id, measure::cell(&measurement_id, cx))
+                (id, measure::cell(&measurement_id, window, cx))
             })
             .collect();
         let measured_heights: HashMap<SharedString, f32> = node_measurements
@@ -1013,7 +1017,11 @@ impl RenderOnce for NodeGraph {
             })
             .collect();
         let geometry = self.geometry_with_heights(&theme, &measured_heights);
-        let route_cell = keyed::slot::<RouteCache>(&self.ident.child("routes").semantic_id(), cx);
+        let route_cell = keyed::slot::<RouteCache>(
+            &self.ident.child("routes").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
         let signature = route_signature(&geometry, &self.edges);
         let routes = {
             let mut cache = route_cell.borrow_mut();

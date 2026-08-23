@@ -248,9 +248,16 @@ impl RenderOnce for Terminal {
         let ident = self.ident.clone();
         let state = self.state.clone();
 
-        let geometry =
-            keyed::slot::<Option<GridGeometry>>(&ident.child("geometry").semantic_id(), cx);
-        let gesture = keyed::slot::<Gesture>(&ident.child("gesture").semantic_id(), cx);
+        let geometry = keyed::slot::<Option<GridGeometry>>(
+            &ident.child("geometry").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
+        let gesture = keyed::slot::<Gesture>(
+            &ident.child("gesture").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
 
         let mut panel = div()
             .id(ident.element_id())

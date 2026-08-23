@@ -229,21 +229,21 @@ impl Toolbar {
 
     /// Where the cut falls, which is nowhere when there is no menu to move
     /// anything into.
-    fn cut(&self, theme: &Theme, cx: &mut App) -> usize {
+    fn cut(&self, theme: &Theme, window: &Window, cx: &mut App) -> usize {
         if self.overflow_menu.is_none() {
             return usize::MAX;
         }
         if let Some(declared) = self.overflow_after {
             return declared;
         }
-        self.measured_cut(theme, cx).unwrap_or(usize::MAX)
+        self.measured_cut(theme, window, cx).unwrap_or(usize::MAX)
     }
 
     /// The largest number of items whose remembered widths fit the remembered
     /// width of the bar, or `None` while anything it needs is still unknown.
-    fn measured_cut(&self, theme: &Theme, cx: &mut App) -> Option<usize> {
+    fn measured_cut(&self, theme: &Theme, window: &Window, cx: &mut App) -> Option<usize> {
         let bar = f32::from(
-            measure::cell(&self.ident.semantic_id(), cx)
+            measure::cell(&self.ident.semantic_id(), window, cx)
                 .get()
                 .size
                 .width,
@@ -256,7 +256,7 @@ impl Toolbar {
         let mut widths = Vec::with_capacity(ids.len());
         for id in &ids {
             let width = f32::from(
-                measure::cell(&self.ident.child(id.as_ref()).semantic_id(), cx)
+                measure::cell(&self.ident.child(id.as_ref()).semantic_id(), window, cx)
                     .get()
                     .size
                     .width,
@@ -270,7 +270,7 @@ impl Toolbar {
         }
 
         let trigger = f32::from(
-            measure::cell(&self.ident.child("overflow").semantic_id(), cx)
+            measure::cell(&self.ident.child("overflow").semantic_id(), window, cx)
                 .get()
                 .size
                 .width,
@@ -339,14 +339,14 @@ impl Sizable for Toolbar {
 }
 
 impl RenderOnce for Toolbar {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let direction = cx.layout_direction();
         let total = self.item_count();
-        let cut = self.cut(&theme, cx);
+        let cut = self.cut(&theme, window, cx);
         let ident = self.ident.clone();
-        let bar_extent = measure::cell(&ident.semantic_id(), cx);
-        let trigger_extent = measure::cell(&ident.child("overflow").semantic_id(), cx);
+        let bar_extent = measure::cell(&ident.semantic_id(), window, cx);
+        let trigger_extent = measure::cell(&ident.child("overflow").semantic_id(), window, cx);
 
         let mut drawn: Vec<AnyElement> = Vec::new();
         let mut overflowed: Vec<MenuItem> = Vec::new();
@@ -369,8 +369,11 @@ impl RenderOnce for Toolbar {
                             // Each item records its own width under its
                             // business id, which is what the next frame's cut
                             // is computed from.
-                            let extent =
-                                measure::cell(&ident.child(item.id.as_ref()).semantic_id(), cx);
+                            let extent = measure::cell(
+                                &ident.child(item.id.as_ref()).semantic_id(),
+                                window,
+                                cx,
+                            );
                             inline.push(
                                 div()
                                     .flex()

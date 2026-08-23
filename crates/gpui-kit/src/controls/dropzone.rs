@@ -170,7 +170,7 @@ impl RenderOnce for Dropzone {
 
         // The zone has to know whether the pointer is inside it before any
         // drop event arrives, and only prepaint knows where it ended up.
-        let measured = measure::cell(&self.ident.semantic_id(), cx);
+        let measured = measure::cell(&self.ident.semantic_id(), window, cx);
         let over = measured.get().contains(&window.mouse_position());
         let carried = dnd::active(window, cx).map(|drag| drag.item);
         let handles = |item: &DragItem| self.kinds.contains(&item.kind);

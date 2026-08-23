@@ -253,7 +253,7 @@ impl Outline {
             .tip(ident.clone(), self.preview(mark, held, cx))
             .on_click(move |_, window, cx| {
                 if let Some(list) = &list {
-                    glide_to_row(list, row, cx);
+                    glide_to_row(list, row, window, cx);
                 }
                 if let Some(handler) = &handler {
                     handler(id.clone(), window, cx);
@@ -274,7 +274,7 @@ impl Outline {
 }
 
 impl RenderOnce for Outline {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         // One mark is not a map. Two is the least that can tell you which way
         // to go, so below that the outline draws nothing at all rather than
         // putting a control on screen that cannot change anything.
@@ -283,7 +283,10 @@ impl RenderOnce for Outline {
         }
 
         let theme = cx.theme().clone();
-        let viewed = self.over.as_ref().and_then(|list| viewed_rows(list, cx));
+        let viewed = self
+            .over
+            .as_ref()
+            .and_then(|list| viewed_rows(list, window, cx));
         let first_row = viewed.map(|viewed| viewed.first_row).unwrap_or(0);
         let height = viewed.map(|viewed| f32::from(viewed.height)).unwrap_or(0.0);
         let current = current_mark(&self.marks, first_row);

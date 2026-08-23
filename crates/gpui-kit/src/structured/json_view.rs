@@ -48,14 +48,13 @@
 //! for a second column; a key and a typed value drawn as one string would lose
 //! the distinction between the name of a thing and what it holds.
 
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::f32::consts::FRAC_PI_2;
 use std::ops::Range;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, Global, InteractiveElement, IntoElement, ListSizingBehavior, ParentElement,
+    AnyElement, App, InteractiveElement, IntoElement, ListSizingBehavior, ParentElement,
     RenderOnce, ScrollStrategy, SharedString, StatefulInteractiveElement, Styled, Transformation,
     UniformListScrollHandle, Window, div, prelude::FluentBuilder, px, radians, uniform_list,
 };
@@ -66,6 +65,7 @@ use unicode_segmentation::UnicodeSegmentation;
 
 use crate::display::icon::flips;
 use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
+use crate::foundation::window_state;
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -576,13 +576,13 @@ fn keystroke_move(
 }
 
 impl RenderOnce for JsonView {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let metrics = theme.control.get(self.size);
         let row_height = self.row_height.unwrap_or(metrics.height);
         let lines = Rc::new(self.lines(cx));
         let count = lines.len();
-        let scroll = scroll_handle(&self.ident, cx);
+        let scroll = scroll_handle(&self.ident, window, cx);
         let view = Rc::new(self);
 
         let owner = Rc::clone(&view);
@@ -838,19 +838,16 @@ fn row_element(
     row.semantic_in(cx, spec).into_any_element()
 }
 
-#[derive(Default)]
-struct ScrollHandles(RefCell<HashMap<SharedString, UniformListScrollHandle>>);
-
-impl Global for ScrollHandles {}
+type ScrollHandles = HashMap<SharedString, UniformListScrollHandle>;
 
 /// Where a view is scrolled, kept across the frames a `RenderOnce` builder is
 /// rebuilt in, keyed by the identity the caller gave it.
-fn scroll_handle(ident: &Ident, cx: &mut App) -> UniformListScrollHandle {
-    if !cx.has_global::<ScrollHandles>() {
-        cx.set_global(ScrollHandles::default());
-    }
-    let mut handles = cx.global::<ScrollHandles>().0.borrow_mut();
-    handles.entry(ident.semantic_id()).or_default().clone()
+fn scroll_handle(ident: &Ident, window: &Window, cx: &mut App) -> UniformListScrollHandle {
+    window_state::with(
+        window.window_handle().window_id(),
+        cx,
+        |handles: &mut ScrollHandles| handles.entry(ident.semantic_id()).or_default().clone(),
+    )
 }
 
 #[cfg(test)]

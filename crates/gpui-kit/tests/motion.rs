@@ -283,7 +283,7 @@ fn reorder_scene(
             if id == "b" && !second.get() {
                 continue;
             }
-            let handle = flip(format!("row.{id}"), cx);
+            let handle = flip(format!("row.{id}"), window, cx);
             column = column.child(
                 div()
                     .w(px(100.0))
@@ -320,7 +320,7 @@ fn a_moved_element_starts_offset_and_settles_back_to_zero(cx: &mut TestAppContex
         }
     });
 
-    let offset = harness.update(|_, cx| flip("row.a", cx).offset());
+    let offset = harness.update(|window, cx| flip("row.a", window, cx).offset());
     assert_eq!(
         offset.y,
         px(-20.0),
@@ -328,7 +328,7 @@ fn a_moved_element_starts_offset_and_settles_back_to_zero(cx: &mut TestAppContex
     );
 
     harness.advance(Duration::from_millis(500));
-    let offset = harness.update(|_, cx| flip("row.a", cx).offset());
+    let offset = harness.update(|window, cx| flip("row.a", window, cx).offset());
     assert_eq!(offset, gpui::Point::default(), "the slide settles at zero");
     assert_eq!(
         harness.bounds("row.a").expect("laid out").origin.y,
@@ -351,7 +351,7 @@ fn a_slide_does_not_move_a_sibling(cx: &mut TestAppContext) {
         }
     });
     assert!(
-        harness.update(|_, cx| flip("row.a", cx).is_animating()),
+        harness.update(|window, cx| flip("row.a", window, cx).is_animating()),
         "the sibling check is only meaningful while a slide is in flight"
     );
     assert_eq!(
@@ -376,7 +376,7 @@ fn reduced_motion_puts_a_moved_element_straight_into_its_new_place(cx: &mut Test
     });
 
     assert_eq!(
-        harness.update(|_, cx| flip("row.a", cx).offset()),
+        harness.update(|window, cx| flip("row.a", window, cx).offset()),
         gpui::Point::default(),
         "reduced motion never offsets the first frame"
     );
@@ -388,7 +388,7 @@ fn the_flip_global_drops_ids_that_stopped_rendering(cx: &mut TestAppContext) {
     let mut harness = reorder_scene(cx, Rc::new(Cell::new(false)), second.clone());
     assert!(
         harness
-            .update(|_, cx| tracked_ids(cx))
+            .update(|window, cx| tracked_ids(window, cx))
             .contains(&"row.b".into())
     );
 
@@ -402,7 +402,7 @@ fn the_flip_global_drops_ids_that_stopped_rendering(cx: &mut TestAppContext) {
     harness.frame();
     harness.frame();
 
-    let tracked = harness.update(|_, cx| tracked_ids(cx));
+    let tracked = harness.update(|window, cx| tracked_ids(window, cx));
     assert!(
         tracked.contains(&"row.a".into()),
         "a row still on screen keeps its state"
@@ -421,7 +421,7 @@ fn the_flip_global_drops_ids_that_stopped_rendering(cx: &mut TestAppContext) {
 #[gpui::test]
 fn a_position_flip_takes_no_layout_node_of_its_own(cx: &mut TestAppContext) {
     let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
-        let handle = flip("stretch.row", cx);
+        let handle = flip("stretch.row", window, cx);
         div()
             .flex()
             .flex_row()
@@ -442,7 +442,7 @@ fn a_position_flip_takes_no_layout_node_of_its_own(cx: &mut TestAppContext) {
         "a wrapper with a box of its own would have swallowed flex_1"
     );
     assert_eq!(
-        harness.update(|_, cx| flip("stretch.row", cx).size()),
+        harness.update(|window, cx| flip("stretch.row", window, cx).size()),
         None,
         "a position-only flip never measures a size"
     );
@@ -455,7 +455,7 @@ fn a_position_flip_takes_no_layout_node_of_its_own(cx: &mut TestAppContext) {
 /// with it.
 fn resize_scene(cx: &mut TestAppContext, grown: Rc<Cell<bool>>, pushed: Rc<Cell<bool>>) -> Harness {
     Harness::new(cx, gpui_kit::install, move |window, cx| {
-        let handle = flip("panel", cx);
+        let handle = flip("panel", window, cx);
         let (width, height) = if grown.get() {
             (200.0, 80.0)
         } else {
@@ -496,26 +496,26 @@ fn a_resized_element_starts_at_its_old_size_and_lands_on_the_new_one(cx: &mut Te
     let grown = Rc::new(Cell::new(false));
     let mut harness = resize_scene(cx, grown.clone(), Rc::new(Cell::new(false)));
     assert_eq!(
-        harness.update(|_, cx| flip("panel", cx).size()),
+        harness.update(|window, cx| flip("panel", window, cx).size()),
         Some(gpui::size(px(100.0), px(40.0))),
         "a first measurement is drawn at once"
     );
 
     grow(&mut harness, &grown);
     assert_eq!(
-        harness.update(|_, cx| flip("panel", cx).size()),
+        harness.update(|window, cx| flip("panel", window, cx).size()),
         Some(gpui::size(px(100.0), px(40.0))),
         "the box starts the frame at the size it had"
     );
     assert_eq!(
-        harness.update(|_, cx| flip("panel", cx).target_size()),
+        harness.update(|window, cx| flip("panel", window, cx).target_size()),
         Some(gpui::size(px(200.0), px(80.0))),
         "and it already knows where it is going"
     );
 
     harness.advance(Duration::from_millis(500));
     assert_eq!(
-        harness.update(|_, cx| flip("panel", cx).size()),
+        harness.update(|window, cx| flip("panel", window, cx).size()),
         Some(gpui::size(px(200.0), px(80.0))),
         "a resize lands exactly on the new size"
     );
@@ -559,7 +559,7 @@ fn reduced_motion_puts_a_resized_element_straight_at_its_new_size(cx: &mut TestA
 
     grow(&mut harness, &grown);
     assert_eq!(
-        harness.update(|_, cx| flip("panel", cx).size()),
+        harness.update(|window, cx| flip("panel", window, cx).size()),
         Some(gpui::size(px(200.0), px(80.0))),
         "reduced motion is at the new size on the first frame"
     );
@@ -587,23 +587,25 @@ fn an_element_that_moves_and_grows_does_both(cx: &mut TestAppContext) {
     });
 
     assert_eq!(
-        harness.update(|_, cx| flip("panel", cx).offset()).y,
+        harness
+            .update(|window, cx| flip("panel", window, cx).offset())
+            .y,
         px(-30.0),
         "the box is drawn where it used to be"
     );
     assert_eq!(
-        harness.update(|_, cx| flip("panel", cx).size()),
+        harness.update(|window, cx| flip("panel", window, cx).size()),
         Some(gpui::size(px(100.0), px(40.0))),
         "at the size it used to be"
     );
 
     harness.advance(Duration::from_millis(500));
     assert_eq!(
-        harness.update(|_, cx| flip("panel", cx).offset()),
+        harness.update(|window, cx| flip("panel", window, cx).offset()),
         gpui::Point::default()
     );
     assert_eq!(
-        harness.update(|_, cx| flip("panel", cx).size()),
+        harness.update(|window, cx| flip("panel", window, cx).size()),
         Some(gpui::size(px(200.0), px(80.0)))
     );
 }
@@ -616,7 +618,7 @@ fn an_element_that_moves_and_grows_does_both(cx: &mut TestAppContext) {
 /// itself from what it is handed.
 fn filling_scene(cx: &mut TestAppContext, wide: Rc<Cell<bool>>) -> Harness {
     Harness::new(cx, gpui_kit::install, move |window, cx| {
-        let handle = flip("filler", cx);
+        let handle = flip("filler", window, cx);
         div()
             .flex()
             .flex_col()
@@ -684,7 +686,7 @@ fn shared_scene(cx: &mut TestAppContext, stage: Rc<Cell<Stage>>) -> Harness {
     Harness::new(cx, gpui_kit::install, move |window, cx| {
         let mut root = div().flex().flex_col().items_start();
         if matches!(stage.get(), Stage::List | Stage::Both) {
-            let handle = shared_flip("item.7", cx);
+            let handle = shared_flip("item.7", window, cx);
             root = root.child(
                 div()
                     .w(px(80.0))
@@ -694,7 +696,7 @@ fn shared_scene(cx: &mut TestAppContext, stage: Rc<Cell<Stage>>) -> Harness {
             );
         }
         if matches!(stage.get(), Stage::Detail | Stage::Both) {
-            let handle = shared_flip("item.7", cx);
+            let handle = shared_flip("item.7", window, cx);
             root = root.child(div().w(px(10.0)).h(px(50.0))).child(
                 div()
                     .w(px(240.0))
@@ -720,29 +722,31 @@ fn a_shared_id_travels_from_the_tree_that_last_rendered_it(cx: &mut TestAppConte
     let showing = Rc::new(Cell::new(Stage::List));
     let mut harness = shared_scene(cx, showing.clone());
     assert_eq!(
-        harness.update(|_, cx| flip("item.7", cx).size()),
+        harness.update(|window, cx| flip("item.7", window, cx).size()),
         Some(gpui::size(px(80.0), px(20.0)))
     );
 
     stage(&mut harness, &showing, Stage::Detail);
     assert_eq!(
-        harness.update(|_, cx| flip("item.7", cx).offset()).y,
+        harness
+            .update(|window, cx| flip("item.7", window, cx).offset())
+            .y,
         px(-50.0),
         "the panel is drawn where the row was"
     );
     assert_eq!(
-        harness.update(|_, cx| flip("item.7", cx).size()),
+        harness.update(|window, cx| flip("item.7", window, cx).size()),
         Some(gpui::size(px(80.0), px(20.0))),
         "and at the size the row was"
     );
 
     harness.advance(Duration::from_millis(500));
     assert_eq!(
-        harness.update(|_, cx| flip("item.7", cx).offset()),
+        harness.update(|window, cx| flip("item.7", window, cx).offset()),
         gpui::Point::default()
     );
     assert_eq!(
-        harness.update(|_, cx| flip("item.7", cx).size()),
+        harness.update(|window, cx| flip("item.7", window, cx).size()),
         Some(gpui::size(px(240.0), px(120.0))),
         "and arrives as itself"
     );
@@ -755,18 +759,18 @@ fn two_trees_sharing_an_id_in_one_frame_refuse_to_animate(cx: &mut TestAppContex
 
     stage(&mut harness, &showing, Stage::Both);
     assert!(
-        harness.update(|_, cx| flip("item.7", cx).is_contended()),
+        harness.update(|window, cx| flip("item.7", window, cx).is_contended()),
         "two elements in one slot is a collision"
     );
     assert_eq!(
-        harness.update(|_, cx| flip("item.7", cx).offset()),
+        harness.update(|window, cx| flip("item.7", window, cx).offset()),
         gpui::Point::default(),
         "a contested id does not animate rather than oscillating"
     );
 
     harness.frame();
     assert_eq!(
-        harness.update(|_, cx| flip("item.7", cx).offset()),
+        harness.update(|window, cx| flip("item.7", window, cx).offset()),
         gpui::Point::default(),
         "and it keeps not animating while the collision lasts"
     );
@@ -774,11 +778,11 @@ fn two_trees_sharing_an_id_in_one_frame_refuse_to_animate(cx: &mut TestAppContex
     stage(&mut harness, &showing, Stage::Detail);
     harness.frame();
     assert!(
-        !harness.update(|_, cx| flip("item.7", cx).is_contended()),
+        !harness.update(|window, cx| flip("item.7", window, cx).is_contended()),
         "one renderer again is no longer a collision"
     );
     assert_eq!(
-        harness.update(|_, cx| flip("item.7", cx).offset()),
+        harness.update(|window, cx| flip("item.7", window, cx).offset()),
         gpui::Point::default(),
         "and it resumes from a rectangle nothing else was writing to"
     );
@@ -795,14 +799,16 @@ fn a_shared_id_survives_the_gap_between_two_trees(cx: &mut TestAppContext) {
     }
     assert!(
         harness
-            .update(|_, cx| tracked_ids(cx))
+            .update(|window, cx| tracked_ids(window, cx))
             .contains(&"item.7".into()),
         "a shared id outlives the frames in which neither tree renders it"
     );
 
     stage(&mut harness, &showing, Stage::Detail);
     assert_eq!(
-        harness.update(|_, cx| flip("item.7", cx).offset()).y,
+        harness
+            .update(|window, cx| flip("item.7", window, cx).offset())
+            .y,
         px(-50.0),
         "the panel still arrives from where the row was"
     );
@@ -818,12 +824,12 @@ fn a_shared_id_left_too_long_arrives_already_in_place(cx: &mut TestAppContext) {
 
     stage(&mut harness, &showing, Stage::Detail);
     assert_eq!(
-        harness.update(|_, cx| flip("item.7", cx).offset()),
+        harness.update(|window, cx| flip("item.7", window, cx).offset()),
         gpui::Point::default(),
         "a rectangle from long ago is not somewhere to fly in from"
     );
     assert_eq!(
-        harness.update(|_, cx| flip("item.7", cx).size()),
+        harness.update(|window, cx| flip("item.7", window, cx).size()),
         Some(gpui::size(px(240.0), px(120.0))),
         "the panel is simply its own size"
     );
@@ -844,7 +850,7 @@ fn a_shared_id_left_for_too_many_frames_arrives_already_in_place(cx: &mut TestAp
 
     stage(&mut harness, &showing, Stage::Detail);
     assert_eq!(
-        harness.update(|_, cx| flip("item.7", cx).offset()),
+        harness.update(|window, cx| flip("item.7", window, cx).offset()),
         gpui::Point::default(),
         "the clock never moved, so only the frames the gap took can have \
          ended the handoff"
@@ -992,7 +998,7 @@ fn reduced_motion_holds_one_frame_across_the_choice_controls(cx: &mut TestAppCon
     });
 
     assert_eq!(
-        harness.update(|_, cx| flip("form.view.selection", cx).offset()),
+        harness.update(|window, cx| flip("form.view.selection", window, cx).offset()),
         gpui::Point::default(),
         "the segmented background must be drawn where it belongs at once"
     );
@@ -1004,7 +1010,7 @@ fn a_segmented_background_slides_to_the_segment_that_was_chosen(cx: &mut TestApp
     let on = Rc::new(Cell::new(false));
     let mut harness = choice_scene(cx, on.clone());
     assert_eq!(
-        harness.update(|_, cx| flip("form.view.selection", cx).offset()),
+        harness.update(|window, cx| flip("form.view.selection", window, cx).offset()),
         gpui::Point::default()
     );
 
@@ -1016,7 +1022,7 @@ fn a_segmented_background_slides_to_the_segment_that_was_chosen(cx: &mut TestApp
         }
     });
 
-    let offset = harness.update(|_, cx| flip("form.view.selection", cx).offset());
+    let offset = harness.update(|window, cx| flip("form.view.selection", window, cx).offset());
     assert!(
         offset.x < px(0.0),
         "the background starts drawn under the segment that used to hold, got {offset:?}"
@@ -1024,7 +1030,7 @@ fn a_segmented_background_slides_to_the_segment_that_was_chosen(cx: &mut TestApp
 
     harness.advance(Duration::from_millis(600));
     assert_eq!(
-        harness.update(|_, cx| flip("form.view.selection", cx).offset()),
+        harness.update(|window, cx| flip("form.view.selection", window, cx).offset()),
         gpui::Point::default(),
         "the slide settles under the segment that holds now"
     );
@@ -1070,7 +1076,7 @@ fn a_tab_indicator_slides_to_the_tab_that_holds_now(cx: &mut TestAppContext) {
         }
     });
 
-    let offset = harness.update(|_, cx| flip("workspace.tabs.indicator", cx).offset());
+    let offset = harness.update(|window, cx| flip("workspace.tabs.indicator", window, cx).offset());
     assert!(
         offset.x < px(0.0),
         "the indicator starts drawn under the tab that used to hold, got {offset:?}"
@@ -1078,7 +1084,7 @@ fn a_tab_indicator_slides_to_the_tab_that_holds_now(cx: &mut TestAppContext) {
 
     harness.advance(Duration::from_millis(600));
     assert_eq!(
-        harness.update(|_, cx| flip("workspace.tabs.indicator", cx).offset()),
+        harness.update(|window, cx| flip("workspace.tabs.indicator", window, cx).offset()),
         gpui::Point::default()
     );
 }
@@ -1141,7 +1147,7 @@ fn reduced_motion_opens_a_section_at_its_full_height_at_once(cx: &mut TestAppCon
         "the body is at its full height on the frame it opens"
     );
     assert_eq!(
-        harness.update(|_, cx| flip("workspace.tabs.indicator", cx).offset()),
+        harness.update(|window, cx| flip("workspace.tabs.indicator", window, cx).offset()),
         gpui::Point::default()
     );
     holds_one_frame(&mut harness);
@@ -1482,7 +1488,7 @@ fn a_row_wave_is_capped_however_long_the_list_is(_cx: &mut TestAppContext) {
 fn shape_scene(cx: &mut TestAppContext, opened: Rc<Cell<bool>>) -> Harness {
     Harness::new(cx, gpui_kit::install, move |window, cx| {
         let theme = cx.theme().clone();
-        let handle = flip("detail", cx);
+        let handle = flip("detail", window, cx);
         let target = if opened.get() {
             Shape::surface(theme.colors.panel).radius(12.0)
         } else {
@@ -1505,7 +1511,7 @@ fn a_shape_change_is_travelled_rather_than_cut(cx: &mut TestAppContext) {
     let mut harness = shape_scene(cx, opened.clone());
 
     let closed = harness
-        .update(|_, cx| flip("detail", cx).drawn_shape())
+        .update(|window, cx| flip("detail", window, cx).drawn_shape())
         .expect("a shape was asked for");
     assert_eq!(closed.radius, px(0.0));
 
@@ -1521,7 +1527,7 @@ fn a_shape_change_is_travelled_rather_than_cut(cx: &mut TestAppContext) {
     harness.frame();
 
     let travelling = harness
-        .update(|_, cx| flip("detail", cx).drawn_shape())
+        .update(|window, cx| flip("detail", window, cx).drawn_shape())
         .expect("a shape in flight");
     assert!(
         travelling.radius > px(0.0) && travelling.radius < px(12.0),
@@ -1533,7 +1539,7 @@ fn a_shape_change_is_travelled_rather_than_cut(cx: &mut TestAppContext) {
     harness.frame();
     harness.frame();
     let settled = harness
-        .update(|_, cx| flip("detail", cx).drawn_shape())
+        .update(|window, cx| flip("detail", window, cx).drawn_shape())
         .expect("a settled shape");
     assert!(
         (f32::from(settled.radius) - 12.0).abs() < 0.5,
@@ -1550,7 +1556,7 @@ fn reduced_motion_is_at_the_new_shape_from_the_first_frame(cx: &mut TestAppConte
         move |window, cx| {
             cx.set_reduce_motion(true);
             let theme = cx.theme().clone();
-            let handle = flip("detail", cx);
+            let handle = flip("detail", window, cx);
             let target = if opened.get() {
                 Shape::surface(theme.colors.panel).radius(12.0)
             } else {
@@ -1576,7 +1582,7 @@ fn reduced_motion_is_at_the_new_shape_from_the_first_frame(cx: &mut TestAppConte
     harness.frame();
 
     let shape = harness
-        .update(|_, cx| flip("detail", cx).drawn_shape())
+        .update(|window, cx| flip("detail", window, cx).drawn_shape())
         .expect("a shape");
     assert_eq!(
         shape.radius,

@@ -395,7 +395,11 @@ impl RenderOnce for TransportBar {
 
         let total = self.duration.seconds();
         let fraction = self.fraction();
-        let scrubbing = keyed::slot::<Scrubbing>(&ident.child("scrubber").semantic_id(), cx);
+        let scrubbing = keyed::slot::<Scrubbing>(
+            &ident.child("scrubber").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
         let held = scrubbing.borrow().held;
         // A head the pointer is holding has to be exactly under the pointer,
         // so the spring is skipped for a move this bar caused itself.
@@ -410,7 +414,7 @@ impl RenderOnce for TransportBar {
             )
         });
 
-        let measured = measure::cell(&ident.child("scrubber").semantic_id(), cx);
+        let measured = measure::cell(&ident.child("scrubber").semantic_id(), window, cx);
         let scrubbable = actionable && total.is_some();
 
         let mut track = div()

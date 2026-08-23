@@ -472,7 +472,11 @@ impl RenderOnce for CodeView {
                 .iter()
                 .all(|line| line.spans.is_empty() && !line.text.contains('\n'))
         {
-            let cache = keyed::slot::<Cache>(&self.ident.child("colour").semantic_id(), cx);
+            let cache = keyed::slot::<Cache>(
+                &self.ident.child("colour").semantic_id(),
+                window.window_handle().window_id(),
+                cx,
+            );
             let coloured = cache.borrow_mut().lines(known, &source);
             for (line, spans) in self.lines.iter_mut().zip(coloured.iter()) {
                 line.spans = spans.clone();

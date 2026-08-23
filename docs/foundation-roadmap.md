@@ -53,7 +53,7 @@ phase does not paper over an unmet earlier primitive.
 Acceptance: generated API and site catalogs agree with source; `xtask gate`,
 macOS headless checks, and Windows WARP checks pass on the same commit.
 
-## Phase 1: one semantic context per window
+## Phase 1: one runtime context per window
 
 Replace the application-global frame with a window-owned context without
 changing 400 component call sites into plugin-aware code.
@@ -64,6 +64,11 @@ changing 400 component call sites into plugin-aware code.
 - `begin_frame`, generation, snapshot, duplicate diagnostics, action routing,
   and unmount cleanup are per window. Rendering one window cannot clear or
   collide with another.
+- Kit state retained by `RenderOnce` builders — measurements, scroll and list
+  handles, edit memory, modal stacks, follow state, motion caches, effect
+  replay/budgets, and toast routing — is keyed by the same `WindowId` and is
+  removed when that window closes. A local component id is never treated as
+  application-global identity.
 - Add validated segment types for semantic ids. Plugin ids, mount ids, and
   local business keys are qualified by constructors, never scattered string
   concatenation. Prefix checks are segment-aware and plugin parents must stay
@@ -74,7 +79,8 @@ changing 400 component call sites into plugin-aware code.
   types remain outside Kit components.
 
 Acceptance: two simultaneously rendered test windows may publish identical
-local component ids without sharing generations or nodes; two mounts of one
+local component ids without sharing generations, nodes, transient visual
+state, modal order, effect replay, or toast destinations; two mounts of one
 plugin remain distinct; invalid segments, parent escapes, duplicate nodes, and
 actions after unmount are refused and tested.
 

@@ -177,7 +177,16 @@ impl RenderOnce for ColorPicker {
         let (hue, sat, val) = hsl_to_hsv(self.value);
         let report = self.on_change.clone().filter(|_| !self.disabled);
 
-        let board = saturation_board(&self.ident, self.value, hue, sat, val, report.clone(), cx);
+        let board = saturation_board(
+            &self.ident,
+            self.value,
+            hue,
+            sat,
+            val,
+            report.clone(),
+            window,
+            cx,
+        );
         let hue_track = channel_track(
             &self.ident.child("hue"),
             cx.strings().text(StringKey::ColorHue),
@@ -194,6 +203,7 @@ impl RenderOnce for ColorPicker {
                 })
             },
             &theme,
+            window,
             cx,
         );
         let alpha_track = self.alpha.then(|| {
@@ -217,6 +227,7 @@ impl RenderOnce for ColorPicker {
                     })
                 },
                 &theme,
+                window,
                 cx,
             )
         });
@@ -285,6 +296,7 @@ impl RenderOnce for ColorPicker {
 
 type ChannelHandler = Rc<dyn Fn(f32, &mut Window, &mut App)>;
 
+#[allow(clippy::too_many_arguments)]
 fn saturation_board(
     ident: &Ident,
     value: Hsla,
@@ -292,11 +304,12 @@ fn saturation_board(
     sat: f32,
     val: f32,
     report: Option<ChangeHandler>,
+    window: &Window,
     cx: &mut App,
 ) -> gpui::AnyElement {
     let theme = cx.theme().clone();
     let board = ident.child("board");
-    let measured = measure::cell(&board.semantic_id(), cx);
+    let measured = measure::cell(&board.semantic_id(), window, cx);
     let label = cx.strings().text(StringKey::ColorSaturation);
     let mut surface = div()
         .on_children_prepainted({
@@ -382,6 +395,7 @@ fn saturation_board(
         .into_any_element()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn channel_track(
     ident: &Ident,
     label: SharedString,
@@ -389,9 +403,10 @@ fn channel_track(
     fill: gpui::Background,
     report: Option<ChannelHandler>,
     theme: &gpui_kit_theme::Theme,
+    window: &Window,
     cx: &mut App,
 ) -> gpui::AnyElement {
-    let measured = measure::cell(&ident.semantic_id(), cx);
+    let measured = measure::cell(&ident.semantic_id(), window, cx);
     let mut track = div()
         .on_children_prepainted({
             let measured = Rc::clone(&measured);

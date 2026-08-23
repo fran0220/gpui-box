@@ -345,21 +345,24 @@ pub(super) struct SceneToasts {
 
 impl Global for SceneToasts {}
 
-pub(super) fn toast(_window: &mut Window, cx: &mut App) -> AnyElement {
+pub(super) fn toast(window: &mut Window, cx: &mut App) -> AnyElement {
     if !cx.has_global::<SceneToasts>() {
-        let layer = cx.new(|cx| ToastLayer::new(cx).capacity(4));
+        let layer = cx.new(|cx| ToastLayer::new(window, cx).capacity(4));
         cx.set_global(SceneToasts { layer });
         toast_push(
+            window,
             cx,
             Toast::new("scene.toast.saved", "Theme exported to disk").tone(Tone::Success),
         );
         toast_push(
+            window,
             cx,
             Toast::new("scene.toast.stale", "Refreshing the model catalog failed")
                 .tone(Tone::Warning)
                 .detail("The last verified catalog is still shown."),
         );
         toast_push(
+            window,
             cx,
             // A refusal, so the offer is the thing that could change the
             // answer. Retrying an unapproved call only gets refused again.
@@ -375,6 +378,7 @@ pub(super) fn toast(_window: &mut Window, cx: &mut App) -> AnyElement {
         // together and the difference between them is a picture rather than a
         // claim.
         toast_push(
+            window,
             cx,
             Toast::new("scene.toast.failed", "Publishing this run failed")
                 .tone(Tone::Danger)

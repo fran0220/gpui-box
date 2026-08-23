@@ -18,15 +18,15 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use gpui::{
-    App, AppContext, Entity, Focusable, Global, InteractiveElement, IntoElement, ParentElement,
-    RenderOnce, SharedString, StatefulInteractiveElement, Styled, Window, div,
-    prelude::FluentBuilder, px,
+    App, AppContext, Entity, Focusable, InteractiveElement, IntoElement, ParentElement, RenderOnce,
+    SharedString, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TypeScale};
 
 use crate::controls::input::{self, TextInput};
 use crate::controls::textarea::{self, TextArea};
+use crate::foundation::window_state;
 use crate::foundation::{
     Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text as foundation_text,
 };
@@ -74,17 +74,14 @@ struct Memory {
     editor: RefCell<Option<Editor>>,
 }
 
-#[derive(Default)]
-struct Memories(RefCell<HashMap<SharedString, Rc<Memory>>>);
+type Memories = HashMap<SharedString, Rc<Memory>>;
 
-impl Global for Memories {}
-
-fn memory(id: &SharedString, cx: &mut App) -> Rc<Memory> {
-    if !cx.has_global::<Memories>() {
-        cx.set_global(Memories::default());
-    }
-    let mut memories = cx.global::<Memories>().0.borrow_mut();
-    Rc::clone(memories.entry(id.clone()).or_default())
+fn memory(id: &SharedString, window: &Window, cx: &mut App) -> Rc<Memory> {
+    window_state::with(
+        window.window_handle().window_id(),
+        cx,
+        |memories: &mut Memories| Rc::clone(memories.entry(id.clone()).or_default()),
+    )
 }
 
 /// Text that a click or enter turns into a field.
@@ -257,7 +254,7 @@ impl RenderOnce for InlineEdit {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let metrics = theme.control.get(self.size);
-        let state = memory(&self.ident.semantic_id(), cx);
+        let state = memory(&self.ident.semantic_id(), window, cx);
         let editing = self.editing && !self.disabled;
 
         if !editing {

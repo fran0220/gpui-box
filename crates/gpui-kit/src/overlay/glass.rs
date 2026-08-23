@@ -350,8 +350,9 @@ impl RenderOnce for Glass {
 
         let id = self.ident.semantic_id();
         let interactive = self.track_pointer || self.pressable || self.adaptive;
-        let state = interactive.then(|| keyed::slot::<GlassState>(&id, cx));
-        let measured = measure::cell(&id, cx);
+        let state = interactive
+            .then(|| keyed::slot::<GlassState>(&id, window.window_handle().window_id(), cx));
+        let measured = measure::cell(&id, window, cx);
         let bounds = measured.get();
 
         // The pointer carries the light: the angle from the surface's centre

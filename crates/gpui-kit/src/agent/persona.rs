@@ -293,7 +293,11 @@ fn voice_elapsed(
         return Duration::ZERO;
     }
 
-    let slot = keyed::slot::<VoiceClock>(&ident.child("clock").semantic_id(), cx);
+    let slot = keyed::slot::<VoiceClock>(
+        &ident.child("clock").semantic_id(),
+        window.window_handle().window_id(),
+        cx,
+    );
     let now = cx.background_executor().now();
     let elapsed = {
         let mut clock = slot.borrow_mut();

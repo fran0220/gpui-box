@@ -43,10 +43,10 @@ fn a_static_status_is_not_a_live_region(cx: &mut TestAppContext) {
 fn scene(cx: &mut TestAppContext, capacity: usize) -> (Harness, Entity<ToastLayer>) {
     let slot: Rc<RefCell<Option<Entity<ToastLayer>>>> = Rc::new(RefCell::new(None));
     let build = slot.clone();
-    let mut harness = Harness::new(cx, gpui_kit::install, move |_window, cx| {
+    let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
         let layer = build
             .borrow_mut()
-            .get_or_insert_with(|| cx.new(|cx| ToastLayer::new(cx).capacity(capacity)))
+            .get_or_insert_with(|| cx.new(|cx| ToastLayer::new(window, cx).capacity(capacity)))
             .clone();
         div().size_full().child(layer).into_any_element()
     });
@@ -56,7 +56,7 @@ fn scene(cx: &mut TestAppContext, capacity: usize) -> (Harness, Entity<ToastLaye
 }
 
 fn push(harness: &mut Harness, toast: Toast) -> bool {
-    harness.update(move |_, cx| toast::push(cx, toast))
+    harness.update(move |window, cx| toast::push(window, cx, toast))
 }
 
 fn phase(harness: &mut Harness, layer: &Entity<ToastLayer>, ident: &str) -> Option<Phase> {
@@ -201,8 +201,9 @@ fn a_push_with_no_layer_mounted_reports_that_it_went_nowhere(cx: &mut TestAppCon
     });
     harness.snapshot();
 
-    let delivered = harness.update(|_, cx| {
+    let delivered = harness.update(|window, cx| {
         toast::push(
+            window,
             cx,
             Toast::new("run.published", "The run was published").tone(Tone::Success),
         )
@@ -363,7 +364,7 @@ fn reduced_motion_shows_and_removes_a_toast_in_one_frame(cx: &mut TestAppContext
         Some(Phase::Present)
     );
 
-    harness.update(|_, cx| toast::dismiss(cx, "run.published"));
+    harness.update(|window, cx| toast::dismiss(window, cx, "run.published"));
     harness.advance(Duration::ZERO);
     assert!(harness.node("run.published").is_none());
     let tree = harness.accessibility_tree();

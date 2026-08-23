@@ -31,9 +31,14 @@ pub(super) fn split_pane(_window: &mut Window, cx: &mut App) -> AnyElement {
 
 /// The same region, already scrolled, so the shadow that says there is content
 /// above the fold is in a captured image rather than only in a test.
-pub(super) fn scroll_shadow(_window: &mut Window, cx: &mut App) -> AnyElement {
+pub(super) fn scroll_shadow(window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
-    crate::layout::scroll_to("scene.scroll.scrolled", gpui::point(px(0.0), px(120.0)), cx);
+    crate::layout::scroll_to(
+        "scene.scroll.scrolled",
+        gpui::point(px(0.0), px(120.0)),
+        window,
+        cx,
+    );
     stack(&theme)
         .w(px(480.0))
         .child(
@@ -89,9 +94,14 @@ pub(super) fn scroll_area(_window: &mut Window, cx: &mut App) -> AnyElement {
 /// A region scrolled off both ends, so the fade that says there is more in
 /// either direction is in a captured image, beside one that hides nothing and
 /// therefore fades at neither edge.
-pub(super) fn scroll_fade(_window: &mut Window, cx: &mut App) -> AnyElement {
+pub(super) fn scroll_fade(window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
-    crate::layout::scroll_to("scene.fade.output", gpui::point(px(0.0), px(120.0)), cx);
+    crate::layout::scroll_to(
+        "scene.fade.output",
+        gpui::point(px(0.0), px(120.0)),
+        window,
+        cx,
+    );
     stack(&theme)
         .w(px(480.0))
         .child(caption(&theme, "Scrolled: content runs past both ends"))

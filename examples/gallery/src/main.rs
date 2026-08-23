@@ -992,8 +992,9 @@ fn toast_buttons(theme: &Theme) -> gpui::Div {
             Button::new("gallery.toast.saved")
                 .label("Report a success")
                 .secondary()
-                .on_click(|_, cx| {
+                .on_click(|window, cx| {
                     toast::push(
+                        window,
                         cx,
                         Toast::new("gallery.toast.saved.note", "Theme exported to disk")
                             .tone(Tone::Success),
@@ -1004,8 +1005,9 @@ fn toast_buttons(theme: &Theme) -> gpui::Div {
             Button::new("gallery.toast.stale")
                 .label("Report a stale refresh")
                 .secondary()
-                .on_click(|_, cx| {
+                .on_click(|window, cx| {
                     toast::push(
+                        window,
                         cx,
                         Toast::new(
                             "gallery.toast.stale.note",
@@ -1020,8 +1022,9 @@ fn toast_buttons(theme: &Theme) -> gpui::Div {
             Button::new("gallery.toast.refused")
                 .label("Report a refusal")
                 .danger()
-                .on_click(|_, cx| {
+                .on_click(|window, cx| {
                     toast::push(
+                        window,
                         cx,
                         Toast::new(
                             "gallery.toast.refused.note",
@@ -1037,8 +1040,9 @@ fn toast_buttons(theme: &Theme) -> gpui::Div {
             Button::new("gallery.toast.pinned")
                 .label("Report something that stays")
                 .ghost()
-                .on_click(|_, cx| {
+                .on_click(|window, cx| {
                     toast::push(
+                        window,
                         cx,
                         Toast::new("gallery.toast.pinned.note", "Indexing is still running")
                             .tone(Tone::Info)
@@ -1051,7 +1055,7 @@ fn toast_buttons(theme: &Theme) -> gpui::Div {
             Button::new("gallery.toast.clear")
                 .label("Clear")
                 .ghost()
-                .on_click(|_, cx| toast::clear(cx)),
+                .on_click(|window, cx| toast::clear(window, cx)),
         )
 }
 
@@ -1316,7 +1320,7 @@ fn motion_section(theme: &Theme, window: &mut Window, cx: &mut App) -> gpui::Any
     let mut queue = Card::new().id("gallery.motion.queue");
     for (index, (id, label)) in steps.iter().enumerate() {
         let ident = format!("gallery.motion.{id}");
-        let handle = flip(ident.clone(), cx);
+        let handle = flip(ident.clone(), window, cx);
         queue = queue.child(
             ListRow::new()
                 .id(ident)
@@ -1952,7 +1956,7 @@ fn open_gallery(
                         .cancel_label("Keep")
                         .confirm_label("Delete")
                 }),
-                toasts: cx.new(ToastLayer::new),
+                toasts: cx.new(|cx| ToastLayer::new(window, cx)),
                 filters: cx.new(|cx| {
                     Popover::new("gallery.filters", window, cx)
                         .trigger("Filters")
@@ -2605,7 +2609,7 @@ fn conversation_section(theme: &Theme, cx: &mut App) -> gpui::AnyElement {
             MessageList::new("gallery.thread", messages.clone())
                 .group_consecutive(true)
                 .body_lines(2)
-                .on_retry(|id, _, cx| {
+                .on_retry(|id, window, cx| {
                     // The window applies the retry; the list only asked for it.
                     cx.update_global::<GalleryThread, ()>(|thread, _| {
                         for message in &mut thread.messages {
@@ -2615,13 +2619,14 @@ fn conversation_section(theme: &Theme, cx: &mut App) -> gpui::AnyElement {
                         }
                     });
                     toast::push(
+                        window,
                         cx,
                         Toast::new("gallery.thread.retried", "Asked the host to try again")
                             .tone(Tone::Info),
                     );
                     cx.refresh_windows();
                 })
-                .on_markdown(|_, event, _, cx| report_markdown(event, cx)),
+                .on_markdown(|_, event, window, cx| report_markdown(event, window, cx)),
         )
         .child(recipes::footnote(
             theme,
@@ -2662,7 +2667,7 @@ fn conversation_section(theme: &Theme, cx: &mut App) -> gpui::AnyElement {
                             .into_any_element(),
                     )
                 })
-                .on_event(|event, _, cx| report_markdown(event, cx)),
+                .on_event(|event, window, cx| report_markdown(event, window, cx)),
         )
         .child(recipes::footnote(
             theme,
@@ -2674,7 +2679,7 @@ fn conversation_section(theme: &Theme, cx: &mut App) -> gpui::AnyElement {
         .child(
             Markdown::new("gallery.markdown.short", GALLERY_DOCUMENT)
                 .max_lines(4)
-                .on_event(|event, _, cx| report_markdown(event, cx)),
+                .on_event(|event, window, cx| report_markdown(event, window, cx)),
         )
         .child(recipes::footnote(
             theme,
@@ -2685,7 +2690,7 @@ fn conversation_section(theme: &Theme, cx: &mut App) -> gpui::AnyElement {
 }
 
 /// What the window does with a report from a rendered document.
-fn report_markdown(event: &MarkdownEvent, cx: &mut App) {
+fn report_markdown(event: &MarkdownEvent, window: &Window, cx: &mut App) {
     let note = match event {
         MarkdownEvent::LinkClicked { href } => {
             format!("The document asked to open {href}")
@@ -2695,6 +2700,7 @@ fn report_markdown(event: &MarkdownEvent, cx: &mut App) {
         MarkdownEvent::MoreRequested { lines } => format!("{lines} more lines were asked for"),
     };
     toast::push(
+        window,
         cx,
         Toast::new("gallery.markdown.note", SharedString::from(note)).tone(Tone::Info),
     );
@@ -2799,7 +2805,7 @@ fn media_section(theme: &Theme, cx: &mut App) -> gpui::AnyElement {
                                     .into_any_element(),
                             )
                         })
-                        .on_event(|event, _, cx| {
+                        .on_event(|event, window, cx| {
                             match event {
                                 ImageViewerEvent::FitChanged(fit) => {
                                     let fit = *fit;
@@ -2815,6 +2821,7 @@ fn media_section(theme: &Theme, cx: &mut App) -> gpui::AnyElement {
                                 }
                                 ImageViewerEvent::ImageRequested(request) => {
                                     toast::push(
+                                        window,
                                         cx,
                                         Toast::new(
                                             "gallery.image.requested",

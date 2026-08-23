@@ -16,8 +16,10 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use gpui::{App, Global, SharedString};
+use gpui::{App, SharedString, WindowId};
 use gpui_kit_semantics::SemanticCoordinator;
+
+use crate::foundation::window_state;
 
 /// How many frames an untouched entry survives.
 ///
@@ -34,22 +36,24 @@ struct Entry<T> {
     value: Rc<RefCell<T>>,
 }
 
-struct Keyed<T>(RefCell<HashMap<SharedString, Entry<T>>>);
+struct Keyed<T>(HashMap<SharedString, Entry<T>>);
 
 impl<T> Default for Keyed<T> {
     fn default() -> Self {
-        Self(RefCell::new(HashMap::new()))
+        Self(HashMap::new())
     }
 }
-
-impl<T: 'static> Global for Keyed<T> {}
 
 /// The cell holding `id`'s state, creating it on first use.
 ///
 /// Every call also drops the entries whose ids have stopped rendering, so the
 /// global tracks the elements on screen rather than every element ever shown.
-pub(crate) fn slot<T: Default + 'static>(id: &SharedString, cx: &mut App) -> Rc<RefCell<T>> {
-    slot_retained(id, GRACE, cx)
+pub(crate) fn slot<T: Default + 'static>(
+    id: &SharedString,
+    window_id: WindowId,
+    cx: &mut App,
+) -> Rc<RefCell<T>> {
+    slot_retained(id, GRACE, window_id, cx)
 }
 
 /// The same, for an id that has to survive a gap in which nothing renders it.
@@ -60,22 +64,23 @@ pub(crate) fn slot<T: Default + 'static>(id: &SharedString, cx: &mut App) -> Rc<
 pub(crate) fn slot_retained<T: Default + 'static>(
     id: &SharedString,
     grace: u64,
+    window_id: WindowId,
     cx: &mut App,
 ) -> Rc<RefCell<T>> {
-    let frame = frame(cx);
-    if !cx.has_global::<Keyed<T>>() {
-        cx.set_global(Keyed::<T>::default());
-    }
-    let mut entries = cx.global::<Keyed<T>>().0.borrow_mut();
-    entries.retain(|_, entry| frame.saturating_sub(entry.seen) < entry.grace);
-    let entry = entries.entry(id.clone()).or_insert_with(|| Entry {
-        seen: frame,
-        grace,
-        value: Rc::new(RefCell::new(T::default())),
-    });
-    entry.seen = frame;
-    entry.grace = grace;
-    Rc::clone(&entry.value)
+    let frame = frame(window_id, cx);
+    window_state::with(window_id, cx, |keyed: &mut Keyed<T>| {
+        keyed
+            .0
+            .retain(|_, entry| frame.saturating_sub(entry.seen) < entry.grace);
+        let entry = keyed.0.entry(id.clone()).or_insert_with(|| Entry {
+            seen: frame,
+            grace,
+            value: Rc::new(RefCell::new(T::default())),
+        });
+        entry.seen = frame;
+        entry.grace = grace;
+        Rc::clone(&entry.value)
+    })
 }
 
 /// One container's worth of per-entry state.
@@ -86,15 +91,13 @@ struct Scope<T> {
     entries: HashMap<SharedString, Rc<RefCell<T>>>,
 }
 
-struct Scoped<T>(RefCell<HashMap<SharedString, Scope<T>>>);
+struct Scoped<T>(HashMap<SharedString, Scope<T>>);
 
 impl<T> Default for Scoped<T> {
     fn default() -> Self {
-        Self(RefCell::new(HashMap::new()))
+        Self(HashMap::new())
     }
 }
-
-impl<T: 'static> Global for Scoped<T> {}
 
 /// State belonging to one entry of a container, which outlives the element.
 ///
@@ -115,25 +118,24 @@ impl<T: 'static> Global for Scoped<T> {}
 pub(crate) fn scoped_slot<T: Default + 'static>(
     container: &SharedString,
     entry: &SharedString,
+    window_id: WindowId,
     cx: &mut App,
 ) -> Rc<RefCell<T>> {
-    let frame = frame(cx);
-    if !cx.has_global::<Scoped<T>>() {
-        cx.set_global(Scoped::<T>::default());
-    }
-    let mut scopes = cx.global::<Scoped<T>>().0.borrow_mut();
-    prune(&mut scopes, frame);
-    let scope = scopes.entry(container.clone()).or_insert_with(|| Scope {
-        seen: frame,
-        entries: HashMap::new(),
-    });
-    scope.seen = frame;
-    Rc::clone(
-        scope
-            .entries
-            .entry(entry.clone())
-            .or_insert_with(|| Rc::new(RefCell::new(T::default()))),
-    )
+    let frame = frame(window_id, cx);
+    window_state::with(window_id, cx, |scoped: &mut Scoped<T>| {
+        prune(&mut scoped.0, frame);
+        let scope = scoped.0.entry(container.clone()).or_insert_with(|| Scope {
+            seen: frame,
+            entries: HashMap::new(),
+        });
+        scope.seen = frame;
+        Rc::clone(
+            scope
+                .entries
+                .entry(entry.clone())
+                .or_insert_with(|| Rc::new(RefCell::new(T::default()))),
+        )
+    })
 }
 
 /// Declares which entries of `container` still exist.
@@ -147,20 +149,19 @@ pub(crate) fn scoped_slot<T: Default + 'static>(
 pub(crate) fn retain_scope<T: 'static>(
     container: &SharedString,
     live: &[SharedString],
+    window_id: WindowId,
     cx: &mut App,
 ) {
-    let frame = frame(cx);
-    if !cx.has_global::<Scoped<T>>() {
-        cx.set_global(Scoped::<T>::default());
-    }
-    let mut scopes = cx.global::<Scoped<T>>().0.borrow_mut();
-    prune(&mut scopes, frame);
-    let scope = scopes.entry(container.clone()).or_insert_with(|| Scope {
-        seen: frame,
-        entries: HashMap::new(),
+    let frame = frame(window_id, cx);
+    window_state::with(window_id, cx, |scoped: &mut Scoped<T>| {
+        prune(&mut scoped.0, frame);
+        let scope = scoped.0.entry(container.clone()).or_insert_with(|| Scope {
+            seen: frame,
+            entries: HashMap::new(),
+        });
+        scope.seen = frame;
+        scope.entries.retain(|id, _| live.contains(id));
     });
-    scope.seen = frame;
-    scope.entries.retain(|id, _| live.contains(id));
 }
 
 /// Drops the scopes whose containers have stopped rendering.
@@ -182,11 +183,13 @@ fn prune<T>(scopes: &mut HashMap<SharedString, Scope<T>>, frame: u64) {
 pub(crate) fn scoped_peek<T: 'static>(
     container: &SharedString,
     entry: &SharedString,
+    window_id: WindowId,
     cx: &App,
 ) -> Option<Rc<RefCell<T>>> {
-    let scoped = cx.try_global::<Scoped<T>>()?;
-    let scopes = scoped.0.borrow();
-    scopes.get(container)?.entries.get(entry).map(Rc::clone)
+    window_state::read(window_id, cx, |scoped: &Scoped<T>| {
+        scoped.0.get(container)?.entries.get(entry).map(Rc::clone)
+    })
+    .flatten()
 }
 
 /// The entries currently held for one container.
@@ -195,37 +198,40 @@ pub(crate) fn scoped_peek<T: 'static>(
 /// outside, so it is asserted on directly rather than inferred from what an
 /// element happened to draw.
 #[cfg(test)]
-pub(crate) fn scoped_ids<T: 'static>(container: &SharedString, cx: &App) -> Vec<SharedString> {
-    let Some(scoped) = cx.try_global::<Scoped<T>>() else {
-        return Vec::new();
-    };
-    let scopes = scoped.0.borrow();
-    let Some(scope) = scopes.get(container) else {
-        return Vec::new();
-    };
-    let mut ids: Vec<SharedString> = scope.entries.keys().cloned().collect();
-    ids.sort();
-    ids
+pub(crate) fn scoped_ids<T: 'static>(
+    container: &SharedString,
+    window_id: WindowId,
+    cx: &App,
+) -> Vec<SharedString> {
+    window_state::read(window_id, cx, |scoped: &Scoped<T>| {
+        let Some(scope) = scoped.0.get(container) else {
+            return Vec::new();
+        };
+        let mut ids: Vec<SharedString> = scope.entries.keys().cloned().collect();
+        ids.sort();
+        ids
+    })
+    .unwrap_or_default()
 }
 
 /// The ids currently retained, for diagnostics and tests.
-pub(crate) fn ids<T: 'static>(cx: &App) -> Vec<SharedString> {
-    let Some(keyed) = cx.try_global::<Keyed<T>>() else {
-        return Vec::new();
-    };
-    let mut ids: Vec<SharedString> = keyed.0.borrow().keys().cloned().collect();
-    ids.sort();
-    ids
+pub(crate) fn ids<T: 'static>(window_id: WindowId, cx: &App) -> Vec<SharedString> {
+    window_state::read(window_id, cx, |keyed: &Keyed<T>| {
+        let mut ids: Vec<SharedString> = keyed.0.keys().cloned().collect();
+        ids.sort();
+        ids
+    })
+    .unwrap_or_default()
 }
 
-fn frame(cx: &App) -> u64 {
-    frame_counter(cx).unwrap_or_default()
+fn frame(window_id: WindowId, cx: &App) -> u64 {
+    frame_counter(window_id, cx).unwrap_or_default()
 }
 
 /// The current frame, or `None` where the host installed no semantic registry
 /// and there is therefore no frame boundary to count.
-pub(crate) fn frame_counter(cx: &App) -> Option<u64> {
-    SemanticCoordinator::try_global(cx).map(|coordinator| coordinator.frame_clock())
+pub(crate) fn frame_counter(window_id: WindowId, cx: &App) -> Option<u64> {
+    SemanticCoordinator::try_global(cx).and_then(|coordinator| coordinator.generation(window_id))
 }
 
 #[cfg(test)]
@@ -247,6 +253,10 @@ mod tests {
         SharedString::from(id.to_string())
     }
 
+    fn window_id() -> WindowId {
+        WindowId::from(1)
+    }
+
     /// A host that counts frames, which is what gives this state a clock.
     fn install(cx: &mut App) {
         gpui_kit_semantics::install(cx);
@@ -254,17 +264,19 @@ mod tests {
 
     /// Ends the frame the way a host does at the top of a root render.
     fn next_frame(cx: &mut App) {
-        SemanticCoordinator::global(cx).begin_window_frame(WindowId::from(1));
+        SemanticCoordinator::global(cx).begin_window_frame(window_id());
     }
 
     fn mark(container: &SharedString, id: &str, cx: &mut App) {
-        scoped_slot::<Settled>(container, &row(id), cx)
+        scoped_slot::<Settled>(container, &row(id), window_id(), cx)
             .borrow_mut()
             .0 = true;
     }
 
     fn settled(container: &SharedString, id: &str, cx: &mut App) -> bool {
-        scoped_slot::<Settled>(container, &row(id), cx).borrow().0
+        scoped_slot::<Settled>(container, &row(id), window_id(), cx)
+            .borrow()
+            .0
     }
 
     #[gpui::test]
@@ -274,7 +286,7 @@ mod tests {
             let container = container();
             let live = [row("a"), row("b"), row("c")];
 
-            retain_scope::<Settled>(&container, &live, cx);
+            retain_scope::<Settled>(&container, &live, window_id(), cx);
             mark(&container, "b", cx);
             assert!(settled(&container, "b", cx));
 
@@ -283,7 +295,7 @@ mod tests {
             // still holds the row.
             for _ in 0..10 {
                 next_frame(cx);
-                retain_scope::<Settled>(&container, &live, cx);
+                retain_scope::<Settled>(&container, &live, window_id(), cx);
             }
 
             assert!(
@@ -298,14 +310,17 @@ mod tests {
         cx.update(|cx| {
             install(cx);
             let container = container();
-            retain_scope::<Settled>(&container, &[row("a"), row("b")], cx);
+            retain_scope::<Settled>(&container, &[row("a"), row("b")], window_id(), cx);
             mark(&container, "a", cx);
             mark(&container, "b", cx);
 
             next_frame(cx);
-            retain_scope::<Settled>(&container, &[row("a")], cx);
+            retain_scope::<Settled>(&container, &[row("a")], window_id(), cx);
 
-            assert_eq!(scoped_ids::<Settled>(&container, cx), vec![row("a")]);
+            assert_eq!(
+                scoped_ids::<Settled>(&container, window_id(), cx),
+                vec![row("a")]
+            );
             assert!(settled(&container, "a", cx), "the kept row is untouched");
         });
     }
@@ -315,7 +330,7 @@ mod tests {
         cx.update(|cx| {
             install(cx);
             let container = container();
-            retain_scope::<Settled>(&container, &[row("a")], cx);
+            retain_scope::<Settled>(&container, &[row("a")], window_id(), cx);
             mark(&container, "a", cx);
 
             // The surface is unmounted: a session was switched away from, a
@@ -324,10 +339,10 @@ mod tests {
                 next_frame(cx);
             }
             // Any call prunes, so ask about a different container.
-            retain_scope::<Settled>(&SharedString::new_static("elsewhere"), &[], cx);
+            retain_scope::<Settled>(&SharedString::new_static("elsewhere"), &[], window_id(), cx);
 
             assert!(
-                scoped_ids::<Settled>(&container, cx).is_empty(),
+                scoped_ids::<Settled>(&container, window_id(), cx).is_empty(),
                 "an unmounted container must not keep its rows alive forever"
             );
         });
@@ -341,12 +356,28 @@ mod tests {
             // row alone would let one settle the other.
             let left = SharedString::new_static("left");
             let right = SharedString::new_static("right");
-            retain_scope::<Settled>(&left, &[row("shared")], cx);
-            retain_scope::<Settled>(&right, &[row("shared")], cx);
+            retain_scope::<Settled>(&left, &[row("shared")], window_id(), cx);
+            retain_scope::<Settled>(&right, &[row("shared")], window_id(), cx);
             mark(&left, "shared", cx);
 
             assert!(settled(&left, "shared", cx));
             assert!(!settled(&right, "shared", cx));
+        });
+    }
+
+    #[gpui::test]
+    fn two_windows_do_not_share_an_animation_identity(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            let left = WindowId::from(1);
+            let right = WindowId::from(2);
+            let id = row("shared");
+
+            slot::<Settled>(&id, left, cx).borrow_mut().0 = true;
+
+            assert!(slot::<Settled>(&id, left, cx).borrow().0);
+            assert!(!slot::<Settled>(&id, right, cx).borrow().0);
+            assert_eq!(ids::<Settled>(left, cx), vec![id.clone()]);
+            assert_eq!(ids::<Settled>(right, cx), vec![id]);
         });
     }
 
@@ -357,7 +388,7 @@ mod tests {
             // The grace exists because a container's own render can straddle a
             // frame boundary. One frame of silence must not drop anything.
             let container = container();
-            retain_scope::<Settled>(&container, &[row("a")], cx);
+            retain_scope::<Settled>(&container, &[row("a")], window_id(), cx);
             mark(&container, "a", cx);
             next_frame(cx);
             assert!(settled(&container, "a", cx));

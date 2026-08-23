@@ -234,7 +234,11 @@ and used by no component here. That is recorded in `docs/coverage.md`.
 
 ```rust
 let header = ScrollLink::new(px(0.0), px(64.0));
-let height = header.sample(scroll_offset("inbox", cx).y, px(96.0), px(40.0));
+let height = header.sample(
+    scroll_offset("inbox", window, cx).y,
+    px(96.0),
+    px(40.0),
+);
 ```
 
 It has no duration, no start and no end, it never requests an animation frame,
@@ -243,7 +247,7 @@ backwards because the offset went backwards. That is why it is a plain value
 with no `animate` and no `Window`: there is nothing to drive. Anything that
 takes a progress can be driven from it, `Keyframes::sample` included.
 
-`layout::scroll_offset(ident, cx)` reads how far a `ScrollArea` has been
+`layout::scroll_offset(ident, window, cx)` reads how far a `ScrollArea` has been
 scrolled, which is the input side of the same pair.
 
 `ScrollArea` uses it for the second of the two motivating cases: a hairline
@@ -393,7 +397,7 @@ difference into a visual offset, and plays that offset back to zero on the
 `grab` spring:
 
 ```rust
-let handle = flip("queue.publish", cx);
+let handle = flip("queue.publish", window, cx);
 row.flip(&handle, window, cx)
 ```
 
@@ -441,7 +445,7 @@ it in its container is genuinely pushed. `flip` is therefore the default and
 layout node because something else in the library grew.
 
 ```rust
-let handle = flip("card.7", cx);
+let handle = flip("card.7", window, cx);
 card.flip_size(&handle, window, cx)
 ```
 
@@ -474,7 +478,7 @@ than by element, the panel inverts from the rectangle the row last recorded
 and travels there instead of cutting:
 
 ```rust
-let handle = shared_flip("item.7", cx);
+let handle = shared_flip("item.7", window, cx);
 panel.flip_size(&handle, window, cx)
 ```
 

@@ -5,18 +5,19 @@
 //! the caller says is true, so a host that refuses a resize keeps the layout
 //! that still holds.
 
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
 use gpui::{
-    AccessibleAction, AnyElement, App, ClickEvent, Global, InteractiveElement, IntoElement,
-    MouseButton, ParentElement, RenderOnce, SharedString, StatefulInteractiveElement, Styled,
-    Window, div, prelude::FluentBuilder, px, relative,
+    AccessibleAction, AnyElement, App, ClickEvent, InteractiveElement, IntoElement, MouseButton,
+    ParentElement, RenderOnce, SharedString, StatefulInteractiveElement, Styled, Window, div,
+    prelude::FluentBuilder, px, relative,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::ActiveTheme;
 
+use crate::foundation::window_state;
 use crate::foundation::{Disableable, FocusRing, Ident};
 use crate::layout::measure;
 use crate::strings::{ActiveStrings, StringKey};
@@ -232,7 +233,7 @@ pub(crate) fn collapse_target(ratio: f32) -> SplitSide {
 }
 
 impl RenderOnce for SplitPane {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let horizontal = self.axis == SplitAxis::Horizontal;
         let ratio = self.ratio.clamp(0.0, 1.0);
@@ -241,7 +242,7 @@ impl RenderOnce for SplitPane {
 
         // The divider needs the split's measured extent to turn a pointer
         // position into a ratio, and only prepaint knows it.
-        let measured = measure::cell(&self.ident.semantic_id(), cx);
+        let measured = measure::cell(&self.ident.semantic_id(), window, cx);
         let frame = measured.get();
         let extent = if horizontal {
             f32::from(frame.size.width)
@@ -317,7 +318,7 @@ impl RenderOnce for SplitPane {
         // A drag has to be followed across the whole split, not just the few
         // pixels of the handle, so the divider only records that one started
         // and the frame does the following.
-        let dragging = drag_flag(&self.ident, cx);
+        let dragging = drag_flag(&self.ident, window, cx);
         if actionable {
             let started = Rc::clone(&dragging);
             divider = divider.on_mouse_down(MouseButton::Left, move |_, _, _| started.set(true));
@@ -498,22 +499,19 @@ impl RenderOnce for SplitPane {
     }
 }
 
-#[derive(Default)]
-struct Dragging(RefCell<HashMap<SharedString, Rc<Cell<bool>>>>);
-
-impl Global for Dragging {}
+type Dragging = HashMap<SharedString, Rc<Cell<bool>>>;
 
 /// Whether a drag of this split's divider is in flight.
 ///
 /// A `RenderOnce` builder is rebuilt every frame, so the press that starts a
 /// drag and the moves that continue it are in different builds and need
 /// somewhere outside the frame to agree.
-fn drag_flag(ident: &Ident, cx: &mut App) -> Rc<Cell<bool>> {
-    if !cx.has_global::<Dragging>() {
-        cx.set_global(Dragging::default());
-    }
-    let mut flags = cx.global::<Dragging>().0.borrow_mut();
-    Rc::clone(flags.entry(ident.semantic_id()).or_default())
+fn drag_flag(ident: &Ident, window: &Window, cx: &mut App) -> Rc<Cell<bool>> {
+    window_state::with(
+        window.window_handle().window_id(),
+        cx,
+        |flags: &mut Dragging| Rc::clone(flags.entry(ident.semantic_id()).or_default()),
+    )
 }
 
 fn pane_frame(ident: &Ident, side: &str, cx: &App) -> gpui::Stateful<gpui::Div> {

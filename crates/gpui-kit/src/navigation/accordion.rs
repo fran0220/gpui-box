@@ -278,7 +278,7 @@ impl RenderOnce for Accordion {
             // and something on screen is something a typist can point at, so
             // it stays addressable exactly as long as it stays visible.
             let body = (disclosed > 0.0).then_some(section.body).flatten();
-            let measured = measure::cell(&body_id, cx);
+            let measured = measure::cell(&body_id, window, cx);
             let height = px(f32::from(measured.get().size.height) * disclosed);
 
             stack = stack.child(div().column().child(header).children(body.map(|body| {

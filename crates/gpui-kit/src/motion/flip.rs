@@ -10,7 +10,7 @@
 //! # use gpui::{App, Window, div, prelude::*};
 //! # use gpui_kit::motion::{Flipping, flip};
 //! # fn row(id: &'static str, window: &mut Window, cx: &mut App) -> impl IntoElement {
-//! let handle = flip(id, cx);
+//! let handle = flip(id, window, cx);
 //! div().child("Row").flip(&handle, window, cx)
 //! # }
 //! ```
@@ -412,7 +412,7 @@ impl Flip {
     /// `target` from the first frame.
     ///
     /// ```ignore
-    /// let handle = flip(id, cx);
+    /// let handle = flip(id, window, cx);
     /// let shape = handle.shape(if open { card } else { row }, window, cx);
     /// div().shaped(shape).flip(&handle, window, cx)
     /// ```
@@ -464,9 +464,9 @@ impl Flip {
 }
 
 /// The slide handle for `id`.
-pub fn flip(id: impl Into<SharedString>, cx: &mut App) -> Flip {
+pub fn flip(id: impl Into<SharedString>, window: &Window, cx: &mut App) -> Flip {
     let id = id.into();
-    let state = keyed::slot::<FlipState>(&id, cx);
+    let state = keyed::slot::<FlipState>(&id, window.window_handle().window_id(), cx);
     Flip { id, state }
 }
 
@@ -483,9 +483,14 @@ pub fn flip(id: impl Into<SharedString>, cx: &mut App) -> Flip {
 ///
 /// Both trees rendering the id at once is a collision, and a collision does
 /// not animate; see [`Flip::is_contended`].
-pub fn shared_flip(id: impl Into<SharedString>, cx: &mut App) -> Flip {
+pub fn shared_flip(id: impl Into<SharedString>, window: &Window, cx: &mut App) -> Flip {
     let id = id.into();
-    let state = keyed::slot_retained::<FlipState>(&id, HANDOFF_GRACE, cx);
+    let state = keyed::slot_retained::<FlipState>(
+        &id,
+        HANDOFF_GRACE,
+        window.window_handle().window_id(),
+        cx,
+    );
     Flip { id, state }
 }
 
@@ -494,8 +499,8 @@ pub fn shared_flip(id: impl Into<SharedString>, cx: &mut App) -> Flip {
 /// An id that stops rendering is dropped within two frames — or within 30
 /// when it was last asked for through [`shared_flip`] — so this is the set
 /// of elements on screen rather than every element ever flipped.
-pub fn tracked_ids(cx: &App) -> Vec<SharedString> {
-    keyed::ids::<FlipState>(cx)
+pub fn tracked_ids(window: &Window, cx: &App) -> Vec<SharedString> {
+    keyed::ids::<FlipState>(window.window_handle().window_id(), cx)
 }
 
 /// Slides an element from where it was to where it is.
@@ -545,7 +550,7 @@ fn flipped<E: IntoElement>(
         measuring: false,
         measured_against: None,
         reduce_motion: cx.reduce_motion(),
-        frame: keyed::frame_counter(cx),
+        frame: keyed::frame_counter(window.window_handle().window_id(), cx),
     };
     // A slide that is still running needs the next frame even when nothing
     // else on the window asks for one.

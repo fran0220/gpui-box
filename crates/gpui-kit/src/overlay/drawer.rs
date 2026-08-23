@@ -219,20 +219,20 @@ impl Drawer {
             .presence
             .get_or_insert_with(|| Presence::hidden(enter_spec(&theme), exit_spec(&theme)));
         presence.show();
-        stack::push(self.ident.semantic_id(), cx);
+        stack::push(self.ident.semantic_id(), window, cx);
         self.trap.engage(window, cx);
         cx.emit(DrawerEvent::Opened);
         cx.notify();
     }
 
     /// Starts the slide out. The drawer stays on screen until it finishes.
-    pub fn close(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+    pub fn close(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if !self.open {
             return;
         }
         self.open = false;
         self.pending_focus = false;
-        stack::pop(&self.ident.semantic_id(), cx);
+        stack::pop(&self.ident.semantic_id(), window, cx);
         if let Some(presence) = self.presence.as_mut() {
             presence.hide();
         }
@@ -268,7 +268,7 @@ impl Drawer {
         if !self.open || event.keystroke.key.as_str() != "escape" {
             return;
         }
-        if !stack::is_top(&self.ident.semantic_id(), cx) {
+        if !stack::is_top(&self.ident.semantic_id(), window, cx) {
             return;
         }
         self.dismiss(window, cx);
@@ -495,9 +495,9 @@ impl Render for Drawer {
             .semantic_in(cx, spec);
 
         let mut overlay = Overlay::edge(self.ident.child("overlay"), self.edge)
-            .stack(stack::depth(&self.ident.semantic_id(), cx))
+            .stack(stack::depth(&self.ident.semantic_id(), window, cx))
             .child(card);
-        if self.dismissable && self.open && stack::is_top(&self.ident.semantic_id(), cx) {
+        if self.dismissable && self.open && stack::is_top(&self.ident.semantic_id(), window, cx) {
             let drawer = cx.entity().downgrade();
             overlay = overlay.on_dismiss(move |window, cx| {
                 drawer

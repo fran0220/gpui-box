@@ -399,14 +399,14 @@ impl RenderOnce for MessageList {
         // cut to a fixed number of lines per message has no such measurements,
         // and follows by naming the row to bring into view.
         let flowing = body_lines.is_none();
-        let held = flowing && follows_end(&ident, cx);
+        let held = flowing && follows_end(&ident, window, cx);
 
-        let follow = self.follow(count, held, cx);
+        let follow = self.follow(count, held, window, cx);
         if follow.stick {
             if flowing {
-                engage_end(&ident, cx);
+                engage_end(&ident, window, cx);
             } else {
-                scroll_to_row(&ident, count.saturating_sub(1), cx);
+                scroll_to_row(&ident, count.saturating_sub(1), window, cx);
             }
         }
         if flowing {
@@ -428,7 +428,12 @@ impl RenderOnce for MessageList {
         // The same names say which messages the conversation still holds, so
         // per-message state goes when its message does rather than when its
         // row happens to stop being drawn.
-        keyed::retain_scope::<Stream>(&ident.semantic_id(), &row_keys, cx);
+        keyed::retain_scope::<Stream>(
+            &ident.semantic_id(),
+            &row_keys,
+            window.window_handle().window_id(),
+            cx,
+        );
         let rows = List::new(ident.clone(), count, move |index, window, cx| {
             if let Some(highest) = seen.borrow_mut().current.as_mut() {
                 *highest = (*highest).max(index);
@@ -521,8 +526,12 @@ impl MessageList {
     /// follow, which is the same rule
     /// [`ScrollArea`](crate::layout::ScrollArea) keeps — content continuing
     /// past the view is published rather than left to be noticed.
-    fn follow(&self, count: usize, held: bool, cx: &mut App) -> Follow {
-        let cell = keyed::slot::<Following>(&self.ident.child("following").semantic_id(), cx);
+    fn follow(&self, count: usize, held: bool, window: &Window, cx: &mut App) -> Follow {
+        let cell = keyed::slot::<Following>(
+            &self.ident.child("following").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
         let mut following = cell.borrow_mut();
         following.previous = following.current.take();
         if let Some(previous) = following.previous {
@@ -617,9 +626,9 @@ impl MessageList {
                             // cut to: the reader sees what they are passing
                             // and where they land.
                             if flowing {
-                                engage_end(&list, cx);
+                                engage_end(&list, window, cx);
                             } else {
-                                scroll_to_row(&list, last, cx);
+                                scroll_to_row(&list, last, window, cx);
                             }
                             window.refresh();
                         }),
@@ -647,9 +656,14 @@ struct Stream(Option<Instant>);
 /// conversation whose "still writing" mark flickered on every token would be
 /// reporting the token, not the stream. Answers `None` once the message stops
 /// streaming.
-pub fn streaming_since(list: &Ident, message: &str, cx: &App) -> Option<Instant> {
-    keyed::scoped_peek::<Stream>(&list.semantic_id(), &stream_key(message), cx)
-        .and_then(|stream| stream.borrow().0)
+pub fn streaming_since(list: &Ident, message: &str, window: &Window, cx: &App) -> Option<Instant> {
+    keyed::scoped_peek::<Stream>(
+        &list.semantic_id(),
+        &stream_key(message),
+        window.window_handle().window_id(),
+        cx,
+    )
+    .and_then(|stream| stream.borrow().0)
 }
 
 fn stream_key(message: &str) -> SharedString {
@@ -663,8 +677,19 @@ fn stream_key(message: &str) -> SharedString {
 /// to the element would be left behind by the frame that would have cleared
 /// it, and a conversation that ran long enough would accumulate one entry per
 /// message it had ever streamed. Tied to the list, it goes when the list does.
-fn stream_began(list: &Ident, message: &str, streaming: bool, cx: &mut App) -> Option<Instant> {
-    let cell = keyed::scoped_slot::<Stream>(&list.semantic_id(), &stream_key(message), cx);
+fn stream_began(
+    list: &Ident,
+    message: &str,
+    streaming: bool,
+    window: &Window,
+    cx: &mut App,
+) -> Option<Instant> {
+    let cell = keyed::scoped_slot::<Stream>(
+        &list.semantic_id(),
+        &stream_key(message),
+        window.window_handle().window_id(),
+        cx,
+    );
     if !streaming {
         cell.borrow_mut().0 = None;
         return None;
@@ -698,7 +723,7 @@ fn row(
     let theme = cx.theme().clone();
     let ident = list.child(message.id.as_ref());
     let author = shown_author(message.author.as_ref());
-    let began = stream_began(list, message.id.as_ref(), message.streaming, cx);
+    let began = stream_began(list, message.id.as_ref(), message.streaming, window, cx);
 
     let header = div()
         .row()

@@ -243,7 +243,11 @@ impl RenderOnce for Markdown {
         // Parsing goes through the incremental reader whether the document is
         // streaming or not: a source that did not change costs nothing to read
         // again, which is every settled document on screen.
-        let reader = keyed::slot::<Stream>(&ident.child("source").semantic_id(), cx);
+        let reader = keyed::slot::<Stream>(
+            &ident.child("source").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
         let parsed = {
             let mut reader = reader.borrow_mut();
             reader.read(self.source.as_ref());
@@ -258,9 +262,13 @@ impl RenderOnce for Markdown {
             None => (parsed, 0),
         };
 
-        let veil = self
-            .streaming
-            .then(|| keyed::slot::<Veil>(&ident.child("arriving").semantic_id(), cx));
+        let veil = self.streaming.then(|| {
+            keyed::slot::<Veil>(
+                &ident.child("arriving").semantic_id(),
+                window.window_handle().window_id(),
+                cx,
+            )
+        });
 
         let mut painter = Painter {
             ident: ident.clone(),
@@ -331,7 +339,11 @@ fn report_images(
     let Some(handler) = handler.cloned() else {
         return;
     };
-    let cell = keyed::slot::<Requested>(&ident.child("images").semantic_id(), cx);
+    let cell = keyed::slot::<Requested>(
+        &ident.child("images").semantic_id(),
+        window.window_handle().window_id(),
+        cx,
+    );
     let fresh: Vec<ImageRequest> = {
         let mut seen = cell.borrow_mut();
         requests
@@ -441,7 +453,7 @@ impl Painter {
         match block {
             Block::Heading { level, content } => self.heading(*level, content, window, cx),
             Block::Paragraph(inlines) => self.paragraph(inlines, window, cx),
-            Block::Code { language, text } => self.code(language.clone(), text.clone(), cx),
+            Block::Code { language, text } => self.code(language.clone(), text.clone(), window, cx),
             Block::Quote(blocks) => self.quote(blocks, window, cx),
             Block::List {
                 ordered,
@@ -793,6 +805,7 @@ impl Painter {
         &mut self,
         language: Option<SharedString>,
         text: SharedString,
+        window: &Window,
         cx: &mut App,
     ) -> AnyElement {
         let theme = self.theme.clone();
@@ -813,9 +826,13 @@ impl Painter {
                 text: text.clone(),
             })),
             None => match language.as_deref().and_then(Language::named) {
-                Some(known) => keyed::slot::<Cache>(&ident.child("colour").semantic_id(), cx)
-                    .borrow_mut()
-                    .block(known, &text),
+                Some(known) => keyed::slot::<Cache>(
+                    &ident.child("colour").semantic_id(),
+                    window.window_handle().window_id(),
+                    cx,
+                )
+                .borrow_mut()
+                .block(known, &text),
                 None => Rc::new(Vec::new()),
             },
         };

@@ -592,7 +592,11 @@ impl Dock {
 
         // A panel that changed regions lands in its new slot on the frame the
         // host applies the move; only the pixels take their time.
-        let slide = flip(self.ident.child(panel.id.as_ref()).semantic_id(), cx);
+        let slide = flip(
+            self.ident.child(panel.id.as_ref()).semantic_id(),
+            window,
+            cx,
+        );
         frame
             .semantic_in(cx, spec)
             .flip(&slide, window, cx)

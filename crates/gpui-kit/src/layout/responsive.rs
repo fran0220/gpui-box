@@ -118,7 +118,7 @@ impl Responsive {
 
 impl RenderOnce for Responsive {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let measured = measure::cell(&self.ident.semantic_id(), cx);
+        let measured = measure::cell(&self.ident.semantic_id(), window, cx);
         let size = size_of(&measured);
         let content = (self.build)(size, window, cx);
 

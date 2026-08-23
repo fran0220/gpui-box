@@ -102,7 +102,7 @@ impl Minimap {
 }
 
 impl RenderOnce for Minimap {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let marks = self
             .marks
@@ -138,7 +138,7 @@ impl RenderOnce for Minimap {
                 .border(px(theme.borders.hairline))
                 .border_color(theme.colors.danger)
         });
-        let measured = measure::cell(&self.ident.semantic_id(), cx);
+        let measured = measure::cell(&self.ident.semantic_id(), window, cx);
         let handler = self.on_pan;
         let mut frame = div()
             .on_children_prepainted({

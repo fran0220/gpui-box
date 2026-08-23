@@ -255,10 +255,15 @@ impl NotificationCenter {
     /// False means no [`ToastLayer`](crate::overlay::ToastLayer) is mounted,
     /// so nothing floated on screen — but the record is filed either way,
     /// which is exactly the point of the centre.
-    pub fn show(&mut self, notification: Notification, cx: &mut Context<Self>) -> bool {
+    pub fn show(
+        &mut self,
+        notification: Notification,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
         let toast = notification.toast();
         self.record(notification, cx);
-        toast::push(cx, toast)
+        toast::push(window, cx, toast)
     }
 
     /// Files a notification without showing a toast of it.

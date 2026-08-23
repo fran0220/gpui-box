@@ -280,8 +280,9 @@ fn a_table_row_far_down_becomes_real_once_it_is_revealed(cx: &mut TestAppContext
         "the row starts well outside the viewport"
     );
 
-    harness
-        .update(|_, cx| gpui_kit::data::reveal_row(&Ident::new("v.table").child("body"), 5000, cx));
+    harness.update(|window, cx| {
+        gpui_kit::data::reveal_row(&Ident::new("v.table").child("body"), 5000, window, cx)
+    });
     harness.frame();
 
     assert!(

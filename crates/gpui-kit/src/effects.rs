@@ -11,9 +11,7 @@
 //! [`EffectPolicy::replay_capacity`], and budgets reset on the semantic frame
 //! generation installed by [`crate::install`].
 
-use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -25,7 +23,7 @@ use gpui::{
 use gpui_kit_theme::ActiveTheme;
 use web_time::Instant;
 
-use crate::foundation::direction::ActiveDirection;
+use crate::foundation::{direction::ActiveDirection, window_state};
 use crate::motion::keyed;
 
 mod dotlottie;
@@ -317,7 +315,7 @@ fn particle_elapsed(
 
     let key: SharedString =
         format!("effect-particles:{}", replay_key(&plan.surface, &plan.id)).into();
-    let slot = keyed::slot::<ParticleClock>(&key, cx);
+    let slot = keyed::slot::<ParticleClock>(&key, window.window_handle().window_id(), cx);
     let now = cx.background_executor().now();
     let elapsed = {
         let mut clock = slot.borrow_mut();
@@ -835,16 +833,27 @@ impl Default for EffectPlanner {
     }
 }
 
-#[derive(Clone)]
-struct InstalledEffects(Rc<RefCell<EffectPlanner>>);
+struct InstalledEffects {
+    policy: EffectPolicy,
+    version: u64,
+}
 
 impl Default for InstalledEffects {
     fn default() -> Self {
-        Self(Rc::new(RefCell::new(EffectPlanner::default())))
+        Self {
+            policy: EffectPolicy::default(),
+            version: 1,
+        }
     }
 }
 
 impl Global for InstalledEffects {}
+
+#[derive(Default)]
+struct WindowEffects {
+    planner: EffectPlanner,
+    policy_version: u64,
+}
 
 pub(crate) fn install(cx: &mut App) {
     if !cx.has_global::<InstalledEffects>() {
@@ -855,17 +864,16 @@ pub(crate) fn install(cx: &mut App) {
 /// Installs a new policy while preserving replay history.
 pub fn set_effect_policy(policy: EffectPolicy, cx: &mut App) {
     install(cx);
-    cx.global::<InstalledEffects>()
-        .0
-        .borrow_mut()
-        .set_policy(policy);
+    let effects = cx.global_mut::<InstalledEffects>();
+    effects.policy = policy;
+    effects.version = effects.version.wrapping_add(1).max(1);
     cx.refresh_windows();
 }
 
 /// Returns the currently installed policy, defaulting to Balanced.
 pub fn effect_policy(cx: &App) -> EffectPolicy {
     cx.try_global::<InstalledEffects>()
-        .map(|effects| effects.0.borrow().policy().clone())
+        .map(|effects| effects.policy.clone())
         .unwrap_or_default()
 }
 
@@ -902,9 +910,14 @@ pub fn burst_particles(
     surface: impl Into<SharedString>,
     target: impl Into<SharedString>,
     style: ParticleBurst,
+    window: &Window,
     cx: &mut App,
 ) -> EffectPlan {
-    plan_effect(EffectEvent::new(id, surface, target, style.cue()), cx)
+    plan_effect(
+        EffectEvent::new(id, surface, target, style.cue()),
+        window,
+        cx,
+    )
 }
 
 /// Compresses a list wave to the active quality tier.
@@ -919,14 +932,21 @@ pub fn stagger_for_policy(stagger: crate::motion::Stagger, cx: &App) -> crate::m
 }
 
 /// Resolves and consumes one semantic event against the active policy.
-pub fn plan_effect(event: EffectEvent, cx: &mut App) -> EffectPlan {
+pub fn plan_effect(event: EffectEvent, window: &Window, cx: &mut App) -> EffectPlan {
     install(cx);
-    let frame = keyed::frame_counter(cx).unwrap_or_default();
+    let window_id = window.window_handle().window_id();
+    let frame = keyed::frame_counter(window_id, cx).unwrap_or_default();
     let reduce_motion = cx.reduce_motion();
-    cx.global::<InstalledEffects>()
-        .0
-        .borrow_mut()
-        .plan(event, frame, reduce_motion)
+    let installed = cx.global::<InstalledEffects>();
+    let policy = installed.policy.clone();
+    let version = installed.version;
+    window_state::with(window_id, cx, |effects: &mut WindowEffects| {
+        if effects.policy_version != version {
+            effects.planner.set_policy(policy);
+            effects.policy_version = version;
+        }
+        effects.planner.plan(event, frame, reduce_motion)
+    })
 }
 
 fn stable_seed(id: &str) -> u64 {

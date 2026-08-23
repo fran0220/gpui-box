@@ -87,7 +87,11 @@ impl RenderOnce for AnimatedNumber {
         });
         let target = self.value as f32;
 
-        let counter = keyed::slot::<Counter>(&self.ident.semantic_id(), cx);
+        let counter = keyed::slot::<Counter>(
+            &self.ident.semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
         let shown = {
             let mut counter = counter.borrow_mut();
             let mut transition = counter

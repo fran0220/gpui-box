@@ -6,16 +6,15 @@
 //! keeps the position across rebuilds without making every caller own a GPUI
 //! handle, and it lets a surface built on top of another one move it by name.
 
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::time::Duration;
 
 use gpui::{
-    App, Global, ListAlignment, ListOffset, ListState, Pixels, ScrollStrategy, SharedString,
-    UniformListScrollHandle, px,
+    App, ListAlignment, ListOffset, ListState, Pixels, ScrollStrategy, SharedString,
+    UniformListScrollHandle, Window, WindowId, px,
 };
 
-use crate::foundation::Ident;
+use crate::foundation::{Ident, window_state};
 use crate::motion::{CubicBezier, Glide, MotionSpec, reduce_motion};
 
 /// How long a glide takes to cross whatever distance it has, and on what
@@ -33,10 +32,7 @@ const FRAME: Duration = Duration::from_millis(16);
 /// its estimated height and then jumping to its real one.
 const OVERDRAW: f32 = 240.0;
 
-#[derive(Default)]
-struct ScrollHandles(RefCell<HashMap<SharedString, UniformListScrollHandle>>);
-
-impl Global for ScrollHandles {}
+type ScrollHandles = HashMap<SharedString, UniformListScrollHandle>;
 
 /// What one variable-height surface has learned about itself.
 struct Flow {
@@ -53,10 +49,7 @@ struct Flow {
 /// knows where row ten thousand starts without laying one out. A list whose
 /// rows are as tall as their content only learns a row's height by laying it
 /// out, so what it has learned has to survive the rebuild.
-#[derive(Default)]
-struct FlowStates(RefCell<HashMap<SharedString, Flow>>);
-
-impl Global for FlowStates {}
+type FlowStates = HashMap<SharedString, Flow>;
 
 /// How a surface describes the rows it is about to draw.
 ///
@@ -116,12 +109,16 @@ fn splice_range(before: &[SharedString], after: &[SharedString]) -> Option<(usiz
 }
 
 /// The scroll position of the surface with this identity.
-pub(crate) fn scroll_handle(ident: &Ident, cx: &mut App) -> UniformListScrollHandle {
-    if !cx.has_global::<ScrollHandles>() {
-        cx.set_global(ScrollHandles::default());
-    }
-    let mut handles = cx.global::<ScrollHandles>().0.borrow_mut();
-    handles.entry(ident.semantic_id()).or_default().clone()
+pub(crate) fn scroll_handle(
+    ident: &Ident,
+    window: &Window,
+    cx: &mut App,
+) -> UniformListScrollHandle {
+    window_state::with(
+        window.window_handle().window_id(),
+        cx,
+        |handles: &mut ScrollHandles| handles.entry(ident.semantic_id()).or_default().clone(),
+    )
 }
 
 /// The measured rows of the variable-height surface with this identity.
@@ -140,41 +137,45 @@ pub(crate) fn list_state(
     rows: Rows<'_>,
     alignment: ListAlignment,
     estimate: Pixels,
+    window: &Window,
     cx: &mut App,
 ) -> ListState {
-    if !cx.has_global::<FlowStates>() {
-        cx.set_global(FlowStates::default());
-    }
     let count = rows.len();
-    let mut states = cx.global::<FlowStates>().0.borrow_mut();
-    let flow = states.entry(ident.semantic_id()).or_insert_with(|| Flow {
-        state: ListState::new(count, alignment, px(OVERDRAW)).with_uniform_item_height(estimate),
-        keys: anonymous(count),
-    });
+    window_state::with(
+        window.window_handle().window_id(),
+        cx,
+        |states: &mut FlowStates| {
+            let flow = states.entry(ident.semantic_id()).or_insert_with(|| Flow {
+                state: ListState::new(count, alignment, px(OVERDRAW))
+                    .with_uniform_item_height(estimate),
+                keys: anonymous(count),
+            });
 
-    match rows {
-        Rows::Keyed(keys) => {
-            if flow.keys != keys {
-                if let Some((start, removed)) = splice_range(&flow.keys, keys) {
-                    let added = keys.len() - (flow.keys.len() - removed);
-                    flow.state.splice(start..start + removed, added);
+            match rows {
+                Rows::Keyed(keys) => {
+                    if flow.keys != keys {
+                        if let Some((start, removed)) = splice_range(&flow.keys, keys) {
+                            let added = keys.len() - (flow.keys.len() - removed);
+                            flow.state.splice(start..start + removed, added);
+                        }
+                        flow.keys = keys.to_vec();
+                    }
                 }
-                flow.keys = keys.to_vec();
-            }
-        }
-        Rows::Counted(count) => {
-            let known = flow.keys.len();
-            if known != count {
-                if count > known {
-                    flow.state.splice(known..known, count - known);
-                } else {
-                    flow.state.reset_with_uniform_height(count, estimate);
+                Rows::Counted(count) => {
+                    let known = flow.keys.len();
+                    if known != count {
+                        if count > known {
+                            flow.state.splice(known..known, count - known);
+                        } else {
+                            flow.state.reset_with_uniform_height(count, estimate);
+                        }
+                        flow.keys = anonymous(count);
+                    }
                 }
-                flow.keys = anonymous(count);
             }
-        }
-    }
-    flow.state.clone()
+            flow.state.clone()
+        },
+    )
 }
 
 /// Stand-in names for a surface that counts its rows instead of naming them.
@@ -193,22 +194,22 @@ fn anonymous(count: usize) -> Vec<SharedString> {
 /// Scroll position belongs to the surface, not to whoever draws over it, so a
 /// surface built on a list — a conversation that follows its newest message —
 /// moves it by naming the list rather than by owning a GPUI handle of its own.
-pub fn scroll_to_row(ident: &Ident, index: usize, cx: &mut App) {
-    if let Some(state) = flow_state(ident, cx) {
+pub fn scroll_to_row(ident: &Ident, index: usize, window: &Window, cx: &mut App) {
+    if let Some(state) = flow_state(ident, window.window_handle().window_id(), cx) {
         state.scroll_to_reveal_item(index);
         return;
     }
-    scroll_handle(ident, cx).scroll_to_item(index, ScrollStrategy::Bottom);
+    scroll_handle(ident, window, cx).scroll_to_item(index, ScrollStrategy::Bottom);
 }
 
 /// Brings row `index` into view by the shortest move that gets it there, and
 /// leaves the offset alone when the row is already on screen.
-pub fn reveal_row(ident: &Ident, index: usize, cx: &mut App) {
-    if let Some(state) = flow_state(ident, cx) {
+pub fn reveal_row(ident: &Ident, index: usize, window: &Window, cx: &mut App) {
+    if let Some(state) = flow_state(ident, window.window_handle().window_id(), cx) {
         state.scroll_to_reveal_item(index);
         return;
     }
-    scroll_handle(ident, cx).scroll_to_item(index, ScrollStrategy::Nearest);
+    scroll_handle(ident, window, cx).scroll_to_item(index, ScrollStrategy::Nearest);
 }
 
 /// Travels to row `index` rather than arriving there.
@@ -229,9 +230,10 @@ pub fn reveal_row(ident: &Ident, index: usize, cx: &mut App) {
 /// is a surface that is not a variable-height list: a uniform list knows every
 /// row's height without laying it out, so it has no unmeasured distance for
 /// this to solve and its own scroll already lands correctly.
-pub fn glide_to_row(ident: &Ident, index: usize, cx: &mut App) {
-    let Some(state) = flow_state(ident, cx).filter(|_| !reduce_motion(cx)) else {
-        reveal_row(ident, index, cx);
+pub fn glide_to_row(ident: &Ident, index: usize, window: &Window, cx: &mut App) {
+    let window_id = window.window_handle().window_id();
+    let Some(state) = flow_state(ident, window_id, cx).filter(|_| !reduce_motion(cx)) else {
+        reveal_row(ident, index, window, cx);
         return;
     };
     let total = GLIDE.total();
@@ -355,22 +357,21 @@ pub struct Viewed {
 /// not been laid out as a variable-height list, which is one frame at most and
 /// is not the same answer as "the top", so a caller can tell "not yet" from
 /// "row zero".
-pub fn viewed_rows(ident: &Ident, cx: &mut App) -> Option<Viewed> {
-    let state = flow_state(ident, cx)?;
+pub fn viewed_rows(ident: &Ident, window: &Window, cx: &App) -> Option<Viewed> {
+    let state = flow_state(ident, window.window_handle().window_id(), cx)?;
     Some(Viewed {
         first_row: state.logical_scroll_top().item_ix,
         height: state.viewport_bounds().size.height,
     })
 }
 
-pub(crate) fn flow_state(ident: &Ident, cx: &mut App) -> Option<ListState> {
-    if !cx.has_global::<FlowStates>() {
-        return None;
-    }
-    let states = cx.global::<FlowStates>().0.borrow();
-    states
-        .get(&ident.semantic_id())
-        .map(|flow| flow.state.clone())
+pub(crate) fn flow_state(ident: &Ident, window_id: WindowId, cx: &App) -> Option<ListState> {
+    window_state::read(window_id, cx, |states: &FlowStates| {
+        states
+            .get(&ident.semantic_id())
+            .map(|flow| flow.state.clone())
+    })
+    .flatten()
 }
 
 #[cfg(test)]

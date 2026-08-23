@@ -784,7 +784,7 @@ impl FlatKind {
 
 impl DiffView {
     /// The flattened rows, done again only when they cannot be reused.
-    fn rows(&mut self, cx: &mut App) -> Rc<Vec<FlatRow>> {
+    fn rows(&mut self, window: &Window, cx: &mut App) -> Rc<Vec<FlatRow>> {
         let presentation = self.presentation;
         let language = self.language.clone();
         let build = |mut files: Vec<DiffFile>| {
@@ -804,7 +804,11 @@ impl DiffView {
             return build(files);
         };
 
-        let cell = keyed::slot::<Flattened>(&self.ident.semantic_id(), cx);
+        let cell = keyed::slot::<Flattened>(
+            &self.ident.semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
         let mut held = cell.borrow_mut();
         let reusable = held
             .files
@@ -835,7 +839,7 @@ impl Slotted for DiffView {
 impl RenderOnce for DiffView {
     fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let rows = self.rows(cx);
+        let rows = self.rows(window, cx);
         let count = rows.len();
         let list_ident = self.ident.child("rows");
 
@@ -901,11 +905,15 @@ impl RenderOnce for DiffView {
                     .position(|row| row.id == at || row.id.starts_with(prefix.as_ref()));
                 if let Some(index) = found {
                     list = list.selected(rows[index].id.clone());
-                    let stepped = keyed::slot::<Stepped>(&self.ident.semantic_id(), cx);
+                    let stepped = keyed::slot::<Stepped>(
+                        &self.ident.semantic_id(),
+                        window.window_handle().window_id(),
+                        cx,
+                    );
                     let mut stepped = stepped.borrow_mut();
                     if stepped.at.as_ref() != Some(&at) {
                         stepped.at = Some(at);
-                        reveal_row(&list_ident, index, cx);
+                        reveal_row(&list_ident, index, window, cx);
                     }
                 }
             }

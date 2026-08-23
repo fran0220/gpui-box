@@ -193,7 +193,11 @@ impl RenderOnce for Slider {
         let metrics = theme.control.get(self.size);
         let actionable =
             !self.disabled && (self.on_change.is_some() || self.on_range_change.is_some());
-        let dragging = keyed::slot::<PointerDriven>(&self.ident.semantic_id(), cx);
+        let dragging = keyed::slot::<PointerDriven>(
+            &self.ident.semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
         let snap = std::mem::take(&mut dragging.borrow_mut().0);
         let fraction = motion::tracked_or_snap(
             &self.ident.semantic_id(),
@@ -225,7 +229,7 @@ impl RenderOnce for Slider {
         let track_id = self.ident.clone();
         // The handlers need the track's measured width to turn a pointer
         // position into a value, and only prepaint knows it.
-        let measured = measure::cell(&track_id.semantic_id(), cx);
+        let measured = measure::cell(&track_id.semantic_id(), window, cx);
         let mut track = div()
             .id(track_id.element_id())
             .relative()

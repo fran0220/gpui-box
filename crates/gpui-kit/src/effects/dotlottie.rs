@@ -648,7 +648,7 @@ impl RenderOnce for CinematicEffect {
         } else {
             let key: SharedString =
                 format!("cinematic-effect:{}:{}", self.plan.surface, self.plan.id).into();
-            let slot = keyed::slot::<CinematicClock>(&key, cx);
+            let slot = keyed::slot::<CinematicClock>(&key, window.window_handle().window_id(), cx);
             let now = cx.background_executor().now();
             let elapsed = {
                 let mut clock = slot.borrow_mut();

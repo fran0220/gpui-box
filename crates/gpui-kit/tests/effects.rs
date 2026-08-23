@@ -7,11 +7,20 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use gpui::{
-    DevicePixels, IntoElement, ParentElement, RenderImage, Styled, TestAppContext, div, px, size,
+    AppContext, Context, DevicePixels, IntoElement, ParentElement, Render, RenderImage, Styled,
+    TestAppContext, Window, div, px, size,
 };
 use gpui_kit::prelude::*;
 use gpui_kit::semantics::Role;
 use gpui_kit_testkit::harness::Harness;
+
+struct WindowFixture;
+
+impl Render for WindowFixture {
+    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+        div()
+    }
+}
 
 fn animated_plan(id: &'static str, cue: VisualCue) -> EffectPlan {
     let mut planner = EffectPlanner::new(EffectPolicy::new(EffectQuality::Cinematic));
@@ -73,9 +82,10 @@ fn installed_policy_defaults_balanced_and_can_be_replaced(cx: &mut TestAppContex
         harness.update(|_, cx| effect_policy(cx).quality),
         EffectQuality::Off
     );
-    let plan = harness.update(|_, cx| {
+    let plan = harness.update(|window, cx| {
         plan_effect(
             EffectEvent::new("arrival", "conversation", "agent", VisualCue::Arrival),
+            window,
             cx,
         )
     });
@@ -92,9 +102,10 @@ fn active_reduced_motion_and_replay_policy_are_applied_centrally(cx: &mut TestAp
         set_effect_policy(EffectPolicy::new(EffectQuality::Cinematic), cx);
         cx.set_reduce_motion(true);
     });
-    let static_plan = harness.update(|_, cx| {
+    let static_plan = harness.update(|window, cx| {
         plan_effect(
             EffectEvent::new("reward", "game", "player", VisualCue::Reward),
+            window,
             cx,
         )
     });
@@ -104,9 +115,10 @@ fn active_reduced_motion_and_replay_policy_are_applied_centrally(cx: &mut TestAp
     );
 
     harness.update(|_, cx| cx.set_reduce_motion(false));
-    let replay = harness.update(|_, cx| {
+    let replay = harness.update(|window, cx| {
         plan_effect(
             EffectEvent::new("reward", "game", "player", VisualCue::Reward),
+            window,
             cx,
         )
     });
@@ -115,6 +127,25 @@ fn active_reduced_motion_and_replay_policy_are_applied_centrally(cx: &mut TestAp
         EffectPresentation::Suppressed(EffectSuppression::Replay),
         "changing accessibility policy does not replay an event"
     );
+}
+
+#[gpui::test]
+fn replay_identity_is_consumed_once_per_window(cx: &mut TestAppContext) {
+    cx.update(gpui_kit::install);
+    cx.update(|cx| set_effect_policy(EffectPolicy::new(EffectQuality::Cinematic), cx));
+    let left = cx.add_window(|_, _| WindowFixture);
+    let right = cx.add_window(|_, _| WindowFixture);
+
+    let event = || EffectEvent::new("shared", "surface", "target", VisualCue::Arrival);
+    let left_plan = cx
+        .update_window(*left, |_, window, cx| plan_effect(event(), window, cx))
+        .expect("left window");
+    let right_plan = cx
+        .update_window(*right, |_, window, cx| plan_effect(event(), window, cx))
+        .expect("right window");
+
+    assert_eq!(left_plan.presentation, EffectPresentation::Animated);
+    assert_eq!(right_plan.presentation, EffectPresentation::Animated);
 }
 
 #[gpui::test]

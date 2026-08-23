@@ -7,9 +7,8 @@
 //!
 //! The host mounts a [`ToastLayer`] in the window it wants notifications drawn
 //! in, and any call site adds one with [`push`]. The stack lives in the mounted
-//! layer and the global holds only a weak handle to it, so the library renders
-//! into the window it was given and reports a push it cannot deliver instead of
-//! choosing a window on the caller's behalf.
+//! layer and routing is keyed by the window, so equal toast identities in two
+//! windows cannot replace one another and a push never guesses its destination.
 //!
 //! Timing is truthful before it is convenient:
 //!
@@ -24,8 +23,8 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use gpui::{
-    AnyElement, App, Context, Entity, Global, InteractiveElement, IntoElement, ParentElement,
-    Render, SharedString, StatefulInteractiveElement, Styled, WeakEntity, Window, div,
+    AnyElement, App, Context, Entity, InteractiveElement, IntoElement, ParentElement, Render,
+    SharedString, StatefulInteractiveElement, Styled, WeakEntity, Window, div,
     prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::{Icon, icon};
@@ -36,7 +35,7 @@ use web_time::Instant;
 use crate::controls::button::Button;
 use crate::display::badge::Tone;
 use crate::display::status::StatusDot;
-use crate::foundation::{FocusRing, Ident, Sizable, StyledExt};
+use crate::foundation::{FocusRing, Ident, Sizable, StyledExt, window_state};
 use crate::motion::{Easing, Flipping, MotionSpec, Phase, Presence, flip};
 use crate::overlay::layer::{pinned, priority, surface};
 use crate::strings::{ActiveStrings, StringKey};
@@ -280,15 +279,14 @@ impl std::fmt::Debug for ToastLayer {
 }
 
 impl ToastLayer {
-    /// Mounts a layer and makes it the one [`push`] delivers to.
-    ///
-    /// A second layer takes over from the first, so an application with two
-    /// windows decides which one notifies by mounting there last.
-    pub fn new(cx: &mut Context<Self>) -> Self {
+    /// Mounts a layer as the notification destination for `window`.
+    pub fn new(window: &Window, cx: &mut Context<Self>) -> Self {
         let handle = cx.weak_entity();
-        cx.set_global(ToastCenter {
-            layer: Some(handle),
-        });
+        window_state::with(
+            window.window_handle().window_id(),
+            cx,
+            |route: &mut ToastRoute| route.layer = Some(handle),
+        );
         Self {
             corner: ToastCorner::default(),
             capacity: DEFAULT_CAPACITY,
@@ -569,7 +567,7 @@ impl ToastLayer {
         // that would mistake an arrival for a reorder. The slot moves only
         // when the stack itself reflows, which is what happens when a toast
         // in the middle of the stack leaves.
-        let slot = flip(toast.ident.child("slot").semantic_id(), cx);
+        let slot = flip(toast.ident.child("slot").semantic_id(), window, cx);
         div().child(card).flip(&slot, window, cx).into_any_element()
     }
 }
@@ -633,27 +631,26 @@ impl Render for ToastLayer {
 /// a push afterwards reports that it went nowhere instead of resurrecting a
 /// dead view.
 #[derive(Default)]
-struct ToastCenter {
+struct ToastRoute {
     layer: Option<WeakEntity<ToastLayer>>,
 }
 
-impl Global for ToastCenter {}
-
 /// Prepares the process for toasts. Idempotent, and called by
 /// [`crate::install`].
-pub fn install(cx: &mut App) {
-    if !cx.has_global::<ToastCenter>() {
-        cx.set_global(ToastCenter::default());
-    }
-}
+pub fn install(_cx: &mut App) {}
 
-fn mounted(cx: &App) -> Option<Entity<ToastLayer>> {
-    cx.try_global::<ToastCenter>()?.layer.as_ref()?.upgrade()
+fn mounted(window: &Window, cx: &App) -> Option<Entity<ToastLayer>> {
+    window_state::read(
+        window.window_handle().window_id(),
+        cx,
+        |route: &ToastRoute| route.layer.as_ref()?.upgrade(),
+    )
+    .flatten()
 }
 
 /// Whether a layer is mounted and can therefore show a notification.
-pub fn is_mounted(cx: &App) -> bool {
-    mounted(cx).is_some()
+pub fn is_mounted(window: &Window, cx: &App) -> bool {
+    mounted(window, cx).is_some()
 }
 
 /// Shows a toast, reporting whether it was delivered.
@@ -661,8 +658,8 @@ pub fn is_mounted(cx: &App) -> bool {
 /// False means no layer is mounted. The library will not pick a window it was
 /// not given, so the caller learns the notification went nowhere rather than
 /// believing something was shown.
-pub fn push(cx: &mut App, toast: Toast) -> bool {
-    let Some(layer) = mounted(cx) else {
+pub fn push(window: &Window, cx: &mut App, toast: Toast) -> bool {
+    let Some(layer) = mounted(window, cx) else {
         return false;
     };
     layer.update(cx, |layer, cx| layer.push(toast, cx));
@@ -670,26 +667,78 @@ pub fn push(cx: &mut App, toast: Toast) -> bool {
 }
 
 /// Starts the exit of one toast, reporting whether it was on screen.
-pub fn dismiss(cx: &mut App, ident: &str) -> bool {
-    let Some(layer) = mounted(cx) else {
+pub fn dismiss(window: &Window, cx: &mut App, ident: &str) -> bool {
+    let Some(layer) = mounted(window, cx) else {
         return false;
     };
     layer.update(cx, |layer, cx| layer.dismiss(ident, cx))
 }
 
 /// Starts the exit of every toast on screen.
-pub fn clear(cx: &mut App) {
-    if let Some(layer) = mounted(cx) {
+pub fn clear(window: &Window, cx: &mut App) {
+    if let Some(layer) = mounted(window, cx) {
         layer.update(cx, |layer, cx| layer.clear(cx));
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    use gpui::{AppContext, TestAppContext};
+
     use super::*;
+
+    struct WindowToasts {
+        layer: Entity<ToastLayer>,
+    }
+
+    impl Render for WindowToasts {
+        fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+            self.layer.clone()
+        }
+    }
 
     fn theme() -> Theme {
         Theme::studio_dark()
+    }
+
+    #[gpui::test]
+    fn pushes_are_routed_to_the_named_window(cx: &mut TestAppContext) {
+        cx.update(crate::install);
+        let left_layer = Rc::new(RefCell::new(None));
+        let left_slot = left_layer.clone();
+        let left = cx.add_window(move |window, cx| {
+            let layer = cx.new(|cx| ToastLayer::new(window, cx));
+            *left_slot.borrow_mut() = Some(layer.clone());
+            WindowToasts { layer }
+        });
+        let right_layer = Rc::new(RefCell::new(None));
+        let right_slot = right_layer.clone();
+        let right = cx.add_window(move |window, cx| {
+            let layer = cx.new(|cx| ToastLayer::new(window, cx));
+            *right_slot.borrow_mut() = Some(layer.clone());
+            WindowToasts { layer }
+        });
+        let left_layer = left_layer.borrow().clone().expect("left layer");
+        let right_layer = right_layer.borrow().clone().expect("right layer");
+
+        cx.update_window(*left, |_, window, cx| {
+            assert!(push(window, cx, Toast::new("shared", "Left")));
+            assert_eq!(left_layer.read(cx).len(), 1);
+        })
+        .expect("left window");
+        cx.update_window(*right, |_, window, cx| {
+            assert_eq!(right_layer.read(cx).len(), 0);
+            assert!(push(window, cx, Toast::new("shared", "Right")));
+            assert_eq!(right_layer.read(cx).len(), 1);
+        })
+        .expect("right window");
+        cx.update_window(*left, |_, _, cx| {
+            assert_eq!(left_layer.read(cx).len(), 1);
+        })
+        .expect("left window");
     }
 
     #[test]

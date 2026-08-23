@@ -860,7 +860,11 @@ fn sync_motion(
     window: &mut Window,
     cx: &mut App,
 ) -> Vec<PaintPoint> {
-    let cell = keyed::slot::<ChartMotion>(&ident.child("motion").semantic_id(), cx);
+    let cell = keyed::slot::<ChartMotion>(
+        &ident.child("motion").semantic_id(),
+        window.window_handle().window_id(),
+        cx,
+    );
     let mut motion_state = cell.borrow_mut();
     let active_keys = active
         .iter()
@@ -949,9 +953,14 @@ fn current_cell(
     ident: &Ident,
     declared: Option<ChartSelection>,
     active: &[ActivePoint],
+    window: &Window,
     cx: &mut App,
 ) -> Rc<std::cell::RefCell<ChartInteraction>> {
-    let cell = keyed::slot::<ChartInteraction>(&ident.child("interaction").semantic_id(), cx);
+    let cell = keyed::slot::<ChartInteraction>(
+        &ident.child("interaction").semantic_id(),
+        window.window_handle().window_id(),
+        cx,
+    );
     {
         let mut state = cell.borrow_mut();
         if !state.initialized || state.declared != declared {
@@ -1085,8 +1094,8 @@ fn ready_chart(
 ) -> AnyElement {
     let stroke = theme.borders.thick;
     let painted = sync_motion(ident, &active, theme, window, cx);
-    let measured = measure::cell(&ident.child("plot-bounds").semantic_id(), cx);
-    let interaction = crosshair.then(|| current_cell(ident, declared, &active, cx));
+    let measured = measure::cell(&ident.child("plot-bounds").semantic_id(), window, cx);
+    let interaction = crosshair.then(|| current_cell(ident, declared, &active, window, cx));
     let current = interaction.as_ref().and_then(|state| {
         let selection = state.borrow().current.clone()?;
         active

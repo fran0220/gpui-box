@@ -642,7 +642,11 @@ impl RenderOnce for Tree {
                 .into_any_element();
         }
         let reorder = self.reorder(window, cx);
-        let cache = keyed::slot::<FlattenCache>(&self.ident.child("flatten").semantic_id(), cx);
+        let cache = keyed::slot::<FlattenCache>(
+            &self.ident.child("flatten").semantic_id(),
+            window.window_handle().window_id(),
+            cx,
+        );
         let fingerprint = fingerprint_tree(&self.nodes, &self.expanded);
         let visible = {
             let mut cache = cache.borrow_mut();
@@ -668,7 +672,9 @@ impl RenderOnce for Tree {
         // the ones that happen to be built. A move that lands off screen
         // brings the row it named into view.
         let rows_ident = self.ident.child("rows");
-        let scroll = self.visible_rows.map(|_| scroll_handle(&rows_ident, cx));
+        let scroll = self
+            .visible_rows
+            .map(|_| scroll_handle(&rows_ident, window, cx));
 
         if !self.disabled && (self.on_select.is_some() || self.on_toggle.is_some()) {
             let nodes = visible.clone();

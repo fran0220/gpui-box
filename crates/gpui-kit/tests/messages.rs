@@ -149,7 +149,7 @@ fn appending_to_a_streaming_message_does_not_restart_its_indicator(cx: &mut Test
     let began = harness
         .update({
             let list = list.clone();
-            move |_, cx| streaming_since(&list, "msg-stream", cx)
+            move |window, cx| streaming_since(&list, "msg-stream", window, cx)
         })
         .expect("a streaming message starts a clock");
     assert!(harness.node("chat.msg-stream.streaming").is_some());
@@ -164,7 +164,7 @@ fn appending_to_a_streaming_message_does_not_restart_its_indicator(cx: &mut Test
     let after = harness
         .update({
             let list = list.clone();
-            move |_, cx| streaming_since(&list, "msg-stream", cx)
+            move |window, cx| streaming_since(&list, "msg-stream", window, cx)
         })
         .expect("still streaming");
     assert_eq!(
@@ -193,7 +193,7 @@ fn a_message_that_stops_streaming_drops_its_indicator_and_its_clock(cx: &mut Tes
     assert!(harness.node("chat.msg-stream.streaming").is_none());
     let list = Ident::new("chat");
     assert_eq!(
-        harness.update(move |_, cx| streaming_since(&list, "msg-stream", cx)),
+        harness.update(move |window, cx| streaming_since(&list, "msg-stream", window, cx)),
         None
     );
 }
@@ -398,7 +398,7 @@ fn a_conversation_travels_to_its_end_rather_than_cutting_to_it(cx: &mut TestAppC
     let list = Ident::new("chat");
     harness.update({
         let list = list.clone();
-        move |_, cx| engage_end(&list, cx)
+        move |window, cx| engage_end(&list, window, cx)
     });
 
     // One frame of a glide is a step, not the whole distance: the reader can
@@ -416,7 +416,7 @@ fn a_conversation_travels_to_its_end_rather_than_cutting_to_it(cx: &mut TestAppC
     );
     assert!(harness.update({
         let list = list.clone();
-        move |_, cx| follows_end(&list, cx)
+        move |window, cx| follows_end(&list, window, cx)
     }));
 }
 
@@ -425,7 +425,7 @@ fn a_message_arriving_while_the_end_is_held_is_followed(cx: &mut TestAppContext)
     let thread: Thread = Rc::new(RefCell::new(history(40)));
     let mut harness = flowing(cx, thread.clone());
     harness.frame();
-    harness.update(move |_, cx| engage_end(&Ident::new("chat"), cx));
+    harness.update(move |window, cx| engage_end(&Ident::new("chat"), window, cx));
     settle(&mut harness);
 
     thread
@@ -451,7 +451,7 @@ fn a_wheel_upward_stops_the_conversation_following(cx: &mut TestAppContext) {
     let list = Ident::new("chat");
     harness.update({
         let list = list.clone();
-        move |_, cx| engage_end(&list, cx)
+        move |window, cx| engage_end(&list, window, cx)
     });
     settle(&mut harness);
 
@@ -461,7 +461,7 @@ fn a_wheel_upward_stops_the_conversation_following(cx: &mut TestAppContext) {
     assert!(
         !harness.update({
             let list = list.clone();
-            move |_, cx| follows_end(&list, cx)
+            move |window, cx| follows_end(&list, window, cx)
         }),
         "a reader who scrolled up is reading, not following"
     );
@@ -488,7 +488,7 @@ fn scrolling_back_to_the_end_picks_following_up_again(cx: &mut TestAppContext) {
     let list = Ident::new("chat");
     harness.update({
         let list = list.clone();
-        move |_, cx| engage_end(&list, cx)
+        move |window, cx| engage_end(&list, window, cx)
     });
     settle(&mut harness);
     harness.scroll("chat", -400.0);
@@ -503,7 +503,7 @@ fn scrolling_back_to_the_end_picks_following_up_again(cx: &mut TestAppContext) {
     assert!(
         harness.update({
             let list = list.clone();
-            move |_, cx| follows_end(&list, cx)
+            move |window, cx| follows_end(&list, window, cx)
         }),
         "a reader who came back to the end is following again"
     );

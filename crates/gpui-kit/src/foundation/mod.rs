@@ -12,6 +12,7 @@ pub mod slot;
 pub(crate) mod stepping;
 mod styled_ext;
 mod theme_overlay;
+pub(crate) mod window_state;
 
 pub use direction::{
     ActiveDirection, DirectionalExt, LayoutDirection, LogicalSide, PhysicalSide,

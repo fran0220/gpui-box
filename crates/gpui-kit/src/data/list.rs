@@ -318,7 +318,7 @@ impl RenderOnce for List {
             .filter(|_| !self.disabled)
             .filter(|_| count > 0);
         let render_row = Rc::clone(&self.render_row);
-        let scroll = scroll_handle(&ident, cx);
+        let scroll = scroll_handle(&ident, window, cx);
         let reorder = self.reorder(window, cx);
 
         // Which index published which id on the last frame. The rows fill it
@@ -454,7 +454,7 @@ impl RenderOnce for List {
                     return;
                 };
                 if flowing {
-                    reveal_row(&reveal_ident, next, cx);
+                    reveal_row(&reveal_ident, next, window, cx);
                 } else {
                     scroll.scroll_to_item(next, ScrollStrategy::Nearest);
                 }
@@ -485,7 +485,7 @@ impl RenderOnce for List {
                 // the list's own state, so it asks for the frame that applies
                 // it rather than waiting for the caller to notice.
                 if flowing {
-                    reveal_row(&keyboard_ident, index, cx);
+                    reveal_row(&keyboard_ident, index, window, cx);
                 } else {
                     scroll.scroll_to_item(index, ScrollStrategy::Nearest);
                 }
