@@ -487,7 +487,9 @@ newer optional or false fields, which is a useful additive snapshot practice.
 That contract describes what the host rendered. It is not a plugin input
 schema. `SemanticRegistry` is application-global in the current implementation,
 not per-window: `install` puts one registry into `App`, and every window shares
-its generation and node map. `NodeSpec` contains `SharedString` and optional
+its generation and node map. Replacing that with a per-window context and a
+GPUI-free namespace/action envelope is committed foundation work in
+`docs/foundation-roadmap.md`. `NodeSpec` contains `SharedString` and optional
 `FocusHandle`; the `Semantic` trait records actual bounds during GPUI prepaint.
 Those remain renderer-side.
 

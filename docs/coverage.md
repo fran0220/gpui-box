@@ -21,10 +21,10 @@ input, and an entry in `docs/components.md`.
 | Choice | `Select`, `Combobox`, `Checkbox`, `Radio`, `Switch`, `Slider`, `SegmentedControl` |
 | Form | `FormField`, `SettingsRow`, `SettingsSection` |
 | Navigation | `Tabs`, `Accordion`, `Collapsible`, `Breadcrumb`, `Sidebar`, `Pagination`, `Wizard`, `UndoHistory` |
-| Data | `List` (virtualized), `Table`, `DataGrid` (virtualized), `BulkBar`, `Tree` |
+| Data | `List` (virtualized), `Table`, `DataGrid` (virtualized), `BulkBar`, `Tree`, `KanbanBoard` |
 | Date and time | `Calendar`, `DateInput`, `RangePicker`, `TimeInput` |
 | Content | `Markdown`, `AgentDocument`, `MessageList`, `ImageViewer`, `TransportBar`, `BrowserPanel` (shell only), `LogStream`, `DiffView` |
-| Display | `Badge`, `Tag`, `Avatar`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `StatusDot`, `StatusLine`, `Callout`, `Banner`, `StaleMark`, `PulseLoader`, `GradientSpinner`, `Skeleton`, `Spinner`, `RefreshVeil`, `ProgressCircle`, `StageProgress`, `StateView`, `OutcomePanel`, `DescriptionList`, `Timeline`, `Sparkline`, `LineChart`, `BarChart` |
+| Display | `Badge`, `Tag`, `Avatar`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `StatusDot`, `StatusLine`, `Callout`, `Banner`, `StaleMark`, `PulseLoader`, `GradientSpinner`, `Skeleton`, `Spinner`, `RefreshVeil`, `ProgressCircle`, `StageProgress`, `StateView`, `OutcomePanel`, `DescriptionList`, `Timeline`, `Sparkline`, `LineChart`, `BarChart`, `Heatmap` |
 | Overlay | `Overlay`, `Dialog`, `Drawer`, `Popover`, `Menu`, `ContextMenu`, `Menubar`, `CommandPalette`, `Tooltip`, `HoverCard`, `Toast`, `ToastLayer`, `Kbd` |
 | Layout | `DesktopTitlebar`, `SplitPane`, `SplitTree`, `ScrollArea`, `Toolbar`, `AspectRatio` |
 | Shell | `Dock`, `StatusBar` |
@@ -151,16 +151,13 @@ own; both are exercised through every control and overlay that uses them.
 - **Persisting a layout.** `SplitLayout` converts to and from plain records so
   a host can write it out, and this crate takes no serialization dependency to
   do it for them.
-- **Rich text and code editing.** `TextArea` edits plain text and `Markdown`
-  renders it read-only; neither edits rich text. Folding and multi-caret
-  editing are an editor, not a control. Syntax colouring stops at four classes
-  found by looking — keyword, string, comment, number — on the eight languages
-  `content::highlight` has a table for, chosen by the name the writer gave the
-  block. Anything past that (types, calls, scopes, errors) needs a grammar per
-  language and a resolver behind it, which is the same kind of fact the
-  calendar is — answered correctly only by the library the application already
-  depends on. A host that has one installs `Markdown::highlight` and its spans
-  win.
+- **Language intelligence and document policy.** Basic rich-text editing is a
+  framework and Kit gap, not permanently out of scope; its staged contract is
+  in `docs/foundation-roadmap.md`. Grammar/LSP facts, diagnostics, folding and
+  multi-caret policy, persistence, collaboration, and conversion to a product
+  document format remain host work. Syntax colouring still stops at four
+  built-in classes on the eight languages `content::highlight` knows. A host
+  that has a grammar installs its own spans, and those facts win.
 - **Doing what a document says.** `Markdown` draws HTML as the characters
   somebody wrote, reports a link rather than opening it, and names an image
   rather than fetching it. There is no HTML renderer here, no URL policy, and
@@ -188,14 +185,14 @@ own; both are exercised through every control and overlay that uses them.
   source is a caller input like every other fact this library cannot hold;
   a viewer given none says the size is unknown rather than reporting the box
   it drew.
-- **Playing media.** `TransportBar` reports play, pause, seek, volume, mute,
+- **Media policy.** `TransportBar` reports play, pause, seek, volume, mute,
   speed and a track step, and applies none of them. `AudioPlayer` and
-  `VideoPlayer` ask a `MediaTransport`; `PlatformMediaTransport` implements it
-  with AVFoundation on macOS and Media Foundation on Windows, including the
-  native decoder, output, clock and video view. Linux and Web remain explicit
-  no-backend targets. Playlist policy, DRM, subtitle/track selection, output
-  device routing, custom network retry/cache policy and capture remain host
-  responsibilities rather than states the components invent.
+  `VideoPlayer` ask a `MediaTransport`; `PlatformMediaTransport` currently
+  implements it with AVFoundation on macOS and Media Foundation on Windows.
+  Linux GStreamer and Web HTML media adapters are planned work in
+  `docs/foundation-roadmap.md`, not permanent no-backend policy. Playlist and
+  queue ownership, URL/auth policy, DRM, subtitle/track policy, output-device
+  policy, custom cache/retry and capture remain host responsibilities.
 - **Reading a 3D model that is not glTF.** `ModelViewer` reads the subset of
   glTF 2.0 stated in `docs/components.md` and refuses everything else, without
   a scene-graph dependency, a material system, or a texture pipeline. Other
@@ -433,11 +430,10 @@ unreadable source remains `failed`; neither is converted to empty media.
 
 ### Components
 
-Ordinary applications, roughly in the order they are wanted: document-tab
-vocabulary on `Tabs` (dirty, close, overflow), a search field with in-place hit
-highlighting, find and replace, a notification centre holding what `Toast`
-showed, an error boundary for a panel that failed to render, a read-only code
-view, and an upload list over `Dropzone`.
+Document tabs, `SearchField`, `FindReplace`, `NotificationCenter`, `CodeView`,
+and `UploadList` are covered above. `FailurePanel` presents an ordinary
+caller-owned failure; a render error boundary is not implementable while GPUI
+rendering is infallible and its draw arenas are not unwind-safe.
 
 `Toggle`, `ToggleGroup`, `Collapsible`, `HoverCard`, `Menubar`, `CopyButton`
 and `AspectRatio` are covered above. Three of them were built on top of what
@@ -494,7 +490,7 @@ presentation contract downstream.
 | Text range highlighting | `HighlightedText`, `LogStream`, `CodeView` and `DiffView` render caller-supplied ranges while constructing their text. GPUI still has no API that marks a substring of an arbitrary already-rendered text element, which blocks a generic find-in-page overlay. |
 | Writing direction | `LayoutDirection` supplies logical row order, start/end spacing and borders, text alignment, directional glyph mirroring, and reading-order keyboard traversal across controls, navigation, menus, calendars, trees, structured views, and schema forms. Unicode bidi shaping keeps mixed Arabic/Hebrew, Latin, punctuation, and numbers in logical order. Host-owned localized copy, locale formatting, and a larger language-specific bidi corpus remain integration work rather than component geometry. |
 | Number, date, and quantity formatting | Every word is now host-replaceable, but every *number* beside one is still formatted by Rust. See "Numbers a catalogue cannot fix" below. |
-| Assistive technology gaps | Basic semantics, grapheme-based editable and read-only text runs, read-only character geometry, selection actions, and explicit live-region properties now reach GPUI's AccessKit platform tree. Editable character geometry/native caret tracking, verified screen-reader announcement timing, native-child handoff, and native Windows session verification remain absent. Linux compatibility, including native AT-SPI validation, is deferred; see `docs/accessibility.md`. |
+| Assistive technology gaps | Basic semantics, grapheme-based editable and read-only text runs, read-only character geometry, selection actions, and explicit live-region properties now reach GPUI's AccessKit platform tree. Editable character geometry/native caret tracking, cross-tree relationships, native-child handoff, platform live-event verification, Windows UIA and Linux AT-SPI validation are active foundation work; see `docs/accessibility.md` and `docs/foundation-roadmap.md`. |
 | Validation vocabulary | `FormField` shows an error it is handed. When to validate, field against form, and validation still in flight have no shared shape. |
 | Composition | `Slotted` lets a caller replace a node a component authored rather than only configure it. A component publishes its positions as `SLOTS`, and a name outside that list panics rather than silently rendering nothing. Surfaces that author an `EmptyState` now offer `empty` / `failed` / `loading` so a host can replace those nodes without rewriting the state match. No component yet slots a node that is not a whole-region state. |
 | Size response | `Responsive` builds its content from its own measured width, so a component laid out in a sidebar and in a full-width page arranges itself differently without either of them consulting the window. `ContainerSize` reports `Unmeasured` for the one frame before there is a width rather than guessing at one. `Toolbar` now measures its cut from the widths it recorded last frame; `overflow_after` remains for a caller who already knows. What is still missing is a declarative breakpoint vocabulary — every caller writes its own thresholds — and there is no way to respond to a size a component cannot itself be given, such as the width of a sibling. |
@@ -534,8 +530,10 @@ format Rust digits and are the rest of this batch.
 `CHANGELOG.md` and the versioning policy in `README.md` now say what a consumer
 pins and what breaks them, including the two breaks the compiler cannot see: a
 token key and a semantic id. The publishable crates are a crates.io cohort;
-GPUI Box is no longer a git dependency of itself. What is still missing is a
-performance budget, so nothing fails when a virtualized list gets slower.
+GPUI Box is no longer a git dependency of itself. An enforceable structural
+and calibrated timing budget is active foundation work in
+`docs/foundation-roadmap.md`; until that phase lands, virtualization behavior
+tests still do not fail on every class of slowdown.
 The hosted catalog at gpui-box.origingame.dev is the published documentation;
 it is deployed from a checkout and is not itself a crates.io release.
 
