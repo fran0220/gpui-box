@@ -1641,6 +1641,18 @@ impl PlatformWindow for X11Window {
         .log_err();
     }
 
+    fn request_close(&self) {
+        let window = self.0.clone();
+        let executor = self.0.state.borrow().executor.clone();
+        executor
+            .spawn(async move {
+                if window.should_close() {
+                    window.close();
+                }
+            })
+            .detach();
+    }
+
     fn toggle_fullscreen(&self) {
         let state = self.0.state.borrow();
         self.set_wm_hints(

@@ -924,11 +924,28 @@ impl PlatformWindow for WindowsWindow {
     fn zoom(&self) {
         unsafe {
             if IsWindowVisible(self.0.hwnd).as_bool() {
-                ShowWindowAsync(self.0.hwnd, SW_MAXIMIZE).ok().log_err();
+                let command = if self.state.is_maximized() {
+                    SW_NORMAL
+                } else {
+                    SW_MAXIMIZE
+                };
+                ShowWindowAsync(self.0.hwnd, command).ok().log_err();
             } else if let Some(mut status) = self.state.initial_placement.take() {
                 status.state = WindowOpenState::Maximized;
                 self.state.initial_placement.set(Some(status));
             }
+        }
+    }
+
+    fn request_close(&self) {
+        unsafe {
+            PostMessageW(
+                Some(self.0.hwnd),
+                WM_CLOSE,
+                WPARAM::default(),
+                LPARAM::default(),
+            )
+            .log_err();
         }
     }
 

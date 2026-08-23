@@ -679,6 +679,12 @@ pub(crate) struct HitTest {
 /// A type of window control area that corresponds to the platform window.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum WindowControlArea {
+    /// An ordinary client area nested inside custom window chrome.
+    ///
+    /// Use this for interactive content inside a surrounding [`Self::Drag`]
+    /// area so the operating system does not treat the nested content as a
+    /// caption gesture.
+    Client,
     /// An area that allows dragging of the platform window.
     Drag,
     /// An area that allows closing of the platform window.
@@ -2275,6 +2281,18 @@ impl Window {
         self.platform_window.is_maximized()
     }
 
+    /// Returns the custom window-control area at `position` in the latest
+    /// rendered frame.
+    ///
+    /// This test-support API verifies client title-bar hit testing without a
+    /// native compositor. Later-painted nested areas take precedence over an
+    /// enclosing drag area, matching the platform callback.
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn window_control_area_at(&self, position: Point<Pixels>) -> Option<WindowControlArea> {
+        let hit_test = self.rendered_frame.hit_test(position);
+        window_control_at_mouse(&self.rendered_frame, &hit_test)
+    }
+
     /// request a certain window decoration (Wayland)
     pub fn request_decorations(&self, decorations: WindowDecorations) {
         self.platform_window.request_decorations(decorations);
@@ -2670,6 +2688,13 @@ impl Window {
     /// Toggle zoom on the window.
     pub fn zoom_window(&self) {
         self.platform_window.zoom();
+    }
+
+    /// Requests that the platform close this window through its normal close
+    /// path, including any callback registered with
+    /// [`Self::on_window_should_close`].
+    pub fn request_close(&self) {
+        self.platform_window.request_close();
     }
 
     /// Opens the native title bar context menu, useful when implementing client side decorations (Wayland and X11)
@@ -7694,6 +7719,14 @@ mod tests {
                         .size(px(40.))
                         .window_control_area(WindowControlArea::Close),
                 )
+                .child(
+                    div()
+                        .absolute()
+                        .top_0()
+                        .left(px(40.))
+                        .size(px(40.))
+                        .window_control_area(WindowControlArea::Client),
+                )
         }
     }
 
@@ -7709,7 +7742,13 @@ mod tests {
                 Some(WindowControlArea::Close)
             );
 
-            window.simulate_mouse_move(point(px(60.), px(60.)), cx);
+            window.simulate_mouse_move(point(px(60.), px(20.)), cx);
+            assert_eq!(
+                window_control_at_mouse(&window.rendered_frame, &window.mouse_hit_test),
+                Some(WindowControlArea::Client)
+            );
+
+            window.simulate_mouse_move(point(px(100.), px(60.)), cx);
             assert_eq!(
                 window_control_at_mouse(&window.rendered_frame, &window.mouse_hit_test),
                 Some(WindowControlArea::Drag)

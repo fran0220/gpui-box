@@ -28,6 +28,7 @@ pub(crate) struct TestWindowState {
     sprite_atlas: Arc<dyn PlatformAtlas>,
     renderer: Option<Box<dyn PlatformHeadlessRenderer>>,
     pub(crate) should_close_handler: Option<Box<dyn FnMut() -> bool>>,
+    close_handler: Option<Box<dyn FnOnce()>>,
     hit_test_window_control_callback: Option<Box<dyn FnMut() -> Option<WindowControlArea>>>,
     input_callback: Option<Box<dyn FnMut(PlatformInput) -> DispatchEventResult>>,
     active_status_change_callback: Option<Box<dyn FnMut(bool)>>,
@@ -85,6 +86,7 @@ impl TestWindow {
             edited: false,
             document_path: None,
             should_close_handler: None,
+            close_handler: None,
             hit_test_window_control_callback: None,
             input_callback: None,
             active_status_change_callback: None,
@@ -289,6 +291,32 @@ impl PlatformWindow for TestWindow {
         unimplemented!()
     }
 
+    fn request_close(&self) {
+        let Some(platform) = self.0.lock().platform.upgrade() else {
+            return;
+        };
+        let executor = platform.foreground_executor.clone();
+        let window = self.clone();
+        executor
+            .spawn(async move {
+                let should_close_handler = window.0.lock().should_close_handler.take();
+                let should_close = if let Some(mut callback) = should_close_handler {
+                    let should_close = callback();
+                    window.0.lock().should_close_handler = Some(callback);
+                    should_close
+                } else {
+                    true
+                };
+                if should_close {
+                    let close = window.0.lock().close_handler.take();
+                    if let Some(close) = close {
+                        close();
+                    }
+                }
+            })
+            .detach();
+    }
+
     fn toggle_fullscreen(&self) {
         let mut lock = self.0.lock();
         lock.is_fullscreen = !lock.is_fullscreen;
@@ -324,7 +352,9 @@ impl PlatformWindow for TestWindow {
         self.0.lock().should_close_handler = Some(callback);
     }
 
-    fn on_close(&self, _callback: Box<dyn FnOnce()>) {}
+    fn on_close(&self, callback: Box<dyn FnOnce()>) {
+        self.0.lock().close_handler = Some(callback);
+    }
 
     fn on_hit_test_window_control(&self, callback: Box<dyn FnMut() -> Option<WindowControlArea>>) {
         self.0.lock().hit_test_window_control_callback = Some(callback);

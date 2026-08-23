@@ -720,6 +720,28 @@ impl PlatformWindow for WebWindow {
         log::warn!("WebWindow::zoom is not supported in the browser");
     }
 
+    fn request_close(&self) {
+        let inner = self.inner.clone();
+        let callback = Closure::once_into_js(move || {
+            let mut callbacks = inner.callbacks.borrow_mut();
+            let should_close = if let Some(mut callback) = callbacks.should_close.take() {
+                let should_close = callback();
+                callbacks.should_close = Some(callback);
+                should_close
+            } else {
+                true
+            };
+            let close = should_close.then(|| callbacks.close.take()).flatten();
+            drop(callbacks);
+            if let Some(close) = close {
+                close();
+            }
+        });
+        self.inner
+            .browser_window
+            .queue_microtask(callback.unchecked_ref());
+    }
+
     fn toggle_fullscreen(&self) {
         let Some(document) = self.inner.browser_window.document() else {
             return;

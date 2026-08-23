@@ -16,10 +16,10 @@ use uuid::Uuid;
 
 use gpui::{
     AtlasKey, AtlasTextureId, AtlasTile, Bounds, Capslock, DevicePixels, DispatchEventResult,
-    DisplayId, GpuSpecs, Modifiers, Pixels, PlatformAtlas, PlatformDisplay, PlatformInput,
-    PlatformInputHandler, PlatformWindow, Point, PromptButton, PromptLevel, RequestFrameOptions,
-    Scene, Size, TileId, WindowAppearance, WindowBackgroundAppearance, WindowBounds,
-    WindowControlArea, WindowParams, px,
+    DisplayId, ForegroundExecutor, GpuSpecs, Modifiers, Pixels, PlatformAtlas, PlatformDisplay,
+    PlatformInput, PlatformInputHandler, PlatformWindow, Point, PromptButton, PromptLevel,
+    RequestFrameOptions, Scene, Size, TileId, WindowAppearance, WindowBackgroundAppearance,
+    WindowBounds, WindowControlArea, WindowParams, px,
 };
 
 #[derive(Debug)]
@@ -56,8 +56,12 @@ struct HeadlessWindowState {
     input_handler: Option<PlatformInputHandler>,
     title: Option<String>,
     is_fullscreen: bool,
+    executor: ForegroundExecutor,
+    should_close_callback: Option<Box<dyn FnMut() -> bool>>,
+    close_callback: Option<Box<dyn FnOnce()>>,
 }
 
+#[derive(Clone)]
 pub(crate) struct HeadlessWindow(Rc<RefCell<HeadlessWindowState>>);
 
 impl raw_window_handle::HasWindowHandle for HeadlessWindow {
@@ -78,13 +82,20 @@ impl raw_window_handle::HasDisplayHandle for HeadlessWindow {
 }
 
 impl HeadlessWindow {
-    pub(crate) fn new(params: WindowParams, display: Rc<dyn PlatformDisplay>) -> Self {
+    pub(crate) fn new(
+        params: WindowParams,
+        display: Rc<dyn PlatformDisplay>,
+        executor: ForegroundExecutor,
+    ) -> Self {
         Self(Rc::new(RefCell::new(HeadlessWindowState {
             bounds: params.bounds,
             display,
             input_handler: None,
             title: None,
             is_fullscreen: false,
+            executor,
+            should_close_callback: None,
+            close_callback: None,
         })))
     }
 }
@@ -181,6 +192,26 @@ impl PlatformWindow for HeadlessWindow {
 
     fn zoom(&self) {}
 
+    fn request_close(&self) {
+        let window = self.clone();
+        let executor = self.0.borrow().executor.clone();
+        executor
+            .spawn(async move {
+                let should_close_callback = window.0.borrow_mut().should_close_callback.take();
+                let should_close = if let Some(mut callback) = should_close_callback {
+                    let should_close = callback();
+                    window.0.borrow_mut().should_close_callback = Some(callback);
+                    should_close
+                } else {
+                    true
+                };
+                if should_close && let Some(close) = window.0.borrow_mut().close_callback.take() {
+                    close();
+                }
+            })
+            .detach();
+    }
+
     fn toggle_fullscreen(&self) {
         let mut state = self.0.borrow_mut();
         state.is_fullscreen = !state.is_fullscreen;
@@ -204,9 +235,13 @@ impl PlatformWindow for HeadlessWindow {
 
     fn on_moved(&self, _callback: Box<dyn FnMut()>) {}
 
-    fn on_should_close(&self, _callback: Box<dyn FnMut() -> bool>) {}
+    fn on_should_close(&self, callback: Box<dyn FnMut() -> bool>) {
+        self.0.borrow_mut().should_close_callback = Some(callback);
+    }
 
-    fn on_close(&self, _callback: Box<dyn FnOnce()>) {}
+    fn on_close(&self, callback: Box<dyn FnOnce()>) {
+        self.0.borrow_mut().close_callback = Some(callback);
+    }
 
     fn on_hit_test_window_control(&self, _callback: Box<dyn FnMut() -> Option<WindowControlArea>>) {
     }

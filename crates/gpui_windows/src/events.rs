@@ -1019,6 +1019,7 @@ impl WindowsWindowInner {
                 .hit_test_window_control
                 .set(Some(callback));
             area.and_then(|area| match area {
+                WindowControlArea::Client => Some(HTCLIENT as _),
                 WindowControlArea::Drag if self.is_movable => Some(HTCAPTION as _),
                 WindowControlArea::Drag => None,
                 WindowControlArea::Close => Some(HTCLOSE as _),

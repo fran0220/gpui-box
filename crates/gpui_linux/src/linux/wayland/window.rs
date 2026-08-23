@@ -1659,6 +1659,27 @@ impl PlatformWindow for WaylandWindow {
         }
     }
 
+    fn request_close(&self) {
+        let window = self.0.clone();
+        let executor = self.borrow().globals.executor.clone();
+        executor
+            .spawn(async move {
+                let mut callbacks = window.callbacks.borrow_mut();
+                let should_close = if let Some(mut callback) = callbacks.should_close.take() {
+                    let should_close = callback();
+                    callbacks.should_close = Some(callback);
+                    should_close
+                } else {
+                    true
+                };
+                drop(callbacks);
+                if should_close {
+                    window.close();
+                }
+            })
+            .detach();
+    }
+
     fn toggle_fullscreen(&self) {
         let state = self.borrow();
         if let Some(toplevel) = state.surface_state.toplevel() {

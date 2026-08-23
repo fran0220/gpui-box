@@ -853,6 +853,11 @@ pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
     fn set_background_appearance(&self, background_appearance: WindowBackgroundAppearance);
     fn minimize(&self);
     fn zoom(&self);
+    /// Asks the platform to close this window through its normal close path.
+    ///
+    /// The request must run the callback registered by [`Self::on_should_close`]
+    /// and leave the window open when that callback refuses.
+    fn request_close(&self);
     fn toggle_fullscreen(&self);
     fn is_fullscreen(&self) -> bool;
     fn on_request_frame(&self, callback: Box<dyn FnMut(RequestFrameOptions)>);

@@ -20,7 +20,7 @@ use std::{
 /// TestPlatform implements the Platform trait for use in tests.
 pub(crate) struct TestPlatform {
     background_executor: BackgroundExecutor,
-    foreground_executor: ForegroundExecutor,
+    pub(crate) foreground_executor: ForegroundExecutor,
 
     pub(crate) active_window: RefCell<Option<TestWindow>>,
     active_display: Rc<dyn PlatformDisplay>,

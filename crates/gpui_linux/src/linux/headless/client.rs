@@ -102,9 +102,11 @@ impl LinuxClient for HeadlessClient {
         _handle: AnyWindowHandle,
         params: WindowParams,
     ) -> anyhow::Result<Box<dyn PlatformWindow>> {
+        let state = self.0.borrow();
         Ok(Box::new(HeadlessWindow::new(
             params,
-            self.0.borrow().display.clone(),
+            state.display.clone(),
+            state.common.foreground_executor.clone(),
         )))
     }
 
