@@ -4215,7 +4215,8 @@
       "source": "crates/gpui-kit/src/layout/status_bar.rs",
       "summary": "The strip along the bottom of a window.",
       "construct": [
-        "new(ident: impl Into<Ident>) -> Self"
+        "new(ident: impl Into<Ident>) -> Self",
+        "height() -> gpui::Pixels"
       ],
       "options": [
         "label(label: impl Into<SharedString>) -> Self",
@@ -4720,7 +4721,8 @@
       ],
       "options": [
         "corner(corner: ToastCorner) -> Self",
-        "capacity(capacity: usize) -> Self"
+        "capacity(capacity: usize) -> Self",
+        "reserved_edges(edges: impl Into<Edges<Pixels>>) -> Self"
       ],
       "commands": [
         "push(toast: Toast, cx: &mut Context<Self>)",

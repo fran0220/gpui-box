@@ -51,6 +51,11 @@ Snap Layout; macOS keeps native traffic lights; Linux reports the same requests
 to its compositor-backed window implementation; browser builds expose no
 desktop caption controls.
 
+Transient notifications remain viewport-pinned, but a host can declare edges
+already occupied by its own chrome through `ToastLayer::reserved_edges`.
+`StatusBar::height` exposes the matching shared strip height, so applications
+do not copy framework geometry to keep persistent notifications clear.
+
 Renderer-backed linear, elliptical radial, and conic gradients accept two
 through eight ordered color stops for both quads and filled paths. Radial
 centres and radii are normalized to the painted bounds; conic gradients start

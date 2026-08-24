@@ -23,8 +23,8 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use gpui::{
-    AnyElement, App, Context, Entity, InteractiveElement, IntoElement, ParentElement, Render,
-    SharedString, StatefulInteractiveElement, Styled, WeakEntity, Window, div,
+    AnyElement, App, Context, Edges, Entity, InteractiveElement, IntoElement, ParentElement,
+    Pixels, Render, SharedString, StatefulInteractiveElement, Styled, WeakEntity, Window, div,
     prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::{Icon, icon};
@@ -262,6 +262,7 @@ impl Entry {
 pub struct ToastLayer {
     corner: ToastCorner,
     capacity: usize,
+    reserved_edges: Edges<Pixels>,
     entries: Vec<Entry>,
     /// When the last frame that advanced a timer happened.
     last_tick: Option<Instant>,
@@ -273,6 +274,7 @@ impl std::fmt::Debug for ToastLayer {
             .debug_struct("ToastLayer")
             .field("corner", &self.corner)
             .field("capacity", &self.capacity)
+            .field("reserved_edges", &self.reserved_edges)
             .field("toasts", &self.entries.len())
             .finish()
     }
@@ -290,6 +292,7 @@ impl ToastLayer {
         Self {
             corner: ToastCorner::default(),
             capacity: DEFAULT_CAPACITY,
+            reserved_edges: Edges::default(),
             entries: Vec::new(),
             last_tick: None,
         }
@@ -303,6 +306,13 @@ impl ToastLayer {
     /// How many toasts stand at once. A capacity below one is raised to one.
     pub fn capacity(mut self, capacity: usize) -> Self {
         self.capacity = capacity.max(1);
+        self
+    }
+
+    /// Window edges already occupied by host chrome, in addition to the
+    /// layer's own breathing room.
+    pub fn reserved_edges(mut self, edges: impl Into<Edges<Pixels>>) -> Self {
+        self.reserved_edges = edges.into();
         self
     }
 
@@ -608,6 +618,7 @@ impl Render for ToastLayer {
         let leading = self.corner.is_leading();
         let top = self.corner.is_top();
         let viewport = window.viewport_size();
+        let inset = px(theme.space(Space::Lg));
         let stack = div()
             .column()
             .gap_token(&theme, Space::Sm)
@@ -624,7 +635,10 @@ impl Render for ToastLayer {
             .h(viewport.height)
             .flex()
             .flex_col()
-            .p_token(&theme, Space::Lg)
+            .pt(inset + self.reserved_edges.top)
+            .pr(inset + self.reserved_edges.right)
+            .pb(inset + self.reserved_edges.bottom)
+            .pl(inset + self.reserved_edges.left)
             .when(top, |element| element.justify_start())
             .when(!top, |element| element.justify_end())
             .when(leading, |element| element.items_start())

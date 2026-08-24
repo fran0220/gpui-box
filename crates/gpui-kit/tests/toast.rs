@@ -6,7 +6,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
-use gpui::{AppContext as _, Entity, Modifiers, MouseButton, TestAppContext, div, prelude::*, px};
+use gpui::{
+    AppContext as _, Edges, Entity, Modifiers, MouseButton, TestAppContext, div, prelude::*, px,
+};
 use gpui_kit::motion::Phase;
 use gpui_kit::overlay::toast;
 use gpui_kit::prelude::*;
@@ -40,19 +42,33 @@ fn a_static_status_is_not_a_live_region(cx: &mut TestAppContext) {
     assert!(status["aria"].get("live").is_none());
 }
 
-fn scene(cx: &mut TestAppContext, capacity: usize) -> (Harness, Entity<ToastLayer>) {
+fn scene_with_reserved_edges(
+    cx: &mut TestAppContext,
+    capacity: usize,
+    reserved_edges: Edges<gpui::Pixels>,
+) -> (Harness, Entity<ToastLayer>) {
     let slot: Rc<RefCell<Option<Entity<ToastLayer>>>> = Rc::new(RefCell::new(None));
     let build = slot.clone();
     let mut harness = Harness::new(cx, gpui_kit::install, move |window, cx| {
         let layer = build
             .borrow_mut()
-            .get_or_insert_with(|| cx.new(|cx| ToastLayer::new(window, cx).capacity(capacity)))
+            .get_or_insert_with(|| {
+                cx.new(|cx| {
+                    ToastLayer::new(window, cx)
+                        .capacity(capacity)
+                        .reserved_edges(reserved_edges)
+                })
+            })
             .clone();
         div().size_full().child(layer).into_any_element()
     });
     harness.snapshot();
     let layer = slot.borrow().clone().expect("a layer was mounted");
     (harness, layer)
+}
+
+fn scene(cx: &mut TestAppContext, capacity: usize) -> (Harness, Entity<ToastLayer>) {
+    scene_with_reserved_edges(cx, capacity, Edges::default())
 }
 
 fn push(harness: &mut Harness, toast: Toast) -> bool {
@@ -151,6 +167,32 @@ fn a_danger_toast_is_an_assertive_live_region(cx: &mut TestAppContext) {
         })
         .expect("assertive native status");
     assert_eq!(native["aria"]["live"], "Assertive");
+}
+
+#[gpui::test]
+fn reserved_host_chrome_moves_the_toast_stack_out_of_its_edge(cx: &mut TestAppContext) {
+    let reserved = px(26.0);
+    let (mut harness, _layer) = scene_with_reserved_edges(
+        cx,
+        3,
+        Edges {
+            bottom: reserved,
+            ..Edges::default()
+        },
+    );
+    assert!(push(
+        &mut harness,
+        Toast::new("run.failed", "Publishing failed")
+            .tone(Tone::Danger)
+            .persistent()
+    ));
+
+    let toast = harness.bounds("run.failed").expect("published");
+    let viewport = harness.update(|window, _| window.viewport_size());
+    assert!(
+        toast.bottom() <= viewport.height - reserved,
+        "the toast must not cover the edge its host reserved"
+    );
 }
 
 #[gpui::test]

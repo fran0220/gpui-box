@@ -272,6 +272,11 @@ impl StatusBar {
         }
     }
 
+    /// The vertical space this bar reserves in its host shell.
+    pub fn height() -> gpui::Pixels {
+        px(HEIGHT)
+    }
+
     /// What the strip is, for a reader that has only the tree.
     pub fn label(mut self, label: impl Into<SharedString>) -> Self {
         self.label = Some(label.into());
