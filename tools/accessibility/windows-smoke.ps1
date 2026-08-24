@@ -12,6 +12,12 @@ $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 
+# The Windows PowerShell UIAutomationTypes assembly does not expose a named
+# identifier for newer UIA properties. LookupById is the documented bridge for
+# properties whose numerical identifier is known; FullDescription is 30159.
+$FullDescriptionProperty =
+    [System.Windows.Automation.AutomationProperty]::LookupById(30159)
+
 function Find-All {
     param(
         [System.Windows.Automation.ControlType]$ControlType,
@@ -177,11 +183,11 @@ switch ($Mode) {
         $workspace = Find-Unique -ControlType ([System.Windows.Automation.ControlType]::Edit) -Name "Workspace name"
         $retention = Find-Unique -ControlType ([System.Windows.Automation.ControlType]::Edit) -Name "Retention"
         $workspaceHelp = [string]$workspace.GetCurrentPropertyValue(
-            [System.Windows.Automation.AutomationElementIdentifiers]::FullDescriptionProperty,
+            $FullDescriptionProperty,
             $true
         )
         $retentionHelp = [string]$retention.GetCurrentPropertyValue(
-            [System.Windows.Automation.AutomationElementIdentifiers]::FullDescriptionProperty,
+            $FullDescriptionProperty,
             $true
         )
         if ($workspaceHelp -ne "Shown wherever this workspace appears. A workspace with this name already exists.") {
