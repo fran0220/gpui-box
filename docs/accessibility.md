@@ -114,7 +114,10 @@ selection/caret positions, and `SetValue` and
 boundaries as editing, including combining sequences and emoji ZWJ sequences.
 TextArea run boundaries come from its shaped visual rows, hard line breaks
 remain in the preceding row, and line links never cross a shaped wrap or hard
-break. Resolved Unicode bidi levels split mixed-direction text into truthful
+break. `RichTextEditor` publishes the same contract over its flat platform
+projection: one separator between caller-identified blocks, styled visual rows
+from the geometry that painted them, and alignment-aware caret, range, and IME
+bounds. Resolved Unicode bidi levels split mixed-direction text into truthful
 logical-order runs; no whole-chunk first-strong direction is inferred.
 Kit type styles bundle and explicitly select Arabic and Hebrew fallback faces,
 so those logical runs remain visible even in deterministic renderers with no

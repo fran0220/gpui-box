@@ -454,6 +454,13 @@ pub enum RichTextIntent {
         text: SharedString,
         kind: RichTextInputKind,
     },
+    /// Replaces the selection with plain text whose normalized line breaks
+    /// become hard blocks. There must be one fresh stable id per break.
+    ReplaceMultiline {
+        text: SharedString,
+        new_blocks: Vec<RichTextBlockId>,
+        kind: RichTextInputKind,
+    },
     InsertSoftBreak,
     InsertHardBreak {
         new_block: RichTextBlockId,
@@ -494,6 +501,7 @@ pub enum RichTextError {
     EmptyBlockId,
     DuplicateBlockId(RichTextBlockId),
     UnknownBlock(RichTextBlockId),
+    BlockIdCount { expected: usize, actual: usize },
 }
 
 impl fmt::Display for RichTextError {
@@ -505,6 +513,10 @@ impl fmt::Display for RichTextError {
                 write!(formatter, "rich-text block id `{id}` is repeated")
             }
             Self::UnknownBlock(id) => write!(formatter, "rich-text block `{id}` does not exist"),
+            Self::BlockIdCount { expected, actual } => write!(
+                formatter,
+                "multiline rich-text replacement needs {expected} new block ids, got {actual}"
+            ),
         }
     }
 }
@@ -649,6 +661,43 @@ impl RichTextEditSession {
                     HistoryKind::Other
                 };
                 (changed, history)
+            }
+            RichTextIntent::ReplaceMultiline {
+                text,
+                new_blocks,
+                kind: _,
+            } => {
+                let normalized = normalize_multiline(text.as_ref());
+                let expected = normalized.matches('\n').count();
+                if new_blocks.len() != expected {
+                    return Err(RichTextError::BlockIdCount {
+                        expected,
+                        actual: new_blocks.len(),
+                    });
+                }
+                let mut seen = self
+                    .document
+                    .blocks
+                    .iter()
+                    .map(|block| block.id.clone())
+                    .collect::<HashSet<_>>();
+                for id in &new_blocks {
+                    if id.as_str().is_empty() {
+                        return Err(RichTextError::EmptyBlockId);
+                    }
+                    if !seen.insert(id.clone()) {
+                        return Err(RichTextError::DuplicateBlockId(id.clone()));
+                    }
+                }
+                let mut parts = normalized.split('\n');
+                let mut changed = self.replace_selection(parts.next().unwrap_or_default())?;
+                for (part, id) in parts.zip(new_blocks) {
+                    changed |= self.split_block(id)?;
+                    if !part.is_empty() {
+                        changed |= self.replace_selection(part)?;
+                    }
+                }
+                (changed, HistoryKind::Other)
             }
             RichTextIntent::InsertSoftBreak => (self.replace_selection("\n")?, HistoryKind::Other),
             RichTextIntent::InsertHardBreak { new_block } => {
@@ -1446,6 +1495,62 @@ mod tests {
             })
             .expect("type without history");
         assert!(!session.can_undo());
+    }
+
+    #[test]
+    fn multiline_replacement_is_one_atomic_history_step() {
+        let mut session = session("old");
+        select(&mut session, ("a", 0), ("a", 3));
+        session
+            .apply(RichTextIntent::ReplaceMultiline {
+                text: "first\nsecond\n".into(),
+                new_blocks: vec!["b".into(), "c".into()],
+                kind: RichTextInputKind::Paste,
+            })
+            .expect("multiline replacement");
+        assert_eq!(
+            session
+                .document()
+                .blocks()
+                .iter()
+                .map(|block| block.text().as_ref())
+                .collect::<Vec<_>>(),
+            ["first", "second", ""]
+        );
+
+        session.apply(RichTextIntent::Undo).expect("undo");
+        assert_eq!(session.document().blocks().len(), 1);
+        assert_eq!(session.document().blocks()[0].text().as_ref(), "old");
+        session.apply(RichTextIntent::Redo).expect("redo");
+        assert_eq!(session.document().blocks().len(), 3);
+    }
+
+    #[test]
+    fn multiline_replacement_refuses_bad_ids_before_mutating() {
+        let mut session = session("old");
+        let before = session.document().clone();
+        assert_eq!(
+            session.apply(RichTextIntent::ReplaceMultiline {
+                text: "first\nsecond".into(),
+                new_blocks: Vec::new(),
+                kind: RichTextInputKind::Paste,
+            }),
+            Err(RichTextError::BlockIdCount {
+                expected: 1,
+                actual: 0,
+            })
+        );
+        assert_eq!(session.document(), &before);
+
+        assert_eq!(
+            session.apply(RichTextIntent::ReplaceMultiline {
+                text: "first\nsecond".into(),
+                new_blocks: vec!["a".into()],
+                kind: RichTextInputKind::Paste,
+            }),
+            Err(RichTextError::DuplicateBlockId("a".into()))
+        );
+        assert_eq!(session.document(), &before);
     }
 
     #[test]

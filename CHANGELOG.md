@@ -124,8 +124,12 @@ ordered or unordered list metadata without choosing Markdown, HTML, or a
 durable format. Caller-owned `RichTextEditSession` applies typed selection,
 replacement, formatting, link, list, split, merge, IME composition, undo, and
 redo intents with grapheme-safe boundaries. External document replacement and
-secret-history refusal cannot resurrect superseded text. The visible
-`RichTextEditor` and its toolbar remain the next part of this foundation.
+secret-history refusal cannot resurrect superseded text. `RichTextEditor`
+renders that caller-owned session with styled wrapped blocks, logical
+alignment, list markers, selections, diagnostics, clipboard, keyboard and IME
+input, multiline accessibility text, and a quiet token-backed formatting
+toolbar. Hosts still own persistence, collaboration, grammar facts, URL policy,
+and stable ids for newly split blocks.
 
 **Editable text has one framework authority.** `gpui::EditBuffer` now owns the
 grapheme-safe selection, replacement, marked-composition, grouped undo/redo,

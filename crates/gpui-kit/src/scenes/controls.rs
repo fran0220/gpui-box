@@ -1074,6 +1074,100 @@ pub(super) fn textarea(window: &mut Window, cx: &mut App) -> AnyElement {
         .into_any_element()
 }
 
+pub(super) struct SceneRichTextEditor {
+    editor: Entity<RichTextEditor>,
+}
+
+impl Global for SceneRichTextEditor {}
+
+pub(super) fn ensure_rich_text_editor(window: &mut Window, cx: &mut App) {
+    if cx.has_global::<SceneRichTextEditor>() {
+        return;
+    }
+    let title_text = "A structured editing surface";
+    let body_text = "Inline code stays quiet, links remain caller-owned, and diagnostics keep their actual severity.";
+    let code_start = body_text
+        .find("Inline code")
+        .expect("fixture phrase exists");
+    let code_end = code_start + "Inline code".len();
+    let link_start = body_text.find("links").expect("fixture phrase exists");
+    let link_end = link_start + "links".len();
+    let document = RichTextDocument::new([
+        RichTextBlock::new("rich-title", title_text).with_style(
+            0..title_text.len(),
+            RichTextInlineStyle::default().with_format(RichTextFormat::Bold, true),
+        ),
+        RichTextBlock::new("rich-body", body_text)
+            .with_style(
+                code_start..code_end,
+                RichTextInlineStyle::default().with_format(RichTextFormat::Code, true),
+            )
+            .with_style(
+                link_start..link_end,
+                RichTextInlineStyle::default()
+                    .with_link(Some("https://example.invalid/policy".into())),
+            ),
+        RichTextBlock::new("rich-list-one", "Host owns persistence and collaboration.")
+            .with_paragraph(
+                RichTextParagraphStyle::default()
+                    .with_list(Some(RichTextListItem::new(RichTextListKind::Unordered))),
+            ),
+        RichTextBlock::new(
+            "rich-list-two",
+            "Kit owns selection, IME, layout, and formatting.",
+        )
+        .with_paragraph(
+            RichTextParagraphStyle::default()
+                .with_list(Some(RichTextListItem::new(RichTextListKind::Unordered))),
+        ),
+        RichTextBlock::new("rich-centered", "Alignment shares caret geometry.").with_paragraph(
+            RichTextParagraphStyle::default().with_alignment(RichTextAlignment::Center),
+        ),
+    ])
+    .expect("fixture document is valid");
+    let session = cx.new(|_| RichTextEditSession::new(document));
+    let next_id = Rc::new(std::cell::Cell::new(0_u64));
+    let editor = cx.new(|cx| {
+        let next_id = Rc::clone(&next_id);
+        RichTextEditor::new(
+            "scene.rich-text-editor",
+            session,
+            move || {
+                let value = next_id.get().wrapping_add(1);
+                next_id.set(value);
+                RichTextBlockId::new(format!("scene-rich-{value}"))
+            },
+            window,
+            cx,
+        )
+        .name("Structured document")
+        .rows(8)
+        .max_rows(8)
+        .diagnostics([RichTextDiagnostic::new(
+            RichTextRange {
+                start: RichTextPosition::new("rich-body", link_start),
+                end: RichTextPosition::new("rich-body", link_end),
+            },
+            RichTextDiagnosticSeverity::Warning,
+        )])
+    });
+    cx.set_global(SceneRichTextEditor { editor });
+}
+
+pub(super) fn rich_text_editor(window: &mut Window, cx: &mut App) -> AnyElement {
+    ensure_rich_text_editor(window, cx);
+    let editor = cx.global::<SceneRichTextEditor>().editor.clone();
+    let theme = cx.theme().clone();
+    stack(&theme)
+        .w(px(720.0))
+        .child(caption(
+            &theme,
+            "one caller-owned document; styled blocks, lists, diagnostics, IME, and semantics share one projection",
+        ))
+        .child(editor)
+        .into_any_element()
+}
+
 pub(super) fn dropzone(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     // No single pointer position can produce all three states at once, so each

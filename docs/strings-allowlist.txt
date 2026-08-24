@@ -144,6 +144,7 @@ RangePicker
 RefreshVeil
 Responsive
 RewardReveal
+RichTextEditor
 Row
 SCALAR
 SchemaForm
@@ -212,6 +213,7 @@ Yes
 `{id}` names a parent `{parent}` that is absent
 a built source was just matched
 a keyframe list is never empty
+a rich text document always has one block
 a rich-text block id cannot be empty
 a rich-text document needs one block
 ability charge maximum must be positive
@@ -230,9 +232,12 @@ game fraction must be between 0 and 1
 game fraction must be finite
 glTF
 handled before mutation
+layout came from projected document
+layout is present until paint
 markdown stream closed `{end:?}` past its root
 month unknown
 more than one root: {}
+multiline rich-text replacement needs {expected} new block ids, got {actual}
 must be between 0 and 1
 must be finite
 no record without a parent

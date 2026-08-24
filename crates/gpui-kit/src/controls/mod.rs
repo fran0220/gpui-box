@@ -15,6 +15,7 @@ pub mod input;
 pub mod keybinding_recorder;
 pub mod keymap_editor;
 pub mod number_input;
+pub mod rich_text_editor;
 pub mod search;
 pub mod segmented;
 pub mod select;

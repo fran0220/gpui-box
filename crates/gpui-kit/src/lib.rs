@@ -173,6 +173,9 @@ pub mod prelude {
         KeymapBinding, KeymapCommand, KeymapEditor, KeymapEditorEvent,
     };
     pub use crate::controls::number_input::{NumberInput, NumberInputEvent};
+    pub use crate::controls::rich_text_editor::{
+        RichTextDiagnostic, RichTextDiagnosticSeverity, RichTextEditor, RichTextEditorEvent,
+    };
     pub use crate::controls::search::{
         FindReplace, FindReplaceEvent, HitCount, SearchField, SearchFieldEvent,
     };
@@ -323,6 +326,7 @@ pub fn install(cx: &mut App) {
     foundation::direction::install(cx);
     interaction::install(cx);
     controls::input::install(cx);
+    controls::rich_text_editor::install(cx);
     controls::textarea::install(cx);
     overlay::toast::install(cx);
 }

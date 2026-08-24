@@ -120,9 +120,11 @@ Status: the framework `EditBuffer`, `EditableTextLayout`, and generic
 shared edit and geometry authorities. Kit's storage-neutral
 `RichTextDocument` and caller-owned `RichTextEditSession` now provide stable
 block identity, paragraph/list metadata, inline marks and links, grapheme-safe
-typed intents, composition, and document-level undo/redo. Editor presentation,
-input wiring, diagnostics, and platform/visual acceptance remain to be
-completed in this phase.
+typed intents, composition, and document-level undo/redo. `RichTextEditor` now
+projects that session through styled wrapped layout, alignment-aware pointer,
+caret, selection, IME and accessibility geometry, caller-supplied diagnostics,
+clipboard and keyboard commands, and the standard token-backed toolbar.
+Cross-platform visual acceptance remains the final proof for this phase.
 
 ### Framework primitive
 

@@ -17,7 +17,7 @@ input, and an entry in `docs/components.md`.
 | Family | Components |
 |---|---|
 | Action | `Button`, `IconButton`, `ButtonGroup`, `SplitButton`, `Toggle`, `ToggleGroup`, `CopyButton` |
-| Text entry | `TextInput`, `PasswordInput`, `OneTimeCodeInput`, `TextArea`, `NumberInput`, `TagInput`, `InlineEdit`, `SearchField`, `FindReplace`, `UploadList` |
+| Text entry | `TextInput`, `PasswordInput`, `OneTimeCodeInput`, `TextArea`, `RichTextEditor`, `NumberInput`, `TagInput`, `InlineEdit`, `SearchField`, `FindReplace`, `UploadList` |
 | Choice | `Select`, `Cascader`, `Combobox`, `Checkbox`, `Radio`, `Switch`, `Slider`, `SegmentedControl`, `ColorPicker`, `ColorSwatch` |
 | Form | `FormField`, `SettingsRow`, `SettingsSection` |
 | Navigation | `Tabs`, `Accordion`, `Collapsible`, `Breadcrumb`, `Sidebar`, `AnchorList`, `Pagination`, `Wizard`, `UndoHistory` |
@@ -155,13 +155,13 @@ own; both are exercised through every control and overlay that uses them.
   do it for them.
 - **Language intelligence and document policy.** The shared editable buffer,
   geometry, style coverage, rich document, and caller-owned edit session now
-  exist. The visible basic rich editor remains an active Kit gap tracked in
-  `docs/foundation-roadmap.md`, not permanently out of scope. Grammar/LSP
-  facts, diagnostics, folding and multi-caret policy, persistence,
-  collaboration, and conversion to a product document format remain host
-  work. Syntax colouring still stops at four built-in classes on the eight
-  languages `content::highlight` knows. A host that has a grammar installs its
-  own spans, and those facts win.
+  drive `RichTextEditor`: styled blocks, alignment, lists, diagnostics,
+  keyboard/clipboard/IME behavior, semantics, and its formatting toolbar share
+  one projection. Grammar/LSP facts, folding and multi-caret policy,
+  persistence, collaboration, URL policy, and conversion to a product
+  document format remain host work. Syntax colouring still stops at four
+  built-in classes on the eight languages `content::highlight` knows. A host
+  that has a grammar installs its own spans, and those facts win.
 - **Doing what a document says.** `Markdown` draws HTML as the characters
   somebody wrote, reports a link rather than opening it, and names an image
   rather than fetching it. There is no HTML renderer here, no URL policy, and

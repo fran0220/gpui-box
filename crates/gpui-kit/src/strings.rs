@@ -734,6 +734,27 @@ string_keys! {
     TreeChildrenUnavailable => "tree.children-unavailable", "Could not load this branch";
     TreeEmpty => "tree.empty", "No items";
     TextAreaCount => "textarea.count", "{0} of {1}";
+    // Structured rich text editing. Document text and link destinations remain
+    // caller-owned; this vocabulary names the editor's own controls.
+    RichTextPlaceholder => "rich-text.placeholder", "Write…";
+    RichTextToolbar => "rich-text.toolbar", "Formatting";
+    RichTextUndo => "rich-text.undo", "Undo";
+    RichTextRedo => "rich-text.redo", "Redo";
+    RichTextBold => "rich-text.bold", "Bold";
+    RichTextItalic => "rich-text.italic", "Italic";
+    RichTextUnderline => "rich-text.underline", "Underline";
+    RichTextStrike => "rich-text.strike", "Strikethrough";
+    RichTextCode => "rich-text.code", "Code";
+    RichTextLink => "rich-text.link", "Link";
+    RichTextUnorderedList => "rich-text.unordered-list", "Bulleted list";
+    RichTextOrderedList => "rich-text.ordered-list", "Numbered list";
+    RichTextAlignStart => "rich-text.align-start", "Align to start";
+    RichTextAlignCenter => "rich-text.align-center", "Align to center";
+    RichTextAlignEnd => "rich-text.align-end", "Align to end";
+    RichTextIndent => "rich-text.indent", "Increase indent";
+    RichTextOutdent => "rich-text.outdent", "Decrease indent";
+    RichTextBullet => "rich-text.bullet", "•";
+    RichTextOrderedMarker => "rich-text.ordered-marker", "{0}.";
     DrawerResize => "drawer.resize", "Resize drawer";
     SparklineEmpty => "sparkline.empty", "No readings";
     SparklineUnavailable => "sparkline.unavailable", "Reading unavailable";
