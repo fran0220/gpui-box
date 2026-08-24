@@ -798,6 +798,7 @@ mod tests {
 
     #[test]
     fn external_drop_bytes_stay_locked_until_drop_and_obey_limit() {
+        let _lock = lock_pasteboard_tests();
         let pasteboard = Pasteboard::unique();
         let bytes = b"encoded-image";
         unsafe {
