@@ -106,6 +106,14 @@ Number, date, time, range, switch, and file-drop controls now accept host
 invalidity in addition to their own parser/range/drag state, so every schema
 field can agree with the reason beside it.
 
+**A hidden schema field has one explicit submission answer.** `FieldVisibility`
+records the result of a caller-owned condition without teaching `SchemaForm`
+product rules. Hidden fields and subtrees do not render or field-validate;
+`HiddenSubmission::Omit` leaves them out of `submission_values`, while
+`Include` preserves the complete held subtree. `values` remains the lossless
+inventory. Object and repeated-list parents govern their descendants, and a
+repeated child's visibility follows stable item identity across reorders.
+
 **An accordion body turns with the reading order.** The header honoured RTL and
 the body did not, so a disclosed section read as belonging to the one on the
 other side. Turning the text alone was not enough: a shrink-to-fit child is

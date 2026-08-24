@@ -463,9 +463,11 @@ Application forms now cover date, time, range, files, and repeating sections.
 Date facts come from `DateAdapter`; file admissibility and display names come
 from `SchemaFilePolicy`, while the host still opens the OS picker. Repeating
 sections keep stable visual identity and nested values without owning product
-data. Host-declared visibility remains the schema-level gap: hiding a field can
-change validation and submission policy, so it needs an explicit caller-owned
-contract rather than an ad-hoc component predicate.
+data. Host-declared conditional rules resolve into `FieldVisibility`: visible,
+or hidden with `Omit` / `Include` submission policy. Hidden fields and subtrees
+cannot become invisible validation blockers. `values()` remains the complete
+held-value inventory while `submission_values()` applies that explicit policy;
+the form never owns the condition or removes caller data.
 
 `LineChart` and `BarChart` now cover the cartesian presentation gap with keyed
 motion, area fills, pointer and keyboard crosshairs, exact host-formatted text,
@@ -500,6 +502,7 @@ presentation contract downstream.
 | Number, date, and quantity formatting | `NumberAdapter` owns every library-authored numeric shape — grouped counts and decimals, editable parsing, plural category, count-of-total, percent, multiplier, dimensions, ordinals, signed deltas, lower bounds, and affix placement. `Strings` owns every phrase and its zero/one/two/few/many/other variants. Dates remain the parallel `DateAdapter` contract. See "Numbers a catalogue cannot fix alone" below. |
 | Assistive technology gaps | Basic semantics, grapheme-based editable and read-only text runs, shared shaped character/caret geometry, selection actions, explicit live-region properties, and same-window labelled-by/described-by relationships now reach GPUI's AccessKit platform tree. macOS natively verifies relationship-derived field name/help and editable character/caret bounds. Native-child handoff, platform live-event verification, Windows UIA editable-range coverage, and Linux AT-SPI validation are active foundation work; see `docs/accessibility.md` and `docs/foundation-roadmap.md`. |
 | Validation vocabulary | `ValidationState` is the caller-owned `Pending` / `Validating` / `Invalid { reason }` / `Valid` ladder. `FormField` presents it without painting in-flight work as failure; `SchemaForm` keeps field and whole-form validation separate and blocks submission while an explicitly managed check is pending or validating. Rules and timing remain host-owned. |
+| Schema field participation | `FieldVisibility` records the result of a host-owned condition without evaluating it. Hidden fields are absent from rendering and field validation; `HiddenSubmission::Omit` removes the subtree only from `submission_values`, while `Include` preserves its complete held subtree. `values` stays lossless, and a hidden object or repeated-list parent governs every descendant. |
 | Composition | `Slotted` lets a caller replace a node a component authored rather than only configure it. A component publishes only positions its public state model can actually reach as `SLOTS`, and a name outside that list panics rather than silently rendering nothing. Surfaces with loading and failure phases offer those distinct slots; an empty-only collection offers only `empty`. No component yet slots a node that is not a whole-region state. |
 | Size response | `Responsive` builds its content from its own measured width, so a component laid out in a sidebar and in a full-width page arranges itself differently without either of them consulting the window. `ContainerSize` reports `Unmeasured` for the one frame before there is a width rather than guessing at one. `Toolbar` now measures its cut from the widths it recorded last frame; `overflow_after` remains for a caller who already knows. What is still missing is a declarative breakpoint vocabulary — every caller writes its own thresholds — and there is no way to respond to a size a component cannot itself be given, such as the width of a sibling. |
 | Style escape hatch | `ThemeOverlay` installs a caller-adjusted `Theme` for one subtree and pops it afterwards, in every element phase, so an override cannot reach a sibling. What comes back is a whole `Theme`, so the subtree still reads a complete token set and a component inside it cannot tell it was overridden. There is still no way to override *one property of one instance* without constructing a theme for it, which is deliberate: a per-instance colour is how a library stops being one. |

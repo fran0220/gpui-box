@@ -604,6 +604,143 @@ fn field_and_form_validation_are_separate_caller_owned_ladders(cx: &mut TestAppC
 }
 
 #[gpui::test]
+fn hidden_fields_have_explicit_validation_and_submission_semantics(cx: &mut TestAppContext) {
+    let schema = Schema::new()
+        .field(SchemaField::new(
+            "visible",
+            SchemaKind::Text {
+                placeholder: None,
+                secret: false,
+            },
+        ))
+        .field(
+            SchemaField::new(
+                "retained",
+                SchemaKind::Text {
+                    placeholder: None,
+                    secret: false,
+                },
+            )
+            .required(true),
+        )
+        .field(
+            SchemaField::new(
+                "advanced",
+                SchemaKind::Object(vec![
+                    SchemaField::new(
+                        "host_value",
+                        SchemaKind::Unrenderable("The host supplies this value.".into()),
+                    )
+                    .required(true),
+                ]),
+            )
+            .label("Advanced"),
+        );
+    let (mut harness, form) = form_harness(cx, schema);
+
+    harness.click("form.retained.control");
+    harness.context().simulate_input("stored");
+    harness.update(|_, cx| {
+        form.update(cx, |form, cx| {
+            assert!(form.set_field_validation(
+                "retained",
+                ValidationState::invalid("The stored value was refused."),
+                cx,
+            ));
+            assert!(form.set_field_visibility(
+                "retained",
+                FieldVisibility::Hidden {
+                    submission: HiddenSubmission::Include,
+                },
+                cx,
+            ));
+            assert!(form.set_field_visibility(
+                "advanced",
+                FieldVisibility::Hidden {
+                    submission: HiddenSubmission::Omit,
+                },
+                cx,
+            ));
+            assert!(!form.set_field_visibility(
+                "field-that-no-longer-exists",
+                FieldVisibility::Hidden {
+                    submission: HiddenSubmission::Omit,
+                },
+                cx,
+            ));
+            assert_eq!(
+                form.field_visibility("advanced/host_value", cx),
+                Some(FieldVisibility::Hidden {
+                    submission: HiddenSubmission::Omit,
+                }),
+                "a hidden object governs its whole subtree"
+            );
+            assert!(
+                form.validate(cx),
+                "hidden required and invalid fields cannot become invisible blockers"
+            );
+
+            let held = form.values(cx);
+            assert!(held.contains(&("retained".into(), FieldValue::Text("stored".into()))));
+            assert!(held.contains(&("advanced/host_value".into(), FieldValue::Unrenderable)));
+
+            let submitted = form.submission_values(cx);
+            assert!(submitted.contains(&("retained".into(), FieldValue::Text("stored".into()))));
+            assert!(
+                submitted
+                    .iter()
+                    .all(|(path, _)| !path.starts_with("advanced")),
+                "Hidden + Omit removes the complete object subtree"
+            );
+            assert!(form.has_unrenderable_required());
+        });
+    });
+    harness.frame();
+
+    assert!(harness.node("form.retained").is_none());
+    assert!(harness.node("form.advanced").is_none());
+    assert!(harness.node("form.advanced/host_value").is_none());
+    assert!(harness.node("form.unrenderable").is_none());
+    assert!(!harness.node("form").expect("form").invalid);
+    assert_eq!(
+        harness.node("form").expect("form").value.as_deref(),
+        Some("1"),
+        "the semantic count is the fields currently presented"
+    );
+
+    harness.update(|_, cx| {
+        form.update(cx, |form, cx| {
+            assert!(form.set_field_visibility(
+                "retained",
+                FieldVisibility::Hidden {
+                    submission: HiddenSubmission::Omit,
+                },
+                cx,
+            ));
+            assert!(
+                form.submission_values(cx)
+                    .iter()
+                    .all(|(path, _)| path != "retained"),
+                "the caller can switch the hidden value from preserved to omitted"
+            );
+            assert!(form.set_field_visibility("retained", FieldVisibility::Visible, cx));
+            assert!(form.set_field_visibility("advanced", FieldVisibility::Visible, cx));
+        });
+    });
+    harness.frame();
+
+    assert!(
+        harness
+            .node("form.retained")
+            .expect("restored field")
+            .invalid
+    );
+    assert!(harness.node("form.advanced").is_some());
+    assert!(harness.node("form.advanced/host_value").is_some());
+    assert!(harness.node("form.unrenderable").is_some());
+}
+
+#[gpui::test]
 fn the_form_can_also_find_a_missing_required_field_itself(cx: &mut TestAppContext) {
     let (mut harness, form) = form_harness(cx, schema());
 
@@ -1105,6 +1242,90 @@ fn repeated_items_keep_identity_while_exported_paths_follow_position(cx: &mut Te
         assert!(values.iter().all(|(path, _)| !path.starts_with("items[1]")));
         assert_eq!(form.read(cx).unrenderable().len(), 1);
     });
+}
+
+#[gpui::test]
+fn repeated_visibility_follows_stable_items_and_parent_policy_governs_the_subtree(
+    cx: &mut TestAppContext,
+) {
+    let (mut harness, form) = form_harness(cx, repeated_schema());
+
+    harness.click("form.items.control.add");
+    harness.click("form.items.control.item-0.name.control");
+    harness.context().simulate_input("Alpha");
+    harness.click("form.items.control.add");
+    harness.click("form.items.control.item-1.name.control");
+    harness.context().simulate_input("Beta");
+    harness.update(|_, cx| {
+        form.update(cx, |form, cx| {
+            assert!(form.set_field_visibility(
+                "items[0].name",
+                FieldVisibility::Hidden {
+                    submission: HiddenSubmission::Omit,
+                },
+                cx,
+            ));
+            assert!(form.move_list_item("items", 0, 1, cx));
+            assert_eq!(
+                form.field_visibility("items[0].name", cx),
+                Some(FieldVisibility::Visible)
+            );
+            assert_eq!(
+                form.field_visibility("items[1].name", cx),
+                Some(FieldVisibility::Hidden {
+                    submission: HiddenSubmission::Omit,
+                }),
+                "visibility moves with the stable item rather than its former index"
+            );
+
+            let submitted = form.submission_values(cx);
+            assert!(submitted.contains(&("items[0].name".into(), FieldValue::Text("Beta".into()))));
+            assert!(submitted.iter().all(|(path, _)| path != "items[1].name"));
+            assert!(
+                form.values(cx)
+                    .contains(&("items[1].name".into(), FieldValue::Text("Alpha".into()))),
+                "the complete held-value inventory is independent of visibility"
+            );
+
+            assert!(form.set_field_visibility(
+                "items",
+                FieldVisibility::Hidden {
+                    submission: HiddenSubmission::Include,
+                },
+                cx,
+            ));
+            assert_eq!(
+                form.field_visibility("items[1].name", cx),
+                Some(FieldVisibility::Hidden {
+                    submission: HiddenSubmission::Include,
+                }),
+                "a hidden list parent governs every descendant"
+            );
+            let submitted = form.submission_values(cx);
+            assert!(
+                submitted.contains(&("items[1].name".into(), FieldValue::Text("Alpha".into())))
+            );
+            assert_eq!(
+                submitted.first(),
+                Some(&("items".into(), FieldValue::ItemCount(2)))
+            );
+        });
+    });
+    harness.frame();
+    assert!(harness.node("form.items").is_none());
+    assert_eq!(
+        harness.node("form").expect("form").value.as_deref(),
+        Some("0")
+    );
+
+    harness.update(|_, cx| {
+        form.update(cx, |form, cx| {
+            assert!(form.set_field_visibility("items", FieldVisibility::Visible, cx));
+        });
+    });
+    harness.frame();
+    assert!(harness.node("form.items.control.item-0.name").is_none());
+    assert!(harness.node("form.items.control.item-1.name").is_some());
 }
 
 #[gpui::test]

@@ -30,6 +30,15 @@
 //! marks only what this component can judge; [`SchemaForm::set_field_validation`]
 //! and [`SchemaForm::set_validation`] advance checks owned by the caller. A
 //! whole-form refusal never paints every field red.
+//!
+//! # Visibility is caller-owned
+//!
+//! Conditional rules stay with the host. [`SchemaForm::set_field_visibility`]
+//! only records their result: whether a field is visible and, when hidden,
+//! whether its held value belongs in [`SchemaForm::submission_values`]. Hidden
+//! fields are never field-validated because a person cannot repair a control
+//! they cannot reach. [`SchemaForm::values`] remains the complete held-value
+//! inventory, independent of presentation and submission policy.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -374,6 +383,35 @@ pub enum FieldValue {
     Unrenderable,
 }
 
+/// Whether a hidden field's held value belongs in the caller's submission.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HiddenSubmission {
+    /// Leave the field and its subtree out of [`SchemaForm::submission_values`].
+    Omit,
+    /// Keep the field and its subtree in [`SchemaForm::submission_values`].
+    Include,
+}
+
+/// Whether one schema field participates in this form presentation.
+///
+/// Hidden fields are not rendered or field-validated. A hidden object or
+/// repeating list applies its submission policy to the complete subtree, so a
+/// descendant cannot accidentally reappear or use a contradictory policy.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum FieldVisibility {
+    #[default]
+    Visible,
+    Hidden {
+        submission: HiddenSubmission,
+    },
+}
+
+impl FieldVisibility {
+    fn is_visible(self) -> bool {
+        matches!(self, Self::Visible)
+    }
+}
+
 /// What the form reports.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SchemaFormEvent {
@@ -462,6 +500,9 @@ pub struct SchemaForm {
     field_validation: BTreeMap<SharedString, ValidationState>,
     /// Validation about the submission as a whole, kept apart from fields.
     validation: Option<ValidationState>,
+    /// Caller-owned conditional presentation, by local field path. Missing
+    /// entries are visible; hidden object fields govern their whole subtree.
+    field_visibility: BTreeMap<SharedString, FieldVisibility>,
     /// What the form worked out is missing, by path. Cleared by every edit to
     /// that field, so an answered complaint does not stay on screen.
     derived_errors: BTreeMap<SharedString, SharedString>,
@@ -498,6 +539,7 @@ impl SchemaForm {
             fields: Vec::new(),
             field_validation: BTreeMap::new(),
             validation: None,
+            field_visibility: BTreeMap::new(),
             derived_errors: BTreeMap::new(),
             unrenderable: Vec::new(),
             base_unrenderable: 0,
@@ -1251,6 +1293,42 @@ impl SchemaForm {
         })
     }
 
+    fn repeated_parent_visibility(&self, path: &str) -> Option<FieldVisibility> {
+        self.fields.iter().find_map(|field| {
+            let Control::Repeated(repeated) = &field.control else {
+                return None;
+            };
+            let rest = path.strip_prefix(field.path.as_ref())?.strip_prefix('[')?;
+            let (index, _) = rest.split_once("].")?;
+            let index = index.parse::<usize>().ok()?;
+            repeated.items.get(index)?;
+            Some(self.visibility_for_local_path(field.path.as_ref()))
+        })
+    }
+
+    /// Returns the effective local visibility, including a hidden object
+    /// ancestor. The first hidden ancestor governs the whole subtree.
+    fn visibility_for_local_path(&self, path: &str) -> FieldVisibility {
+        let mut prefix = String::new();
+        for segment in path.split('/') {
+            if !prefix.is_empty() {
+                prefix.push('/');
+            }
+            prefix.push_str(segment);
+            if let Some(visibility @ FieldVisibility::Hidden { .. }) =
+                self.field_visibility.get(prefix.as_str()).copied()
+            {
+                return visibility;
+            }
+        }
+        FieldVisibility::Visible
+    }
+
+    fn field_is_visible(&self, field: &Field) -> bool {
+        self.visibility_for_local_path(field.path.as_ref())
+            .is_visible()
+    }
+
     fn refresh_repeated_unrenderable(&mut self, cx: &App) {
         self.unrenderable.truncate(self.base_unrenderable);
         for field in &self.fields {
@@ -1332,6 +1410,60 @@ impl SchemaForm {
         true
     }
 
+    /// Applies the caller's conditional-visibility result to one current
+    /// field path. Returns `false` for a stale or unknown path.
+    ///
+    /// A hidden field is never field-validated: an invalid control nobody can
+    /// reach must not become an invisible submission blocker. Use whole-form
+    /// validation when a hidden caller-owned value is itself refused. Hiding
+    /// an object or repeating list governs its complete subtree.
+    pub fn set_field_visibility(
+        &mut self,
+        path: impl Into<SharedString>,
+        visibility: FieldVisibility,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let path = path.into();
+        if let Some((form, child_path)) = self.repeated_child(path.as_ref()) {
+            return form.update(cx, |form, cx| {
+                form.set_field_visibility(child_path, visibility, cx)
+            });
+        }
+        if !self.fields.iter().any(|field| field.path == path) {
+            return false;
+        }
+        match visibility {
+            FieldVisibility::Visible => {
+                self.field_visibility.remove(&path);
+            }
+            FieldVisibility::Hidden { .. } => {
+                self.field_visibility.insert(path, visibility);
+            }
+        }
+        self.sync_control_validity(cx);
+        cx.notify();
+        true
+    }
+
+    /// Returns one current field path's effective visibility. A hidden object
+    /// or repeating-list ancestor is returned for every descendant it governs.
+    /// Repeated item paths resolve through the item's current position while
+    /// their state stays with the stable child form across reorders.
+    pub fn field_visibility(&self, path: &str, cx: &App) -> Option<FieldVisibility> {
+        if let Some(parent_visibility @ FieldVisibility::Hidden { .. }) =
+            self.repeated_parent_visibility(path)
+        {
+            return Some(parent_visibility);
+        }
+        if let Some((form, child_path)) = self.repeated_child(path) {
+            return form.read(cx).field_visibility(child_path.as_ref(), cx);
+        }
+        self.fields
+            .iter()
+            .any(|field| field.path == path)
+            .then(|| self.visibility_for_local_path(path))
+    }
+
     /// Advances validation for the complete form. A form-level invalid reason
     /// is presented once and never copied onto individual fields.
     pub fn set_validation(&mut self, validation: ValidationState, cx: &mut Context<Self>) {
@@ -1404,7 +1536,8 @@ impl SchemaForm {
             .fields
             .iter()
             .filter(|field| {
-                field.required
+                self.field_is_visible(field)
+                    && field.required
                     && match self.value_of(field, cx) {
                         FieldValue::Absent => true,
                         FieldValue::Files(paths) => paths.is_empty(),
@@ -1421,6 +1554,7 @@ impl SchemaForm {
         let rejected: Vec<(SharedString, SharedString)> = self
             .fields
             .iter()
+            .filter(|field| self.field_is_visible(field))
             .filter_map(|field| match &field.control {
                 Control::Number(number) => number
                     .read(cx)
@@ -1433,24 +1567,24 @@ impl SchemaForm {
             self.derived_errors.entry(path).or_insert(reason);
         }
         let mut repeated_answerable = true;
-        for item in self
+        for field in self
             .fields
             .iter()
-            .filter_map(|field| match &field.control {
-                Control::Repeated(repeated) => Some(&repeated.items),
-                _ => None,
-            })
-            .flatten()
+            .filter(|field| self.field_is_visible(field))
         {
-            repeated_answerable &= item.form.update(cx, |form, cx| form.validate(cx));
+            if let Control::Repeated(repeated) = &field.control {
+                for item in &repeated.items {
+                    repeated_answerable &= item.form.update(cx, |form, cx| form.validate(cx));
+                }
+            }
         }
         self.refresh_repeated_unrenderable(cx);
         self.sync_control_validity(cx);
         cx.notify();
         repeated_answerable
             && self.derived_errors.is_empty()
-            && !self.unrenderable.iter().any(|field| field.required)
-            && self.managed_validation_allows_submit()
+            && !self.visible_unrenderable(cx).1
+            && self.managed_validation_allows_submit(cx)
     }
 
     /// Every field and what it holds, including the ones the form could not
@@ -1473,6 +1607,48 @@ impl SchemaForm {
                             )
                         },
                     ));
+                }
+            }
+        }
+        values
+    }
+
+    /// The explicit submission set after applying caller-owned visibility.
+    ///
+    /// Unlike [`SchemaForm::values`], a hidden field with
+    /// [`HiddenSubmission::Omit`] and its subtree are absent. A hidden field
+    /// with [`HiddenSubmission::Include`] preserves its complete held subtree.
+    pub fn submission_values(&self, cx: &App) -> Vec<(SharedString, FieldValue)> {
+        let mut values = Vec::new();
+        for field in &self.fields {
+            let visibility = self.visibility_for_local_path(field.path.as_ref());
+            if matches!(
+                visibility,
+                FieldVisibility::Hidden {
+                    submission: HiddenSubmission::Omit
+                }
+            ) || matches!(field.control, Control::Group)
+            {
+                continue;
+            }
+            values.push((field.path.clone(), self.value_of(field, cx)));
+            if let Control::Repeated(repeated) = &field.control {
+                for (index, item) in repeated.items.iter().enumerate() {
+                    let child_values = match visibility {
+                        FieldVisibility::Visible => item.form.read(cx).submission_values(cx),
+                        FieldVisibility::Hidden {
+                            submission: HiddenSubmission::Include,
+                        } => item.form.read(cx).values(cx),
+                        FieldVisibility::Hidden {
+                            submission: HiddenSubmission::Omit,
+                        } => Vec::new(),
+                    };
+                    values.extend(child_values.into_iter().map(|(child_path, value)| {
+                        (
+                            format!("{}[{index}].{child_path}", field.path).into(),
+                            value,
+                        )
+                    }));
                 }
             }
         }
@@ -1624,14 +1800,16 @@ impl SchemaForm {
             .unwrap_or_default()
     }
 
-    fn managed_validation_allows_submit(&self) -> bool {
+    fn managed_validation_allows_submit(&self, cx: &App) -> bool {
         self.validation
             .as_ref()
             .is_none_or(|validation| matches!(validation, ValidationState::Valid))
-            && self
-                .field_validation
-                .values()
-                .all(|validation| matches!(validation, ValidationState::Valid))
+            && self.field_validation.iter().all(|(path, validation)| {
+                !self
+                    .field_visibility(path, cx)
+                    .is_some_and(FieldVisibility::is_visible)
+                    || matches!(validation, ValidationState::Valid)
+            })
     }
 
     fn validation_is_busy(&self, cx: &App) -> bool {
@@ -1641,14 +1819,19 @@ impl SchemaForm {
             || self
                 .fields
                 .iter()
+                .filter(|field| self.field_is_visible(field))
                 .any(|field| self.validation_for(field, cx).is_busy())
-            || self.fields.iter().any(|field| match &field.control {
-                Control::Repeated(repeated) => repeated
-                    .items
-                    .iter()
-                    .any(|item| item.form.read(cx).validation_is_busy(cx)),
-                _ => false,
-            })
+            || self
+                .fields
+                .iter()
+                .filter(|field| self.field_is_visible(field))
+                .any(|field| match &field.control {
+                    Control::Repeated(repeated) => repeated
+                        .items
+                        .iter()
+                        .any(|item| item.form.read(cx).validation_is_busy(cx)),
+                    _ => false,
+                })
     }
 
     fn validation_is_invalid(&self, cx: &App) -> bool {
@@ -1658,15 +1841,49 @@ impl SchemaForm {
             || self
                 .fields
                 .iter()
+                .filter(|field| self.field_is_visible(field))
                 .any(|field| self.validation_for(field, cx).is_invalid())
-            || self.unrenderable.iter().any(|field| field.required)
-            || self.fields.iter().any(|field| match &field.control {
-                Control::Repeated(repeated) => repeated
-                    .items
-                    .iter()
-                    .any(|item| item.form.read(cx).validation_is_invalid(cx)),
-                _ => false,
-            })
+            || self.visible_unrenderable(cx).1
+            || self
+                .fields
+                .iter()
+                .filter(|field| self.field_is_visible(field))
+                .any(|field| match &field.control {
+                    Control::Repeated(repeated) => repeated
+                        .items
+                        .iter()
+                        .any(|item| item.form.read(cx).validation_is_invalid(cx)),
+                    _ => false,
+                })
+    }
+
+    /// Number of unrenderable fields currently presented, and whether one is
+    /// required. The public inventory remains complete; this projection keeps
+    /// hidden fields out of validation and the visible summary.
+    fn visible_unrenderable(&self, cx: &App) -> (usize, bool) {
+        let mut count = 0;
+        let mut required = false;
+        for field in self
+            .fields
+            .iter()
+            .filter(|field| self.field_is_visible(field))
+        {
+            match &field.control {
+                Control::Unrenderable(_) => {
+                    count += 1;
+                    required |= field.required;
+                }
+                Control::Repeated(repeated) => {
+                    for item in &repeated.items {
+                        let child = item.form.read(cx).visible_unrenderable(cx);
+                        count += child.0;
+                        required |= child.1;
+                    }
+                }
+                _ => {}
+            }
+        }
+        (count, required)
     }
 
     /// Tells every control whether the form is showing an error about it.
@@ -1729,15 +1946,19 @@ impl Disableable for SchemaForm {
 impl Render for SchemaForm {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let count = self.fields.len();
+        let count = self
+            .fields
+            .iter()
+            .filter(|field| self.field_is_visible(field))
+            .count();
         let strings = cx.strings();
-        let unrenderable_required = self.has_unrenderable_required();
-        let summary = (!self.unrenderable.is_empty()).then(|| {
+        let (unrenderable_count, unrenderable_required) = self.visible_unrenderable(cx);
+        let summary = (unrenderable_count > 0).then(|| {
             strings.format_plural(
                 StringKey::SchemaUnrenderableOne,
                 StringKey::SchemaUnrenderableMany,
-                cx.numbers().plural(self.unrenderable.len()),
-                &[cx.numbers().count(self.unrenderable.len()).as_ref()],
+                cx.numbers().plural(unrenderable_count),
+                &[cx.numbers().count(unrenderable_count).as_ref()],
             )
         });
         let busy = self.validation_is_busy(cx);
@@ -1784,6 +2005,7 @@ impl Render for SchemaForm {
         let rows: Vec<AnyElement> = self
             .fields
             .iter()
+            .filter(|field| self.field_is_visible(field))
             .map(|field| self.field_element(field, cx))
             .collect();
 

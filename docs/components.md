@@ -1019,7 +1019,7 @@ turns a number into text.
 | Component | Kind | Reports | Notes |
 |---|---|---|---|
 | `JsonView` | builder | a path and the disclosure state it should take, and the row that was picked | A structured value over a caller-supplied `JsonValue`. Virtualized, so only the rows the viewport holds are laid out or published. `null`, an empty container, and a key the document does not hold are three presentations, and a withheld subtree reads as withheld |
-| `SchemaForm` | view | a field that changed, a file field whose picker was requested, and a submit | A form built from a caller-supplied `Schema` over the existing controls. Caller-owned field and whole-form validation stay separate; pending/validating managed checks block submission without becoming invalid. Date shapes use the host's `DateAdapter`; `Files` uses a host `SchemaFilePolicy` without owning an OS picker; repeating `List` owns stable add/remove UI and nested values. A field it cannot draw states so where the control would have been and is still reported by `values` |
+| `SchemaForm` | view | a field that changed, a file field whose picker was requested, and a submit | A form built from a caller-supplied `Schema` over the existing controls. Caller-owned field and whole-form validation stay separate; pending/validating managed checks block submission without becoming invalid. `FieldVisibility` records host-owned conditional results, with explicit hidden-value submission policy and no invisible field validation. Date shapes use the host's `DateAdapter`; `Files` uses a host `SchemaFilePolicy` without owning an OS picker; repeating `List` owns stable add/remove UI and nested values. A field it cannot draw states so where the control would have been and is still reported by `values` |
 | `ServerList` | builder | a server that was picked, a failed one that should be tried again, and a server whose offerings should be shown | What is connected and what each connection offers. Five states, none of them a shade of another, and an empty answer that is not an unasked question |
 | `OfferingCatalog` | builder | activation carrying `{server_id, offering_id}` | Searchable Tool, Skill, and Resource results aggregated across caller-owned servers. Search text and kind filters are caller supplied; duplicate names remain attributed, stale data remains visible, and the component performs no install, invocation, trust, permission, or network policy |
 
@@ -1079,6 +1079,23 @@ field. Field validation setters return `false` for a path the current form does
 not hold, so an asynchronous answer for a removed repeated item cannot become
 an invisible submission blocker. `set_error` remains shorthand for an invalid
 field state in the host's own words.
+
+Conditional visibility has the same ownership boundary. The host evaluates
+its product rules and advances `set_field_visibility(path, state)`; the form
+does not grow a predicate language or infer conditions from values. `Visible`
+participates normally. `Hidden { submission: Omit }` removes the field or
+subtree from `submission_values`, while `Hidden { submission: Include }`
+preserves every held value beneath it. Both hidden forms disappear from the
+semantic and visual trees and skip field validation, because a refusal on a
+control nobody can reach would be an invisible blocker. A host refusal about a
+hidden value belongs in whole-form validation, where it can be read.
+
+`values` remains the complete inventory, including hidden and unrenderable
+fields, so changing a condition never destroys caller data. A hidden object or
+repeating-list parent governs its whole subtree; child configuration becomes
+effective again when that parent is visible. Repeated child visibility follows
+the stable item entity across reorders just as field validation does, while
+`submission_values` always exports current indexed paths.
 
 Files keep the same boundary. The form owns its drop target, selected rows,
 maximum count, removal, and `FilesRequested` event. The installed

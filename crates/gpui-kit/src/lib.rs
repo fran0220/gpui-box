@@ -309,10 +309,11 @@ pub mod prelude {
         set_strings,
     };
     pub use crate::structured::{
-        DefaultSchemaFilePolicy, FieldValue, JsonValue, JsonView, NumberBounds, Schema,
-        SchemaChoice, SchemaField, SchemaFilePolicy, SchemaFileRequest, SchemaForm,
-        SchemaFormEvent, SchemaKind, SharedSchemaFilePolicy, UnrenderableField, ValueKind,
-        installed_schema_file_policy, reset_schema_file_policy, set_schema_file_policy,
+        DefaultSchemaFilePolicy, FieldValue, FieldVisibility, HiddenSubmission, JsonValue,
+        JsonView, NumberBounds, Schema, SchemaChoice, SchemaField, SchemaFilePolicy,
+        SchemaFileRequest, SchemaForm, SchemaFormEvent, SchemaKind, SharedSchemaFilePolicy,
+        UnrenderableField, ValueKind, installed_schema_file_policy, reset_schema_file_policy,
+        set_schema_file_policy,
     };
 }
 

@@ -3552,6 +3552,7 @@
         "move_list_item(path: impl Into<SharedString>, from: usize, to: usize, cx: &mut Context<Self>) -> bool",
         "set_field_validation(path: impl Into<SharedString>, validation: ValidationState, cx: &mut Context<Self>) -> bool",
         "clear_field_validation(path: impl Into<SharedString>, cx: &mut Context<Self>) -> bool",
+        "set_field_visibility(path: impl Into<SharedString>, visibility: FieldVisibility, cx: &mut Context<Self>) -> bool",
         "set_validation(validation: ValidationState, cx: &mut Context<Self>)",
         "clear_validation(cx: &mut Context<Self>)",
         "set_error(path: impl Into<SharedString>, message: impl Into<SharedString>, cx: &mut Context<Self>)",
@@ -3561,8 +3562,10 @@
       ],
       "queries": [
         "field_validation(path: &str, cx: &App) -> Option<ValidationState>",
+        "field_visibility(path: &str, cx: &App) -> Option<FieldVisibility>",
         "validation() -> Option<&ValidationState>",
         "values(cx: &App) -> Vec<(SharedString, FieldValue)>",
+        "submission_values(cx: &App) -> Vec<(SharedString, FieldValue)>",
         "unrenderable() -> &[UnrenderableField]",
         "has_unrenderable_required() -> bool"
       ],
@@ -7856,6 +7859,19 @@
       "queries": []
     },
     {
+      "name": "FieldVisibility",
+      "path": "gpui_kit::structured::FieldVisibility",
+      "summary": "Whether one schema field participates in this form presentation.",
+      "variants": [
+        "Visible",
+        "Hidden"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "FilterCondition",
       "path": "gpui_kit::controls::FilterCondition",
       "summary": "One condition the list is narrowed by.",
@@ -8357,6 +8373,19 @@
       "queries": [
         "name() -> &'static str"
       ]
+    },
+    {
+      "name": "HiddenSubmission",
+      "path": "gpui_kit::structured::HiddenSubmission",
+      "summary": "Whether a hidden field's held value belongs in the caller's submission.",
+      "variants": [
+        "Omit",
+        "Include"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
     },
     {
       "name": "HistoryEntry",
