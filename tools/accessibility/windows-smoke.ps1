@@ -94,23 +94,23 @@ function One-CharacterRange {
 
     $range = $Document.Clone()
     $null = $range.MoveEndpointByRange(
-        [System.Windows.Automation.TextPatternRangeEndpoint]::End,
+        [System.Windows.Automation.Text.TextPatternRangeEndpoint]::End,
         $range,
-        [System.Windows.Automation.TextPatternRangeEndpoint]::Start
+        [System.Windows.Automation.Text.TextPatternRangeEndpoint]::Start
     )
     $null = $range.MoveEndpointByUnit(
-        [System.Windows.Automation.TextPatternRangeEndpoint]::Start,
-        [System.Windows.Automation.TextUnit]::Character,
+        [System.Windows.Automation.Text.TextPatternRangeEndpoint]::Start,
+        [System.Windows.Automation.Text.TextUnit]::Character,
         $Offset
     )
     $null = $range.MoveEndpointByRange(
-        [System.Windows.Automation.TextPatternRangeEndpoint]::End,
+        [System.Windows.Automation.Text.TextPatternRangeEndpoint]::End,
         $range,
-        [System.Windows.Automation.TextPatternRangeEndpoint]::Start
+        [System.Windows.Automation.Text.TextPatternRangeEndpoint]::Start
     )
     $null = $range.MoveEndpointByUnit(
-        [System.Windows.Automation.TextPatternRangeEndpoint]::End,
-        [System.Windows.Automation.TextUnit]::Character,
+        [System.Windows.Automation.Text.TextPatternRangeEndpoint]::End,
+        [System.Windows.Automation.Text.TextUnit]::Character,
         1
     )
     return $range
@@ -159,14 +159,14 @@ switch ($Mode) {
         $selection = @($text.GetSelection())
         if ($selection.Count -ne 1 -or
             $selection[0].CompareEndpoints(
-                [System.Windows.Automation.TextPatternRangeEndpoint]::Start,
+                [System.Windows.Automation.Text.TextPatternRangeEndpoint]::Start,
                 $document,
-                [System.Windows.Automation.TextPatternRangeEndpoint]::End
+                [System.Windows.Automation.Text.TextPatternRangeEndpoint]::End
             ) -ne 0 -or
             $selection[0].CompareEndpoints(
-                [System.Windows.Automation.TextPatternRangeEndpoint]::End,
+                [System.Windows.Automation.Text.TextPatternRangeEndpoint]::End,
                 $document,
-                [System.Windows.Automation.TextPatternRangeEndpoint]::End
+                [System.Windows.Automation.Text.TextPatternRangeEndpoint]::End
             ) -ne 0) {
             throw "Email did not expose its logical end caret through UIA TextPattern selection"
         }
