@@ -114,6 +114,15 @@ product rules. Hidden fields and subtrees do not render or field-validate;
 inventory. Object and repeated-list parents govern their descendants, and a
 repeated child's visibility follows stable item identity across reorders.
 
+**Windows UIA now has a real editable and form proof.** The native smoke edits
+an input through ValuePattern, requests focus, reads distinct TextPattern
+character rectangles and the logical end caret, verifies relationship-derived
+field names and complete descriptions, and invokes the uniquely focused menu
+item before observing its menu close. A small native COM query bridge reads the
+modern FullDescription property that PowerShell's legacy managed identifier
+table cannot represent. Narrator speech, selection mutation, remaining overlay
+lifetime, and announcement events stay explicitly unverified.
+
 **An accordion body turns with the reading order.** The header honoured RTL and
 the body did not, so a disclosed section read as belonging to the one on the
 other side. Turning the text alone was not enough: a shrink-to-fit child is

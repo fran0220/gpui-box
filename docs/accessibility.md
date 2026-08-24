@@ -85,18 +85,18 @@ not evidence that a particular screen reader announces every property correctly.
 
 | Capability | macOS AX | Windows UIA | Linux AT-SPI (planned) | Browser semantic DOM |
 |---|---|---|---|---|
-| Role and accessible name | Native AX smoke verified, including relationship-derived form names | Bridged; native session unverified | Adapter exists; non-gating and unverified | Button/dialog roles and names browser-smoke verified |
-| Labelled-by and described-by | Same-window AccessKit relationships, including deferred overlays, verified deterministically; native name/help fallback verified | Same AccessKit structure and scalar fallback; native UIA session unverified | Same AccessKit structure and scalar fallback; native AT-SPI session unverified | AccessKit structure exists; semantic DOM relationship projection unverified |
-| String value and placeholder | Bridged; deterministic tree verified | Bridged; native session unverified | Bridged; native session unverified | Mirrored; text editing browser-smoke verified |
+| Role and accessible name | Native AX smoke verified, including relationship-derived form names | Native Edit, Menu, and MenuItem role/name smoke verified, including relationship-derived form names | Adapter exists; non-gating and unverified | Button/dialog roles and names browser-smoke verified |
+| Labelled-by and described-by | Same-window AccessKit relationships, including deferred overlays, verified deterministically; native name/help fallback verified | Same AccessKit structure and scalar fallback; native relationship-derived form name and complete description verified | Same AccessKit structure and scalar fallback; native AT-SPI session unverified | AccessKit structure exists; semantic DOM relationship projection unverified |
+| String value and placeholder | Bridged; deterministic tree verified | Native ValuePattern read/write verified; placeholder remains deterministic only | Bridged; native session unverified | Mirrored; text editing browser-smoke verified |
 | Disabled, invalid, required, busy | Disabled native AX smoke verified; other states deterministic only | Bridged; native session unverified | Bridged; native session unverified | Mirrored; screen-reader announcement unverified |
 | Checked, expanded, widget selection | Checked native AX smoke verified; expanded/selection deterministic only | Bridged; native session unverified | Bridged; native session unverified | Mirrored; screen-reader announcement unverified |
 | Focus | GPUI focus is projected and assistive-technology-requested focus has a native AX smoke check | Native UIA `SetFocus` verified: keyboard focus, global focused element, and one focus-changed event agree; Tab navigation is not claimed | GPUI focus action is routed to its owning handle; native AT-SPI session unverified | DOM focus action and ownership browser-smoke verified |
 | Numeric min, max, current value | Bridged; deterministic tree verified | Bridged; native session unverified | Bridged; native session unverified | Mirrored; AT interaction unverified |
-| Editable text | Native AX name/value/enabled/focus/editing plus range-dependent character geometry verified; grapheme-based TextRun structure verified deterministically | Same AccessKit structure; native session unverified | Same AccessKit structure; native session unverified | Keyboard editing browser-smoke verified |
-| Text selection and caret | Selection/caret structure and actions verified deterministically; native AX selected range and caret bounds verified, selection mutation unverified | Same AccessKit structure; native UIA interaction unverified | Same AccessKit structure; native AT-SPI interaction unverified | Mirrored; browser AT mutation unverified |
+| Editable text | Native AX name/value/enabled/focus/editing plus range-dependent character geometry verified; grapheme-based TextRun structure verified deterministically | Native ValuePattern editing and distinct non-empty TextPattern character rectangles verified | Same AccessKit structure; native session unverified | Keyboard editing browser-smoke verified |
+| Text selection and caret | Selection/caret structure and actions verified deterministically; native AX selected range and caret bounds verified, selection mutation unverified | Native TextPattern logical end caret verified; selection mutation remains unverified | Same AccessKit structure; native AT-SPI interaction unverified | Mirrored; browser AT mutation unverified |
 | Live-region updates | Explicit polite/assertive atomic Toast create/update/removal verified deterministically; native `AXApplicationStatus` identity/action/removal verified, but VoiceOver speech/timing unverified; static Status is non-live | Same AccessKit structure; UIA announcement unverified | Same AccessKit structure; AT-SPI announcement unverified | ARIA live attributes mirrored; announcement unverified |
-| GPUI overlays | Dialog/Menu/Tooltip/Status roles and lifetime native-smoke verified, including exact `AXDialog`, `AXMenu`/`AXMenuItem`, `AXUserInterfaceTooltip`, and `AXApplicationStatus` subroles where applicable; screen-reader ordering, navigation, and announcement remain unverified | Same AccessKit structure; native UIA revalidation pending | Same AccessKit structure; native AT-SPI session unverified | Dialog role and dismiss action browser-smoke verified |
-| Bounds | Control and editable character/caret bounds native-smoke verified | Native adapter; editable range session unverified | Native adapter; editable range session unverified | Canvas-scaled DOM bounds browser-smoke verified |
+| GPUI overlays | Dialog/Menu/Tooltip/Status roles and lifetime native-smoke verified, including exact `AXDialog`, `AXMenu`/`AXMenuItem`, `AXUserInterfaceTooltip`, and `AXApplicationStatus` subroles where applicable; screen-reader ordering, navigation, and announcement remain unverified | Native Menu/MenuItem focus, Invoke action, and close lifetime verified; Dialog/Tooltip/Status sessions remain unverified | Same AccessKit structure; native AT-SPI session unverified | Dialog role and dismiss action browser-smoke verified |
+| Bounds | Control and editable character/caret bounds native-smoke verified | Native editable character bounds verified; general control bounds remain deterministic only | Native adapter; editable range session unverified | Canvas-scaled DOM bounds browser-smoke verified |
 | Native-child handoff | Not implemented | Not implemented | Not implemented | Not applicable |
 
 `hovered` and pointer `pressed` remain diagnostic-only transient state. Semantic
@@ -157,8 +157,8 @@ joins them only inside one declared selection scope, and never publishes text
 from an unmounted or sensitive participant. Live regions are explicit opt-in:
 static Status nodes are not live, ordinary toasts are polite, and danger toasts
 are assertive, with the whole toast marked atomic. Announcement speech
-and timing, native selection mutation, Windows/Linux editable-range
-verification, and native child nodes remain separate platform work.
+and timing, native selection mutation, Linux editable-range verification, and
+native child nodes remain separate platform work.
 
 Open dialogs publish a modal native Dialog node, and open menus and visible
 tooltips publish separate native Menu and Tooltip nodes; each role-bearing node
@@ -198,3 +198,12 @@ real AccessKit action path is covered deterministically. VoiceOver speech,
 navigation order, value/range adjustment, selection, and announcement timing
 remain manual, unverified boundaries. The automated macOS, Windows, Linux, and
 Web completion plan is in `docs/foundation-roadmap.md`.
+
+On Windows, the same command runs in the repository's interactive
+`windows-2025` job. It uses PID-scoped UI Automation to set and read an Edit
+value, request focus, compare distinct character rectangles, verify the logical
+end caret, read relationship-derived field names and complete descriptions,
+and invoke the uniquely focused MenuItem before confirming that its Menu left
+the native tree. It deliberately does not claim Narrator speech, selection
+mutation, Tab order, Dialog/Tooltip/Status lifetime, or UIA announcement
+events; those remain separate proofs.

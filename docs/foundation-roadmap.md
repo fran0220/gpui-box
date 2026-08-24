@@ -175,8 +175,12 @@ after deferred prepaint and disappear with either endpoint. Kit form labels,
 help/error text, search labels, and deferred tooltips use that native AccessKit
 path, with an absent-scalar fallback for adapters that do not consume the
 references. Editable controls now publish current-frame painted character and
-caret geometry, and macOS verifies both contracts in a native AX session.
-Native-child handoff plus Windows and Linux adapter/session proofs remain open.
+caret geometry. macOS verifies both contracts in a native AX session; Windows
+now verifies ValuePattern editing, TextPattern character bounds/end caret,
+relationship-derived form name/description, and MenuItem focus/invocation/
+lifetime in an interactive UIA session. Native-child handoff, Linux AT-SPI,
+Windows Dialog/Tooltip/Status and live-event sessions, and screen-reader speech
+proof remain open.
 
 1. Keep the completed editable per-grapheme positions/widths, visual rows,
    selection, and native caret geometry tied to the layout that painted text.
