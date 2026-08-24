@@ -8750,29 +8750,6 @@
       "queries": []
     },
     {
-      "name": "Layout",
-      "path": "gpui_kit::controls::Layout",
-      "summary": "",
-      "variants": [],
-      "construct": [
-        "new(lines: Vec<WrappedLine>, line_height: Pixels) -> Self"
-      ],
-      "options": [],
-      "commands": [],
-      "queries": [
-        "line_height() -> Pixels",
-        "total_rows() -> usize",
-        "height() -> Pixels",
-        "text_width() -> Pixels",
-        "painted_lines() -> impl Iterator<Item = (&WrappedLine, Pixels)>",
-        "position_for_offset(offset: usize) -> Point<Pixels>",
-        "row_for_offset(offset: usize) -> usize",
-        "offset_for_position(position: Point<Pixels>) -> usize",
-        "offset_at_row(row: usize, x: Pixels) -> usize",
-        "row_range(row: usize) -> Range<usize>"
-      ]
-    },
-    {
       "name": "LayoutDirection",
       "path": "gpui_kit::foundation::LayoutDirection",
       "summary": "The direction the interface reads in.",
