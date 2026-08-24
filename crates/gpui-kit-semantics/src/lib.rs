@@ -878,6 +878,7 @@ fn diagnostic_probe(target: Option<DiagnosticTarget>, spec: NodeSpec) -> impl In
             let Some(target) = &target else {
                 return;
             };
+            window.record_semantic_node();
             let rect = Rect {
                 x: f32::from(bounds.origin.x),
                 y: f32::from(bounds.origin.y),
@@ -1305,6 +1306,18 @@ mod tests {
                 Some(right_generation)
             );
         });
+    }
+
+    #[gpui::test]
+    fn published_nodes_are_counted_in_the_window_frame(cx: &mut TestAppContext) {
+        cx.update(install);
+        let window: AnyWindowHandle = cx.add_window(|_, _| DiagnosticFixture).into();
+
+        cx.update_window(window, |_, window, cx| {
+            window.draw(cx).clear(cx);
+            assert_eq!(window.frame_stats().semantic_nodes, 1);
+        })
+        .expect("window remains available");
     }
 
     #[gpui::test]

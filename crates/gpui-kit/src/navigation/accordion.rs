@@ -21,7 +21,9 @@ use gpui_kit_theme::{
 
 use crate::display::icon::flips;
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
-use crate::foundation::{FocusRing, Ident, Pressable, Sizable, StyledExt, text as foundation_text};
+use crate::foundation::{
+    FocusRing, Ident, Pressable, Sizable, StyledExt, rule, text as foundation_text,
+};
 use crate::layout::measure;
 use crate::motion;
 
@@ -177,7 +179,7 @@ impl RenderOnce for Accordion {
             .frame(&theme, Surface::Panel, Elevation::Raised)
             .overflow_hidden();
 
-        for section in self.sections.into_iter() {
+        for (position, section) in self.sections.into_iter().enumerate() {
             let open = expanded_ids.contains(&section.id);
             let actionable = !section.disabled && self.on_toggle.is_some();
             let ident = self.ident.child(section.id.as_ref());
@@ -210,9 +212,14 @@ impl RenderOnce for Accordion {
                     div()
                         .column()
                         .flex_1()
-                        .gap(px(2.0))
+                        .gap(px(theme.space(Space::Xs)))
                         .child(
                             foundation_text(&theme, TypeScale::Label, section.title.clone())
+                                .when(open, |title| {
+                                    title.font_weight(gpui::FontWeight(
+                                        theme.typography.strong.weight,
+                                    ))
+                                })
                                 .text_size(px(metrics.font_size))
                                 .text_start(direction)
                                 .text_color(color),
@@ -281,8 +288,19 @@ impl RenderOnce for Accordion {
             let measured = measure::cell(&body_id, window, cx);
             let height = px(f32::from(measured.get().size.height) * disclosed);
 
+            // A stack of sections with no lines in it is one slab with several
+            // paragraphs on it. The rule is what says where one section ends,
+            // and it goes between them rather than around the stack, which
+            // already has a card's edge.
+            if position > 0 {
+                stack = stack.child(rule(&theme));
+            }
             stack = stack.child(div().column().child(header).children(body.map(|body| {
                 let content = div()
+                    // A disclosed body is a different plane from the header
+                    // that opened it, so an open section reads as opened
+                    // rather than as two paragraphs of one header.
+                    .surface(&theme, Surface::Sunken)
                     // Indented to the title rather than to the
                     // chevron, so the body reads as belonging to the
                     // section it hangs under.
@@ -291,7 +309,14 @@ impl RenderOnce for Accordion {
                         px(metrics.padding_x + metrics.icon_size + theme.space(Space::Sm)),
                     )
                     .pe(direction, px(metrics.padding_x))
-                    .pb(px(theme.space(Space::Sm)))
+                    .py(px(theme.space(Space::Sm)))
+                    // The header already turns with the reading order, and a
+                    // body that does not turn with it reads as belonging to
+                    // the section on the other side. The row has to turn as
+                    // well as the text: a shrink-to-fit child is placed by the
+                    // flex axis, which `text_align` does not reach.
+                    .row_reading(direction)
+                    .text_start(direction)
                     .child(body);
                 let record = {
                     let measured = Rc::clone(&measured);

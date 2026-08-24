@@ -269,10 +269,15 @@ impl RenderOnce for VideoPlayer {
                 SurfaceContent::Poster => NoticePlace::Foot,
                 _ => NoticePlace::Middle,
             };
+            // A still already says what kind of surface this is, so the mark
+            // is only drawn over an empty one.
+            let mark =
+                matches!(content, SurfaceContent::Nothing).then_some(gpui_kit_assets::Icon::Video);
             picture = picture.child(match (&snapshot, &self.transport) {
                 (Some(snapshot), _) if snapshot.availability.is_ready() => notice_at(
                     &theme,
                     theme.colors.warning,
+                    mark,
                     strings.text(StringKey::VideoNoFrames),
                     strings.text(StringKey::VideoNoFramesDetail),
                     place,
@@ -282,11 +287,13 @@ impl RenderOnce for VideoPlayer {
                     &strings,
                     &snapshot.availability,
                     self.title.clone(),
+                    mark,
                     place,
                 ),
                 (None, _) => notice_at(
                     &theme,
                     theme.colors.warning,
+                    mark,
                     strings.text(StringKey::MediaNoTransport),
                     strings.text(StringKey::MediaNoTransportDetail),
                     place,

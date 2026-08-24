@@ -268,12 +268,16 @@ impl Render for KeybindingRecorder {
         let conflicted = self.conflict.is_some();
         let actionable = !self.disabled;
 
-        let (border, background) = if recording {
-            (theme.colors.accent, theme.colors.accent.opacity(0.12))
+        // Every state is the same opaque well and differs only in the line
+        // around it. A translucent fill let the focus ring — a hard shadow
+        // drawn behind the element — come through the field, which turned a
+        // recorder into a solid accent slab with accent words on it.
+        let border = if recording {
+            theme.colors.accent
         } else if conflicted {
-            (theme.colors.danger, theme.colors.danger.opacity(0.08))
+            theme.colors.danger
         } else {
-            (theme.colors.hairline, theme.colors.panel)
+            theme.colors.hairline
         };
 
         // Recording has to be unmistakable: a recorder that looks like a text
@@ -305,9 +309,22 @@ impl Render for KeybindingRecorder {
                     .gap_token(&theme, Space::Xs)
                     .child(Kbd::new(binding).id(self.ident.child("keys")))
                     .into_any_element(),
-                None => foundation_text(&theme, TypeScale::Label, self.resolved_placeholder(cx))
-                    .text_size(px(metrics.font_size))
-                    .text_tone(&theme, gpui_kit_theme::TextTone::Faint)
+                // Nothing bound is an absence, so it takes the tone this
+                // library spends on absences rather than the one it spends on
+                // values.
+                None => div()
+                    .row()
+                    .gap_token(&theme, Space::Xs)
+                    .child(
+                        icon(Icon::Keyboard)
+                            .size(px(metrics.icon_size))
+                            .text_color(theme.colors.text_faint),
+                    )
+                    .child(
+                        foundation_text(&theme, TypeScale::Label, self.resolved_placeholder(cx))
+                            .text_size(px(metrics.font_size))
+                            .text_tone(&theme, gpui_kit_theme::TextTone::Placeholder),
+                    )
                     .into_any_element(),
             }
         };
@@ -317,8 +334,12 @@ impl Render for KeybindingRecorder {
             .key_context(KEY_CONTEXT)
             .track_focus(&self.focus_handle)
             .row()
+            .flex_none()
             .h(px(metrics.height))
-            .min_w(px(160.0))
+            // Wide enough that a chord has room and no wider: a field sized to
+            // whatever column it landed in leaves a one-key binding adrift in
+            // an empty box.
+            .min_w(px(metrics.height * 5.0))
             .px(px(metrics.padding_x))
             .gap(px(metrics.gap))
             .items_center()
@@ -329,7 +350,7 @@ impl Render for KeybindingRecorder {
                 theme.borders.hairline
             }))
             .border_color(border)
-            .bg(background)
+            .surface(&theme, gpui_kit_theme::Surface::Sunken)
             .text_size(px(metrics.font_size))
             .text_color(theme.colors.text)
             .when(self.disabled, |element| {
@@ -340,7 +361,12 @@ impl Render for KeybindingRecorder {
                     .cursor_pointer()
                     .tab_index(0)
                     .hover(|style| style.border_color(theme.colors.hairline_strong))
-                    .focus_ring(&theme)
+            })
+            // The thick accent line is the recording mark; adding the focus
+            // ring under it is a second ring saying the same thing, and it is
+            // the one that bloomed into the rows above and below.
+            .when(actionable && !recording, |element| {
+                element.focus_ring(&theme)
             })
             .child(body);
 
@@ -388,7 +414,7 @@ impl Render for KeybindingRecorder {
                 .gap_token(&theme, Space::Xs)
                 .child(
                     icon(Icon::Danger)
-                        .size(px(11.0))
+                        .size(px(theme.control.get(ControlSize::Xs).icon_size))
                         .text_color(theme.colors.danger),
                 )
                 .child(

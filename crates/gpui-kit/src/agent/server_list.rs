@@ -33,7 +33,7 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TextTone, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TextTone, Theme, TypeScale};
 
 use crate::controls::button::Button;
 use crate::display::badge::{Badge, Tone};
@@ -44,7 +44,7 @@ use crate::display::status::{Callout, StatusDot};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{
-    CardVariant, Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text,
+    CardVariant, Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, rule, text,
 };
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
@@ -540,9 +540,10 @@ impl ServerList {
             .w_full()
             .gap_token(theme, Space::Sm)
             .p_token(theme, Space::Sm)
-            .when(selected, |element| element.bg(theme.colors.selected))
-            .when(turned_off, |element| {
-                element.opacity(theme.opacity.disabled)
+            .when(selected, |element| {
+                element
+                    .bg(theme.colors.selected)
+                    .radius(theme, Radius::Card)
             })
             .when(selectable, |element| {
                 element
@@ -623,7 +624,10 @@ impl ServerList {
             .filter(|_| !refused)
             .map(|handler| {
                 let id = server.id.clone();
-                div().px_token(theme, Space::Sm).child(
+                // A recovery control is one control, not a bar across the
+                // card: stretched full width it read as the card's own
+                // footer rather than as something to press.
+                div().row().px_token(theme, Space::Sm).child(
                     Button::new(ident.child("retry"))
                         .label(cx.strings().text(StringKey::TryAgain))
                         .secondary()
@@ -633,13 +637,25 @@ impl ServerList {
             });
 
         let offerings = open.then(|| self.offerings_element(server, &ident, theme, window, cx));
+        // Expanded, the header and the catalog under it are one unbroken
+        // field of the same surface, so the row that can be pressed and the
+        // list it revealed run together. A rule says where the header ends.
+        let has_body = offerings.is_some() || reason.is_some() || retry.is_some();
 
         div()
             .column()
             .w_full()
             .gap_token(theme, Space::Xs)
             .card_surface(theme, CardVariant::Elevated)
+            // The whole entry dims, not only its header. Dimming the header
+            // alone left the reason box below it at full strength, which made
+            // the one server the reader had switched off the brightest thing
+            // on screen.
+            .when(turned_off, |element| {
+                element.opacity(theme.opacity.disabled)
+            })
             .child(header)
+            .children(has_body.then(|| rule(theme)))
             .children(reason)
             .children(retry)
             .children(offerings)

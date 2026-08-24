@@ -56,6 +56,7 @@ fn main() -> Result<()> {
             site::check_with_browser(&root(), &root().join("target/browser-gallery"))
         }
         (Some("accessibility"), Some("check")) => accessibility_check(),
+        (Some("performance"), Some("check")) => performance_check(),
         (Some("scenes"), Some("list")) => scenes_list(),
         (Some("scenes"), Some("render")) => scenes_render(&rest),
         (Some("headless"), Some("capture")) => headless("capture", &rest),
@@ -69,7 +70,7 @@ fn main() -> Result<()> {
         (Some("gate"), Some("full")) => gate(true),
         (Some("gate"), Some("only")) => gate_only(&rest),
         _ => bail!(
-            "usage: cargo xtask <dependencies check|package plan|package check|package publish --execute|site generate [output]|site check|accessibility check|tokens generate|tokens check|strings check|\
+            "usage: cargo xtask <dependencies check|package plan|package check|package publish --execute|site generate [output]|site check|accessibility check|performance check|tokens generate|tokens check|strings check|\
              strings generate|typography check|scenes list|scenes render [name...]|\
              headless capture [name...]|\
              headless check [name...]|web check|web build|web smoke|\
@@ -956,6 +957,7 @@ fn gate(full: bool) -> Result<()> {
     strings::check(&root())?;
     api::check(&root())?;
     site::check(&root())?;
+    performance_check()?;
     if full {
         step(
             "cargo",
@@ -966,6 +968,21 @@ fn gate(full: bool) -> Result<()> {
     }
     println!("gate passed");
     Ok(())
+}
+
+fn performance_check() -> Result<()> {
+    step(
+        "cargo",
+        &[
+            "run",
+            "-p",
+            "gpui-box-performance",
+            "--",
+            "--output",
+            "target/performance/report.json",
+        ],
+        None,
+    )
 }
 
 fn future_compatibility_check() -> Result<()> {
@@ -1608,14 +1625,15 @@ fn theme_section(output: &mut String, tokens: &TokenDocument) -> Result<()> {
         ("color.semantic.info".into(), color.semantic.info.as_str()),
     ]
     .into_iter()
-    .chain(
-        color
-            .loader
-            .gradient
-            .iter()
-            .enumerate()
-            .map(|(index, value)| (format!("color.loader.gradient.{index}"), value.as_str())),
-    )
+    .chain([
+        ("color.loader.mark".into(), color.loader.mark.as_str()),
+        ("color.loader.track".into(), color.loader.track.as_str()),
+        (
+            "color.loader.placeholder".into(),
+            color.loader.placeholder.as_str(),
+        ),
+        ("color.loader.sheen".into(), color.loader.sheen.as_str()),
+    ])
     .chain([
         (
             "color.terminal.background".into(),

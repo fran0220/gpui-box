@@ -151,9 +151,11 @@ pub(super) fn visual_effects(_window: &mut Window, cx: &mut App) -> AnyElement {
             .px_token(&theme, Space::Sm)
             .py_token(&theme, Space::Xs)
             .radius(&theme, Radius::Pill)
-            .bg(theme.colors.panel.opacity(0.9))
-            .border_1()
-            .border_color(theme.colors.hairline_strong)
+            // The caption sits on top of artwork it does not control, so it
+            // carries its own opaque surface rather than a scrim: a legend
+            // that dims with what it labels stops being a legend.
+            .bg(theme.colors.panel)
+            .hairline_strong(&theme)
             .child(crate::foundation::text(&theme, TypeScale::Caption, text))
     };
 
@@ -249,8 +251,7 @@ pub(super) fn visual_effects(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .radius(&theme, Radius::Card)
                 .overflow_hidden()
                 .bg(theme.colors.sunken)
-                .border_1()
-                .border_color(theme.colors.hairline)
+                .hairline(&theme)
                 .semantic_in(
                     cx,
                     NodeSpec::new("scene.effects.path-strokes", Role::Image)
@@ -330,8 +331,7 @@ pub(super) fn visual_effects(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .radius(&theme, Radius::Card)
                 .overflow_hidden()
                 .bg(theme.colors.sunken)
-                .border_1()
-                .border_color(theme.colors.hairline)
+                .hairline(&theme)
                 .semantic_in(
                     cx,
                     NodeSpec::new("scene.effects.sprite-batch", Role::Image)
@@ -455,8 +455,7 @@ pub(super) fn visual_effects(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .radius(&theme, Radius::Card)
                         .overflow_hidden()
                         .bg(theme.colors.sunken)
-                        .border_1()
-                        .border_color(theme.colors.hairline)
+                        .hairline(&theme)
                         .semantic_in(
                             cx,
                             NodeSpec::new("scene.effects.particles-success", Role::Image)
@@ -479,8 +478,7 @@ pub(super) fn visual_effects(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .radius(&theme, Radius::Card)
                         .overflow_hidden()
                         .bg(theme.colors.sunken)
-                        .border_1()
-                        .border_color(theme.colors.hairline)
+                        .hairline(&theme)
                         .semantic_in(
                             cx,
                             NodeSpec::new("scene.effects.particles-reward", Role::Image)
@@ -503,8 +501,7 @@ pub(super) fn visual_effects(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .radius(&theme, Radius::Card)
                         .overflow_hidden()
                         .bg(theme.colors.sunken)
-                        .border_1()
-                        .border_color(theme.colors.hairline)
+                        .hairline(&theme)
                         .semantic_in(
                             cx,
                             NodeSpec::new("scene.effects.particles-static", Role::Image)
@@ -661,8 +658,7 @@ pub(super) fn cinematic_effects(_window: &mut Window, cx: &mut App) -> AnyElemen
             .radius(&theme, Radius::Card)
             .overflow_hidden()
             .bg(theme.colors.sunken)
-            .border_1()
-            .border_color(theme.colors.hairline)
+            .hairline(&theme)
             .child(div().relative().w_full().h(px(154.0)).child(effect))
             .child(
                 div()

@@ -134,6 +134,8 @@ jobs:
         run: cargo test --workspace --all-features --locked --exclude gpui-box-media
       - name: Reject platform-specific warnings
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - name: Check deterministic component performance budgets
+        run: cargo run -p xtask --locked -- performance check
       - name: Compile Direct3D release shaders
         if: runner.os == 'Windows'
         run: cargo check -p gpui-box-windows --release --locked

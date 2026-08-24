@@ -42,7 +42,7 @@ use gpui::{
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TextTone, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Surface, TextTone, TypeScale};
 
 use crate::controls::button::{Button, IconButton};
 use crate::controls::combobox::{Combobox, ComboboxEvent};
@@ -60,7 +60,7 @@ use crate::datetime::{
 use crate::display::badge::Tone;
 use crate::display::status::Callout;
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
-use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text};
+use crate::foundation::{Disableable, Ident, Sizable, StyledExt, rule, text};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// The file field the form is asking the host to acquire paths for.
@@ -866,6 +866,7 @@ impl SchemaForm {
         // The form's own complaint was about this field being empty, and it is
         // not empty any more; the host's stands until the host withdraws it.
         self.derived_errors.remove(&path);
+        self.sync_control_validity(cx);
         cx.emit(SchemaFormEvent::Changed(path));
         cx.notify();
     }
@@ -1284,6 +1285,7 @@ impl SchemaForm {
             return;
         }
         self.host_errors.insert(path, message);
+        self.sync_control_validity(cx);
         cx.notify();
     }
 
@@ -1302,6 +1304,7 @@ impl SchemaForm {
         {
             item.form.update(cx, |form, cx| form.clear_host_errors(cx));
         }
+        self.sync_control_validity(cx);
         cx.notify();
     }
 
@@ -1360,6 +1363,7 @@ impl SchemaForm {
             repeated_answerable &= item.form.update(cx, |form, cx| form.validate(cx));
         }
         self.refresh_repeated_unrenderable(cx);
+        self.sync_control_validity(cx);
         cx.notify();
         repeated_answerable
             && self.derived_errors.is_empty()
@@ -1528,6 +1532,42 @@ impl SchemaForm {
             _ => None,
         }
     }
+
+    /// Tells every control whether the form is showing an error about it.
+    ///
+    /// The message and the control it is about have to agree. A red sentence
+    /// under a field wearing its ordinary border says the field is fine and
+    /// something else is wrong, which is the opposite of what happened. A
+    /// number works this out for itself, so it is left alone.
+    fn sync_control_validity(&mut self, cx: &mut Context<Self>) {
+        let refused: Vec<(usize, bool)> = self
+            .fields
+            .iter()
+            .enumerate()
+            .map(|(index, field)| {
+                (
+                    index,
+                    self.host_errors.contains_key(&field.path)
+                        || self.derived_errors.contains_key(&field.path),
+                )
+            })
+            .collect();
+        for (index, refused) in refused {
+            match &self.fields[index].control {
+                Control::Text(input) => {
+                    input.update(cx, |input, cx| input.set_invalid(refused, cx))
+                }
+                Control::Choice(select) => {
+                    select.update(cx, |select, cx| select.set_invalid(refused, cx))
+                }
+                Control::OpenChoice(combobox) => {
+                    combobox.update(cx, |combobox, cx| combobox.set_invalid(refused, cx))
+                }
+                Control::List(tags) => tags.update(cx, |tags, cx| tags.set_invalid(refused, cx)),
+                _ => {}
+            }
+        }
+    }
 }
 
 impl Sizable for SchemaForm {
@@ -1614,12 +1654,13 @@ impl SchemaForm {
         let theme = cx.theme().clone();
         let direction = cx.layout_direction();
         let ident = self.ident.child(field.path.as_ref());
-        let indent = px(field.level.saturating_sub(1) as f32 * theme.space(Space::Lg));
-
         if let Control::Group = field.control {
+            // A heading with a rule under it says a section starts here. An
+            // indent said it too, and said it by putting the group's own
+            // fields at an x nothing else in the form shares.
             return div()
-                .ms(direction, indent)
                 .column()
+                .w_full()
                 .gap_token(&theme, Space::Xs)
                 .child(text(&theme, TypeScale::Subtitle, field.label.clone()))
                 .when_some(field.description.clone(), |element, description| {
@@ -1628,6 +1669,7 @@ impl SchemaForm {
                             .text_tone(&theme, TextTone::Muted),
                     )
                 })
+                .child(rule(&theme))
                 .semantic_in(
                     cx,
                     NodeSpec::new(ident.semantic_id(), Role::Group)
@@ -1709,6 +1751,14 @@ impl SchemaForm {
                         .items_center()
                         .justify_between()
                         .gap_token(&theme, Space::Sm)
+                        // An acquired file is a thing the form now holds, so
+                        // it is drawn as one rather than as a line of prose
+                        // with a bin beside it.
+                        .ps(direction, px(theme.space(Space::Sm)))
+                        .pe(direction, px(theme.space(Space::Xs)))
+                        .py(px(theme.space(Space::Xs)))
+                        .radius(&theme, gpui_kit_theme::Radius::Control)
+                        .surface(&theme, Surface::Raised)
                         .child(
                             text(&theme, TypeScale::Body, selected.label.clone())
                                 .overflow_hidden()
@@ -1738,7 +1788,10 @@ impl SchemaForm {
                     .column()
                     .gap_token(&theme, Space::Sm)
                     .child(dropzone)
-                    .child(choose)
+                    // The picker is the second way to do what the zone does,
+                    // not part of its frame: full width and flush against it,
+                    // the two read as one control with a lid.
+                    .child(div().row_reading(direction).justify_end().child(choose))
                     .children(selected)
                     .children(files.refusal.clone().map(|refusal| {
                         Callout::new(refusal, Tone::Danger).id(control_ident.child("refusal"))
@@ -1923,10 +1976,7 @@ impl SchemaForm {
             Control::Group => div().into_any_element(),
         };
 
-        div()
-            .ms(direction, indent)
-            .child(form_field.child(body))
-            .into_any_element()
+        div().child(form_field.child(body)).into_any_element()
     }
 }
 

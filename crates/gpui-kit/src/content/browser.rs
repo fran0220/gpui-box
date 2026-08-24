@@ -31,6 +31,7 @@ use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
 
 use crate::controls::button::IconButton;
 use crate::display::empty::{EmptyKind, EmptyState};
+use crate::display::loading::{BarLoader, Skeleton};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
@@ -310,15 +311,29 @@ impl RenderOnce for BrowserPanel {
                     .into_any_element()
                 })
             }),
+            // A page on its way is drawn in the shape of a page — a working
+            // strip across the top the way an engine reports progress, then
+            // the blocks the content will land in. A word centred in an empty
+            // rectangle is indistinguishable from a navigation that stopped.
             ViewportState::Loading => self.slots.or_else(slot::LOADING, window, cx, |_, cx| {
                 div()
                     .size_full()
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .type_scale(&theme, TypeScale::Caption)
-                    .text_color(theme.colors.text_muted)
-                    .child(strings.text(StringKey::Loading))
+                    .column()
+                    .child(BarLoader::new(viewport_ident.child("bar")))
+                    .child(
+                        div()
+                            .column()
+                            .w_full()
+                            .gap_token(&theme, Space::Sm)
+                            .p_token(&theme, Space::Md)
+                            .child(
+                                Skeleton::new(viewport_ident.child("blocks"))
+                                    .rows(4)
+                                    .row_height(theme.typography.body.line_height)
+                                    .widths([0.52, 1.0, 0.94, 0.66])
+                                    .label(strings.text(StringKey::Loading)),
+                            ),
+                    )
                     .semantic_in(
                         cx,
                         NodeSpec::new(viewport_ident.child("status").semantic_id(), Role::Status)
@@ -378,7 +393,10 @@ impl RenderOnce for BrowserPanel {
                     .min_h_0()
                     .w_full()
                     .surface(&theme, Surface::Canvas)
-                    .when(!has_page, |element| {
+                    // A loading body fills the viewport the way a page does,
+                    // so only the states that are one centred sentence get
+                    // centred.
+                    .when(!has_page && !busy, |element| {
                         element.flex().items_center().justify_center()
                     })
                     .child(body)

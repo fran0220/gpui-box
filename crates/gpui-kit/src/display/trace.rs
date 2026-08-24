@@ -12,7 +12,7 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, px, relative,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
 
 use crate::display::badge::Tone;
 use crate::display::empty::{EmptyKind, EmptyState};
@@ -23,6 +23,70 @@ use crate::motion;
 use crate::strings::{ActiveStrings, StringKey};
 
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
+
+/// The label gutter of [`TraceView`]. Wide enough for a nested name, closed by
+/// a hairline so the space left over reads as a column and not as a gap.
+const LABEL_WIDTH: f32 = 148.0;
+const DURATION_WIDTH: f32 = 64.0;
+const ROW_HEIGHT: f32 = 28.0;
+const BAR_HEIGHT: f32 = 18.0;
+const AXIS_HEIGHT: f32 = 22.0;
+const TICK_HEIGHT: f32 = 4.0;
+const TICK_LABEL_WIDTH: f32 = 64.0;
+/// Where the grid is drawn when the host names no ticks of its own. Quarters
+/// of a normalized axis are true without inventing a clock, so they carry a
+/// line and no text; only a host-supplied tick may carry wording.
+const DEFAULT_TICKS: [f32; 5] = [0.0, 0.25, 0.5, 0.75, 1.0];
+/// A bar that ends past this much of the axis has its name drawn before it,
+/// because there is no room left after it.
+const NAME_AFTER_LIMIT: f32 = 0.7;
+
+/// One position on the host's axis, with the host's exact wording for it.
+#[derive(Debug, Clone, PartialEq)]
+struct AxisTick {
+    at: f32,
+    label: Option<SharedString>,
+}
+
+fn resolved_ticks(
+    ticks: &[AxisTick],
+    start: Option<&SharedString>,
+    end: Option<&SharedString>,
+) -> Vec<AxisTick> {
+    let mut resolved: Vec<AxisTick> = if ticks.is_empty() {
+        DEFAULT_TICKS
+            .iter()
+            .map(|at| AxisTick {
+                at: *at,
+                label: None,
+            })
+            .collect()
+    } else {
+        ticks
+            .iter()
+            .map(|tick| AxisTick {
+                at: tick.at.clamp(0.0, 1.0),
+                label: tick.label.clone(),
+            })
+            .collect()
+    };
+    for (at, label) in [(0.0, start), (1.0, end)] {
+        let Some(label) = label else { continue };
+        match resolved.iter_mut().find(|tick| tick.at == at) {
+            Some(tick) => tick.label = Some(label.clone()),
+            None => resolved.push(AxisTick {
+                at,
+                label: Some(label.clone()),
+            }),
+        }
+    }
+    resolved.sort_by(|left, right| {
+        left.at
+            .partial_cmp(&right.at)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    resolved
+}
 
 /// What a span is doing, as the host already knows it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -76,6 +140,10 @@ pub struct TraceSpan {
     pub depth: u32,
     pub state: SpanState,
     pub detail: Option<SharedString>,
+    /// The host's exact wording for how long this span took. The component
+    /// never derives it from `start` and `end`: those are positions on a unit
+    /// interval and know nothing about the clock behind them.
+    pub duration: Option<SharedString>,
 }
 
 impl TraceSpan {
@@ -93,6 +161,7 @@ impl TraceSpan {
             depth: 0,
             state: SpanState::Pending,
             detail: None,
+            duration: None,
         }
     }
 
@@ -110,6 +179,12 @@ impl TraceSpan {
         self.detail = Some(detail.into());
         self
     }
+
+    /// The already-formatted length of this span, shown beside its bar.
+    pub fn duration(mut self, duration: impl Into<SharedString>) -> Self {
+        self.duration = Some(duration.into());
+        self
+    }
 }
 
 /// Hierarchical labels beside a waterfall of caller-owned spans.
@@ -120,6 +195,7 @@ pub struct TraceView {
     spans: Vec<TraceSpan>,
     axis_start: Option<SharedString>,
     axis_end: Option<SharedString>,
+    ticks: Vec<AxisTick>,
     current: Option<SharedString>,
     on_select: Option<SelectHandler>,
     slots: Slots,
@@ -133,6 +209,7 @@ impl TraceView {
             spans: Vec::new(),
             axis_start: None,
             axis_end: None,
+            ticks: Vec::new(),
             current: None,
             on_select: None,
             slots: Slots::default(),
@@ -148,6 +225,23 @@ impl TraceView {
     pub fn axis(mut self, start: impl Into<SharedString>, end: impl Into<SharedString>) -> Self {
         self.axis_start = Some(start.into());
         self.axis_end = Some(end.into());
+        self
+    }
+
+    /// Host-owned gridlines: a position on the same unit axis the spans use,
+    /// and the exact text under it. Without any, the grid falls back to
+    /// quarters of the axis, which carry a line and no wording.
+    pub fn ticks<S: Into<SharedString>>(
+        mut self,
+        ticks: impl IntoIterator<Item = (f32, S)>,
+    ) -> Self {
+        self.ticks = ticks
+            .into_iter()
+            .map(|(at, label)| AxisTick {
+                at,
+                label: Some(label.into()),
+            })
+            .collect();
         self
     }
 
@@ -175,69 +269,28 @@ impl Slotted for TraceView {
 
 impl RenderOnce for TraceView {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let theme = cx.theme().clone();
-        let empty = self.spans.is_empty();
-        let body = if empty {
-            self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
-                EmptyState::new(
-                    self.ident.child("empty"),
-                    cx.strings().text(StringKey::TraceEmpty),
-                )
-                .kind(EmptyKind::Empty)
-                .into_any_element()
-            })
-        } else {
-            let rows: Vec<_> = self
-                .spans
-                .iter()
-                .map(|span| {
-                    span_row(
-                        &self.ident,
-                        span,
-                        true,
-                        self.current.as_ref() == Some(&span.id),
-                        self.on_select.clone(),
-                        &theme,
-                        cx,
-                    )
-                })
-                .collect();
-            div()
-                .column()
-                .w_full()
-                .gap_token(&theme, Space::Xs)
-                .children(rows)
-                .children(axis_row(
-                    self.axis_start.clone(),
-                    self.axis_end.clone(),
-                    true,
-                    &theme,
-                ))
-                .into_any_element()
-        };
-
-        div()
-            .id(self.ident.element_id())
-            .column()
-            .w_full()
-            .gap_token(&theme, Space::Xs)
-            .child(
-                div()
-                    .type_scale(&theme, TypeScale::Label)
-                    .text_color(theme.colors.text)
-                    .child(self.label.clone()),
-            )
-            .child(body)
-            .semantic_in(
-                cx,
-                NodeSpec::new(self.ident.semantic_id(), Role::List)
-                    .text(self.label)
-                    .value(if empty { "empty" } else { "ready" }),
-            )
+        let ticks = resolved_ticks(
+            &self.ticks,
+            self.axis_start.as_ref(),
+            self.axis_end.as_ref(),
+        );
+        waterfall(
+            &self.ident,
+            self.label,
+            &self.spans,
+            &ticks,
+            self.current.as_ref(),
+            self.on_select,
+            &self.slots,
+            true,
+            window,
+            cx,
+        )
     }
 }
 
-/// The waterfall alone: bars and a time axis, without the label column.
+/// The waterfall alone: bars and a time axis, with each span named at its own
+/// bar instead of in a gutter.
 #[derive(IntoElement)]
 pub struct SpanTimeline {
     ident: Ident,
@@ -245,6 +298,7 @@ pub struct SpanTimeline {
     spans: Vec<TraceSpan>,
     axis_start: Option<SharedString>,
     axis_end: Option<SharedString>,
+    ticks: Vec<AxisTick>,
     current: Option<SharedString>,
     on_select: Option<SelectHandler>,
     slots: Slots,
@@ -258,6 +312,7 @@ impl SpanTimeline {
             spans: Vec::new(),
             axis_start: None,
             axis_end: None,
+            ticks: Vec::new(),
             current: None,
             on_select: None,
             slots: Slots::default(),
@@ -272,6 +327,23 @@ impl SpanTimeline {
     pub fn axis(mut self, start: impl Into<SharedString>, end: impl Into<SharedString>) -> Self {
         self.axis_start = Some(start.into());
         self.axis_end = Some(end.into());
+        self
+    }
+
+    /// Host-owned gridlines: a position on the same unit axis the spans use,
+    /// and the exact text under it. Without any, the grid falls back to
+    /// quarters of the axis, which carry a line and no wording.
+    pub fn ticks<S: Into<SharedString>>(
+        mut self,
+        ticks: impl IntoIterator<Item = (f32, S)>,
+    ) -> Self {
+        self.ticks = ticks
+            .into_iter()
+            .map(|(at, label)| AxisTick {
+                at,
+                label: Some(label.into()),
+            })
+            .collect();
         self
     }
 
@@ -299,72 +371,152 @@ impl Slotted for SpanTimeline {
 
 impl RenderOnce for SpanTimeline {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let theme = cx.theme().clone();
-        let empty = self.spans.is_empty();
-        let body = if empty {
-            self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
-                EmptyState::new(
-                    self.ident.child("empty"),
-                    cx.strings().text(StringKey::TraceEmpty),
-                )
-                .kind(EmptyKind::Empty)
-                .into_any_element()
-            })
-        } else {
-            let rows: Vec<_> = self
-                .spans
-                .iter()
-                .map(|span| {
-                    span_row(
-                        &self.ident,
-                        span,
-                        false,
-                        self.current.as_ref() == Some(&span.id),
-                        self.on_select.clone(),
-                        &theme,
-                        cx,
-                    )
-                })
-                .collect();
-            div()
-                .column()
-                .w_full()
-                .gap_token(&theme, Space::Xs)
-                .children(rows)
-                .children(axis_row(
-                    self.axis_start.clone(),
-                    self.axis_end.clone(),
-                    false,
-                    &theme,
-                ))
-                .into_any_element()
-        };
+        let ticks = resolved_ticks(
+            &self.ticks,
+            self.axis_start.as_ref(),
+            self.axis_end.as_ref(),
+        );
+        waterfall(
+            &self.ident,
+            self.label,
+            &self.spans,
+            &ticks,
+            self.current.as_ref(),
+            self.on_select,
+            &self.slots,
+            false,
+            window,
+            cx,
+        )
+    }
+}
 
+#[allow(clippy::too_many_arguments)]
+fn waterfall(
+    ident: &Ident,
+    label: SharedString,
+    spans: &[TraceSpan],
+    ticks: &[AxisTick],
+    current: Option<&SharedString>,
+    on_select: Option<SelectHandler>,
+    slots: &Slots,
+    with_label: bool,
+    window: &mut Window,
+    cx: &mut App,
+) -> gpui::AnyElement {
+    let theme = cx.theme().clone();
+    let empty = spans.is_empty();
+    let with_duration = spans.iter().any(|span| span.duration.is_some());
+    let body = if empty {
+        slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+            EmptyState::new(
+                ident.child("empty"),
+                cx.strings().text(StringKey::TraceEmpty),
+            )
+            .kind(EmptyKind::Empty)
+            .into_any_element()
+        })
+    } else {
+        let rows: Vec<_> = spans
+            .iter()
+            .map(|span| {
+                span_row(
+                    ident,
+                    span,
+                    with_label,
+                    with_duration,
+                    current == Some(&span.id),
+                    on_select.clone(),
+                    &theme,
+                    cx,
+                )
+            })
+            .collect();
         div()
-            .id(self.ident.element_id())
             .column()
             .w_full()
             .gap_token(&theme, Space::Xs)
             .child(
                 div()
-                    .type_scale(&theme, TypeScale::Label)
-                    .text_color(theme.colors.text)
-                    .child(self.label.clone()),
+                    .relative()
+                    .column()
+                    .w_full()
+                    .gap_token(&theme, Space::Xs)
+                    // First, so every line is painted under the bars and the
+                    // names rather than across them.
+                    .child(grid_layer(ticks, with_label, with_duration, &theme))
+                    .children(rows),
             )
-            .child(body)
-            .semantic_in(
-                cx,
-                NodeSpec::new(self.ident.semantic_id(), Role::List)
-                    .text(self.label)
-                    .value(if empty { "empty" } else { "ready" }),
-            )
-    }
+            .child(axis_row(ticks, with_label, with_duration, &theme))
+            .into_any_element()
+    };
+
+    div()
+        .id(ident.element_id())
+        .column()
+        .w_full()
+        .gap_token(&theme, Space::Xs)
+        .child(
+            div()
+                .type_scale(&theme, TypeScale::Label)
+                .text_color(theme.colors.text)
+                .child(label.clone()),
+        )
+        .child(body)
+        .semantic_in(
+            cx,
+            NodeSpec::new(ident.semantic_id(), Role::List)
+                .text(label)
+                .value(if empty { "empty" } else { "ready" }),
+        )
+        .into_any_element()
 }
 
+fn grid_layer(
+    ticks: &[AxisTick],
+    with_label: bool,
+    with_duration: bool,
+    theme: &gpui_kit_theme::Theme,
+) -> gpui::AnyElement {
+    let lines = ticks.iter().map(|tick| {
+        div()
+            .absolute()
+            .top_0()
+            .bottom_0()
+            .left(relative(tick.at))
+            .w(px(theme.borders.hairline))
+            .bg(theme.colors.divider)
+    });
+    let mut layer = div().absolute().inset_0().flex().flex_row();
+    layer = layer.gap_token(theme, Space::Sm);
+    if with_label {
+        // The gutter is closed by one line down the whole plot. Drawn as a
+        // border on each row it breaks at every gap and reads as a dashed rule.
+        layer = layer.child(
+            div().w(px(LABEL_WIDTH)).flex_none().relative().child(
+                div()
+                    .absolute()
+                    .top_0()
+                    .bottom_0()
+                    .right_0()
+                    .w(px(theme.borders.hairline))
+                    .bg(theme.colors.divider),
+            ),
+        );
+    }
+    layer = layer.child(div().flex_1().min_w_0().relative().children(lines));
+    if with_duration {
+        layer = layer.child(div().w(px(DURATION_WIDTH)).flex_none());
+    }
+    layer.into_any_element()
+}
+
+#[allow(clippy::too_many_arguments)]
 fn span_row(
     parent: &Ident,
     span: &TraceSpan,
     with_label: bool,
+    with_duration: bool,
     current: bool,
     on_select: Option<SelectHandler>,
     theme: &gpui_kit_theme::Theme,
@@ -377,30 +529,63 @@ fn span_row(
     let tone = span.state.tone();
     let color = tone.mark_color(None, theme);
     let status = span.state.label(cx);
-    let mut mark = StatusDot::new(tone);
-    if span.state == SpanState::Running {
-        mark = mark
-            .busy(ident.child("running"))
-            .activity(motion::Activity::Advancing);
-    }
+    let mark = || {
+        let mut mark = StatusDot::new(tone);
+        if span.state == SpanState::Running {
+            mark = mark
+                .busy(ident.child("running"))
+                .activity(motion::Activity::Advancing);
+        }
+        mark
+    };
 
-    let bar = div()
+    // Work that has not started yet is drawn as an outline: a filled bar is a
+    // claim that the interval happened.
+    let pending = span.state == SpanState::Pending;
+    let mut fill = div()
+        .absolute()
+        .top_0()
+        .bottom_0()
+        .left(relative(start))
+        .w(relative(width))
+        .radius(theme, Radius::Small);
+    fill = if pending {
+        fill.bg(color.opacity(if current { 0.24 } else { 0.16 }))
+            .border(px(theme.borders.hairline))
+            .border_color(color.opacity(if current { 0.82 } else { 0.62 }))
+    } else {
+        fill.bg(color.opacity(if current { 0.92 } else { 0.72 }))
+    };
+
+    let mut track = div()
         .relative()
         .flex_1()
         .min_w_0()
-        .h(px(16.0))
-        .radius(theme, Radius::Small)
-        .surface(theme, Surface::Canvas)
-        .child(
-            div()
-                .absolute()
-                .top_0()
-                .bottom_0()
-                .left(relative(start))
-                .w(relative(width))
-                .radius(theme, Radius::Small)
-                .bg(color.opacity(if current { 0.92 } else { 0.72 })),
-        );
+        .h(px(BAR_HEIGHT))
+        .overflow_hidden()
+        .child(fill);
+    if !with_label {
+        // The waterfall names each span at its own bar. After the bar while
+        // there is room after it, before it once there is not.
+        let after = end <= NAME_AFTER_LIMIT;
+        let mut name = div()
+            .absolute()
+            .top_0()
+            .bottom_0()
+            .row()
+            .gap_token(theme, Space::Xs)
+            .type_scale(theme, TypeScale::Caption)
+            .text_color(theme.colors.text)
+            .child(mark())
+            .child(div().truncate().child(span.label.clone()));
+        name = if after {
+            name.left(relative(end)).pl(px(theme.space(Space::Xs)))
+        } else {
+            name.right(relative(1.0 - start))
+                .pr(px(theme.space(Space::Xs)))
+        };
+        track = track.child(name);
+    }
 
     let mut row = div()
         .id(ident.element_id())
@@ -408,17 +593,19 @@ fn span_row(
         .w_full()
         .items_center()
         .gap_token(theme, Space::Sm)
-        .h(px(28.0));
+        .h(px(ROW_HEIGHT));
     if with_label {
         row = row.child(
             div()
                 .row()
                 .items_center()
-                .w(px(168.0))
+                .w(px(LABEL_WIDTH))
+                .h_full()
                 .flex_none()
                 .gap_token(theme, Space::Xs)
                 .pl(px(span.depth as f32 * theme.space(Space::Md)))
-                .child(mark)
+                .pr(px(theme.space(Space::Sm)))
+                .child(mark())
                 .child(
                     div()
                         .min_w_0()
@@ -429,7 +616,19 @@ fn span_row(
                 ),
         );
     }
-    row = row.child(bar);
+    row = row.child(track);
+    if with_duration {
+        row = row.child(
+            div()
+                .w(px(DURATION_WIDTH))
+                .flex_none()
+                .truncate()
+                .type_scale(theme, TypeScale::Caption)
+                .text_align(gpui::TextAlign::Right)
+                .text_color(theme.colors.text_muted)
+                .children(span.duration.clone()),
+        );
+    }
     if let Some(handler) = on_select {
         let id = span.id.clone();
         row = row
@@ -452,33 +651,84 @@ fn span_row(
 }
 
 fn axis_row(
-    start: Option<SharedString>,
-    end: Option<SharedString>,
+    ticks: &[AxisTick],
     with_label: bool,
+    with_duration: bool,
     theme: &gpui_kit_theme::Theme,
-) -> Option<gpui::AnyElement> {
-    (start.is_some() || end.is_some()).then(|| {
-        let mut row = div()
-            .row()
-            .w_full()
-            .items_center()
-            .gap_token(theme, Space::Sm)
+) -> gpui::AnyElement {
+    let marks = ticks.iter().map(|tick| {
+        div()
+            .absolute()
+            .top_0()
+            .left(relative(tick.at))
+            .w(px(theme.borders.hairline))
+            .h(px(TICK_HEIGHT))
+            .bg(theme.colors.divider)
+    });
+    let labels = ticks.iter().filter_map(|tick| {
+        let text = tick.label.clone()?;
+        let mut anchor = div()
+            .absolute()
+            .top(px(TICK_HEIGHT + theme.borders.hairline))
+            .left(relative(tick.at))
+            .w_0()
+            .h_0();
+        // The first and last ticks read against the ends of the track; the
+        // ones between it are centred on their own line.
+        let text = div()
             .type_scale(theme, TypeScale::Caption)
-            .text_color(theme.colors.text_faint);
-        if with_label {
-            row = row.child(div().w(px(168.0)).flex_none());
-        }
-        row.child(
-            div()
-                .row()
-                .flex_1()
-                .min_w_0()
-                .justify_between()
-                .children(start)
-                .children(end),
-        )
-        .into_any_element()
-    })
+            .text_color(theme.colors.text_faint)
+            .child(text);
+        anchor = if tick.at <= 0.0 {
+            anchor.child(text.absolute().left_0().w(px(TICK_LABEL_WIDTH)))
+        } else if tick.at >= 1.0 {
+            anchor.child(
+                text.absolute()
+                    .left(px(-TICK_LABEL_WIDTH))
+                    .w(px(TICK_LABEL_WIDTH))
+                    .text_align(gpui::TextAlign::Right),
+            )
+        } else {
+            anchor.child(
+                text.absolute()
+                    .left(px(-TICK_LABEL_WIDTH / 2.0))
+                    .w(px(TICK_LABEL_WIDTH))
+                    .text_align(gpui::TextAlign::Center),
+            )
+        };
+        Some(anchor)
+    });
+
+    let baseline = div()
+        .absolute()
+        .top_0()
+        .left_0()
+        .right_0()
+        .h(px(theme.borders.hairline))
+        .bg(theme.colors.divider);
+
+    let mut row = div()
+        .flex()
+        .flex_row()
+        .w_full()
+        .h(px(AXIS_HEIGHT))
+        .gap_token(theme, Space::Sm);
+    if with_label {
+        row = row.child(div().w(px(LABEL_WIDTH)).flex_none());
+    }
+    row = row.child(
+        div()
+            .flex_1()
+            .min_w_0()
+            .relative()
+            .child(baseline)
+            .children(marks)
+            .children(labels),
+    );
+    if with_duration {
+        row = row.child(div().w(px(DURATION_WIDTH)).flex_none());
+    }
+    row.into_any_element()
 }
 
 #[cfg(test)]

@@ -20,6 +20,7 @@ gpui.workspace = true
 gpui-kit-semantics.workspace = true
 png.workspace = true
 raw-window-handle.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 

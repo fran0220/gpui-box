@@ -35,13 +35,13 @@ use gpui::{
     KeyDownEvent, ParentElement, Render, SharedString, Styled, Window, div, prelude::FluentBuilder,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Space, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TypeScale};
 
 use crate::controls::button::{Button, ButtonVariant};
 use crate::display::badge::Tone;
 use crate::display::description_list::{DescriptionItem, DescriptionList};
 use crate::display::status::StatusLine;
-use crate::foundation::{CardVariant, Ident, StyledExt, text};
+use crate::foundation::{CardVariant, Ident, Sizable, StyledExt, text};
 use crate::strings::{ActiveStrings, StringKey};
 
 /// What a standing approval covers.
@@ -415,7 +415,11 @@ impl Render for ApprovalPrompt {
             let prompt = prompt.clone();
             Button::new(self.ident.child("approve"))
                 .label(cx.strings().text(StringKey::ApprovalApproveOnce))
-                .variant(ButtonVariant::Primary)
+                // Consent is not a call to action: a primary approval next to
+                // a secondary decline reads as the answer the surface wants,
+                // which is exactly the pressure a consent prompt must not
+                // apply. The two answers carry the same weight.
+                .variant(ButtonVariant::Secondary)
                 .semantic_parent(self.ident.semantic_id())
                 .track_focus(&self.approve_focus)
                 .on_click(move |_window, cx| {
@@ -432,9 +436,13 @@ impl Render for ApprovalPrompt {
                 .map(|(scope, handle)| {
                     let prompt = prompt.clone();
                     let chosen = scope.clone();
+                    // The widest grant on the prompt used to be the only
+                    // control with no chrome at all, so the most consequential
+                    // thing a reader could press looked like a caption.
                     Button::new(self.ident.child("always").child(scope.name()))
                         .label(scope.label(cx))
-                        .ghost()
+                        .secondary()
+                        .control_size(ControlSize::Sm)
                         .semantic_parent(self.ident.semantic_id())
                         .track_focus(handle)
                         .on_click(move |_window, cx| {

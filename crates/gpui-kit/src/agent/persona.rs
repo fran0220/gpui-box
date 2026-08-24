@@ -248,6 +248,12 @@ impl RenderOnce for VoiceReactive {
             .items_center()
             .justify_center()
             .gap_token(&theme, Space::Xs)
+            // The bars sit in a track. Loose ticks on the page gave the
+            // reading no floor and no ceiling, so nothing said how loud full
+            // scale is or where silence would be drawn. With no signal at
+            // all the track holds a flat line rather than a waveform: a
+            // refused microphone has no levels to show, and drawing seven
+            // red bars for one claimed a signal that was never captured.
             .child(
                 div()
                     .row()
@@ -255,13 +261,28 @@ impl RenderOnce for VoiceReactive {
                     .justify_center()
                     .gap(px(3.0))
                     .h(px(42.0))
-                    .children(bars.into_iter().map(|level| {
-                        div()
-                            .w(px(4.0))
-                            .h(px(5.0 + level * 31.0))
-                            .rounded_full()
-                            .bg(color)
-                    })),
+                    .px_token(&theme, Space::Xs)
+                    .radius(&theme, Radius::Control)
+                    .well(&theme)
+                    .map(|track| {
+                        if unavailable.is_some() {
+                            track.child(
+                                div()
+                                    .w(px(58.0))
+                                    .h(px(2.0))
+                                    .rounded_full()
+                                    .bg(theme.colors.text_faint),
+                            )
+                        } else {
+                            track.children(bars.into_iter().map(|level| {
+                                div()
+                                    .w(px(4.0))
+                                    .h(px(5.0 + level * 31.0))
+                                    .rounded_full()
+                                    .bg(color)
+                            }))
+                        }
+                    }),
             )
             .children(unavailable.map(|reason| {
                 div()
@@ -479,18 +500,20 @@ impl RenderOnce for PersonaPortrait {
                 cx,
             );
             let color = voice_color(&sample.state, &theme);
+            // The voice reading sits under the portrait rather than on it.
+            // Pinned inside the square it cut a panel-coloured notch out of
+            // the state ring and landed in the same corner as the presence
+            // mark, so three separate facts overlapped in one place.
             div()
-                .absolute()
-                .bottom(px(0.0))
-                .left(px((self.size - 38.0) / 2.0))
                 .row()
+                .flex_none()
                 .items_center()
                 .justify_center()
                 .gap(px(2.0))
                 .w(px(38.0))
-                .h(px(18.0))
+                .h(px(16.0))
                 .rounded_full()
-                .bg(theme.colors.panel)
+                .well(&theme)
                 .children(
                     voice_levels(&sample, elapsed, cx.reduce_motion(), 5)
                         .into_iter()
@@ -514,14 +537,21 @@ impl RenderOnce for PersonaPortrait {
         });
 
         div()
-            .relative()
-            .size(px(self.size))
+            .column()
             .flex_none()
             .items_center()
-            .justify_center()
-            .children(effect)
-            .child(avatar)
-            .child(indicator)
+            .gap(px(4.0))
+            .child(
+                div()
+                    .relative()
+                    .size(px(self.size))
+                    .flex_none()
+                    .items_center()
+                    .justify_center()
+                    .children(effect)
+                    .child(avatar)
+                    .child(indicator),
+            )
             .children(voice)
             .semantic_in(
                 cx,
@@ -863,33 +893,37 @@ impl RenderOnce for PersonaDialogue {
             .column()
             .gap_token(&theme, Space::Sm)
             .child(
+                // "Streaming" belongs beside the name, on the name's own
+                // line. Centred against the two-line block it floated at a
+                // baseline neither the name nor the activity line shared,
+                // which read as a third, unattached fact.
                 div()
-                    .row_reading(direction)
-                    .items_center()
-                    .gap_token(&theme, Space::Md)
+                    .column()
+                    .gap_token(&theme, Space::Xs)
                     .child(
                         div()
-                            .column()
-                            .gap_token(&theme, Space::Xs)
+                            .row_reading(direction)
+                            .items_center()
+                            .gap_token(&theme, Space::Md)
                             .child(
                                 div()
                                     .type_scale(&theme, TypeScale::Label)
                                     .text_tone(&theme, TextTone::Primary)
                                     .child(self.turn.agent.descriptor.name.clone()),
                             )
-                            .child(AgentActivityLine::new(
-                                self.ident.child("activity"),
-                                self.turn.agent.execution.clone(),
-                            )),
+                            .children(streaming.then(|| {
+                                StatusLine::new(
+                                    cx.strings().text(StringKey::MessageStreaming),
+                                    Tone::Accent,
+                                )
+                                .id(self.ident.child("streaming"))
+                                .busy(self.ident.child("streaming-mark"))
+                            })),
                     )
-                    .children(streaming.then(|| {
-                        StatusLine::new(
-                            cx.strings().text(StringKey::MessageStreaming),
-                            Tone::Accent,
-                        )
-                        .id(self.ident.child("streaming"))
-                        .busy(self.ident.child("streaming-mark"))
-                    })),
+                    .child(AgentActivityLine::new(
+                        self.ident.child("activity"),
+                        self.turn.agent.execution.clone(),
+                    )),
             )
             .child(body)
             .children(has_choices.then(|| {

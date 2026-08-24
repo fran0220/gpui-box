@@ -1775,6 +1775,7 @@ dependencies = [
  "objc2-app-kit 0.3.2",
  "png 0.18.1",
  "raw-window-handle",
+ "serde",
  "serde_json",
  "thiserror 2.0.20",
 ]

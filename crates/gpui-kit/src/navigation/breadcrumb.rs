@@ -12,10 +12,12 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Space, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
 
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
-use crate::foundation::{FocusRing, Ident, Pressable, StyledExt, text as foundation_text};
+use crate::foundation::{
+    FocusRing, Hoverable, Ident, Pressable, StyledExt, text as foundation_text,
+};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
@@ -171,6 +173,13 @@ impl Breadcrumb {
             .id(ident.element_id())
             .group(hover_group.clone())
             .flex_none()
+            // A crumb that can be gone back to wears a target: without one the
+            // trail is a sentence, and nothing in it says which words answer
+            // to a pointer.
+            .px(px(theme.space(Space::Xs)))
+            .py(px(theme.space(Space::Xs) / 2.0))
+            .radius(&theme, Radius::Control)
+            .when(actionable, |element| element.hover_row(&theme))
             .child(
                 foundation_text(&theme, TypeScale::Label, crumb.label.clone())
                     .text_color(if current {
@@ -238,6 +247,14 @@ impl Breadcrumb {
             .id(ident.element_id())
             .group(hover_group.clone())
             .flex_none()
+            // Three dots set in a run of text is punctuation. The chip is what
+            // makes it a control that hides a count of crumbs.
+            .px(px(theme.space(Space::Xs)))
+            .py(px(theme.space(Space::Xs) / 2.0))
+            .radius(&theme, Radius::Control)
+            .when(actionable, |element| {
+                element.bg(theme.colors.hover).hover_row(&theme)
+            })
             .child(
                 foundation_text(&theme, TypeScale::Label, SharedString::from("…"))
                     .text_tone(&theme, gpui_kit_theme::TextTone::Muted)

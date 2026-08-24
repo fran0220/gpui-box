@@ -9,7 +9,7 @@ use gpui_kit_theme::{ActiveTheme, Space, TypeScale};
 
 use crate::controls::button::Button;
 use crate::controls::keybinding_recorder::{KeybindingRecorder, KeybindingRecorderEvent};
-use crate::foundation::{Disableable, Ident, StyledExt, text as foundation_text};
+use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text as foundation_text};
 use crate::overlay::Kbd;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -350,7 +350,12 @@ impl Render for KeymapEditor {
                     actions = actions.child(
                         Button::new(row.child("add"))
                             .label(cx.strings().text(StringKey::KeymapAdd))
-                            .ghost()
+                            // A tertiary action still has to look like one.
+                            // Drawn as a ghost these three are words in a
+                            // column of words, and nothing on the panel says
+                            // which of them can be pressed.
+                            .secondary()
+                            .small()
                             .semantic_parent(row.semantic_id())
                             .on_click(move |window, cx| {
                                 editor.update(cx, |this, cx| {
@@ -374,7 +379,8 @@ impl Render for KeymapEditor {
                         actions = actions.child(
                             Button::new(row.child("reset"))
                                 .label(cx.strings().text(StringKey::KeymapReset))
-                                .ghost()
+                                .secondary()
+                                .small()
                                 .semantic_parent(row.semantic_id())
                                 .on_click(move |_, cx| {
                                     editor.update(cx, |_, cx| {
@@ -447,7 +453,8 @@ impl Render for KeymapEditor {
                         line = line.child(
                             Button::new(binding_id.child("remove"))
                                 .label(cx.strings().text(StringKey::KeymapRemove))
-                                .ghost()
+                                .secondary()
+                                .small()
                                 .semantic_parent(binding_id.semantic_id())
                                 .on_click(move |_, cx| {
                                     editor.update(cx, |_, cx| {

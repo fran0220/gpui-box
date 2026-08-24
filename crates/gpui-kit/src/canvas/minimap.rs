@@ -114,7 +114,7 @@ impl RenderOnce for Minimap {
                     .top(relative(mark.y.clamp(0.0, 1.0)))
                     .w(relative(mark.width.clamp(0.04, 1.0)))
                     .h(relative(mark.height.clamp(0.04, 1.0)))
-                    .bg(theme.colors.accent.opacity(0.7))
+                    .bg(theme.colors.loader_placeholder)
                     .semantic_in(
                         cx,
                         NodeSpec::new(
@@ -128,15 +128,22 @@ impl RenderOnce for Minimap {
                     )
             })
             .collect::<Vec<_>>();
+        // The viewport is where the reader is, not an alarm, and it is kept
+        // inside the square: a rectangle that overhangs the overview reports
+        // a view of somewhere the overview does not describe.
         let viewport = self.view.map(|view| {
+            let x = view.x.clamp(0.0, 1.0);
+            let y = view.y.clamp(0.0, 1.0);
             div()
                 .absolute()
-                .left(relative(view.x.clamp(0.0, 1.0)))
-                .top(relative(view.y.clamp(0.0, 1.0)))
-                .w(relative(view.width.clamp(0.04, 1.0)))
-                .h(relative(view.height.clamp(0.04, 1.0)))
+                .left(relative(x))
+                .top(relative(y))
+                .w(relative(view.width.clamp(0.04, 1.0 - x)))
+                .h(relative(view.height.clamp(0.04, 1.0 - y)))
+                .radius(&theme, Radius::Small)
                 .border(px(theme.borders.hairline))
-                .border_color(theme.colors.danger)
+                .border_color(theme.colors.text)
+                .bg(theme.colors.selected)
         });
         let measured = measure::cell(&self.ident.semantic_id(), window, cx);
         let handler = self.on_pan;

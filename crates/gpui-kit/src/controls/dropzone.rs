@@ -186,33 +186,37 @@ impl RenderOnce for Dropzone {
             _ => DropzoneState::Idle,
         });
 
-        let (border, text, message) = match state {
-            DropzoneState::Idle => (
-                theme.colors.hairline_strong,
-                theme.colors.text_muted,
-                self.label.clone(),
-            ),
-            DropzoneState::Accepting => {
-                (theme.colors.accent, theme.colors.text, self.label.clone())
-            }
-            DropzoneState::Refusing => (
-                theme.colors.danger,
-                theme.colors.danger,
-                self.refusal
-                    .clone()
-                    .unwrap_or_else(|| cx.strings().text(StringKey::DropzoneRefusal)),
-            ),
+        let (border, text) = match state {
+            DropzoneState::Idle => (theme.colors.hairline_strong, theme.colors.text_muted),
+            DropzoneState::Accepting => (theme.colors.accent, theme.colors.text),
+            DropzoneState::Refusing => (theme.colors.danger, theme.colors.danger),
         };
+        // The zone always says what it is. A refusal is a second line under
+        // that, in the tone of a refusal, so a refusing zone is still
+        // recognisably the same target and not an unlabelled red box.
+        let message = self.label.clone();
+        let refusal = (state == DropzoneState::Refusing).then(|| {
+            self.refusal
+                .clone()
+                .unwrap_or_else(|| cx.strings().text(StringKey::DropzoneRefusal))
+        });
 
         let mut zone = div()
             .id(self.ident.element_id())
             .column()
+            .w_full()
+            .h_full()
             .items_center()
             .justify_center()
             .gap_token(&theme, Space::Xs)
             .p_token(&theme, Space::Lg)
             .border(px(theme.borders.thick))
             .border_color(border)
+            // A solid ring is what a disabled field wears. A drop target is
+            // an opening, and the dashes are how every platform says so.
+            .when(state == DropzoneState::Idle, |element| {
+                element.border_dashed()
+            })
             .radius(&theme, Radius::Card)
             .when(state == DropzoneState::Accepting, |element| {
                 element.bg(theme
@@ -229,10 +233,13 @@ impl RenderOnce for Dropzone {
                     .text_color(text)
             }))
             .child(foundation_text(&theme, TypeScale::Label, message.clone()).text_color(text))
+            .children(refusal.clone().map(|refusal| {
+                foundation_text(&theme, TypeScale::Caption, refusal).text_color(theme.colors.danger)
+            }))
             .children(
                 self.hint
                     .clone()
-                    .filter(|_| state == DropzoneState::Idle)
+                    .filter(|_| state != DropzoneState::Refusing)
                     .map(|hint| {
                         foundation_text(&theme, TypeScale::Caption, hint)
                             .text_tone(&theme, gpui_kit_theme::TextTone::Faint)
@@ -275,7 +282,7 @@ impl RenderOnce for Dropzone {
         let zone = zone.semantic_in(
             cx,
             NodeSpec::new(self.ident.semantic_id(), Role::Region)
-                .text(message)
+                .text(refusal.unwrap_or(message))
                 .value(state.name())
                 .disabled(self.disabled)
                 .selected(state == DropzoneState::Accepting)

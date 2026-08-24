@@ -122,15 +122,41 @@ impl LineMark {
     }
 
     /// The rail colour and the wash behind the row.
+    ///
+    /// A line somebody deleted and a line the host says is wrong are two
+    /// different claims, and drawing both in the danger colour at one strength
+    /// left them the same row twice. The diff classes take the syntax table's
+    /// own added and removed colours, which is where the rest of the library
+    /// says "this line went" already, and a failure keeps danger to itself.
     fn colors(self, theme: &Theme) -> (gpui::Hsla, gpui::Hsla) {
-        let tint = match self {
-            Self::Added => theme.colors.success,
-            Self::Removed => theme.colors.danger,
-            Self::Changed => theme.colors.warning,
-            Self::Highlighted => theme.colors.accent,
-            Self::Error => theme.colors.danger,
-        };
-        (tint, tint.opacity(theme.effects.selected_ring_alpha))
+        match self {
+            Self::Added => (theme.colors.syntax.added, theme.colors.syntax.added_wash),
+            Self::Removed => (
+                theme.colors.syntax.removed,
+                theme.colors.syntax.removed_wash,
+            ),
+            Self::Changed => (
+                theme.colors.warning,
+                theme
+                    .colors
+                    .warning
+                    .opacity(theme.effects.selected_ring_alpha),
+            ),
+            Self::Highlighted => (
+                theme.colors.accent,
+                theme
+                    .colors
+                    .accent
+                    .opacity(theme.effects.selected_ring_alpha),
+            ),
+            Self::Error => (
+                theme.colors.danger,
+                theme
+                    .colors
+                    .danger
+                    .opacity(theme.effects.selected_ring_alpha),
+            ),
+        }
     }
 
     /// A removed line is struck through as well as tinted, because a colour
@@ -314,6 +340,7 @@ fn line_element(
         .row()
         .items_start()
         .w_full()
+        .pl(px(theme.space(Space::Sm)))
         .h(px(theme.typography.code.line_height))
         .when(line.mark.is_some(), |element| element.bg(wash))
         .when(line_numbers, |element| {
@@ -328,11 +355,13 @@ fn line_element(
             )
         })
         // The rail is what a reader in monochrome sees, and it is drawn even
-        // when the gutter is off, because the mark is the fact.
+        // when the gutter is off, because the mark is the fact. It is the
+        // library's one rail width, so a marked line and a selected row are
+        // marked by the same object.
         .child(
             div()
                 .flex_none()
-                .w(px(theme.borders.thick))
+                .w(px(theme.effects.selection_rail_width))
                 .h_full()
                 .when(line.mark.is_some(), |element| element.bg(rail)),
         )
@@ -561,14 +590,20 @@ impl RenderOnce for CodeView {
             .column()
             .w_full()
             .gap_token(&theme, Space::Xs)
-            .p_token(&theme, Space::Sm)
+            // The block's rows run edge to edge and pad themselves: a row
+            // inset by the card's own padding leaves its mark's wash stopping
+            // short of the card, which reads as a band that failed to finish
+            // rather than as a line that is marked.
+            .py_token(&theme, Space::Sm)
             .radius(&theme, Radius::Card)
+            .overflow_hidden()
             .frame(&theme, Surface::Raised, Elevation::Raised)
             .when(self.language.is_some() || copy.is_some(), |element| {
                 element.child(
                     div()
                         .row()
                         .w_full()
+                        .px_token(&theme, Space::Sm)
                         .justify_between()
                         .type_scale(&theme, TypeScale::Caption)
                         .text_color(theme.colors.text_faint)
@@ -578,12 +613,34 @@ impl RenderOnce for CodeView {
             })
             .child(
                 div()
+                    .relative()
                     .w_full()
+                    .overflow_hidden()
                     .font_family(theme.typography.mono.clone())
                     .text_size(px(theme.typography.code.size))
                     .line_height(px(theme.typography.code.line_height))
                     .text_color(theme.colors.text)
-                    .child(body),
+                    .child(body)
+                    // A column carries meaning in code, so a long line runs off
+                    // the edge rather than wrapping — and the edge it runs off
+                    // is a fade, not a cut through the middle of a word that
+                    // reads as a rendering failure.
+                    .child(
+                        div()
+                            .absolute()
+                            .top_0()
+                            .bottom_0()
+                            .right_0()
+                            .w(px(theme.effects.edge_fade_band))
+                            .bg(gpui::linear_gradient(
+                                90.0,
+                                gpui::linear_color_stop(
+                                    theme.surface(Surface::Raised).opacity(0.0),
+                                    0.0,
+                                ),
+                                gpui::linear_color_stop(theme.surface(Surface::Raised), 1.0),
+                            )),
+                    ),
             )
             .semantic_in(
                 cx,

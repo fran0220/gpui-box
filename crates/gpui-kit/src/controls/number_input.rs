@@ -458,6 +458,8 @@ impl Render for NumberInput {
             Icon::ArrowDown,
             cx.strings().text(StringKey::NumberDecrease),
         )
+        .secondary()
+        .join(crate::controls::button::ButtonJoin::Trailing)
         .control_size(self.size)
         .semantic_parent(self.ident.semantic_id())
         .disabled(!can_decrement)
@@ -475,6 +477,8 @@ impl Render for NumberInput {
             Icon::ArrowUp,
             cx.strings().text(StringKey::NumberIncrease),
         )
+        .secondary()
+        .join(crate::controls::button::ButtonJoin::Leading)
         .control_size(self.size)
         .semantic_parent(self.ident.semantic_id())
         .disabled(!can_increment)
@@ -499,22 +503,29 @@ impl Render for NumberInput {
                         .invalid(invalid)
                         .disabled(self.disabled),
                 )
+                // An adornment is the field talking, not the typist. At the
+                // value's own weight it read as characters somebody entered
+                // and could delete.
                 .when_some(self.prefix.clone(), |element, prefix| {
                     element.child(
-                        foundation_text(&theme, TypeScale::Label, prefix)
+                        foundation_text(&theme, TypeScale::Caption, prefix)
                             .flex_none()
-                            .text_tone(&theme, gpui_kit_theme::TextTone::Muted),
+                            .text_tone(&theme, gpui_kit_theme::TextTone::Faint),
                     )
                 })
                 .child(div().flex_1().child(self.field.clone()))
                 .when_some(self.unit.clone(), |element, unit| {
                     element.child(
-                        foundation_text(&theme, TypeScale::Label, unit)
+                        foundation_text(&theme, TypeScale::Caption, unit)
                             .flex_none()
-                            .text_tone(&theme, gpui_kit_theme::TextTone::Muted),
+                            .text_tone(&theme, gpui_kit_theme::TextTone::Faint),
                     )
                 })
-                .child(div().flex_none().row().child(decrement).child(increment)),
+                // Up before down: a spinner is read as a pair going the way
+                // the numbers do, and the pair is drawn as one joined control
+                // so it is legible as something to press rather than as two
+                // glyphs floating in the field.
+                .child(div().flex_none().row().child(increment).child(decrement)),
             )
             .semantic_in(cx, spec)
     }

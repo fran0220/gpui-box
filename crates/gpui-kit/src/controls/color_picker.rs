@@ -9,7 +9,7 @@ use std::rc::Rc;
 use gpui::{
     App, CursorStyle, Hsla, InteractiveElement, IntoElement, MouseButton, ParentElement,
     RenderOnce, SharedString, StatefulInteractiveElement, Styled, Window, div, hsla,
-    linear_color_stop, linear_gradient_stops, px, relative,
+    linear_color_stop, linear_gradient_stops, prelude::FluentBuilder as _, px, relative,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
@@ -192,6 +192,7 @@ impl RenderOnce for ColorPicker {
             cx.strings().text(StringKey::ColorHue),
             hue,
             hue_fill(),
+            false,
             {
                 let value = self.value;
                 let report = report.clone();
@@ -218,6 +219,7 @@ impl RenderOnce for ColorPicker {
                         linear_color_stop(self.value.opacity(1.0), 1.0),
                     ],
                 ),
+                true,
                 {
                     let value = self.value;
                     report.clone().map(|handler| {
@@ -395,12 +397,51 @@ fn saturation_board(
         .into_any_element()
 }
 
+/// How tall either channel track is. Both take it from here, so an alpha run
+/// and a hue run are the same object at different jobs.
+const TRACK_HEIGHT: f32 = 12.0;
+const CHECKER: f32 = TRACK_HEIGHT / 2.0;
+/// How many squares the checkerboard lays down before it runs out. The track
+/// clips, so the count only has to exceed the widest picker.
+const CHECKER_COLUMNS: usize = 64;
+
+/// The surface that says "nothing is painted here".
+///
+/// A colour at zero alpha over a solid panel is indistinguishable from the
+/// panel, so the alpha run needs something behind it that visibly does not
+/// belong to the colour.
+fn checkerboard(theme: &gpui_kit_theme::Theme) -> Vec<gpui::Div> {
+    (0..2)
+        .map(|row| {
+            div()
+                .absolute()
+                .left_0()
+                .top(px(row as f32 * CHECKER))
+                .h(px(CHECKER))
+                .flex()
+                .flex_row()
+                .children((0..CHECKER_COLUMNS).map(|column| {
+                    div()
+                        .w(px(CHECKER))
+                        .h(px(CHECKER))
+                        .flex_none()
+                        .bg(if (row + column) % 2 == 0 {
+                            theme.colors.raised
+                        } else {
+                            theme.colors.track
+                        })
+                }))
+        })
+        .collect()
+}
+
 #[allow(clippy::too_many_arguments)]
 fn channel_track(
     ident: &Ident,
     label: SharedString,
     value: f32,
     fill: gpui::Background,
+    transparency: bool,
     report: Option<ChannelHandler>,
     theme: &gpui_kit_theme::Theme,
     window: &Window,
@@ -419,10 +460,21 @@ fn channel_track(
         .id(ident.element_id())
         .relative()
         .w_full()
-        .h(px(12.0))
-        .radius(theme, Radius::Small)
-        .overflow_hidden()
-        .bg(fill)
+        .h(px(TRACK_HEIGHT))
+        // The clipped part is the gradient, not the handle. Rounding the
+        // whole thing cut the handle to a half-circle whenever the value sat
+        // at either end of the run.
+        .child(
+            div()
+                .absolute()
+                .inset_0()
+                .radius(theme, Radius::Small)
+                .overflow_hidden()
+                .when(transparency, |element| {
+                    element.children(checkerboard(theme))
+                })
+                .child(div().absolute().inset_0().bg(fill)),
+        )
         .child(
             div()
                 .absolute()

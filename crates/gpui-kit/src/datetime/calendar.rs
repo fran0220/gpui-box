@@ -476,7 +476,14 @@ impl Calendar {
             .into_any_element()
     }
 
-    fn cell(&self, cell: MonthCell, cx: &mut Context<Self>) -> AnyElement {
+    fn cell(
+        &self,
+        cell: MonthCell,
+        week_start: bool,
+        week_end: bool,
+        direction: LayoutDirection,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let theme = cx.theme().clone();
         let Some(day) = cell.day() else {
             return div().size(px(CELL_SIZE)).flex_none().into_any_element();
@@ -515,21 +522,50 @@ impl Calendar {
             None
         };
 
+        // A run of days is one shape. Every day in it carrying its own full
+        // radius draws a row of separate chips, which is a list of days rather
+        // than a range; the corners survive only where the run actually ends,
+        // or where the week does.
+        let bounds = self.band_bounds();
+        let in_band = banded || endpoint;
+        let opens = bounds.is_none_or(|(low, _)| low == day) || week_start;
+        let closes = bounds.is_none_or(|(_, high)| high == day) || week_end;
+        let flat = px(0.0);
+        let open_flat = move |element: gpui::Stateful<gpui::Div>| {
+            if direction.is_rtl() {
+                element.rounded_tr(flat).rounded_br(flat)
+            } else {
+                element.rounded_tl(flat).rounded_bl(flat)
+            }
+        };
+        let close_flat = move |element: gpui::Stateful<gpui::Div>| {
+            if direction.is_rtl() {
+                element.rounded_tl(flat).rounded_bl(flat)
+            } else {
+                element.rounded_tr(flat).rounded_br(flat)
+            }
+        };
+
         let cell = div()
             .id(ident.element_id())
             .size(px(CELL_SIZE))
             .flex_none()
+            .relative()
             .flex()
             .flex_col()
             .items_center()
             .justify_center()
-            .gap(px(2.0))
             .radius(&theme, Radius::Control)
             .when_some(background, |element, color| element.bg(color))
+            .when(in_band && !opens, open_flat)
+            .when(in_band && !closes, close_flat)
+            // Today is not a choice anybody made, so it does not wear the
+            // colour a chosen day wears; a neutral ring says "you are here"
+            // without competing with the endpoints of a range.
             .when(is_today && !selected && !endpoint, |element| {
                 element
                     .border(px(theme.borders.thick))
-                    .border_color(theme.colors.accent)
+                    .border_color(theme.colors.hairline_strong)
             })
             .when(cursored, |element| element.shadow(theme.focus_ring()))
             .when(selectable, |element| {
@@ -543,23 +579,35 @@ impl Calendar {
                         calendar.hover(over.then_some(day), cx);
                     }))
             })
+            // Dimming the whole cell dimmed the band under it too, which left
+            // a day nobody may pick looking exactly like a day inside the run.
+            // The mark goes on the number instead, in the same colour the
+            // report under the calendar names it in.
             .when_some(blocked.clone(), |element, reason| {
-                element
-                    .opacity(theme.opacity.disabled)
-                    .tip(ident.clone(), reason)
+                element.tip(ident.clone(), reason)
             })
-            .child(if selected || endpoint {
-                foundation_text(&theme, TypeScale::Label, label)
-                    .text_color(theme.colors.text_on_accent)
-            } else if !selectable {
-                foundation_text(&theme, TypeScale::Label, label).text_tone(&theme, TextTone::Faint)
-            } else if cell.is_adjacent() {
-                foundation_text(&theme, TypeScale::Label, label).text_tone(&theme, TextTone::Muted)
-            } else {
-                foundation_text(&theme, TypeScale::Label, label)
+            .child({
+                let text = foundation_text(&theme, TypeScale::Label, label);
+                if blocked.is_some() {
+                    text.text_color(theme.colors.warning).line_through()
+                } else if selected || endpoint {
+                    text.text_color(theme.colors.text_on_accent)
+                } else if !selectable {
+                    text.text_tone(&theme, TextTone::Disabled)
+                } else if cell.is_adjacent() {
+                    // A day from the month either side is the quietest thing
+                    // in the grid: it is context, not a row of this month.
+                    text.text_tone(&theme, TextTone::Faint)
+                } else {
+                    text
+                }
             })
+            // Absolute, so a day that carries a mark keeps its number on the
+            // same baseline as the twenty that do not.
             .children(mark.as_ref().map(|mark| {
                 div()
+                    .absolute()
+                    .bottom(px(theme.space(Space::Xs) / 2.0))
                     .size(px(4.0))
                     .rounded_full()
                     .bg(if selected || endpoint {
@@ -582,19 +630,21 @@ impl Calendar {
     /// Whether the day falls inside the drawn range, including the length a
     /// hover is currently previewing.
     fn band(&self, day: Day) -> bool {
-        let Some(range) = &self.range else {
-            return false;
-        };
-        let end = range.end.or(self.hovered);
-        let Some(end) = end else {
-            return false;
-        };
-        let (low, high) = if range.start <= end {
-            (range.start, end)
-        } else {
-            (end, range.start)
-        };
-        low <= day && day <= high
+        self.band_bounds()
+            .is_some_and(|(low, high)| low <= day && day <= high)
+    }
+
+    /// The first and last day the drawn run covers, in that order.
+    ///
+    /// A run with no end yet covers its start alone, which is what lets the
+    /// endpoint keep the corners a single chosen day has.
+    fn band_bounds(&self) -> Option<(Day, Day)> {
+        let range = self.range.as_ref()?;
+        let end = range.end.or(self.hovered).unwrap_or(range.start);
+        Some(match range.start <= end {
+            true => (range.start, end),
+            false => (end, range.start),
+        })
     }
 
     fn is_endpoint(&self, day: Day) -> bool {
@@ -611,11 +661,15 @@ impl Calendar {
             .weeks
             .iter()
             .map(|week| {
+                let last = week.len().saturating_sub(1);
                 div()
                     .row_reading(direction)
                     .children(
                         week.iter()
-                            .map(|cell| self.cell(*cell, cx))
+                            .enumerate()
+                            .map(|(index, cell)| {
+                                self.cell(*cell, index == 0, index == last, direction, cx)
+                            })
                             .collect::<Vec<_>>(),
                     )
                     .into_any_element()

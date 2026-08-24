@@ -180,6 +180,18 @@ impl Select {
         self
     }
 
+    /// Draws the control as refused after it was built, for an owner that
+    /// learns the answer is wrong later — a host that rejected it, or a form
+    /// that found a required answer missing. Without it the message and the
+    /// control it is about disagree.
+    pub fn set_invalid(&mut self, invalid: bool, cx: &mut Context<Self>) {
+        if self.invalid == invalid {
+            return;
+        }
+        self.invalid = invalid;
+        cx.notify();
+    }
+
     /// Offers a control that reports [`SelectEvent::Cleared`]. Disabled
     /// options stay offered; an empty answer is a different fact.
     pub fn clearable(mut self, clearable: bool) -> Self {
@@ -609,8 +621,10 @@ impl Render for Select {
             .px(px(metrics.padding_x))
             .radius(&theme, Radius::Control)
             .well(&theme)
-            .when(self.invalid, |element| {
-                element.border_color(theme.colors.danger)
+            .border_color(if self.invalid {
+                theme.colors.danger
+            } else {
+                theme.colors.hairline
             })
             .when(focused, |element| element.shadow(theme.focus_ring()))
             .when(!self.disabled, |element| {
@@ -621,6 +635,8 @@ impl Render for Select {
             })
             .child(
                 foundation_text(&theme, TypeScale::Label, label)
+                    .flex_1()
+                    .min_w_0()
                     .text_size(px(metrics.font_size))
                     .text_color(if self.disabled {
                         theme.colors.text_disabled
@@ -630,39 +646,50 @@ impl Render for Select {
                         theme.colors.text
                     }),
             )
-            .when(self.clearable && has_choice && !self.disabled, |element| {
-                let clear = self.ident.child("clear");
-                element.child(
-                    div()
-                        .id(clear.element_id())
-                        .flex_none()
-                        .cursor_pointer()
-                        .on_mouse_down(
-                            MouseButton::Left,
-                            cx.listener(|select, _, _, cx| {
-                                select.clear(cx);
-                                cx.stop_propagation();
-                            }),
-                        )
-                        .child(
-                            icon(Icon::Close)
-                                .size(px(metrics.icon_size * 0.8))
-                                .text_color(theme.colors.text_muted),
-                        )
-                        .semantic_in(
-                            cx,
-                            NodeSpec::new(clear.semantic_id(), Role::Button)
-                                .parent(self.ident.semantic_id())
-                                .text(cx.strings().text(StringKey::SelectClear)),
-                        ),
-                )
-            })
+            // The two affordances travel together at the trailing edge. Left
+            // to a space-between row the clear lands wherever the value
+            // happened to end, which is a control floating in the middle of a
+            // field.
             .child(
-                // One glyph in both states: the menu itself shows whether the
-                // control is open, and a flipped arrow would say it twice.
-                icon(Icon::AltArrowDown)
-                    .size(px(metrics.icon_size * 0.9))
-                    .text_color(theme.colors.text_muted),
+                div()
+                    .row_reading(direction)
+                    .flex_none()
+                    .gap_token(&theme, Space::Xs)
+                    .when(self.clearable && has_choice && !self.disabled, |element| {
+                        let clear = self.ident.child("clear");
+                        element.child(
+                            div()
+                                .id(clear.element_id())
+                                .flex_none()
+                                .cursor_pointer()
+                                .on_mouse_down(
+                                    MouseButton::Left,
+                                    cx.listener(|select, _, _, cx| {
+                                        select.clear(cx);
+                                        cx.stop_propagation();
+                                    }),
+                                )
+                                .child(
+                                    icon(Icon::Close)
+                                        .size(px(metrics.icon_size * 0.8))
+                                        .text_color(theme.colors.text_muted),
+                                )
+                                .semantic_in(
+                                    cx,
+                                    NodeSpec::new(clear.semantic_id(), Role::Button)
+                                        .parent(self.ident.semantic_id())
+                                        .text(cx.strings().text(StringKey::SelectClear)),
+                                ),
+                        )
+                    })
+                    .child(
+                        // One glyph in both states: the menu itself shows
+                        // whether the control is open, and a flipped arrow
+                        // would say it twice.
+                        icon(Icon::AltArrowDown)
+                            .size(px(metrics.icon_size * 0.9))
+                            .text_color(theme.colors.text_muted),
+                    ),
             )
             .semantic_in(cx, spec);
         let measured = Rc::clone(&self.trigger_bounds);

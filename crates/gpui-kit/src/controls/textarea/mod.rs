@@ -44,7 +44,9 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, TypeScale};
 
 use crate::controls::text_edit;
-use crate::foundation::{ActiveDirection, Disableable, Ident, Sizable, StyledExt, text};
+use crate::foundation::{
+    ActiveDirection, DirectionalExt, Disableable, Ident, Sizable, StyledExt, text,
+};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 use element::TextAreaElement;
 use layout::Layout;
@@ -1434,8 +1436,12 @@ impl Render for TextArea {
                     .py(px(theme.spacing.xs))
                     .radius(&theme, Radius::Control)
                     .well(&theme)
-                    .when(self.invalid, |element| {
-                        element.border_color(theme.colors.danger)
+                    // The same drawn boundary every field in the library
+                    // carries; invalidity recolours it rather than adding one.
+                    .border_color(if self.invalid {
+                        theme.colors.danger
+                    } else {
+                        theme.colors.hairline
                     })
                     .when(focused, |element| element.shadow(theme.focus_ring()))
                     .text_size(px(metrics.font_size))
@@ -1465,6 +1471,11 @@ impl Render for TextArea {
                     .child(
                         text(&theme, TypeScale::Caption, count.clone())
                             .mt(px(theme.spacing.xs))
+                            // Under the trailing edge of the field it counts,
+                            // which is the only edge it has anything to do
+                            // with.
+                            .w_full()
+                            .text_end(cx.layout_direction())
                             .text_color(if used >= max {
                                 theme.colors.danger
                             } else {

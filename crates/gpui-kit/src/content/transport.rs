@@ -35,7 +35,7 @@ use gpui::{
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TypeScale};
 
 use crate::controls::button::{Button, IconButton};
 use crate::controls::segmented::{Segment, SegmentedControl};
@@ -43,7 +43,7 @@ use crate::controls::slider::Slider;
 use crate::display::badge::Tone;
 use crate::display::signature;
 use crate::display::status::StatusLine;
-use crate::foundation::{Disableable, FocusRing, Ident, Selectable, Sizable, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
 use crate::layout::measure;
 use crate::motion::{self, keyed};
 use crate::state::{HasPhase, Phase};
@@ -443,23 +443,17 @@ impl RenderOnce for TransportBar {
         let measured = measure::cell(&ident.child("scrubber").semantic_id(), window, cx);
         let scrubbable = actionable && self.seekable && total.is_some();
 
-        let mut track = div()
-            .id(ident.child("scrubber").element_id())
-            .relative()
-            .w_full()
-            .h(px(KNOB))
-            .flex()
-            .items_center()
-            .when(scrubbable, |element| element.cursor_pointer())
-            .child(
-                div()
-                    .absolute()
-                    .left_0()
-                    .right_0()
-                    .h(px(TRACK_HEIGHT))
-                    .rounded_full()
-                    .bg(theme.colors.track),
-            );
+        // The groove holds everything drawn along the bar, so the buffered
+        // band and the played fill are clipped to its height and its ends
+        // rather than each choosing a geometry of its own.
+        let mut groove = div()
+            .absolute()
+            .left_0()
+            .right_0()
+            .h(px(TRACK_HEIGHT))
+            .radius(&theme, Radius::Pill)
+            .overflow_hidden()
+            .bg(signature::track(&theme));
 
         // Buffered spans are the host's fact and are drawn as their own band,
         // never as part of the played fill: a reader who cannot tell them
@@ -467,7 +461,7 @@ impl RenderOnce for TransportBar {
         // that supplied none gets no band and no node, so "nothing buffered"
         // is distinguishable from "buffered to the start".
         if let (Some(total), false) = (total, self.buffered.is_empty()) {
-            let mut band = div().absolute().left_0().right_0().h(px(TRACK_HEIGHT));
+            let mut band = div().absolute().left_0().right_0().top_0().bottom_0();
             for range in &self.buffered {
                 let (start, width) = buffered_span(*range, total);
                 if width <= 0.0 {
@@ -476,11 +470,11 @@ impl RenderOnce for TransportBar {
                 band = band.child(
                     div()
                         .absolute()
+                        .top_0()
+                        .bottom_0()
                         .left(relative(start))
                         .w(relative(width))
-                        .h(px(TRACK_HEIGHT))
-                        .rounded_full()
-                        .bg(theme.colors.text_faint),
+                        .bg(theme.colors.hairline_strong),
                 );
             }
             let furthest = self
@@ -492,13 +486,14 @@ impl RenderOnce for TransportBar {
             // The node describes the buffered extent rather than the whole
             // track, so a test reads how far the buffer reaches from its
             // bounds as well as from its range.
-            track = track.child(
+            groove = groove.child(
                 band.child(
                     div()
                         .absolute()
+                        .top_0()
+                        .bottom_0()
                         .left_0()
                         .w(relative(furthest.max(f32::EPSILON)))
-                        .h(px(TRACK_HEIGHT))
                         .semantic_in(
                             cx,
                             NodeSpec::new(ident.child("buffered").semantic_id(), Role::Status)
@@ -516,28 +511,36 @@ impl RenderOnce for TransportBar {
             );
         }
 
+        // Playing and paused are told apart by the control that changes them
+        // and by the state line beside it, never by painting the fill in a
+        // second colour: how far in the media is does not change when it
+        // stops, so neither does the mark that says so.
         if let Some(drawn) = drawn {
-            let played = if self.state.is_playing() {
-                signature::determined(&theme, drawn)
-                    .h(px(TRACK_HEIGHT))
-                    .into_any_element()
-            } else {
-                div()
-                    .absolute()
-                    .left_0()
-                    .w(relative(drawn))
-                    .h(px(TRACK_HEIGHT))
-                    .rounded_full()
-                    .bg(theme.colors.accent)
-                    .into_any_element()
-            };
-            track = track.child(played).child(
+            groove = groove.child(signature::determined(&theme, drawn));
+        }
+
+        let mut track = div()
+            .id(ident.child("scrubber").element_id())
+            .relative()
+            .w_full()
+            .h(px(KNOB))
+            .flex()
+            .items_center()
+            .when(scrubbable, |element| element.cursor_pointer())
+            .child(groove);
+
+        // The head stands exactly over the end of the fill, which is why both
+        // read the one tracked fraction: a head drawn from the reported
+        // position while the fill was still travelling toward it would leave a
+        // gap that says the media is somewhere it is not.
+        if let Some(drawn) = drawn {
+            track = track.child(
                 div()
                     .absolute()
                     .left(relative(drawn))
                     .ml(px(-KNOB / 2.0))
                     .size(px(KNOB))
-                    .rounded_full()
+                    .radius(&theme, Radius::Pill)
                     .bg(theme.colors.text)
                     .border(px(theme.borders.hairline))
                     .border_color(theme.colors.hairline_strong),
@@ -624,6 +627,10 @@ impl RenderOnce for TransportBar {
                 } else {
                     StringKey::TransportPlay
                 }))
+                // The glyph carries the same word the label does, which is
+                // what makes this the control the eye lands on in a row of
+                // step buttons that are glyphs alone.
+                .icon(if playing { Icon::Pause } else { Icon::Play })
                 .secondary()
                 .control_size(ControlSize::Sm)
                 .semantic_parent(ident.semantic_id())
@@ -677,7 +684,10 @@ impl RenderOnce for TransportBar {
                 .ghost()
                 .control_size(ControlSize::Sm)
                 .semantic_parent(ident.semantic_id())
-                .selected(self.muted)
+                // Muted is said by the label, which is the control's own
+                // wording for what it will do next. Filling the chip as well
+                // made one transport's mute the loudest thing on the bar while
+                // the next one's was a word.
                 .disabled(!actionable);
             if actionable {
                 control = control
@@ -731,15 +741,20 @@ impl RenderOnce for TransportBar {
             control
         });
 
+        // One skeleton for every transport: the controls that move the media
+        // at the reading edge, what is playing in the middle, and the controls
+        // that shape it at the trailing edge. A transport that offers fewer of
+        // them leaves a slot out rather than rearranging the rest, and nothing
+        // wraps, so a narrow bar keeps one row instead of inventing a second
+        // layout.
         let controls = div()
             .row()
             .w_full()
-            .flex_wrap()
             .gap_token(&theme, Space::Sm)
-            .justify_between()
             .child(
                 div()
                     .row()
+                    .flex_none()
                     .gap_token(&theme, Space::Xs)
                     .child(step_control(
                         "previous",
@@ -755,18 +770,32 @@ impl RenderOnce for TransportBar {
                         StringKey::TransportNextTrack,
                         TrackStep::Next,
                         self.has_next,
-                    ))
-                    .children(self.label.clone().map(|label| {
-                        div()
-                            .type_scale(&theme, TypeScale::Label)
-                            .text_color(theme.colors.text)
-                            .child(label)
-                    }))
-                    .child(StatusLine::new(status.0, status.1).id(ident.child("status"))),
+                    )),
             )
             .child(
                 div()
                     .row()
+                    .flex_1()
+                    .min_w_0()
+                    .gap_token(&theme, Space::Sm)
+                    .children(self.label.clone().map(|label| {
+                        div()
+                            .min_w_0()
+                            .overflow_hidden()
+                            .type_scale(&theme, TypeScale::Label)
+                            .text_color(theme.colors.text)
+                            .child(label)
+                    }))
+                    .child(
+                        div()
+                            .flex_none()
+                            .child(StatusLine::new(status.0, status.1).id(ident.child("status"))),
+                    ),
+            )
+            .child(
+                div()
+                    .row()
+                    .flex_none()
                     .gap_token(&theme, Space::Sm)
                     .children(mute)
                     .children(volume)

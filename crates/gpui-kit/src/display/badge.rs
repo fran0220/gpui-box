@@ -1,10 +1,12 @@
 use gpui::{
-    App, Hsla, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div, px,
+    App, Hsla, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div,
+    prelude::FluentBuilder, px,
 };
+use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Theme, TypeScale};
 
-use crate::foundation::{Ident, StyledExt};
+use crate::foundation::{Ident, Sizable, StyledExt};
 
 /// The severity a status surface claims.
 ///
@@ -70,6 +72,10 @@ pub struct Badge {
     label: SharedString,
     tone: Tone,
     tint: Option<Hsla>,
+    size: ControlSize,
+    glyph: Option<Glyph>,
+    dot: bool,
+    outlined: bool,
 }
 
 impl Badge {
@@ -79,7 +85,35 @@ impl Badge {
             label: label.into(),
             tone: Tone::default(),
             tint: None,
+            size: ControlSize::Sm,
+            glyph: None,
+            dot: false,
+            outlined: false,
         }
+    }
+
+    /// A glyph before the word, for a badge whose meaning has a picture.
+    pub fn icon(mut self, glyph: Glyph) -> Self {
+        self.glyph = Some(glyph);
+        self
+    }
+
+    /// A mark before the word, for a badge that reports a live state rather
+    /// than a fixed label. Ignored when the badge already carries a glyph:
+    /// two marks for one claim is one mark too many.
+    pub fn dot(mut self, dot: bool) -> Self {
+        self.dot = dot;
+        self
+    }
+
+    /// Trades the wash for a hairline in the same colour.
+    ///
+    /// For a badge sitting on a surface that is already washed — a selected
+    /// row, a tinted callout — where a second wash reads as a smudge rather
+    /// than as a shape.
+    pub fn outlined(mut self, outlined: bool) -> Self {
+        self.outlined = outlined;
+        self
     }
 
     pub fn id(mut self, ident: impl Into<Ident>) -> Self {
@@ -129,6 +163,13 @@ impl Badge {
     }
 }
 
+impl Sizable for Badge {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.size = size;
+        self
+    }
+}
+
 impl RenderOnce for Badge {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
@@ -155,15 +196,39 @@ impl RenderOnce for Badge {
             }
         };
 
+        let step = theme.control.get(self.size);
         let element = div()
             .flex_none()
-            .px_token(&theme, gpui_kit_theme::Space::Sm)
-            .py(px(2.0))
+            .row()
+            .gap(px(step.gap * 0.5))
+            .h(px(step.height * 0.72))
+            .px(px(step.padding_x * 0.6))
             .rounded_full()
-            .bg(background)
+            .map(|element| {
+                if self.outlined {
+                    element
+                        .border(px(theme.borders.hairline))
+                        .border_color(foreground.opacity(0.45))
+                } else {
+                    element.bg(background)
+                }
+            })
             .type_scale(&theme, TypeScale::Caption)
+            .text_size(px(step.font_size * 0.86))
             .font_weight(gpui::FontWeight(500.0))
             .text_color(foreground)
+            .children(self.glyph.map(|glyph| {
+                crate::display::icon::paint(glyph, step.icon_size * 0.8, foreground, false)
+            }))
+            .when(self.glyph.is_none() && self.dot, |element| {
+                element.child(
+                    div()
+                        .flex_none()
+                        .size(px(theme.effects.selection_rail_width))
+                        .rounded_full()
+                        .bg(foreground),
+                )
+            })
             .child(self.label.clone());
         match self.ident {
             Some(ident) => element

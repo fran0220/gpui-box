@@ -197,7 +197,7 @@ pub mod prelude {
         TimeOfDay, TimeSegment, installed_adapter, reset_date_adapter, set_date_adapter,
     };
     pub use crate::display::animated_number::{AnimatedNumber, grouped};
-    pub use crate::display::avatar::Avatar;
+    pub use crate::display::avatar::{Avatar, AvatarGroup, AvatarPresence};
     pub use crate::display::badge::{Badge, Tone};
     pub use crate::display::card::{Card, CardHeader, CardVariant, ListRow};
     pub use crate::display::chart::{
@@ -207,13 +207,14 @@ pub mod prelude {
     pub use crate::display::description_list::{
         DescriptionItem, DescriptionList, DescriptionValue,
     };
-    pub use crate::display::empty::{Divider, EmptyKind, EmptyState};
+    pub use crate::display::empty::{Divider, DividerAxis, EmptyKind, EmptyState};
     pub use crate::display::failure_panel::FailurePanel;
-    pub use crate::display::heatmap::{HeatCell, Heatmap, HeatmapState};
+    pub use crate::display::heatmap::{HeatAxis, HeatCell, Heatmap, HeatmapState};
     pub use crate::display::highlight::HighlightedText;
     pub use crate::display::icon::{Icon, IconTone};
     pub use crate::display::loading::{
-        GradientSpinner, PulseLoader, RefreshVeil, Skeleton, SkeletonShape, Spinner,
+        BarLoader, LoadMore, LoadMoreState, PulseLoader, RefreshVeil, Skeleton, SkeletonShape,
+        Spinner,
     };
     pub use crate::display::metric::{MetricCard, MetricReading, MetricState};
     pub use crate::display::outcome::{OutcomeKind, OutcomePanel};

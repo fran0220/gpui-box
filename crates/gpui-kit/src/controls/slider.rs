@@ -219,7 +219,15 @@ impl RenderOnce for Slider {
         });
         let physical_fraction = directed_fraction(fraction, direction);
         let physical_high = high_fraction.map(|high| directed_fraction(high, direction));
-        let track_height = px(4.0);
+        let track_height = px(6.0);
+        // A disabled slider still reports a value, so it keeps its fill and
+        // loses only the colour that says the value can be moved. Dimming
+        // alone left it all but identical to the live one beside it.
+        let fill_color = if self.disabled {
+            theme.colors.hairline_strong
+        } else {
+            theme.colors.accent
+        };
         // The handle is the control's only tappable part, so it is sized from
         // the same scale step the other controls take their glyphs from.
         let knob = px(metrics.icon_size);
@@ -245,24 +253,12 @@ impl RenderOnce for Slider {
                     .right_0()
                     .h(track_height)
                     .rounded_full()
-                    .bg(theme.colors.track),
+                    // The groove is a recess, not a drawn line: without the
+                    // boundary a 6px bar of `track` on `canvas` is a smudge.
+                    .bg(theme.colors.track)
+                    .border(px(theme.borders.hairline))
+                    .border_color(theme.colors.hairline),
             )
-            .children(self.marks.iter().filter_map(|mark| {
-                if *mark < self.min || *mark > self.max {
-                    return None;
-                }
-                let at = directed_fraction((*mark - self.min) / (self.max - self.min), direction);
-                Some(
-                    div()
-                        .absolute()
-                        .left(gpui::relative(at))
-                        .ml(px(-1.0))
-                        .w(px(2.0))
-                        .h(px(8.0))
-                        .rounded_full()
-                        .bg(theme.colors.hairline_strong),
-                )
-            }))
             .child(if let Some(high) = physical_high {
                 let start = physical_fraction.min(high);
                 let span = (physical_fraction - high).abs();
@@ -272,7 +268,7 @@ impl RenderOnce for Slider {
                     .w(gpui::relative(span))
                     .h(track_height)
                     .rounded_full()
-                    .bg(theme.colors.accent)
+                    .bg(fill_color)
             } else {
                 div()
                     .absolute()
@@ -280,10 +276,38 @@ impl RenderOnce for Slider {
                     .w(gpui::relative(physical_fraction))
                     .h(track_height)
                     .rounded_full()
-                    .bg(theme.colors.accent)
+                    .bg(fill_color)
             })
-            .child(knob_at(physical_fraction, knob, &theme))
-            .children(physical_high.map(|high| knob_at(high, knob, &theme)));
+            // Ticks are drawn over both halves of the track, and over the
+            // fill they invert: under the fill a hairline mark is invisible,
+            // which is how a scale with marks came to show none.
+            .children(self.marks.iter().filter_map(|mark| {
+                if *mark < self.min || *mark > self.max {
+                    return None;
+                }
+                let logical = (*mark - self.min) / (self.max - self.min);
+                let filled = match high_fraction {
+                    Some(high) => logical >= fraction.min(high) && logical <= fraction.max(high),
+                    None => logical <= fraction,
+                };
+                let at = directed_fraction(logical, direction);
+                Some(
+                    div()
+                        .absolute()
+                        .left(gpui::relative(at))
+                        .ml(px(-1.0))
+                        .w(px(2.0))
+                        .h(track_height + px(4.0))
+                        .rounded_full()
+                        .bg(if filled {
+                            theme.colors.canvas
+                        } else {
+                            theme.colors.hairline_strong
+                        }),
+                )
+            }))
+            .child(knob_at(physical_fraction, knob, &theme, self.disabled))
+            .children(physical_high.map(|high| knob_at(high, knob, &theme, self.disabled)));
 
         if actionable {
             let (min, max, step) = (self.min, self.max, self.step);
@@ -431,14 +455,23 @@ impl RenderOnce for Slider {
     }
 }
 
-fn knob_at(fraction: f32, knob: gpui::Pixels, theme: &gpui_kit_theme::Theme) -> gpui::Div {
+fn knob_at(
+    fraction: f32,
+    knob: gpui::Pixels,
+    theme: &gpui_kit_theme::Theme,
+    disabled: bool,
+) -> gpui::Div {
     div()
         .absolute()
         .left(gpui::relative(fraction))
         .ml(-(knob / 2.0))
         .size(knob)
         .rounded_full()
-        .bg(theme.colors.text)
+        .bg(if disabled {
+            theme.colors.text_disabled
+        } else {
+            theme.colors.text
+        })
         .border(px(theme.borders.hairline))
         .border_color(theme.colors.hairline_strong)
 }

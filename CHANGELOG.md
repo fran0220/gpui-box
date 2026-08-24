@@ -8,7 +8,146 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ## [Unreleased]
 
+### Changed
+
+**Waiting is grey, and the theme owns it.** The three-stop loader gradient is
+gone. `color.loader` now carries four neutral roles — `mark` (the moving part:
+a bar's fill, a spinner's arc, a breathing dot), `track` (the groove it
+travels), `placeholder` (the shape of content that is not there yet), and
+`sheen` (the highlight that crosses it) — and every loading, progress and
+scrubbing surface in the library paints from them. Colour on a loading surface
+is now a caller's `tint` with a meaning attached, never the library's
+decoration.
+
+Two token rules came with it, because the failures they catch were both
+shipping. `color.loader.mark` is held to the 3:1 an active identity gets, on
+every surface. `color.loader.placeholder` is held inside a *band*: visible, and
+quieter than content. A skeleton had been filled with
+`color.interactive.track` — a value tuned to clear the 3:1 a control boundary
+needs — which made the absence of content the brightest thing on a dark page in
+nine scenes. Too loud is a defect exactly as real as invisible, and the
+validator now says so.
+
+**A state glow stays out of its neighbours' pixels.** `effect.glowSpread` is
+the bloom budget: how far a state glow is pulled in before it is blurred.
+Without it a failed panel put its full alpha on its own edge and reached its
+whole blur past it, which is how a red card tinted the card beside it and a
+running node was cut flat at the edge of its canvas.
+
+**The accent stopped being decoration.** Colour in the library now marks
+selection, focus, status, or data, and nothing else. A chosen segment or tab
+rises to the brightest neutral the interactive scale has and spends the accent
+on one rail along its edge, so the current answer is the lightest thing in a
+run rather than the darkest; a context gauge, a vote, a tag and a rating all
+draw "selected" the same way; and every border width and corner radius that
+means anything now comes from a token. What is left is drawing: the hue ramp
+in the colour picker, and the marks inside a persona's face.
+
+**A refused control looks refused.** Disabling used to remove the handlers and
+leave the drawing alone, which left a rating, a permission cell, a dropzone and
+a primary button looking exactly like the ones that still worked. A refused
+action now gives up its variant's fill entirely, and a refusal on a surface
+that has one — a dropzone, a consent prompt — is a sentence in the refusal
+tone rather than an unlabelled red box.
+
+**A region says which edge hides something.** `ScrollArea` fades its own
+content at the edges it is scrolled past instead of laying a backdrop-tinted
+wash over it, which is how a scrolled panel in the dark theme came to show a
+hard cut through its last row of glyphs. The fade a component draws inside
+itself publishes no node, so a caller who wraps that component in a
+`ScrollFade` of its own still owns the only region under that identity.
+
+**Rows are ruled, states are separated, and content is not clipped.** Lists,
+diagnostics, offering rows, kanban cards and grid cells took separators,
+shared baselines, a hover fill quieter than selection, and bottom padding
+where a panel had been cutting letterforms. A consent prompt draws its two
+answers at equal weight, because a primary grant beside a secondary decline is
+pressure a consent prompt must not apply.
+
+**A bundled fallback face is reachable, and every keycap modifier draws.**
+`⌘`, `⌃` and `⌥` were blank boxes on every keystroke in the library. The asset
+crate bundles a face covering the seven keyboard symbols no Geist face draws,
+and `Kbd` names it in its fallback list, but both text systems threw that face
+away before the shaper could reach it: a font is dropped if it has no `m`,
+because `em_width` measures with `m` and a caller asks a family for its em
+before it draws. A face named in a *fallback list* is never measured with — it
+is only reached for the characters the primary does not cover — so requiring
+`m` of it rejected exactly the symbol-only faces a fallback list exists to
+name, and the cosmic text system additionally removed it from the database,
+which took it away from everything else too. Family lookup now knows which of
+the two roles it is filling. On macOS, an embedded font is also registered with
+CoreText: a cascade list entry is resolved from a family name, and a family
+CoreText was never told about resolves to nothing, so the bundled face was
+unreachable there for a second and independent reason.
+
+Which glyph appeared used to depend on what the host machine had installed,
+which is the one thing a bundled face is for. `gpui-box-kit-assets` now checks
+the bundle against its own bytes: that the face publishes the family the
+fallback list names, that it covers all seven symbols, and that it has no `m`
+— the property that made it a fallback rather than a family.
+
+**A control the form is complaining about draws itself refused.** `SchemaForm`
+showed a red sentence under a field wearing its ordinary border, which says the
+field is fine and something else is wrong. Text, choice, open-choice and list
+controls are now told when the form is showing an error about them, and
+`Select`, `Combobox` and `TagInput` gained the `set_invalid` that `TextInput`
+already had, for an owner that learns the answer is wrong after building the
+control. A number still works this out for itself.
+
+**An accordion body turns with the reading order.** The header honoured RTL and
+the body did not, so a disclosed section read as belonging to the one on the
+other side. Turning the text alone was not enough: a shrink-to-fit child is
+placed by the flex axis, which `text-align` does not reach.
+
+**Three components that drew their shape but not their content.** A `Trace`
+waterfall was unlabelled bars on an unmarked field: rows now carry the span
+they belong to, the field carries gridlines and time ticks, and each span
+states its own duration. A `Wizard` drew its steps as loose marks with nothing
+between them; they are joined now, in both orientations, and the current step's
+body sits in a container instead of floating beside the rail. An `UndoHistory`
+broke its own timeline at the selected revision — the rail runs through it now,
+and the selected card is inset clear of the rail rather than sitting on it.
+
+**Fields and pickers say what they are.** A segmented code input draws each
+place as its own slot, a time field gives every segment the same width so the
+colons line up, a calendar draws a range as one shape with corners only where
+the run ends, and today is a neutral ring rather than a second chosen day. A
+count in progress in a filter bar wears the same loading mark as everything
+else that is waiting.
+
 ### Added
+
+**The loading family says six different things.** `PulseLoader` breathes,
+`Spinner` turns an open arc whose gap is what says the ring is not a position,
+`Skeleton` is the shape of absent content, `BarLoader` is the strip form for a
+region filling in, `LoadMore` is a list tail whose idle, loading and exhausted
+states are three different pictures, and `RefreshVeil` covers last-verified
+content without erasing it. `PulseLoader` and `Spinner` take a `ControlSize`
+and a caller `tint`; `GradientSpinner` is removed.
+
+Each of them now handles reduced motion itself rather than letting a repeating
+animation hold frame zero. Frame zero of the old pulse was opacity 0.08 — a
+row of marks nobody could see — and frame zero of a rotating refresh glyph is a
+picture of being stuck, which is the one reading these exist to rule out.
+
+**`AvatarGroup` stacks identities that will not fit as a row.** Each member
+carries a cut-out ring so the one beside it cannot eat its edge or its presence
+dot, and the rest are counted.
+
+**A tooltip says what it came out of.** `overlay::tail` paints the mark that
+hangs off the side facing the trigger, because a rectangle of panel colour on a
+page of panel colour says only that it is there. It is a painted path rather
+than a rotated square: GPUI rotates sprites and not layout boxes, and a
+staircase of one-pixel rows is a triangle only until somebody looks at it.
+
+**Thirteen glyphs the components were drawing as characters.** `calendar`,
+`checkbox-empty`, `checkbox-checked`, `play`, `pause`, `sound-wave`,
+`drag-handle`, `filter`, `image`, `video`, `minus`, `double-arrow-left` and
+`double-arrow-right` are original drawings on the same grid as the set around
+them. A markdown task list had been rendering its boxes as tofu, a date field
+had borrowed the checklist glyph, and a transport had no play or pause of its
+own. `stop` is redrawn: at eight units of a ten-unit box it read as a solid
+block among stroked glyphs rather than as a mark.
 
 **Media capability and failure vocabulary survives the platform seam.**
 `MediaCapabilities` reports audio/video, seek, volume, rate, native-track, and

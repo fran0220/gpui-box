@@ -2533,6 +2533,7 @@ version = "0.1.2"
 dependencies = [
  "gpui-box",
  "tracing",
+ "ttf-parser",
 ]
 
 [[package]]
@@ -2554,6 +2555,7 @@ dependencies = [
  "objc2-app-kit 0.3.2",
  "png 0.18.1",
  "raw-window-handle",
+ "serde",
  "serde_json",
  "tempfile",
  "thiserror 2.0.19",
@@ -2713,6 +2715,18 @@ dependencies = [
  "url",
  "windows 0.61.3",
  "windows-core 0.61.2",
+]
+
+[[package]]
+name = "gpui-box-performance"
+version = "0.1.2"
+dependencies = [
+ "anyhow",
+ "gpui-box",
+ "gpui-box-kit",
+ "gpui-box-kit-semantics",
+ "gpui-box-kit-testkit",
+ "serde_json",
 ]
 
 [[package]]

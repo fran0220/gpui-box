@@ -4,15 +4,113 @@ use super::support::*;
 
 pub(super) fn kbd(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
+    // A keystroke is only ever read beside the thing it performs, so the
+    // exhibit shows it where it is used: at the end of a menu row, at the end
+    // of a sentence, and in the run of special keys whose glyphs are the part
+    // that goes wrong.
+    let named = |label: &'static str, keystroke: &'static str, id: &'static str| {
+        div()
+            .row()
+            .w_full()
+            .items_center()
+            .justify_between()
+            .gap_token(&theme, Space::Md)
+            .py_token(&theme, Space::Xs)
+            .child(crate::foundation::text(&theme, TypeScale::Body, label))
+            .child(Kbd::new(keystroke).id(id))
+    };
+
     stack(&theme)
+        .w(px(420.0))
+        .child(caption(&theme, "the shortcut sits with the thing it does"))
+        .child(
+            div()
+                .column()
+                .w_full()
+                .card_surface(&theme, CardVariant::Elevated)
+                .px_token(&theme, Space::Md)
+                .py_token(&theme, Space::Sm)
+                .child(named(
+                    "Open the command palette",
+                    "cmd-shift-p",
+                    "scene.kbd.palette",
+                ))
+                .child(
+                    div()
+                        .w_full()
+                        .h(px(theme.borders.hairline))
+                        .bg(theme.colors.divider),
+                )
+                .child(named("Copy the selection", "ctrl-c", "scene.kbd.copy"))
+                .child(
+                    div()
+                        .w_full()
+                        .h(px(theme.borders.hairline))
+                        .bg(theme.colors.divider),
+                )
+                .child(named("Rename in place", "cmd-alt-r", "scene.kbd.rename")),
+        )
+        .child(caption(
+            &theme,
+            "the keys that need the bundled symbol face",
+        ))
         .child(
             row(&theme)
-                .child(Kbd::new("cmd-shift-p").id("scene.kbd.palette"))
-                .child(Kbd::new("ctrl-c").id("scene.kbd.copy"))
+                .gap_token(&theme, Space::Sm)
                 .child(Kbd::new("enter").id("scene.kbd.confirm"))
-                .child(Kbd::new("escape").id("scene.kbd.dismiss")),
+                .child(Kbd::new("escape").id("scene.kbd.dismiss"))
+                .child(Kbd::new("backspace").id("scene.kbd.erase"))
+                .child(Kbd::new("delete").id("scene.kbd.delete"))
+                .child(Kbd::new("tab").id("scene.kbd.advance"))
+                .child(Kbd::new("space").id("scene.kbd.space"))
+                .child(Kbd::new("up").id("scene.kbd.up"))
+                .child(Kbd::new("down").id("scene.kbd.down")),
+        )
+        .child(
+            div()
+                .row()
+                .items_center()
+                .gap_token(&theme, Space::Xs)
+                .child(crate::foundation::text(&theme, TypeScale::Body, "Press"))
+                .child(Kbd::new("cmd-enter").id("scene.kbd.inline"))
+                .child(crate::foundation::text(
+                    &theme,
+                    TypeScale::Body,
+                    "to send the message.",
+                ))
+                .text_color(theme.colors.text_muted),
         )
         .into_any_element()
+}
+
+/// A page for a modal layer to sit over.
+///
+/// A scrim drawn over an empty canvas is indistinguishable from a fill: the
+/// only thing that shows it is translucent is what stays legible underneath
+/// it. So every scene in this file that raises a modal layer puts a page worth
+/// obscuring behind it rather than one line of text.
+fn page_behind(theme: &Theme, title: &'static str) -> gpui::Div {
+    let card = |heading: &'static str, lines: usize| {
+        div()
+            .flex_1()
+            .min_w_0()
+            .card_surface(theme, CardVariant::Elevated)
+            .overflow_hidden()
+            .child(filler(theme, heading, lines))
+    };
+    div()
+        .column()
+        .w_full()
+        .gap(px(theme.space(Space::Md)))
+        .child(crate::foundation::text(theme, TypeScale::Subtitle, title))
+        .child(
+            div()
+                .row()
+                .w_full()
+                .gap(px(theme.space(Space::Md)))
+                .child(card("Runs", 5))
+                .child(card("Details", 5)),
+        )
 }
 
 pub(super) fn overlay(_window: &mut Window, cx: &mut App) -> AnyElement {
@@ -20,11 +118,7 @@ pub(super) fn overlay(_window: &mut Window, cx: &mut App) -> AnyElement {
     stack(&theme)
         .w(px(520.0))
         .h(px(320.0))
-        .child(crate::foundation::text(
-            &theme,
-            TypeScale::Body,
-            "Content behind the dialog",
-        ))
+        .child(page_behind(&theme, "Workspace settings"))
         .child(
             Overlay::modal("scene.overlay.dialog")
                 .placement(Placement::Center)
@@ -39,8 +133,18 @@ pub(super) fn overlay(_window: &mut Window, cx: &mut App) -> AnyElement {
                             "Delete this workspace?",
                         ))
                         .child(
+                            crate::foundation::text(
+                                &theme,
+                                TypeScale::Body,
+                                "Its runs, filters and saved views are removed for everyone. This \
+                                 cannot be undone.",
+                            )
+                            .text_tone(&theme, TextTone::Muted),
+                        )
+                        .child(
                             div()
                                 .row()
+                                .justify_end()
                                 .gap(px(theme.spacing.sm))
                                 .child(
                                     Button::new("scene.overlay.cancel")
@@ -476,27 +580,10 @@ pub(super) fn frost(_window: &mut Window, cx: &mut App) -> AnyElement {
             ))
             .child(caption(&theme, body))
     };
-    let stripes = || {
-        div()
-            .absolute()
-            .top(px(56.0))
-            .left(px(100.0))
-            .w(px(330.0))
-            .h(px(64.0))
-            .flex()
-            .overflow_hidden()
-            .children((0..22).map(|index| {
-                div()
-                    .flex_none()
-                    .w(px(15.0))
-                    .h(px(64.0))
-                    .bg(if index % 2 == 0 {
-                        theme.colors.accent
-                    } else {
-                        theme.colors.canvas
-                    })
-            }))
-    };
+    // What is behind the glass is a page, not a test pattern. A block of
+    // accent stripes dropped into a panel reads as a hole cut in it, and it
+    // answers the wrong question anyway: the thing a reader has to be able to
+    // judge is whether text they can otherwise read has gone out of focus.
     stack(&theme)
         .w(px(480.0))
         .child(caption(&theme, "A floating surface on glass"))
@@ -507,13 +594,17 @@ pub(super) fn frost(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .surface(&theme, Surface::Panel)
                 .radius(&theme, Radius::Card)
                 .overflow_hidden()
-                .child(stripes())
                 .child(filler(&theme, "Document", 8))
                 .child(
                     div()
                         .absolute()
                         .top(px(48.0))
-                        .left(px(120.0))
+                        // Far enough left to cross the lines. Placed clear of
+                        // them the glass had nothing behind it, so the picture
+                        // could not answer the one question it is here for:
+                        // whether text a reader can otherwise read has gone
+                        // out of focus.
+                        .left(px(64.0))
                         .w(px(240.0))
                         .child(
                             Frost::new("scene.frost.popover")
@@ -533,20 +624,22 @@ pub(super) fn frost(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .surface(&theme, Surface::Panel)
                 .radius(&theme, Radius::Card)
                 .overflow_hidden()
-                .child(stripes())
                 .child(filler(&theme, "Files", 6))
                 .child(
                     div()
                         .absolute()
                         .top(px(32.0))
-                        .left(px(120.0))
+                        .left(px(64.0))
                         .w(px(280.0))
                         .child(
                             Frost::new("scene.frost.rail")
                                 .surface(gpui_kit_theme::Surface::Panel)
                                 .radius(Radius::Dialog)
                                 .blur(32.0)
-                                .child(card("Rail", "The striped backdrop stays out of focus")),
+                                .child(card(
+                                    "Rail",
+                                    "The lines behind stay legible and out of focus",
+                                )),
                         ),
                 ),
         )
@@ -559,6 +652,13 @@ pub(super) fn frost(_window: &mut Window, cx: &mut App) -> AnyElement {
 /// The presets sit side by side deliberately: `Frosted` is the control, and
 /// what separates it from `Lens` is exactly the refraction, so a reviewer
 /// looking at the pair is looking at the thing that changed.
+/// One square of the backdrop every optics plate is read against, and the two
+/// plate footprints built from it. Both are whole numbers of squares.
+const TILE: f32 = 48.0;
+const PLATE_WIDTH: f32 = TILE * 10.0;
+const PLATE_HEIGHT: f32 = TILE * 3.0;
+const JOIN_WIDTH: f32 = TILE * 9.0;
+
 pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     let label = |title: &'static str, body: &'static str| {
@@ -575,11 +675,15 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
     };
 
     // A checkerboard bends far more legibly than a flat fill: a straight edge
-    // running under the rim is what makes refraction readable in a still.
+    // running under the rim is what makes refraction readable in a still. It
+    // is drawn in neutrals, and every plate that carries one is an exact
+    // number of squares across and down: a board cut through the middle of a
+    // square at the plate edge reads as a broken pattern rather than as the
+    // ruled backdrop the optics are being measured against.
     let checkerboard =
         |width: f32, height: f32| {
-            let columns = (width / 48.0).ceil() as usize;
-            let rows = (height / 48.0).ceil() as usize;
+            let columns = (width / TILE).ceil() as usize;
+            let rows = (height / TILE).ceil() as usize;
             div()
                 .absolute()
                 .top(px(0.0))
@@ -592,11 +696,11 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
                     div()
                         .flex()
                         .flex_none()
-                        .h(px(48.0))
+                        .h(px(TILE))
                         .children((0..columns).map(move |column| {
-                            div().flex_none().w(px(48.0)).h(px(48.0)).bg(
+                            div().flex_none().w(px(TILE)).h(px(TILE)).bg(
                                 if (row + column) % 2 == 0 {
-                                    theme.colors.accent
+                                    theme.colors.text_faint
                                 } else {
                                     theme.colors.canvas
                                 },
@@ -609,12 +713,12 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
         |ident: &'static str, preset: GlassPreset, title: &'static str, body: &'static str| {
             div()
                 .relative()
-                .h(px(150.0))
-                .w(px(460.0))
+                .h(px(PLATE_HEIGHT))
+                .w(px(PLATE_WIDTH))
                 .surface(&theme, Surface::Panel)
                 .radius(&theme, Radius::Card)
                 .overflow_hidden()
-                .child(checkerboard(460.0, 150.0))
+                .child(checkerboard(PLATE_WIDTH, PLATE_HEIGHT))
                 .child(
                     div()
                         .absolute()
@@ -672,12 +776,12 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .child(
                             div()
                                 .relative()
-                                .h(px(150.0))
-                                .w(px(440.0))
+                                .h(px(PLATE_HEIGHT))
+                                .w(px(JOIN_WIDTH))
                                 .surface(&theme, Surface::Panel)
                                 .radius(&theme, Radius::Card)
                                 .overflow_hidden()
-                                .child(checkerboard(440.0, 150.0))
+                                .child(checkerboard(JOIN_WIDTH, PLATE_HEIGHT))
                                 .child(
                                     div().absolute().top(px(40.0)).left(px(40.0)).child(
                                         GlassGroup::new("scene.glass.fused")
@@ -704,8 +808,8 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .child(
                             div()
                                 .relative()
-                                .h(px(150.0))
-                                .w(px(440.0))
+                                .h(px(PLATE_HEIGHT))
+                                .w(px(JOIN_WIDTH))
                                 .surface(&theme, Surface::Panel)
                                 .radius(&theme, Radius::Card)
                                 .overflow_hidden()
@@ -714,17 +818,17 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
                                         .absolute()
                                         .top(px(0.0))
                                         .left(px(0.0))
-                                        .w(px(220.0))
-                                        .h(px(150.0))
+                                        .w(px(JOIN_WIDTH / 2.0))
+                                        .h(px(PLATE_HEIGHT))
                                         .bg(gpui::white()),
                                 )
                                 .child(
                                     div()
                                         .absolute()
                                         .top(px(0.0))
-                                        .left(px(220.0))
-                                        .w(px(220.0))
-                                        .h(px(150.0))
+                                        .left(px(JOIN_WIDTH / 2.0))
+                                        .w(px(JOIN_WIDTH / 2.0))
+                                        .h(px(PLATE_HEIGHT))
                                         .bg(gpui::black()),
                                 )
                                 .child(
@@ -748,7 +852,7 @@ pub(super) fn glass(_window: &mut Window, cx: &mut App) -> AnyElement {
                                     div()
                                         .absolute()
                                         .top(px(28.0))
-                                        .left(px(235.0))
+                                        .left(px(JOIN_WIDTH / 2.0 + 15.0))
                                         .w(px(190.0))
                                         .child(
                                             Glass::new("scene.glass.adaptive.dark")
@@ -783,29 +887,87 @@ pub(super) fn drawer(window: &mut Window, cx: &mut App) -> AnyElement {
                 .description("The drawer reports what was chosen. The host applies it.")
                 .content(|_, cx| {
                     let theme = cx.theme().clone();
+                    let group = |heading: &'static str, rows: gpui::Div| {
+                        div()
+                            .column()
+                            .gap(px(theme.space(Space::Sm)))
+                            .child(
+                                crate::foundation::text(&theme, TypeScale::Label, heading)
+                                    .text_tone(&theme, TextTone::Muted),
+                            )
+                            .child(rows.column().gap(px(theme.space(Space::Sm))))
+                    };
                     div()
-                        .flex()
-                        .flex_col()
-                        .gap(px(theme.space(Space::Sm)))
-                        .child(
-                            Checkbox::new("scene.drawer.failed")
-                                .label("Failed runs only")
-                                .checked(true)
-                                .on_change(|_, _, _| {}),
-                        )
-                        .child(
-                            Checkbox::new("scene.drawer.mine")
-                                .label("Started by me")
-                                .on_change(|_, _, _| {}),
-                        )
+                        .column()
+                        .gap(px(theme.space(Space::Lg)))
+                        .child(group(
+                            "Outcome",
+                            div()
+                                .child(
+                                    Checkbox::new("scene.drawer.failed")
+                                        .label("Failed runs only")
+                                        .checked(true)
+                                        .on_change(|_, _, _| {}),
+                                )
+                                .child(
+                                    Checkbox::new("scene.drawer.cancelled")
+                                        .label("Include cancelled")
+                                        .on_change(|_, _, _| {}),
+                                ),
+                        ))
+                        .child(group(
+                            "Ownership",
+                            div()
+                                .child(
+                                    Checkbox::new("scene.drawer.mine")
+                                        .label("Started by me")
+                                        .on_change(|_, _, _| {}),
+                                )
+                                .child(
+                                    Checkbox::new("scene.drawer.watching")
+                                        .label("Repositories I watch")
+                                        .checked(true)
+                                        .on_change(|_, _, _| {}),
+                                ),
+                        ))
+                        .child(group(
+                            "Window",
+                            div()
+                                .child(
+                                    Checkbox::new("scene.drawer.today")
+                                        .label("Today")
+                                        .checked(true)
+                                        .on_change(|_, _, _| {}),
+                                )
+                                .child(
+                                    Checkbox::new("scene.drawer.week")
+                                        .label("This week")
+                                        .on_change(|_, _, _| {}),
+                                ),
+                        ))
                         .into_any_element()
                 })
-                .footer(|_, _| {
-                    Button::new("scene.drawer.apply")
-                        .label("Apply")
-                        .primary()
-                        .full_width(true)
-                        .on_click(|_, _| {})
+                // Two controls, sized to their labels and pinned to the
+                // reading edge: a full-width primary slab is the loudest
+                // thing on the page and says the drawer has one exit.
+                .footer(|_, cx| {
+                    let theme = cx.theme().clone();
+                    div()
+                        .row()
+                        .justify_end()
+                        .gap(px(theme.space(Space::Sm)))
+                        .child(
+                            Button::new("scene.drawer.cancel")
+                                .label("Cancel")
+                                .secondary()
+                                .on_click(|_, _| {}),
+                        )
+                        .child(
+                            Button::new("scene.drawer.apply")
+                                .label("Apply")
+                                .primary()
+                                .on_click(|_, _| {}),
+                        )
                         .into_any_element()
                 })
         });
@@ -821,11 +983,7 @@ pub(super) fn drawer(window: &mut Window, cx: &mut App) -> AnyElement {
     stack(&theme)
         .w(px(620.0))
         .h(px(400.0))
-        .child(crate::foundation::text(
-            &theme,
-            TypeScale::Body,
-            "Content behind the drawer",
-        ))
+        .child(page_behind(&theme, "Runs"))
         .child(filters)
         .into_any_element()
 }

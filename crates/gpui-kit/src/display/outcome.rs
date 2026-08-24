@@ -7,7 +7,7 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TypeScale};
 
 use crate::display::badge::Tone;
 use crate::foundation::{Ident, StyledExt};
@@ -39,11 +39,13 @@ impl OutcomeKind {
         }
     }
 
+    /// The same three pictures the rest of the library reports these
+    /// severities with: a partial outcome warns, a failed one refuses.
     fn glyph(self) -> Icon {
         match self {
             Self::Success => Icon::Check,
             Self::Partial => Icon::Danger,
-            Self::Failed => Icon::Danger,
+            Self::Failed => Icon::CloseCircle,
         }
     }
 
@@ -122,13 +124,28 @@ impl RenderOnce for OutcomePanel {
             .unwrap_or_else(|| cx.strings().text(self.kind.title_key()));
 
         div()
+            .relative()
             .column()
             .w_full()
+            .overflow_hidden()
             .gap_token(&theme, Space::Sm)
             .p_token(&theme, Space::Lg)
             .radius(&theme, Radius::Card)
-            .bg(theme.colors.panel)
-            .glow(&theme, color)
+            .surface(&theme, Surface::Panel)
+            .hairline(&theme)
+            // The outcome is carried by a rail and a glyph rather than by a
+            // halo around the card. A bloom the size of the panel it reports
+            // on is the loudest thing on the page and says nothing the mark
+            // has not already said.
+            .child(
+                div()
+                    .absolute()
+                    .top_0()
+                    .bottom_0()
+                    .left_0()
+                    .w(px(theme.effects.selection_rail_width))
+                    .bg(color),
+            )
             .child(
                 div()
                     .row()
@@ -161,7 +178,10 @@ impl RenderOnce for OutcomePanel {
                         .child(detail),
                 )
             })
-            .children(self.action)
+            .children(
+                self.action
+                    .map(|action| div().row().flex_none().child(action)),
+            )
             .semantic_in(
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::Region)

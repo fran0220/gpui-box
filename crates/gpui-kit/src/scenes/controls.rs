@@ -5,6 +5,7 @@ use super::support::*;
 pub(super) fn button(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)
+        .child(caption(&theme, "how much weight the action carries"))
         .child(
             row(&theme)
                 .child(
@@ -38,6 +39,10 @@ pub(super) fn button(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .on_click(|_, _| {}),
                 ),
         )
+        .child(caption(
+            &theme,
+            "refused is not in flight, and neither is the current answer",
+        ))
         .child(
             row(&theme)
                 .child(
@@ -62,6 +67,7 @@ pub(super) fn button(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .on_click(|_, _| {}),
                 ),
         )
+        .child(caption(&theme, "the control scale, smallest to largest"))
         .child(
             row(&theme)
                 .child(Button::new("scene.button.xs").label("Extra small").xs())
@@ -78,6 +84,9 @@ pub(super) fn button(_window: &mut Window, cx: &mut App) -> AnyElement {
 /// a frame, so they are built once and driven once.
 pub(super) struct SceneSearch {
     field: Entity<SearchField>,
+    counting: Entity<SearchField>,
+    none: Entity<SearchField>,
+    too_many: Entity<SearchField>,
     replace: Entity<FindReplace>,
 }
 
@@ -99,10 +108,34 @@ pub(super) fn ensure_search(window: &mut Window, cx: &mut App) {
         );
     });
 
+    // The three counts a field must keep apart are shown by three fields.
+    // Rendering their published names as chips said what the tree calls them,
+    // which is not what a reader of the field would ever see.
+    let mut sample = |id: &'static str, query: &'static str, count: HitCount, cx: &mut App| {
+        let field = cx.new(|cx| SearchField::new(id, window, cx));
+        field.update(cx, |field, cx| {
+            field.set_query(query, cx);
+            field.set_count(count, cx);
+        });
+        field
+    };
+    let counting = sample("scene.search.counting", "transport", HitCount::Counting, cx);
+    let none = sample("scene.search.none", "teleport", HitCount::None, cx);
+    let too_many = sample(
+        "scene.search.too-many",
+        "e",
+        HitCount::TooMany { counted: 500 },
+        cx,
+    );
+
     let replace = cx.new(|cx| FindReplace::new("scene.search.replace", window, cx));
     replace.update(cx, |replace, cx| {
         replace.search_field().update(cx, |field, cx| {
             field.set_query("transport", cx);
+            // Case and whole-word are the host's state, and a find surface
+            // that cannot show them is not the one a product ships.
+            field.set_match_case(Some(true), cx);
+            field.set_whole_word(Some(false), cx);
         });
         replace.replacement_input().update(cx, |input, cx| {
             input.set_value("delivery", cx);
@@ -116,13 +149,23 @@ pub(super) fn ensure_search(window: &mut Window, cx: &mut App) {
         );
     });
 
-    cx.set_global(SceneSearch { field, replace });
+    cx.set_global(SceneSearch {
+        field,
+        counting,
+        none,
+        too_many,
+        replace,
+    });
 }
 
 pub(super) fn search_field(window: &mut Window, cx: &mut App) -> AnyElement {
     ensure_search(window, cx);
     let field = cx.global::<SceneSearch>().field.clone();
     let theme = cx.theme().clone();
+
+    let counting = cx.global::<SceneSearch>().counting.clone();
+    let none = cx.global::<SceneSearch>().none.clone();
+    let too_many = cx.global::<SceneSearch>().too_many.clone();
 
     // The three counts a field must keep apart. No pointer position produces
     // them at once, so each is stated.
@@ -133,16 +176,9 @@ pub(super) fn search_field(window: &mut Window, cx: &mut App) -> AnyElement {
             &theme,
             "counting is not none, and too many is not a total",
         ))
-        .child(
-            row(&theme)
-                .child(hit_count_sample(&theme, "counting", HitCount::Counting))
-                .child(hit_count_sample(&theme, "none", HitCount::None))
-                .child(hit_count_sample(
-                    &theme,
-                    "too many",
-                    HitCount::TooMany { counted: 500 },
-                )),
-        )
+        .child(counting)
+        .child(none)
+        .child(too_many)
         .child(caption(&theme, "the current hit is not the other hits"))
         .child(
             div().child(
@@ -155,26 +191,6 @@ pub(super) fn search_field(window: &mut Window, cx: &mut App) -> AnyElement {
             ),
         )
         .into_any_element()
-}
-
-/// One hit count, rendered on its own so the states can be seen side by side.
-pub(super) fn hit_count_sample(theme: &Theme, label: &'static str, count: HitCount) -> gpui::Div {
-    div()
-        .column()
-        .gap(px(theme.spacing.xs))
-        .child(caption(theme, label))
-        .child(
-            div()
-                .px(px(theme.spacing.sm))
-                .py(px(theme.spacing.xs))
-                .hairline(theme)
-                .radius(theme, Radius::Control)
-                .child(crate::foundation::text(
-                    theme,
-                    TypeScale::Label,
-                    count.name(),
-                )),
-        )
 }
 
 pub(super) fn find_replace(window: &mut Window, cx: &mut App) -> AnyElement {
@@ -423,9 +439,11 @@ pub(super) fn form(window: &mut Window, cx: &mut App) -> AnyElement {
     );
     let theme = cx.theme().clone();
 
+    // No fixed height and nothing pushed to the bottom: a form is a stack of
+    // fields one gap apart, and the 250px of nothing that a pinned last field
+    // opened up is not a rhythm anything else in the library keeps.
     stack(&theme)
         .w(px(420.0))
-        .h(px(920.0))
         .child(
             FormField::new("scene.form.name.form-field", "Workspace name")
                 .control("scene.form.name")
@@ -470,18 +488,17 @@ pub(super) fn form(window: &mut Window, cx: &mut App) -> AnyElement {
                 .child(labels),
         )
         .child(
-            div().mt_auto().child(
-                FormField::new("scene.form.region.form-field", "All Agent models")
-                    .control("scene.form.region")
-                    .description("Choose a chat-capable model for direct runs.")
-                    .child(region),
-            ),
+            FormField::new("scene.form.region.form-field", "All Agent models")
+                .control("scene.form.region")
+                .description("Choose a chat-capable model for direct runs.")
+                .child(region),
         )
         .into_any_element()
 }
 
 /// The password in the canonical sign-in composition, kept across frames.
 pub(super) struct SceneAuthSignIn {
+    identity: Entity<TextInput>,
     password: Entity<PasswordInput>,
 }
 
@@ -491,26 +508,53 @@ pub(super) fn ensure_auth_sign_in(window: &mut Window, cx: &mut App) {
     if cx.has_global::<SceneAuthSignIn>() {
         return;
     }
+    // Nobody signs in with a password alone, and a password field reviewed
+    // without the field above it is reviewed in a shape no product ships.
+    let identity = cx.new(|cx| {
+        TextInput::new("scene.auth.sign-in.identity", window, cx)
+            .placeholder("you@example.com")
+            .text("ada@origingame.dev")
+    });
     let password = cx.new(|cx| {
         PasswordInput::new("scene.auth.sign-in.password", window, cx)
             .name("Password")
             .placeholder("Enter password")
             .required(true)
     });
-    cx.set_global(SceneAuthSignIn { password });
+    cx.set_global(SceneAuthSignIn { identity, password });
 }
 
 pub(super) fn auth_sign_in(window: &mut Window, cx: &mut App) -> AnyElement {
     ensure_auth_sign_in(window, cx);
+    let identity = cx.global::<SceneAuthSignIn>().identity.clone();
     let password = cx.global::<SceneAuthSignIn>().password.clone();
     let theme = cx.theme().clone();
     let card_id = "scene.auth.sign-in.card";
-    let title = crate::foundation::text(&theme, TypeScale::Title, "Sign in").semantic_in(
-        cx,
-        NodeSpec::new("scene.auth.sign-in.title", Role::Text)
-            .parent(card_id)
-            .text("Sign in"),
-    );
+    let heading = div()
+        .column()
+        .gap_token(&theme, Space::Xs)
+        .child(
+            crate::foundation::text(&theme, TypeScale::Title, "Sign in").semantic_in(
+                cx,
+                NodeSpec::new("scene.auth.sign-in.title", Role::Text)
+                    .parent(card_id)
+                    .text("Sign in"),
+            ),
+        )
+        .child(
+            crate::foundation::text(
+                &theme,
+                TypeScale::Body,
+                "Continue to the workspace you were invited to.",
+            )
+            .text_color(theme.colors.text_muted)
+            .semantic_in(
+                cx,
+                NodeSpec::new("scene.auth.sign-in.subtitle", Role::Text)
+                    .parent(card_id)
+                    .text("Continue to the workspace you were invited to."),
+            ),
+        );
 
     stack(&theme)
         .w(px(440.0))
@@ -519,10 +563,16 @@ pub(super) fn auth_sign_in(window: &mut Window, cx: &mut App) -> AnyElement {
                 div()
                     .column()
                     .gap_token(&theme, Space::Md)
-                    .child(title)
+                    .child(heading)
                     .child(
-                        Callout::new("Credentials are verified by the caller.", Tone::Neutral)
+                        Callout::new("Credentials are verified by the caller.", Tone::Info)
                             .id("scene.auth.sign-in.boundary"),
+                    )
+                    .child(
+                        FormField::new("scene.auth.sign-in.identity.field", "Email")
+                            .control("scene.auth.sign-in.identity")
+                            .required(true)
+                            .child(identity),
                     )
                     .child(
                         FormField::new("scene.auth.sign-in.password.field", "Password")
@@ -606,7 +656,7 @@ pub(super) fn auth_verification(window: &mut Window, cx: &mut App) -> AnyElement
                     .child(
                         Callout::new(
                             "Enter the code from your authenticator or recovery method.",
-                            Tone::Neutral,
+                            Tone::Info,
                         )
                         .id("scene.auth.verification.guidance"),
                     )
@@ -658,10 +708,19 @@ pub(super) fn ensure_actions(window: &mut Window, cx: &mut App) {
             .on_click(|_, _| {})
             .items(
                 [
-                    MenuItem::command("publish.draft", "Save as draft"),
-                    MenuItem::command("publish.schedule", "Schedule…").shortcut("cmd-shift-s"),
+                    MenuItem::command("publish.draft", "Save as draft")
+                        .icon(Icon::Document)
+                        .shortcut("cmd-s"),
+                    MenuItem::command("publish.schedule", "Schedule…")
+                        .icon(Icon::Calendar)
+                        .shortcut("cmd-shift-s"),
+                    MenuItem::command("publish.export", "Export without publishing")
+                        .icon(Icon::ArchiveUp)
+                        .shortcut("cmd-e"),
                     MenuItem::separator("publish.rule"),
-                    MenuItem::command("publish.export", "Export without publishing"),
+                    MenuItem::command("publish.discard", "Discard this draft")
+                        .icon(Icon::Trash)
+                        .destructive(true),
                 ],
                 cx,
             )
@@ -681,7 +740,10 @@ pub(super) fn actions(window: &mut Window, cx: &mut App) -> AnyElement {
         .child(
             row(&theme)
                 .child(
+                    // One row, one weight: a chipless button beside four
+                    // chipped ones reads as the one that is unavailable.
                     IconButton::new("scene.actions.copy", Icon::Copy, "Copy run id")
+                        .secondary()
                         .on_click(|_, _| {}),
                 )
                 .child(
@@ -926,16 +988,40 @@ pub(super) fn input(window: &mut Window, cx: &mut App) -> AnyElement {
     );
     let theme = cx.theme().clone();
 
+    // A field with no label is a box. Each one is put where a product would
+    // put it: under the words that say what it is for, and above the sentence
+    // that says what is wrong with it.
     div()
         .flex()
         .flex_col()
         .gap(px(theme.space(Space::Md)))
         .p(px(theme.space(Space::Lg)))
         .w(px(360.0))
-        .child(token)
-        .child(disabled)
-        .child(invalid)
-        .child(provider)
+        .child(
+            FormField::new("scene.input.token.field", "API token")
+                .control("scene.input.token")
+                .description("Kept on this machine, never published.")
+                .child(token),
+        )
+        .child(
+            FormField::new("scene.input.disabled.field", "Workspace id")
+                .control("scene.input.disabled")
+                .description("Set when the workspace was created.")
+                .child(disabled),
+        )
+        .child(
+            FormField::new("scene.input.invalid.field", "Email")
+                .control("scene.input.invalid")
+                .required(true)
+                .error("This is not an address anyone can be reached at.")
+                .child(invalid),
+        )
+        .child(
+            FormField::new("scene.input.provider.field", "Provider")
+                .control("scene.input.provider")
+                .description("Where a run is sent.")
+                .child(provider),
+        )
         .into_any_element()
 }
 
@@ -958,9 +1044,22 @@ pub(super) fn textarea(window: &mut Window, cx: &mut App) -> AnyElement {
         .gap(px(theme.space(Space::Md)))
         .p(px(theme.space(Space::Lg)))
         .w(px(360.0))
-        .child(notes)
-        .child(review)
-        .child(frozen)
+        .child(
+            FormField::new("scene.textarea.notes.field", "Release notes")
+                .control("scene.textarea.notes")
+                .description("Shown to everyone who opens this run.")
+                .child(notes),
+        )
+        .child(
+            FormField::new("scene.textarea.review.field", "Review")
+                .control("scene.textarea.review")
+                .child(review),
+        )
+        .child(
+            FormField::new("scene.textarea.frozen.field", "Policy")
+                .control("scene.textarea.frozen")
+                .child(frozen),
+        )
         // The other enter policy, for text that is a message rather than a
         // value. Nothing about it looks different, which is the point: what
         // changes is which key is the common act.
@@ -1004,6 +1103,7 @@ pub(super) fn dropzone(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .child(
                     div().flex_1().child(
                         Dropzone::new("scene.dropzone.refusing", "Drop files to attach")
+                            .hint("PDF, PNG, or plain text")
                             .refusal("A folder cannot be attached.")
                             .state(DropzoneState::Refusing)
                             .on_files(|_, _, _| {}),
@@ -1054,6 +1154,7 @@ pub(super) fn settings(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .dimmed_by("This workspace is local, so nothing synchronises.")
                 .row(
                     SettingsRow::new("scene.settings.sync.settings", "Sync settings")
+                        .description("Keyboard, theme, and editor preferences")
                         .value("Off")
                         .control(
                             Switch::new("scene.settings.sync.settings.switch")
@@ -1064,6 +1165,7 @@ pub(super) fn settings(_window: &mut Window, cx: &mut App) -> AnyElement {
                 )
                 .row(
                     SettingsRow::new("scene.settings.sync.history", "Sync history")
+                        .description("Runs and transcripts from the last 30 days")
                         .value("Off")
                         .control(
                             Switch::new("scene.settings.sync.history.switch")

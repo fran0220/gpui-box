@@ -208,9 +208,13 @@ impl RenderOnce for ProgressBar {
             })
         });
         let cancel = self.on_cancel.map(|handler| {
+            // Stopping a run is a control, so it wears a boundary. Ghost
+            // chrome put it in the same tone as the count beside it, which
+            // left the only thing on the row a reader can press looking like
+            // the two things they cannot.
             Button::new(self.ident.child("cancel"))
                 .label(cx.strings().text(StringKey::ProgressCancel))
-                .ghost()
+                .secondary()
                 .control_size(ControlSize::Sm)
                 .semantic_parent(self.ident.semantic_id())
                 .on_click(move |window, cx| handler(window, cx))
@@ -248,9 +252,20 @@ impl RenderOnce for ProgressBar {
                     .h(px(4.0))
                     .rounded_full()
                     .overflow_hidden()
-                    .bg(theme.colors.track)
+                    .bg(signature::track(&theme))
                     .when_some(drawn, |element, fraction| {
-                        element.child(signature::determined(&theme, fraction))
+                        // The pace is part of the picture, not only of the
+                        // caption: a stalled fill wears the warning colour
+                        // and a paused one dims, so neither can pass for
+                        // healthy running work at a glance.
+                        let fill = match self.value.pace {
+                            ProgressPace::Running => signature::mark(&theme),
+                            ProgressPace::Stalled => theme.colors.warning,
+                            ProgressPace::Paused => {
+                                signature::mark(&theme).opacity(theme.opacity.muted)
+                            }
+                        };
+                        element.child(signature::filled(fill, fraction))
                     })
                     // An unknown extent sweeps only while the work is moving.
                     // A still sweep would be read as a position, and a stalled

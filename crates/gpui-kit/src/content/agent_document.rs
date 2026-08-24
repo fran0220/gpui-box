@@ -27,6 +27,7 @@ use crate::display::status::StatusLine;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Ident, StyledExt};
 use crate::state::{HasPhase, Phase};
+use crate::strings::{ActiveStrings, StringKey};
 
 type EventHandler = Rc<dyn Fn(&AgentDocumentEvent, &mut Window, &mut App)>;
 
@@ -499,22 +500,35 @@ impl RenderOnce for AgentDocument {
                 })
             }
             AgentDocumentState::Empty(reason) => {
-                self.slots.or_else(slot::EMPTY, window, cx, |_, _| {
-                    EmptyState::new(ident.child("empty"), reason).into_any_element()
+                self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                    EmptyState::new(
+                        ident.child("empty"),
+                        cx.strings().text(StringKey::AgentDocumentEmpty),
+                    )
+                    .detail(reason.clone())
+                    .into_any_element()
                 })
             }
             AgentDocumentState::Unavailable(reason) => {
-                self.slots.or_else(slot::EMPTY, window, cx, |_, _| {
-                    EmptyState::new(ident.child("unavailable"), reason)
-                        .kind(EmptyKind::Unavailable)
-                        .into_any_element()
+                self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                    EmptyState::new(
+                        ident.child("unavailable"),
+                        cx.strings().text(StringKey::AgentDocumentUnavailable),
+                    )
+                    .kind(EmptyKind::Unavailable)
+                    .detail(reason.clone())
+                    .into_any_element()
                 })
             }
             AgentDocumentState::Failed(reason) => {
-                self.slots.or_else(slot::FAILED, window, cx, |_, _| {
-                    EmptyState::new(ident.child("failed"), reason)
-                        .kind(EmptyKind::Failed)
-                        .into_any_element()
+                self.slots.or_else(slot::FAILED, window, cx, |_, cx| {
+                    EmptyState::new(
+                        ident.child("failed"),
+                        cx.strings().text(StringKey::AgentDocumentFailed),
+                    )
+                    .kind(EmptyKind::Failed)
+                    .detail(reason.clone())
+                    .into_any_element()
                 })
             }
             AgentDocumentState::Ready => match self.visible_rows {

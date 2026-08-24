@@ -28,7 +28,12 @@ const NODE_WIDTH: f32 = 216.0;
 const COLUMN_GAP: f32 = 160.0;
 const ROW_GAP: f32 = 52.0;
 const ESTIMATED_NODE_HEIGHT: f32 = 132.0;
-const INSET: f32 = 40.0;
+// A node in a notable state bleeds its state colour into the canvas around
+// it, so the layout has to leave that colour somewhere to go. At the old
+// inset the first row and the last column sat close enough to the frame that
+// the halo was sliced off square, which read as a rendering fault rather than
+// as a node that is running.
+const INSET: f32 = 88.0;
 
 type EventHandler = Rc<dyn Fn(&AgentRunCanvasEvent, &mut Window, &mut App)>;
 

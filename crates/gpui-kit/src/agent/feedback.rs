@@ -7,12 +7,14 @@ use std::rc::Rc;
 
 use gpui::{
     App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
-    StatefulInteractiveElement, Styled, Window, div, px,
+    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
+use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TypeScale};
 
-use crate::foundation::{Disableable, FocusRing, Ident, StyledExt};
+use crate::display::icon::{Icon as IconView, IconTone};
+use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
 use crate::strings::{ActiveStrings, StringKey};
 
 type VoteHandler = Rc<dyn Fn(FeedbackVote, &mut Window, &mut App)>;
@@ -115,32 +117,52 @@ impl Disableable for FeedbackRating {
 impl RenderOnce for FeedbackRating {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
+        // One selected treatment for both rows. A vote said "selected" with
+        // an accent wash and accent lettering while a tag said it with a wash
+        // alone, so the same fact was drawn two ways inside one control.
+        let selected_chip = |element: gpui::Stateful<gpui::Div>, selected: bool| {
+            if selected {
+                element
+                    .bg(theme.colors.selected)
+                    .border_color(theme.colors.hairline_strong)
+            } else {
+                element
+            }
+        };
         let vote_chip = |vote: FeedbackVote, label: SharedString, selected: bool| {
             let handler = self.on_vote.clone().filter(|_| !self.disabled);
-            let mut chip = div()
-                .id(self.ident.child(vote.name()).element_id())
-                .focus_ring(&theme)
-                .px(px(theme.space(Space::Sm)))
-                .py(px(theme.space(Space::Xs)))
-                .radius(&theme, Radius::Small)
-                .bg(if selected {
-                    theme.colors.accent.opacity(0.18)
-                } else {
-                    theme.colors.raised
-                })
-                .text_color(if selected {
-                    theme.colors.accent
-                } else {
-                    theme.colors.text
-                })
-                .type_scale(&theme, TypeScale::Caption)
-                .child(label)
-                .semantic_in(
-                    cx,
-                    NodeSpec::new(self.ident.child(vote.name()).semantic_id(), Role::Button)
-                        .text(vote.name())
-                        .selected(selected),
-                );
+            let glyph = match vote {
+                FeedbackVote::Up => Glyph::ArrowUp,
+                FeedbackVote::Down => Glyph::ArrowDown,
+            };
+            let mut chip = selected_chip(
+                div()
+                    .id(self.ident.child(vote.name()).element_id())
+                    .focus_ring(&theme)
+                    .row()
+                    .items_center()
+                    .gap(px(theme.space(Space::Xs)))
+                    .px(px(theme.space(Space::Sm)))
+                    .py(px(theme.space(Space::Xs)))
+                    .radius(&theme, Radius::Small)
+                    .surface(&theme, Surface::Raised)
+                    .hairline(&theme)
+                    .text_color(theme.colors.text),
+                selected,
+            )
+            .type_scale(&theme, TypeScale::Caption)
+            .child(IconView::new(glyph).small().tone(if selected {
+                IconTone::Primary
+            } else {
+                IconTone::Faint
+            }))
+            .child(label)
+            .semantic_in(
+                cx,
+                NodeSpec::new(self.ident.child(vote.name()).semantic_id(), Role::Button)
+                    .text(vote.name())
+                    .selected(selected),
+            );
             if let Some(handler) = handler {
                 chip = chip.on_click(move |_, window, cx| handler(vote, window, cx));
             }
@@ -152,27 +174,26 @@ impl RenderOnce for FeedbackRating {
             .map(|(id, label)| {
                 let selected = self.current_tag.as_ref() == Some(&id);
                 let handler = self.on_tag.clone().filter(|_| !self.disabled);
-                let mut chip = div()
-                    .id(self.ident.child("tag").child(id.as_ref()).element_id())
-                    .px(px(theme.space(Space::Xs)))
-                    .py(px(2.0))
-                    .radius(&theme, Radius::Small)
-                    .bg(if selected {
-                        theme.colors.accent.opacity(0.18)
-                    } else {
-                        theme.colors.panel
-                    })
-                    .type_scale(&theme, TypeScale::Caption)
-                    .child(label.clone())
-                    .semantic_in(
-                        cx,
-                        NodeSpec::new(
-                            self.ident.child("tag").child(id.as_ref()).semantic_id(),
-                            Role::Button,
-                        )
-                        .text(label)
-                        .selected(selected),
-                    );
+                let mut chip = selected_chip(
+                    div()
+                        .id(self.ident.child("tag").child(id.as_ref()).element_id())
+                        .px(px(theme.space(Space::Xs)))
+                        .py(px(2.0))
+                        .radius(&theme, Radius::Small)
+                        .hairline(&theme),
+                    selected,
+                )
+                .type_scale(&theme, TypeScale::Caption)
+                .child(label.clone())
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(
+                        self.ident.child("tag").child(id.as_ref()).semantic_id(),
+                        Role::Button,
+                    )
+                    .text(label)
+                    .selected(selected),
+                );
                 if let Some(handler) = handler {
                     let reported = id.clone();
                     chip =
@@ -181,9 +202,15 @@ impl RenderOnce for FeedbackRating {
                 chip
             })
             .collect::<Vec<_>>();
+        // A rating nobody may cast has to look like one. Disabling only
+        // removed the handlers, which left the control drawn exactly as the
+        // live one beside it.
         div()
             .column()
             .gap_token(&theme, Space::Sm)
+            .when(self.disabled, |element| {
+                element.opacity(theme.opacity.disabled)
+            })
             .child(
                 div()
                     .row()

@@ -39,11 +39,11 @@ use gpui::{
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Space};
+use gpui_kit_theme::ControlSize;
 
 use crate::controls::button::{Button, ButtonJoin, ButtonVariant};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
-use crate::foundation::{Disableable, Ident, Selectable, Sizable, StyledExt};
+use crate::foundation::{Disableable, Ident, Selectable, Sizable};
 
 /// Reports the state the toggle should take next.
 type PressHandler = Rc<dyn Fn(bool, &mut Window, &mut App)>;
@@ -94,9 +94,12 @@ impl Toggle {
             pressed: false,
             disabled: false,
             size: ControlSize::Md,
-            // A toggle that is out should be quiet, because a bar of them is
-            // mostly out; going in is what the eye should catch.
-            variant: ButtonVariant::Ghost,
+            // A toggle out still has to look like a button. Drawn as a ghost
+            // it is a word on the canvas, which is indistinguishable from the
+            // label beside it and from the refused toggle at the end of the
+            // row; the tonal fill is what says there is something here to
+            // press before anybody presses it.
+            variant: ButtonVariant::Secondary,
             join: ButtonJoin::Alone,
             semantic_parent: None,
             focus_handle: None,
@@ -448,7 +451,6 @@ fn next_set(
 
 impl RenderOnce for ToggleGroup {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let theme = cx.theme().clone();
         let parent = self.ident.semantic_id();
         let last = self.items.len().saturating_sub(1);
         let actionable = !self.disabled && self.on_change.is_some();
@@ -497,10 +499,13 @@ impl RenderOnce for ToggleGroup {
             })
             .collect::<Vec<_>>();
 
+        // No gap: the toggles are joined, so their shared corners are already
+        // flattened. A gap between them leaves square edges facing across a
+        // hole, which is a run that has been taken apart rather than one
+        // frame.
         div()
             .row_reading(cx.layout_direction())
             .flex_none()
-            .gap_token(&theme, Space::Xs)
             .children(toggles)
             .semantic_in(cx, {
                 let mut spec = NodeSpec::new(parent, Role::Toolbar).disabled(self.disabled);

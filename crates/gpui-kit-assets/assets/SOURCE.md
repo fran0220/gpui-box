@@ -52,9 +52,17 @@ renderers instead of depending on machine fonts.
 Most icons are Solar Icons, Linear weight, by 480 Design, licensed under
 CC BY 4.0. Attribution: “Solar Icons by 480 Design.”
 
-The terminal, plus, close, stop, check, copy, return, info-circle, git-branch,
+The terminal, plus, close, check, copy, return, info-circle, git-branch,
 and mirrored sidebar glyphs are product-neutral icons derived from Comet,
 Copyright (c) 2026 Wing, MIT licensed.
+
+The calendar, checkbox-empty, checkbox-checked, double-arrow-left,
+double-arrow-right, drag-handle, filter, image, minus, pause, play, sound-wave,
+stop and video glyphs are original drawings for this repository, on the same
+sixteen-unit grid and 1.25 stroke as the set around them. They exist because
+the components that needed them were drawing a character the embedded fonts do
+not cover — a task list rendered its boxes as tofu, a date field borrowed the
+checklist glyph, and a transport had no play or pause of its own.
 
 Product and provider marks from the source application are deliberately not
 included in this generic asset crate.

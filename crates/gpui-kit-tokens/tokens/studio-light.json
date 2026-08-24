@@ -40,11 +40,6 @@
       "cyan": {
         "400": "#2a6f8f"
       },
-      "loader": {
-        "blue": "#4776b5",
-        "orange": "#ad5c20",
-        "pink": "#bc3a60"
-      },
       "syntax": {
         "keyword": "#a83232",
         "string": "#0f6b4f",
@@ -125,7 +120,10 @@
       "evidenceWash": "{neutral.850}/08"
     },
     "loader": {
-      "gradient": ["{loader.blue}", "{loader.orange}", "{loader.pink}"]
+      "mark": "{neutral.700}",
+      "track": "{neutral.850}/1f",
+      "placeholder": "{neutral.850}/17",
+      "sheen": "{neutral.900}/8c"
     },
     "syntax": {
       "keyword": "{syntax.keyword}",
@@ -278,8 +276,9 @@
     "selectionRailWidth": 2.5,
     "focusRingWidth": 2,
     "focusRingAlpha": 0.8,
-    "glowAlpha": 0.22,
+    "glowAlpha": 0.18,
     "glowBlur": 12,
+    "glowSpread": -5,
     "glassAlpha": 0.78,
     "glassBlur": 24,
     "glassLiquidAlpha": 0.34,

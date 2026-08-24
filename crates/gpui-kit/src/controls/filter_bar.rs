@@ -12,10 +12,11 @@ use gpui::{
     prelude::FluentBuilder,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TypeScale};
 
 use crate::controls::button::Button;
 use crate::display::badge::Tone;
+use crate::display::loading::Spinner;
 use crate::display::tag::Tag;
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text as foundation_text};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
@@ -46,7 +47,10 @@ impl FilterCondition {
             field: field.into(),
             operator: operator.into(),
             value: value.into(),
-            tone: Tone::Accent,
+            // A condition is a value the caller typed, not a status: the
+            // default is the neutral chip, and a tone is what a caller reaches
+            // for when one condition means something the others do not.
+            tone: Tone::Neutral,
         }
     }
 
@@ -272,7 +276,10 @@ impl RenderOnce for FilterBar {
                                 .clone()
                                 .unwrap_or_else(|| cx.strings().text(StringKey::FilterBarAdd)),
                         )
-                        .ghost()
+                        // Adding a condition is what the bar is for; clearing
+                        // is the way back out. Drawn at the same weight the
+                        // reader has to work out which is which.
+                        .secondary()
                         .control_size(self.size)
                         .semantic_parent(self.ident.semantic_id())
                         .icon(gpui_kit_assets::Icon::Plus)
@@ -299,19 +306,35 @@ impl RenderOnce for FilterBar {
             });
 
         let count_ident = self.ident.child("count");
+        let counting = self.count == ResultCount::Counting;
         let count = self.count.sentence(self.noun.as_ref(), cx).map(|sentence| {
-            foundation_text(&theme, TypeScale::Caption, sentence.clone())
+            let wording = sentence.clone();
+            let sentence = foundation_text(&theme, TypeScale::Caption, sentence.clone())
                 .flex_none()
                 .text_color(match self.count {
                     ResultCount::Unavailable(_) => theme.colors.warning,
                     ResultCount::Counting => theme.colors.text_faint,
                     _ => theme.colors.text_muted,
+                });
+            // A count in progress is a loading state, and it wears what every
+            // other loading state in the library wears. As bare text it was a
+            // value that happened to be worded oddly.
+            div()
+                .row()
+                .flex_none()
+                .items_center()
+                .gap_token(&theme, Space::Xs)
+                .when(counting, |element| {
+                    element.child(
+                        Spinner::new(count_ident.child("spinner")).control_size(ControlSize::Xs),
+                    )
                 })
+                .child(sentence)
                 .semantic_in(
                     cx,
                     NodeSpec::new(count_ident.semantic_id(), Role::Status)
                         .parent(self.ident.semantic_id())
-                        .text(sentence)
+                        .text(wording)
                         // The state is published by name so a test tells a
                         // count in progress from a count of zero.
                         .value(self.count.as_str())
@@ -332,6 +355,15 @@ impl RenderOnce for FilterBar {
             .when(self.disabled, |element| {
                 element.opacity(theme.opacity.disabled)
             })
+            // A bar of chips with nothing at its head is a row of chips. The
+            // mark says which row it is, and it is the only thing here a
+            // reader cannot press.
+            .child(
+                gpui_kit_assets::icon(gpui_kit_assets::Icon::Filter)
+                    .size(gpui::px(theme.control.get(self.size).icon_size))
+                    .flex_none()
+                    .text_color(theme.colors.text_faint),
+            )
             .children(chips)
             .children(add)
             .child(div().flex_1())

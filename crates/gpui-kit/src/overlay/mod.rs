@@ -32,6 +32,7 @@ pub mod panel;
 pub mod popover;
 pub mod positioner;
 pub(crate) mod stack;
+pub mod tail;
 pub mod toast;
 pub mod tooltip;
 
@@ -51,5 +52,6 @@ pub use notification_center::{
 pub use palette::{Command, CommandPalette, CommandPaletteEvent};
 pub use popover::{Popover, PopoverEvent};
 pub use positioner::{Positioner, Room, Side};
+pub use tail::{TailSide, tail};
 pub use toast::{Toast, ToastCorner, ToastLayer};
 pub use tooltip::{Tooltip, Tooltipped};

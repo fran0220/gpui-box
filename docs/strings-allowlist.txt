@@ -32,6 +32,7 @@ AnimatedNumber
 ApprovalPrompt
 AspectRatio
 AudioPlayer
+AvatarGroup
 BackspaceAtStart
 Banner
 Blur
@@ -99,6 +100,7 @@ Layout
 List
 ListItem
 ListRow
+LoadMore
 LogStream
 MakeWay
 Markdown
@@ -218,6 +220,7 @@ an actionable row has one
 array
 camelCase
 checked above
+empty
 empty array
 empty object
 end before start
@@ -296,5 +299,3 @@ x1b[Z
 •
 ••••••••
 …
-☐
-☑

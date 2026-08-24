@@ -59,7 +59,7 @@ mod stagger;
 mod transition;
 
 pub use animated::{Animated, Entrance};
-pub use busy::{Activity, breathe, breathe_as, breathing_dot, spin, sweep};
+pub use busy::{Activity, breath, breathe, breathe_as, breathing_dot, spin, sweep};
 pub use easing::{CubicBezier, Easing};
 pub use flip::{Flip, Flipped, Flipping, Shape, Shaping, flip, shared_flip, tracked_ids};
 pub use follow::{AtEnd, Chase, STICK_BAND, engage_end, follow_end, follows_end, release_end};

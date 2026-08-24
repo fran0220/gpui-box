@@ -5,6 +5,7 @@
 
 use gpui::{
     AnyElement, App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div,
+    prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TypeScale};
@@ -174,16 +175,36 @@ impl RenderOnce for ArtifactPreview {
                 self.state.name().into(),
             ),
         };
+        let ready = matches!(self.state, ArtifactPreviewState::Ready);
+        // The body sits in its own well, so the panel is the frame around the
+        // artifact and the artifact is the thing inside it. Every state fills
+        // that same well, which is how loading comes to occupy the shape of
+        // what is loading rather than floating in the card.
+        let body = div()
+            .w_full()
+            .min_h(px(60.0))
+            .column()
+            .p_token(&theme, Space::Sm)
+            .radius(&theme, Radius::Control)
+            .well(&theme)
+            .when(!ready, |element| element.items_center().justify_center())
+            .child(inner);
+
         div()
             .column()
             .gap_token(&theme, Space::Sm)
             .p_token(&theme, Space::Md)
             .radius(&theme, Radius::Card)
             .surface(&theme, Surface::Panel)
+            .hairline(&theme)
             .child(
                 div()
                     .row()
                     .justify_between()
+                    .items_center()
+                    .pb(px(theme.spacing.xs))
+                    .border_b(px(theme.borders.hairline))
+                    .border_color(theme.colors.divider)
                     .child(
                         div()
                             .type_scale(&theme, TypeScale::Subtitle)
@@ -196,7 +217,7 @@ impl RenderOnce for ArtifactPreview {
                             .child(SharedString::from(self.kind.name())),
                     ),
             )
-            .child(inner)
+            .child(body)
             .semantic_in(
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::Region)

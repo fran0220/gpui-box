@@ -11,8 +11,11 @@ Rules:
 - surfaces establish hierarchy before borders;
 - accent remains a compact action/focus color;
 - semantic colors only communicate status;
-- `color.loader.gradient` is the working signature, not an accent: it
-  appears only while work is in flight and stays off idle chrome;
+- `color.loader.*` is the neutral vocabulary of work in progress: the moving
+  `mark`, the quiet `track` it travels, the `placeholder` shape of absent
+  content, and the `sheen` that crosses it. Waiting is not information, so
+  none of the four carries a hue — colour on a loading surface is the
+  caller's meaning, never the library's decoration;
 - typography steps keep size, line-height, and weight together;
 - repeated semantic geometry is tokenized;
 - one-off component geometry may remain local;

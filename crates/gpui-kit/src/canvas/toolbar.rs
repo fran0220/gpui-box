@@ -104,9 +104,15 @@ impl RenderOnce for CanvasToolbar {
                 .py(px(theme.space(Space::Xs)))
                 .radius(&theme, Radius::Small)
                 .bg(if selected {
-                    theme.colors.accent.opacity(0.18)
+                    theme.colors.selected
                 } else {
                     theme.colors.raised
+                })
+                .border(px(theme.borders.hairline))
+                .border_color(if selected {
+                    theme.colors.hairline_strong
+                } else {
+                    theme.colors.hairline
                 })
                 .type_scale(&theme, TypeScale::Caption)
                 .child(label.clone())
@@ -128,11 +134,22 @@ impl RenderOnce for CanvasToolbar {
             .p_token(&theme, Space::Xs)
             .radius(&theme, Radius::Small)
             .surface(&theme, Surface::Overlay)
+            // The zoom is a reading, not a control: it wears the mono figures
+            // and a rule separates it from the three chips beside it, so a
+            // reader does not try to press it.
             .child(
                 div()
+                    .px_token(&theme, Space::Xs)
+                    .font_family(theme.typography.mono.clone())
                     .type_scale(&theme, TypeScale::Caption)
                     .text_color(theme.colors.text_muted)
                     .child(self.zoom.clone()),
+            )
+            .child(
+                div()
+                    .w(px(theme.borders.hairline))
+                    .h(px(theme.typography.caption.line_height))
+                    .bg(theme.colors.divider),
             )
             .child(button(CanvasToolbarAction::Fit, false))
             .child(button(CanvasToolbarAction::Snap, self.snap))

@@ -299,6 +299,7 @@ impl<E: Element> Drawable<E> {
     fn request_layout(&mut self, window: &mut Window, cx: &mut App) -> LayoutId {
         match mem::take(&mut self.phase) {
             ElementDrawPhase::Start => {
+                window.record_request_layout_call();
                 let global_id = self.element.id().map(|element_id| {
                     window.element_id_stack.push(element_id);
                     GlobalElementId(Arc::from(&*window.element_id_stack))
@@ -358,6 +359,7 @@ impl<E: Element> Drawable<E> {
                 mut request_layout,
                 ..
             } => {
+                window.record_prepaint_call();
                 if let Some(element_id) = self.element.id() {
                     window.element_id_stack.push(element_id);
                     debug_assert_eq!(
@@ -476,6 +478,7 @@ impl<E: Element> Drawable<E> {
                 mut prepaint,
                 ..
             } => {
+                window.record_paint_call();
                 if let Some(element_id) = self.element.id() {
                     window.element_id_stack.push(element_id);
                     debug_assert_eq!(

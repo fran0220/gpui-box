@@ -24,7 +24,7 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Space, Theme, TypeScal
 use crate::controls::button::{Button, ButtonJoin, ButtonVariant};
 use crate::display::icon::flips;
 use crate::foundation::direction::{ActiveDirection, LayoutDirection};
-use crate::foundation::{Ident, Pressable, Sizable, StyledExt, text};
+use crate::foundation::{Ident, Pressable, Selectable, Sizable, StyledExt, text};
 use crate::motion;
 use crate::overlay::focus::FocusTrap;
 use crate::overlay::kbd::Kbd;
@@ -375,7 +375,18 @@ fn panels<V: 'static>(
             None
         };
         let opened = (level_depth < depth).then(|| state.path[level_depth]);
-        rendered.push(panel(
+        // A submenu belongs to one row, not to the panel that row is in, so
+        // it starts level with that row. Anchoring it to the top of the panel
+        // instead is what made an expanded "Share" appear to have come out of
+        // the heading four rows above it.
+        let offset = if level_depth > 0 {
+            let owner = state.path[level_depth - 1];
+            let siblings = level(items, &state.path[..level_depth - 1]);
+            rows_above(&siblings[..owner.min(siblings.len())], theme)
+        } else {
+            0.0
+        };
+        let panel = panel(
             ident,
             level(items, &base),
             &base,
@@ -385,7 +396,12 @@ fn panels<V: 'static>(
             theme,
             cx,
             activate.clone(),
-        ));
+        );
+        rendered.push(if offset > 0.0 {
+            div().mt(px(offset)).child(panel).into_any_element()
+        } else {
+            panel
+        });
     }
 
     div()
@@ -394,6 +410,18 @@ fn panels<V: 'static>(
         .items_start()
         .gap(px(theme.space(Space::Xs)))
         .children(rendered)
+}
+
+/// How far down a panel the row after `items` starts.
+fn rows_above(items: &[MenuItem], theme: &Theme) -> f32 {
+    items
+        .iter()
+        .map(|item| match item.kind {
+            MenuItemKind::Separator => popover::menu_separator_height(theme),
+            MenuItemKind::Section => popover::menu_heading_height(theme),
+            _ => popover::menu_row_height(theme),
+        })
+        .sum()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -906,6 +934,10 @@ impl Render for Menu {
             .variant(self.trigger_variant)
             .join(self.trigger_join)
             .control_size(self.trigger_size)
+            // An open menu marks the control it came out of. A ghost trigger
+            // that keeps its resting appearance while a panel hangs off it
+            // leaves the panel looking like it belongs to the whole row.
+            .selected(self.open)
             .track_focus(&self.trigger_focus)
             .when_some(self.trigger_icon, |button, glyph| {
                 match (glyph_only, self.trigger_name.clone()) {

@@ -152,9 +152,11 @@ impl RenderOnce for FailurePanel {
             .unwrap_or_else(|| cx.strings().text(StringKey::FailureTitle));
 
         let retry = self.on_retry.clone().map(|handler| {
+            // The one thing a reader can do about a failure is the loudest
+            // control on the panel. A secondary chip beside a red message
+            // reads as the disabled remains of something that already failed.
             Button::new(self.ident.child("retry"))
                 .label(cx.strings().text(StringKey::TryAgain))
-                .secondary()
                 .control_size(ControlSize::Sm)
                 .semantic_parent(self.ident.semantic_id())
                 // A retry already in flight refuses another one rather than
@@ -204,23 +206,44 @@ impl RenderOnce for FailurePanel {
             .gap_token(&theme, Space::Sm)
             .p_token(&theme, Space::Lg)
             .radius(&theme, Radius::Card)
-            // A failure reports itself by bleeding its colour into the pixels
-            // around the panel, which says the same thing an outline said and
-            // says it without a line.
+            // A failure states its severity inside its own edge. A halo that
+            // reaches into whatever is next to the panel makes the neighbour
+            // look implicated, and it is the loudest thing in a frame whose
+            // subject is the sentence, not the colour.
+            .overflow_hidden()
+            .relative()
             .bg(theme.colors.panel)
-            .glow(&theme, theme.colors.danger)
+            .hairline(&theme)
+            .child(
+                div()
+                    .absolute()
+                    .left_0()
+                    .top_0()
+                    .bottom_0()
+                    .w(px(theme.effects.selection_rail_width))
+                    .bg(theme.colors.danger),
+            )
             .child(
                 div()
                     .row()
+                    .w_full()
                     .gap_token(&theme, Space::Sm)
                     .child(
                         icon(Icon::Danger)
+                            .flex_none()
                             .size(px(theme.control.md.icon_size))
                             .text_color(theme.colors.danger),
                     )
                     .child(
+                        // The name of what is missing outranks the sentence
+                        // explaining it, which is the order they are read in.
+                        // It wraps inside the panel: a headline that runs off
+                        // the edge of a narrow column takes the last word of
+                        // the failure with it.
                         div()
-                            .type_scale(&theme, TypeScale::Label)
+                            .min_w_0()
+                            .flex_1()
+                            .type_scale(&theme, TypeScale::Subtitle)
                             .text_color(theme.colors.text)
                             .child(title.clone()),
                     ),

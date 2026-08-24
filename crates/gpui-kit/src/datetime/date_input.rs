@@ -325,7 +325,7 @@ impl Render for DateInput {
 
         let trigger = IconButton::new(
             self.ident.child("open"),
-            Icon::Checklist,
+            Icon::Calendar,
             cx.strings().text(StringKey::DateInputOpen),
         )
         .ghost()

@@ -5,6 +5,8 @@ use super::support::*;
 pub(super) fn badge(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)
+        .w(px(560.0))
+        .child(caption(&theme, "Tones, which report rather than decorate"))
         .child(
             row(&theme)
                 .child(Badge::new("Neutral").neutral().id("scene.badge.neutral"))
@@ -14,19 +16,69 @@ pub(super) fn badge(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .child(Badge::new("Danger").danger().id("scene.badge.danger"))
                 .child(Badge::new("Info").info().id("scene.badge.info")),
         )
+        .child(caption(
+            &theme,
+            "A glyph or a mark, for a badge whose claim has a picture",
+        ))
+        .child(
+            row(&theme)
+                .child(
+                    Badge::new("Passed")
+                        .success()
+                        .icon(Icon::Check)
+                        .id("scene.badge.icon"),
+                )
+                .child(Badge::new("Live").success().dot(true).id("scene.badge.dot"))
+                .child(
+                    Badge::new("Refused")
+                        .danger()
+                        .icon(Icon::CloseCircle)
+                        .id("scene.badge.refused"),
+                ),
+        )
+        .child(caption(
+            &theme,
+            "Outlined, for a badge landing on a surface that is already washed",
+        ))
+        .child(
+            row(&theme)
+                .child(
+                    Badge::new("Warning")
+                        .warning()
+                        .outlined(true)
+                        .id("scene.badge.outlined-warning"),
+                )
+                .child(
+                    Badge::new("Neutral")
+                        .outlined(true)
+                        .id("scene.badge.outlined-neutral"),
+                ),
+        )
+        .child(caption(&theme, "The size ramp"))
+        .child(
+            row(&theme)
+                .child(Badge::new("Extra small").xs().id("scene.badge.xs"))
+                .child(Badge::new("Small").small().id("scene.badge.sm"))
+                .child(Badge::new("Medium").medium().id("scene.badge.md"))
+                .child(Badge::new("Large").large().id("scene.badge.lg")),
+        )
         // A tint says whose the badge is. The colours come from the theme's
         // own palette rather than from literals, so a retinted document
         // retints these too, and the tone underneath still reports itself.
+        .child(caption(
+            &theme,
+            "An identity tint, which says whose and not how it is going",
+        ))
         .child(
             row(&theme)
                 .child(
                     Badge::new("Ada")
-                        .tint(identity_tint(&theme, "loader.pink"))
+                        .tint(identity_tint(&theme, "agent.external"))
                         .id("scene.badge.tinted-neutral"),
                 )
                 .child(
                     Badge::new("Grace")
-                        .tint(identity_tint(&theme, "loader.orange"))
+                        .tint(identity_tint(&theme, "agent.shell"))
                         .warning()
                         .id("scene.badge.tinted-warning"),
                 ),
@@ -193,18 +245,35 @@ pub(super) fn card(_window: &mut Window, cx: &mut App) -> AnyElement {
 
 pub(super) fn status(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
+    // A dot on its own says a thing has a state without saying which; the
+    // name beside it is what the row is for.
+    let named = |label: &'static str, dot: StatusDot| {
+        div()
+            .row()
+            .items_center()
+            .gap(px(theme.space(Space::Xs)))
+            .child(dot)
+            .child(caption(&theme, label))
+    };
     stack(&theme)
+        .w(px(560.0))
+        .child(caption(&theme, "The smallest mark, and what each one claims"))
         .child(
             row(&theme)
-                .child(StatusDot::new(Tone::Success))
-                .child(StatusDot::new(Tone::Warning))
-                .child(StatusDot::new(Tone::Danger))
-                .child(StatusDot::new(Tone::Neutral))
+                .gap(px(theme.space(Space::Lg)))
+                .child(named("ready", StatusDot::new(Tone::Success)))
+                .child(named("stale", StatusDot::new(Tone::Warning)))
+                .child(named("refused", StatusDot::new(Tone::Danger)))
+                .child(named("off", StatusDot::new(Tone::Neutral)))
                 // The same dot wearing an identity colour: a state the six
                 // severities cannot name, still reporting the severity it
                 // claims through the surface around it.
-                .child(StatusDot::new(Tone::Neutral).tint(identity_tint(&theme, "loader.pink"))),
+                .child(named(
+                    "Ada",
+                    StatusDot::new(Tone::Neutral).tint(identity_tint(&theme, "agent.external")),
+                )),
         )
+        .child(caption(&theme, "Work that is still going"))
         .child(
             row(&theme)
                 .child(
@@ -223,15 +292,21 @@ pub(super) fn status(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .activity(crate::motion::Activity::Advancing),
                 ),
         )
+        .child(caption(&theme, "The same claim, named"))
         .child(
             StatusLine::new("Connected", Tone::Success).id("scene.status.line"),
         )
         .child(
             StatusLine::new("Ada · reviewing", Tone::Neutral)
-                .tint(identity_tint(&theme, "loader.pink"))
+                .tint(identity_tint(&theme, "agent.external"))
                 .busy("scene.status.tinted")
                 .id("scene.status.tinted"),
         )
+        .child(caption(
+            &theme,
+            "A report: a rail and a glyph carry the severity, so two of them differ \
+             by meaning and never by weight",
+        ))
         .child(
             Callout::new(
                 "The host refused this action. The refusal is shown, not converted to an empty state.",
@@ -275,9 +350,9 @@ pub(super) fn loading(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .into_any_element(),
                 ))
                 .child(indicator(
-                    "Contacting host",
-                    GradientSpinner::new("scene.loading.spinner")
-                        .label("Contacting host")
+                    "Inline wait",
+                    Spinner::new("scene.loading.inline")
+                        .label("Inline wait")
                         .into_any_element(),
                 )),
         )
@@ -285,9 +360,9 @@ pub(super) fn loading(_window: &mut Window, cx: &mut App) -> AnyElement {
             row(&theme)
                 .gap_token(&theme, Space::Md)
                 .child(indicator(
-                    "Inline wait",
-                    Spinner::new("scene.loading.inline")
-                        .label("Inline wait")
+                    "Region filling in",
+                    BarLoader::new("scene.loading.bar")
+                        .label("Region filling in")
                         .into_any_element(),
                 ))
                 .child(indicator(
@@ -299,6 +374,20 @@ pub(super) fn loading(_window: &mut Window, cx: &mut App) -> AnyElement {
                     .label("Refreshing")
                     .into_any_element(),
                 )),
+        )
+        .child(
+            div()
+                .column()
+                .gap_token(&theme, Space::Sm)
+                .w_full()
+                .child(crate::foundation::text(
+                    &theme,
+                    TypeScale::Label,
+                    "List tails",
+                ))
+                .child(LoadMore::new("scene.loading.more-idle").on_more(|_, _| {}))
+                .child(LoadMore::new("scene.loading.more-loading").state(LoadMoreState::Loading))
+                .child(LoadMore::new("scene.loading.more-end").state(LoadMoreState::Exhausted)),
         )
         .child(
             div()
@@ -379,161 +468,193 @@ pub(super) fn chart(_window: &mut Window, cx: &mut App) -> AnyElement {
         ChartPoint::new("00:45", 0.75, 0.58, "00:45", "58%"),
         ChartPoint::new("01:00", 1.0, 0.61, "01:00", "61%"),
     ];
+    // Two columns rather than one tall stack. The family is ten surfaces, and
+    // a column of ten runs off the bottom of the frame that holds it, which
+    // is how the last of them came to be reviewed as half a picture.
+    let column = || {
+        div()
+            .column()
+            .flex_1()
+            .min_w_0()
+            .gap(px(theme.space(Space::Md)))
+    };
     stack(&theme)
-        .w(px(520.0))
+        .w(px(1060.0))
         .child(caption(
             &theme,
             "host-owned series, host-owned axis wording, no invented scale",
         ))
         .child(
-            LineChart::new(
-                "scene.chart.ready",
-                "Fixture load",
-                ChartState::Stale {
-                    series: vec![
-                        ChartSeries::new("cpu", "CPU")
-                            .points(cpu)
-                            .tint(identity_tint(&theme, "loader.blue")),
-                        ChartSeries::new("memory", "Memory")
-                            .points(memory)
-                            .tint(identity_tint(&theme, "loader.orange")),
-                    ],
-                    reason: "Refresh failed; showing last verified sample".into(),
-                },
-            )
-            .area()
-            .crosshair()
-            .current("cpu", "00:45")
-            .on_current(|_, _, _| {})
-            .axes(
-                ChartAxes::default()
-                    .x_label("Time")
-                    .y_label("Utilization")
-                    .x_ends("00:00", "01:00")
-                    .y_ends("0%", "100%"),
-            ),
+            div()
+                .row()
+                .items_start()
+                .w_full()
+                .gap(px(theme.space(Space::Lg)))
+                .child(
+                    column()
+                        .child(
+                            LineChart::new(
+                                "scene.chart.ready",
+                                "Fixture load",
+                                ChartState::Stale {
+                                    series: vec![
+                                        ChartSeries::new("cpu", "CPU")
+                                            .points(cpu)
+                                            .tint(identity_tint(&theme, "agent.read")),
+                                        ChartSeries::new("memory", "Memory")
+                                            .points(memory)
+                                            .tint(identity_tint(&theme, "agent.shell")),
+                                    ],
+                                    reason: "Refresh failed; showing last verified sample".into(),
+                                },
+                            )
+                            .area()
+                            .crosshair()
+                            .current("cpu", "00:45")
+                            .on_current(|_, _, _| {})
+                            .axes(
+                                ChartAxes::default()
+                                    .x_label("Time")
+                                    .y_label("Utilization")
+                                    .x_ends("00:00", "01:00")
+                                    .y_ends("0%", "100%"),
+                            ),
+                        )
+                        .child(LineChart::new(
+                            "scene.chart.empty",
+                            "Fixture load",
+                            ChartState::Empty,
+                        ))
+                        .child(
+                            BarChart::new(
+                                "scene.chart.bars",
+                                "Fixture share",
+                                ChartState::Ready(vec![ChartSeries::new("share", "Share").points(
+                                    [
+                                        ChartPoint::new("alpha", 0.0, 0.35, "Alpha", "35 jobs"),
+                                        ChartPoint::new("beta", 0.33, 0.70, "Beta", "70 jobs"),
+                                        ChartPoint::new("gamma", 0.66, 0.45, "Gamma", "45 jobs"),
+                                        ChartPoint::new("delta", 1.0, 0.90, "Delta", "90 jobs"),
+                                    ],
+                                )]),
+                            )
+                            .axes(ChartAxes::default().y_ends("0", "max")),
+                        )
+                        .child(
+                            PieChart::new(
+                                "scene.chart.pie",
+                                "Fixture share",
+                                ChartState::Ready(vec![ChartSeries::new("share", "Share").points(
+                                    [
+                                        ChartPoint::new("alpha", 0.0, 0.25, "Alpha", "25%"),
+                                        ChartPoint::new("beta", 0.25, 0.35, "Beta", "35%"),
+                                        ChartPoint::new("gamma", 0.60, 0.20, "Gamma", "20%"),
+                                        ChartPoint::new("delta", 0.80, 0.20, "Delta", "20%"),
+                                    ],
+                                )]),
+                            )
+                            .donut(),
+                        )
+                        .child(
+                            StackedBarChart::new(
+                                "scene.chart.stacked",
+                                "Fixture mix",
+                                ChartState::Ready(vec![
+                                    ChartSeries::new("cpu", "CPU")
+                                        .points([
+                                            ChartPoint::new("alpha", 0.0, 0.30, "Alpha", "30%"),
+                                            ChartPoint::new("beta", 0.5, 0.20, "Beta", "20%"),
+                                        ])
+                                        .tint(identity_tint(&theme, "agent.read")),
+                                    ChartSeries::new("memory", "Memory")
+                                        .points([
+                                            ChartPoint::new("alpha", 0.0, 0.25, "Alpha", "25%"),
+                                            ChartPoint::new("beta", 0.5, 0.40, "Beta", "40%"),
+                                        ])
+                                        .tint(identity_tint(&theme, "agent.shell")),
+                                ]),
+                            )
+                            .axes(ChartAxes::default().y_ends("0", "max")),
+                        ),
+                )
+                .child(
+                    column()
+                        .child(
+                            ChartLegend::new(
+                                "scene.chart.legend",
+                                [
+                                    ChartSeries::new("cpu", "CPU")
+                                        .tint(identity_tint(&theme, "agent.read")),
+                                    ChartSeries::new("memory", "Memory")
+                                        .tint(identity_tint(&theme, "agent.shell")),
+                                ],
+                            )
+                            .on_toggle(|_, _, _, _| {}),
+                        )
+                        .child(
+                            AreaChart::new(
+                                "scene.chart.area",
+                                "Fixture tokens",
+                                ChartState::Ready(vec![
+                                    ChartSeries::new("tokens", "Tokens")
+                                        .points([
+                                            ChartPoint::new("00:00", 0.0, 0.20, "00:00", "20%"),
+                                            ChartPoint::new("00:15", 0.25, 0.45, "00:15", "45%"),
+                                            ChartPoint::new("00:30", 0.5, 0.38, "00:30", "38%"),
+                                            ChartPoint::new("00:45", 0.75, 0.70, "00:45", "70%"),
+                                            ChartPoint::new("01:00", 1.0, 0.62, "01:00", "62%"),
+                                        ])
+                                        .tint(identity_tint(&theme, "agent.read")),
+                                ]),
+                            )
+                            .axes(ChartAxes::default().y_ends("0", "max"))
+                            .crosshair(),
+                        )
+                        .child(
+                            ScatterChart::new(
+                                "scene.chart.scatter",
+                                "Fixture samples",
+                                ChartState::Ready(vec![
+                                    ChartSeries::new("samples", "Samples").points([
+                                        ChartPoint::new("a", 0.15, 0.30, "A", "30").weight(0.2),
+                                        ChartPoint::new("b", 0.40, 0.62, "B", "62").weight(0.6),
+                                        ChartPoint::new("c", 0.72, 0.48, "C", "48").weight(0.35),
+                                        ChartPoint::new("d", 0.88, 0.80, "D", "80").weight(0.9),
+                                    ]),
+                                ]),
+                            )
+                            .crosshair()
+                            .current("samples", "b")
+                            .on_current(|_, _, _| {})
+                            .axes(ChartAxes::default().y_ends("0", "max")),
+                        )
+                        .child(RadarChart::new(
+                            "scene.chart.radar",
+                            "Fixture profile",
+                            ChartState::Ready(vec![ChartSeries::new("profile", "Profile").points(
+                                [
+                                    ChartPoint::new("clarity", 0.0, 0.80, "Clarity", "80"),
+                                    ChartPoint::new("speed", 0.0, 0.55, "Speed", "55"),
+                                    ChartPoint::new("coverage", 0.0, 0.70, "Coverage", "70"),
+                                    ChartPoint::new("cost", 0.0, 0.40, "Cost", "40"),
+                                ],
+                            )]),
+                        ))
+                        .child(RadarChart::new(
+                            "scene.chart.radar-empty",
+                            "Fixture profile",
+                            ChartState::Empty,
+                        ))
+                        .child(GaugeChart::new(
+                            "scene.chart.gauge",
+                            "Fixture occupancy",
+                            ChartState::Ready(vec![
+                                ChartSeries::new("occupancy", "Occupancy")
+                                    .points([ChartPoint::new("now", 0.0, 0.72, "Now", "72%")]),
+                            ]),
+                        )),
+                ),
         )
-        .child(LineChart::new(
-            "scene.chart.empty",
-            "Fixture load",
-            ChartState::Empty,
-        ))
-        .child(
-            BarChart::new(
-                "scene.chart.bars",
-                "Fixture share",
-                ChartState::Ready(vec![ChartSeries::new("share", "Share").points([
-                    ChartPoint::new("alpha", 0.0, 0.35, "Alpha", "35 jobs"),
-                    ChartPoint::new("beta", 0.33, 0.70, "Beta", "70 jobs"),
-                    ChartPoint::new("gamma", 0.66, 0.45, "Gamma", "45 jobs"),
-                    ChartPoint::new("delta", 1.0, 0.90, "Delta", "90 jobs"),
-                ])]),
-            )
-            .axes(ChartAxes::default().y_ends("0", "max")),
-        )
-        .child(
-            PieChart::new(
-                "scene.chart.pie",
-                "Fixture share",
-                ChartState::Ready(vec![ChartSeries::new("share", "Share").points([
-                    ChartPoint::new("alpha", 0.0, 0.25, "Alpha", "25%"),
-                    ChartPoint::new("beta", 0.25, 0.35, "Beta", "35%"),
-                    ChartPoint::new("gamma", 0.60, 0.20, "Gamma", "20%"),
-                    ChartPoint::new("delta", 0.80, 0.20, "Delta", "20%"),
-                ])]),
-            )
-            .donut(),
-        )
-        .child(
-            StackedBarChart::new(
-                "scene.chart.stacked",
-                "Fixture mix",
-                ChartState::Ready(vec![
-                    ChartSeries::new("cpu", "CPU")
-                        .points([
-                            ChartPoint::new("alpha", 0.0, 0.30, "Alpha", "30%"),
-                            ChartPoint::new("beta", 0.5, 0.20, "Beta", "20%"),
-                        ])
-                        .tint(identity_tint(&theme, "loader.blue")),
-                    ChartSeries::new("memory", "Memory")
-                        .points([
-                            ChartPoint::new("alpha", 0.0, 0.25, "Alpha", "25%"),
-                            ChartPoint::new("beta", 0.5, 0.40, "Beta", "40%"),
-                        ])
-                        .tint(identity_tint(&theme, "loader.orange")),
-                ]),
-            )
-            .axes(ChartAxes::default().y_ends("0", "max")),
-        )
-        .child(
-            ChartLegend::new(
-                "scene.chart.legend",
-                [
-                    ChartSeries::new("cpu", "CPU").tint(identity_tint(&theme, "loader.blue")),
-                    ChartSeries::new("memory", "Memory")
-                        .tint(identity_tint(&theme, "loader.orange")),
-                ],
-            )
-            .on_toggle(|_, _, _, _| {}),
-        )
-        .child(
-            AreaChart::new(
-                "scene.chart.area",
-                "Fixture tokens",
-                ChartState::Ready(vec![
-                    ChartSeries::new("tokens", "Tokens")
-                        .points([
-                            ChartPoint::new("00:00", 0.0, 0.20, "00:00", "20%"),
-                            ChartPoint::new("00:15", 0.25, 0.45, "00:15", "45%"),
-                            ChartPoint::new("00:30", 0.5, 0.38, "00:30", "38%"),
-                            ChartPoint::new("00:45", 0.75, 0.70, "00:45", "70%"),
-                            ChartPoint::new("01:00", 1.0, 0.62, "01:00", "62%"),
-                        ])
-                        .tint(identity_tint(&theme, "loader.blue")),
-                ]),
-            )
-            .axes(ChartAxes::default().y_ends("0", "max"))
-            .crosshair(),
-        )
-        .child(
-            ScatterChart::new(
-                "scene.chart.scatter",
-                "Fixture samples",
-                ChartState::Ready(vec![ChartSeries::new("samples", "Samples").points([
-                    ChartPoint::new("a", 0.15, 0.30, "A", "30").weight(0.2),
-                    ChartPoint::new("b", 0.40, 0.62, "B", "62").weight(0.6),
-                    ChartPoint::new("c", 0.72, 0.48, "C", "48").weight(0.35),
-                    ChartPoint::new("d", 0.88, 0.80, "D", "80").weight(0.9),
-                ])]),
-            )
-            .crosshair()
-            .current("samples", "b")
-            .on_current(|_, _, _| {})
-            .axes(ChartAxes::default().y_ends("0", "max")),
-        )
-        .child(RadarChart::new(
-            "scene.chart.radar",
-            "Fixture profile",
-            ChartState::Ready(vec![ChartSeries::new("profile", "Profile").points([
-                ChartPoint::new("clarity", 0.0, 0.80, "Clarity", "80"),
-                ChartPoint::new("speed", 0.0, 0.55, "Speed", "55"),
-                ChartPoint::new("coverage", 0.0, 0.70, "Coverage", "70"),
-                ChartPoint::new("cost", 0.0, 0.40, "Cost", "40"),
-            ])]),
-        ))
-        .child(RadarChart::new(
-            "scene.chart.radar-empty",
-            "Fixture profile",
-            ChartState::Empty,
-        ))
-        .child(GaugeChart::new(
-            "scene.chart.gauge",
-            "Fixture occupancy",
-            ChartState::Ready(vec![
-                ChartSeries::new("occupancy", "Occupancy")
-                    .points([ChartPoint::new("now", 0.0, 0.72, "Now", "72%")]),
-            ]),
-        ))
         .into_any_element()
 }
 
@@ -595,19 +716,27 @@ pub(super) fn trace(_window: &mut Window, cx: &mut App) -> AnyElement {
     let spans = [
         TraceSpan::new("plan", "Plan", 0.00, 0.18)
             .state(SpanState::Succeeded)
+            .duration("216 ms")
             .detail("planner.finish"),
         TraceSpan::new("generate", "Generate", 0.18, 0.62)
             .depth(1)
             .state(SpanState::Running)
+            .duration("528 ms")
             .detail("model.reply"),
         TraceSpan::new("tool", "Search", 0.40, 0.55)
             .depth(2)
+            .duration("180 ms")
             .state(SpanState::Succeeded),
         TraceSpan::new("wait", "Review", 0.62, 0.80)
             .depth(1)
+            .duration("216 ms")
             .state(SpanState::Pending),
-        TraceSpan::new("fail", "Publish", 0.80, 1.00).state(SpanState::Failed),
+        TraceSpan::new("fail", "Publish", 0.80, 1.00)
+            .duration("240 ms")
+            .state(SpanState::Failed),
     ];
+    // The host owns every reading on the axis; the component only places them.
+    let ticks = [(0.25, "300 ms"), (0.5, "600 ms"), (0.75, "900 ms")];
     stack(&theme)
         .w(px(640.0))
         .child(caption(
@@ -618,6 +747,7 @@ pub(super) fn trace(_window: &mut Window, cx: &mut App) -> AnyElement {
             TraceView::new("scene.trace.view", "Fixture run")
                 .spans(spans.clone())
                 .axis("0 ms", "1.2 s")
+                .ticks(ticks)
                 .current("generate")
                 .on_select(|_, _, _| {}),
         )
@@ -625,6 +755,7 @@ pub(super) fn trace(_window: &mut Window, cx: &mut App) -> AnyElement {
             SpanTimeline::new("scene.trace.timeline", "Fixture waterfall")
                 .spans(spans)
                 .axis("0 ms", "1.2 s")
+                .ticks(ticks)
                 .current("generate")
                 .on_select(|_, _, _| {}),
         )
@@ -633,38 +764,50 @@ pub(super) fn trace(_window: &mut Window, cx: &mut App) -> AnyElement {
 
 pub(super) fn heatmap(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
+    // A quarter of weekdays, which is the shape this component is actually
+    // asked for. Four columns of five said nothing about how the grid reads
+    // once it carries a period somebody would look at.
     let days = ["Mon", "Tue", "Wed", "Thu", "Fri"];
-    let weeks = ["W1", "W2", "W3", "W4"];
-    let levels = [
-        [Some(0), Some(1), Some(2), None],
-        [Some(1), Some(3), Some(2), Some(1)],
-        [Some(4), Some(2), Some(0), Some(3)],
-        [None, Some(1), Some(4), Some(2)],
-        [Some(2), None, Some(1), Some(0)],
-    ];
+    // Week-starting dates. Each column is joined on by its own key and prints
+    // the day of the month, which is what fits over a cell; the month itself
+    // is in the caption, where a calendar puts it.
+    let starts = [6, 13, 20, 27, 3, 10, 17, 24, 3, 10, 17, 24];
+    let weeks: Vec<(String, String)> = starts
+        .iter()
+        .enumerate()
+        .map(|(column, day)| (format!("w{column}"), day.to_string()))
+        .collect();
     let mut cells = Vec::new();
     for (row, day) in days.iter().enumerate() {
         for (column, week) in weeks.iter().enumerate() {
-            let mut cell =
-                HeatCell::new(format!("{day}-{week}"), *day, *week).label(format!("{day} {week}"));
-            if let Some(level) = levels[row][column] {
-                cell = cell.level(level).value(format!("{level}"));
+            let month = ["January", "February", "March"][column / 4];
+            let mut cell = HeatCell::new(format!("{day}-{}", week.0), *day, week.0.clone())
+                .label(format!("{day}, {month} {}", week.1));
+            // Deterministic, and holed in two places so the difference between
+            // "nothing was measured" and "zero was measured" has somewhere to
+            // show itself.
+            let sample = (row * 7 + column * 3 + (column * column) % 5) % 11;
+            if sample != 4 && sample != 9 {
+                let level = (sample % 5) as u8;
+                cell = cell.level(level).value(format!("{level} runs"));
             }
             cells.push(cell);
         }
     }
     stack(&theme)
-        .w(px(420.0))
+        .w(px(560.0))
         .child(caption(
             &theme,
-            "five intensity steps; a missing cell is not a measured zero",
+            "January to March, by weekday: five intensity steps, and a missing \
+             cell is not a measured zero",
         ))
         .child(
             Heatmap::new("scene.heatmap.ready", "Fixture activity")
                 .rows(days)
-                .columns(weeks)
+                .columns(weeks.clone())
                 .cells(cells),
         )
+        .child(caption(&theme, "Nothing measured in the period at all"))
         .child(Heatmap::new("scene.heatmap.empty", "Fixture activity").state(HeatmapState::Empty))
         .into_any_element()
 }
@@ -681,6 +824,18 @@ pub(super) fn sparkline(_window: &mut Window, cx: &mut App) -> AnyElement {
         SparklinePoint::new(0.85, 0.66),
         SparklinePoint::new(1.0, 0.82),
     ];
+    // A second metric is a second shape. Two readings that draw the same
+    // curve prove only that both were handed the same fixture.
+    let queue = [
+        SparklinePoint::new(0.0, 0.72),
+        SparklinePoint::new(0.14, 0.64),
+        SparklinePoint::new(0.28, 0.80),
+        SparklinePoint::new(0.42, 0.45),
+        SparklinePoint::new(0.57, 0.38),
+        SparklinePoint::new(0.71, 0.52),
+        SparklinePoint::new(0.85, 0.30),
+        SparklinePoint::new(1.0, 0.34),
+    ];
     stack(&theme)
         .w(px(520.0))
         .child(caption(
@@ -694,14 +849,31 @@ pub(super) fn sparkline(_window: &mut Window, cx: &mut App) -> AnyElement {
                 points, "82 req/s", "20 req/s", "82 req/s",
             )),
         ))
+        .child(caption(
+            &theme,
+            "a reading that is no longer verified draws quieter, and its latest \
+             sample is a ring rather than a mark",
+        ))
         .child(Sparkline::new(
             "scene.sparkline.stale",
             "Fixture queue depth",
             SparklineState::Stale {
-                reading: SparklineReading::new(points, "34 jobs", "8 jobs", "41 jobs"),
+                reading: SparklineReading::new(queue, "34 jobs", "8 jobs", "41 jobs"),
                 reason: "The latest sample is unavailable; the verified reading remains.".into(),
             },
         ))
+        .child(caption(
+            &theme,
+            "a series the caller has already spent a colour on",
+        ))
+        .child(
+            Sparkline::new(
+                "scene.sparkline.tinted",
+                "Fixture tokens",
+                SparklineState::Ready(SparklineReading::new(points, "1.2k", "0.4k", "1.4k")),
+            )
+            .tint(identity_tint(&theme, "agent.read")),
+        )
         .into_any_element()
 }
 
@@ -753,6 +925,48 @@ pub(super) fn divider(_window: &mut Window, cx: &mut App) -> AnyElement {
         .child(caption(&theme, "Labelled, which names the group below it"))
         .child(Divider::new().id("scene.divider.labelled").label("Filters"))
         .child(Divider::new().id("scene.divider.archive").label("Archive"))
+        .child(caption(
+            &theme,
+            "Inset, for a rule inside a padded container that should not reach its \
+             corners",
+        ))
+        .child(
+            div()
+                .column()
+                .w_full()
+                .py(px(theme.space(Space::Sm)))
+                .radius(&theme, Radius::Card)
+                .surface(&theme, Surface::Panel)
+                .child(
+                    div()
+                        .px(px(theme.space(Space::Md)))
+                        .py(px(theme.space(Space::Xs)))
+                        .child(crate::foundation::text(
+                            &theme,
+                            TypeScale::Label,
+                            "Workspace",
+                        )),
+                )
+                .child(Divider::new().id("scene.divider.inset").inset(Space::Md))
+                .child(
+                    div()
+                        .px(px(theme.space(Space::Md)))
+                        .py(px(theme.space(Space::Xs)))
+                        .child(caption(&theme, "Two rows, one rule between them")),
+                ),
+        )
+        .child(caption(&theme, "Standing up, between two columns"))
+        .child(
+            div()
+                .row()
+                .items_stretch()
+                .h(px(64.0))
+                .w_full()
+                .gap(px(theme.space(Space::Md)))
+                .child(div().flex_1().child(caption(&theme, "Left column")))
+                .child(Divider::new().id("scene.divider.vertical").vertical())
+                .child(div().flex_1().child(caption(&theme, "Right column"))),
+        )
         .into_any_element()
 }
 
@@ -788,23 +1002,41 @@ pub(super) fn tag(_window: &mut Window, cx: &mut App) -> AnyElement {
             row(&theme)
                 .child(
                     Tag::new("scene.tag.ada", "Ada")
-                        .tint(identity_tint(&theme, "loader.pink"))
+                        .tint(identity_tint(&theme, "agent.external"))
                         .on_remove(|_, _| {}),
                 )
                 .child(
                     Tag::new("scene.tag.grace", "Grace")
-                        .tint(identity_tint(&theme, "loader.orange"))
+                        .tint(identity_tint(&theme, "agent.shell"))
                         .on_remove(|_, _| {}),
                 ),
         )
         .child(caption(
             &theme,
-            "Not removable, and disabled. Neither installs a handler",
+            "Read-only: nothing offers to remove it, because no handler was given",
+        ))
+        .child(row(&theme).child(Tag::new("scene.tag.plain", "read-only")))
+        .child(caption(
+            &theme,
+            "Disabled: the host refuses to act on it at all, and it dims to say so",
         ))
         .child(
-            row(&theme)
-                .child(Tag::new("scene.tag.plain", "read-only"))
-                .child(Tag::new("scene.tag.pinned", "pinned").disabled(true)),
+            row(&theme).child(
+                Tag::new("scene.tag.pinned", "pinned")
+                    .disabled(true)
+                    .on_remove(|_, _| {}),
+            ),
+        )
+        .child(caption(
+            &theme,
+            "Singled out by the keyboard, which is what the next keystroke acts on",
+        ))
+        .child(
+            row(&theme).child(
+                Tag::new("scene.tag.selected", "selected")
+                    .selected(true)
+                    .on_remove(|_, _| {}),
+            ),
         )
         .into_any_element()
 }
@@ -822,30 +1054,84 @@ pub(super) fn avatar(_window: &mut Window, cx: &mut App) -> AnyElement {
         )
         .child(caption(
             &theme,
-            "An identity tint the caller owns, and no name at all",
+            "An identity tint the caller owns, and no name at all — which is drawn \
+             as its own state rather than as a picture that failed to arrive",
         ))
         .child(
             row(&theme)
                 .child(
                     Avatar::new("Grace Hopper")
-                        .tint(identity_tint(&theme, "loader.orange"))
+                        .tint(identity_tint(&theme, "agent.shell"))
                         .id("scene.avatar.tinted"),
                 )
                 .child(Avatar::new("").id("scene.avatar.anonymous")),
+        )
+        .child(caption(
+            &theme,
+            "Presence, which the host knows and the mark does not derive. No dot at \
+             all is not the same claim as offline",
+        ))
+        .child(
+            row(&theme)
+                .gap(px(theme.space(Space::Md)))
+                .child(
+                    Avatar::new("Ada Lovelace")
+                        .presence(AvatarPresence::Online)
+                        .id("scene.avatar.online"),
+                )
+                .child(
+                    Avatar::new("Grace Hopper")
+                        .presence(AvatarPresence::Away)
+                        .id("scene.avatar.away"),
+                )
+                .child(
+                    Avatar::new("Katherine Johnson")
+                        .presence(AvatarPresence::Busy)
+                        .id("scene.avatar.busy"),
+                )
+                .child(
+                    Avatar::new("Ada Lovelace")
+                        .presence(AvatarPresence::Offline)
+                        .id("scene.avatar.offline"),
+                ),
+        )
+        .child(caption(
+            &theme,
+            "A stack, where each mark is cut out of the one behind it and the \
+             remainder is a count the host supplied",
+        ))
+        .child(
+            row(&theme).child(
+                AvatarGroup::new()
+                    .id("scene.avatar.group")
+                    .size(32.0)
+                    .members([
+                        Avatar::new("Ada Lovelace").presence(AvatarPresence::Online),
+                        Avatar::new("Grace Hopper").presence(AvatarPresence::Away),
+                        Avatar::new("Katherine Johnson"),
+                    ])
+                    .overflow("+4"),
+            ),
         )
         .child(caption(&theme, "Sizes"))
         .child(
             row(&theme)
                 .items_center()
+                .gap(px(theme.space(Space::Md)))
                 .child(
                     Avatar::new("Ada Lovelace")
-                        .size(24.0)
+                        .size(20.0)
                         .id("scene.avatar.small"),
                 )
                 .child(Avatar::new("Ada Lovelace").id("scene.avatar.default"))
                 .child(
                     Avatar::new("Ada Lovelace")
-                        .size(48.0)
+                        .size(40.0)
+                        .id("scene.avatar.medium"),
+                )
+                .child(
+                    Avatar::new("Ada Lovelace")
+                        .size(56.0)
                         .id("scene.avatar.large"),
                 ),
         )
@@ -878,7 +1164,6 @@ pub(super) fn empty_state(_window: &mut Window, cx: &mut App) -> AnyElement {
             .action(
                 Button::new("scene.empty-state.retry")
                     .label("Try again")
-                    .secondary()
                     .on_click(|_, _| {}),
             ),
         )
@@ -896,7 +1181,6 @@ pub(super) fn empty_state(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .action(
                     Button::new("scene.empty-state.reload")
                         .label("Reload")
-                        .secondary()
                         .on_click(|_, _| {}),
                 ),
         )
@@ -1049,12 +1333,29 @@ pub(super) fn outcome_panel(_window: &mut Window, cx: &mut App) -> AnyElement {
             OutcomePanel::new("scene.outcome.partial", OutcomeKind::Partial)
                 .title("Import finished, with failures")
                 .count("47 succeeded, 3 failed")
-                .detail("The three that failed are still in the queue."),
+                .detail("The three that failed are still in the queue.")
+                .action(
+                    Button::new("scene.outcome.review")
+                        .label("Review the three")
+                        .secondary()
+                        .small()
+                        .on_click(|_, _| {}),
+                ),
         )
-        .child(caption(&theme, "Did not finish"))
+        .child(caption(
+            &theme,
+            "Did not finish. What the reader can do about it is a control, not a \
+             sentence about a control",
+        ))
         .child(
             OutcomePanel::new("scene.outcome.failed", OutcomeKind::Failed)
-                .detail("The host closed the connection before any file landed."),
+                .detail("The host closed the connection before any file landed.")
+                .action(
+                    Button::new("scene.outcome.retry")
+                        .label("Import again")
+                        .small()
+                        .on_click(|_, _| {}),
+                ),
         )
         .into_any_element()
 }
@@ -1098,37 +1399,59 @@ pub(super) fn animated_number(_window: &mut Window, cx: &mut App) -> AnyElement 
     let (runs, seconds) = (counts.runs, counts.seconds);
     let theme = cx.theme().clone();
 
-    let readout = |label: &'static str, number: AnimatedNumber| {
+    // A readout is a reading, so it is drawn as one: the same card, caption
+    // and hierarchy a KPI gets. A number floating on the canvas beside its
+    // label is a debug print of the value, not a report of it.
+    let readout = |label: &'static str, detail: &'static str, number: AnimatedNumber| {
         div()
             .column()
-            .gap(px(theme.spacing.xs))
+            .flex_1()
+            .min_w_0()
+            .gap(px(theme.space(Space::Xs)))
+            .p(px(theme.space(Space::Md)))
+            .card_surface(&theme, CardVariant::Outlined)
             .child(
                 crate::foundation::text(&theme, TypeScale::Caption, label)
                     .text_tone(&theme, TextTone::Muted),
             )
             .child(number)
+            .child(
+                crate::foundation::text(&theme, TypeScale::Caption, detail)
+                    .text_tone(&theme, TextTone::Faint),
+            )
     };
 
     stack(&theme)
+        .w(px(520.0))
+        .child(caption(
+            &theme,
+            "the published value is the target, from the frame it changes",
+        ))
         .child(
-            row(&theme)
-                .gap(px(theme.spacing.xl))
-                .items_start()
+            div()
+                .row()
+                .items_stretch()
+                .w_full()
+                .gap(px(theme.space(Space::Md)))
                 .child(readout(
                     "Runs this week",
-                    AnimatedNumber::new("scene.number.runs", runs).format(grouped),
+                    "counted by the host",
+                    AnimatedNumber::new("scene.number.runs", runs)
+                        .format(grouped)
+                        .type_scale(TypeScale::Title),
                 ))
                 .child(readout(
                     "Median duration",
+                    "one decimal, the host's choice",
                     AnimatedNumber::new("scene.number.seconds", seconds)
-                        .format(|value| format!("{value:.1}s")),
+                        .format(|value| format!("{value:.1}s"))
+                        .type_scale(TypeScale::Title),
                 )),
         )
         .child(
-            row(&theme).child(
+            div().row().child(
                 Button::new("scene.number.recount")
                     .label("Recount")
-                    .secondary()
                     .on_click(|_, cx| {
                         cx.update_global::<SceneCounts, ()>(|counts, _| {
                             counts.runs += 318.0;
@@ -1137,14 +1460,6 @@ pub(super) fn animated_number(_window: &mut Window, cx: &mut App) -> AnyElement 
                         cx.refresh_windows();
                     }),
             ),
-        )
-        .child(
-            crate::foundation::text(
-                &theme,
-                TypeScale::Body,
-                "The published value is the target, from the frame it changes.",
-            )
-            .text_tone(&theme, TextTone::Muted),
         )
         .into_any_element()
 }
@@ -1320,21 +1635,39 @@ pub(super) fn icon(_window: &mut Window, cx: &mut App) -> AnyElement {
             &theme,
             "Every tone. These are facts about what a glyph reports, not decoration",
         ))
+        // At the size a glyph is actually drawn, a stroke two steps apart on
+        // the text ramp is a few pixels of difference nobody can hold side by
+        // side. Each tone is shown once large enough to be compared and once
+        // at the size it is used, on a panel so the comparison is against one
+        // ground rather than against the canvas at three different insets.
         .child(
             row(&theme)
-                .gap(px(theme.space(Space::Lg)))
+                .gap(px(theme.space(Space::Md)))
                 .children(tones.map(|(label, tone)| {
                     div()
                         .column()
                         .items_center()
                         .gap(px(theme.space(Space::Xs)))
+                        .w(px(96.0))
+                        .p(px(theme.space(Space::Sm)))
+                        .radius(&theme, Radius::Card)
+                        .surface(&theme, Surface::Panel)
                         .child(
                             IconView::named(format!("scene.icon.tone.{label}"), Icon::Info, label)
-                                .tone(tone),
+                                .tone(tone)
+                                .large(),
+                        )
+                        .child(
+                            div()
+                                .row()
+                                .gap(px(theme.space(Space::Xs)))
+                                .child(IconView::new(Icon::Check).tone(tone))
+                                .child(IconView::new(Icon::Danger).tone(tone))
+                                .child(IconView::new(Icon::Refresh).tone(tone)),
                         )
                         .child(
                             crate::foundation::text(&theme, TypeScale::Caption, label)
-                                .text_tone(&theme, TextTone::Faint),
+                                .text_tone(&theme, TextTone::Muted),
                         )
                         .into_any_element()
                 })),

@@ -366,12 +366,23 @@ impl RenderOnce for SettingsSection {
                 )
         });
 
-        let rows = self.rows.into_iter().map(|row| {
+        // Settings in one card are separate decisions, and a card that runs
+        // them together makes the reader find the boundaries by reading. A
+        // hairline between neighbours is where a card says where one ends.
+        let last = self.rows.len().saturating_sub(1);
+        let rows = self.rows.into_iter().enumerate().map(|(index, row)| {
             let row = match dimmed.clone() {
                 Some(reason) => row.inapplicable(reason),
                 None => row,
             };
-            row.render_in(&theme, cx)
+            div()
+                .w_full()
+                .when(index < last, |element| {
+                    element
+                        .border_b(px(theme.borders.hairline))
+                        .border_color(theme.colors.hairline)
+                })
+                .child(row.render_in(&theme, cx))
         });
 
         div()

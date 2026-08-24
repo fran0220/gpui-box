@@ -1187,7 +1187,7 @@ impl RenderOnce for NodeGraph {
                     .absolute()
                     .whitespace_nowrap()
                     .px(px(theme.spacing.xs * viewport.zoom))
-                    .rounded_sm()
+                    .rounded(px(theme.radius(Radius::Small) * viewport.zoom))
                     .bg(theme.colors.canvas)
                     .text_size(px(theme.typography.caption.size * viewport.zoom))
                     .text_color(theme.colors.text_muted)
@@ -1257,8 +1257,7 @@ impl RenderOnce for NodeGraph {
                         .items_center()
                         .justify_center()
                         .rounded_full()
-                        .border_1()
-                        .border_color(theme.colors.hairline_strong)
+                        .hairline_strong(&theme)
                         .bg(theme.colors.canvas)
                         .cursor_pointer()
                         .tab_index(0)
@@ -1360,14 +1359,21 @@ impl RenderOnce for NodeGraph {
                 let color = match target {
                     Some(true) => theme.colors.success,
                     Some(false) => theme.colors.danger,
-                    None if port.direction() == PortDirection::Output => theme.colors.accent,
+                    // Which way a port faces is said by two neutral weights,
+                    // not by a hue: a graph whose every output is accent-blue
+                    // spends the colour that marks a live edge on the ports
+                    // that are merely there.
+                    None if port.direction() == PortDirection::Output => theme.colors.text_muted,
                     None => theme.colors.hairline_strong,
                 };
+                // The chip is what keeps a port name off the wire that runs
+                // under it: without clearance either side the stroke touches
+                // the letterforms and the two read as one mark.
                 let label = div()
                     .absolute()
                     .whitespace_nowrap()
-                    .px(px(2.0 * viewport.zoom))
-                    .rounded_sm()
+                    .px(px(theme.spacing.xs * viewport.zoom))
+                    .rounded(px(theme.radius(Radius::Small) * viewport.zoom))
                     .bg(theme.colors.canvas)
                     .text_size(px(theme.typography.caption.size * viewport.zoom))
                     .text_color(theme.colors.text_muted)
@@ -1400,7 +1406,7 @@ impl RenderOnce for NodeGraph {
                     .w(px(diameter))
                     .h(px(diameter))
                     .rounded_full()
-                    .border_1()
+                    .border(px(theme.borders.hairline))
                     .border_color(theme.colors.canvas)
                     .bg(color)
                     .child(label);
@@ -1474,9 +1480,14 @@ impl RenderOnce for NodeGraph {
         }
 
         let mut shockwaves = Vec::new();
+        // A shockwave is a ring travelling outward. Held at one frame it is
+        // just a second outline sitting a fixed distance off the card, which
+        // reads as a selection halo that overshot rather than as motion, so
+        // under reduced motion the node's own glow carries "running" alone.
         for placed in self
             .nodes
             .iter()
+            .filter(|_| animation_phase.is_some())
             .filter(|placed| placed.node.node_state().is_busy())
             .filter(|placed| {
                 geometry
@@ -1494,16 +1505,13 @@ impl RenderOnce for NodeGraph {
             let screen = world_to_screen(bounds.origin, viewport);
             let width = bounds.size.width * viewport.zoom;
             let height = bounds.size.height * viewport.zoom;
+            let state_color = placed.node.node_state().color(&theme);
             let phases: Vec<f32> = animation_phase
                 .map(|phase| vec![phase, (phase + 0.5).rem_euclid(1.0)])
-                .unwrap_or_else(|| vec![0.35]);
+                .unwrap_or_default();
             for phase in phases {
                 let reach = (8.0 + phase * 30.0) * viewport.zoom;
-                let opacity = if animation_phase.is_some() {
-                    0.36 * (1.0 - phase).powf(1.7)
-                } else {
-                    0.18
-                };
+                let opacity = theme.effects.glow_alpha * (1.0 - phase).powf(1.7);
                 shockwaves.push(
                     div()
                         .absolute()
@@ -1512,8 +1520,8 @@ impl RenderOnce for NodeGraph {
                         .w(px(width + reach * 2.0))
                         .h(px(height + reach * 2.0))
                         .rounded(px(theme.radius(Radius::Card) * viewport.zoom + reach))
-                        .border_1()
-                        .border_color(theme.colors.accent.opacity(opacity))
+                        .border(px(theme.borders.hairline))
+                        .border_color(state_color.opacity(opacity))
                         .into_any_element(),
                 );
             }
@@ -1723,7 +1731,7 @@ impl RenderOnce for NodeGraph {
 
         let overview = self
             .minimap
-            .then(|| graph_minimap(&self.ident, &geometry, viewport, &theme, cx));
+            .then(|| graph_minimap(&self.ident, &geometry, view, &theme, cx));
         let group = selected
             .len()
             .gt(&1)
@@ -1760,7 +1768,7 @@ impl RenderOnce for NodeGraph {
                         .w(px((max.x - min.x) + 16.0))
                         .h(px((max.y - min.y) + 16.0))
                         .rounded(px(theme.radius(Radius::Card)))
-                        .border_1()
+                        .border(px(theme.borders.hairline))
                         .border_color(theme.colors.accent.opacity(0.55))
                         .into_any_element(),
                 )
@@ -1782,7 +1790,7 @@ impl RenderOnce for NodeGraph {
                             .top(px(top))
                             .w(px(width))
                             .h(px(height))
-                            .border_1()
+                            .border(px(theme.borders.hairline))
                             .border_color(theme.colors.accent.opacity(0.7))
                             .bg(theme.colors.accent.opacity(0.08))
                             .into_any_element(),
@@ -1809,7 +1817,7 @@ impl RenderOnce for NodeGraph {
 fn graph_minimap(
     ident: &Ident,
     geometry: &[NodeGeometry],
-    viewport: GraphViewport,
+    view: Option<Bounds<f32>>,
     theme: &gpui_kit_theme::Theme,
     cx: &mut App,
 ) -> AnyElement {
@@ -1845,12 +1853,30 @@ fn graph_minimap(
                         .top(relative(y))
                         .w(relative(w.max(0.04)))
                         .h(relative(h.max(0.04)))
-                        .bg(theme.colors.accent.opacity(0.7))
+                        .bg(theme.colors.loader_placeholder)
                 })
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
-    let _ = viewport;
+    // Without this rectangle the overview says where the nodes are but not
+    // where the reader is, which is the one question a minimap exists to
+    // answer.
+    let indicator = world.zip(view).map(|((min, max), view)| {
+        let width = (max.x - min.x).max(1.0);
+        let height = (max.y - min.y).max(1.0);
+        let x = ((view.origin.x - min.x) / width).clamp(0.0, 1.0);
+        let y = ((view.origin.y - min.y) / height).clamp(0.0, 1.0);
+        div()
+            .absolute()
+            .left(relative(x))
+            .top(relative(y))
+            .w(relative((view.size.width / width).clamp(0.04, 1.0 - x)))
+            .h(relative((view.size.height / height).clamp(0.04, 1.0 - y)))
+            .radius(theme, Radius::Small)
+            .border(px(theme.borders.hairline))
+            .border_color(theme.colors.text)
+            .bg(theme.colors.selected)
+    });
     div()
         .id(ident.element_id())
         .absolute()
@@ -1863,6 +1889,7 @@ fn graph_minimap(
         .elevation(theme, Elevation::Raised)
         .overflow_hidden()
         .children(marks)
+        .children(indicator)
         .semantic_in(
             cx,
             NodeSpec::new(ident.semantic_id(), Role::Status)

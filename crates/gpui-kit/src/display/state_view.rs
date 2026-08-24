@@ -65,7 +65,7 @@ impl StateView {
 
     /// How long the host says this wait has already run.
     ///
-    /// The clock stays with the host. Past [`LONG_WAIT`] the surface names
+    /// The clock stays with the host. Past eight seconds the surface names
     /// that the wait is longer than usual; it does not invent a duration.
     pub fn elapsed(mut self, elapsed: Duration) -> Self {
         self.elapsed = Some(elapsed);
@@ -123,7 +123,7 @@ impl RenderOnce for StateView {
                     ident.child("empty"),
                     cx.strings().text(StringKey::StateViewQueued),
                 )
-                .kind(EmptyKind::Unstarted)
+                .kind(EmptyKind::Queued)
                 .into_any_element()
             }),
             Phase::Blocked => self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
@@ -131,7 +131,7 @@ impl RenderOnce for StateView {
                     ident.child("empty"),
                     cx.strings().text(StringKey::StateViewBlocked),
                 )
-                .kind(EmptyKind::Unstarted)
+                .kind(EmptyKind::Blocked)
                 .into_any_element()
             }),
             Phase::Empty => self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
@@ -147,7 +147,7 @@ impl RenderOnce for StateView {
                     ident.child("empty"),
                     cx.strings().text(StringKey::StateViewCancelled),
                 )
-                .kind(EmptyKind::Empty);
+                .kind(EmptyKind::Cancelled);
                 if let Some(reason) = reason.clone() {
                     empty = empty.detail(reason);
                 }

@@ -41,8 +41,13 @@ use crate::display::badge::Tone;
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::progress::ProgressBar;
 use crate::display::status::StatusDot;
+use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text as foundation_text};
+
+/// The width of the status mark a row leads with. The overall bar is indented
+/// by it so both bars measure from the same edge.
+const STATUS_MARK: f32 = 7.0;
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -389,7 +394,9 @@ impl UploadList {
                 let id = upload.id.clone();
                 IconButton::new(
                     ident.child("cancel"),
-                    Icon::Stop,
+                    // A filled square inside a filled chip is a chip with a
+                    // hole in it; the ring reads as a control at this size.
+                    Icon::CloseCircle,
                     cx.strings()
                         .format(StringKey::UploadCancel, &[upload.name.as_ref()]),
                 )
@@ -425,6 +432,14 @@ impl UploadList {
             }
             bar
         });
+        // A bar says roughly; a number says how far. A transfer a caller may
+        // be waiting on is worth both.
+        let measure = match upload.state {
+            UploadState::Uploading {
+                fraction: Some(fraction),
+            } => Some(cx.numbers().percent(fraction)),
+            _ => None,
+        };
 
         div()
             .row()
@@ -476,7 +491,19 @@ impl UploadList {
                         _ => foundation_text(&theme, TypeScale::Caption, wording.clone())
                             .text_tone(&theme, gpui_kit_theme::TextTone::Muted),
                     })
-                    .children(bar),
+                    .children(bar.map(|bar| {
+                        div()
+                            .row()
+                            .w_full()
+                            .items_center()
+                            .gap_token(&theme, Space::Sm)
+                            .child(div().flex_1().min_w_0().child(bar))
+                            .children(measure.map(|measure| {
+                                foundation_text(&theme, TypeScale::Caption, measure)
+                                    .flex_none()
+                                    .text_tone(&theme, gpui_kit_theme::TextTone::Faint)
+                            }))
+                    })),
             )
             .children(retry)
             .children(cancel)
@@ -557,7 +584,20 @@ impl RenderOnce for UploadList {
                 element.opacity(theme.opacity.disabled)
             })
             .children(self.zone)
-            .children(progress)
+            // The overall bar starts where the per-file bars start: the row
+            // padding, plus the status mark and the gap after it. Two bars
+            // measuring the same work from different left edges read as two
+            // unrelated measurements.
+            .children(progress.map(|progress| {
+                div()
+                    .w_full()
+                    .px_token(&theme, Space::Sm)
+                    .ps(
+                        cx.layout_direction(),
+                        px(theme.space(Space::Sm) * 2.0 + STATUS_MARK),
+                    )
+                    .child(progress)
+            }))
             .child(body)
             .semantic_in(
                 cx,

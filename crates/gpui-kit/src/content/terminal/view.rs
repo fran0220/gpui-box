@@ -33,13 +33,13 @@ use gpui::{
     Style, Styled, TextRun, Window, div, fill, font, outline, point, px, relative, size,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Surface, Theme};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, Theme, TypeScale};
 
 use super::emulator::{CellColor, CellSnapshot, CursorSnapshot, SelectionKind};
 use super::input::{CellHit, SELECTION_DRAG_THRESHOLD, cell_at};
 use super::palette::resolve;
 use crate::display::empty::{EmptyKind, EmptyState};
-use crate::display::loading::PulseLoader;
+use crate::display::loading::Skeleton;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Ident, StyledExt};
 use crate::motion::keyed;
@@ -315,16 +315,33 @@ fn state_overlay(
 ) -> Option<AnyElement> {
     match state {
         TerminalState::Ready => None,
+        // A session that has not started yet is drawn in the shape of the
+        // thing that is starting: rows where the first output will land, at
+        // the top-left where a shell writes, rather than a mark in the middle
+        // of a rectangle of black that says only that something is happening
+        // somewhere.
         TerminalState::Loading => Some(slots.or_else(slot::LOADING, window, cx, |_, cx| {
+            let theme = cx.theme().clone();
             div()
                 .absolute()
                 .inset_0()
-                .flex()
-                .items_center()
-                .justify_center()
+                .column()
+                .gap_token(&theme, Space::Sm)
+                .p_token(&theme, Space::Md)
                 .child(
-                    PulseLoader::new(ident.child("loading"))
+                    Skeleton::new(ident.child("loading"))
+                        .rows(3)
+                        .row_height(theme.typography.code.line_height)
+                        .widths([0.46, 0.72, 0.28])
                         .label(cx.strings().text(StringKey::TerminalStarting)),
+                )
+                .child(
+                    div()
+                        .row()
+                        .gap_token(&theme, Space::Xs)
+                        .type_scale(&theme, TypeScale::Caption)
+                        .text_color(theme.colors.text_faint)
+                        .child(cx.strings().text(StringKey::TerminalStarting)),
                 )
                 .into_any_element()
         })),
@@ -349,19 +366,57 @@ fn state_overlay(
         }
         // An ended session keeps its output on screen and says so underneath,
         // because the last thing the program printed is usually the reason.
+        // The band is chrome and is drawn as chrome — its own surface, above a
+        // rule, in the interface's face rather than the grid's — or the reader
+        // is being shown a sentence the program never printed in the place the
+        // program prints.
         TerminalState::Error(reason) => Some(slots.or_else(slot::FAILED, window, cx, |_, cx| {
+            let theme = cx.theme().clone();
+            let strings = cx.strings().clone();
             div()
                 .absolute()
                 .bottom_0()
                 .left_0()
                 .right_0()
+                .column()
+                .child(crate::foundation::rule(&theme))
                 .child(
-                    EmptyState::new(
-                        ident.child("error"),
-                        cx.strings().text(StringKey::TerminalError),
-                    )
-                    .kind(EmptyKind::Failed)
-                    .detail(reason.clone()),
+                    div()
+                        .row()
+                        .w_full()
+                        .items_baseline()
+                        .gap_token(&theme, Space::Sm)
+                        .px_token(&theme, Space::Md)
+                        .py_token(&theme, Space::Sm)
+                        .surface(&theme, Surface::Panel)
+                        .child(
+                            gpui_kit_assets::icon(gpui_kit_assets::Icon::Danger)
+                                .size(px(theme.typography.label.line_height))
+                                .flex_none()
+                                .text_color(theme.colors.danger),
+                        )
+                        .child(
+                            crate::foundation::text(
+                                &theme,
+                                TypeScale::Label,
+                                strings.text(StringKey::TerminalError),
+                            )
+                            .flex_none(),
+                        )
+                        .child(
+                            crate::foundation::text(&theme, TypeScale::Caption, reason.clone())
+                                .min_w_0()
+                                .overflow_hidden()
+                                .text_color(theme.colors.text_muted),
+                        ),
+                )
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(ident.child("error").semantic_id(), Role::Status)
+                        .parent(ident.semantic_id())
+                        .text(strings.text(StringKey::TerminalError))
+                        .value(reason.clone())
+                        .invalid(true),
                 )
                 .into_any_element()
         })),

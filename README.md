@@ -120,6 +120,10 @@ drives a real Chromium smoke. Browser validation is single-threaded and does
 not claim screen-reader announcements. Exact support and limitations are in
 [`docs/compatibility.md`](docs/compatibility.md).
 
+`cargo run -p xtask -- performance check` enforces deterministic structural
+budgets for the 10,000-item virtualized surfaces and writes a machine-readable
+report. See [`docs/performance-testing.md`](docs/performance-testing.md).
+
 ## Imported framework and independence
 
 Framework source was filtered into this repository from

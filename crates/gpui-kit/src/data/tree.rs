@@ -40,7 +40,7 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Theme, TypeScale};
 
 use crate::data::viewport::scroll_handle;
 use crate::display::empty::{EmptyKind, EmptyState};
@@ -432,6 +432,32 @@ fn flatten(
             }
         }
     }
+}
+
+/// One cell of indent per ancestor, each carrying the line that leads back to
+/// it.
+///
+/// The indent is drawn rather than left as padding, so depth is a thing on
+/// screen a reader can follow rather than an amount of nothing they have to
+/// measure by eye. The line sits at the reading-start edge of its cell, which
+/// puts it under the ancestor's disclosure whichever way the interface reads.
+pub(crate) fn indent_guides(
+    theme: &Theme,
+    direction: LayoutDirection,
+    level: u32,
+    height: f32,
+) -> Vec<gpui::Div> {
+    (1..level)
+        .map(|_| {
+            div()
+                .w(px(theme.space(Space::Md)))
+                .h(px(height))
+                .flex_none()
+                .row_reading(direction)
+                .border_s(direction, px(theme.borders.hairline))
+                .border_color(theme.colors.hairline)
+        })
+        .collect()
 }
 
 /// What a keystroke reports: a selection, a disclosure change, or nothing.
@@ -904,13 +930,18 @@ impl Rows {
             .h(px(theme.control.get(self.size).height))
             .pe(direction, px(theme.space(Space::Sm)))
             // The indent is the only thing that says how deep a node sits, so
-            // it steps once per level from the edge reading starts at.
-            .ps(
-                direction,
-                px(theme.space(Space::Sm)
-                    + node.level.saturating_sub(1) as f32 * theme.space(Space::Md)),
-            )
+            // it steps once per level from the edge reading starts at, and
+            // each step is drawn rather than left as empty padding: a guide
+            // per ancestor is what lets a reader follow a child at the bottom
+            // of a long branch back up to the branch it belongs to.
+            .ps(direction, px(theme.space(Space::Sm)))
             .gap(px(theme.space(Space::Xs)))
+            .children(indent_guides(
+                theme,
+                direction,
+                node.level,
+                theme.control.get(self.size).height,
+            ))
             .text_color(color)
             .selected_row(theme, direction, selected)
             .when(disabled, |element| element.opacity(theme.opacity.disabled))
@@ -941,7 +972,29 @@ impl Rows {
                     .text_color(color),
             )
             .children(landing.map(|(position, accepted)| {
-                dnd::indicator(&position, accepted, DropAxis::Vertical, cx)
+                match position {
+                    // A drop *into* a node is a landing zone, and a solid ring
+                    // around a row is what focus already means here. The
+                    // dashed outline is the same mark every landing zone in
+                    // the library wears, so the two states cannot be read as
+                    // each other.
+                    DropPosition::Into(_) => {
+                        let color = if accepted {
+                            theme.colors.accent
+                        } else {
+                            theme.colors.danger
+                        };
+                        div()
+                            .absolute()
+                            .inset_0()
+                            .radius(theme, Radius::Small)
+                            .bg(color.opacity(theme.effects.selected_ring_alpha))
+                            .border(px(theme.borders.hairline))
+                            .border_dashed()
+                            .border_color(color)
+                    }
+                    position => dnd::indicator(&position, accepted, DropAxis::Vertical, cx),
+                }
             }));
 
         if let (true, Some(handler)) = (selectable, self.on_select.clone()) {
@@ -1030,26 +1083,49 @@ impl Rows {
             ),
             VisibleKind::Node => unreachable!("status rows are not nodes"),
         };
-        let color = theme.colors.text_faint;
+        let direction = cx.layout_direction();
+        let height = theme.control.get(self.size).height;
+        // Loading, unavailable and disabled are three different things, and a
+        // faint line of prose is only ever one of them. A branch that is
+        // fetching carries the library's moving mark; one that cannot be
+        // listed carries the refusal glyph and states the reason.
+        let mark: AnyElement = match node.kind {
+            VisibleKind::Loading => PulseLoader::new(ident.child("mark"))
+                .control_size(ControlSize::Xs)
+                .into_any_element(),
+            _ => icon(Icon::Danger)
+                .size(px(icon_size))
+                .text_color(theme.colors.warning)
+                .into_any_element(),
+        };
+        let color = match node.kind {
+            VisibleKind::Loading => theme.colors.text_muted,
+            _ => theme.colors.text_faint,
+        };
         motion::surface_in(
             ident.element_id(),
             theme,
             div()
                 .id(ident.element_id())
-                .row()
+                .row_reading(direction)
                 .w_full()
-                .h(px(theme.control.get(self.size).height))
-                .ps(
-                    cx.layout_direction(),
-                    px(theme.space(Space::Sm)
-                        + node.level.saturating_sub(1) as f32 * theme.space(Space::Md)),
-                )
+                .h(px(height))
+                .ps(direction, px(theme.space(Space::Sm)))
                 .gap(px(theme.space(Space::Xs)))
-                .opacity(theme.opacity.muted)
-                .child(div().flex_none().size(px(icon_size)))
+                .children(indent_guides(theme, direction, node.level, height))
+                .child(
+                    div()
+                        .flex_none()
+                        .size(px(icon_size))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .child(mark),
+                )
                 .child(
                     text(theme, TypeScale::Caption, label.clone())
                         .flex_1()
+                        .text_start(direction)
                         .text_color(color),
                 )
                 .semantic_in(

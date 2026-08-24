@@ -339,19 +339,11 @@ pub(super) fn wizard(_window: &mut Window, cx: &mut App) -> AnyElement {
                     WizardStep::new("publish", "Publish")
                         .blocked("Approval is required for this workspace."),
                 ])
-                .body(
-                    div()
-                        .p(px(theme.spacing.md))
-                        .radius(&theme, Radius::Card)
-                        .surface(&theme, Surface::Panel)
-                        .child(crate::foundation::text(
-                            &theme,
-                            TypeScale::Body,
-                            SharedString::new_static(
-                                "The body of the current step belongs to the caller.",
-                            ),
-                        )),
-                )
+                .body(crate::foundation::text(
+                    &theme,
+                    TypeScale::Body,
+                    SharedString::new_static("The body of the current step belongs to the caller."),
+                ))
                 .back_to("build")
                 .on_navigate(|_, _, _| {}),
         )

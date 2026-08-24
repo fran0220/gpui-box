@@ -28,6 +28,7 @@ use gpui_kit_theme::{ActiveTheme, Theme};
 
 use crate::foundation::{Ident, window_state};
 use crate::layout::measure;
+use crate::layout::scroll_fade::{FadeEdges, ScrollFade};
 use crate::motion::ScrollLink;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -217,52 +218,31 @@ impl RenderOnce for ScrollArea {
             .when(!bound, |element| element.track_scroll(&own_handle))
             .child(content);
 
-        // The shadow is a function of the offset and nothing else: it does not
-        // animate, it does not ask for a frame, and scrolling back up takes it
-        // away again because the offset went back. It is also information —
-        // there is content above the fold — so it is not suppressed under
-        // reduced motion.
-        let shade = self.axis.has_vertical().then(|| {
-            ScrollLink::over(px(theme.effects.edge_fade_band)).progress(px(-f32::from(offset.y)))
-        });
-        // It is a band that falls away rather than a line, because a line at
-        // the top of a scrolled region is indistinguishable from a border
-        // somebody drew around the region, and the two say opposite things:
-        // one is "there is content above this", the other is "this is where
-        // the region ends".
-        let top_shadow = shade.filter(|shade| *shade > 0.0).map(|shade| {
-            let cast = theme.colors.backdrop;
-            div()
-                .absolute()
-                .top_0()
-                .left_0()
-                .right_0()
-                .h(px(theme.effects.edge_fade_band * 0.6))
-                .bg(gpui::linear_gradient(
-                    180.0,
-                    gpui::linear_color_stop(cast.opacity(0.28 * shade), 0.0),
-                    gpui::linear_color_stop(cast.opacity(0.0), 1.0),
-                ))
-        });
-        let remaining = (f32::from(max.y) + f32::from(offset.y)).max(0.0);
-        let bottom_shade = self
-            .axis
-            .has_vertical()
-            .then(|| ScrollLink::over(px(theme.effects.edge_fade_band)).progress(px(remaining)));
-        let bottom_shadow = bottom_shade.filter(|shade| *shade > 0.0).map(|shade| {
-            let cast = theme.colors.backdrop;
-            div()
-                .absolute()
-                .bottom_0()
-                .left_0()
-                .right_0()
-                .h(px(theme.effects.edge_fade_band * 0.6))
-                .bg(gpui::linear_gradient(
-                    0.0,
-                    gpui::linear_color_stop(cast.opacity(0.28 * shade), 0.0),
-                    gpui::linear_color_stop(cast.opacity(0.0), 1.0),
-                ))
-        });
+        // Which edges hide something is a function of the offset and nothing
+        // else: it does not animate, it does not ask for a frame, and
+        // scrolling back takes it away again because the offset went back. It
+        // is information — there is content past this edge — so it is not
+        // suppressed under reduced motion.
+        //
+        // The content fades rather than a wash being laid over it. A gradient
+        // tinted with the colour of whatever is behind the region says nothing
+        // on a surface that colour does not match, which is how a scrolled
+        // panel in the dark theme came to show a hard cut through the last row
+        // of glyphs and no cue at all.
+        let band = px(theme.effects.edge_fade_band);
+        let hides = |distance: f32| ScrollLink::over(band).progress(px(distance)) > 0.0;
+        let edges = FadeEdges {
+            top: self.axis.has_vertical() && hides(-f32::from(offset.y)),
+            bottom: self.axis.has_vertical()
+                && hides((f32::from(max.y) + f32::from(offset.y)).max(0.0)),
+            left: self.axis.has_horizontal() && hides(-f32::from(offset.x)),
+            right: self.axis.has_horizontal()
+                && hides((f32::from(max.x) + f32::from(offset.x)).max(0.0)),
+        };
+        let viewport_element = ScrollFade::inside(self.ident.child("fade"))
+            .edges(edges)
+            .when(fit_height, |fade| fade.fit_height())
+            .child(viewport_element);
 
         let viewport_frame = div()
             .relative()
@@ -280,9 +260,7 @@ impl RenderOnce for ScrollArea {
             // The viewport stays the first child: the prepaint above measures
             // whichever child comes first, and it is the viewport that decides
             // whether a scrollbar is needed.
-            .child(viewport_element)
-            .children(top_shadow)
-            .children(bottom_shadow);
+            .child(viewport_element);
 
         let vertical = self.axis.has_vertical().then(|| {
             bar(
@@ -510,8 +488,22 @@ fn bar(
         })
         .flex_none()
         .group(hover_group)
-        .when(vertical, |element| element.w(px(TRACK)).h_full())
-        .when(!vertical, |element| element.h(px(TRACK)).w_full())
+        // The thumb stops short of both ends of its lane. A thumb that runs
+        // into the corner of a rounded container crosses outside the shape it
+        // is drawn in, and that corner is where the container's own radius is
+        // already saying the region stops.
+        .when(vertical, |element| {
+            element
+                .w(px(TRACK))
+                .h_full()
+                .py(px(theme.space(gpui_kit_theme::Space::Sm)))
+        })
+        .when(!vertical, |element| {
+            element
+                .h(px(TRACK))
+                .w_full()
+                .px(px(theme.space(gpui_kit_theme::Space::Sm)))
+        })
         .child(gutter)
         .into_any_element()
 }

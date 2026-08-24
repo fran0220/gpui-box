@@ -431,8 +431,35 @@ fn a_host_error_appears_next_to_its_field(cx: &mut TestAppContext) {
     );
     assert!(harness.node("form.path").expect("published").invalid);
     assert!(
+        harness
+            .node("form.path.control")
+            .expect("published")
+            .invalid,
+        "the control the message is about draws itself refused; a red \
+         sentence under an ordinary border says something else is wrong"
+    );
+    assert!(
         harness.node("form.max_bytes.error").is_none(),
         "an error belongs to one field and stays there"
+    );
+    assert!(
+        !harness
+            .node("form.encoding.control")
+            .expect("published")
+            .invalid,
+        "an error belongs to one control and stays there"
+    );
+
+    harness.update(|_, cx| {
+        form.update(cx, |form, cx| form.clear_host_errors(cx));
+    });
+    harness.frame();
+    assert!(
+        !harness
+            .node("form.path.control")
+            .expect("published")
+            .invalid,
+        "withdrawing the error withdraws the refusal it drew"
     );
 }
 

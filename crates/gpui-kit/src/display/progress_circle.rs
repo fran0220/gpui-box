@@ -127,9 +127,16 @@ impl RenderOnce for ProgressCircle {
         let diameter = (metrics.height * RING_SCALE).round();
         let stroke = theme.borders.thick;
         let radius = (diameter - stroke) / 2.0;
-        let track = theme.colors.track;
-        let signature = signature::stops(&theme);
-        let muted = signature[1].opacity(theme.opacity.muted);
+        let track = signature::track(&theme);
+        // The pace is part of the picture, not only of the caption: a
+        // stalled ring wears the warning colour and a paused one dims, so
+        // neither can pass for healthy running work at a glance.
+        let mark = match self.value.pace {
+            ProgressPace::Running => signature::mark(&theme),
+            ProgressPace::Stalled => theme.colors.warning,
+            ProgressPace::Paused => signature::mark(&theme).opacity(theme.opacity.muted),
+        };
+        let muted = signature::mark(&theme).opacity(theme.opacity.muted);
 
         // The published position is the caller's number from the frame it
         // changes; only the arc takes its time getting there.
@@ -166,7 +173,7 @@ impl RenderOnce for ProgressCircle {
                             radius,
                             stroke,
                             track,
-                            signature,
+                            mark,
                             muted,
                             None,
                             Some(phase),
@@ -175,10 +182,8 @@ impl RenderOnce for ProgressCircle {
                 )
                 .into_any_element()
         } else {
-            ring_canvas(
-                diameter, radius, stroke, track, signature, muted, drawn, None,
-            )
-            .into_any_element()
+            ring_canvas(diameter, radius, stroke, track, mark, muted, drawn, None)
+                .into_any_element()
         };
 
         let centre = self.centre.clone().map(|reading| {
@@ -237,7 +242,7 @@ fn ring_canvas(
     radius: f32,
     stroke: f32,
     track: Hsla,
-    signature: [Hsla; 3],
+    mark: Hsla,
     muted: Hsla,
     drawn: Option<f32>,
     // Where the travelling arc has got to, or `None` for the still ring that
@@ -251,17 +256,17 @@ fn ring_canvas(
             arc(window, centre, radius, stroke, 0.0, 1.0, track);
             match (drawn, phase) {
                 (Some(fraction), _) if fraction > 0.0 => {
-                    signature_arc(window, centre, radius, stroke, 0.0, fraction, signature)
+                    arc(window, centre, radius, stroke, 0.0, fraction, mark)
                 }
                 (Some(_), _) => {}
-                (None, Some(phase)) => signature_arc(
+                (None, Some(phase)) => arc(
                     window,
                     centre,
                     radius,
                     stroke,
                     phase,
                     phase + TRAVELLING_ARC,
-                    signature,
+                    mark,
                 ),
                 (None, None) => arc(window, centre, radius, stroke, 0.0, 1.0, muted),
             }
@@ -270,56 +275,13 @@ fn ring_canvas(
     .size(px(diameter))
 }
 
-/// Strokes a working arc in the three signature colours, so a ring and a bar
-/// name the same work.
-fn signature_arc(
-    window: &mut Window,
-    centre: Point<Pixels>,
-    radius: f32,
-    width: f32,
-    from: f32,
-    to: f32,
-    signature: [Hsla; 3],
-) {
-    if to <= from {
-        return;
-    }
-    let span = to - from;
-    // Three segments keep the ring on the same three stops the bar uses.
-    arc(
-        window,
-        centre,
-        radius,
-        width,
-        from,
-        from + span / 3.0,
-        signature[0],
-    );
-    arc(
-        window,
-        centre,
-        radius,
-        width,
-        from + span / 3.0,
-        from + span * 2.0 / 3.0,
-        signature[1],
-    );
-    arc(
-        window,
-        centre,
-        radius,
-        width,
-        from + span * 2.0 / 3.0,
-        to,
-        signature[2],
-    );
-}
-
 /// Strokes the part of a circle between two turns, clockwise from the top.
 ///
 /// The arc is sampled rather than swept with an elliptical segment so a
 /// partial ring and a full one are the same shape built the same way.
-fn arc(
+/// Shared with the loading family, so a spinner's ring and a progress ring
+/// are one shape at two sizes.
+pub(crate) fn arc(
     window: &mut Window,
     centre: Point<Pixels>,
     radius: f32,

@@ -36,19 +36,23 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Theme};
+use gpui_kit_theme::{ActiveTheme, Radius, Space, Theme};
 
 use crate::data::viewport::{glide_to_row, viewed_rows};
-use crate::foundation::Ident;
+use crate::foundation::{Ident, StyledExt};
 use crate::overlay::Tooltipped;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 
-/// The height of one mark's hit target, and the gap between two of them.
+/// The least height one mark's hit target is given, and the gap between two of
+/// them.
 ///
 /// The target is much taller than the line it draws, because a two-pixel line
-/// is not something a pointer can be asked to hit.
+/// is not something a pointer can be asked to hit. It is a floor rather than a
+/// height: the slots divide the rail between them, so a mark stands at the
+/// share of the surface its bucket covers rather than at a fixed offset from
+/// the top of a stack that floats in the middle of the frame.
 const SLOT: f32 = 10.0;
 const GAP: f32 = 3.0;
 
@@ -227,16 +231,21 @@ impl Outline {
         div()
             .id(ident.element_id())
             .group(hover_group.clone())
-            .h(px(SLOT))
+            // Every slot takes the same share of the rail, which is what makes
+            // the rail an index of the surface: a bucket covers an even range
+            // of it, so the mark for that range stands over it.
+            .flex_1()
+            .min_h(px(SLOT))
             .w_full()
             .flex()
             .items_center()
+            .justify_center()
             .cursor_pointer()
             .child(
                 div()
                     .h(px(MARK_HEIGHT))
                     .w(px(MARK_WIDTH))
-                    .rounded(px(MARK_HEIGHT / 2.0))
+                    .radius(theme, Radius::Pill)
                     // Only the pointer widens a mark. The one you are reading
                     // reads brighter and stays the same size, so the outline's
                     // shape does not change under you as you scroll past it.
@@ -293,11 +302,21 @@ impl RenderOnce for Outline {
         let slots = self.slots.unwrap_or_else(|| fitting(height));
         let ranges = buckets(self.marks.len(), slots);
 
+        // The rail is a container rather than a column of loose dashes: a
+        // groove the marks sit in, as tall as the surface it indexes, so a
+        // mark's place on it means the same thing as a row's place in the
+        // list beside it.
         div()
             .flex()
             .flex_col()
-            .items_start()
-            .justify_center()
+            .flex_none()
+            .items_center()
+            .h_full()
+            .w(px(MARK_WIDTH_HOVERED + 2.0 * theme.space(Space::Xs)))
+            .px_token(&theme, Space::Xs)
+            .py_token(&theme, Space::Sm)
+            .radius(&theme, Radius::Pill)
+            .bg(theme.colors.track)
             .gap(px(GAP))
             .children(
                 ranges

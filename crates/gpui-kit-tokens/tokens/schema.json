@@ -56,14 +56,12 @@
         "loader": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["gradient"],
+          "required": ["mark", "track", "placeholder", "sheen"],
           "properties": {
-            "gradient": {
-              "type": "array",
-              "minItems": 3,
-              "maxItems": 3,
-              "items": { "$ref": "#/$defs/color" }
-            }
+            "mark": { "$ref": "#/$defs/color" },
+            "track": { "$ref": "#/$defs/color" },
+            "placeholder": { "$ref": "#/$defs/color" },
+            "sheen": { "$ref": "#/$defs/color" }
           }
         },
         "syntax": { "$ref": "#/$defs/syntaxColors" },
@@ -535,6 +533,7 @@
         "focusRingAlpha",
         "glowAlpha",
         "glowBlur",
+        "glowSpread",
         "glassAlpha",
         "glassBlur",
         "glassLiquidAlpha",
@@ -557,6 +556,7 @@
         "focusRingAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
         "glowAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
         "glowBlur": { "$ref": "#/$defs/positiveNumber" },
+        "glowSpread": { "type": "number" },
         "glassAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
         "glassBlur": { "$ref": "#/$defs/positiveNumber" },
         "glassLiquidAlpha": { "type": "number", "minimum": 0, "maximum": 1 },

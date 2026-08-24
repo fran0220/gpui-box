@@ -267,19 +267,21 @@ impl CopyButton {
     fn glyph(&self) -> Icon {
         match self.state {
             CopyState::Copied => Icon::Check,
-            _ => Icon::Copy,
+            CopyState::Failed(_) => Icon::Danger,
+            CopyState::Idle => Icon::Copy,
         }
     }
 
+    /// The words on the control name the action, in every state.
+    ///
+    /// The outcome is the status line's to report, and it says it once: a
+    /// button reading "Copied" beside a line reading "Copied" is one claim
+    /// drawn twice, and a control whose words change under the pointer is a
+    /// control that changes width while it is being aimed at.
     fn button_label(&self, cx: &App) -> SharedString {
-        match &self.state {
-            CopyState::Copied => cx.strings().text(StringKey::CopyDone),
-            CopyState::Failed(_) => cx.strings().text(StringKey::CopyFailed),
-            CopyState::Idle => self
-                .label
-                .clone()
-                .unwrap_or_else(|| cx.strings().text(StringKey::Copy)),
-        }
+        self.label
+            .clone()
+            .unwrap_or_else(|| cx.strings().text(StringKey::Copy))
     }
 }
 
@@ -311,9 +313,17 @@ impl Render for CopyButton {
         let glyph = self.glyph();
         let parent = self.ident.semantic_id();
 
+        // The three answers are three chips, not one chip with three captions:
+        // a refusal takes the danger tint the rest of the library refuses in,
+        // and the confirmation is carried by the mark beside it.
+        let variant = match self.state {
+            CopyState::Failed(_) => ButtonVariant::Danger,
+            _ => self.variant,
+        };
+
         let button = Button::new(self.ident.child("action"))
             .semantic_parent(parent.clone())
-            .variant(self.variant)
+            .variant(variant)
             .control_size(self.size)
             .disabled(self.disabled)
             .track_focus(&self.focus_handle)
@@ -343,13 +353,23 @@ impl Render for CopyButton {
             CopyState::Failed(reason) => Some((reason.clone(), true)),
         };
         let status_ident = self.ident.child("status");
+        let metrics = theme.control.get(self.size);
         let status = status.map(|(text, failed)| {
-            foundation_text(&theme, TypeScale::Caption, text.clone())
-                .text_color(if failed {
-                    theme.colors.danger
-                } else {
-                    theme.colors.text_muted
-                })
+            let tone = if failed {
+                theme.colors.danger
+            } else {
+                theme.colors.success
+            };
+            div()
+                .row()
+                .flex_none()
+                .gap_token(&theme, Space::Xs)
+                .child(
+                    gpui_kit_assets::icon(if failed { Icon::Danger } else { Icon::Check })
+                        .size(px(metrics.icon_size))
+                        .text_color(tone),
+                )
+                .child(foundation_text(&theme, TypeScale::Caption, text.clone()).text_color(tone))
                 .semantic_in(
                     cx,
                     NodeSpec::new(status_ident.semantic_id(), Role::Status)

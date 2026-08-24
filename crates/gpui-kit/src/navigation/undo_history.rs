@@ -24,6 +24,9 @@ use crate::strings::ActiveNumbers;
 const RAIL_WIDTH: f32 = 20.0;
 /// The marker is local geometry: it occurs only on this rail.
 const MARKER_SIZE: f32 = 10.0;
+/// How far below the entry's own surface the marker centres on the first line
+/// of the label. Local geometry: it depends on this rail's marker alone.
+const MARKER_TOP: f32 = 5.0;
 
 type JumpHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 
@@ -243,7 +246,7 @@ fn entry_element(
         .items_center()
         .child(
             div()
-                .mt(px(5.0))
+                .mt(px(theme.space(Space::Xs) + MARKER_TOP))
                 .size(px(MARKER_SIZE))
                 .rounded_full()
                 .border(px(theme.borders.hairline))
@@ -289,10 +292,7 @@ fn entry_element(
 
     let mut content = div()
         .column()
-        .flex_1()
-        .min_w_0()
         .gap(px(2.0))
-        .pb(px(theme.space(Space::Md)))
         .child(
             foundation_text(theme, TypeScale::Label, entry.label.clone()).text_tone(
                 theme,
@@ -323,29 +323,45 @@ fn entry_element(
         );
     }
 
+    let hover_group = ident.child("hover").semantic_id();
+
+    // The surface an entry wears starts to the right of the rail, so the
+    // timeline stays continuous through the entry the document is on.
+    let surface = div()
+        .flex_1()
+        .min_w_0()
+        .column()
+        .px_token(theme, Space::Sm)
+        .py(px(theme.space(Space::Xs)))
+        .radius(theme, Radius::Control)
+        .when(selected, |element| element.bg(theme.colors.selected))
+        .when(actionable, |element| {
+            element.group_hover(hover_group.clone(), |style| style.bg(theme.colors.hover))
+        })
+        .child(content);
+
     let mut row = div()
         .id(ident.element_id())
+        .group(hover_group)
         .row()
         .items_stretch()
         .w_full()
         .gap_token(theme, Space::Sm)
         .px_token(theme, Space::Sm)
         .pt(px(theme.space(Space::Sm)))
+        .pb(px(theme.space(Space::Md)))
         .radius(theme, Radius::Control)
-        .when(selected, |element| element.bg(theme.colors.selected))
         .when(history_disabled, |element| {
             element.opacity(theme.opacity.disabled)
         })
         .child(rail)
-        .child(content);
+        .child(surface);
 
     if !disabled && handler.is_some() {
         row = row.tab_index(0).pressable(cx).focus_ring(theme);
     }
     if actionable {
-        row = row
-            .cursor_pointer()
-            .hover(|style| style.bg(theme.colors.hover));
+        row = row.cursor_pointer();
     }
 
     if let Some(handler) = handler {

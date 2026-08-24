@@ -279,7 +279,15 @@ fn retry_is_reported_and_disabled_surfaces_install_no_handlers(cx: &mut TestAppC
     failed.click("fixture.diagnostics.retry");
     assert_eq!(retries.borrow().len(), 1);
 
-    let (mut disabled, recorded) = ready(cx, "error-a", DiagnosticFilter::all(), true);
+    // One severity is left out so both filter controls are on screen: the
+    // chip for the severity that is applied, and the toggle offering the one
+    // that is not. A disabled surface draws them and installs neither.
+    let (mut disabled, recorded) = ready(
+        cx,
+        "error-a",
+        DiagnosticFilter::from_severities([DiagnosticSeverity::Error]),
+        true,
+    );
     disabled.click("fixture.diagnostics.list.error-a");
     disabled.click("fixture.diagnostics.list.error-a.action.apply");
     assert!(

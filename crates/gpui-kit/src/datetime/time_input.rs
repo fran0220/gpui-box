@@ -13,13 +13,14 @@ use gpui::{
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TextTone, TypeScale};
 
+use gpui_kit_assets::Icon;
+
+use crate::controls::button::{ButtonJoin, IconButton};
 use crate::controls::field::{FieldState, field_shell};
 use crate::datetime::adapter::{Clock, SharedDateAdapter, TimeOfDay};
 use crate::foundation::direction::ActiveDirection;
 use crate::foundation::stepping::bounded_step;
-use crate::foundation::{
-    Disableable, FocusRing, Ident, Sizable, StyledExt, text as foundation_text,
-};
+use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text as foundation_text};
 use crate::strings::{ActiveStrings, StringKey};
 
 /// Which part of the time the keyboard is on.
@@ -320,24 +321,54 @@ impl Focusable for TimeInput {
 impl Render for TimeInput {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
+        let metrics = theme.control.get(self.size);
         let focused = self.focus_handle.is_focused(window);
         let segments = self.segments();
         let last = segments.len().saturating_sub(1);
+        // Every segment holds two characters, so every segment is the same
+        // width. Sizing each one to its own glyphs is what put the colons of
+        // one field at different places from the colons of the field beside
+        // it.
+        let cell_width = px(metrics.font_size * 2.0);
 
-        let cells: Vec<gpui::AnyElement> = segments
-            .iter()
-            .enumerate()
-            .map(|(index, segment)| {
-                let segment = *segment;
-                let ident = self.ident.child(segment.key());
-                let text = self.segment_text(segment);
-                let active = self.active == segment && focused;
-                let (min, max) = self.bounds(segment);
+        // The mark between two segments, and the same mark drawn in nothing
+        // so the caption row keeps the columns the value row set.
+        let separator = |index: usize, visible: bool| {
+            (index != last && segments[index] != Segment::Meridiem).then(|| {
+                foundation_text(
+                    &theme,
+                    TypeScale::Body,
+                    if segments[index + 1] == Segment::Meridiem {
+                        SharedString::new_static(" ")
+                    } else {
+                        SharedString::new_static(":")
+                    },
+                )
+                .flex_none()
+                .text_color(match visible {
+                    true => theme.colors.text_faint,
+                    false => gpui::transparent_black(),
+                })
+                .into_any_element()
+            })
+        };
 
-                let cell = div()
+        let mut cells: Vec<gpui::AnyElement> = Vec::new();
+        let mut labels: Vec<gpui::AnyElement> = Vec::new();
+        for (index, segment) in segments.iter().copied().enumerate() {
+            let ident = self.ident.child(segment.key());
+            let text = self.segment_text(segment);
+            let active = self.active == segment && focused;
+            let (min, max) = self.bounds(segment);
+
+            cells.push(
+                div()
                     .id(ident.element_id())
-                    .px(px(theme.space(Space::Xs)))
-                    .rounded(px(theme.radii.small))
+                    .flex_none()
+                    .w(cell_width)
+                    .flex()
+                    .justify_center()
+                    .radius(&theme, gpui_kit_theme::Radius::Small)
                     .when(active, |element| element.bg(theme.colors.selected))
                     .when(!self.disabled, |element| {
                         element.cursor_pointer().on_click(cx.listener(
@@ -367,38 +398,84 @@ impl Render for TimeInput {
                             .range(min as f32, max as f32, self.raw(segment) as f32)
                             .selected(active),
                     )
-                    .into_any_element();
+                    .into_any_element(),
+            );
+            cells.extend(separator(index, true));
 
-                if index == last || segment == Segment::Meridiem {
-                    cell
-                } else {
-                    div()
-                        .row()
-                        .child(cell)
-                        .child(
-                            foundation_text(
-                                &theme,
-                                TypeScale::Body,
-                                if segments[index + 1] == Segment::Meridiem {
-                                    SharedString::new_static(" ")
-                                } else {
-                                    SharedString::new_static(":")
-                                },
-                            )
-                            .text_tone(&theme, TextTone::Faint),
+            labels.push(
+                div()
+                    .flex_none()
+                    .w(cell_width)
+                    .flex()
+                    .justify_center()
+                    .child(
+                        foundation_text(
+                            &theme,
+                            TypeScale::Caption,
+                            cx.strings().text(segment.label()),
                         )
-                        .into_any_element()
-                }
-            })
-            .collect();
+                        .text_tone(
+                            &theme,
+                            match active {
+                                true => TextTone::Primary,
+                                false => TextTone::Faint,
+                            },
+                        ),
+                    )
+                    .into_any_element(),
+            );
+            labels.extend(separator(index, false));
+        }
+
+        // The two arrows step the segment the keyboard is on, which is the
+        // same thing the up and down keys do. Without them the field says
+        // nothing about being adjustable at all.
+        let control = cx.entity().downgrade();
+        let steppers = (!self.disabled).then(|| {
+            let stepper = control.clone();
+            let up = IconButton::new(
+                self.ident.child("increment"),
+                Icon::ArrowUp,
+                cx.strings().text(StringKey::NumberIncrease),
+            )
+            .secondary()
+            .join(ButtonJoin::Leading)
+            .control_size(self.size)
+            .semantic_parent(self.ident.semantic_id())
+            .on_click(move |_window, cx| {
+                stepper.update(cx, |input, cx| input.step(1, cx)).ok();
+            });
+            let stepper = control.clone();
+            let down = IconButton::new(
+                self.ident.child("decrement"),
+                Icon::ArrowDown,
+                cx.strings().text(StringKey::NumberDecrease),
+            )
+            .secondary()
+            .join(ButtonJoin::Trailing)
+            .control_size(self.size)
+            .semantic_parent(self.ident.semantic_id())
+            .on_click(move |_window, cx| {
+                stepper.update(cx, |input, cx| input.step(-1, cx)).ok();
+            });
+            div().row().flex_none().child(up).child(down)
+        });
 
         div()
             .id(self.ident.element_id())
+            .column()
+            .flex_none()
+            .gap_token(&theme, Space::Xs)
             .track_focus(&self.focus_handle)
-            .when(!self.disabled, |element| {
-                element.tab_index(0).focus_ring(&theme)
-            })
+            .when(!self.disabled, |element| element.tab_index(0))
             .on_key_down(cx.listener(Self::on_key_down))
+            .child(
+                div()
+                    .row()
+                    // The captions start where the field's own content starts.
+                    .px(px(metrics.padding_x))
+                    .children(labels),
+            )
             .child(
                 field_shell(
                     &theme,
@@ -407,7 +484,9 @@ impl Render for TimeInput {
                         .focused(focused)
                         .disabled(self.disabled),
                 )
-                .children(cells),
+                .children(cells)
+                .child(div().flex_1())
+                .children(steppers),
             )
             .semantic_in(
                 cx,

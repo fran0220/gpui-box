@@ -703,7 +703,7 @@ impl Render for Gallery {
                             .items_center()
                             .gap(px(theme.spacing.xl))
                             .child(PulseLoader::new("gallery.pulse"))
-                            .child(GradientSpinner::new("gallery.gradient"))
+                            .child(Spinner::new("gallery.spinner"))
                             .child(
                                 div()
                                     .w(px(220.0))
@@ -1551,7 +1551,7 @@ fn lower_gallery(theme: &Theme, cx: &mut App) -> gpui::AnyElement {
                             .items_center()
                             .gap(px(theme.spacing.xl))
                             .child(PulseLoader::new("lower.pulse"))
-                            .child(GradientSpinner::new("lower.gradient"))
+                            .child(Spinner::new("lower.spinner"))
                             .child(
                                 div()
                                     .w(px(260.0))

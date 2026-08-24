@@ -38,6 +38,7 @@ use gpui::{
     IntoElement, ParentElement, RenderOnce, SharedString, StatefulInteractiveElement, Styled,
     StyledText, Window, div, prelude::FluentBuilder, px,
 };
+use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{
     ActiveTheme, Elevation, Radius, Space, Surface, SyntaxColor, Theme, TypeScale,
@@ -923,15 +924,23 @@ impl Painter {
         for block in blocks {
             column = column.child(self.block(block, window, cx));
         }
+        // A quote is a rail and a recess, not a line: the code block beside it
+        // is drawn with a border of the same weight, and two blocks separated
+        // only by what is inside them read as one kind of thing.
         div()
             .row()
             .items_stretch()
             .w_full()
             .gap_token(&theme, Space::Sm)
+            .py_token(&theme, Space::Xs)
+            .pr(px(theme.space(Space::Sm)))
+            .radius(&theme, Radius::Small)
+            .surface(&theme, Surface::Sunken)
             .child(
                 div()
-                    .w(px(theme.borders.thick))
+                    .w(px(theme.effects.selection_rail_width))
                     .flex_none()
+                    .radius(&theme, Radius::Pill)
                     .bg(theme.colors.hairline_strong),
             )
             .child(
@@ -970,11 +979,33 @@ impl Painter {
         cx: &mut App,
     ) -> AnyElement {
         let theme = self.theme.clone();
-        let marker = match (entry.task, ordered) {
-            (Some(true), _) => SharedString::new_static("☑"),
-            (Some(false), _) => SharedString::new_static("☐"),
-            (None, true) => cx.numbers().ordinal(start + offset as u64),
-            (None, false) => SharedString::new_static("•"),
+        // A tick is drawn, not typed. The box characters CommonMark suggests
+        // are outside every face this library bundles, so a document that used
+        // them rendered its task list as two missing-glyph boxes on any
+        // machine without a font that happened to cover them.
+        let marker: AnyElement = match (entry.task, ordered) {
+            (Some(checked), _) => gpui_kit_assets::icon(if checked {
+                Icon::CheckboxChecked
+            } else {
+                Icon::CheckboxEmpty
+            })
+            .size(px(theme.typography.body.line_height))
+            .text_color(if checked {
+                theme.colors.text_muted
+            } else {
+                theme.colors.text_faint
+            })
+            .into_any_element(),
+            (None, true) => div()
+                .type_scale(&theme, TypeScale::Body)
+                .text_color(theme.colors.text_faint)
+                .child(cx.numbers().ordinal(start + offset as u64))
+                .into_any_element(),
+            (None, false) => div()
+                .type_scale(&theme, TypeScale::Body)
+                .text_color(theme.colors.text_faint)
+                .child(SharedString::new_static("•"))
+                .into_any_element(),
         };
 
         let mut body = div()
@@ -994,9 +1025,11 @@ impl Painter {
             .child(
                 div()
                     .flex_none()
+                    .flex()
+                    .items_center()
+                    .justify_center()
                     .min_w(px(18.0))
-                    .type_scale(&theme, TypeScale::Body)
-                    .text_color(theme.colors.text_faint)
+                    .h(px(theme.typography.body.line_height))
                     .child(marker),
             )
             .child(body);

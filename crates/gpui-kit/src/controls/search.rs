@@ -13,9 +13,9 @@
 use gpui::{
     App, AppContext as _, Context, Entity, EventEmitter, FocusHandle, Focusable,
     InteractiveElement, IntoElement, ParentElement, Render, SharedString, Styled, Subscription,
-    Window, div,
+    Window, div, px,
 };
-use gpui_kit_assets::Icon;
+use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TypeScale};
 
@@ -207,6 +207,19 @@ impl SearchField {
     }
 
     /// The count the host established. The field counts nothing itself.
+    /// Offers the match-case toggle, or withdraws it, after construction.
+    /// The state stays the host's; the field only draws it.
+    pub fn set_match_case(&mut self, on: Option<bool>, cx: &mut Context<Self>) {
+        self.match_case = on;
+        cx.notify();
+    }
+
+    /// Offers the whole-word toggle, or withdraws it, after construction.
+    pub fn set_whole_word(&mut self, on: Option<bool>, cx: &mut Context<Self>) {
+        self.whole_word = on;
+        cx.notify();
+    }
+
     pub fn set_count(&mut self, count: HitCount, cx: &mut Context<Self>) {
         self.count = count;
         cx.notify();
@@ -327,6 +340,20 @@ impl Render for SearchField {
         })
         .collect::<Vec<_>>();
 
+        let clear = (!self.disabled && !self.query.read(cx).is_empty()).then(|| {
+            let query = self.query.downgrade();
+            IconButton::new(
+                self.ident.child("clear"),
+                Icon::Close,
+                cx.strings().text(StringKey::SearchClear),
+            )
+            .semantic_parent(self.ident.semantic_id())
+            .control_size(self.size)
+            .on_click(move |_, cx| {
+                query.update(cx, |query, cx| query.set_value("", cx)).ok();
+            })
+        });
+
         div()
             .id(self.ident.element_id())
             .row_reading(direction)
@@ -336,6 +363,14 @@ impl Render for SearchField {
             .py_token(&theme, Space::Xs)
             .radius(&theme, Radius::Card)
             .frame(&theme, Surface::Panel, Elevation::Raised)
+            // A search field that carries no magnifier is a text field, and a
+            // query with no way out has to be selected and deleted by hand.
+            .child(
+                icon(Icon::Magnifier)
+                    .size(px(theme.control.get(self.size).icon_size))
+                    .flex_none()
+                    .text_color(theme.colors.text_faint),
+            )
             .child(
                 div().flex_1().min_w_0().child(self.query.clone()).child(
                     div().absolute().size_0().semantic_in(
@@ -366,6 +401,7 @@ impl Render for SearchField {
                             .busy(self.count == HitCount::Counting),
                     ),
             )
+            .children(clear)
             .children(toggles)
             .child(self.step_control(
                 "previous",
@@ -410,6 +446,10 @@ pub enum FindReplaceEvent {
     ReplaceAll {
         count: usize,
     },
+    /// The typist asked for the surface to go away. It stays until the host
+    /// takes it away, because whether there is anywhere to go back to is not
+    /// something a bar can know.
+    Close,
 }
 
 impl EventEmitter<FindReplaceEvent> for FindReplace {}
@@ -576,6 +616,27 @@ impl Render for FindReplace {
             control
         };
 
+        let close = {
+            let ident = self.ident.child("close");
+            let mut control = IconButton::new(
+                ident,
+                Icon::Close,
+                cx.strings().text(StringKey::FindReplaceClose),
+            )
+            .semantic_parent(self.ident.semantic_id())
+            .control_size(self.size)
+            .disabled(self.disabled);
+            if !self.disabled {
+                let surface = cx.entity().downgrade();
+                control = control.on_click(move |_, cx| {
+                    surface
+                        .update(cx, |_, cx| cx.emit(FindReplaceEvent::Close))
+                        .ok();
+                });
+            }
+            control
+        };
+
         let uncountable = counted.is_none().then(|| {
             let ident = self.ident.child("replace-all.reason");
             foundation_text(
@@ -597,7 +658,15 @@ impl Render for FindReplace {
             .column()
             .w_full()
             .gap_token(&theme, Space::Sm)
-            .child(self.search.clone())
+            .child(
+                div()
+                    .row_reading(direction)
+                    .w_full()
+                    .items_center()
+                    .gap_token(&theme, Space::Sm)
+                    .child(div().flex_1().min_w_0().child(self.search.clone()))
+                    .child(close),
+            )
             .child(
                 div()
                     .row_reading(direction)
@@ -607,8 +676,16 @@ impl Render for FindReplace {
                         div()
                             .flex_1()
                             .min_w_0()
+                            .flex()
+                            .items_center()
                             .px_token(&theme, Space::Sm)
                             .py_token(&theme, Space::Xs)
+                            // The two rows are the same bar twice. Left to
+                            // their contents they differed by four pixels,
+                            // which is enough to read as a mistake.
+                            .min_h(px(
+                                theme.control.get(self.size).height + 2.0 * theme.space(Space::Xs)
+                            ))
                             .radius(&theme, Radius::Card)
                             .frame(&theme, Surface::Panel, Elevation::Raised)
                             .child(self.replacement.clone()),

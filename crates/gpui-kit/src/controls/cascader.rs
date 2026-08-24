@@ -424,16 +424,18 @@ impl Cascader {
         let hover_group = ident.child("hover").semantic_id();
         let active = self.active.as_ref() == Some(&option.id);
         let expanded = self.open_path.contains(&option.id);
+        let chosen = self.selected.as_ref() == Some(&option.id);
         let id = option.id.clone();
         let mut spec = NodeSpec::new(ident.semantic_id(), Role::Option)
             .parent(column.semantic_id())
             .text(option.label.clone())
             .hovered(active)
+            .selected(chosen)
             .disabled(option.disabled);
         if option.children.is_some() {
             spec = spec.expanded(expanded);
         }
-        popover::menu_row(&theme, false, active)
+        popover::menu_row(&theme, chosen, active)
             .id(ident.element_id())
             .group(hover_group.clone())
             .row_reading(direction)
@@ -441,19 +443,30 @@ impl Cascader {
             .child(popover::menu_label_state(
                 &theme,
                 option.label.clone(),
-                false,
+                chosen,
                 active,
                 option.disabled,
                 hover_group,
             ))
+            .child(div().flex_1())
+            // The value the trigger reports is marked where it lives, so a
+            // reader can tell which of the highlighted row and the trigger is
+            // the choice and which is merely where the keyboard is.
+            .when(chosen, |row| {
+                row.child(
+                    icon(Icon::Check)
+                        .size(px(theme.control.get(self.size).icon_size))
+                        .text_color(theme.colors.accent),
+                )
+            })
             .when(option.children.is_some(), |row| {
-                row.child(div().flex_1()).child(
+                row.child(
                     icon(if direction.is_rtl() {
                         Icon::AltArrowLeft
                     } else {
                         Icon::AltArrowRight
                     })
-                    .size(px(14.0))
+                    .size(px(theme.control.get(self.size).icon_size))
                     .text_color(theme.colors.text_muted),
                 )
             })
@@ -595,6 +608,16 @@ impl Cascader {
                 Some(Loadable::Ready(children)) => options = children,
                 _ => break,
             }
+        }
+        // A cascader that highlights a branch and shows nothing beside it has
+        // said the branch is closed. The column the highlight implies is
+        // drawn, which is also what the keyboard is about to walk into.
+        if let Some(active) = self.active.as_ref()
+            && !self.open_path.contains(active)
+            && let Some(option) = options.iter().find(|option| &option.id == active)
+            && option.children.is_some()
+        {
+            columns.push(self.state_column(option, window, cx));
         }
         let card = popover::card_flush(&theme)
             .p(px(theme.space(Space::Xs)))

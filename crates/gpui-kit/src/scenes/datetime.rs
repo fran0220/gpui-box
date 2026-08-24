@@ -153,14 +153,36 @@ pub(super) fn date_range(window: &mut Window, cx: &mut App) -> AnyElement {
         dates.preview.clone(),
         dates.blocked.clone(),
     );
+    // The first two ranges report the same thing, because they are the same
+    // range; what differs is that the pointer is over a day in the second, so
+    // the caption has to say which picture is which.
+    let column = |caption: &'static str, picker: AnyElement| {
+        div()
+            .column()
+            .gap(px(theme.space(Space::Xs)))
+            .child(
+                crate::foundation::text(&theme, TypeScale::Caption, caption)
+                    .text_tone(&theme, TextTone::Muted),
+            )
+            .child(picker)
+    };
     stack(&theme)
         .child(
             row(&theme)
                 .items_start()
                 .gap(px(theme.space(Space::Lg)))
-                .child(incomplete)
-                .child(preview)
-                .child(blocked),
+                .child(column(
+                    "a start with no end yet",
+                    incomplete.into_any_element(),
+                ))
+                .child(column(
+                    "the same start, previewing the end under the pointer",
+                    preview.into_any_element(),
+                ))
+                .child(column(
+                    "a finished range with a blocked day inside it",
+                    blocked.into_any_element(),
+                )),
         )
         .into_any_element()
 }

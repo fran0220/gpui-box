@@ -48,6 +48,9 @@ use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 /// How tall the frame is when the caller says nothing.
 const DEFAULT_HEIGHT: f32 = 320.0;
 
+/// How tall the frame is when it holds a sentence rather than a model.
+const SENTENCE_HEIGHT: f32 = 112.0;
+
 /// How much of the shorter side of the frame the model's own sphere fills.
 const FIT: f32 = 0.42;
 
@@ -282,11 +285,23 @@ impl RenderOnce for ModelViewer {
             pitch: self.pitch.clamp(-PITCH_LIMIT, PITCH_LIMIT),
         };
 
+        // A frame with a model in it, or one waiting for the model that will
+        // fill it, keeps the shape it was given. A refusal and an empty
+        // document have nothing that wants that shape, so they take the height
+        // of the sentence in them: a viewport kept at full height around two
+        // lines of text is mostly a claim that something is about to appear
+        // there.
+        let vacant = matches!(self.state, ModelState::Rejected(_) | ModelState::Empty);
+        let height = if vacant {
+            self.height.min(SENTENCE_HEIGHT)
+        } else {
+            self.height
+        };
         let mut frame = div()
             .id(ident.child("frame").element_id())
             .relative()
             .w_full()
-            .h(px(self.height))
+            .h(px(height))
             .overflow_hidden()
             .radius(&theme, Radius::Card)
             .frame(&theme, Surface::Sunken, Elevation::Flat);
@@ -297,11 +312,14 @@ impl RenderOnce for ModelViewer {
                     div()
                         .absolute()
                         .inset_0()
+                        // Geometry is not information: a face is drawn in the
+                        // neutral the shading ramp is built from, and what the
+                        // reader is being told about the model is its shape.
                         .child(paint(
                             Rc::clone(scene),
                             camera,
                             self.shading,
-                            theme.colors.accent,
+                            theme.colors.text_muted,
                             theme.colors.hairline_strong,
                         ))
                         // Where the camera stands is published only where
@@ -330,6 +348,7 @@ impl RenderOnce for ModelViewer {
                 frame = frame.child(notice(
                     &theme,
                     theme.colors.text_muted,
+                    None,
                     self.title
                         .clone()
                         .unwrap_or_else(|| strings.text(StringKey::ModelEmpty)),
@@ -340,6 +359,7 @@ impl RenderOnce for ModelViewer {
                 frame = frame.child(notice(
                     &theme,
                     theme.colors.text_muted,
+                    None,
                     strings.text(StringKey::ModelEmpty),
                     strings.text(StringKey::ModelEmptyDetail),
                 ));
@@ -348,6 +368,7 @@ impl RenderOnce for ModelViewer {
                 frame = frame.child(notice(
                     &theme,
                     theme.colors.danger,
+                    None,
                     strings.text(StringKey::ModelRefused),
                     refusal(&strings, *error, cx),
                 ));
@@ -802,6 +823,22 @@ fn paint(
                     }
                 };
                 window.paint_path(path, color);
+                if wireframe {
+                    continue;
+                }
+                // Two filled triangles that share an edge each antialias their
+                // own side of it, and the two half-covered runs do not add back
+                // to one: the join shows as a lighter seam across a face that
+                // is one flat surface. Stroking the same outline in the same
+                // colour closes it.
+                let mut edge = PathBuilder::stroke(px(1.0));
+                edge.move_to(face.corners[0]);
+                edge.line_to(face.corners[1]);
+                edge.line_to(face.corners[2]);
+                edge.close();
+                if let Ok(edge) = edge.build() {
+                    window.paint_path(edge, color);
+                }
             }
         },
     )

@@ -37,6 +37,7 @@ use gpui::{
     AnyElement, App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
+use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Surface, Theme, TypeScale};
 use web_time::Instant;
@@ -374,7 +375,11 @@ impl MessageList {
     /// estimate: what a message nobody has laid out yet is assumed to be, so a
     /// scrollbar starts roughly right rather than starting wrong.
     fn row_height(&self, theme: &Theme) -> f32 {
-        theme.space(Space::Sm) * 2.0
+        // The gap between two message surfaces, then the surface's own
+        // padding: a slot that counted only one of them would cut the last
+        // line of every message it held.
+        theme.space(Space::Xs) * 2.0
+            + theme.space(Space::Sm) * 2.0
             + theme.typography.caption.line_height
             + theme.space(Space::Xs) * 2.0
             + theme.typography.body.line_height * self.body_lines.unwrap_or(3) as f32
@@ -778,7 +783,13 @@ fn row(
         .w_full()
         .gap_token(&theme, Space::Sm)
         .h(px(theme.control.get(ControlSize::Sm).height))
-        .child(delivery_mark(&ident, &message.delivery, &theme, cx));
+        .child(delivery_mark(
+            &ident,
+            &message.delivery,
+            message.streaming,
+            &theme,
+            cx,
+        ));
 
     // What the slot cut off is reported next to the delivery mark rather than
     // under the body: the body is clipped to the slot, so a note drawn after
@@ -810,14 +821,25 @@ fn row(
     }
 
     let _ = window;
+    // Every message is a surface of its own. Without one the byline, the body
+    // and the delivery mark are three runs of text at the same left edge, and
+    // which message a status line belongs to is a question about vertical
+    // distance: a reader counting gaps had already been told the wrong thing.
     div()
-        .column()
         .w_full()
-        .gap_token(&theme, Space::Xs)
-        .py_token(&theme, Space::Sm)
-        .child(header)
-        .child(body)
-        .child(footer)
+        .py_token(&theme, Space::Xs)
+        .child(
+            div()
+                .column()
+                .w_full()
+                .gap_token(&theme, Space::Xs)
+                .p_token(&theme, Space::Sm)
+                .radius(&theme, Radius::Card)
+                .surface(&theme, Surface::Raised)
+                .child(header)
+                .child(body)
+                .child(footer),
+        )
         .into_any_element()
 }
 
@@ -842,9 +864,26 @@ fn truncation_mark(ident: &Ident, hidden: usize, theme: &Theme, cx: &mut App) ->
         cx.numbers().plural(hidden),
         &[digits.as_ref()],
     );
+    // Lines the slot cut off are the one thing in this footer a reader may
+    // want to act on, so the note is a chip like the others rather than the
+    // faintest text on the row — a mark quieter than an attachment name was
+    // announcing the missing content less loudly than the content present.
     div()
+        .flex_none()
+        .row()
+        .items_center()
+        .gap_token(theme, Space::Xs)
+        .px_token(theme, Space::Xs)
+        .radius(theme, Radius::Small)
+        .surface(theme, Surface::Sunken)
+        .hairline(theme)
         .type_scale(theme, TypeScale::Caption)
-        .text_color(theme.colors.text_faint)
+        .text_color(theme.colors.text_muted)
+        .child(
+            icon(Icon::AltArrowDown)
+                .size(px(theme.typography.caption.line_height))
+                .text_color(theme.colors.text_muted),
+        )
         .child(label.clone())
         .semantic_in(
             cx,
@@ -935,8 +974,24 @@ fn streaming_mark(ident: &Ident, theme: &Theme, cx: &mut App) -> AnyElement {
         .into_any_element()
 }
 
-fn delivery_mark(ident: &Ident, state: &DeliveryState, theme: &Theme, cx: &mut App) -> AnyElement {
-    let label = state.label(cx.strings());
+/// The mark that says where a message got to.
+///
+/// A message still being written has been handed over exactly as a queued one
+/// has, so the state is the same and the wording is not: two messages in
+/// visibly different situations reading the same word told the reader less
+/// than the host knew. The node keeps the state's own name, so an assertion
+/// reads the delivery rather than the sentence drawn for it.
+fn delivery_mark(
+    ident: &Ident,
+    state: &DeliveryState,
+    writing: bool,
+    theme: &Theme,
+    cx: &mut App,
+) -> AnyElement {
+    let label = match (state, writing) {
+        (DeliveryState::Sending, true) => cx.strings().text(StringKey::MessageWriting),
+        _ => state.label(cx.strings()),
+    };
     let tone = state.tone();
     div()
         .row()
@@ -969,9 +1024,11 @@ fn attachment_chip(
         None => attachment.name.clone(),
     };
     div()
+        .flex_none()
         .px_token(theme, Space::Xs)
         .radius(theme, Radius::Small)
-        .surface(theme, Surface::Raised)
+        .surface(theme, Surface::Sunken)
+        .hairline(theme)
         .type_scale(theme, TypeScale::Caption)
         .text_color(theme.colors.text_muted)
         .child(text.clone())
@@ -996,9 +1053,11 @@ fn reaction_chip(ident: &Ident, reaction: &Reaction, theme: &Theme, cx: &mut App
         .numbers()
         .labelled_count(reaction.label.as_ref(), reaction.count);
     div()
+        .flex_none()
         .px_token(theme, Space::Xs)
         .radius(theme, Radius::Pill)
-        .bg(theme.colors.raised)
+        .surface(theme, Surface::Sunken)
+        .hairline(theme)
         .type_scale(theme, TypeScale::Caption)
         .text_color(theme.colors.text_muted)
         .child(text.clone())

@@ -95,12 +95,114 @@ type EditRequestHandler = Rc<dyn Fn(SharedString, SharedString, &mut Window, &mu
 type EditHandler = Rc<dyn Fn(&EditIntent, &mut Window, &mut App)>;
 type RangeHandler = Rc<dyn Fn(&CellRange, &mut Window, &mut App)>;
 type CopyHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
-type RangeCover = (
-    CellRange,
-    usize,
-    HashSet<SharedString>,
-    HashSet<SharedString>,
-);
+type RangeCover = (CellRange, usize, RangeMask);
+
+/// Which cells a caller's rectangle covers, and where its boundary runs.
+///
+/// The wash alone cannot say where the rectangle ends: a selected row already
+/// carries one, so a covered cell and an uncovered cell in the same selected
+/// row are the same colour. The boundary is what names the rectangle, and it
+/// needs the first and last row and column rather than a membership test.
+#[derive(Clone, Default)]
+struct RangeMask {
+    rows: HashSet<SharedString>,
+    cols: HashSet<SharedString>,
+    first_row: Option<SharedString>,
+    last_row: Option<SharedString>,
+    first_col: Option<SharedString>,
+    last_col: Option<SharedString>,
+}
+
+impl RangeMask {
+    fn covers(&self, row: &SharedString, column: &SharedString) -> bool {
+        self.rows.contains(row) && self.cols.contains(column)
+    }
+
+    fn edges(&self, row: &SharedString, column: &SharedString) -> RangeEdges {
+        RangeEdges {
+            top: self.first_row.as_ref() == Some(row),
+            bottom: self.last_row.as_ref() == Some(row),
+            start: self.first_col.as_ref() == Some(column),
+            end: self.last_col.as_ref() == Some(column),
+        }
+    }
+}
+
+/// Which sides of a covered cell sit on the rectangle's boundary.
+#[derive(Debug, Clone, Copy, Default)]
+struct RangeEdges {
+    top: bool,
+    bottom: bool,
+    start: bool,
+    end: bool,
+}
+
+/// A cell inside the caller's rectangle: the same wash a selected row wears,
+/// and the boundary of the rectangle drawn where this cell is on it.
+///
+/// The boundary is absolutely positioned rather than a border, so a cell that
+/// joins the rectangle does not move its own content by a pixel.
+fn range_cell<E: Styled + ParentElement + FluentBuilder>(
+    element: E,
+    theme: &Theme,
+    edges: RangeEdges,
+    rtl: bool,
+) -> E {
+    let line = px(theme.borders.hairline);
+    let color = theme.colors.accent;
+    let (leading, trailing) = if rtl {
+        (edges.end, edges.start)
+    } else {
+        (edges.start, edges.end)
+    };
+    element
+        .relative()
+        .bg(theme.colors.selected)
+        .when(edges.top, |element| {
+            element.child(
+                div()
+                    .absolute()
+                    .top_0()
+                    .left_0()
+                    .right_0()
+                    .h(line)
+                    .bg(color),
+            )
+        })
+        .when(edges.bottom, |element| {
+            element.child(
+                div()
+                    .absolute()
+                    .bottom_0()
+                    .left_0()
+                    .right_0()
+                    .h(line)
+                    .bg(color),
+            )
+        })
+        .when(leading, |element| {
+            element.child(
+                div()
+                    .absolute()
+                    .top_0()
+                    .bottom_0()
+                    .left_0()
+                    .w(line)
+                    .bg(color),
+            )
+        })
+        .when(trailing, |element| {
+            element.child(
+                div()
+                    .absolute()
+                    .top_0()
+                    .bottom_0()
+                    .right_0()
+                    .w(line)
+                    .bg(color),
+            )
+        })
+}
 
 /// A caller-owned rectangle of cells, named by row and column identity.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1130,7 +1232,6 @@ impl DataGrid {
             .h(px(height))
             .flex_none()
             .px_token(theme, Space::Sm)
-            .gap_token(theme, Space::Sm)
             // No fill: the header is named by its type step and by the one
             // rule under it, the same way `Table`'s is.
             .border_b(px(theme.borders.hairline))
@@ -1179,30 +1280,38 @@ impl DataGrid {
             .w_full()
             .h(px(height))
             .flex_none()
-            .px_token(theme, Space::Sm)
-            .gap_token(theme, Space::Sm)
-            .border_b(px(theme.borders.hairline))
-            .border_color(theme.colors.divider);
+            .px_token(theme, Space::Sm);
         if self.selection_mode == SelectionMode::Multiple {
             row = row.child(div().w(px(GUTTER)).flex_none());
         }
         if self.on_expand.is_some() {
             row = row.child(div().w(px(GUTTER)).flex_none());
         }
+        let pinned = columns.iter().filter(|column| column.pinned).count();
+        let mut edged = pinned == 0;
         let mut consumed = 0usize;
         while consumed < columns.len() {
+            if !edged && consumed >= pinned {
+                row = row.child(pinned_gap(theme));
+                edged = true;
+            }
             let key = &columns[consumed].key;
             if let Some(group) = self
                 .groups
                 .iter()
                 .find(|group| group.keys.first() == Some(key))
             {
+                // A group covers the columns it names only while they stay
+                // adjacent; the caller owns the column order, so a group whose
+                // members have been separated covers the run that is still
+                // contiguous rather than a rectangle nobody can see.
                 let span = group
                     .keys
                     .iter()
-                    .take_while(|held| {
+                    .enumerate()
+                    .take_while(|(offset, held)| {
                         columns
-                            .get(consumed)
+                            .get(consumed + offset)
                             .is_some_and(|column| &column.key == *held)
                     })
                     .count()
@@ -1211,9 +1320,23 @@ impl DataGrid {
                 let ident = self.ident.child("group").child(group.id.as_ref());
                 row = row.child(
                     group_frame(div().id(ident.element_id()), covered, theme)
+                        .relative()
+                        .justify_center()
                         .child(
                             text(theme, TypeScale::Caption, group.label.clone())
                                 .text_tone(theme, TextTone::Faint),
+                        )
+                        // The rule is what attaches the label to the columns it
+                        // names. Without it the group row is a caption floating
+                        // above a header it has no stated relationship with.
+                        .child(
+                            div()
+                                .absolute()
+                                .left_0()
+                                .right_0()
+                                .bottom_0()
+                                .h(px(theme.borders.hairline))
+                                .bg(theme.colors.hairline_strong),
                         )
                         .semantic_in(
                             cx,
@@ -1250,7 +1373,6 @@ impl DataGrid {
             .h(px(height))
             .flex_none()
             .px_token(theme, Space::Sm)
-            .gap_token(theme, Space::Sm)
             .border_t(px(theme.borders.hairline))
             .border_color(theme.colors.divider);
         if self.selection_mode == SelectionMode::Multiple {
@@ -1259,20 +1381,41 @@ impl DataGrid {
         if self.on_expand.is_some() {
             row = row.child(div().w(px(GUTTER)).flex_none());
         }
-        for column in columns {
-            let value = self
+        // A row of bare numbers under a table says nothing about what they
+        // are, so the first column the caller left empty carries the name of
+        // the row itself.
+        let mut named = self
+            .footer
+            .iter()
+            .any(|(key, _)| columns.first().is_some_and(|column| &column.key == key));
+        let pinned = columns.iter().filter(|column| column.pinned).count();
+        for (index, column) in columns.iter().enumerate() {
+            if index == pinned && pinned > 0 {
+                row = row.child(pinned_gap(theme));
+            }
+            let mut value = self
                 .footer
                 .iter()
                 .find(|(key, _)| key == &column.key)
                 .map(|(_, value)| value.clone())
                 .unwrap_or_default();
+            let mut label = false;
+            if value.is_empty() && !named {
+                value = cx.strings().text(StringKey::GridSummary);
+                label = true;
+                named = true;
+            }
             let cell = self.ident.child("summary").child(column.key.as_ref());
             row = row.child(
                 column_frame(div().id(cell.element_id()), column, theme)
-                    .child(
-                        text(theme, TypeScale::Caption, value.clone())
-                            .text_tone(theme, TextTone::Muted),
-                    )
+                    .child(text(theme, TypeScale::Caption, value.clone()).text_tone(
+                        theme,
+                        if label {
+                            TextTone::Faint
+                        } else {
+                            TextTone::Muted
+                        },
+                    ))
                     .semantic_in(
                         cx,
                         NodeSpec::new(cell.semantic_id(), Role::Cell)
@@ -1555,6 +1698,7 @@ impl DataGrid {
             .child("resize");
         let state = memory(&self.ident.semantic_id(), window, cx);
 
+        let hover_group = ident.child("hover").semantic_id();
         let mut handle = div()
             .id(ident.element_id())
             .absolute()
@@ -1566,11 +1710,17 @@ impl DataGrid {
             .items_center()
             .justify_center()
             .cursor_pointer()
+            .group(hover_group.clone())
             .child(
+                // The grid draws no column rules, so a rule standing where a
+                // handle happens to be reads as a stray column edge — at the
+                // trailing column, as a phantom empty column. It appears when
+                // the pointer is on the handle and says what can be grabbed.
                 div()
                     .w(px(theme.borders.hairline))
                     .h_full()
-                    .bg(theme.colors.divider),
+                    .bg(gpui::transparent_black())
+                    .group_hover(hover_group, |style| style.bg(theme.colors.hairline_strong)),
             )
             .hover(|style| style.bg(theme.colors.hover));
 
@@ -1846,7 +1996,7 @@ impl DataGrid {
         let render_detail = self.render_detail.clone();
         let drawn = Rc::clone(drawn);
         let opened: Vec<SharedString> = self.expanded.iter().map(|row| row.id.clone()).collect();
-        let (range_rows, range_cols) = resolve_range(
+        let range = resolve_range(
             state,
             self.range.as_ref(),
             self.count,
@@ -1868,8 +2018,7 @@ impl DataGrid {
             editor,
             state: Rc::clone(state),
             hierarchy: self.hierarchy,
-            range_rows,
-            range_cols,
+            range,
             on_range_change: self.on_range_change.clone(),
         });
 
@@ -2009,8 +2158,7 @@ struct RowContext {
     editor: Option<Entity<TextInput>>,
     state: Rc<Memory>,
     hierarchy: bool,
-    range_rows: HashSet<SharedString>,
-    range_cols: HashSet<SharedString>,
+    range: RangeMask,
     on_range_change: Option<RangeHandler>,
 }
 
@@ -2042,7 +2190,6 @@ fn row_element(
         .w_full()
         .h(px(height))
         .px_token(theme, Space::Sm)
-        .gap_token(theme, Space::Sm)
         .when(context.lines == GridLines::Rows, |element| {
             element
                 .border_b(px(theme.borders.hairline))
@@ -2085,6 +2232,7 @@ fn row_element(
         element = element.child(cell_element(
             &ident,
             theme,
+            height,
             column,
             &mut row,
             next,
@@ -2160,8 +2308,24 @@ fn row_element(
                 .top(px(height))
                 .h(px(height * detail_rows as f32))
                 .overflow_hidden()
-                .bg(theme.colors.panel)
+                // A detail belongs to the row above it, so it is recessed
+                // under it and carries a rail at the reading edge: a region
+                // drawn on the body's own surface reads as an unexplained
+                // gap between two rows instead.
+                .surface(theme, Surface::Sunken)
+                .relative()
                 .p_token(theme, Space::Sm)
+                .ps(cx.layout_direction(), px(theme.space(Space::Sm) + GUTTER))
+                .child(
+                    div()
+                        .absolute()
+                        .top_0()
+                        .bottom_0()
+                        .when(cx.layout_direction().is_rtl(), |element| element.right_0())
+                        .when(!cx.layout_direction().is_rtl(), |element| element.left_0())
+                        .w(px(theme.effects.selection_rail_width))
+                        .bg(theme.colors.divider),
+                )
                 .child(render(row.id.clone(), window, cx))
                 .semantic_in(
                     cx,
@@ -2203,6 +2367,15 @@ fn pinned_edge(theme: &Theme) -> gpui::Div {
             gpui::linear_color_stop(cast.opacity(0.0), 1.0),
         )))
         .flex()
+}
+
+/// The width the pinned edge occupies, drawn as nothing.
+///
+/// The group and summary rows do not carry the cast — it belongs to the rows
+/// that are held still — but they have to reserve the same width, or every
+/// column right of the pinned group steps out of line with the header.
+fn pinned_gap(theme: &Theme) -> gpui::Div {
+    div().w(px(theme.space(Space::Sm))).h_full().flex_none()
 }
 
 /// The mark that says a row is in the selection. It is not a control: the row
@@ -2300,6 +2473,7 @@ fn disclosure(
 fn cell_element(
     ident: &Ident,
     theme: &Theme,
+    height: f32,
     column: &GridColumn,
     row: &mut GridRow,
     next: Option<(SharedString, SharedString)>,
@@ -2334,10 +2508,9 @@ fn cell_element(
             .min_w_0()
             .w_full();
         if let Some(meta) = hierarchy {
-            leading = leading.ps(
-                direction,
-                px((meta.level.saturating_sub(1) as f32) * theme.spacing.md),
-            );
+            leading = leading.children(crate::data::tree::indent_guides(
+                theme, direction, meta.level, height,
+            ));
             if meta.has_children {
                 if let Some(expand) = context
                     .on_expand
@@ -2355,18 +2528,15 @@ fn cell_element(
         content = Some(leading.into_any_element());
     }
 
-    let in_range = context.range_rows.contains(&row.id) && context.range_cols.contains(&column.key);
+    let in_range = context.range.covers(&row.id, &column.key);
+    let edges = context.range.edges(&row.id, &column.key);
+    let rtl = cx.layout_direction().is_rtl();
     let ranged = context.on_range_change.is_some() && !context.disabled && !row.disabled;
 
     if !published && !ranged {
         return column_frame(div(), column, theme)
             .overflow_hidden()
-            .when(in_range, |element| {
-                element.bg(theme
-                    .colors
-                    .accent
-                    .opacity(theme.effects.selected_ring_alpha))
-            })
+            .when(in_range, |element| range_cell(element, theme, edges, rtl))
             .children(content)
             .into_any_element();
     }
@@ -2390,12 +2560,7 @@ fn cell_element(
 
     let mut frame = column_frame(div().id(cell_ident.element_id()), column, theme)
         .overflow_hidden()
-        .when(in_range, |element| {
-            element.bg(theme
-                .colors
-                .accent
-                .opacity(theme.effects.selected_ring_alpha))
-        })
+        .when(in_range, |element| range_cell(element, theme, edges, rtl))
         .children(content);
 
     if let (true, Some(request)) = (editable, context.on_edit_request.clone()) {
@@ -2474,21 +2639,34 @@ fn editor_cell(
     next: Option<(SharedString, SharedString)>,
     context: &RowContext,
 ) -> AnyElement {
-    let frame = column_frame(div(), column, theme)
+    let reading = field.clone();
+    // The field is inset in the cell rather than being the cell. A well drawn
+    // at the full height of the row is taller than every value around it and
+    // reads as a hole punched through the body; a field the height of a small
+    // control, carrying the focus treatment every other field in the library
+    // wears, reads as the one cell that is open.
+    let well = div()
+        .w_full()
+        .h(px(theme.control.sm.height))
+        .row()
         .overflow_hidden()
-        .px(px(theme.spacing.xs))
-        .radius(theme, Radius::Small)
+        .px(px(theme.space(Space::Xs)))
+        .radius(theme, Radius::Control)
         .well(theme)
-        .shadow(theme.focus_ring());
+        .border_color(theme.colors.focus)
+        .shadow(theme.focus_ring())
+        .child(field);
+    let frame = column_frame(div(), column, theme)
+        .items_center()
+        .overflow_hidden();
 
     let Some(handler) = context.on_edit.clone() else {
-        return frame.child(field).into_any_element();
+        return frame.child(well).into_any_element();
     };
 
     let row_id = row.id.clone();
     let key = column.key.clone();
     let seed = edit.value.clone();
-    let reading = field.clone();
 
     // The field's own key bindings dispatch before any ancestor's key
     // listener, so enter and escape are taken in the capture phase of the
@@ -2564,7 +2742,7 @@ fn editor_cell(
         .capture_action::<Submit>(commit)
         .capture_action::<Cancel>(revert)
         .capture_key_down(advance)
-        .child(field)
+        .child(well)
         .into_any_element()
 }
 
@@ -2596,9 +2774,16 @@ fn group_frame<E: Styled>(element: E, columns: &[GridColumn], theme: &Theme) -> 
         .row()
         .h_full()
         .items_center()
+        .px(px(theme.space(Space::Xs)))
         .gap(px(theme.space(Space::Xs)))
 }
 
+/// One column's slot in a row.
+///
+/// The separation between two columns is padding inside each of them rather
+/// than a gap between them, so a wash that covers a run of cells — a selected
+/// rectangle — covers one continuous band instead of alternating stripes of
+/// covered cell and uncovered gap.
 fn column_frame<E: Styled>(element: E, column: &GridColumn, theme: &Theme) -> E {
     let element = match column.width {
         ColumnWidth::Fixed(width) => element.w(px(width)).flex_none(),
@@ -2611,7 +2796,11 @@ fn column_frame<E: Styled>(element: E, column: &GridColumn, theme: &Theme) -> E 
             .flex_basis(px(0.0))
             .min_w(px(column.min_width)),
     };
-    let element = element.row().h_full().gap(px(theme.space(Space::Xs)));
+    let element = element
+        .row()
+        .h_full()
+        .px(px(theme.space(Space::Xs)))
+        .gap(px(theme.space(Space::Xs)));
     match column.align {
         Align::Start => element.justify_start(),
         Align::Center => element.justify_center(),
@@ -2888,16 +3077,16 @@ fn resolve_range(
     columns: &[GridColumn],
     window: &mut Window,
     cx: &mut App,
-) -> (HashSet<SharedString>, HashSet<SharedString>) {
+) -> RangeMask {
     let Some(range) = range else {
         *state.range_cover.borrow_mut() = None;
-        return (HashSet::new(), HashSet::new());
+        return RangeMask::default();
     };
-    if let Some((cached, cached_count, rows, cols)) = state.range_cover.borrow().as_ref()
+    if let Some((cached, cached_count, mask)) = state.range_cover.borrow().as_ref()
         && cached == range
         && *cached_count == count
     {
-        return (rows.clone(), cols.clone());
+        return mask.clone();
     }
     let mut start_i = None;
     let mut end_i = None;
@@ -2912,28 +3101,27 @@ fn resolve_range(
         }
         ids.push(id);
     }
-    let rows = match (start_i, end_i) {
-        (Some(first), Some(last)) => ids[first.min(last)..=first.max(last)]
-            .iter()
-            .cloned()
-            .collect(),
-        _ => HashSet::new(),
-    };
+    let mut mask = RangeMask::default();
+    if let (Some(first), Some(last)) = (start_i, end_i) {
+        let span = &ids[first.min(last)..=first.max(last)];
+        mask.first_row = span.first().cloned();
+        mask.last_row = span.last().cloned();
+        mask.rows = span.iter().cloned().collect();
+    }
     let start_c = columns
         .iter()
         .position(|column| column.key() == &range.start_column);
     let end_c = columns
         .iter()
         .position(|column| column.key() == &range.end_column);
-    let cols = match (start_c, end_c) {
-        (Some(first), Some(last)) => columns[first.min(last)..=first.max(last)]
-            .iter()
-            .map(|column| column.key().clone())
-            .collect(),
-        _ => HashSet::new(),
-    };
-    *state.range_cover.borrow_mut() = Some((range.clone(), count, rows.clone(), cols.clone()));
-    (rows, cols)
+    if let (Some(first), Some(last)) = (start_c, end_c) {
+        let span = &columns[first.min(last)..=first.max(last)];
+        mask.first_col = span.first().map(|column| column.key().clone());
+        mask.last_col = span.last().map(|column| column.key().clone());
+        mask.cols = span.iter().map(|column| column.key().clone()).collect();
+    }
+    *state.range_cover.borrow_mut() = Some((range.clone(), count, mask.clone()));
+    mask
 }
 
 fn range_tsv(

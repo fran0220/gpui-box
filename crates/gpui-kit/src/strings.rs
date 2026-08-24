@@ -93,6 +93,9 @@ string_keys! {
     Dismiss => "common.dismiss", "Dismiss";
     TryAgain => "common.try-again", "Try again";
     Loading => "common.loading", "Loading";
+    LoadMore => "load-more.action", "Load more";
+    LoadMoreLoading => "load-more.loading", "Loading more";
+    LoadMoreEnd => "load-more.end", "No more items";
     MoreActions => "common.more-actions", "More actions";
     Expand => "common.expand", "Expand";
     Collapse => "common.collapse", "Collapse";
@@ -193,6 +196,7 @@ string_keys! {
     MessageDelivered => "message.delivered", "Delivered";
     MessageRead => "message.read", "Read";
     MessageStreaming => "message.streaming", "Streaming";
+    MessageWriting => "message.writing", "Still writing";
     MessageMoreOne => "message.more-one", "1 more message";
     MessageMoreMany => "message.more-many", "{0} more messages";
     MessageNewOne => "message.new-one", "1 new message";
@@ -425,6 +429,7 @@ string_keys! {
     GamePartyDuplicateMember => "game.party.duplicate-member", "Party member {0} appears more than once.";
     GamePartyDuplicateGauge => "game.party.duplicate-gauge", "Party member {0} has more than one gauge named {1}.";
     GameGaugeUnknown => "game.gauge.unknown", "Unknown";
+    GameGaugeUnavailable => "game.gauge.unavailable", "Unavailable";
     GameObjectiveLocked => "game.objective.locked", "Locked";
     GameObjectiveActive => "game.objective.active", "Active";
     GameObjectiveCompleted => "game.objective.completed", "Completed";
@@ -478,6 +483,9 @@ string_keys! {
     TraceRunning => "trace.running", "Running";
     TraceSucceeded => "trace.succeeded", "Succeeded";
     TraceFailed => "trace.failed", "Failed";
+    HeatmapLess => "heatmap.less", "Less";
+    HeatmapMore => "heatmap.more", "More";
+    HeatmapMissing => "heatmap.missing", "Not observed";
     HeatmapEmpty => "heatmap.empty", "No activity";
     HeatmapUnavailable => "heatmap.unavailable", "Activity is unavailable";
     ColorHue => "color.hue", "Hue";
@@ -500,6 +508,10 @@ string_keys! {
     ArtifactLoading => "artifact.loading", "Preparing artifact";
     KanbanEmpty => "kanban.empty", "No cards";
     KanbanUnavailable => "kanban.unavailable", "Board unavailable";
+    KanbanColumnEmpty => "kanban.column-empty", "Nothing here";
+    KanbanAdd => "kanban.add", "Add to {0}";
+    KanbanMoveHere => "kanban.move-here", "Move {0} to {1}";
+    KanbanOverLimit => "kanban.over-limit", "Over the limit for {0}";
     MetricEmpty => "metric.empty", "No reading";
     MetricUnavailable => "metric.unavailable", "Reading unavailable";
     MetricError => "metric.error", "Could not load reading";
@@ -507,6 +519,7 @@ string_keys! {
     RadarEmpty => "radar.empty", "No axes to plot";
     Waveform => "waveform.label", "Waveform";
     WaveformEmpty => "waveform.empty", "No samples";
+    WaveformUnavailable => "waveform.unavailable", "Envelope unavailable";
     MicroHeartbeat => "micro.heartbeat", "Heartbeat";
     MicroBounce => "micro.bounce", "Bounce";
     MicroWobble => "micro.wobble", "Wobble";
@@ -538,6 +551,12 @@ string_keys! {
     // them. The state words are shared between the card and the list, because
     // a call that is running and a step that is running are one word to a
     // reader.
+    // A document that reports nothing says what happened to the document
+    // first; the host's own words are the second line, so the reader is never
+    // asked to read a bare reason as if it were a headline.
+    AgentDocumentEmpty => "agent.document.empty", "This document is empty";
+    AgentDocumentUnavailable => "agent.document.unavailable", "Document unavailable";
+    AgentDocumentFailed => "agent.document.failed", "Document could not be built";
     AgentArguments => "agent.arguments", "Arguments";
     AgentResult => "agent.result", "Result";
     AgentPendingApproval => "agent.pending-approval", "Waiting for approval";
@@ -626,6 +645,8 @@ string_keys! {
     SearchTooMany => "search.too-many", "More than {0}";
     SearchHitOne => "search.hit-one", "1 result";
     SearchHitMany => "search.hit-many", "{0} results";
+    SearchClear => "search.clear", "Clear the query";
+    FindReplaceClose => "search.close", "Close find and replace";
     SearchNext => "search.next", "Next result";
     SearchPrevious => "search.previous", "Previous result";
     SearchCaseSensitive => "search.case-sensitive", "Match case";
@@ -663,6 +684,10 @@ string_keys! {
     ProgressCancel => "progress.cancel", "Cancel";
     ProgressPaused => "progress.paused", "Paused";
     ProgressStalled => "progress.stalled", "Stalled";
+    StagePending => "stage.pending", "Not started";
+    StageActive => "stage.active", "In progress";
+    StageDone => "stage.done", "Done";
+    StageFailed => "stage.failed", "Failed";
     OutcomeSuccess => "outcome.success", "Finished";
     OutcomePartial => "outcome.partial", "Finished, with failures";
     OutcomeFailed => "outcome.failed", "Did not finish";

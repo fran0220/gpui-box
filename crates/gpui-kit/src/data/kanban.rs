@@ -10,17 +10,25 @@ use gpui::{
     App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
     StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
+use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Surface, TypeScale};
 
+use crate::controls::button::{ButtonVariant, IconButton};
+use crate::display::badge::{Badge, Tone};
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::foundation::slot::{self, Slots, Slotted};
-use crate::foundation::{Disableable, Ident, StyledExt};
+use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
 use crate::state::{HasPhase, Phase};
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type CardHandler = Rc<dyn Fn(&KanbanCard, &mut Window, &mut App)>;
 type MoveHandler = Rc<dyn Fn(&KanbanCard, SharedString, &mut Window, &mut App)>;
+type AddHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
+
+/// How tall a lane is before its cards decide, so three columns holding one,
+/// three and no cards still stand on the same baseline.
+const LANE_ROWS: f32 = 4.0;
 
 /// One card on the board. Identity is the host's.
 #[derive(Debug, Clone, PartialEq)]
@@ -56,6 +64,8 @@ impl KanbanCard {
 pub struct KanbanColumn {
     pub id: SharedString,
     pub title: SharedString,
+    /// How many cards the host says belong here at once, when it says so.
+    pub limit: Option<usize>,
 }
 
 impl KanbanColumn {
@@ -63,7 +73,18 @@ impl KanbanColumn {
         Self {
             id: id.into(),
             title: title.into(),
+            limit: None,
         }
+    }
+
+    /// The work-in-progress limit the host keeps for this column.
+    ///
+    /// The board enforces nothing: it states the count against the limit and
+    /// says when the column is over it, which is the whole point of a limit a
+    /// reader can see.
+    pub fn limit(mut self, limit: usize) -> Self {
+        self.limit = Some(limit);
+        self
     }
 }
 
@@ -123,6 +144,7 @@ pub struct KanbanBoard {
     disabled: bool,
     on_card: Option<CardHandler>,
     on_move: Option<MoveHandler>,
+    on_add: Option<AddHandler>,
     slots: Slots,
 }
 
@@ -137,6 +159,7 @@ impl KanbanBoard {
             disabled: false,
             on_card: None,
             on_move: None,
+            on_add: None,
             slots: Slots::default(),
         }
     }
@@ -177,6 +200,16 @@ impl KanbanBoard {
         self.on_move = Some(Rc::new(handler));
         self
     }
+
+    /// What starting a card in a column does. Without it no column offers to
+    /// start one, because a control that cannot act is not drawn as one.
+    pub fn on_add(
+        mut self,
+        handler: impl Fn(SharedString, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_add = Some(Rc::new(handler));
+        self
+    }
 }
 
 impl Slotted for KanbanBoard {
@@ -197,17 +230,37 @@ impl Disableable for KanbanBoard {
 impl RenderOnce for KanbanBoard {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        match &self.state {
-            KanbanState::Empty => self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
-                EmptyState::new(
-                    self.ident.child("empty"),
-                    cx.strings().text(StringKey::KanbanEmpty),
-                )
-                .kind(EmptyKind::Empty)
+        // A board that cannot show its columns is still a board. Drawn on the
+        // canvas instead, the empty and unavailable states are two paragraphs
+        // floating where a board was, with nothing to say how much of the
+        // surface they stand for.
+        let board_frame = |content| {
+            div()
+                .w_full()
+                .min_h(px(theme.control.md.height * LANE_ROWS))
+                .flex()
+                .items_center()
+                .justify_center()
+                .p_token(&theme, Space::Md)
+                .radius(&theme, Radius::Card)
+                .surface(&theme, Surface::Panel)
+                .child(content)
                 .into_any_element()
-            }),
+        };
+        match &self.state {
+            KanbanState::Empty => {
+                let inner = self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                    EmptyState::new(
+                        self.ident.child("empty"),
+                        cx.strings().text(StringKey::KanbanEmpty),
+                    )
+                    .kind(EmptyKind::Empty)
+                    .into_any_element()
+                });
+                board_frame(inner)
+            }
             KanbanState::Unavailable(reason) => {
-                self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                let inner = self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
                     EmptyState::new(
                         self.ident.child("unavailable"),
                         cx.strings().text(StringKey::KanbanUnavailable),
@@ -215,20 +268,32 @@ impl RenderOnce for KanbanBoard {
                     .kind(EmptyKind::Unavailable)
                     .detail(reason.clone())
                     .into_any_element()
-                })
+                });
+                board_frame(inner)
             }
             KanbanState::Ready => {
                 let held = self.held.clone();
+                let carried = held
+                    .as_ref()
+                    .and_then(|id| self.cards.iter().find(|card| &card.id == id))
+                    .cloned();
                 let columns = self
                     .columns
                     .iter()
                     .map(|column| {
+                        let count = self
+                            .cards
+                            .iter()
+                            .filter(|card| card.column == column.id)
+                            .count();
+                        let over = column.limit.is_some_and(|limit| count > limit);
                         let cards = self
                             .cards
                             .iter()
                             .filter(|card| card.column == column.id)
                             .map(|card| {
                                 let handler = self.on_card.clone().filter(|_| !self.disabled);
+                                let lifted = held.as_ref() == Some(&card.id);
                                 let mut tile = div()
                                     .id(self
                                         .ident
@@ -236,10 +301,16 @@ impl RenderOnce for KanbanBoard {
                                         .child(card.id.as_ref())
                                         .element_id())
                                     .column()
-                                    .gap(px(2.0))
+                                    .gap(px(theme.space(Space::Xs)))
                                     .p_token(&theme, Space::Sm)
-                                    .radius(&theme, Radius::Small)
+                                    .radius(&theme, Radius::Control)
                                     .surface(&theme, Surface::Raised)
+                                    // The card the reader is carrying stays
+                                    // where the host still says it is and
+                                    // says so by receding, not by leaving.
+                                    .when(lifted, |tile| {
+                                        tile.opacity(theme.opacity.muted).hairline_strong(&theme)
+                                    })
                                     .child(
                                         div()
                                             .type_scale(&theme, TypeScale::Label)
@@ -273,6 +344,54 @@ impl RenderOnce for KanbanBoard {
                                 tile
                             })
                             .collect::<Vec<_>>();
+                        let empty = cards.is_empty();
+                        let tally = match column.limit {
+                            Some(limit) => cx.numbers().count_of_total(count, limit),
+                            None => cx.numbers().count(count),
+                        };
+                        let adding =
+                            self.on_add
+                                .clone()
+                                .filter(|_| !self.disabled)
+                                .map(|handler| {
+                                    let column_id = column.id.clone();
+                                    IconButton::new(
+                                        self.ident.child("add").child(column.id.as_ref()),
+                                        Icon::Plus,
+                                        cx.strings()
+                                            .format(StringKey::KanbanAdd, &[column.title.as_ref()]),
+                                    )
+                                    .variant(ButtonVariant::Ghost)
+                                    .control_size(ControlSize::Sm)
+                                    .on_click(
+                                        move |window, cx| handler(column_id.clone(), window, cx),
+                                    )
+                                });
+                        // The lane the reader would drop into says where the
+                        // card would land, rather than leaving the whole
+                        // column as an invisible target.
+                        let landing = carried
+                            .as_ref()
+                            .filter(|card| card.column != column.id)
+                            .filter(|_| self.on_move.is_some() && !self.disabled)
+                            .map(|card| {
+                                div()
+                                    .w_full()
+                                    .p_token(&theme, Space::Sm)
+                                    .radius(&theme, Radius::Control)
+                                    .border(px(theme.borders.hairline))
+                                    .border_dashed()
+                                    .border_color(theme.colors.accent)
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .type_scale(&theme, TypeScale::Caption)
+                                    .text_color(theme.colors.text_muted)
+                                    .child(cx.strings().format(
+                                        StringKey::KanbanMoveHere,
+                                        &[card.title.as_ref(), column.title.as_ref()],
+                                    ))
+                            });
                         let mut lane = div()
                             .id(self
                                 .ident
@@ -280,7 +399,8 @@ impl RenderOnce for KanbanBoard {
                                 .child(column.id.as_ref())
                                 .element_id())
                             .flex_1()
-                            .min_w(px(160.0))
+                            .min_w(px(theme.control.md.height * LANE_ROWS))
+                            .min_h(px(theme.control.md.height * LANE_ROWS))
                             .column()
                             .gap_token(&theme, Space::Xs)
                             .p_token(&theme, Space::Sm)
@@ -288,11 +408,44 @@ impl RenderOnce for KanbanBoard {
                             .surface(&theme, Surface::Panel)
                             .child(
                                 div()
-                                    .type_scale(&theme, TypeScale::Caption)
-                                    .text_color(theme.colors.text_muted)
-                                    .child(column.title.clone()),
+                                    .row()
+                                    .items_center()
+                                    .gap_token(&theme, Space::Xs)
+                                    .child(
+                                        div()
+                                            .flex_1()
+                                            .type_scale(&theme, TypeScale::Caption)
+                                            .text_color(theme.colors.text_muted)
+                                            .child(column.title.clone()),
+                                    )
+                                    .child(
+                                        Badge::new(tally.clone())
+                                            .tone(if over { Tone::Warning } else { Tone::Neutral })
+                                            .outlined(!over),
+                                    )
+                                    .children(adding),
                             )
+                            .when(over, |lane| {
+                                lane.child(
+                                    div()
+                                        .type_scale(&theme, TypeScale::Caption)
+                                        .text_color(theme.colors.warning)
+                                        .child(cx.strings().format(
+                                            StringKey::KanbanOverLimit,
+                                            &[column.title.as_ref()],
+                                        )),
+                                )
+                            })
                             .children(cards)
+                            .when(empty && landing.is_none(), |lane| {
+                                lane.child(
+                                    div()
+                                        .type_scale(&theme, TypeScale::Caption)
+                                        .text_color(theme.colors.text_faint)
+                                        .child(cx.strings().text(StringKey::KanbanColumnEmpty)),
+                                )
+                            })
+                            .children(landing)
                             .semantic_in(
                                 cx,
                                 NodeSpec::new(
@@ -302,7 +455,8 @@ impl RenderOnce for KanbanBoard {
                                         .semantic_id(),
                                     Role::List,
                                 )
-                                .text(column.title.clone()),
+                                .text(column.title.clone())
+                                .value(tally),
                             );
                         if let (Some(handler), Some(held_id)) = (
                             self.on_move.clone().filter(|_| !self.disabled),
@@ -320,7 +474,7 @@ impl RenderOnce for KanbanBoard {
                     .collect::<Vec<_>>();
                 div()
                     .row()
-                    .items_start()
+                    .items_stretch()
                     .gap_token(&theme, Space::Sm)
                     .w_full()
                     .children(columns)

@@ -7,17 +7,28 @@ use gpui::{
     AnyElement, App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Space, TextTone, Theme, TypeScale};
 
 use crate::display::badge::Tone;
 use crate::display::empty::{EmptyKind, EmptyState};
-use crate::display::loading::PulseLoader;
+use crate::display::loading::{Skeleton, SkeletonShape};
 use crate::display::sparkline::{Sparkline, SparklinePoint, SparklineReading, SparklineState};
 use crate::display::status::StatusDot;
 use crate::foundation::slot::{self, Slots, Slotted};
-use crate::foundation::{Ident, StyledExt};
+use crate::foundation::{CardVariant, Ident, StyledExt};
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
+
+/// How tall the region under the caption is, whatever is in it.
+///
+/// A card that loses its shape when the reading does not arrive reports the
+/// absence as a different component; every state of one metric is the same
+/// object in the same place, so the height is the card's and not the
+/// reading's.
+const BODY_HEIGHT: f32 = 92.0;
+
+/// The height the trend plot and the placeholder standing in for it share.
+const TREND_HEIGHT: f32 = 40.0;
 
 /// One verified KPI the host already formatted.
 #[derive(Debug, Clone, PartialEq)]
@@ -137,27 +148,39 @@ impl Slotted for MetricCard {
 impl RenderOnce for MetricCard {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let (inner, spec): (AnyElement, NodeSpec) = match &self.state {
-            MetricState::Loading => (
-                self.slots.or_else(slot::LOADING, window, cx, |_, cx| {
-                    PulseLoader::new(self.ident.child("loading"))
-                        .label(cx.strings().text(StringKey::Loading))
-                        .into_any_element()
-                }),
-                spec_for(&self.ident, &self.label, &self.state),
-            ),
-            MetricState::Empty => (
-                self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
-                    EmptyState::new(
-                        self.ident.child("empty"),
-                        cx.strings().text(StringKey::MetricEmpty),
-                    )
-                    .kind(EmptyKind::Empty)
+        let spec = spec_for(&self.ident, &self.label, &self.state);
+        let body: AnyElement = match &self.state {
+            // The placeholder takes the shape of the reading it is standing
+            // in for — a value, a delta, a trend — so the card that arrives
+            // lands where the wait was rather than replacing it.
+            MetricState::Loading => self.slots.or_else(slot::LOADING, window, cx, |_, cx| {
+                Skeleton::new(self.ident.child("loading"))
+                    .label(cx.strings().text(StringKey::Loading))
+                    .shapes([
+                        SkeletonShape::Rect {
+                            width: 0.42,
+                            height: theme.typography.title.line_height,
+                        },
+                        SkeletonShape::Rect {
+                            width: 0.24,
+                            height: theme.typography.caption.line_height,
+                        },
+                        SkeletonShape::Rect {
+                            width: 1.0,
+                            height: TREND_HEIGHT,
+                        },
+                    ])
                     .into_any_element()
-                }),
-                spec_for(&self.ident, &self.label, &self.state),
-            ),
-            MetricState::Unavailable(reason) => (
+            }),
+            MetricState::Empty => self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
+                EmptyState::new(
+                    self.ident.child("empty"),
+                    cx.strings().text(StringKey::MetricEmpty),
+                )
+                .kind(EmptyKind::Empty)
+                .into_any_element()
+            }),
+            MetricState::Unavailable(reason) => {
                 self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {
                     EmptyState::new(
                         self.ident.child("unavailable"),
@@ -166,36 +189,47 @@ impl RenderOnce for MetricCard {
                     .kind(EmptyKind::Unavailable)
                     .detail(reason.clone())
                     .into_any_element()
-                }),
-                spec_for(&self.ident, &self.label, &self.state),
-            ),
-            MetricState::Error(reason) => (
-                self.slots.or_else(slot::FAILED, window, cx, |_, cx| {
-                    EmptyState::new(
-                        self.ident.child("error"),
-                        cx.strings().text(StringKey::MetricError),
-                    )
-                    .kind(EmptyKind::Failed)
-                    .detail(reason.clone())
-                    .into_any_element()
-                }),
-                spec_for(&self.ident, &self.label, &self.state),
-            ),
+                })
+            }
+            MetricState::Error(reason) => self.slots.or_else(slot::FAILED, window, cx, |_, cx| {
+                EmptyState::new(
+                    self.ident.child("error"),
+                    cx.strings().text(StringKey::MetricError),
+                )
+                .kind(EmptyKind::Failed)
+                .detail(reason.clone())
+                .into_any_element()
+            }),
             MetricState::Ready(reading) | MetricState::Stale { reading, .. } => {
                 let stale = match &self.state {
                     MetricState::Stale { reason, .. } => Some(reason.clone()),
                     _ => None,
                 };
-                (
-                    ready_metric(&self.ident, &self.label, reading, stale, &theme, cx),
-                    spec_for(&self.ident, &self.label, &self.state),
-                )
+                reading_body(&self.ident, &self.label, reading, stale, &theme)
             }
         };
+
         div()
+            .column()
             .w_full()
             .min_w(px(180.0))
-            .child(inner)
+            .gap_token(&theme, Space::Sm)
+            .p_token(&theme, Space::Md)
+            .card_surface(&theme, CardVariant::Outlined)
+            .child(
+                div()
+                    .type_scale(&theme, TypeScale::Caption)
+                    .text_tone(&theme, TextTone::Muted)
+                    .child(self.label.clone()),
+            )
+            .child(
+                div()
+                    .column()
+                    .justify_center()
+                    .w_full()
+                    .min_h(px(BODY_HEIGHT))
+                    .child(body),
+            )
             .semantic_in(cx, spec)
     }
 }
@@ -206,64 +240,77 @@ fn spec_for(ident: &Ident, label: &SharedString, state: &MetricState) -> NodeSpe
         .value(state.name())
 }
 
-fn ready_metric(
+/// The reading itself: the value, what it moved by, and the shape it moved in.
+///
+/// The trend is drawn embedded, which is what keeps the card one card. A
+/// sparkline that brought its own frame in here drew a second panel inside
+/// the first and repeated the card's own value back at it as a minimum and a
+/// maximum it had never been given.
+fn reading_body(
     ident: &Ident,
     label: &SharedString,
     reading: &MetricReading,
     stale: Option<SharedString>,
-    theme: &gpui_kit_theme::Theme,
-    _cx: &mut App,
+    theme: &Theme,
 ) -> AnyElement {
     let trend = (!reading.trend.is_empty()).then(|| {
-        Sparkline::new(
-            ident.child("trend"),
-            label.clone(),
-            SparklineState::Ready(SparklineReading::new(
-                reading.trend.clone(),
-                reading.value.clone(),
-                reading.value.clone(),
-                reading.value.clone(),
-            )),
+        div().h(px(TREND_HEIGHT)).w_full().child(
+            Sparkline::new(
+                ident.child("trend"),
+                label.clone(),
+                SparklineState::Ready(SparklineReading::new(
+                    reading.trend.clone(),
+                    reading.value.clone(),
+                    reading.value.clone(),
+                    reading.value.clone(),
+                )),
+            )
+            .embedded()
+            .stale(stale.is_some()),
         )
-        .into_any_element()
     });
     div()
         .column()
+        .w_full()
         .gap_token(theme, Space::Xs)
-        .p_token(theme, Space::Md)
-        .radius(theme, Radius::Card)
-        .surface(theme, Surface::Panel)
         .child(
             div()
-                .type_scale(theme, TypeScale::Caption)
-                .text_color(theme.colors.text_muted)
-                .child(label.clone()),
+                .row()
+                .items_baseline()
+                .justify_between()
+                .gap_token(theme, Space::Sm)
+                .child(
+                    div()
+                        .type_scale(theme, TypeScale::Title)
+                        .text_tone(theme, TextTone::Primary)
+                        .child(reading.value.clone()),
+                )
+                .children(reading.delta.as_ref().map(|delta| {
+                    div()
+                        .row()
+                        .items_center()
+                        .flex_none()
+                        .gap_token(theme, Space::Xs)
+                        .child(StatusDot::new(reading.tone))
+                        .child(
+                            div()
+                                .type_scale(theme, TypeScale::Caption)
+                                .text_color(reading.tone.color(theme))
+                                .child(delta.clone()),
+                        )
+                })),
         )
-        .child(
-            div()
-                .type_scale(theme, TypeScale::Title)
-                .child(reading.value.clone()),
-        )
-        .children(reading.delta.as_ref().map(|delta| {
+        .children(trend)
+        .children(stale.map(|reason| {
             div()
                 .row()
                 .items_center()
                 .gap_token(theme, Space::Xs)
-                .child(StatusDot::new(reading.tone))
-                .child(
-                    div()
-                        .type_scale(theme, TypeScale::Caption)
-                        .text_color(theme.colors.text_muted)
-                        .child(delta.clone()),
-                )
-        }))
-        .children(stale.map(|reason| {
-            div()
                 .type_scale(theme, TypeScale::Caption)
                 .text_color(theme.colors.warning)
+                .child(StatusDot::new(Tone::Warning))
                 .child(reason)
         }))
-        .children(trend)
         .into_any_element()
 }
 

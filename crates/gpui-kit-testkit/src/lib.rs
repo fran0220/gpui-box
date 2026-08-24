@@ -4,8 +4,13 @@ pub mod audit;
 pub mod capture;
 #[cfg(feature = "test-support")]
 pub mod harness;
+pub mod performance;
 
 pub use audit::{AuditError, Finding, Problem, audit, audit_or_error};
+pub use performance::{
+    PerformanceBudget, PerformanceBudgetError, PerformanceLimit, PerformanceMetric,
+    PerformanceReport, PerformanceSample, PerformanceViolation,
+};
 
 use std::fs;
 use std::io::BufReader;

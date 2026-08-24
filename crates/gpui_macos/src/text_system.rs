@@ -15,7 +15,7 @@ use core_graphics::{
     display::CGPoint,
 };
 use core_text::{
-    font::CTFont,
+    font::{CTFont, CTFontRef},
     font_collection::CTFontCollectionRef,
     font_descriptor::{
         CTFontDescriptor, kCTFontSlantTrait, kCTFontSymbolicTrait, kCTFontWeightTrait,
@@ -252,21 +252,83 @@ fn font_smoothing_allowed_by_user() -> bool {
     })
 }
 
+/// CoreText's code for a face that is already registered in this process.
+#[allow(non_upper_case_globals)]
+const kCTFontManagerErrorAlreadyRegistered: isize = 105;
+
+/// Makes an embedded face reachable by family name, not only by handle.
+///
+/// `MemSource` is this process's own bookkeeping, so a font added there can be
+/// found by `load_family` and by nothing else. CoreText resolves a cascade
+/// list entry by building a descriptor from a family name, which left a
+/// bundled fallback face silently unreachable: the shaper drew `.notdef` for
+/// exactly the codepoints the bundle existed to cover, and whether a glyph
+/// appeared depended on what the host machine had installed. Process scope
+/// keeps the registration out of the user's font book.
+fn register_with_core_text(font: &FontKitFont) {
+    unsafe extern "C" {
+        fn CTFontCopyGraphicsFont(
+            font: CTFontRef,
+            attributes: *mut std::ffi::c_void,
+        ) -> *mut std::ffi::c_void;
+        fn CGFontRelease(font: *mut std::ffi::c_void);
+        fn CTFontManagerRegisterGraphicsFont(
+            font: *mut std::ffi::c_void,
+            error: *mut core_foundation_sys::error::CFErrorRef,
+        ) -> bool;
+    }
+
+    // Taken back out of the CoreText font rather than kept from the loader:
+    // `CGFont`'s own `TCFType` impl does not resolve consistently across this
+    // workspace's feature sets, while `CTFont`'s is what every other call here
+    // already uses.
+    let graphics_font = unsafe {
+        CTFontCopyGraphicsFont(
+            font.native_font().as_concrete_TypeRef(),
+            std::ptr::null_mut(),
+        )
+    };
+    if graphics_font.is_null() {
+        log::warn!("an embedded font carried no graphics font to register");
+        return;
+    }
+
+    let mut error: core_foundation_sys::error::CFErrorRef = std::ptr::null_mut();
+    let registered = unsafe { CTFontManagerRegisterGraphicsFont(graphics_font, &mut error) };
+    unsafe { CGFontRelease(graphics_font) };
+    if registered {
+        return;
+    }
+    let code = (!error.is_null())
+        .then(|| unsafe { core_foundation::error::CFError::wrap_under_create_rule(error) })
+        .map(|error| error.code());
+    // Registering the same bundle twice is the ordinary case for a host that
+    // starts more than one app in one process. Any other refusal leaves the
+    // family resolvable through `MemSource` alone, which is where it was
+    // before this call, so it is reported rather than raised.
+    if code != Some(kCTFontManagerErrorAlreadyRegistered) {
+        log::warn!("CoreText refused to register an embedded font: error {code:?}");
+    }
+}
+
 impl MacTextSystemState {
     fn add_fonts(&mut self, fonts: Vec<Cow<'static, [u8]>>) -> Result<()> {
         let fonts = fonts
             .into_iter()
-            .map(|bytes| match bytes {
-                Cow::Borrowed(embedded_font) => {
-                    let data_provider = unsafe {
+            .map(|bytes| {
+                let data_provider = match bytes {
+                    Cow::Borrowed(embedded_font) => unsafe {
                         core_graphics::data_provider::CGDataProvider::from_slice(embedded_font)
-                    };
-                    let font = core_graphics::font::CGFont::from_data_provider(data_provider)
-                        .map_err(|()| anyhow!("Could not load an embedded font."))?;
-                    let font = font_kit::loaders::core_text::Font::from_core_graphics_font(font);
-                    Ok(Handle::from_native(&font))
-                }
-                Cow::Owned(bytes) => Ok(Handle::from_memory(Arc::new(bytes), 0)),
+                    },
+                    Cow::Owned(bytes) => {
+                        core_graphics::data_provider::CGDataProvider::from_buffer(Arc::new(bytes))
+                    }
+                };
+                let font = core_graphics::font::CGFont::from_data_provider(data_provider)
+                    .map_err(|()| anyhow!("Could not load an embedded font."))?;
+                let font = font_kit::loaders::core_text::Font::from_core_graphics_font(font);
+                register_with_core_text(&font);
+                Ok(Handle::from_native(&font))
             })
             .collect::<Result<Vec<_>>>()?;
         self.memory_source.add_fonts(fonts.into_iter())?;

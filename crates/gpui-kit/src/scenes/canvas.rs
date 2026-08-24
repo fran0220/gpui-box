@@ -24,11 +24,11 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
     if !cx.has_global::<SceneGraph>() {
         cx.set_global(SceneGraph {
             viewport: GraphViewport::default(),
-            ingest: gpui::point(24.0, 200.0),
-            validate: gpui::point(244.0, 56.0),
-            persist: gpui::point(500.0, 56.0),
-            observe: gpui::point(464.0, 330.0),
-            publish: gpui::point(684.0, 200.0),
+            ingest: gpui::point(24.0, 190.0),
+            validate: gpui::point(244.0, 40.0),
+            persist: gpui::point(492.0, 40.0),
+            observe: gpui::point(452.0, 300.0),
+            publish: gpui::point(648.0, 190.0),
             selected: vec!["scene.graph.validate".into()],
             deleted: Vec::new(),
             edges: vec![
@@ -73,7 +73,7 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)
         .child(
-            div().w(px(860.0)).h(px(420.0)).child(
+            div().w(px(860.0)).h(px(470.0)).child(
                 NodeGraph::new("scene.graph")
                     .viewport(viewport)
                     .zoom_range(0.55, 1.8)
@@ -258,11 +258,27 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
 
 pub(super) fn canvas_tools(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
+    let member = |label: &'static str| {
+        div()
+            .w(px(150.0))
+            .p_token(&theme, Space::Sm)
+            .card_surface(&theme, CardVariant::Outlined)
+            .type_scale(&theme, TypeScale::Caption)
+            .text_tone(&theme, TextTone::Primary)
+            .child(label)
+    };
+    let members = |left: &'static str, right: &'static str| {
+        div()
+            .row()
+            .gap_token(&theme, Space::Sm)
+            .child(member(left))
+            .child(member(right))
+    };
     stack(&theme)
         .w(px(560.0))
         .child(caption(
             &theme,
-            "overview, chrome, and a group wash; the host still owns pan and zoom",
+            "overview, chrome, and a named region; the host still owns pan and zoom",
         ))
         .child(
             CanvasToolbar::new("scene.canvas.toolbar", "125%")
@@ -279,7 +295,14 @@ pub(super) fn canvas_tools(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .view(MinimapView::new(0.22, 0.20, 0.40, 0.36))
                 .on_pan(|_, _, _, _| {}),
         )
-        .child(NodeGroup::new("scene.canvas.group", "Ingest").selected(true))
-        .child(NodeGroup::new("scene.canvas.group.quiet", "Observe"))
+        .child(
+            NodeGroup::new("scene.canvas.group", "Ingest")
+                .selected(true)
+                .child(members("Stream ingest", "Validate & enrich")),
+        )
+        .child(
+            NodeGroup::new("scene.canvas.group.quiet", "Observe")
+                .child(members("Observe quality", "Publish artifact")),
+        )
         .into_any_element()
 }

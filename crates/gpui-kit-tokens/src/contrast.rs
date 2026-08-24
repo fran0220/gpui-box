@@ -11,8 +11,8 @@
 //! [`line_report`].
 
 use crate::{
-    AgentColor, Color, InteractiveColor, SemanticColor, Surface, SyntaxColor, TextTone,
-    TokenDocument, contrast_ratio,
+    AgentColor, Color, InteractiveColor, LoaderColor, SemanticColor, Surface, SyntaxColor,
+    TextTone, TokenDocument, contrast_ratio,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -162,15 +162,17 @@ pub fn report(tokens: &TokenDocument) -> Vec<ContrastCheck> {
             background,
             NON_TEXT_MINIMUM,
         ));
-        for (index, color) in tokens.loader_gradient().into_iter().enumerate() {
-            checks.push(check(
-                &format!("color.loader.gradient.{index}"),
-                color,
-                surface_name,
-                background,
-                NON_TEXT_MINIMUM,
-            ));
-        }
+        // Of the four loader roles only the mark is held here: it is the
+        // moving part a reader watches, so it carries the same 3:1 an active
+        // visual identity gets. The track, placeholder and sheen are quiet by
+        // contract and are held to their own band in `placeholder_report`.
+        checks.push(check(
+            LoaderColor::Mark.path(),
+            tokens.loader(LoaderColor::Mark),
+            surface_name,
+            background,
+            NON_TEXT_MINIMUM,
+        ));
     }
 
     // Every ANSI slot has to be legible on the terminal background *of its own
@@ -491,12 +493,106 @@ pub fn line_report(tokens: &TokenDocument) -> Vec<LineCheck> {
             distance: (drawn.lightness() - background.lightness()).abs(),
             minimum: LINE_MINIMUM,
         });
+        // The groove a progress mark travels is structure, not a control
+        // boundary: like a hairline, its whole failure mode is being typed
+        // and never drawn.
+        let drawn = crate::over(tokens.loader(LoaderColor::Track), background);
+        checks.push(LineCheck {
+            line: LoaderColor::Track.path().into(),
+            surface: surface_name.into(),
+            distance: (drawn.lightness() - background.lightness()).abs(),
+            minimum: LINE_MINIMUM,
+        });
     }
     checks
 }
 
 pub fn line_failures(tokens: &TokenDocument) -> Vec<LineCheck> {
     line_report(tokens)
+        .into_iter()
+        .filter(|check| !check.passes())
+        .collect()
+}
+
+/// One loading placeholder on one surface, and how loudly it reads there.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PlaceholderCheck {
+    pub role: String,
+    pub surface: String,
+    pub distance: f32,
+    pub minimum: f32,
+    pub maximum: f32,
+}
+
+impl PlaceholderCheck {
+    pub fn passes(&self) -> bool {
+        self.distance >= self.minimum && self.distance <= self.maximum
+    }
+}
+
+/// The least a loading placeholder may stand from its surface, in L\*.
+///
+/// The floor is the line rule's concern restated: a skeleton typed at an
+/// alpha that rounds away is a blank region the author believes is a shape.
+pub const PLACEHOLDER_MINIMUM: f32 = 3.0;
+
+/// The most a loading placeholder may stand from its surface, in L\*.
+///
+/// The ceiling is the point of the rule, and it is the one this table did not
+/// have while every skeleton in the library was filled with
+/// `color.interactive.track`: a 3:1 control boundary used as a fill reads
+/// around 40 L\* from a dark panel, which made *the absence of content* the
+/// brightest thing on the page. A placeholder is a shape being awaited, not
+/// content — too loud is a defect exactly as real as invisible.
+pub const PLACEHOLDER_MAXIMUM: f32 = 14.0;
+
+/// The least a sheen may change the placeholder it crosses, in L\*.
+///
+/// Measured over the composited placeholder rather than the bare surface,
+/// because that is the only plane a sheen is ever drawn on: a highlight that
+/// clears every surface but vanishes on the skeleton itself is still a
+/// shimmer nobody sees.
+pub const SHEEN_MINIMUM: f32 = 1.5;
+
+/// Evaluates the quiet loader roles for one theme.
+///
+/// `placeholder` is composited over every surface and must land inside the
+/// band — visible, and quieter than content. `sheen` is composited over that
+/// result and must move it at all.
+pub fn placeholder_report(tokens: &TokenDocument) -> Vec<PlaceholderCheck> {
+    let surfaces = [
+        ("color.surface.backdrop", Surface::Backdrop),
+        ("color.surface.canvas", Surface::Canvas),
+        ("color.surface.sunken", Surface::Sunken),
+        ("color.surface.panel", Surface::Panel),
+        ("color.surface.raised", Surface::Raised),
+        ("color.surface.overlay", Surface::Overlay),
+    ];
+    let mut checks = Vec::new();
+    for (surface_name, surface) in surfaces {
+        let background = tokens.surface(surface);
+        let placeholder = crate::over(tokens.loader(LoaderColor::Placeholder), background);
+        checks.push(PlaceholderCheck {
+            role: LoaderColor::Placeholder.path().into(),
+            surface: surface_name.into(),
+            distance: (placeholder.lightness() - background.lightness()).abs(),
+            minimum: PLACEHOLDER_MINIMUM,
+            maximum: PLACEHOLDER_MAXIMUM,
+        });
+        let lit = crate::over(tokens.loader(LoaderColor::Sheen), placeholder);
+        checks.push(PlaceholderCheck {
+            role: LoaderColor::Sheen.path().into(),
+            surface: format!("{surface_name} + {}", LoaderColor::Placeholder.path()),
+            distance: (lit.lightness() - placeholder.lightness()).abs(),
+            minimum: SHEEN_MINIMUM,
+            maximum: f32::INFINITY,
+        });
+    }
+    checks
+}
+
+pub fn placeholder_failures(tokens: &TokenDocument) -> Vec<PlaceholderCheck> {
+    placeholder_report(tokens)
         .into_iter()
         .filter(|check| !check.passes())
         .collect()
@@ -631,11 +727,79 @@ mod tests {
     #[test]
     fn the_report_covers_every_surface_and_tone() {
         let checks = report(crate::studio_dark());
-        // Twenty-five tones against each of six surfaces, ten code checks
+        // Twenty-three tones against each of six surfaces, ten code checks
         // against each of the two surfaces code is drawn on, the sixteen ANSI
         // slots against the terminal background, and `onAccent` against
         // `accent`.
-        assert_eq!(checks.len(), 6 * 25 + 2 * 10 + 16 + 1);
+        assert_eq!(checks.len(), 6 * 23 + 2 * 10 + 16 + 1);
+    }
+
+    #[test]
+    fn every_bundled_theme_keeps_its_placeholders_inside_the_band() {
+        for tokens in crate::bundled() {
+            let failures = placeholder_failures(tokens);
+            assert!(
+                failures.is_empty(),
+                "{} draws placeholders outside the loudness band: {:#?}",
+                tokens.meta.id,
+                failures
+            );
+        }
+    }
+
+    /// The regression the ceiling exists to catch: the 3:1 control boundary
+    /// used as a skeleton fill, which made the absence of content the
+    /// brightest thing on a dark page.
+    #[test]
+    fn a_control_track_used_as_a_skeleton_fill_is_rejected() {
+        let mut tokens = crate::studio_dark().clone();
+        tokens.color.loader.placeholder = tokens.color.interactive.track.clone();
+        let failures = placeholder_failures(&tokens);
+        assert!(
+            failures
+                .iter()
+                .any(|check| check.role == "color.loader.placeholder"
+                    && check.distance > check.maximum),
+            "{failures:#?}"
+        );
+        assert!(matches!(
+            tokens.validate(),
+            Err(crate::TokenError::Placeholder(_))
+        ));
+    }
+
+    /// A sheen is only ever drawn over the placeholder, so it is measured
+    /// there; one that composites back into the skeleton is a shimmer nobody
+    /// sees.
+    #[test]
+    fn a_sheen_that_vanishes_on_its_own_placeholder_is_rejected() {
+        let mut tokens = crate::studio_dark().clone();
+        tokens.color.loader.sheen = "{neutral.900}/01".into();
+        let failures = placeholder_failures(&tokens);
+        assert!(
+            failures
+                .iter()
+                .any(|check| check.role == "color.loader.sheen"),
+            "{failures:#?}"
+        );
+    }
+
+    /// The mark is the moving part a reader watches, so it is the one loader
+    /// role held to the identity floor rather than the quiet band.
+    #[test]
+    fn the_loader_mark_is_held_to_the_identity_floor_everywhere() {
+        for tokens in crate::bundled() {
+            let checks = report(tokens);
+            let marks: Vec<_> = checks
+                .iter()
+                .filter(|check| check.foreground == LoaderColor::Mark.path())
+                .collect();
+            assert_eq!(marks.len(), 6, "{}", tokens.meta.id);
+            for check in marks {
+                assert_eq!(check.minimum, NON_TEXT_MINIMUM);
+                assert!(check.passes(), "{}: {check:#?}", tokens.meta.id);
+            }
+        }
     }
 
     #[test]

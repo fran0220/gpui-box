@@ -40,6 +40,16 @@ impl FontKey {
     }
 }
 
+/// Why a family is being loaded, which decides what the face has to carry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FamilyRole {
+    /// The family a run asked for. It answers `em_width`, so it needs `m`.
+    Primary,
+    /// A family named in a fallback list. It is reached only for characters
+    /// the primary does not cover and is never measured with.
+    Fallback,
+}
+
 struct CosmicTextSystemState {
     font_system: FontSystem,
     scratch: ShapeBuffer,
@@ -231,6 +241,16 @@ impl CosmicTextSystemState {
         features: &FontFeatures,
         fallbacks: Option<&FontFallbacks>,
     ) -> Result<SmallVec<[FontId; 4]>> {
+        self.load_family_as(name, features, fallbacks, FamilyRole::Primary)
+    }
+
+    fn load_family_as(
+        &mut self,
+        name: &str,
+        features: &FontFeatures,
+        fallbacks: Option<&FontFallbacks>,
+        role: FamilyRole,
+    ) -> Result<SmallVec<[FontId; 4]>> {
         // recurse with `fallbacks = None` so a fallback family cannot pull in
         // another chain. missing fallback families are dropped so a typo in
         // settings still lets the primary family load.
@@ -246,7 +266,12 @@ impl CosmicTextSystemState {
                     let fb_ids = if let Some(cached) = self.font_ids_by_family_cache.get(&fb_key) {
                         cached.clone()
                     } else {
-                        let loaded = self.load_family(fallback_name, features, None)?;
+                        let loaded = self.load_family_as(
+                            fallback_name,
+                            features,
+                            None,
+                            FamilyRole::Fallback,
+                        )?;
                         self.font_ids_by_family_cache
                             .insert(fb_key.clone(), loaded.clone());
                         loaded
@@ -285,15 +310,8 @@ impl CosmicTextSystemState {
                 .get_font(font_id, cosmic_text::Weight::NORMAL)
                 .context("Could not load font")?;
 
-            // HACK: To let the storybook run and render Windows caption icons. We should actually do better font fallback.
-            let allowed_bad_font_names = [
-                "SegoeFluentIcons", // NOTE: Segoe fluent icons postscript name is inconsistent
-                "Segoe Fluent Icons",
-            ];
-
-            if font.as_swash().charmap().map('m') == 0
-                && !allowed_bad_font_names.contains(&postscript_name.as_str())
-            {
+            let has_m = font.as_swash().charmap().map('m') != 0;
+            if !face_is_usable(has_m, &postscript_name, role) {
                 self.font_system.db_mut().remove_face(font.id());
                 continue;
             };
@@ -937,6 +955,23 @@ fn pick_covering_slot(
     None
 }
 
+/// Whether a face may be kept for the role it was loaded under.
+///
+/// `em_width` measures with `m`, and a caller asks a family for its em before
+/// it draws, so a primary family whose face has no `m` is dropped rather than
+/// left to answer with nothing. A face named in a *fallback list* is never
+/// measured with — it is reached only for the characters the primary does not
+/// cover — and requiring `m` of it rejects exactly the symbol-only faces a
+/// fallback list exists to name.
+fn face_is_usable(has_m: bool, postscript_name: &str, role: FamilyRole) -> bool {
+    // HACK: To let the storybook run and render Windows caption icons. We should actually do better font fallback.
+    const ALLOWED_BAD_FONT_NAMES: [&str; 2] = [
+        "SegoeFluentIcons", // NOTE: Segoe fluent icons postscript name is inconsistent
+        "Segoe Fluent Icons",
+    ];
+    has_m || role == FamilyRole::Fallback || ALLOWED_BAD_FONT_NAMES.contains(&postscript_name)
+}
+
 fn charmap_covers(loaded_fonts: &[LoadedFont], id: FontId, ch: char) -> bool {
     loaded_fonts
         .get(id.0)
@@ -1239,6 +1274,39 @@ mod tests {
             }]
         );
         assert!(clip_font_runs(&runs, 5..5).is_empty());
+    }
+
+    #[test]
+    fn a_symbol_only_face_survives_as_a_fallback_but_not_as_a_family() {
+        // A face carrying `⌘ ⌥ ⌃` and nothing else is the whole reason a
+        // caller names a fallback. Dropping it for having no `m` left the
+        // shaper with `.notdef` for precisely the codepoints the bundle was
+        // added to cover, so which glyph appeared depended on the machine.
+        assert!(face_is_usable(
+            false,
+            "SomeKeySymbols",
+            FamilyRole::Fallback
+        ));
+        assert!(!face_is_usable(
+            false,
+            "SomeKeySymbols",
+            FamilyRole::Primary
+        ));
+    }
+
+    #[test]
+    fn a_face_that_can_be_measured_is_kept_for_either_role() {
+        assert!(face_is_usable(true, "Geist Mono", FamilyRole::Primary));
+        assert!(face_is_usable(true, "Geist Mono", FamilyRole::Fallback));
+    }
+
+    #[test]
+    fn the_named_exceptions_stay_usable_as_a_family() {
+        assert!(face_is_usable(
+            false,
+            "SegoeFluentIcons",
+            FamilyRole::Primary
+        ));
     }
 
     #[test]

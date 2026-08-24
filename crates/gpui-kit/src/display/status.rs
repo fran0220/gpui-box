@@ -6,15 +6,80 @@ use gpui::{
 };
 use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Surface, TypeScale};
 
 use crate::controls::button::IconButton;
 use crate::display::badge::Tone;
+use crate::foundation::direction::ActiveDirection;
 use crate::foundation::{Ident, Sizable, StyledExt};
 use crate::motion;
 use crate::strings::{ActiveStrings, StringKey};
 
 type DismissHandler = Rc<dyn Fn(&mut Window, &mut App)>;
+
+/// The glyph a severity is drawn with.
+///
+/// A dot says *something has a state*; it cannot say which one without being
+/// read for its colour, which is the one channel a reader may not have. The
+/// four severities that name an outcome therefore lead with a picture of that
+/// outcome, and the two that do not — neutral and accent — keep the dot,
+/// because there is nothing for them to draw.
+fn tone_glyph(tone: Tone) -> Option<Glyph> {
+    match tone {
+        Tone::Success => Some(Glyph::Check),
+        Tone::Warning => Some(Glyph::Danger),
+        Tone::Danger => Some(Glyph::CloseCircle),
+        Tone::Info => Some(Glyph::Info),
+        Tone::Neutral | Tone::Accent => None,
+    }
+}
+
+/// The mark a report leads with, sized and aligned to the first line of text.
+fn severity_mark(tone: Tone, theme: &gpui_kit_theme::Theme) -> AnyElement {
+    let color = tone.color(theme);
+    let edge = theme.control.sm.icon_size;
+    match tone_glyph(tone) {
+        Some(glyph) => div()
+            .flex_none()
+            .h(px(theme.typography.body.line_height))
+            .flex()
+            .items_center()
+            .child(crate::display::icon::paint(glyph, edge, color, false))
+            .into_any_element(),
+        None => div()
+            .flex_none()
+            .h(px(theme.typography.body.line_height))
+            .flex()
+            .items_center()
+            .child(StatusDot::new(tone))
+            .into_any_element(),
+    }
+}
+
+/// The band at the reading edge that carries the severity.
+///
+/// A report used to be a wash of its own colour across the whole surface,
+/// which made a yellow one heavier than the red one above it for no reason
+/// anybody meant. The colour is spent on a rail and a glyph instead, so two
+/// severities differ by hue and by picture and never by weight.
+fn tone_rail(
+    theme: &gpui_kit_theme::Theme,
+    color: gpui::Hsla,
+    direction: crate::foundation::LayoutDirection,
+) -> gpui::Div {
+    let bar = div()
+        .absolute()
+        .top_0()
+        .bottom_0()
+        .w(px(theme.effects.selection_rail_width))
+        .flex_none()
+        .bg(color);
+    if direction.is_rtl() {
+        bar.right_0()
+    } else {
+        bar.left_0()
+    }
+}
 
 /// A tone-colored dot, the smallest state indicator in the system.
 #[derive(Debug, IntoElement)]
@@ -218,24 +283,28 @@ impl RenderOnce for Callout {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let color = self.tone.color(&theme);
+        let direction = cx.layout_direction();
         let content = div()
             .w_full()
             .flex()
             .flex_row()
             .items_start()
             .gap_token(&theme, Space::Sm)
-            .child(div().mt(px(5.0)).child(StatusDot::new(self.tone)))
+            .child(severity_mark(self.tone, &theme))
             .child(div().min_w_0().child(self.message.clone()));
 
         let frame = div()
+            .relative()
             .w_full()
+            .overflow_hidden()
             .px_token(&theme, Space::Lg)
             .py_token(&theme, Space::Md)
             .radius(&theme, Radius::Card)
-            .bg(color.opacity(0.14))
+            .surface(&theme, Surface::Panel)
+            .child(tone_rail(&theme, color, direction))
             .type_scale(&theme, TypeScale::Label)
             .line_height(px(theme.typography.body.line_height))
-            .text_color(color.opacity(0.92));
+            .text_color(theme.colors.text);
 
         // A callout is a report arriving, so it arrives rather than appearing.
         // The travel is inside the frame that publishes the node, so the
@@ -326,19 +395,23 @@ impl RenderOnce for Banner {
         });
 
         div()
+            .relative()
             .w_full()
+            .overflow_hidden()
             .row()
             .items_start()
             .gap_token(&theme, Space::Sm)
             .px_token(&theme, Space::Lg)
             .py_token(&theme, Space::Md)
             .radius(&theme, Radius::Card)
-            .bg(color.opacity(0.14))
-            .child(div().mt(px(5.0)).child(StatusDot::new(self.tone)))
+            .surface(&theme, Surface::Panel)
+            .child(tone_rail(&theme, color, cx.layout_direction()))
+            .child(severity_mark(self.tone, &theme))
             .child(
                 div()
                     .column()
                     .gap_token(&theme, Space::Xs)
+                    .items_start()
                     .flex_1()
                     .min_w_0()
                     .when_some(self.title.clone(), |element, title| {
@@ -352,10 +425,15 @@ impl RenderOnce for Banner {
                     .child(
                         div()
                             .type_scale(&theme, TypeScale::Body)
-                            .text_color(color.opacity(0.92))
+                            .text_color(theme.colors.text)
                             .child(self.message.clone()),
                     )
-                    .children(self.action),
+                    // An action inside a report is a control, not a second
+                    // bar: it takes the width of its own label and no more.
+                    .children(
+                        self.action
+                            .map(|action| div().row().flex_none().child(action)),
+                    ),
             )
             .children(dismiss)
             .semantic_in(

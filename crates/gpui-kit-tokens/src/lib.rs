@@ -32,6 +32,8 @@ pub enum TokenError {
     Separation(String),
     #[error("token decorative lines are not visible:\n{0}")]
     Line(String),
+    #[error("token loading placeholders are outside their loudness band:\n{0}")]
+    Placeholder(String),
     #[error("token tones are not distinguishable:\n{0}")]
     Distinction(String),
 }
@@ -227,6 +229,15 @@ impl TokenDocument {
             }
         }
 
+        // A bloom pulled in further than it is blurred never reaches the
+        // surface's edge, which is a glow the theme pays for and nobody sees.
+        if self.effect.glow_spread > 0.0 || self.effect.glow_spread.abs() >= self.effect.glow_blur {
+            return invalid(
+                "effect.glowSpread",
+                "must not be positive and must be pulled in by less than effect.glowBlur",
+            );
+        }
+
         if self.effect.glass_specular_sharpness < 1.0 {
             return invalid("effect.glassSpecularSharpness", "must be at least 1");
         }
@@ -345,6 +356,26 @@ impl TokenDocument {
                         format!(
                             "  {} on {} gains {:.2} L*; requires {:.2}",
                             failure.line, failure.surface, failure.distance, failure.minimum
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ));
+        }
+
+        let failures = contrast::placeholder_failures(self);
+        if !failures.is_empty() {
+            return Err(TokenError::Placeholder(
+                failures
+                    .iter()
+                    .map(|failure| {
+                        format!(
+                            "  {} over {} reads {:.1} L*; requires {:.1} to {:.1}",
+                            failure.role,
+                            failure.surface,
+                            failure.distance,
+                            failure.minimum,
+                            failure.maximum
                         )
                     })
                     .collect::<Vec<_>>()
@@ -471,12 +502,14 @@ impl TokenDocument {
         self.resolved(role.path(), value)
     }
 
-    pub fn loader_gradient(&self) -> [Color; 3] {
-        [
-            self.resolved("color.loader.gradient.0", &self.color.loader.gradient[0]),
-            self.resolved("color.loader.gradient.1", &self.color.loader.gradient[1]),
-            self.resolved("color.loader.gradient.2", &self.color.loader.gradient[2]),
-        ]
+    pub fn loader(&self, role: LoaderColor) -> Color {
+        let value = match role {
+            LoaderColor::Mark => self.color.loader.mark.as_str(),
+            LoaderColor::Track => self.color.loader.track.as_str(),
+            LoaderColor::Placeholder => self.color.loader.placeholder.as_str(),
+            LoaderColor::Sheen => self.color.loader.sheen.as_str(),
+        };
+        self.resolved(role.path(), value)
     }
 
     /// One paint class of code, from this theme.
@@ -784,6 +817,32 @@ pub enum SemanticColor {
     Warning,
     Success,
     Info,
+}
+
+/// The four neutral paint roles of work in progress. See [`LoaderColors`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LoaderColor {
+    /// The moving part: a bar's fill, a spinner's arc, a breathing dot.
+    Mark,
+    /// The groove the mark travels, quieter than the mark by construction.
+    Track,
+    /// The shape of content that is not there yet.
+    Placeholder,
+    /// The highlight that crosses a placeholder.
+    Sheen,
+}
+
+impl LoaderColor {
+    pub const ALL: [Self; 4] = [Self::Mark, Self::Track, Self::Placeholder, Self::Sheen];
+
+    pub fn path(self) -> &'static str {
+        match self {
+            Self::Mark => "color.loader.mark",
+            Self::Track => "color.loader.track",
+            Self::Placeholder => "color.loader.placeholder",
+            Self::Sheen => "color.loader.sheen",
+        }
+    }
 }
 
 /// Paint roles used by quiet evidence inside an agent transcript.
@@ -1213,7 +1272,7 @@ pub struct ColorTokens {
 }
 
 impl ColorTokens {
-    fn entries(&self) -> [(&'static str, &str); 45] {
+    fn entries(&self) -> [(&'static str, &str); 46] {
         [
             ("color.agent.read", &self.agent.read),
             ("color.agent.network", &self.agent.network),
@@ -1260,9 +1319,10 @@ impl ColorTokens {
             ("color.semantic.warning", &self.semantic.warning),
             ("color.semantic.success", &self.semantic.success),
             ("color.semantic.info", &self.semantic.info),
-            ("color.loader.gradient.0", &self.loader.gradient[0]),
-            ("color.loader.gradient.1", &self.loader.gradient[1]),
-            ("color.loader.gradient.2", &self.loader.gradient[2]),
+            ("color.loader.mark", &self.loader.mark),
+            ("color.loader.track", &self.loader.track),
+            ("color.loader.placeholder", &self.loader.placeholder),
+            ("color.loader.sheen", &self.loader.sheen),
         ]
     }
 }
@@ -1333,10 +1393,24 @@ pub struct AgentColors {
     pub evidence_wash: String,
 }
 
+/// The neutral vocabulary of work in progress.
+///
+/// Waiting is not information, so nothing here is allowed a hue: the set is
+/// grey by contract and any colour a loading surface shows is the caller's
+/// own meaning, not the library's decoration. `mark` is the moving part — a
+/// bar's fill, a spinner's arc, a breathing dot — and is the only member held
+/// to a legibility floor. `track` is the groove that mark travels, quieter
+/// than the mark by construction. `placeholder` is the shape of absent
+/// content, held *inside* a loudness band because a skeleton that outshouts
+/// real content is a defect, not an emphasis. `sheen` is the highlight that
+/// crosses a placeholder, measured against the placeholder it crosses.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct LoaderColors {
-    pub gradient: [String; 3],
+    pub mark: String,
+    pub track: String,
+    pub placeholder: String,
+    pub sheen: String,
 }
 
 /// The vocabulary code is painted in, wherever this library draws code.
@@ -1596,6 +1670,18 @@ pub struct EffectTokens {
     pub glow_alpha: f32,
     /// How far that bleed reaches, in pixels.
     pub glow_blur: f32,
+    /// The bloom budget: how far the glow is pulled in before it is blurred,
+    /// in pixels. Negative by design.
+    ///
+    /// A blurred shadow at spread zero puts its full alpha at the surface's
+    /// own edge and reaches `glowBlur` past it in every direction, which is
+    /// how a failed card came to tint the card beside it and a running node
+    /// came to be cut flat at the edge of its canvas. Pulling the shape in
+    /// first keeps the state readable at the edge it belongs to and keeps it
+    /// out of its neighbours' pixels. The validator holds `|glowSpread|`
+    /// below `glowBlur`, because a bloom pulled in further than it is blurred
+    /// is a glow nobody sees.
+    pub glow_spread: f32,
     /// How opaque a frosted surface's own fill is over what it blurs. A theme
     /// that sets this to 1 declares itself opaque, and a frosted surface then
     /// paints no blur at all rather than blurring pixels nobody can see.

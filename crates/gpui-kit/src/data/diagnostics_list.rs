@@ -9,7 +9,7 @@ use gpui::{App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Wi
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TextTone, TypeScale};
 
-use crate::controls::button::Button;
+use crate::controls::button::{Button, ButtonVariant};
 use crate::controls::filter_bar::{FilterBar, FilterCondition, ResultCount};
 use crate::controls::toggle_button::Toggle;
 use crate::data::list::{List, ListItem};
@@ -418,22 +418,33 @@ impl RenderOnce for DiagnosticsList {
                     .flex()
                     .flex_wrap()
                     .gap(px(cx.theme().space(Space::Xs)))
-                    .children(DiagnosticSeverity::ALL.map(|severity| {
-                        let mut toggle =
-                            Toggle::new(ident.child("filters.severities").child(severity.name()))
+                    // Only the severities the filter is currently leaving out
+                    // appear here. The chips above already say which ones are
+                    // applied, and a control that repeats them says the same
+                    // four things twice in two languages: this row offers what
+                    // is missing, the chips drop what is there.
+                    .children(
+                        DiagnosticSeverity::ALL
+                            .into_iter()
+                            .filter(|severity| !self.filter.contains(*severity))
+                            .map(|severity| {
+                                let mut toggle = Toggle::new(
+                                    ident.child("filters.severities").child(severity.name()),
+                                )
                                 .label(severity.label(cx))
                                 .pressed(self.filter.contains(severity))
                                 .control_size(self.size)
                                 .disabled(self.disabled)
                                 .semantic_parent(ident.child("filters").semantic_id());
-                        if let Some(handler) = filter_handler.clone() {
-                            let filter = self.filter;
-                            toggle = toggle.on_press(move |included, window, cx| {
-                                handler(filter.setting(severity, included), window, cx);
-                            });
-                        }
-                        toggle
-                    }));
+                                if let Some(handler) = filter_handler.clone() {
+                                    let filter = self.filter;
+                                    toggle = toggle.on_press(move |included, window, cx| {
+                                        handler(filter.setting(severity, included), window, cx);
+                                    });
+                                }
+                                toggle
+                            }),
+                    );
                 let mut bar = FilterBar::new(ident.child("filters"))
                     .conditions(conditions)
                     .add_control(filter_control)
@@ -484,8 +495,11 @@ impl RenderOnce for DiagnosticsList {
                                 Button::new(item_ident.child("action").child(action.id.as_ref()))
                                     .label(action.label.clone())
                                     .semantic_parent(item_ident.semantic_id())
-                                    .ghost()
-                                    .control_size(size)
+                                    // A row action carries its own frame: a
+                                    // ghost label beside a message is prose
+                                    // that happens to be clickable.
+                                    .variant(ButtonVariant::Secondary)
+                                    .control_size(ControlSize::Sm)
                                     .disabled(disabled || diagnostic.disabled || action.disabled);
                             if let Some(handler) = action_handler
                                 .clone()
@@ -500,10 +514,33 @@ impl RenderOnce for DiagnosticsList {
                             }
                             button
                         });
+                        // Severity leads the row and holds a column of its
+                        // own, so four badges land at one x and a reader
+                        // scans the column instead of hunting the ragged
+                        // right edge each message left behind.
+                        let severity_column = cx.theme().control.get(size).height * 3.0;
                         let content = div()
                             .flex()
                             .items_center()
                             .gap(px(cx.theme().space(Space::Sm)))
+                            .child(
+                                div()
+                                    .flex_none()
+                                    .w(px(severity_column))
+                                    .child(
+                                        Badge::new(diagnostic.severity.label(cx))
+                                            .tone(diagnostic.severity.tone()),
+                                    )
+                                    .semantic_in(
+                                        cx,
+                                        NodeSpec::new(
+                                            item_ident.child("severity").semantic_id(),
+                                            Role::Status,
+                                        )
+                                        .parent(item_ident.semantic_id())
+                                        .text(diagnostic.severity.label(cx)),
+                                    ),
+                            )
                             .child(
                                 div()
                                     .flex()
@@ -526,21 +563,11 @@ impl RenderOnce for DiagnosticsList {
                             .child(
                                 div()
                                     .flex_none()
-                                    .child(
-                                        Badge::new(diagnostic.severity.label(cx))
-                                            .tone(diagnostic.severity.tone()),
-                                    )
-                                    .semantic_in(
-                                        cx,
-                                        NodeSpec::new(
-                                            item_ident.child("severity").semantic_id(),
-                                            Role::Status,
-                                        )
-                                        .parent(item_ident.semantic_id())
-                                        .text(diagnostic.severity.label(cx)),
-                                    ),
-                            )
-                            .children(actions);
+                                    .flex()
+                                    .items_center()
+                                    .gap(px(cx.theme().space(Space::Xs)))
+                                    .children(actions),
+                            );
                         ListItem::new(diagnostic.id.clone(), content)
                             .text(diagnostic.message.clone())
                             .disabled(disabled || diagnostic.disabled)

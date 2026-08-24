@@ -51,7 +51,8 @@ pub use video_player::VideoPlayer;
 pub use waveform::{AudioWaveform, AudioWaveformState};
 
 use gpui::{AnyElement, Hsla, IntoElement, ParentElement, SharedString, Styled, div, px};
-use gpui_kit_theme::{Space, Theme, TypeScale};
+use gpui_kit_assets::{Icon, icon};
+use gpui_kit_theme::{ControlSize, Space, Theme, TypeScale};
 
 use crate::foundation::{StyledExt, text};
 
@@ -69,39 +70,73 @@ pub(crate) enum NoticePlace {
 ///
 /// A title and the backend's own sentence, never an empty rectangle: a reader
 /// shown a blank frame cannot tell a refusal from silence.
-fn notice(theme: &Theme, tint: Hsla, title: SharedString, detail: SharedString) -> AnyElement {
-    notice_at(theme, tint, title, detail, NoticePlace::Middle)
+fn notice(
+    theme: &Theme,
+    tint: Hsla,
+    mark: Option<Icon>,
+    title: SharedString,
+    detail: SharedString,
+) -> AnyElement {
+    notice_at(theme, tint, mark, title, detail, NoticePlace::Middle)
 }
 
 /// The same sentence, placed against whatever is already on the surface.
+///
+/// The mark says which kind of surface is empty. Without it an empty frame is
+/// a rectangle with a sentence in it, and every empty surface in the library
+/// looks like the same fault.
 fn notice_at(
     theme: &Theme,
     tint: Hsla,
+    mark: Option<Icon>,
     title: SharedString,
     detail: SharedString,
     place: NoticePlace,
 ) -> AnyElement {
-    let base = match place {
-        NoticePlace::Middle => div().absolute().inset_0().justify_center(),
+    match place {
+        NoticePlace::Middle => div()
+            .absolute()
+            .inset_0()
+            .column()
+            .items_center()
+            .justify_center()
+            .gap_token(theme, Space::Xs)
+            .p_token(theme, Space::Lg)
+            .text_align(gpui::TextAlign::Center)
+            .children(mark.map(|mark| {
+                icon(mark)
+                    .size(px(theme.control.get(ControlSize::Lg).icon_size))
+                    .text_color(theme.colors.text_faint)
+            }))
+            .child(text(theme, TypeScale::Subtitle, title))
+            .child(
+                text(theme, TypeScale::Body, detail)
+                    .max_w(px(360.0))
+                    .text_color(tint),
+            )
+            .into_any_element(),
         // A still is worth keeping visible, so the sentence takes a band at
-        // the foot on a scrim of its own rather than covering the picture.
+        // the foot on a scrim of its own. One line of it: a block deep enough
+        // to hold a centred heading and a wrapped paragraph stops being a band
+        // over the picture and becomes a second box beside it.
         NoticePlace::Foot => div()
             .absolute()
             .bottom_0()
             .left_0()
             .right_0()
-            .bg(theme.colors.canvas.opacity(0.88)),
-    };
-    base.column()
-        .items_center()
-        .gap_token(theme, Space::Xs)
-        .p_token(theme, Space::Lg)
-        .text_align(gpui::TextAlign::Center)
-        .child(text(theme, TypeScale::Subtitle, title))
-        .child(
-            text(theme, TypeScale::Body, detail)
-                .max_w(px(360.0))
-                .text_color(tint),
-        )
-        .into_any_element()
+            .row()
+            .items_baseline()
+            .gap_token(theme, Space::Sm)
+            .px_token(theme, Space::Md)
+            .py_token(theme, Space::Sm)
+            .bg(theme.colors.canvas.opacity(0.88))
+            .child(text(theme, TypeScale::Label, title).flex_none())
+            .child(
+                text(theme, TypeScale::Caption, detail)
+                    .min_w_0()
+                    .overflow_hidden()
+                    .text_color(tint),
+            )
+            .into_any_element(),
+    }
 }

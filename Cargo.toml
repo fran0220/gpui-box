@@ -29,6 +29,7 @@ members = [
   "examples/browser-gallery",
   "examples/gallery",
   "tools/mcp",
+  "tools/performance-check",
   "xtask",
 ]
 # Its own workspace on purpose: the cross-platform visual harness has

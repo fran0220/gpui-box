@@ -1679,12 +1679,18 @@ fn line_canvas(
             grouped.sort_by_key(|series| series[0].series_order);
 
             if area {
+                // Two fills at the weight one fill wants stack into a third
+                // colour that belongs to neither series and matches no entry
+                // in the key. The more series overlap, the less each fill is
+                // allowed to say, and the line stays the thing that carries
+                // the identity.
+                let crowding = 1.0 / (grouped.len().max(1) as f32).sqrt();
                 for series in &grouped {
                     if series.len() < 2 {
                         continue;
                     }
-                    let opacity =
-                        series.iter().map(|point| point.opacity).sum::<f32>() / series.len() as f32;
+                    let opacity = crowding * series.iter().map(|point| point.opacity).sum::<f32>()
+                        / series.len() as f32;
                     let color = series[0].color;
                     let samples: Vec<Point<f32>> =
                         series.iter().map(|sample| sample.position).collect();
@@ -2015,10 +2021,33 @@ fn ready_pie(
     cx: &mut App,
 ) -> AnyElement {
     let painted = sync_motion(ident, &active, theme, window, cx);
+    // A pie divides one series into its parts, so the thing a reader has to
+    // tell apart is a slice and not a series. Painted in the series colour
+    // they are one disc with hairline seams in it; each slice takes its own
+    // step down the same colour instead, and the key beside it names the
+    // slices rather than the one series they all came from.
+    let count = painted.len().max(1);
     let slices = painted
         .iter()
-        .map(|point| (point.color, point.position.y.clamp(0.0, 1.0), point.opacity))
+        .enumerate()
+        .map(|(index, point)| {
+            (
+                slice_step(point.color, index, count),
+                point.position.y.clamp(0.0, 1.0),
+                point.opacity,
+            )
+        })
         .collect::<Vec<_>>();
+    let key: Vec<ChartSeries> = active
+        .iter()
+        .enumerate()
+        .map(|(index, point)| ChartSeries {
+            id: point.selection.point_id.clone(),
+            label: point.point.label.clone(),
+            points: Vec::new(),
+            color: Some(slice_step(point.color, index, count)),
+        })
+        .collect();
     div()
         .column()
         .w_full()
@@ -2026,29 +2055,23 @@ fn ready_pie(
         .child(chart_heading(label, None, theme))
         .children(stale.map(|reason| stale_warning(ident, reason, theme, cx)))
         .child(div().w_full().h(px(180.0)).child(pie_canvas(slices, donut)))
-        .child(series_legend(
-            ident,
-            &series_from_active(&active),
-            theme,
-            cx,
-        ))
+        .child(series_legend(ident, &key, theme, cx))
         .into_any_element()
 }
 
-fn series_from_active(active: &[ActivePoint]) -> Vec<ChartSeries> {
-    let mut seen = HashSet::new();
-    let mut series = Vec::new();
-    for point in active {
-        if seen.insert(point.selection.series_id.clone()) {
-            series.push(ChartSeries {
-                id: point.selection.series_id.clone(),
-                label: point.series_label.clone(),
-                points: Vec::new(),
-                color: Some(point.color),
-            });
-        }
-    }
-    series
+/// One slice's step down the series colour.
+///
+/// The ramp runs from the full colour to a little under half of it, which is
+/// the widest range that keeps the palest slice legible against the surface
+/// behind it in both appearances.
+fn slice_step(color: Hsla, index: usize, count: usize) -> Hsla {
+    let span = 0.55;
+    let position = if count <= 1 {
+        0.0
+    } else {
+        index as f32 / (count - 1) as f32
+    };
+    color.opacity(1.0 - span * position)
 }
 
 fn pie_canvas(slices: Vec<(Hsla, f32, f32)>, donut: bool) -> impl IntoElement {

@@ -335,29 +335,38 @@ impl RenderOnce for CostMeter {
                                 text(&theme, TypeScale::Label, line.label.clone())
                                     .text_tone(&theme, TextTone::Muted),
                             )
+                            // The staleness qualifies this number, so it hangs
+                            // under it. At the reading edge it looked like a
+                            // heading for the row below.
                             .child(
                                 div()
-                                    .row()
-                                    .gap_token(&theme, Space::Sm)
+                                    .column()
+                                    .items_end()
+                                    .gap_token(&theme, Space::Xs)
                                     .child(
-                                        text(&theme, TypeScale::Label, display.clone()).text_tone(
-                                            &theme,
-                                            if unavailable {
-                                                TextTone::Faint
-                                            } else {
-                                                TextTone::Primary
-                                            },
-                                        ),
+                                        div()
+                                            .row()
+                                            .items_center()
+                                            .gap_token(&theme, Space::Sm)
+                                            .child(
+                                                text(&theme, TypeScale::Label, display.clone())
+                                                    .text_tone(
+                                                        &theme,
+                                                        if unavailable {
+                                                            TextTone::Faint
+                                                        } else {
+                                                            TextTone::Primary
+                                                        },
+                                                    ),
+                                            )
+                                            .when(line.reading.is_estimate(), |element| {
+                                                element.child(estimate_mark(&ident, cx))
+                                            }),
                                     )
-                                    .when(line.reading.is_estimate(), |element| {
-                                        element.child(estimate_mark(&ident, cx))
-                                    }),
+                                    .children(line.stale.as_ref().map(|verified| {
+                                        stale_line(&ident, &theme, verified.sentence(cx), cx)
+                                    })),
                             ),
-                    )
-                    .children(
-                        line.stale
-                            .as_ref()
-                            .map(|verified| stale_line(&ident, &theme, verified.sentence(cx), cx)),
                     )
                     .semantic_in(
                         cx,
@@ -520,7 +529,18 @@ impl RenderOnce for ContextGauge {
                             }),
                     ),
             )
-            .child(
+            // A reading with no ceiling and a reading nobody has are not the
+            // same absence, so they are not the same shape: the first keeps
+            // its groove and shows nothing in it, the second has no groove to
+            // fill and is drawn as the outline of one.
+            .child(if unavailable {
+                div()
+                    .w_full()
+                    .h(px(4.0))
+                    .rounded_full()
+                    .border(px(theme.borders.hairline))
+                    .border_color(theme.colors.hairline_strong)
+            } else {
                 div()
                     .relative()
                     .w_full()
@@ -539,11 +559,14 @@ impl RenderOnce for ContextGauge {
                                 .top_0()
                                 .bottom_0()
                                 .rounded_full()
-                                .bg(theme.colors.accent)
+                                // Neutral and solid: the proportion is the
+                                // reading, and an accent here would make every
+                                // context gauge the loudest thing on a panel.
+                                .bg(theme.colors.text_muted)
                                 .w(relative(fraction)),
                         )
-                    }),
-            )
+                    })
+            })
             .children(limit_note)
             .children(
                 self.stale

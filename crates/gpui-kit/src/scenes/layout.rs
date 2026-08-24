@@ -2,6 +2,43 @@
 
 use super::support::*;
 
+/// A pane with a heading and something under it worth resizing.
+///
+/// Two panes of the same fixture copy demonstrate a divider and nothing else:
+/// what a reader has to be able to judge is that the two sides hold different
+/// things and that dragging trades room between them, so each side is given
+/// its own kind of content and its own heading.
+fn pane(theme: &Theme, title: &'static str, rows: &'static [&'static str]) -> gpui::Div {
+    div()
+        .column()
+        .size_full()
+        .min_w_0()
+        .overflow_hidden()
+        .child(
+            div()
+                .row()
+                .items_center()
+                .px(px(theme.space(Space::Md)))
+                .py(px(theme.space(Space::Sm)))
+                .child(
+                    crate::foundation::text(theme, TypeScale::Label, title)
+                        .text_tone(theme, TextTone::Muted),
+                ),
+        )
+        .child(crate::foundation::rule(theme))
+        .child(
+            div()
+                .column()
+                .gap(px(theme.space(Space::Xs)))
+                .px(px(theme.space(Space::Md)))
+                .py(px(theme.space(Space::Sm)))
+                .children(
+                    rows.iter()
+                        .map(|row| crate::foundation::text(theme, TypeScale::Body, *row)),
+                ),
+        )
+}
+
 pub(super) fn split_pane(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)
@@ -20,8 +57,33 @@ pub(super) fn split_pane(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .min_sizes(120.0, 200.0)
                         .collapsible(true)
                         .handle_label("Resize the file tree")
-                        .start(filler(&theme, "Files", 6))
-                        .end(filler(&theme, "Editor", 8))
+                        .start(pane(
+                            &theme,
+                            "Files",
+                            &[
+                                "src/",
+                                "  main.rs",
+                                "  theme.rs",
+                                "  layout/",
+                                "    split.rs",
+                                "    scroll.rs",
+                                "Cargo.toml",
+                            ],
+                        ))
+                        .end(pane(
+                            &theme,
+                            "split.rs",
+                            &[
+                                "pub struct SplitPane {",
+                                "    ratio: f32,",
+                                "    min_start: f32,",
+                                "    min_end: f32,",
+                                "}",
+                                "",
+                                "// The divider reports the ratio a drag",
+                                "// asked for; the caller decides it.",
+                            ],
+                        ))
                         .on_resize(|_, _, _| {})
                         .on_collapse(|_, _, _| {}),
                 ),
@@ -41,6 +103,11 @@ pub(super) fn scroll_shadow(window: &mut Window, cx: &mut App) -> AnyElement {
     );
     stack(&theme)
         .w(px(480.0))
+        .child(caption(
+            &theme,
+            "Scrolled to the middle: content is hidden past both ends, so both \
+             fade",
+        ))
         .child(
             div()
                 .surface(&theme, Surface::Panel)
@@ -61,6 +128,10 @@ pub(super) fn scroll_area(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)
         .w(px(480.0))
+        .child(caption(
+            &theme,
+            "Overflowing: a scrollbar, and the edges fade",
+        ))
         .child(
             div()
                 .surface(&theme, Surface::Panel)
@@ -74,7 +145,10 @@ pub(super) fn scroll_area(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .child(filler(&theme, "Output", 20)),
                 ),
         )
-        // Nothing overflows here, so no scrollbar is drawn or published.
+        // Nothing overflows here, so no scrollbar is drawn or published, and
+        // the content is sized to fill the box rather than to leave a hole
+        // that would be mistaken for the difference being demonstrated.
+        .child(caption(&theme, "Fits: no scrollbar, no fade"))
         .child(
             div()
                 .surface(&theme, Surface::Panel)
@@ -85,7 +159,7 @@ pub(super) fn scroll_area(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .label("Summary")
                         .vertical()
                         .height(120.0)
-                        .child(filler(&theme, "Summary", 2)),
+                        .child(filler(&theme, "Summary", 4)),
                 ),
         )
         .into_any_element()
@@ -135,8 +209,8 @@ pub(super) fn scroll_fade(window: &mut Window, cx: &mut App) -> AnyElement {
                         ScrollArea::new("scene.fade.summary")
                             .label("Summary")
                             .vertical()
-                            .height(120.0)
-                            .child(filler(&theme, "Summary", 2)),
+                            .height(200.0)
+                            .child(filler(&theme, "Summary", 7)),
                     ),
                 ),
         )
@@ -438,13 +512,19 @@ pub(super) fn ide_shell(_window: &mut Window, cx: &mut App) -> AnyElement {
 
 pub(super) fn aspect_ratio(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
+    // The ratio is the subject, so the block it drives is drawn the way every
+    // other bounded region in the library is: a surface step, the card radius,
+    // and its label inside it.
     let filled = |label: &'static str| {
         div()
             .size_full()
             .flex()
             .items_center()
             .justify_center()
-            .bg(theme.colors.hover)
+            .surface(&theme, Surface::Sunken)
+            .radius(&theme, Radius::Card)
+            .hairline(&theme)
+            .overflow_hidden()
             .child(
                 crate::foundation::text(&theme, TypeScale::Label, label)
                     .text_tone(&theme, TextTone::Muted),
@@ -489,16 +569,22 @@ pub(super) fn responsive(_window: &mut Window, cx: &mut App) -> AnyElement {
                 Some(measured) if wide => format!("{measured:.0}px wide, so two columns"),
                 Some(measured) => format!("{measured:.0}px wide, so one column"),
             };
-            let block = |label: &'static str, cx: &mut App| {
+            // A card rather than a tinted rectangle, and with enough in it to
+            // be a column: two panels holding one word each say nothing about
+            // an arrangement, which is what the component is for.
+            let block = |label: &'static str, lines: &'static [&'static str], cx: &mut App| {
                 div()
                     .flex_1()
+                    .min_w_0()
+                    .column()
+                    .gap_token(&theme, Space::Xs)
                     .p_token(&theme, Space::Md)
-                    .radius(&theme, Radius::Card)
-                    .surface(&theme, Surface::Panel)
-                    .child(
-                        crate::foundation::text(&theme, TypeScale::Label, label)
-                            .text_tone(&theme, TextTone::Muted),
-                    )
+                    .card_surface(&theme, CardVariant::Elevated)
+                    .child(crate::foundation::text(&theme, TypeScale::Label, label))
+                    .children(lines.iter().map(|line| {
+                        crate::foundation::text(&theme, TypeScale::Caption, *line)
+                            .text_tone(&theme, TextTone::Muted)
+                    }))
                     .semantic_in(
                         cx,
                         NodeSpec::new(format!("{id}.{}", label.to_lowercase()), Role::Group)
@@ -507,8 +593,16 @@ pub(super) fn responsive(_window: &mut Window, cx: &mut App) -> AnyElement {
             };
             let panes = div()
                 .gap_token(&theme, Space::Sm)
-                .child(block("Settings", cx))
-                .child(block("Detail", cx));
+                .child(block(
+                    "Settings",
+                    &["Theme", "Density", "Reading direction"],
+                    cx,
+                ))
+                .child(block(
+                    "Detail",
+                    &["Studio Dark", "Comfortable", "Left to right"],
+                    cx,
+                ));
             div()
                 .column()
                 .gap_token(&theme, Space::Sm)

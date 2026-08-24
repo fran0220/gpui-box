@@ -29,7 +29,7 @@ use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 type SelectHandler = Rc<dyn Fn(usize, &mut Window, &mut App)>;
 
 /// How wide the page-size control is. The value occurs once.
-const PAGE_SIZE_WIDTH: f32 = 160.0;
+const PAGE_SIZE_WIDTH: f32 = 132.0;
 
 /// How many pages the host knows about.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -224,21 +224,25 @@ impl RenderOnce for Pagination {
             control
         };
 
+        // One glyph family across all four steps: a chevron for one page and
+        // a doubled chevron for the end of the range. A line arrow beside a
+        // chevron reads as two different kinds of control rather than as two
+        // distances of the same one.
         let first = step(
             "first",
-            Icon::AltArrowLeft,
+            Icon::DoubleArrowLeft,
             StringKey::PaginationFirst,
             self.has_previous().then_some(1),
         );
         let previous = step(
             "previous",
-            Icon::ArrowLeft,
+            Icon::AltArrowLeft,
             StringKey::PaginationPrevious,
             self.has_previous().then(|| self.page - 1),
         );
         let next = step(
             "next",
-            Icon::ArrowRight,
+            Icon::AltArrowRight,
             StringKey::PaginationNext,
             self.has_next().then(|| self.page + 1),
         );
@@ -246,7 +250,7 @@ impl RenderOnce for Pagination {
         let last = self.total.count().map(|total| {
             step(
                 "last",
-                Icon::AltArrowRight,
+                Icon::DoubleArrowRight,
                 StringKey::PaginationLast,
                 (self.page < total).then_some(total),
             )
@@ -340,6 +344,16 @@ impl RenderOnce for Pagination {
             spec = spec.value(cx.numbers().count(total));
         }
 
+        // Where the typist is goes between the two directions of travel. With
+        // no numbered range to separate them, the four steps otherwise run
+        // together as one block in which the two that go back are simply the
+        // first two, which is not a thing a reader can see at a glance.
+        let (middle, trailing) = if numbers.is_some() {
+            (None, Some(status))
+        } else {
+            (Some(status), None)
+        };
+
         div()
             .id(ident.element_id())
             .row_reading(direction)
@@ -349,9 +363,10 @@ impl RenderOnce for Pagination {
             .child(first)
             .child(previous)
             .children(numbers)
+            .children(middle)
             .child(next)
             .children(last)
-            .child(status)
+            .children(trailing)
             // A select fills the width it is given, and a page-size control
             // has no business being as wide as the bar it sits in.
             .children(

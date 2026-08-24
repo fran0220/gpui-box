@@ -4,10 +4,11 @@
 //! group can be seen without inventing a layout.
 
 use gpui::{
-    App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div, px, relative,
+    AnyElement, App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div, px,
+    relative,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Radius, Space, TextTone, TypeScale};
 
 use crate::foundation::{Ident, StyledExt};
 
@@ -17,6 +18,7 @@ pub struct NodeGroup {
     ident: Ident,
     label: SharedString,
     selected: bool,
+    children: Vec<AnyElement>,
 }
 
 impl NodeGroup {
@@ -25,6 +27,7 @@ impl NodeGroup {
             ident: ident.into(),
             label: label.into(),
             selected: false,
+            children: Vec::new(),
         }
     }
 
@@ -34,27 +37,57 @@ impl NodeGroup {
     }
 }
 
+impl ParentElement for NodeGroup {
+    fn extend(&mut self, elements: impl IntoIterator<Item = AnyElement>) {
+        self.children.extend(elements);
+    }
+}
+
 impl RenderOnce for NodeGroup {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let wash = if self.selected {
-            theme.colors.accent.opacity(0.16)
-        } else {
-            theme.colors.accent.opacity(0.08)
-        };
+        // A group is a boundary, not a colour: the wash is the canvas one
+        // step darker and the edge is the same hairline every other container
+        // in the library wears, so a named region does not out-shout the
+        // nodes inside it.
         div()
             .relative()
+            .column()
             .w(relative(1.0))
-            .h(px(120.0))
+            .min_h(px(120.0))
             .radius(&theme, Radius::Card)
-            .bg(wash)
+            .bg(theme.colors.sunken)
+            .border(px(theme.borders.hairline))
+            .border_color(if self.selected {
+                theme.colors.hairline_strong
+            } else {
+                theme.colors.hairline
+            })
             .p_token(&theme, Space::Sm)
+            .gap_token(&theme, Space::Sm)
             .child(
-                div()
-                    .type_scale(&theme, TypeScale::Caption)
-                    .text_color(theme.colors.accent)
-                    .child(self.label.clone()),
+                div().row().flex_none().child(
+                    div()
+                        .px_token(&theme, Space::Xs)
+                        .radius(&theme, Radius::Small)
+                        .bg(if self.selected {
+                            theme.colors.selected
+                        } else {
+                            theme.colors.raised
+                        })
+                        .type_scale(&theme, TypeScale::Caption)
+                        .text_tone(
+                            &theme,
+                            if self.selected {
+                                TextTone::Primary
+                            } else {
+                                TextTone::Muted
+                            },
+                        )
+                        .child(self.label.clone()),
+                ),
             )
+            .children(self.children)
             .semantic_in(
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::Group)

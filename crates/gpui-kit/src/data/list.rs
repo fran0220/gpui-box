@@ -27,6 +27,7 @@ use gpui::{
     ParentElement, RenderOnce, ScrollStrategy, SharedString, StatefulInteractiveElement, Styled,
     Window, div, point, prelude::FluentBuilder, px, uniform_list,
 };
+use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Theme};
 
@@ -515,6 +516,8 @@ struct Reorder {
     drag: Option<SurfaceDrag>,
     accepts: Accepts,
     on_drop: ReorderHandler,
+    /// How big the grip on a resting row is drawn.
+    icon_size: f32,
 }
 
 impl List {
@@ -533,6 +536,7 @@ impl List {
             surface,
             accepts,
             on_drop,
+            icon_size: cx.theme().control.get(self.size).icon_size,
         })
     }
 }
@@ -581,6 +585,20 @@ fn row_element(
                 .when(!selected, |element| element.hover_row(theme))
                 .focus_ring(theme)
         })
+        // A row that can be carried says so while it is resting. Without a
+        // grip, the only way to find out a list reorders is to try dragging
+        // one and see what happens.
+        .children(draggable.map(|reorder| {
+            div().flex_none().size(px(reorder.icon_size)).child(
+                icon(Icon::DragHandle)
+                    .size(px(reorder.icon_size))
+                    .text_color(if carried {
+                        theme.colors.text_muted
+                    } else {
+                        theme.colors.text_faint
+                    }),
+            )
+        }))
         .child(div().flex_1().overflow_hidden().child(item.content))
         .children(landing.map(|(position, accepted)| {
             dnd::indicator(&position, accepted, DropAxis::Vertical, cx)

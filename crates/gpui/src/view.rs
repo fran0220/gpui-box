@@ -333,6 +333,7 @@ impl<V: View> Element for ViewElement<V> {
                         (layout_id, None)
                     }
                     _ => {
+                        window.record_entity_render();
                         let mut element = self
                             .view
                             .take()
@@ -406,6 +407,7 @@ impl<V: View> Element for ViewElement<V> {
                         let refreshing = mem::replace(&mut window.refreshing, true);
                         let prepaint_start = window.prepaint_index();
                         let (mut element, accessed_entities) = cx.detect_accessed_entities(|cx| {
+                            window.record_entity_render();
                             let mut element = self
                                 .view
                                 .take()

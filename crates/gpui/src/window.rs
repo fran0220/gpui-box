@@ -123,10 +123,9 @@ struct WindowInvalidatorInner {
     pub frame_dirty: FrameDirtyAccumulator,
 }
 
-/// Per-frame invalidation bookkeeping, drained at draw time and emitted to the
-/// frame profiler. Tracks when the current frame first became dirty and how
-/// many invalidations were coalesced into it. Only populated while
-/// `profiler::frame_trace_enabled()` is set.
+/// Per-frame invalidation bookkeeping, drained at draw time. The fixed counter
+/// is always collected; the timestamp is populated only while frame tracing is
+/// enabled.
 #[derive(Default)]
 struct FrameDirtyAccumulator {
     dirty_at: Option<Instant>,
@@ -189,8 +188,8 @@ impl WindowInvalidator {
     fn record_frame_dirty(inner: &mut WindowInvalidatorInner) {
         if profiler::frame_trace_enabled() {
             inner.frame_dirty.dirty_at.get_or_insert_with(Instant::now);
-            inner.frame_dirty.invalidations += 1;
         }
+        inner.frame_dirty.invalidations = inner.frame_dirty.invalidations.saturating_add(1);
     }
 
     fn take_frame_dirty(&self) -> FrameDirtyAccumulator {
@@ -1219,6 +1218,8 @@ pub struct Window {
     #[cfg(any(feature = "inspector", debug_assertions))]
     inspector: Option<Entity<Inspector>>,
     pub(crate) a11y: A11y,
+    current_frame_stats: profiler::FrameStats,
+    completed_frame_stats: profiler::FrameStats,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -2031,6 +2032,8 @@ impl Window {
                 accessibility_force_disabled,
                 initial_window_title,
             ),
+            current_frame_stats: profiler::FrameStats::default(),
+            completed_frame_stats: profiler::FrameStats::default(),
         })
     }
 
@@ -3043,6 +3046,14 @@ impl Window {
         // leak into a later frame across enable/disable of frame tracing.
         let frame_dirty = self.invalidator.take_frame_dirty();
         let draw_started_at = profiler::frame_trace_enabled().then(Instant::now);
+        self.current_frame_stats = profiler::FrameStats {
+            frame_index: self.completed_frame_stats.frame_index.saturating_add(1),
+            invalidations: frame_dirty.invalidations,
+            ..Default::default()
+        };
+
+        #[cfg(any(test, feature = "test-support"))]
+        let allocator_capacity_before = cx.element_arena.borrow().capacity();
 
         // Set up the per-App arena for element allocation during this draw.
         // This ensures that multiple test Apps have isolated arenas.
@@ -3154,6 +3165,16 @@ impl Window {
         self.needs_present.set(true);
         self.sync_platform_views();
 
+        self.current_frame_stats.platform_view_placements =
+            self.rendered_frame.platform_views.len() as u64;
+        #[cfg(any(test, feature = "test-support"))]
+        {
+            let allocator_capacity_after = cx.element_arena.borrow().capacity();
+            self.current_frame_stats.allocator_delta_bytes =
+                Some(allocator_capacity_after.saturating_sub(allocator_capacity_before) as i64);
+        }
+        self.completed_frame_stats = self.current_frame_stats;
+
         if let Some(draw_start) = draw_started_at {
             profiler::record_frame_timing(profiler::FrameTiming {
                 window_id: self.handle.window_id(),
@@ -3167,6 +3188,44 @@ impl Window {
         // Exit the scope to obtain the arena-clear token this draw owes; the
         // scope's teardown itself happens in `ElementArenaScope::drop`.
         arena_scope.exit(&cx.element_arena)
+    }
+
+    /// Returns deterministic structural counters for the most recently
+    /// completed frame in this window.
+    pub fn frame_stats(&self) -> profiler::FrameStats {
+        self.completed_frame_stats
+    }
+
+    pub(crate) fn record_entity_render(&mut self) {
+        self.current_frame_stats.entity_renders =
+            self.current_frame_stats.entity_renders.saturating_add(1);
+    }
+
+    pub(crate) fn record_request_layout_call(&mut self) {
+        self.current_frame_stats.request_layout_calls = self
+            .current_frame_stats
+            .request_layout_calls
+            .saturating_add(1);
+    }
+
+    pub(crate) fn record_prepaint_call(&mut self) {
+        self.current_frame_stats.prepaint_calls =
+            self.current_frame_stats.prepaint_calls.saturating_add(1);
+    }
+
+    pub(crate) fn record_paint_call(&mut self) {
+        self.current_frame_stats.paint_calls =
+            self.current_frame_stats.paint_calls.saturating_add(1);
+    }
+
+    /// Records one product semantic node published during the active frame.
+    ///
+    /// Semantic libraries call this from their paint-time probe. GPUI keeps
+    /// the counter at the window boundary without depending on any particular
+    /// semantic vocabulary.
+    pub fn record_semantic_node(&mut self) {
+        self.current_frame_stats.semantic_nodes =
+            self.current_frame_stats.semantic_nodes.saturating_add(1);
     }
 
     fn record_entities_accessed(&mut self, cx: &mut App) {
@@ -7753,6 +7812,43 @@ mod tests {
                 window_control_at_mouse(&window.rendered_frame, &window.mouse_hit_test),
                 Some(WindowControlArea::Drag)
             );
+        })
+        .expect("window remains available");
+    }
+
+    struct FrameStatsView;
+
+    impl Render for FrameStatsView {
+        fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+            div()
+                .size_full()
+                .child(div().child("first"))
+                .child(div().child("second"))
+        }
+    }
+
+    #[gpui::test]
+    fn frame_stats_count_structural_work_per_window(cx: &mut TestAppContext) {
+        let window: AnyWindowHandle = cx.add_window(|_, _| FrameStatsView).into();
+
+        cx.update_window(window, |_, window, cx| {
+            // Drain whatever opened the window, then create two coalesced
+            // invalidations for the frame under test.
+            window.draw(cx).clear(cx);
+            window.invalidator.set_dirty(true);
+            window.invalidator.set_dirty(true);
+            window.draw(cx).clear(cx);
+
+            let stats = window.frame_stats();
+            assert!(stats.frame_index >= 2);
+            assert_eq!(stats.entity_renders, 1);
+            assert!(stats.request_layout_calls >= 5);
+            assert_eq!(stats.request_layout_calls, stats.prepaint_calls);
+            assert_eq!(stats.prepaint_calls, stats.paint_calls);
+            assert_eq!(stats.invalidations, 2);
+            assert_eq!(stats.semantic_nodes, 0);
+            assert_eq!(stats.platform_view_placements, 0);
+            assert!(stats.allocator_delta_bytes.is_some());
         })
         .expect("window remains available");
     }

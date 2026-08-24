@@ -98,8 +98,8 @@ fn a_tinted_tag_still_publishes_its_tone(cx: &mut TestAppContext) {
     let mut harness = Harness::new(cx, gpui_kit::install, |_, cx| {
         let tint = cx
             .theme()
-            .palette_color("loader.pink")
-            .expect("bundled loader stop");
+            .palette_color("agent.external")
+            .expect("bundled identity scale");
         Tag::new("filter.ada", "Ada")
             .tone(Tone::Neutral)
             .tint(tint)

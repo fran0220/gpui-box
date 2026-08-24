@@ -88,22 +88,29 @@ pub(super) fn caption(theme: &Theme, text: impl Into<SharedString>) -> gpui::Div
 /// The element a host hands back for an image this crate did not fetch.
 ///
 /// A flat fill rather than a picture, because the crate ships no photographs
-/// and a scene has to photograph the same pixels every run.
+/// and a scene has to photograph the same pixels every run. Neutral, and
+/// quieter than the surface it sits in: a stand-in painted in the accent was
+/// the loudest thing in every scene that used one, which said the placeholder
+/// mattered more than the component being reviewed around it.
 pub(super) fn scene_picture(label: &'static str, cx: &App) -> AnyElement {
     let theme = cx.theme().clone();
     div()
         .size_full()
         .flex()
+        .flex_col()
         .items_center()
         .justify_center()
-        .bg(theme.colors.accent.opacity(0.35))
-        .border(px(theme.borders.thick))
-        .border_color(theme.colors.accent)
-        .child(crate::foundation::text(
-            &theme,
-            TypeScale::Label,
-            SharedString::new_static(label),
-        ))
+        .gap(px(theme.space(gpui_kit_theme::Space::Xs)))
+        .bg(theme.colors.sunken)
+        .child(
+            gpui_kit_assets::icon(gpui_kit_assets::Icon::Image)
+                .size(px(theme.typography.subtitle.line_height))
+                .text_color(theme.colors.text_faint),
+        )
+        .child(
+            crate::foundation::text(&theme, TypeScale::Caption, SharedString::new_static(label))
+                .text_tone(&theme, TextTone::Faint),
+        )
         .into_any_element()
 }
 

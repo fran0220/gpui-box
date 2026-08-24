@@ -29,13 +29,13 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{LiveRegion, NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Layer, Space, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Layer, Space, Theme, TypeScale};
 use web_time::Instant;
 
 use crate::controls::button::Button;
 use crate::display::badge::Tone;
 use crate::display::status::StatusDot;
-use crate::foundation::{FocusRing, Ident, Sizable, StyledExt, window_state};
+use crate::foundation::{FocusRing, Hoverable, Ident, Sizable, StyledExt, window_state};
 use crate::motion::{Easing, Flipping, MotionSpec, Phase, Presence, flip};
 use crate::overlay::layer::{pinned, priority, surface};
 use crate::strings::{ActiveStrings, StringKey};
@@ -451,13 +451,15 @@ impl ToastLayer {
                 .flex_none()
                 .items_center()
                 .justify_center()
-                .size(px(16.0))
+                .size(px(theme.control.get(ControlSize::Xs).height))
+                .radius(theme, gpui_kit_theme::Radius::Small)
                 .cursor_pointer()
                 .tab_index(0)
                 .focus_ring(theme)
+                .hover_row(theme)
                 .child(
                     icon(Icon::Close)
-                        .size(px(11.0))
+                        .size(px(theme.control.get(ControlSize::Xs).icon_size))
                         .text_color(theme.colors.text_faint),
                 )
                 .semantic_in(
@@ -530,9 +532,15 @@ impl ToastLayer {
             .child(
                 div()
                     .flex_none()
-                    .mt(px(5.0))
+                    .flex()
+                    .items_center()
+                    .h(px(theme.typography.label.line_height))
                     .child(StatusDot::new(toast.tone)),
             )
+            // The action sits under the report rather than beside it. A
+            // button in the title's row takes the width the title needed,
+            // which is what wrapped "The host refused to publish this run"
+            // into the control that answers it.
             .child(
                 div()
                     .column()
@@ -544,9 +552,15 @@ impl ToastLayer {
                             .type_scale(theme, TypeScale::Label)
                             .child(toast.message.clone()),
                     )
-                    .children(detail),
+                    .children(detail)
+                    .children(action.map(|action| {
+                        div()
+                            .row()
+                            .justify_end()
+                            .pt(px(theme.space(Space::Xs)))
+                            .child(action)
+                    })),
             )
-            .children(action)
             .children(dismiss)
             .semantic_in(
                 cx,

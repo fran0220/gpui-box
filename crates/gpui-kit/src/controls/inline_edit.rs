@@ -281,9 +281,21 @@ impl RenderOnce for InlineEdit {
             let mut reading = div()
                 .id(self.ident.element_id())
                 .row()
+                .justify_between()
+                .w_full()
+                .gap_token(&theme, Space::Sm)
                 .min_h(px(metrics.height))
                 .px(px(theme.space(Space::Xs)))
+                // The same transparent hairline the well carries, so the words
+                // sit on the exact left edge the field's words will sit on and
+                // the column does not step sideways when an edit opens.
+                .border(px(theme.borders.hairline))
+                .border_color(gpui::transparent_black())
                 .radius(&theme, Radius::Control)
+                // A value nobody on this machine can change is still a value in
+                // a field. Dropping the recess leaves it indistinguishable from
+                // the caption above it.
+                .when(self.disabled, |element| element.well(&theme))
                 .child(
                     foundation_text(
                         &theme,
@@ -295,12 +307,24 @@ impl RenderOnce for InlineEdit {
                         },
                     )
                     .text_size(px(metrics.font_size))
-                    .text_color(if self.disabled || empty {
+                    .text_color(if self.disabled {
+                        theme.colors.text_disabled
+                    } else if empty {
                         theme.colors.text_faint
                     } else {
                         theme.colors.text
                     }),
                 )
+                // Text that turns into a field has to say so before it is
+                // clicked, or it is text.
+                .when(actionable, |element| {
+                    element.child(
+                        gpui_kit_assets::icon(gpui_kit_assets::Icon::Pen)
+                            .size(px(metrics.icon_size))
+                            .flex_none()
+                            .text_color(theme.colors.text_faint),
+                    )
+                })
                 .when(actionable, |element| {
                     element
                         .cursor_pointer()
@@ -403,10 +427,16 @@ impl RenderOnce for InlineEdit {
                 .px(px(theme.space(Space::Xs)))
                 .radius(&theme, Radius::Control)
                 .well(&theme)
-                .when(self.failure.is_some(), |element| {
-                    element.border_color(theme.colors.danger)
+                // One ring. A refused save is drawn in danger and nothing
+                // else; drawing the focus ring under it left two concentric
+                // rings in two colours saying two different things about the
+                // same field.
+                .map(|element| match self.failure.is_some() {
+                    true => element
+                        .border_color(theme.colors.danger)
+                        .glow(&theme, theme.colors.danger),
+                    false => element.shadow(theme.focus_ring()),
                 })
-                .shadow(theme.focus_ring())
                 .text_size(px(metrics.font_size))
                 .child(field),
             Editor::Block(field) => div().w_full().child(field),

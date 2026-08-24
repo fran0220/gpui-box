@@ -122,7 +122,7 @@ pub(super) fn agent_avatar(_window: &mut Window, cx: &mut App) -> AnyElement {
                         "scene.agent-avatar.tinted",
                         identity("atlas", "Atlas", AgentPresence::Online),
                     )
-                    .tint(identity_tint(&theme, "loader.pink")),
+                    .tint(identity_tint(&theme, "agent.external")),
                 ),
         )
         .child(caption(&theme, "Sizes"))
@@ -527,14 +527,14 @@ pub(super) fn agent_run_canvas(_window: &mut Window, cx: &mut App) -> AnyElement
         .child(
             div()
                 .w_full()
-                .h(px(500.0))
+                .h(px(420.0))
                 .surface(&theme, Surface::Panel)
                 .radius(&theme, Radius::Card)
                 .overflow_hidden()
                 .child(
                     AgentRunCanvas::new("scene.agent-run-canvas", run)
                         .selected([RunSubjectId::Agent("researcher".into())])
-                        .viewport(GraphViewport::new(gpui::point(0.0, 0.0), 0.56))
+                        .viewport(GraphViewport::new(gpui::point(0.0, 0.0), 0.5))
                         .on_event(|_, _, _| {}),
                 ),
         )

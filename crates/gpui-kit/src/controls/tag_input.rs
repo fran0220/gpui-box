@@ -135,6 +135,18 @@ impl TagInput {
         self
     }
 
+    /// Draws the control as refused after it was built, for an owner that
+    /// learns the answer is wrong later — a host that rejected it, or a form
+    /// that found a required answer missing. Without it the message and the
+    /// control it is about disagree.
+    pub fn set_invalid(&mut self, invalid: bool, cx: &mut Context<Self>) {
+        if self.invalid == invalid {
+            return;
+        }
+        self.invalid = invalid;
+        cx.notify();
+    }
+
     /// Lets a tag be picked up and put somewhere else in the set.
     pub fn reorderable(mut self, reorderable: bool) -> Self {
         self.reorderable = reorderable;

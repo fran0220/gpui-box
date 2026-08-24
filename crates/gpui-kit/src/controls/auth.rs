@@ -12,14 +12,14 @@ use gpui::{
     prelude::FluentBuilder as _, px,
 };
 use gpui_kit_assets::Icon;
-use gpui_kit_theme::{ActiveTheme, ControlSize, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Surface, TypeScale};
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::controls::button::Button;
 use crate::controls::field::{FieldState, field_shell};
 use crate::controls::input::{TextInput, TextInputEvent};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
-use crate::foundation::{Disableable, Ident, Sizable, text as foundation_text};
+use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text as foundation_text};
 use crate::strings::{ActiveStrings, StringKey};
 
 const DEFAULT_CODE_SLOTS: usize = 6;
@@ -559,48 +559,55 @@ impl Render for OneTimeCodeInput {
         let selected_end = value[..selection.end].graphemes(true).count();
         let cursor = value[..cursor].graphemes(true).count();
         let direction = cx.layout_direction();
+        // A code is read as a run of separate places, so each place is drawn
+        // as one: its own well, its own boundary, its own gap. Hairlines
+        // inside a single bar say only that the bar has been divided, and
+        // leave a typed slot looking exactly like an empty one.
         let slots = (0..self.slots).map(|index| {
             let selected = selected_start <= index && index < selected_end;
             let active = focused && selection.is_empty() && cursor == index;
+            let filled = index < length;
             div()
                 .flex_1()
                 .h(px(metrics.height))
                 .flex()
                 .items_center()
                 .justify_center()
-                .when(index > 0, |slot| {
-                    slot.border_s(direction, px(theme.borders.hairline))
-                        .border_color(theme.colors.hairline)
+                .radius(&theme, Radius::Control)
+                .surface(&theme, Surface::Sunken)
+                .border(px(theme.borders.hairline))
+                .border_color(if self.invalid {
+                    theme.colors.danger
+                } else if active {
+                    theme.colors.focus
+                } else if filled {
+                    theme.colors.hairline_strong
+                } else {
+                    theme.colors.hairline
                 })
                 .when(selected, |slot| slot.bg(theme.colors.selected))
-                .when(active, |slot| slot.bg(theme.colors.hover))
-                .child(foundation_text(
-                    &theme,
-                    TypeScale::Label,
-                    if index < length { "•" } else { "" },
-                ))
+                .when(active, |slot| slot.shadow(theme.focus_ring()))
+                .when(self.disabled, |slot| slot.opacity(theme.opacity.disabled))
+                .child(
+                    foundation_text(&theme, TypeScale::Label, if filled { "•" } else { "" })
+                        .text_size(px(metrics.font_size))
+                        .text_color(theme.colors.text),
+                )
         });
 
-        field_shell(
-            &theme,
-            self.size,
-            FieldState::default()
-                .focused(focused)
-                .invalid(self.invalid)
-                .disabled(self.disabled),
-        )
-        .relative()
-        .px(px(0.0))
-        .child(
-            div()
-                .row_reading(direction)
-                .w_full()
-                .overflow_hidden()
-                .children(slots),
-        )
-        // The one editor occupies exactly the segmented surface. It paints
-        // nothing in slot mode, but owns input, hit testing, IME bounds, and
-        // the one semantic/native node for the control.
-        .child(div().absolute().inset_0().child(self.field.clone()))
+        div()
+            .relative()
+            .w_full()
+            .child(
+                div()
+                    .row_reading(direction)
+                    .w_full()
+                    .gap_token(&theme, Space::Xs)
+                    .children(slots),
+            )
+            // The one editor occupies exactly the segmented surface. It paints
+            // nothing in slot mode, but owns input, hit testing, IME bounds,
+            // and the one semantic/native node for the control.
+            .child(div().absolute().inset_0().child(self.field.clone()))
     }
 }

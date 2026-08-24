@@ -34,6 +34,13 @@ the final column. Accessibility capability details remain in
 [`accessibility.md`](accessibility.md), and visual mechanics in
 [`screenshot-testing.md`](screenshot-testing.md).
 
+Every native row also runs `cargo run -p xtask -- performance check`. The
+command enforces per-window structural budgets over 10,000-item List,
+DataGrid, TreeGrid, CodeView, LogStream, and AgentDocument fixtures and writes
+`target/performance/report.json`. Browser CI compiles the same fixed counters;
+its renderer-specific timing lane remains separate from the structural gate.
+See [`performance-testing.md`](performance-testing.md).
+
 Client-drawn desktop titlebars share one framework contract. Nested `Client`
 areas override an enclosing `Drag` strip, caption controls preserve their
 platform identities, and `Window::request_close` follows the same vetoable

@@ -28,7 +28,7 @@ use std::rc::Rc;
 
 use gpui::{
     AnyElement, App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
-    Styled, StyledText, Window, div, px,
+    Styled, StyledText, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TypeScale};
@@ -39,7 +39,7 @@ use crate::data::{List, ListItem, scroll_to_row};
 use crate::display::badge::{Badge, Tone};
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::highlight::HighlightedText;
-use crate::display::loading::PulseLoader;
+use crate::display::loading::Skeleton;
 use crate::display::status::StatusDot;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
@@ -480,6 +480,7 @@ fn entries_body(
     let rows = Rc::clone(&entries);
     let parent = list_ident.clone();
     let row_theme = theme.clone();
+    let columns = Columns::of(&entries);
     let mut list = List::new(list_ident.clone(), entries.len(), move |index, _, cx| {
         let entry = &rows[index];
         ListItem::new(
@@ -487,7 +488,16 @@ fn entries_body(
             // The row's position in the filtered stream is its reading order.
             // The list is virtualized, so a copy spanning rows that were never
             // mounted says so rather than dropping them silently.
-            entry_row(&parent, entry, index as u64, true, &row_theme, ansi, cx),
+            entry_row(
+                &parent,
+                entry,
+                index as u64,
+                true,
+                columns,
+                &row_theme,
+                ansi,
+                cx,
+            ),
         )
         // Log payloads stay out of diagnostic snapshots. The caller's
         // level is enough to name the row without publishing the message.
@@ -504,12 +514,36 @@ fn entries_body(
     list.into_any_element()
 }
 
+/// Which of the fixed leading columns any entry in the stream actually fills.
+///
+/// A column no entry supplies is not drawn. Reserving its width regardless
+/// leaves a gutter that reads as content the row failed to render, and pushes
+/// the message — the only part of a log line a reader is looking for — away
+/// from the edge it is scanned from.
+#[derive(Debug, Clone, Copy)]
+struct Columns {
+    timestamp: bool,
+    level: bool,
+    source: bool,
+}
+
+impl Columns {
+    fn of(entries: &[LogEntry]) -> Self {
+        Self {
+            timestamp: entries.iter().any(|entry| !entry.timestamp.is_empty()),
+            level: entries.iter().any(|entry| !entry.level.is_empty()),
+            source: entries.iter().any(|entry| !entry.source.is_empty()),
+        }
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn entry_row(
     parent: &Ident,
     entry: &LogEntry,
     order: u64,
     virtualized: bool,
+    columns: Columns,
     theme: &gpui_kit_theme::Theme,
     ansi: bool,
     cx: &App,
@@ -568,29 +602,44 @@ fn entry_row(
         .font_family(theme.typography.mono.clone())
         .text_size(px(theme.typography.code.size))
         .line_height(px(theme.typography.code.line_height))
-        .child(
-            div()
-                .flex_none()
-                .w(px(76.0))
-                .overflow_hidden()
-                .text_color(theme.colors.text_faint)
-                .child(entry.timestamp.clone()),
-        )
-        .child(
-            div()
-                .flex_none()
-                .w(px(68.0))
-                .overflow_hidden()
-                .child(Badge::new(entry.level.clone()).tone(entry.tone)),
-        )
-        .child(
-            div()
-                .flex_none()
-                .w(px(104.0))
-                .overflow_hidden()
-                .text_color(theme.colors.text_muted)
-                .child(entry.source.clone()),
-        )
+        .when(columns.timestamp, |row| {
+            row.child(
+                div()
+                    .flex_none()
+                    .w(px(76.0))
+                    .overflow_hidden()
+                    .text_color(theme.colors.text_faint)
+                    .child(entry.timestamp.clone()),
+            )
+        })
+        .when(columns.level, |row| {
+            // The column is a column so the levels line up; the pill inside it
+            // stays the width of its own word, because a pill stretched to a
+            // slot is claiming a length its label does not have.
+            row.child(
+                div()
+                    .flex_none()
+                    .row()
+                    .items_center()
+                    .w(px(68.0))
+                    .overflow_hidden()
+                    .child(
+                        div()
+                            .flex_none()
+                            .child(Badge::new(entry.level.clone()).tone(entry.tone)),
+                    ),
+            )
+        })
+        .when(columns.source, |row| {
+            row.child(
+                div()
+                    .flex_none()
+                    .w(px(104.0))
+                    .overflow_hidden()
+                    .text_color(theme.colors.text_muted)
+                    .child(entry.source.clone()),
+            )
+        })
         .child(message_element)
         .into_any_element()
 }
@@ -603,16 +652,27 @@ fn state_body(
     cx: &mut App,
 ) -> AnyElement {
     match state {
+        // A stream that has not arrived is drawn in the shape of the rows it
+        // will arrive as, so waiting for a log and reading an empty one are
+        // not the same rectangle with a different mark in the middle of it.
         LogStreamState::Loading => slots.or_else(slot::LOADING, window, cx, |_, cx| {
+            let theme = cx.theme().clone();
             div()
-                .flex()
-                .items_center()
-                .justify_center()
+                .column()
                 .w_full()
-                .p(px(24.0))
+                .gap_token(&theme, Space::Xs)
                 .child(
-                    PulseLoader::new(ident.child("loading"))
+                    Skeleton::new(ident.child("loading"))
+                        .rows(4)
+                        .row_height(theme.typography.code.line_height)
+                        .widths([0.82, 0.64, 0.9, 0.38])
                         .label(cx.strings().text(StringKey::Loading)),
+                )
+                .child(
+                    div()
+                        .type_scale(&theme, TypeScale::Caption)
+                        .text_color(theme.colors.text_faint)
+                        .child(cx.strings().text(StringKey::Loading)),
                 )
                 .into_any_element()
         }),

@@ -11,10 +11,13 @@ pub(super) fn browser_panel(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)
         .child(
+            // One size class for every panel: a difference between two tiles
+            // here is a difference in what the panel shows, never in the frame
+            // it was handed.
             row(&theme)
                 .items_start()
                 .child(
-                    div().w(px(232.0)).h(px(190.0)).child(
+                    div().w(px(272.0)).h(px(200.0)).child(
                         BrowserPanel::new("scene.browser.loading")
                             .url("https://docs.example.com/a/long/path/that-must-stay-inside-the-address-well")
                             .state(ViewportState::Loading)
@@ -22,7 +25,7 @@ pub(super) fn browser_panel(_window: &mut Window, cx: &mut App) -> AnyElement {
                     ),
                 )
                 .child(
-                    div().w(px(232.0)).h(px(190.0)).child(
+                    div().w(px(272.0)).h(px(200.0)).child(
                         BrowserPanel::new("scene.browser.empty")
                             .url("https://docs.example.com/empty")
                             .state(ViewportState::Empty)
@@ -31,7 +34,7 @@ pub(super) fn browser_panel(_window: &mut Window, cx: &mut App) -> AnyElement {
                     ),
                 )
                 .child(
-                    div().w(px(232.0)).h(px(190.0)).child(
+                    div().w(px(272.0)).h(px(200.0)).child(
                         BrowserPanel::new("scene.browser.unavailable")
                             .url("https://internal.example.com/admin")
                             .state(ViewportState::Unavailable(
@@ -45,7 +48,7 @@ pub(super) fn browser_panel(_window: &mut Window, cx: &mut App) -> AnyElement {
             row(&theme)
                 .items_start()
                 .child(
-                    div().w(px(352.0)).h(px(210.0)).child(
+                    div().w(px(272.0)).h(px(200.0)).child(
                         BrowserPanel::new("scene.browser.error")
                             .url("https://status.example.com/incidents/current")
                             .state(ViewportState::Error(
@@ -56,7 +59,7 @@ pub(super) fn browser_panel(_window: &mut Window, cx: &mut App) -> AnyElement {
                     ),
                 )
                 .child(
-                    div().w(px(352.0)).h(px(210.0)).child(
+                    div().w(px(272.0)).h(px(200.0)).child(
                         BrowserPanel::new("scene.browser.ready")
                             .url("https://docs.example.com/ready")
                             .state(ViewportState::Ready)
@@ -194,7 +197,7 @@ pub(super) fn diff_view(_window: &mut Window, cx: &mut App) -> AnyElement {
                     div().w(px(840.0)).child(
                         DiffView::new("scene.diff.split", scene_diff())
                             .presentation(DiffPresentation::Split)
-                            .visible_rows(7)
+                            .visible_rows(6)
                             .on_event(|_, _, _| {}),
                     ),
                 ),
@@ -208,7 +211,10 @@ pub(super) fn diff_view(_window: &mut Window, cx: &mut App) -> AnyElement {
         ))
         .child(
             // Given a height rather than a row count, the way a pane gives one.
-            div().w(px(840.0)).h(px(320.0)).child(
+            // Kept short enough that the wrapping card below still finishes
+            // inside the frame: a scene whose last words are cut off is the
+            // defect its own caption is about.
+            div().w(px(840.0)).h(px(220.0)).child(
                 DiffView::shared("scene.diff.review", std::sync::Arc::new(scene_review()))
                     .language("rust")
                     .fills()
@@ -225,10 +231,15 @@ pub(super) fn diff_view(_window: &mut Window, cx: &mut App) -> AnyElement {
              the frame wraps instead of being cut off",
         ))
         .child(
-            div().w(px(420.0)).child(
+            // Every card in this scene is the same width, so a difference
+            // between two of them is about the diff and not about the frame.
+            div().w(px(840.0)).child(
                 DiffView::new("scene.diff.wrapping", scene_long_line())
                     .wrapping(true)
-                    .visible_rows(5)
+                    // Room for both lines *after* they wrap. A budget counted
+                    // in unwrapped rows cuts the last line in half, which is
+                    // the one thing this card exists to show does not happen.
+                    .visible_rows(6)
                     .on_event(|_, _, _| {}),
             ),
         )
@@ -285,12 +296,15 @@ fn scene_long_line() -> Vec<DiffFile> {
             "one",
             "@@ -1,1 +1,1 @@",
             [
-                DiffLine::added("profile", "{\"profile\": \"release\", \"debug\": false}")
-                    .new_number(1),
+                DiffLine::added(
+                    "profile",
+                    "{\"profile\":\"release\",\"debug\":false,\"incremental\":false,\"lto\":\"thin\",\"codegen-units\":1,\"panic\":\"abort\"}",
+                )
+                .new_number(1),
                 DiffLine::paired(
                     "targets",
-                    "{\"targets\":[\"macos-arm64\",\"macos-x86\",\"windows-x86\"],\"strip\":false}",
-                    "{\"targets\":[\"macos-arm64\",\"macos-x86\",\"windows-x86\",\"linux-arm64\"],\"strip\":true}",
+                    "{\"targets\":[\"macos-arm64\",\"macos-x86\",\"windows-x86\",\"windows-arm64\"],\"strip\":false,\"sign\":\"developer-id\"}",
+                    "{\"targets\":[\"macos-arm64\",\"macos-x86\",\"windows-x86\",\"windows-arm64\",\"linux-arm64\"],\"strip\":true,\"sign\":\"developer-id\"}",
                 )
                 .old_number(1)
                 .new_number(2),
@@ -549,7 +563,12 @@ pub(super) fn scene_thread() -> Vec<Message> {
         .author("Grace")
         .time("09:15")
         .delivery(DeliveryState::Delivered)
-        .reaction(Reaction::new("thumbs", "👍", 2)),
+        // A reaction's label is the caller's, and this one is written in the
+        // bundled faces: the headless text system shapes from those alone, so
+        // an emoji would be recorded as the font's missing-glyph box and the
+        // baseline would hold a picture of a gap in a font rather than of a
+        // chip.
+        .reaction(Reaction::new("thumbs", "+1", 2)),
         Message::new("msg-log", "Attaching the run log.")
             .author("Grace")
             .time("09:15")
@@ -610,8 +629,11 @@ pub(super) fn outline(_window: &mut Window, cx: &mut App) -> AnyElement {
         let rows = turns * 2;
         div()
             .flex()
+            // Stretched rather than given a height: the rail is as tall as the
+            // list it indexes, and the list is as tall as the rows it was
+            // asked for, so neither is cut through a line of text.
+            .items_stretch()
             .gap(px(theme.space(Space::Sm)))
-            .h(px(220.0))
             .child(
                 Outline::new(format!("{ident}.outline"))
                     .over(format!("{ident}.rows"))
@@ -630,9 +652,10 @@ pub(super) fn outline(_window: &mut Window, cx: &mut App) -> AnyElement {
                         ListItem::new(format!("row-{row}"), div().child(format!("{who}: {what}")))
                             .text(format!("{who}: {what}"))
                     })
-                    .flowing()
                     // Bounded, or the list draws every row it has and the
-                    // outline has no viewport to be an outline of.
+                    // outline has no viewport to be an outline of. Slotted
+                    // rather than flowing, so the frame is a whole number of
+                    // rows and the last one on screen is a whole row.
                     .visible_rows(6),
                 ),
             )
@@ -898,7 +921,11 @@ pub(super) fn terminal(_window: &mut Window, cx: &mut App) -> AnyElement {
                         emulator.feed(b"\x1b[32m>\x1b[0m tail -f build.log\r\n\x1b[31merror\x1b[0m: interrupted\r\n");
                         Some(GridSnapshot {
                             lines: emulator.lines(),
-                            cursor: emulator.cursor(),
+                            // Nothing is reading this grid any more, so there
+                            // is no insertion point in it: a caret drawn under
+                            // an exited process invites a keystroke that has
+                            // nowhere to go.
+                            cursor: None,
                         })
                     }),
             ),

@@ -98,8 +98,11 @@ icons![
     (ArrowLeft, "arrow-left", Directional),
     (ArrowRight, "arrow-right", Directional),
     (ArrowUp, "arrow-up", Fixed),
+    (Calendar, "calendar", Fixed),
     (Chat, "chat-round-line", Directional),
     (Check, "check", Fixed),
+    (CheckboxChecked, "checkbox-checked", Fixed),
+    (CheckboxEmpty, "checkbox-empty", Fixed),
     (Checklist, "checklist", Directional),
     (Close, "close", Fixed),
     (CloseCircle, "close-circle", Fixed),
@@ -108,10 +111,15 @@ icons![
     (Danger, "danger-triangle", Fixed),
     (Document, "document", Directional),
     (DocumentAdd, "document-add", Directional),
+    (DoubleArrowLeft, "double-arrow-left", Directional),
+    (DoubleArrowRight, "double-arrow-right", Directional),
+    (DragHandle, "drag-handle", Fixed),
+    (Filter, "filter", Fixed),
     (Folder, "folder", Directional),
     (FolderWithFiles, "folder-with-files", Directional),
     (GitBranch, "git-branch", Directional),
     (Global, "global", Fixed),
+    (Image, "image", Fixed),
     (Info, "info-circle", Fixed),
     (Key, "key-minimalistic", Directional),
     (Keyboard, "keyboard", Fixed),
@@ -119,10 +127,13 @@ icons![
     (List, "list", Directional),
     (Logout, "logout-2", Directional),
     (Magnifier, "magnifer", Directional),
+    (Minus, "minus", Fixed),
     (Monitor, "monitor", Fixed),
     (Paperclip, "paperclip", Directional),
+    (Pause, "pause", Fixed),
     (Pen, "pen", Directional),
     (PenNew, "pen-new-square", Directional),
+    (Play, "play", Directional),
     (Plus, "plus", Fixed),
     (Refresh, "refresh", Fixed),
     (Restart, "restart", Fixed),
@@ -132,10 +143,12 @@ icons![
     (SidebarLeft, "sidebar-minimalistic-left", Directional),
     (Smartphone, "smartphone", Fixed),
     (SortVertical, "sort-vertical", Fixed),
+    (SoundWave, "sound-wave", Fixed),
     (Stop, "stop", Fixed),
     (Terminal, "terminal", Directional),
     (Trash, "trash-bin-minimalistic", Fixed),
     (Tuning, "tuning", Fixed),
+    (Video, "video", Directional),
     (Widget, "widget", Fixed),
 ];
 
@@ -182,6 +195,29 @@ pub fn text_fallbacks() -> FontFallbacks {
         })
         .clone()
 }
+
+/// The fallbacks a keystroke needs on top of the script ones.
+///
+/// The bundled face is registered either way, but a face nobody names is a
+/// face the shaper never reaches: `⏎`, `⌫`, `⌦`, `⌘`, `⌃`, `⌥` and `␣` are
+/// drawn by none of the Geist faces, so a keycap that does not carry this
+/// list renders whichever of them the host machine happens to cover and a
+/// blank box for the rest.
+pub fn key_fallbacks() -> FontFallbacks {
+    static FALLBACKS: OnceLock<FontFallbacks> = OnceLock::new();
+    FALLBACKS
+        .get_or_init(|| {
+            FontFallbacks::from_fonts(vec![
+                KEY_SYMBOLS_FAMILY.to_owned(),
+                "Noto Sans Arabic".to_owned(),
+                "Noto Sans Hebrew".to_owned(),
+            ])
+        })
+        .clone()
+}
+
+/// The family the bundled keyboard-symbol face publishes.
+pub const KEY_SYMBOLS_FAMILY: &str = "GPUI Kit Key Symbols";
 
 pub fn register_fonts(cx: &mut App) {
     if cx.has_global::<EmbeddedFonts>() {
@@ -246,8 +282,8 @@ mod tests {
             .iter()
             .filter(|icon| icon.mirrors_in_rtl())
             .count();
-        assert_eq!(Icon::ALL.len(), 49);
-        assert_eq!(directional, 23);
+        assert_eq!(Icon::ALL.len(), 62);
+        assert_eq!(directional, 27);
     }
 
     #[test]
@@ -263,5 +299,45 @@ mod tests {
             text_fallbacks().fallback_list(),
             ["Noto Sans Arabic", "Noto Sans Hebrew"]
         );
+    }
+
+    /// The symbols a keystroke is written with on macOS.
+    const KEY_SYMBOLS: [char; 7] = ['⏎', '⌫', '⌦', '␣', '⌘', '⌃', '⌥'];
+
+    #[test]
+    fn the_key_symbol_face_publishes_the_family_the_fallback_list_names() {
+        // A fallback list is resolved by family name. A name that matches
+        // nothing is dropped in silence, which is indistinguishable from
+        // having no fallback at all until a glyph goes missing in a picture.
+        let face = ttf_parser::Face::parse(FONT_KEY_SYMBOLS, 0).expect("parse the bundled face");
+        let family = face
+            .names()
+            .into_iter()
+            .find(|name| name.name_id == ttf_parser::name_id::FAMILY && name.is_unicode())
+            .and_then(|name| name.to_string())
+            .expect("the bundled face names a family");
+        assert_eq!(family, KEY_SYMBOLS_FAMILY);
+        assert_eq!(key_fallbacks().fallback_list()[0], KEY_SYMBOLS_FAMILY);
+    }
+
+    #[test]
+    fn the_key_symbol_face_covers_every_symbol_the_text_faces_do_not() {
+        let symbols = ttf_parser::Face::parse(FONT_KEY_SYMBOLS, 0).expect("parse the bundled face");
+        for symbol in KEY_SYMBOLS {
+            assert!(
+                symbols.glyph_index(symbol).is_some(),
+                "the bundled key face does not draw {symbol:?}, so a keycap \
+                 showing it falls back to whatever the host installed"
+            );
+        }
+    }
+
+    #[test]
+    fn the_key_symbol_face_is_reachable_only_as_a_fallback() {
+        // It carries no `m`, which is what a text system measures an em with,
+        // so it is not a family anything may ask for by name. That is exactly
+        // why it has to survive being named in a fallback list.
+        let symbols = ttf_parser::Face::parse(FONT_KEY_SYMBOLS, 0).expect("parse the bundled face");
+        assert!(symbols.glyph_index('m').is_none());
     }
 }

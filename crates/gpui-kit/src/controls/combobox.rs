@@ -163,6 +163,18 @@ impl Combobox {
         self
     }
 
+    /// Draws the control as refused after it was built, for an owner that
+    /// learns the answer is wrong later — a host that rejected it, or a form
+    /// that found a required answer missing. Without it the message and the
+    /// control it is about disagree.
+    pub fn set_invalid(&mut self, invalid: bool, cx: &mut Context<Self>) {
+        if self.invalid == invalid {
+            return;
+        }
+        self.invalid = invalid;
+        cx.notify();
+    }
+
     /// Whether a query nothing answers may be reported as a new value.
     ///
     /// With it off the combobox reports nothing at all for such a query, and

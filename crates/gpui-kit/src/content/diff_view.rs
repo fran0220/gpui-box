@@ -1408,6 +1408,13 @@ fn code_side(
         .when(side.is_some() && mark != DiffLineMark::Context, |element| {
             element.bg(color.opacity(theme.effects.selected_ring_alpha))
         })
+        // A side with no line on it is a fact about the change — this file
+        // gained a line the other did not have — so it is drawn as a stated
+        // absence. Left blank it reads as a row that failed to render, and a
+        // reader cannot tell it from a context line that happens to be empty.
+        .when(side.is_none(), |element| {
+            element.surface(theme, Surface::Sunken)
+        })
         .child(number(side.and_then(|side| side.number), theme, cx))
         .child(
             div()

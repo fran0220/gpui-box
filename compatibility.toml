@@ -13,23 +13,23 @@ type_universe_crate = "gpui"
 [[platform]]
 name = "macos"
 contract = "framework-kit-native-metal-clipped-platform-view-avfoundation-media"
-commands = ["cargo test -p gpui-box-media --all-features --locked", "cargo run -p xtask -- gate full", "cargo run -p xtask -- headless check"]
+commands = ["cargo test -p gpui-box-media --all-features --locked", "cargo run -p xtask -- gate full", "cargo run -p xtask -- performance check", "cargo run -p xtask -- headless check"]
 ci_gated = true
-ci_commands = ["cargo test -p gpui-box-media --all-features --locked", "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings", "cargo run -p xtask -- headless check"]
+ci_commands = ["cargo test -p gpui-box-media --all-features --locked", "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings", "cargo run -p xtask -- performance check", "cargo run -p xtask -- headless check"]
 limitations = ["visual CI requires separately configured evidence", "native playback covers unprotected sources and operating-system codecs only", "does not prove other platforms"]
 
 [[platform]]
 name = "windows"
 contract = "framework-kit-native-clipped-platform-view-media-foundation-headless-warp"
-commands = ["cargo test -p gpui-box-media --all-features --locked", "cargo run -p xtask -- headless check"]
+commands = ["cargo test -p gpui-box-media --all-features --locked", "cargo run -p xtask -- performance check", "cargo run -p xtask -- headless check"]
 ci_gated = true
-ci_commands = ["cargo test -p gpui-box-media --all-features --locked", "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings", "cargo run -p xtask -- headless check"]
+ci_commands = ["cargo test -p gpui-box-media --all-features --locked", "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings", "cargo run -p xtask -- performance check", "cargo run -p xtask -- headless check"]
 limitations = ["native frame capture not implemented", "native playback covers unprotected sources and operating-system codecs only"]
 
 [[platform]]
 name = "linux"
 contract = "wayland-x11-code-and-llvmpipe-baseline"
-commands = ["cargo run -p xtask -- headless check"]
+commands = ["cargo run -p xtask -- performance check", "cargo run -p xtask -- headless check"]
 ci_gated = true
 limitations = ["native media playback is unavailable", "AT-SPI coverage remains capability-scoped", "native behavior still requires host-specific review"]
 

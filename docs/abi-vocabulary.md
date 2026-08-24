@@ -438,8 +438,8 @@ in `controls/filter_bar.rs`; `DropzoneState` and `Dropzone` in
 Display contracts include `Tone` and `Badge` in `display/badge.rs`;
 `StatusDot`, `StatusLine`, and `Callout` in `display/status.rs`; `EmptyKind` and
 `EmptyState` in `display/empty.rs`; `ProgressBar` and `ProgressCircle` in their
-display modules; `PulseLoader`, `GradientSpinner`, and `Skeleton` in
-`display/loading.rs`; `DescriptionValue`, `DescriptionItem`, and
+display modules; `PulseLoader`, `Spinner`, `Skeleton`, `BarLoader`,
+`LoadMoreState`, and `LoadMore` in `display/loading.rs`; `DescriptionValue`, `DescriptionItem`, and
 `DescriptionList` in `display/description_list.rs`; and `FailurePanel` in
 `display/failure_panel.rs`. `AnimatedNumber`, `Avatar`, `Card`, `ListRow`,
 `HighlightedText`, and `Tag` are in the corresponding modules under

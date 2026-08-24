@@ -445,7 +445,7 @@ fn control_glyph(button: WindowButton, maximized: bool, theme: &Theme) -> AnyEle
                     .top_0()
                     .right_0()
                     .size(px(GLYPH_SIZE - 2.0))
-                    .border_1()
+                    .border(px(theme.borders.hairline))
                     .border_color(color),
             )
             .child(
@@ -454,13 +454,13 @@ fn control_glyph(button: WindowButton, maximized: bool, theme: &Theme) -> AnyEle
                     .bottom_0()
                     .left_0()
                     .size(px(GLYPH_SIZE - 2.0))
-                    .border_1()
+                    .border(px(theme.borders.hairline))
                     .border_color(color),
             )
             .into_any_element(),
         WindowButton::Maximize => div()
             .size(px(GLYPH_SIZE))
-            .border_1()
+            .border(px(theme.borders.hairline))
             .border_color(color)
             .into_any_element(),
         WindowButton::Close => icon(Icon::Close)

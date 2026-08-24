@@ -15,10 +15,12 @@ use gpui::{
     IntoElement, KeyDownEvent, MouseButton, ParentElement, Render, SharedString, Styled, Window,
     div, prelude::FluentBuilder, px,
 };
+use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Elevation, Space, Theme};
 
-use crate::foundation::{Ident, StyledExt};
+use crate::controls::button::IconButton;
+use crate::foundation::{Ident, Sizable, StyledExt};
 use crate::motion::{self, Easing, MotionSpec, Phase, Presence};
 use crate::overlay::focus::FocusTrap;
 use crate::overlay::layer::{Edge, Overlay, surface};
@@ -301,6 +303,31 @@ impl Drawer {
         self.preview.unwrap_or(self.size)
     }
 
+    /// The affordance that says the panel can be put away.
+    ///
+    /// Escape and the scrim already close a dismissable drawer, but neither is
+    /// visible, and a panel that covers a side of the window with no drawn way
+    /// out reads as a state the user has been left in.
+    fn close_button(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        if !self.dismissable {
+            return None;
+        }
+        let label = cx.strings().text(StringKey::Dismiss);
+        let drawer = cx.entity().downgrade();
+        Some(
+            IconButton::new(self.ident.child("close"), Icon::Close, label)
+                .ghost()
+                .small()
+                .semantic_parent(self.ident.semantic_id())
+                .on_click(move |window, cx| {
+                    drawer
+                        .update(cx, |drawer, cx| drawer.dismiss(window, cx))
+                        .ok();
+                })
+                .into_any_element(),
+        )
+    }
+
     fn resize_handle(&self, theme: &Theme, cx: &mut Context<Self>) -> Option<AnyElement> {
         if !self.resizable || !self.open {
             return None;
@@ -473,8 +500,6 @@ impl Render for Drawer {
             .relative()
             .when(horizontal, |element| element.w(px(shown)).h_full())
             .when(!horizontal, |element| element.h(px(shown)).w_full())
-            .p_token(&theme, Space::Lg)
-            .gap_token(&theme, Space::Sm)
             .track_focus(&self.focus_handle)
             .on_key_down(cx.listener(Self::on_navigation_key));
         card = match self.edge {
@@ -486,10 +511,44 @@ impl Render for Drawer {
         if self.dismissable {
             card = card.on_key_down(cx.listener(Self::on_dismiss_key));
         }
+        let close = self.close_button(cx);
+        let header = div()
+            .row()
+            .items_start()
+            .flex_none()
+            .px_token(&theme, Space::Lg)
+            .py_token(&theme, Space::Md)
+            .gap_token(&theme, Space::Sm)
+            .child(
+                div()
+                    .column()
+                    .flex_1()
+                    .gap_token(&theme, Space::Xs)
+                    .children(heading)
+                    .children(description),
+            )
+            .children(close);
+        // The body owns whatever room is left over between the two seams, so
+        // a panel taller than its content shows the gap as part of the body
+        // rather than as a hole opened up above pinned actions.
+        let body = body.map(|body| {
+            panel::band(&theme)
+                .flex_1()
+                .min_h(px(0.0))
+                .overflow_hidden()
+                .child(body)
+        });
+        let footer = footer.map(|footer| {
+            div()
+                .column()
+                .flex_none()
+                .child(panel::seam(&theme))
+                .child(panel::band(&theme).child(footer))
+        });
         let card = card
-            .children(heading)
-            .children(description)
-            .children(body.map(|body| div().flex_1().overflow_hidden().child(body)))
+            .child(header)
+            .child(panel::seam(&theme))
+            .children(body)
             .children(footer)
             .children(handle)
             .semantic_in(cx, spec);

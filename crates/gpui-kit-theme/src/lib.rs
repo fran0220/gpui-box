@@ -9,9 +9,9 @@ use gpui_kit_tokens::{
 };
 
 pub use gpui_kit_tokens::{
-    AgentColor, Appearance, ControlSize, Density, Elevation, Layer, MotionDuration, MotionEasing,
-    Palette, Radius, SemanticColor, Space, SpringPreset, SpringTokens, Surface, SyntaxColor,
-    TextTone, TypeScale,
+    AgentColor, Appearance, ControlSize, Density, Elevation, Layer, LoaderColor, MotionDuration,
+    MotionEasing, Palette, Radius, SemanticColor, Space, SpringPreset, SpringTokens, Surface,
+    SyntaxColor, TextTone, TypeScale,
 };
 
 /// Reads the active theme from any context that dereferences to [`App`].
@@ -82,7 +82,15 @@ pub struct Colors {
     pub warning: Hsla,
     pub success: Hsla,
     pub info: Hsla,
-    pub loader_gradient: [Hsla; 3],
+    /// The neutral vocabulary of work in progress: the moving mark, the
+    /// groove it travels, the shape of absent content, and the highlight that
+    /// crosses it. Grey by contract; any colour a loading surface shows is
+    /// the caller's meaning, not the library's. See
+    /// `gpui_kit_tokens::LoaderColors`.
+    pub loader_mark: Hsla,
+    pub loader_track: Hsla,
+    pub loader_placeholder: Hsla,
+    pub loader_sheen: Hsla,
     /// Quiet tool-family tints and the wash behind expanded transcript
     /// evidence. See `gpui_kit_tokens::AgentColors`.
     pub agent: AgentPalette,
@@ -333,6 +341,9 @@ pub struct Effects {
     pub focus_ring_alpha: f32,
     pub glow_alpha: f32,
     pub glow_blur: f32,
+    /// The bloom budget, negative: how far a state glow is pulled in before
+    /// it is blurred, so it stays out of its neighbours' pixels.
+    pub glow_spread: f32,
     pub glass_alpha: f32,
     pub glass_blur: f32,
     pub glass_liquid_alpha: f32,
@@ -403,7 +414,10 @@ impl Theme {
                 warning: color(tokens.semantic(SemanticColor::Warning)),
                 success: color(tokens.semantic(SemanticColor::Success)),
                 info: color(tokens.semantic(SemanticColor::Info)),
-                loader_gradient: tokens.loader_gradient().map(color),
+                loader_mark: color(tokens.loader(LoaderColor::Mark)),
+                loader_track: color(tokens.loader(LoaderColor::Track)),
+                loader_placeholder: color(tokens.loader(LoaderColor::Placeholder)),
+                loader_sheen: color(tokens.loader(LoaderColor::Sheen)),
                 agent: AgentPalette {
                     read: color(tokens.agent(AgentColor::Read)),
                     network: color(tokens.agent(AgentColor::Network)),
@@ -548,6 +562,7 @@ impl Theme {
                 focus_ring_alpha: tokens.effect.focus_ring_alpha,
                 glow_alpha: tokens.effect.glow_alpha,
                 glow_blur: tokens.effect.glow_blur,
+                glow_spread: tokens.effect.glow_spread,
                 glass_alpha: tokens.effect.glass_alpha,
                 glass_blur: tokens.effect.glass_blur,
                 glass_liquid_alpha: tokens.effect.glass_liquid_alpha,
@@ -732,12 +747,17 @@ impl Theme {
     /// It is the state itself made visible at the edge, which is what lets a
     /// surface report "running" or "failed" without a border drawn round it.
     /// Blurred and unoffset, so nothing about it reads as a line.
+    ///
+    /// Pulled in by the bloom budget before it is blurred: an unpulled glow
+    /// puts its full alpha on the surface's own edge and reaches its whole
+    /// blur past it, which is how a failed panel came to tint the panel
+    /// beside it.
     pub fn glow(&self, color: Hsla) -> Vec<BoxShadow> {
         vec![BoxShadow {
             color: color.opacity(self.effects.glow_alpha),
             offset: point(px(0.0), px(0.0)),
             blur_radius: px(self.effects.glow_blur),
-            spread_radius: px(0.0),
+            spread_radius: px(self.effects.glow_spread),
             inset: false,
         }]
     }
@@ -1147,8 +1167,8 @@ mod tests {
         // A scale no role happens to reference is readable all the same; that
         // is the point of reaching the palette rather than the roles.
         assert_eq!(
-            theme.palette_color("loader.blue"),
-            Some(color(Color::parse("test", "#b6d3ef").expect("literal")))
+            theme.palette_color("neutral.500"),
+            Some(color(Color::parse("test", "#565656").expect("literal")))
         );
     }
 

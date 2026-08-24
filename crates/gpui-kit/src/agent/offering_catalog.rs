@@ -21,7 +21,7 @@ use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::status::StatusDot;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{
-    CardVariant, Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text,
+    CardVariant, Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, rule, text,
 };
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
@@ -275,6 +275,7 @@ impl RenderOnce for OfferingCatalog {
             .filter(|source| source.state.name() != "ready")
             .map(|source| self.source_status(source, &theme, cx))
             .collect();
+        let has_statuses = !statuses.is_empty();
         let body = self.results(&theme, window, cx);
 
         div()
@@ -285,6 +286,10 @@ impl RenderOnce for OfferingCatalog {
             .p_token(&theme, Space::Sm)
             .card_surface(&theme, CardVariant::Elevated)
             .children(statuses)
+            // A banner about where the results came from is not one of the
+            // results: with nothing but a gap under it, the stale notice sat
+            // against the first row and read as its heading.
+            .children(has_statuses.then(|| rule(&theme)))
             .child(body)
             .semantic_in(
                 cx,
@@ -430,14 +435,19 @@ impl OfferingCatalog {
         }
 
         let list_ident = self.ident.child("results");
+        // Rows are ruled rather than merely spaced. Loose rows on one flat
+        // surface gave a two-line result and its neighbour no boundary, so a
+        // summary read as belonging to the name above it.
         div()
             .column()
             .w_full()
-            .gap_token(theme, Space::Xs)
             .children(
                 filtered
                     .iter()
-                    .map(|(source, result)| self.result(source, result, &list_ident, theme, cx)),
+                    .enumerate()
+                    .map(|(index, (source, result))| {
+                        self.result(source, result, &list_ident, theme, cx, index > 0)
+                    }),
             )
             .semantic_in(
                 cx,
@@ -455,6 +465,7 @@ impl OfferingCatalog {
         list_ident: &Ident,
         theme: &gpui_kit_theme::Theme,
         cx: &mut App,
+        ruled: bool,
     ) -> AnyElement {
         let identity = OfferingIdentity::new(source.id.clone(), result.offering.id().clone());
         let ident = list_ident
@@ -477,14 +488,22 @@ impl OfferingCatalog {
             .gap_token(theme, Space::Sm)
             .p_token(theme, Space::Sm)
             .radius(theme, Radius::Control)
+            .when(ruled, |element| {
+                element
+                    .border_t(px(theme.borders.hairline))
+                    .border_color(theme.colors.divider)
+            })
             .when(selected, |element| element.bg(theme.colors.selected))
             .when(actionable, |element| {
                 element
                     .cursor_pointer()
                     .tab_index(0)
                     .pressable(cx)
+                    // A pointer resting on a row is the lightest state the
+                    // list has; at full strength the hover fill outshone the
+                    // selected row it sat next to.
                     .when(!selected, |element| {
-                        element.hover(|style| style.bg(theme.colors.hover))
+                        element.hover(|style| style.bg(theme.colors.hover.opacity(0.3)))
                     })
                     .focus_ring(theme)
             })

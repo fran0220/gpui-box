@@ -109,10 +109,21 @@ text, URLs, and promised or virtual files on macOS and Windows is subsequent
 GPUI Box work. It uses operating-system drag and pasteboard APIs and imports no
 third-party or product source.
 
+Per-window structural frame counters, retained element-arena growth
+accounting, deterministic Kit performance budgets, and the 10,000-item
+component fixtures are subsequent GPUI Box work. They instrument existing
+framework draw boundaries and import no profiler, allocator, benchmark, or
+product source.
+
 The explicit `Styled::font_fallbacks` refinement, grapheme-aware fallback run
 selection, and DirectWrite lookup across registered and system collections are
 subsequent GPUI Box work. They make caller-declared font chains a consistent
 framework contract across native and offscreen renderers and import no source.
+Role-aware face acceptance — a face reached only as a fallback is no longer
+required to carry the `m` that em measurement uses, and is no longer removed
+from the shared database for lacking it — and CoreText process-scope
+registration of embedded fonts on macOS are the same lane of work. Both make an
+embedded symbol-only face reachable by the name a cascade list gives it.
 
 The full-frame platform-view clipping and macOS restacking implementation is
 also subsequent GPUI Box work. It extends the product-neutral host contract on

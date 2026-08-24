@@ -85,6 +85,10 @@ pub struct ScrollFade {
     /// Whether the region is as tall as what it holds instead of as tall as
     /// the space it is offered.
     fit_height: bool,
+    /// Whether this region is one a reader can name. A fade a component draws
+    /// inside itself is not: the component is the region, and a second node
+    /// under the same identity would answer for it.
+    published: bool,
     child: Option<AnyElement>,
 }
 
@@ -109,7 +113,19 @@ impl ScrollFade {
             edges: FadeEdges::default(),
             band: None,
             fit_height: false,
+            published: true,
             child: None,
+        }
+    }
+
+    /// The same fade, drawn inside a component that already publishes the
+    /// region it belongs to. Nothing is added to the tree, so a caller that
+    /// wraps that component in a fade of its own still owns the only node
+    /// under that identity.
+    pub(crate) fn inside(ident: impl Into<Ident>) -> Self {
+        Self {
+            published: false,
+            ..Self::new(ident)
         }
     }
 
@@ -171,15 +187,20 @@ impl RenderOnce for ScrollFade {
         let region = div()
             .w_full()
             .when(!self.fit_height, |element| element.h_full())
-            .children(self.child)
-            .semantic_in(cx, {
-                let spec = NodeSpec::new(self.ident.semantic_id(), Role::Region);
-                match edges.names().as_slice() {
-                    [] => spec.value("none"),
-                    names => spec.value(names.join(" ")),
-                }
-            })
-            .into_any_element();
+            .children(self.child);
+        let region = if self.published {
+            region
+                .semantic_in(cx, {
+                    let spec = NodeSpec::new(self.ident.semantic_id(), Role::Region);
+                    match edges.names().as_slice() {
+                        [] => spec.value("none"),
+                        names => spec.value(names.join(" ")),
+                    }
+                })
+                .into_any_element()
+        } else {
+            region.into_any_element()
+        };
 
         Faded {
             edges,

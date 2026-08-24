@@ -323,13 +323,20 @@ impl RenderOnce for PermissionMatrix {
             .iter()
             .map(|subject| {
                 let row_ident = self.ident.child(subject.id.as_ref());
+                // Cells stretch to the tallest in their row: a provenance
+                // line that wrapped left the row with three different
+                // bottoms and no shared baseline to read across.
                 div()
                     .row()
-                    .items_start()
+                    .items_stretch()
                     .w_full()
                     .gap_token(&theme, Space::Sm)
                     .px_token(&theme, Space::Sm)
                     .py_token(&theme, Space::Xs)
+                    // Drawn above each row rather than below it, so the last
+                    // row does not leave a rule hanging on the card edge.
+                    .border_t(px(theme.borders.hairline))
+                    .border_color(theme.colors.divider)
                     .child(
                         div()
                             .w(px(160.0))
@@ -385,6 +392,7 @@ fn cell(
         &[&action.label, &state.label(cx)],
     );
     let next = state.next();
+    let editable_matrix = on_change.is_some();
     let handler = on_change.zip(next);
 
     let mark = div()
@@ -468,8 +476,16 @@ fn cell(
                 .semantic_in(cx, spec)
                 .into_any_element()
         }
+        // A cell that cannot be changed inside a matrix that can still needs a
+        // box, or "does not apply" reads as a hole between two controls
+        // rather than as an answer. A wholly read-only matrix drops every
+        // box instead, so nothing in it looks pressable.
         None => frame
-            .border_color(gpui::transparent_black())
+            .border_color(if editable_matrix {
+                theme.colors.divider
+            } else {
+                gpui::transparent_black()
+            })
             .child(body)
             .semantic_in(cx, spec)
             .into_any_element(),

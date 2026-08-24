@@ -24,7 +24,7 @@ input, and an entry in `docs/components.md`.
 | Data | `List` (virtualized), `Flow` (virtualized), `Table`, `DataGrid` (virtualized), `TreeGrid` (virtualized), `BulkBar`, `Tree`, `KanbanBoard`, `DiagnosticsList` |
 | Date and time | `Calendar`, `DateInput`, `RangePicker`, `TimeInput` |
 | Content | `Markdown`, `AgentDocument`, `MessageList`, `ImageViewer`, `CodeView`, `TransportBar`, `BrowserPanel` (shell only), `LogStream`, `DiffView`, `ArtifactPreview`, `Terminal` |
-| Display | `Icon`, `Badge`, `Tag`, `Avatar`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `FailurePanel`, `StatusDot`, `StatusLine`, `Callout`, `Banner`, `StaleMark`, `PulseLoader`, `GradientSpinner`, `Skeleton`, `Spinner`, `RefreshVeil`, `ProgressCircle`, `StageProgress`, `StateView`, `OutcomePanel`, `DescriptionList`, `Timeline`, `HighlightedText`, `AnimatedNumber`, `MetricCard`, `Sparkline`, `MicroMark`, `LineChart`, `BarChart`, `AreaChart`, `ScatterChart`, `PieChart`, `StackedBarChart`, `RadarChart`, `GaugeChart`, `ChartLegend`, `Heatmap` |
+| Display | `Icon`, `Badge`, `Tag`, `Avatar`, `AvatarGroup`, `Card`, `ListRow`, `Divider`, `ProgressBar`, `EmptyState`, `FailurePanel`, `StatusDot`, `StatusLine`, `Callout`, `Banner`, `StaleMark`, `PulseLoader`, `Skeleton`, `Spinner`, `BarLoader`, `LoadMore`, `RefreshVeil`, `ProgressCircle`, `StageProgress`, `StateView`, `OutcomePanel`, `DescriptionList`, `Timeline`, `HighlightedText`, `AnimatedNumber`, `MetricCard`, `Sparkline`, `MicroMark`, `LineChart`, `BarChart`, `AreaChart`, `ScatterChart`, `PieChart`, `StackedBarChart`, `RadarChart`, `GaugeChart`, `ChartLegend`, `Heatmap` |
 | Overlay | `Overlay`, `Frost`, `Glass`, `Dialog`, `Drawer`, `Popover`, `Menu`, `ContextMenu`, `Menubar`, `CommandPalette`, `Tooltip`, `HoverCard`, `Toast`, `ToastLayer`, `NotificationCenter`, `Kbd` |
 | Layout | `DesktopTitlebar`, `SplitPane`, `SplitTree`, `ScrollArea`, `ScrollFade`, `Toolbar`, `AspectRatio`, `Responsive` |
 | Shell | `Dock`, `StatusBar` |
@@ -312,7 +312,7 @@ that rubric, not that every possible interaction was exercised.
 | `keybinding` | Medium: unbound/help/error text is faint and keycap/icon/row baselines vary. |
 | `keymap-editor` | High: `Defaults` and host-managed copy use GPUI's large default; chips, conflict/source text, and actions do not share a row grid. |
 | `list` | Light is clean; low in dark for title/list clearance and missing continuation affordance. |
-| `loading` | High: skeletons lack hierarchy/max-width and contrast; loaders crowd the top-left. The three indicators now share `color.loader.gradient` rather than mixing accent with a second palette. |
+| `loading` | Clean. Every indicator paints from the neutral `color.loader.*` roles, the placeholder is held inside a loudness band by the token gate, and each of the six is a different picture rather than a different arrangement of the same one. |
 | `log-stream` | Medium: level/inline chips sit off baseline and small status copy is faint. |
 | `markdown` | Medium: the dark unfetched state disappears; truncated repetition and embedded-block widths are unclear. |
 | `menu` | Low: shortcut gaps/insets vary and the dark section label is weak. |

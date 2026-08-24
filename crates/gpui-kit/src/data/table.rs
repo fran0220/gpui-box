@@ -757,7 +757,11 @@ impl RenderOnce for Table {
             .children(banner)
             .children(extra)
             .child(header)
-            .child(body)
+            // The body is inset from the card's own corners. A row that ends
+            // exactly where the rounded edge begins has its wash and its
+            // selection rail cut by the corner, which reads as the collection
+            // running out of room rather than ending.
+            .child(div().w_full().py_token(&theme, Space::Xs).child(body))
             .semantic_in(
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::Table)

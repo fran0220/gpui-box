@@ -219,9 +219,19 @@ impl RenderOnce for ThinkingBlock {
             .py(px(2.0))
             .child(dot)
             .child(
+                // Absence is drawn quieter than a thought that happened. A
+                // finished thought with nothing to show and no reasoning at
+                // all were the same neutral mark and the same weight of
+                // text, so only the wording told them apart.
                 text(&theme, TypeScale::Caption, label.clone())
                     .flex_none()
-                    .text_tone(&theme, TextTone::Muted),
+                    .text_tone(
+                        &theme,
+                        match self.reasoning {
+                            Reasoning::Absent => TextTone::Faint,
+                            _ => TextTone::Muted,
+                        },
+                    ),
             )
             .children(match &self.reasoning {
                 Reasoning::Withheld(reason) => Some(

@@ -11,11 +11,12 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Surface, TypeScale};
 
+use crate::controls::button::ButtonVariant;
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::stepping::bounded_step;
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, text};
+use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
 use crate::overlay::{Menu, MenuItem};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -242,12 +243,18 @@ impl RenderOnce for AnchorList {
         {
             menu.update(cx, |menu, cx| menu.close(window, cx));
         }
+        // The bar is a place, not a row of loose words: the track is what says
+        // where the set of anchors starts and stops, and it is what the active
+        // anchor's wash is read against.
         let mut strip = div()
             .id(self.ident.element_id())
             .row_reading(direction)
             .items_center()
             .flex_wrap()
-            .gap(px(theme.space(Space::Xs)));
+            .gap(px(theme.space(Space::Xs)))
+            .p(px(theme.space(Space::Xs)))
+            .radius(&theme, Radius::Card)
+            .surface(&theme, Surface::Sunken);
 
         if let (false, Some(handler)) = (self.disabled, self.on_navigate.clone()) {
             let anchors = self.anchors.clone();
@@ -289,6 +296,12 @@ impl RenderOnce for AnchorList {
                 if menu.read(cx).offered() != hidden.as_slice() {
                     menu.update(cx, |menu, cx| menu.set_items(hidden, cx));
                 }
+                // The trigger is a way to the anchors that did not fit, not a
+                // more important anchor. A filled control here out-shouts the
+                // one anchor on the bar that says where the reader is.
+                menu.update(cx, |menu, cx| {
+                    menu.set_trigger_style(ButtonVariant::Ghost, self.size, cx)
+                });
                 let ident = self.ident.child("overflow");
                 div().flex().flex_none().child(menu).semantic_in(
                     cx,

@@ -22,7 +22,7 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TextTone, Theme, T
 use crate::display::badge::Badge;
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{
-    Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text as foundation_text,
+    Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, rule, text as foundation_text,
 };
 use crate::motion::{Flipping, flip};
 use crate::overlay::Tooltipped;
@@ -255,6 +255,11 @@ impl Sidebar {
             theme.colors.text_faint
         } else if active {
             theme.colors.accent
+        } else if self.collapsed {
+            // Collapsed, the glyph is the whole row. Secondary text tone is
+            // sized for something a label is standing next to, and a rail of
+            // glyphs at that weight is a rail nobody can read.
+            theme.colors.text
         } else {
             theme.colors.text_muted
         };
@@ -380,7 +385,7 @@ impl RenderOnce for Sidebar {
             .gap(px(theme.space(Space::Md)))
             .overflow_hidden();
 
-        for section in &self.sections {
+        for (index, section) in self.sections.iter().enumerate() {
             let section_ident = self.ident.child(section.id.as_ref());
             let mut rows: Vec<AnyElement> = Vec::new();
             for item in &section.items {
@@ -409,6 +414,11 @@ impl RenderOnce for Sidebar {
                         )
                 });
 
+            // Collapsed, the rule is the only thing left that says one run of
+            // glyphs ended and another began. A gap on its own is a gap.
+            if self.collapsed && index > 0 {
+                body = body.child(rule(&theme));
+            }
             body = body.child(
                 div()
                     .flex()

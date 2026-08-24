@@ -23,7 +23,8 @@ use crate::controls::button::Button;
 use crate::display::badge::Tone;
 use crate::foundation::stepping::bounded_step;
 use crate::foundation::{
-    Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text as foundation_text,
+    CardVariant, Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt,
+    text as foundation_text,
 };
 use crate::motion;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
@@ -480,9 +481,13 @@ impl RenderOnce for Wizard {
 
         let mut strip = div()
             .w_full()
-            .gap_token(&theme, Space::Sm)
             .when(vertical, |element| element.column())
-            .when(!vertical, |element| element.row().items_start());
+            // A vertical strip spaces its steps with the connector itself, so
+            // the line runs from one mark to the next instead of floating in
+            // the middle of a gap.
+            .when(!vertical, |element| {
+                element.row().items_start().gap_token(&theme, Space::Sm)
+            });
 
         if let Some(handler) = self.handler() {
             let steps = self.steps.clone();
@@ -513,18 +518,27 @@ impl RenderOnce for Wizard {
             });
         }
 
-        for step in &self.steps {
+        for (index, step) in self.steps.iter().enumerate() {
+            if index > 0 {
+                let behind = self.steps[index - 1].status == StepStatus::Complete;
+                strip = strip.child(connector(&theme, vertical, behind));
+            }
             strip = strip.child(self.step_element(step, &theme, window, cx));
         }
 
         let ident = self.ident.clone();
         let handler = self.handler();
         let body = self.body.map(|body| {
-            div().w_full().child(body).semantic_in(
-                cx,
-                NodeSpec::new(ident.child("body").semantic_id(), Role::Group)
-                    .parent(ident.semantic_id()),
-            )
+            div()
+                .w_full()
+                .card_surface(&theme, CardVariant::Outlined)
+                .p_token(&theme, Space::Md)
+                .child(body)
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(ident.child("body").semantic_id(), Role::Group)
+                        .parent(ident.semantic_id()),
+                )
         });
 
         let back = handler
@@ -608,6 +622,34 @@ impl RenderOnce for Wizard {
                     .value(cx.numbers().count(count)),
             )
     }
+}
+
+/// The chrome that joins two consecutive step marks.
+///
+/// A wizard's claim is that its steps are a sequence, so the marks are drawn
+/// joined. The line stays neutral in both states: it says how far the flow has
+/// got, and a step's own mark keeps the only colour that carries meaning.
+fn connector(theme: &Theme, vertical: bool, behind: bool) -> AnyElement {
+    let color = if behind {
+        theme.colors.hairline_strong
+    } else {
+        theme.colors.divider
+    };
+    let thickness = theme.borders.hairline;
+    // The line meets the marks, so it sits on the axis the markers are centred
+    // on rather than on the middle of the step element.
+    let axis = theme.space(Space::Xs) + MARKER / 2.0 - thickness / 2.0;
+    let line = div().flex_none().bg(color);
+    if vertical {
+        line.w(px(thickness))
+            .h(px(theme.space(Space::Lg)))
+            .ml(px(axis))
+    } else {
+        line.h(px(thickness))
+            .w(px(theme.space(Space::Lg)))
+            .mt(px(axis))
+    }
+    .into_any_element()
 }
 
 /// The next step in `delta`'s direction that may actually be jumped to.

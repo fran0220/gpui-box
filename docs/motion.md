@@ -40,7 +40,8 @@ component. Anything not listed here does not move.
 | `Sidebar` | Icon slot slides on collapse | `Flipping::flip` | The glyph is what survives collapsing, so it travels rather than being redrawn narrow. |
 | `ProgressBar` | Determinate fill moves | `Transition<f32>` on `motion.resize` | The published range is the caller's number from the frame it changes. |
 | `Skeleton` | Highlight band sweeps | `with_animation`, `motion.shimmer` | A sweep reads as work moving through the list where a pulse reads as the list blinking. |
-| `PulseLoader`, `GradientSpinner` | Cells breathe | `with_animation`, `motion.pulse` | Decorative, self-contained loops. |
+| `PulseLoader` | Dots breathe | `Activity::Deliberating`, `motion.pulse` | The quietest claim there is: something is being waited on. Under reduced motion the dots stand still and solid rather than holding frame zero, which was a row of nearly invisible marks. |
+| `Spinner` | An open arc turns | `Activity::Working`, `motion.spin` | The gap is what says the ring is not a position. Under reduced motion the arc rests longer and still. |
 | `EmptyState`, `Callout` | Content fades and rises | `motion::content_in` | The travel is inside the element that publishes the node, so the published box never moves. |
 | `Card` | Rises on hover, sinks while held | `HoverLift`, `Pressable` | Only when the card is itself an action. |
 | `ListRow`, `List`, `Table`, `Tree` rows | Sink while held | `Pressable` | Rows get no entrance: a row scrolled into a viewport is the same row that was always there. |

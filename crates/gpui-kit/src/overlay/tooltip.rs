@@ -17,6 +17,7 @@ use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space};
 
 use crate::foundation::{Ident, StyledExt};
 use crate::motion::{Animated, Entrance};
+use crate::overlay::tail::{TailSide, tail};
 
 /// A themed help surface.
 #[derive(Debug, Clone, IntoElement)]
@@ -64,18 +65,33 @@ impl RenderOnce for Tooltip {
         // from the settled box and only the pixels travel, so a reader that
         // asks where the tooltip is gets the answer it will still be giving
         // once the arrival has finished.
+        //
+        // The tail is what separates help from a control: a tooltip and a
+        // secondary button are the same rounded rectangle of overlay colour,
+        // and only the point says this one came out of something else.
         let surface = div()
-            .max_w(px(260.0))
-            .px_token(&theme, Space::Sm)
-            .py_token(&theme, Space::Xs)
-            .radius(&theme, Radius::Small)
-            .bg(theme.colors.overlay)
-            .elevation(&theme, Elevation::Overlay)
-            .text_size(px(theme.typography.label.size))
-            .line_height(px(theme.typography.label.line_height))
-            .font_fallbacks(gpui_kit_assets::text_fallbacks())
-            .text_color(theme.colors.text)
-            .child(self.text.clone());
+            .column()
+            .items_start()
+            .child(
+                div()
+                    .ml(px(crate::overlay::tail::inset(&theme)))
+                    .child(tail(&theme, TailSide::Up, theme.colors.overlay)),
+            )
+            .child(
+                div()
+                    .max_w(px(260.0))
+                    .px_token(&theme, Space::Sm)
+                    .py_token(&theme, Space::Xs)
+                    .radius(&theme, Radius::Small)
+                    .bg(theme.colors.overlay)
+                    .hairline(&theme)
+                    .elevation(&theme, Elevation::Overlay)
+                    .text_size(px(theme.typography.label.size))
+                    .line_height(px(theme.typography.label.line_height))
+                    .font_fallbacks(gpui_kit_assets::text_fallbacks())
+                    .text_color(theme.colors.text)
+                    .child(self.text.clone()),
+            );
 
         div()
             .child(surface.animate_in(self.ident.child("in").element_id(), cx, Entrance::Menu))

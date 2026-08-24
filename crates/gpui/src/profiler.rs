@@ -732,6 +732,37 @@ impl FrameTiming {
     }
 }
 
+/// Deterministic structural work performed while drawing one window frame.
+///
+/// Unlike [`FrameTiming`], these counters do not depend on machine speed. They
+/// are always collected so tests and diagnostics can enforce that work stays
+/// proportional to the viewport rather than to the size of a caller's data
+/// set. Allocation accounting is optional because it is only available when
+/// GPUI is built with test support.
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FrameStats {
+    /// Monotonically increasing frame number for this window.
+    pub frame_index: u64,
+    /// Reactive view entities whose [`crate::Render::render`] method ran.
+    pub entity_renders: u64,
+    /// Element request-layout calls.
+    pub request_layout_calls: u64,
+    /// Element prepaint calls.
+    pub prepaint_calls: u64,
+    /// Element paint calls.
+    pub paint_calls: u64,
+    /// Invalidations coalesced into this frame.
+    pub invalidations: u64,
+    /// Product semantic nodes published while this frame was painted.
+    pub semantic_nodes: u64,
+    /// Native platform-view placements retained by the completed frame.
+    pub platform_view_placements: u64,
+    /// Growth in the retained element-arena capacity during this frame.
+    ///
+    /// `None` means the active build does not include allocator accounting.
+    pub allocator_delta_bytes: Option<i64>,
+}
+
 // Allow 16MiB of frame timing entries.
 const MAX_FRAME_TIMINGS: usize = (16 * 1024 * 1024) / core::mem::size_of::<FrameTiming>();
 

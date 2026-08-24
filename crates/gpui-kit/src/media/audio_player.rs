@@ -26,32 +26,25 @@
 use std::rc::Rc;
 
 use gpui::{
-    App, Hsla, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString, Styled,
-    Window, canvas, div, point, prelude::FluentBuilder, px,
+    App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window,
+    div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TextTone, TypeScale};
 
 use crate::content::transport::{TransportBar, TransportDuration, TransportEvent};
 use crate::display::badge::Badge;
+use crate::display::signature;
 use crate::foundation::{Disableable, Ident, StyledExt, text};
 use crate::media::notice;
 use crate::media::transport::{
     MediaAvailability, MediaCapabilities, MediaCommand, MediaEvent, MediaTransport,
 };
+use crate::media::waveform::{band, peak_band};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
-
-/// How tall the peak band is, and how much space is left between two bars.
-/// Neither value repeats anywhere else.
-const PEAKS_HEIGHT: f32 = 56.0;
-const PEAK_GAP: f32 = 1.0;
 
 /// How tall the frame is when there is a sentence in it instead of a player.
 const NOTICE_HEIGHT: f32 = 96.0;
-
-/// The shortest bar a peak of nearly nothing still draws, so a quiet passage
-/// is visible as quiet rather than as absent.
-const PEAK_FLOOR: f32 = 0.06;
 
 type EventHandler = Rc<dyn Fn(&MediaEvent, &mut Window, &mut App)>;
 
@@ -258,13 +251,11 @@ impl RenderOnce for AudioPlayer {
                 let mut ready = div().column().w_full().gap_token(&theme, Space::Sm);
                 if !self.peaks.is_empty() {
                     ready = ready.child(
-                        div()
-                            .w_full()
-                            .h(px(PEAKS_HEIGHT))
+                        band(&theme)
                             .child(peak_band(
                                 self.peaks.clone(),
                                 fraction,
-                                theme.colors.accent,
+                                signature::mark(&theme),
                                 theme.colors.hairline_strong,
                             ))
                             .semantic_in(
@@ -292,12 +283,14 @@ impl RenderOnce for AudioPlayer {
                 &strings,
                 &snapshot.availability,
                 self.title.clone(),
+                Some(gpui_kit_assets::Icon::SoundWave),
                 super::NoticePlace::Middle,
             ))
             .into_any_element(),
             (None, _) => framed(notice(
                 &theme,
                 theme.colors.warning,
+                Some(gpui_kit_assets::Icon::SoundWave),
                 self.title
                     .clone()
                     .unwrap_or_else(|| strings.text(StringKey::MediaNoTransport)),
@@ -416,6 +409,7 @@ pub(crate) fn unready(
     strings: &crate::strings::Strings,
     availability: &MediaAvailability,
     title: Option<SharedString>,
+    mark: Option<gpui_kit_assets::Icon>,
     place: super::NoticePlace,
 ) -> gpui::AnyElement {
     let (tint, key) = match availability {
@@ -428,48 +422,7 @@ pub(crate) fn unready(
     // A backend's own sentence is the detail whenever it gave one, so a
     // refusal is shown as the refusal it is rather than as an absence.
     let detail = availability.reason().unwrap_or_else(|| strings.text(key));
-    super::notice_at(theme, tint, headline, detail, place)
-}
-
-/// The measured envelope, with the part behind the head drawn as played.
-fn peak_band(
-    peaks: Vec<f32>,
-    fraction: Option<f32>,
-    played: Hsla,
-    ahead: Hsla,
-) -> impl IntoElement {
-    canvas(
-        |_, _, _| {},
-        move |bounds, _, window, _| {
-            let count = peaks.len();
-            if count == 0 || bounds.size.width <= px(0.0) {
-                return;
-            }
-            let width = f32::from(bounds.size.width) / count as f32;
-            let bar = (width - PEAK_GAP).max(0.5);
-            let height = f32::from(bounds.size.height);
-            let centre = f32::from(bounds.origin.y) + height / 2.0;
-            // With no duration there is no fraction, so nothing is drawn as
-            // played rather than everything or nothing being guessed at.
-            let head = fraction.map(|fraction| fraction * count as f32);
-            for (index, peak) in peaks.iter().enumerate() {
-                let extent = (peak.clamp(0.0, 1.0).max(PEAK_FLOOR) * height / 2.0).max(0.5);
-                let left = f32::from(bounds.origin.x) + index as f32 * width;
-                let color = match head {
-                    Some(head) if (index as f32) < head => played,
-                    _ => ahead,
-                };
-                window.paint_quad(gpui::fill(
-                    gpui::Bounds {
-                        origin: point(px(left), px(centre - extent)),
-                        size: gpui::size(px(bar), px(extent * 2.0)),
-                    },
-                    color,
-                ));
-            }
-        },
-    )
-    .size_full()
+    super::notice_at(theme, tint, mark, headline, detail, place)
 }
 
 #[cfg(test)]

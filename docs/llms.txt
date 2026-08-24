@@ -35,6 +35,7 @@ identity.
 
 ```bash
 cargo run -p xtask -- gate
+cargo run -p xtask -- performance check
 cargo run -p xtask -- gate only <scene>
 cargo run -p xtask -- headless check <scene>
 cargo run -p gpui-box-gallery -- --scene badge --theme studio-dark
@@ -64,4 +65,5 @@ published cohort (`0.1.1`).
 References: `docs/components.md`, `docs/component-contracts.md`,
 `docs/coverage.md`, `docs/truthful-ui.md`, `docs/token-model.md`,
 `docs/semantic-automation.md`, `docs/accessibility.md`,
-`docs/screenshot-testing.md`, `docs/mcp.md`, and `docs/releasing.md`.
+`docs/performance-testing.md`, `docs/screenshot-testing.md`, `docs/mcp.md`, and
+`docs/releasing.md`.

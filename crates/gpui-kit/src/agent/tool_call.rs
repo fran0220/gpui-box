@@ -473,7 +473,7 @@ impl RenderOnce for ToolCall {
             ToolCallState::PendingApproval | ToolCallState::Running => {
                 StatusDot::new(Tone::Accent).tint(family_color)
             }
-            ToolCallState::Succeeded { .. } => StatusDot::new(Tone::Neutral),
+            ToolCallState::Succeeded { .. } => StatusDot::new(Tone::Neutral).tint(family_color),
             ToolCallState::Failed { .. } => StatusDot::new(Tone::Danger),
             ToolCallState::Refused { .. } => StatusDot::new(Tone::Warning),
         };
@@ -534,10 +534,15 @@ impl RenderOnce for ToolCall {
             .py(px(2.0))
             .child(dot)
             .child(
+                // Family lives on the mark, not on the name. Colouring every
+                // tool name turned a column of rows into one hue per row,
+                // which is a rainbow standing in for five categories and
+                // leaves nothing neutral for a severity colour to stand out
+                // against.
                 text(&theme, TypeScale::Caption, self.tool.clone())
                     .flex_none()
                     .font_family(theme.typography.mono.clone())
-                    .text_color(family_color),
+                    .text_tone(&theme, TextTone::Primary),
             )
             .children(summary.map(|summary| {
                 text(&theme, TypeScale::Caption, summary)
@@ -547,8 +552,11 @@ impl RenderOnce for ToolCall {
                     .text_tone(&theme, TextTone::Faint)
             }))
             .children(status.map(|(status_ident, words, color, value)| {
+                // The status is part of the sentence the row reads as, so it
+                // takes the width it needs and no more. Stretched, it pushed
+                // the duration to the far edge and opened a gutter wide
+                // enough to lose the two apart.
                 text(&theme, TypeScale::Caption, words.clone())
-                    .flex_1()
                     .min_w_0()
                     .truncate()
                     .font_family(theme.typography.mono.clone())
@@ -660,10 +668,13 @@ impl RenderOnce for ToolCall {
             _ => None,
         };
 
+        // Arguments and result are two blocks, not one block with a seam:
+        // at the tighter step they met close enough to read as a single
+        // panel that had been cut in half.
         div()
             .w_full()
             .column()
-            .gap_token(&theme, Space::Xs)
+            .gap_token(&theme, Space::Sm)
             .child(line)
             .children(arguments)
             .children(
@@ -694,6 +705,13 @@ fn inline_retry(call: &Ident, theme: &Theme, handler: RetryHandler, cx: &mut App
         .tab_index(0)
         .pressable(cx)
         .focus_ring(theme)
+        // The only pressable thing on a failed row used to be caption text
+        // beside caption text, so the recovery action was indistinguishable
+        // from the duration next to it. A quiet outline says it is a control
+        // without raising the row's voice.
+        .px_token(theme, Space::Xs)
+        .radius(theme, Radius::Small)
+        .hairline(theme)
         .type_scale(theme, TypeScale::Caption)
         .text_tone(theme, TextTone::Muted)
         .child(label.clone())

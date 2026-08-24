@@ -32,7 +32,7 @@ use crate::display::badge::{Badge, Tone};
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::status::StatusDot;
 use crate::foundation::slot::{self, Slots, Slotted};
-use crate::foundation::{CardVariant, Ident, Sizable, StyledExt};
+use crate::foundation::{CardVariant, Ident, Sizable, StyledExt, rule};
 use crate::overlay::toast::{self, Toast};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -384,8 +384,10 @@ impl NotificationCenter {
             Button::new(ident.child("action"))
                 .semantic_parent(id.clone())
                 .label(label.clone())
-                .ghost()
-                .control_size(ControlSize::Xs)
+                // A consequential offer wears a control's chrome. A bare word
+                // beside a report reads as more of the report.
+                .secondary()
+                .control_size(ControlSize::Sm)
                 .on_click(move |window, cx| {
                     handler(window, cx);
                     let reported = reported.clone();
@@ -416,11 +418,18 @@ impl NotificationCenter {
             })
         };
 
+        // Unread is a rail at the reading edge rather than a second dot beside
+        // the title. The row already carries one dot, for severity, and two
+        // dot systems on one row are two vocabularies a reader has to keep
+        // apart while scanning.
         let unread_mark = (!notification.read).then(|| {
             div()
+                .absolute()
+                .left_0()
+                .top_0()
+                .bottom_0()
+                .w(px(theme.effects.selection_rail_width))
                 .flex_none()
-                .size(px(6.0))
-                .rounded_full()
                 .bg(theme.colors.accent)
                 .semantic_in(
                     cx,
@@ -432,15 +441,19 @@ impl NotificationCenter {
 
         div()
             .row()
+            .relative()
             .w_full()
             .items_start()
             .gap_token(&theme, Space::Sm)
-            .px_token(&theme, Space::Sm)
-            .py_token(&theme, Space::Xs)
+            .px_token(&theme, Space::Md)
+            .py_token(&theme, Space::Sm)
+            .children(unread_mark)
             .child(
                 div()
                     .flex_none()
-                    .mt(px(5.0))
+                    .flex()
+                    .items_center()
+                    .h(px(theme.typography.label.line_height))
                     .child(StatusDot::new(notification.tone)),
             )
             .child(
@@ -449,13 +462,19 @@ impl NotificationCenter {
                     .flex_1()
                     .min_w_0()
                     .gap_token(&theme, Space::Xs)
+                    // The time qualifies the report, so it rides the report's
+                    // own line instead of starting a third one under it and
+                    // giving every row a different height.
                     .child(
                         div()
                             .row()
-                            .items_center()
-                            .gap_token(&theme, Space::Xs)
+                            .w_full()
+                            .items_baseline()
+                            .gap_token(&theme, Space::Sm)
                             .child(
                                 div()
+                                    .flex_1()
+                                    .min_w_0()
                                     .type_scale(&theme, TypeScale::Label)
                                     // A record that has been read steps back
                                     // rather than disappearing: it is still a
@@ -467,7 +486,13 @@ impl NotificationCenter {
                                     })
                                     .child(notification.message.clone()),
                             )
-                            .children(unread_mark),
+                            .children(notification.at.clone().map(|at| {
+                                div()
+                                    .flex_none()
+                                    .type_scale(&theme, TypeScale::Caption)
+                                    .text_color(theme.colors.text_faint)
+                                    .child(at)
+                            })),
                     )
                     .children(notification.detail.clone().map(|detail| {
                         div()
@@ -475,14 +500,14 @@ impl NotificationCenter {
                             .text_color(theme.colors.text_muted)
                             .child(detail)
                     }))
-                    .children(notification.at.clone().map(|at| {
+                    .children(action.map(|action| {
                         div()
-                            .type_scale(&theme, TypeScale::Caption)
-                            .text_color(theme.colors.text_faint)
-                            .child(at)
+                            .row()
+                            .justify_end()
+                            .pt(px(theme.space(Space::Xs)))
+                            .child(action)
                     })),
             )
-            .children(action)
             .child(dismiss)
             .semantic_in(
                 cx,
@@ -564,12 +589,17 @@ impl Render for NotificationCenter {
                 })
         });
 
-        let rows: Vec<AnyElement> = (0..self.notifications.len())
-            // Newest first: the thing that just happened is the thing being
-            // looked for.
-            .rev()
-            .map(|index| self.row(index, cx))
-            .collect();
+        let count = self.notifications.len();
+        let mut rows: Vec<AnyElement> = Vec::with_capacity(count * 2);
+        // Newest first: the thing that just happened is the thing being looked
+        // for. A rule between records is what stops three reports of different
+        // heights from reading as one paragraph.
+        for (position, index) in (0..count).rev().enumerate() {
+            if position > 0 {
+                rows.push(rule(&theme).into_any_element());
+            }
+            rows.push(self.row(index, cx));
+        }
 
         let body = if rows.is_empty() {
             self.slots.or_else(slot::EMPTY, window, cx, |_, cx| {

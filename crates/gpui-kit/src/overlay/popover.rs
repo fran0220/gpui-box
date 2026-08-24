@@ -187,6 +187,15 @@ pub(crate) struct MenuGeometry {
     pub width: f32,
 }
 
+/// The air between a trigger and the surface it opened.
+///
+/// One value for every anchored surface in the library, so a popover, a menu
+/// and a select all clear their trigger by the same gap and none of them
+/// merges into the control it came from.
+pub fn trigger_gap(theme: &Theme) -> f32 {
+    (theme.space(Space::Sm) - theme.borders.thick).max(0.0)
+}
+
 /// Resolves one menu against the actual window and trigger bounds.
 ///
 /// The fallback is deliberately bounded by the whole usable viewport. It is
@@ -201,7 +210,7 @@ pub(crate) fn menu_geometry(
 ) -> MenuGeometry {
     let room = Positioner::below(desired_height)
         .min_width(min_width)
-        .spacing(theme.spacing.sm, theme.spacing.sm - 2.0)
+        .spacing(theme.spacing.sm, trigger_gap(theme))
         .resolve(window, trigger);
 
     MenuGeometry {
@@ -220,7 +229,7 @@ pub(crate) fn menu_overlay(
     hang: Hang,
     content: AnyElement,
 ) -> AnyElement {
-    let gap = px((theme.spacing.sm - 2.0).max(0.0));
+    let gap = px(trigger_gap(theme));
     let frame = div()
         .occlude()
         .when(placement == Placement::Below, |element| element.pt(gap))
@@ -278,7 +287,7 @@ pub fn anchored(
     content: AnyElement,
 ) -> AnyElement {
     let above = placement == Placement::Above;
-    let gap = px((theme.spacing.sm - 2.0).max(0.0));
+    let gap = px(trigger_gap(theme));
     let anchor = match (above, hang) {
         (true, Hang::Start) => Anchor::BottomLeft,
         (true, Hang::End) => Anchor::BottomRight,
@@ -338,7 +347,7 @@ pub fn modal(
                     .occlude()
                     .w(viewport.width)
                     .h(viewport.height)
-                    .bg(gpui::black().opacity(0.6))
+                    .bg(gpui::black().opacity(theme.opacity.scrim))
                     .flex()
                     .items_center()
                     .justify_center()
@@ -349,6 +358,30 @@ pub fn modal(
     .into_any_element()
 }
 
+/// The air above and below a menu row's label.
+fn menu_row_padding_y(theme: &Theme) -> f32 {
+    theme.space(Space::Xs) + theme.borders.thick
+}
+
+/// How tall a menu row is.
+///
+/// A menu that opens a submenu beside the row it came from has to know this
+/// before anything is painted, so the height is a function of the tokens
+/// rather than something the layout discovers.
+pub fn menu_row_height(theme: &Theme) -> f32 {
+    theme.typography.label.line_height + 2.0 * menu_row_padding_y(theme)
+}
+
+/// How tall a section heading is, including its air.
+pub fn menu_heading_height(theme: &Theme) -> f32 {
+    theme.typography.caption.line_height + 2.0 * theme.space(Space::Xs)
+}
+
+/// How tall a separator is, including its air.
+pub fn menu_separator_height(theme: &Theme) -> f32 {
+    theme.borders.hairline + 2.0 * theme.space(Space::Xs)
+}
+
 /// One row of a menu-like surface, with the shared height, hover wash, and
 /// refusal treatment.
 pub fn menu_row(theme: &Theme, selected: bool, highlighted: bool) -> gpui::Div {
@@ -356,10 +389,10 @@ pub fn menu_row(theme: &Theme, selected: bool, highlighted: bool) -> gpui::Div {
         .flex()
         .flex_row()
         .items_center()
-        .gap(px(10.0))
-        .px(px(theme.spacing.sm))
-        .py(px(6.0))
-        .rounded(px(theme.radii.control))
+        .gap_token(theme, Space::Sm)
+        .px_token(theme, Space::Sm)
+        .py(px(menu_row_padding_y(theme)))
+        .radius(theme, gpui_kit_theme::Radius::Control)
         .when(selected, |element| element.bg(theme.colors.selected))
         .when(!selected && highlighted, |element| {
             element.bg(theme.colors.hover)
@@ -411,25 +444,27 @@ pub(crate) fn menu_label_state(
 /// A section label inside a menu-like surface.
 pub fn heading(theme: &Theme, label: &str) -> gpui::Div {
     div()
-        .px(px(theme.spacing.sm))
-        .pb(px(theme.spacing.xs))
-        .pt(px(6.0))
+        .px_token(theme, Space::Sm)
+        .py_token(theme, Space::Xs)
         .child(
             text(
                 theme,
                 TypeScale::Caption,
                 SharedString::from(tracked_upper(label)),
             )
-            .text_color(theme.colors.text_muted.opacity(0.6)),
+            .text_tone(theme, TextTone::Faint),
         )
 }
 
 /// The rule between two groups of menu rows.
+///
+/// It runs the width of the rows rather than the width of the panel, because
+/// a highlight inset from the panel edge and a rule bleeding past it are two
+/// statements about where the list starts.
 pub fn separator(theme: &Theme) -> gpui::Div {
     div()
         .h(px(theme.borders.hairline))
-        .mx(px(-theme.spacing.xs))
-        .my(px(theme.spacing.xs))
+        .my(px(theme.space(Space::Xs)))
         .bg(theme.colors.divider)
 }
 
@@ -723,11 +758,16 @@ impl Render for Popover {
                     .parent(self.ident.semantic_id())
                     .focus(&self.focus_handle),
             );
-            Overlay::new(self.ident.child("overlay"))
-                .placement(self.placement)
-                .hang(self.hang)
-                .child(card)
-                .into_any_element()
+            // Through the shared menu layer, so the surface clears its trigger
+            // by the same air a menu does. Without it a white panel opening
+            // under a white trigger is one shape with a notch in it.
+            menu_overlay(
+                &self.ident,
+                &theme,
+                self.placement,
+                self.hang,
+                card.into_any_element(),
+            )
         });
 
         anchored_slot(self.placement, self.hang, trigger, overlay).semantic_in(

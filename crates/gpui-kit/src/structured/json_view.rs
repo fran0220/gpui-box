@@ -60,13 +60,17 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TextTone, Theme, TypeScale};
+use gpui_kit_theme::{
+    ActiveTheme, ControlSize, Radius, Space, Surface, SyntaxColor, TextTone, Theme, TypeScale,
+};
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::display::icon::flips;
 use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
 use crate::foundation::window_state;
-use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text};
+use crate::foundation::{
+    Disableable, FocusRing, Ident, Pressable, SelectedRow, Sizable, StyledExt, text,
+};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type ToggleHandler = Rc<dyn Fn(SharedString, bool, &mut Window, &mut App)>;
@@ -634,6 +638,14 @@ impl RenderOnce for JsonView {
             .id(view.ident.element_id())
             .column()
             .w_full()
+            // A selection band has to stop somewhere, and a document drawn
+            // straight onto the canvas gives it nowhere to stop: the surface
+            // is what turns the band's right edge from an arbitrary x into
+            // the edge of the thing being read.
+            .py_token(&theme, Space::Xs)
+            .radius(&theme, Radius::Card)
+            .surface(&theme, Surface::Panel)
+            .overflow_hidden()
             .font_family(theme.typography.mono.clone())
             .child(rows);
 
@@ -701,11 +713,17 @@ fn row_element(
     let selected = view.selected.as_ref() == Some(&line.path);
     let selectable = !view.disabled && view.on_select.is_some();
     let toggleable = !view.disabled && line.has_members && view.on_toggle.is_some();
+    // Type is the one thing a reader of a document asks first, and it is the
+    // only fact this view colours: the syntax roles a code listing already
+    // uses, so `"3"` and `3` are not one grey.
     let value_color = match line.kind {
-        // A withheld or missing value recedes; anything the document actually
-        // states is drawn at full strength. Neither invents a status colour.
+        // A withheld or missing value recedes; neither invents a status colour.
         ValueKind::Null | ValueKind::Redacted => theme.colors.text_faint,
-        _ => theme.colors.text,
+        ValueKind::Bool => theme.colors.syntax.get(SyntaxColor::Keyword),
+        ValueKind::Number => theme.colors.syntax.get(SyntaxColor::Number),
+        ValueKind::String => theme.colors.syntax.get(SyntaxColor::StringLiteral),
+        // A container mark is punctuation, not a value.
+        ValueKind::Array | ValueKind::Object => theme.colors.text_muted,
     };
 
     let chevron = line.has_members.then(|| {
@@ -765,13 +783,9 @@ fn row_element(
         .w_full()
         .h(px(height))
         .pe(direction, px(theme.space(Space::Sm)))
-        .ps(
-            direction,
-            px(theme.space(Space::Sm)
-                + line.level.saturating_sub(1) as f32 * theme.space(Space::Md)),
-        )
+        .ps(direction, px(theme.space(Space::Sm)))
         .gap(px(theme.space(Space::Xs)))
-        .when(selected, |element| element.bg(theme.colors.selected))
+        .selected_row(theme, direction, selected)
         .when(view.disabled, |element| {
             element.opacity(theme.opacity.disabled)
         })
@@ -785,6 +799,9 @@ fn row_element(
                 })
                 .focus_ring(theme)
         })
+        .children(crate::data::tree::indent_guides(
+            theme, direction, line.level, height,
+        ))
         .children(chevron)
         // A row with nothing to disclose still lines up with its siblings, so
         // the indent reads as depth rather than as decoration.
@@ -797,9 +814,17 @@ fn row_element(
                 .text_start(direction)
                 .text_tone(theme, TextTone::Muted),
         )
+        // The separator is what makes a key and a value two things rather
+        // than one sentence. It is JSON punctuation, so it is not translated.
+        .child(
+            text(theme, TypeScale::Code, SharedString::new_static(":"))
+                .flex_none()
+                .text_tone(theme, TextTone::Faint),
+        )
         .child(
             text(theme, TypeScale::Code, line.shown.clone())
-                .flex_1()
+                .flex_none()
+                .when(line.shape.is_none(), |value| value.flex_1())
                 .overflow_hidden()
                 .text_start(direction)
                 .text_color(value_color),

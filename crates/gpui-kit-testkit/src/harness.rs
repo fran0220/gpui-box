@@ -101,6 +101,16 @@ impl Harness {
         })
     }
 
+    /// Returns the diagnostic semantic tree from the most recently completed
+    /// frame without scheduling another draw.
+    pub fn current_snapshot(&mut self) -> Snapshot {
+        self.cx.update(|window, cx| {
+            SemanticCoordinator::global(cx)
+                .snapshot(window.window_handle().window_id())
+                .expect("this window published a semantic frame")
+        })
+    }
+
     pub fn node(&mut self, id: &str) -> Option<Node> {
         self.snapshot().find(id).cloned()
     }
@@ -162,6 +172,12 @@ impl Harness {
     pub fn frame(&mut self) {
         self.cx.update(|_, cx| cx.refresh_windows());
         self.cx.run_until_parked();
+    }
+
+    /// Returns GPUI's structural counters for the most recently completed
+    /// frame without causing another draw.
+    pub fn frame_stats(&mut self) -> gpui::FrameStats {
+        self.cx.update(|window, _| window.frame_stats())
     }
 
     pub fn advance(&mut self, delta: Duration) {

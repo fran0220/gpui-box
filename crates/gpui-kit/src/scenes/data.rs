@@ -81,6 +81,7 @@ pub(super) fn list(_window: &mut Window, cx: &mut App) -> AnyElement {
             div()
                 .surface(&theme, Surface::Panel)
                 .radius(&theme, Radius::Card)
+                .py_token(&theme, Space::Xs)
                 .overflow_hidden()
                 .child(
                     List::new("scene.list.records", FIXTURE_RECORDS, |index, _, _| {
@@ -115,6 +116,8 @@ fn fixture_entry(index: usize) -> (SharedString, SharedString) {
     )
 }
 
+const FLOW_VISIBLE_ROWS: usize = 5;
+
 pub(super) fn flow(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)
@@ -126,50 +129,106 @@ pub(super) fn flow(_window: &mut Window, cx: &mut App) -> AnyElement {
         ))
         .child(
             div()
+                .column()
                 .surface(&theme, Surface::Panel)
                 .radius(&theme, Radius::Card)
                 .overflow_hidden()
-                .child({
-                    let theme = theme.clone();
-                    Flow::new(
-                        "scene.flow.entries",
-                        FIXTURE_RECORDS,
-                        move |index, _, cx| {
-                            let (id, body) = fixture_entry(index);
-                            // A flow publishes nothing of its own, so the rows say
-                            // what they are — which is the arrangement any caller
-                            // drawing its own rows ends up with.
+                .child(
+                    // A row is as tall as its prose, so the viewport's edge
+                    // falls wherever it falls — through a line of text as
+                    // often as between two. The fade is what turns that from
+                    // a glyph sliced in half into a statement that the entries
+                    // carry on past the edge.
+                    ScrollFade::new("scene.flow.edge")
+                        .bottom(true)
+                        .fit_height()
+                        .child({
+                            let theme = theme.clone();
                             div()
                                 .w_full()
-                                .column()
-                                .gap_token(&theme, Space::Xs)
-                                .px_token(&theme, Space::Md)
-                                .py_token(&theme, Space::Sm)
                                 .child(
-                                    crate::foundation::text(&theme, TypeScale::Caption, id.clone())
-                                        .text_tone(&theme, TextTone::Muted),
+                                    Flow::new(
+                                        "scene.flow.entries",
+                                        FIXTURE_RECORDS,
+                                        move |index, _, cx| {
+                                            let (id, body) = fixture_entry(index);
+                                            // A flow publishes nothing of its own, so the rows say
+                                            // what they are — which is the arrangement any caller
+                                            // drawing its own rows ends up with.
+                                            div()
+                                                .w_full()
+                                                .column()
+                                                .gap_token(&theme, Space::Xs)
+                                                .px_token(&theme, Space::Md)
+                                                .py_token(&theme, Space::Sm)
+                                                .child(
+                                                    crate::foundation::text(
+                                                        &theme,
+                                                        TypeScale::Caption,
+                                                        id.clone(),
+                                                    )
+                                                    .text_tone(&theme, TextTone::Muted),
+                                                )
+                                                .child(crate::foundation::text(
+                                                    &theme,
+                                                    TypeScale::Body,
+                                                    body.clone(),
+                                                ))
+                                                .semantic_in(
+                                                    cx,
+                                                    NodeSpec::new(
+                                                        format!("scene.flow.entries.{id}"),
+                                                        Role::Row,
+                                                    )
+                                                    .parent("scene.flow.entries")
+                                                    .text(body),
+                                                )
+                                                .into_any_element()
+                                        },
+                                    )
+                                    .estimate(72.0)
+                                    .visible_rows(FLOW_VISIBLE_ROWS),
                                 )
-                                .child(crate::foundation::text(
-                                    &theme,
-                                    TypeScale::Body,
-                                    body.clone(),
-                                ))
                                 .semantic_in(
                                     cx,
-                                    NodeSpec::new(format!("scene.flow.entries.{id}"), Role::Row)
-                                        .parent("scene.flow.entries")
-                                        .text(body),
+                                    NodeSpec::new("scene.flow.entries", Role::List)
+                                        .value(FIXTURE_RECORDS.to_string()),
                                 )
-                                .into_any_element()
-                        },
-                    )
-                    .estimate(72.0)
-                    .visible_rows(5)
-                })
-                .semantic_in(
-                    cx,
-                    NodeSpec::new("scene.flow.entries", Role::List)
-                        .value(FIXTURE_RECORDS.to_string()),
+                        }),
+                )
+                .child(rule(&theme))
+                // How much is past the edge, and something to do about it. A
+                // count on its own states the overflow and leaves the reader
+                // to find the rest by dragging.
+                .child(
+                    div()
+                        .row()
+                        .w_full()
+                        .gap_token(&theme, Space::Sm)
+                        .px_token(&theme, Space::Md)
+                        .py_token(&theme, Space::Xs)
+                        .child(caption(
+                            &theme,
+                            SharedString::from(format!(
+                                "{} more below",
+                                FIXTURE_RECORDS - FLOW_VISIBLE_ROWS
+                            )),
+                        ))
+                        .child(div().flex_1())
+                        .child(
+                            Button::new("scene.flow.end")
+                                .label("Go to the end")
+                                .ghost()
+                                .small()
+                                .on_click(|window, cx| {
+                                    crate::data::glide_to_row(
+                                        &Ident::from("scene.flow.entries"),
+                                        FIXTURE_RECORDS - 1,
+                                        window,
+                                        cx,
+                                    );
+                                }),
+                        ),
                 ),
         )
         .into_any_element()
@@ -374,7 +433,10 @@ pub(super) fn data_grid(_window: &mut Window, cx: &mut App) -> AnyElement {
             )
             .total(FIXTURE_JOBS_TOTAL)
             .columns(grid_columns())
-            .group(ColumnGroup::new("job", "Job").columns(["name", "state"]))
+            // The columns a group names have to be adjacent in the order the
+            // caller declared, which is what makes the group a bracket over
+            // them rather than a caption over one of them.
+            .group(ColumnGroup::new("identity", "Identity").columns(["name", "owner"]))
             .footer_cell("duration", "4.2s")
             .sorted_by("duration", SortDirection::Descending)
             .selection_mode(SelectionMode::Multiple)
@@ -447,23 +509,76 @@ pub(super) fn data_grid_editing(_window: &mut Window, cx: &mut App) -> AnyElemen
 
 pub(super) fn tree_grid(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
+    // Whether a branch is open is structure, and the disclosure already says
+    // it. What belongs in a state column is what is true of the record — the
+    // same vocabulary, in the same pills, that `table` and `data-grid` use.
     let rows = [
-        ("workspace", "Workspace", 1, true, true, None),
-        ("src", "src", 2, true, true, Some("workspace")),
-        ("components", "components", 3, false, false, Some("src")),
-        ("lib", "lib.rs", 3, false, false, Some("src")),
-        ("docs", "docs", 2, true, false, Some("workspace")),
+        (
+            "workspace",
+            "Workspace",
+            1,
+            true,
+            true,
+            None,
+            "Ready",
+            Tone::Success,
+        ),
+        (
+            "src",
+            "src",
+            2,
+            true,
+            true,
+            Some("workspace"),
+            "Ready",
+            Tone::Success,
+        ),
+        (
+            "components",
+            "components",
+            3,
+            false,
+            false,
+            Some("src"),
+            "Stale",
+            Tone::Warning,
+        ),
+        (
+            "lib",
+            "lib.rs",
+            3,
+            false,
+            false,
+            Some("src"),
+            "Ready",
+            Tone::Success,
+        ),
+        (
+            "docs",
+            "docs",
+            2,
+            true,
+            false,
+            Some("workspace"),
+            "Refused",
+            Tone::Danger,
+        ),
     ];
     stack(&theme)
         .w(px(720.0))
         .child(
             TreeGrid::new("scene.tree-grid.files", rows.len(), move |index, _, _| {
-                let (id, name, level, branch, expanded, parent) = rows[index];
+                let (id, name, level, branch, expanded, parent, state, tone) = rows[index];
                 let mut row = TreeGridRow::new(id, level)
                     .text(name)
                     .cell("name", Cell::new(name).text(name).published(true))
                     .cell("kind", if branch { "Folder" } else { "File" })
-                    .cell("state", if expanded { "Expanded" } else { "Ready" });
+                    .cell(
+                        "state",
+                        Cell::new(Badge::new(state).tone(tone))
+                            .text(state)
+                            .published(true),
+                    );
                 if branch {
                     row = row.branch(expanded);
                 }
@@ -479,7 +594,6 @@ pub(super) fn tree_grid(_window: &mut Window, cx: &mut App) -> AnyElement {
             ])
             .selected("components")
             .visible_rows(5)
-            .lines(GridLines::Rows)
             .on_select(|_, _, _| {})
             .on_expand(|_, _, _, _| {}),
         )
@@ -554,25 +668,32 @@ pub(super) fn drag_list(_window: &mut Window, cx: &mut App) -> AnyElement {
         .child(
             div()
                 .relative()
-                .surface(&theme, Surface::Panel)
-                .radius(&theme, Radius::Card)
-                .overflow_hidden()
                 .child(
-                    List::new("scene.drag.records", 6, |index, _, _| {
-                        let (id, label) = fixture_record(index);
-                        ListItem::new(id, label.clone()).text(label)
-                    })
-                    // A row slides without its layout slot moving, so the
-                    // viewport is one row taller than the rows it holds and
-                    // the open slot has somewhere to be.
-                    .visible_rows(7)
-                    .reorderable(true)
-                    .on_select(|_, _, _| {})
-                    .on_reorder(|_, _, _| {}),
+                    div()
+                        .surface(&theme, Surface::Panel)
+                        .radius(&theme, Radius::Card)
+                        .py_token(&theme, Space::Xs)
+                        .overflow_hidden()
+                        .child(
+                            List::new("scene.drag.records", 6, |index, _, _| {
+                                let (id, label) = fixture_record(index);
+                                ListItem::new(id, label.clone()).text(label)
+                            })
+                            // A row slides without its layout slot moving, so the
+                            // viewport is one row taller than the rows it holds and
+                            // the open slot has somewhere to be.
+                            .visible_rows(7)
+                            .reorderable(true)
+                            .on_select(|_, _, _| {})
+                            .on_reorder(|_, _, _| {}),
+                        ),
                 )
+                // The ghost is what the pointer is holding, and the pointer is
+                // beside the rows rather than on top of them: staged over a
+                // row it would cut the label it is meant to be leaving.
                 .children(
                     dnd::staged_ghost(cx)
-                        .map(|ghost| div().absolute().left(px(96.0)).top(px(18.0)).child(ghost)),
+                        .map(|ghost| div().absolute().left(px(248.0)).top(px(52.0)).child(ghost)),
                 ),
         )
         .into_any_element()
@@ -624,7 +745,10 @@ pub(super) fn drag_tree(_window: &mut Window, cx: &mut App) -> AnyElement {
                 )
                 .children(
                     dnd::staged_ghost(cx)
-                        .map(|ghost| div().absolute().left(px(212.0)).top(px(116.0)).child(ghost)),
+                        // Beside the row it is landing on, and level with it:
+                        // a ghost drawn over the target hides the one thing
+                        // the picture is about.
+                        .map(|ghost| div().absolute().left(px(300.0)).top(px(155.0)).child(ghost)),
                 ),
         )
         .into_any_element()
@@ -642,18 +766,21 @@ pub(super) fn kanban(_window: &mut Window, cx: &mut App) -> AnyElement {
             KanbanBoard::new("scene.kanban.ready")
                 .columns([
                     KanbanColumn::new("inbox", "Inbox"),
-                    KanbanColumn::new("doing", "Doing"),
+                    KanbanColumn::new("doing", "Doing").limit(2),
                     KanbanColumn::new("done", "Done"),
                 ])
                 .cards([
                     KanbanCard::new("triage", "Triage fixture", "inbox")
                         .detail("Waiting on review"),
                     KanbanCard::new("draw", "Draw scene", "doing"),
+                    KanbanCard::new("caption", "Write captions", "doing"),
+                    KanbanCard::new("audit", "Audit tokens", "doing"),
                     KanbanCard::new("ship", "Ship notes", "done"),
                 ])
                 .held("triage")
                 .on_card(|_, _, _| {})
-                .on_move(|_, _, _, _| {}),
+                .on_move(|_, _, _, _| {})
+                .on_add(|_, _, _| {}),
         )
         .child(KanbanBoard::new("scene.kanban.empty").state(KanbanState::Empty))
         .child(

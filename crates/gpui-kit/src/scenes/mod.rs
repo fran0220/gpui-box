@@ -181,7 +181,8 @@ pub fn catalog() -> Vec<Scene> {
             name: "loading",
             build: loading,
             shows: Shows::Subjects(&[
-                "GradientSpinner",
+                "BarLoader",
+                "LoadMore",
                 "PulseLoader",
                 "RefreshVeil",
                 "Skeleton",
@@ -277,7 +278,7 @@ pub fn catalog() -> Vec<Scene> {
         Scene {
             name: "avatar",
             build: avatar,
-            shows: Shows::Subjects(&["Avatar"]),
+            shows: Shows::Subjects(&["Avatar", "AvatarGroup"]),
         },
         Scene {
             name: "empty-state",
@@ -437,7 +438,7 @@ pub fn catalog() -> Vec<Scene> {
         Scene {
             name: "motion-flip",
             build: motion_flip,
-            shows: Shows::Composition(&["Badge", "Button", "Card", "ListRow"]),
+            shows: Shows::Composition(&["Button", "Card", "ListRow"]),
         },
         Scene {
             name: "motion-state",

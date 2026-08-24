@@ -183,15 +183,33 @@ pub(super) fn motion_flip(window: &mut Window, cx: &mut App) -> AnyElement {
     let steps = cx.global::<SceneQueue>().steps.clone();
     let theme = cx.theme().clone();
 
-    let mut queue = Card::new().id("scene.motion.queue");
+    let mut queue = Card::new().id("scene.motion.queue").divided(true);
     for (index, (id, label)) in steps.iter().enumerate() {
         let ident = format!("scene.motion.{id}");
         let handle = flip(ident.clone(), window, cx);
+        // The position is what this scene is about, so it leads the row in a
+        // column of its own rather than trailing as a badge: a number that
+        // moves is only readable against the numbers above and below it.
+        let position = div()
+            .flex_none()
+            .size(px(theme
+                .control
+                .get(gpui_kit_theme::ControlSize::Xs)
+                .height))
+            .flex()
+            .items_center()
+            .justify_center()
+            .radius(&theme, Radius::Small)
+            .well(&theme)
+            .font_family(theme.typography.mono.clone())
+            .type_scale(&theme, TypeScale::Caption)
+            .text_color(theme.colors.text)
+            .child(format!("{}", index + 1));
         queue = queue.child(
             ListRow::new()
                 .id(ident)
+                .leading(position)
                 .child(div().flex_1().child(*label))
-                .child(Badge::new(format!("{}", index + 1)).neutral())
                 .flip(&handle, window, cx),
         );
     }

@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use gpui::{
     App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
-    StatefulInteractiveElement, Styled, Window, div, px,
+    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TypeScale};
@@ -189,19 +189,36 @@ impl RenderOnce for PromptBuilder {
                     .map(|slot| {
                         let handler = self.on_slot.clone().filter(|_| !self.disabled);
                         let id = slot.id.clone();
+                        let filled = !slot.value.is_empty();
+                        // A slot that carries a value and a slot still waiting
+                        // for one are two different facts, and the accent wash
+                        // said neither: it coloured both alike and sat below
+                        // the contrast the caption size needs. A filled slot
+                        // is a settled value on a raised chip; an empty one is
+                        // an outlined hole with the slot's name in it.
                         let mut chip = div()
                             .id(self.ident.child("slot").child(id.as_ref()).element_id())
                             .focus_ring(&theme)
                             .px(px(theme.space(Space::Xs)))
                             .py(px(2.0))
                             .radius(&theme, Radius::Small)
-                            .bg(theme.colors.accent.opacity(0.16))
-                            .text_color(theme.colors.accent)
+                            .hairline(&theme)
                             .type_scale(&theme, TypeScale::Caption)
-                            .child(if slot.value.is_empty() {
-                                slot.name.clone()
-                            } else {
+                            .map(|element| {
+                                if filled {
+                                    element
+                                        .surface(&theme, Surface::Raised)
+                                        .text_color(theme.colors.text)
+                                } else {
+                                    element
+                                        .border_color(theme.colors.hairline_strong)
+                                        .text_color(theme.colors.text_muted)
+                                }
+                            })
+                            .child(if filled {
                                 slot.value.clone()
+                            } else {
+                                slot.name.clone()
                             })
                             .semantic_in(
                                 cx,
@@ -222,18 +239,10 @@ impl RenderOnce for PromptBuilder {
                     div()
                         .column()
                         .gap_token(&theme, Space::Sm)
-                        .p_token(&theme, Space::Md)
-                        .radius(&theme, Radius::Card)
-                        .surface(&theme, Surface::Panel)
-                        .child(
-                            div()
-                                .type_scale(&theme, TypeScale::Caption)
-                                .text_color(theme.colors.text_muted)
-                                .child(self.label.clone()),
-                        )
                         .child(
                             div()
                                 .type_scale(&theme, TypeScale::Body)
+                                .text_color(theme.colors.text)
                                 .child(self.body.clone()),
                         )
                         .child(
@@ -250,7 +259,37 @@ impl RenderOnce for PromptBuilder {
                 )
             }
         };
-        div().w_full().child(body).semantic_in(cx, spec)
+        // Every state is the same template card. Previously only the ready
+        // one had a card at all, so an empty or refused template arrived as a
+        // loose fragment with no label on it and no edge to sit against.
+        let ready = matches!(self.state, PromptBuilderState::Ready);
+        div()
+            .w_full()
+            .column()
+            .gap_token(&theme, Space::Sm)
+            .p_token(&theme, Space::Md)
+            .radius(&theme, Radius::Card)
+            .surface(&theme, Surface::Panel)
+            .hairline(&theme)
+            .child(
+                div()
+                    .type_scale(&theme, TypeScale::Caption)
+                    .text_color(theme.colors.text_muted)
+                    .child(self.label.clone()),
+            )
+            .child(
+                div()
+                    .w_full()
+                    .column()
+                    .when(!ready, |element| {
+                        element
+                            .items_center()
+                            .justify_center()
+                            .py_token(&theme, Space::Sm)
+                    })
+                    .child(body),
+            )
+            .semantic_in(cx, spec)
     }
 }
 

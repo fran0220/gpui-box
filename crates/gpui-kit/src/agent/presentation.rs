@@ -15,7 +15,7 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon as Glyph, icon as glyph};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Space, TextTone, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Radius, Space, TextTone, TypeScale};
 
 use crate::agent::model::{
     AgentActivity, AgentExecutionState, AgentId, AgentModelIssue, AgentOutcome, AgentPresence,
@@ -25,7 +25,7 @@ use crate::agent::model::{
 use crate::data::{List, ListItem, Tree, TreeNode};
 use crate::display::avatar::Avatar;
 use crate::display::badge::{Badge, Tone};
-use crate::display::status::{Callout, StatusDot, StatusLine};
+use crate::display::status::{Callout, StatusDot};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{FocusRing, Ident, Pressable, StyledExt};
 use crate::motion;
@@ -94,14 +94,36 @@ impl RenderOnce for AgentRunIssues {
         if self.issues.is_empty() {
             return div().into_any_element();
         }
-        let message = self
+        let theme = cx.theme().clone();
+        // One notice per problem. Joined into a sentence, four independent
+        // faults read as one long complaint and none of them can be pointed
+        // at on its own.
+        let labels: Vec<_> = self
             .issues
             .iter()
             .map(|issue| issue_label(issue, cx.strings()))
-            .collect::<Vec<_>>()
-            .join("; ");
-        Callout::new(message, Tone::Danger)
-            .id(self.ident)
+            .collect();
+        let notices: Vec<_> = labels
+            .iter()
+            .enumerate()
+            .map(|(index, label)| {
+                Callout::new(label.clone(), Tone::Danger)
+                    .id(self.ident.child(format!("issue-{index}")))
+            })
+            .collect();
+        div()
+            .column()
+            .w_full()
+            .gap_token(&theme, Space::Xs)
+            .children(notices)
+            // The set of faults is itself one report — a host asks whether the
+            // snapshot it handed over was well formed, not which notice is
+            // third — so the group keeps the identity and each notice hangs
+            // under it.
+            .semantic_in(
+                cx,
+                NodeSpec::new(self.ident.semantic_id(), Role::Status).text(labels.join("; ")),
+            )
             .into_any_element()
     }
 }
@@ -186,15 +208,33 @@ impl RenderOnce for AgentAvatar {
             disc.into_any_element()
         };
 
+        // The presence mark is drawn here rather than taken from `StatusDot`
+        // because that dot is one fixed size: at the smallest avatar it stood
+        // proud of the disc it belongs to. Offline gets a filled mark in the
+        // muted tone, so "not here" is legible instead of nearly the panel.
+        let dot_edge = (self.size * 0.26).clamp(6.0, 11.0);
+        let presence_color = match &self.agent.presence {
+            AgentPresence::Offline => theme.colors.text_muted,
+            AgentPresence::Unknown => theme.colors.hairline_strong,
+            _ => presence.mark_color(None, &theme),
+        };
         let mark = div()
             .absolute()
             .bottom_0()
             .when(direction.is_ltr(), |element| element.right_0())
             .when(direction.is_rtl(), |element| element.left_0())
-            .p(px(1.0))
+            .size(px(dot_edge + theme.borders.thick * 2.0))
+            .items_center()
+            .justify_center()
             .rounded_full()
             .bg(theme.colors.panel)
-            .child(StatusDot::new(presence));
+            .child(
+                div()
+                    .size(px(dot_edge))
+                    .flex_none()
+                    .rounded_full()
+                    .bg(presence_color),
+            );
         let state_mark = execution_glyph(&self.agent.execution).map(|state_glyph| {
             glyph(state_glyph)
                 .absolute()
@@ -256,17 +296,56 @@ impl AgentActivityLine {
 
 impl RenderOnce for AgentActivityLine {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let theme = cx.theme().clone();
         let label = execution_label(&self.execution, cx.strings());
         let tone = execution_tone(&self.execution);
         let busy = self.execution.busy();
-        let mut line = StatusLine::new(label.clone(), tone).id(self.ident.clone());
-        if let Some(tint) = self.tint {
-            line = line.tint(tint);
-        }
-        if busy {
-            line = line.busy(self.ident.child("busy"));
-        }
-        line
+        let color = tone.mark_color(self.tint, &theme);
+
+        // Waiting for approval and a refusal are both cautions, so a coloured
+        // dot draws them the same. The mark is the execution's own glyph
+        // wherever it has one, which is the only channel that separates two
+        // states sharing a severity.
+        let inner = match execution_glyph(&self.execution) {
+            Some(state_glyph) => {
+                crate::display::icon::paint(state_glyph, theme.control.sm.icon_size, color, false)
+                    .into_any_element()
+            }
+            None => {
+                let mut dot = StatusDot::new(tone);
+                if let Some(tint) = self.tint {
+                    dot = dot.tint(tint);
+                }
+                dot.into_any_element()
+            }
+        };
+        let mark = div()
+            .flex_none()
+            .h(px(theme.typography.label.line_height))
+            .row()
+            .items_center()
+            .child(inner);
+        let mark = if busy {
+            motion::breathe(mark, self.ident.child("busy").element_id(), &theme, cx)
+        } else {
+            mark.into_any_element()
+        };
+
+        div()
+            .row()
+            .items_start()
+            .gap_token(&theme, Space::Sm)
+            .type_scale(&theme, TypeScale::Label)
+            .text_color(theme.colors.text_muted)
+            .child(mark)
+            .child(div().min_w_0().child(label.clone()))
+            .semantic_in(
+                cx,
+                NodeSpec::new(self.ident.semantic_id(), Role::Status)
+                    .text(label)
+                    .value(tone.name())
+                    .busy(busy),
+            )
     }
 }
 
@@ -389,7 +468,7 @@ impl RenderOnce for AgentCard {
             .id(self.ident.element_id())
             .w_full()
             .p_token(&theme, Space::Md)
-            .rounded(px(theme.radii.card))
+            .radius(&theme, Radius::Card)
             .border(px(theme.borders.hairline))
             .border_color(theme.colors.hairline)
             .when(self.selected, |element| element.bg(theme.colors.selected))
@@ -530,7 +609,8 @@ impl RenderOnce for AgentRoster {
         let rows = Rc::clone(&agents);
         let labels = Rc::clone(&tasks);
         let art = Rc::clone(&appearances);
-        let mut list = List::new(self.ident.clone(), agents.len(), move |index, _, _| {
+        let mut list = List::new(self.ident.clone(), agents.len(), move |index, _, cx| {
+            let theme = cx.theme().clone();
             let agent = rows[index].clone();
             let id = shared_agent_id(&agent.descriptor.id);
             let task_label = agent
@@ -543,6 +623,7 @@ impl RenderOnce for AgentRoster {
                 agent.clone(),
                 task_label,
                 art.get(&agent.descriptor.id),
+                &theme,
             );
             ListItem::new(id, row).text(agent.descriptor.name)
         })
@@ -567,6 +648,7 @@ fn roster_row(
     agent: AgentSnapshot,
     task_label: Option<SharedString>,
     appearance: Option<&AgentAppearance>,
+    theme: &gpui_kit_theme::Theme,
 ) -> AnyElement {
     let ident = roster.child(agent.descriptor.id.as_str());
     let mut avatar = AgentAvatar::new(ident.child("avatar"), agent.clone())
@@ -578,24 +660,39 @@ fn roster_row(
     if let Some(tint) = appearance.and_then(|appearance| appearance.tint) {
         avatar = avatar.tint(tint);
     }
+    // The rule sits inside the row rather than between rows, so a roster
+    // that scrolls does not leave a stripe hanging under the last name.
     div()
         .h_full()
         .row()
         .items_center()
-        .gap(px(10.0))
+        .gap_token(theme, Space::Sm)
+        .border_b(px(theme.borders.hairline))
+        .border_color(theme.colors.divider)
         .child(avatar)
         .child(
             div()
                 .min_w_0()
                 .flex_1()
                 .column()
-                .child(agent.descriptor.name)
+                .child(
+                    div()
+                        .type_scale(theme, TypeScale::Body)
+                        .text_tone(theme, TextTone::Primary)
+                        .child(agent.descriptor.name),
+                )
                 .child(AgentActivityLine::new(
                     ident.child("activity"),
                     agent.execution,
                 )),
         )
-        .children(task_label.map(|label| Badge::new(label).neutral()))
+        .children(task_label.map(|label| {
+            div()
+                .flex_none()
+                .row()
+                .justify_end()
+                .child(Badge::new(label).neutral())
+        }))
         .into_any_element()
 }
 
@@ -664,7 +761,8 @@ impl RenderOnce for AgentGroup {
             .into_iter()
             .map(|appearance| (appearance.id.clone(), appearance))
             .collect();
-        let mut row = div().row_reading(direction).items_center();
+        let overlap = self.size * 0.28;
+        let mut stack: Vec<AnyElement> = Vec::new();
         for (index, agent) in self.agents.into_iter().take(visible).enumerate() {
             let appearance = appearances.get(&agent.descriptor.id);
             let mut avatar =
@@ -677,26 +775,43 @@ impl RenderOnce for AgentGroup {
             if let Some(tint) = appearance.and_then(|appearance| appearance.tint) {
                 avatar = avatar.tint(tint);
             }
-            row = row.child(
+            stack.push(
                 div()
-                    .when(index > 0, |element| element.ms(direction, px(-8.0)))
-                    .child(avatar),
+                    .flex_none()
+                    .when(index > 0, |element| element.ms(direction, px(-overlap)))
+                    .child(avatar)
+                    .into_any_element(),
             );
         }
-        if count > visible {
-            row = row.child(
-                div().ms(direction, px(theme.space(Space::Xs))).child(
+        // Painted back to front so each identity covers the *leading* edge of
+        // the one behind it. In reading order the newer avatar landed on the
+        // older one's presence mark and cut it in half.
+        stack.reverse();
+        let overflow = (count > visible).then(|| {
+            div()
+                .flex_none()
+                .ms(direction, px(theme.space(Space::Xs)))
+                .child(
                     Badge::new(cx.numbers().positive_count(count - visible))
                         .neutral()
                         .id(self.ident.child("overflow")),
-                ),
-            );
-        }
-        row.semantic_in(
-            cx,
-            NodeSpec::new(self.ident.semantic_id(), Role::Group).value(cx.numbers().count(count)),
-        )
-        .into_any_element()
+                )
+                .into_any_element()
+        });
+        let mut row = div().flex().items_center();
+        row = if direction.is_ltr() {
+            row.flex_row_reverse()
+        } else {
+            row.flex_row()
+        };
+        row.children(overflow)
+            .children(stack)
+            .semantic_in(
+                cx,
+                NodeSpec::new(self.ident.semantic_id(), Role::Group)
+                    .value(cx.numbers().count(count)),
+            )
+            .into_any_element()
     }
 }
 

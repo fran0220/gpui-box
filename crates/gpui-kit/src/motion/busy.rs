@@ -190,6 +190,13 @@ pub fn sweep(
     Some(band.into_any_element())
 }
 
+/// Maps a pulse wave into breathing opacity, floored so the element never
+/// vanishes: a mark that reached nothing would read as having been removed
+/// rather than as still working.
+pub fn breath(wave: f32) -> f32 {
+    BREATH_FLOOR + (1.0 - BREATH_FLOOR) * wave.clamp(0.0, 1.0)
+}
+
 /// A dot that breathes, for a place with room for a mark but not a glyph.
 ///
 /// The size is the caller's, because this sits inside layouts that have

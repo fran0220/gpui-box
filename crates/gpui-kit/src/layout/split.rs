@@ -24,7 +24,11 @@ use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// How wide the grab area of the divider is, and how long the grip drawn
 /// inside it is. Neither value repeats anywhere else.
-pub(crate) const HANDLE: f32 = 7.0;
+/// It is an even number of pixels on purpose: the rule and the grip are both
+/// centred in the lane, and an odd lane puts a one-pixel rule and a two-pixel
+/// grip on two different half-pixels, which is what made one divider read as
+/// a line with a misaligned notch cut out of it.
+pub(crate) const HANDLE: f32 = 8.0;
 const GRIP: f32 = 24.0;
 
 /// How far one arrow key moves the divider when the caller says nothing.
@@ -303,10 +307,10 @@ impl RenderOnce for SplitPane {
                                     style.bg(theme.colors.accent)
                                 })
                                 .when(horizontal, |grip| {
-                                    grip.w(px(theme.effects.selection_rail_width)).h(px(GRIP))
+                                    grip.w(px(theme.borders.thick)).h(px(GRIP))
                                 })
                                 .when(!horizontal, |grip| {
-                                    grip.h(px(theme.effects.selection_rail_width)).w(px(GRIP))
+                                    grip.h(px(theme.borders.thick)).w(px(GRIP))
                                 }),
                         ),
                 )

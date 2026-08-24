@@ -12,7 +12,7 @@ use gpui_kit_theme::{ActiveTheme, ControlMetrics, ControlSize, Radius, Theme, Ty
 use crate::display::icon::{Icon as IconView, IconTone};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
 use crate::foundation::{
-    Disableable, FocusRing, Ident, Pressable, Selectable, Sizable, StyledExt,
+    Disableable, FocusRing, Ident, Pressable, Selectable, SelectedRow, Sizable, StyledExt,
     text as foundation_text,
 };
 
@@ -272,13 +272,15 @@ impl RenderOnce for Button {
         let direction = cx.layout_direction();
         let actionable = self.actionable();
         let hover_group = self.ident.child("hover").semantic_id();
-        // A chosen button is marked in accent rather than washed in grey. A
-        // neutral wash over a raised fill reads as *pressed and inactive*,
-        // which is the opposite of what being the current answer means, and
-        // it is what made the middle segment of every toggle group look
-        // disabled beside the two that were not chosen.
-        let paint = if self.selected {
-            theme.colors.accent
+        // A chosen button rises rather than sinks: it takes the brightest
+        // neutral wash the interactive scale has and its label goes to full
+        // primary, so the current answer is the *lightest* thing in a run
+        // instead of the darkest. The accent is spent on one rail along the
+        // bottom edge, which is the same mark a chosen tab or step carries.
+        let paint = if self.disabled {
+            theme.colors.text_disabled
+        } else if self.selected && self.variant != ButtonVariant::Primary {
+            theme.colors.text
         } else {
             foreground(&theme, self.variant)
         };
@@ -346,29 +348,37 @@ impl RenderOnce for Button {
             }
         }
 
-        let mut button = frame(&theme, self.variant, metrics, inert, direction)
-            .group(hover_group)
-            .when(self.icon_only, |element| {
-                element.w(px(metrics.height)).px(px(0.0))
-            })
-            .map(|element| joined(element, &theme, self.join, direction))
-            .when(self.selected, |element| {
-                element.bg(theme.colors.accent.opacity(0.14))
-            })
-            .id(self.ident.element_id())
-            .when_some(self.focus_handle.clone(), |element, handle| {
-                element.track_focus(&handle)
-            })
-            .role(gpui::Role::Button)
-            .when(self.full_width, |element| element.w_full())
-            .when(actionable, |element| {
-                element
-                    .cursor_pointer()
-                    .tab_index(0)
-                    .focus_ring(&theme)
-                    .pressable(cx)
-            })
-            .children(content);
+        let mut button = frame(
+            &theme,
+            self.variant,
+            metrics,
+            self.disabled,
+            self.loading,
+            direction,
+        )
+        .group(hover_group)
+        .when(self.icon_only, |element| {
+            element.w(px(metrics.height)).px(px(0.0))
+        })
+        .map(|element| joined(element, &theme, self.join, direction))
+        .when(self.selected && !self.disabled, |element| {
+            element.bg(theme.colors.active)
+        })
+        .selected_column(&theme, self.selected && !self.disabled)
+        .id(self.ident.element_id())
+        .when_some(self.focus_handle.clone(), |element, handle| {
+            element.track_focus(&handle)
+        })
+        .role(gpui::Role::Button)
+        .when(self.full_width, |element| element.w_full())
+        .when(actionable, |element| {
+            element
+                .cursor_pointer()
+                .tab_index(0)
+                .focus_ring(&theme)
+                .pressable(cx)
+        })
+        .children(content);
 
         if let (true, Some(handler)) = (actionable, self.on_click.clone()) {
             let on_click = Rc::clone(&handler);
@@ -462,7 +472,8 @@ fn frame(
     theme: &Theme,
     variant: ButtonVariant,
     metrics: ControlMetrics,
-    inert: bool,
+    disabled: bool,
+    loading: bool,
     direction: LayoutDirection,
 ) -> Div {
     // Leading and trailing are named for reading order, not for the screen,
@@ -478,8 +489,21 @@ fn frame(
         .radius(theme, Radius::Control)
         // No variant carries an outline any more, so none of them needs a
         // transparent one to keep the run of heights even.
-        .when(inert, |element| element.opacity(theme.opacity.disabled));
+        .when(disabled, |element| element.opacity(theme.opacity.disabled));
 
+    // A refused action gives up its variant's fill entirely. Dimming a
+    // primary button leaves a pale slab that still out-shouts every action
+    // that can actually be taken, and it leaves refused and in-flight — two
+    // different answers — drawn as the same chip.
+    if disabled {
+        return match variant {
+            ButtonVariant::Ghost => base,
+            ButtonVariant::Link => base.px(px(0.0)),
+            _ => base.bg(theme.colors.raised),
+        };
+    }
+
+    let inert = loading;
     match variant {
         ButtonVariant::Primary => base
             .bg(theme.colors.text)

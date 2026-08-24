@@ -53,13 +53,17 @@ pub fn field_shell(theme: &Theme, size: ControlSize, state: FieldState) -> gpui:
         .px(px(metrics.padding_x))
         .radius(theme, Radius::Control)
         .well(theme)
-        // Invalidity is the one thing a field says with a line, because it is
-        // the one thing no amount of surface colour can say: a well that is
-        // wrong looks exactly like a well that is right. Focus stays a ring,
-        // which is the same ring every other focusable thing in the library
-        // wears and costs the layout nothing.
-        .when(state.invalid, |field| {
-            field.border_color(theme.colors.danger)
+        // The recess alone does not separate a field from the canvas behind
+        // it in a dark theme — the two surfaces are a step apart and the step
+        // vanishes at arm's length — so the line the well holds space for is
+        // drawn rather than left transparent. Invalidity then recolours the
+        // same line instead of introducing one, which is why becoming invalid
+        // still reflows nothing. Focus stays a ring, which is the same ring
+        // every other focusable thing in the library wears.
+        .border_color(if state.invalid {
+            theme.colors.danger
+        } else {
+            theme.colors.hairline
         })
         .when(state.focused, |field| field.shadow(theme.focus_ring()))
         .text_size(px(metrics.font_size))

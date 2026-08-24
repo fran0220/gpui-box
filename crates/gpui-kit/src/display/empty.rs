@@ -12,7 +12,7 @@ use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Space};
 
-use crate::foundation::Ident;
+use crate::foundation::{Ident, StyledExt};
 use crate::motion;
 
 /// Which fact the surface is reporting.
@@ -23,12 +23,35 @@ pub enum EmptyKind {
     Empty,
     /// Nothing has been asked for yet.
     Unstarted,
+    /// Asked for, and waiting its turn.
+    Queued,
+    /// Started, and waiting on something outside the surface.
+    Blocked,
+    /// Started, and withdrawn before it finished.
+    Cancelled,
     /// The host refused, or could not be reached.
     Unavailable,
     /// The attempt failed.
     Failed,
     /// The host refused because the reader is not allowed.
     Unauthorized,
+}
+
+impl EmptyKind {
+    /// The name the node publishes, so a test asserts the fact rather than
+    /// the picture drawn for it.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Empty => "empty",
+            Self::Unstarted => "unstarted",
+            Self::Queued => "queued",
+            Self::Blocked => "blocked",
+            Self::Cancelled => "cancelled",
+            Self::Unavailable => "unavailable",
+            Self::Failed => "failed",
+            Self::Unauthorized => "unauthorized",
+        }
+    }
 }
 
 /// A centred explanation with an optional action.
@@ -85,9 +108,16 @@ impl EmptyState {
 impl RenderOnce for EmptyState {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
+        // Eight facts, eight pictures. Two of these surfaces drawn with one
+        // glyph is two different sentences a reader is asked to tell apart by
+        // their wording alone, which is how a withdrawn run and an empty list
+        // came to look like the same thing.
         let (glyph, tint) = match self.kind {
-            EmptyKind::Empty => (Icon::Checklist, theme.colors.text_faint),
+            EmptyKind::Empty => (Icon::Archive, theme.colors.text_faint),
             EmptyKind::Unstarted => (Icon::Document, theme.colors.text_faint),
+            EmptyKind::Queued => (Icon::List, theme.colors.text_faint),
+            EmptyKind::Blocked => (Icon::Chat, theme.colors.warning),
+            EmptyKind::Cancelled => (Icon::Close, theme.colors.text_faint),
             EmptyKind::Unavailable => (Icon::CloseCircle, theme.colors.warning),
             EmptyKind::Failed => (Icon::Danger, theme.colors.danger),
             EmptyKind::Unauthorized => (Icon::Key, theme.colors.warning),
@@ -117,7 +147,16 @@ impl RenderOnce for EmptyState {
                         .child(detail),
                 )
             })
-            .children(self.action);
+            // The way out of an empty surface is the only control on it, so it
+            // is given room and drawn as a control rather than trailing the
+            // explanation as its quietest line.
+            .children(self.action.map(|action| {
+                div()
+                    .row()
+                    .flex_none()
+                    .mt(px(theme.space(Space::Xs)))
+                    .child(action)
+            }));
 
         // The rise happens inside the element that publishes the node, so the
         // published box is the settled one and only the pixels travel.
@@ -138,22 +177,35 @@ impl RenderOnce for EmptyState {
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::Status)
                     .text(self.title.clone())
-                    .value(match self.kind {
-                        EmptyKind::Empty => "empty",
-                        EmptyKind::Unstarted => "unstarted",
-                        EmptyKind::Unavailable => "unavailable",
-                        EmptyKind::Failed => "failed",
-                        EmptyKind::Unauthorized => "unauthorized",
-                    }),
+                    .value(self.kind.name()),
             )
     }
 }
 
-/// A horizontal rule between groups.
+/// Which way a rule runs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DividerAxis {
+    /// Between one group of rows and the next.
+    #[default]
+    Horizontal,
+    /// Between two columns standing side by side.
+    Vertical,
+}
+
+/// A rule between groups.
+///
+/// A divider separates content that shares a surface. It is drawn in the
+/// stronger of the two hairline roles rather than the one used inside a card:
+/// a rule that has to be looked for is a rule that is not doing the job it is
+/// on screen for, and the faint one belongs to rows that are already held
+/// together by a frame.
 #[derive(Debug, IntoElement)]
 pub struct Divider {
     ident: Option<Ident>,
     label: Option<SharedString>,
+    axis: DividerAxis,
+    /// How far the rule stops short of the edges of what holds it.
+    inset: Option<Space>,
 }
 
 impl Default for Divider {
@@ -167,6 +219,8 @@ impl Divider {
         Self {
             ident: None,
             label: None,
+            axis: DividerAxis::default(),
+            inset: None,
         }
     }
 
@@ -175,9 +229,28 @@ impl Divider {
         self
     }
 
-    /// A caption sitting in the rule, naming what follows.
+    /// A caption sitting in the rule, naming what follows. A vertical rule
+    /// takes no label: a caption turned on its side is not read, it is
+    /// deciphered.
     pub fn label(mut self, label: impl Into<SharedString>) -> Self {
         self.label = Some(label.into());
+        self
+    }
+
+    pub fn axis(mut self, axis: DividerAxis) -> Self {
+        self.axis = axis;
+        self
+    }
+
+    /// The rule standing up, for two columns rather than two groups of rows.
+    pub fn vertical(self) -> Self {
+        self.axis(DividerAxis::Vertical)
+    }
+
+    /// Stops the rule short of both ends by one spacing step, for a rule
+    /// inside a padded container that should not touch its corners.
+    pub fn inset(mut self, inset: Space) -> Self {
+        self.inset = Some(inset);
         self
     }
 }
@@ -185,11 +258,16 @@ impl Divider {
 impl RenderOnce for Divider {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let rule = || {
-            div()
-                .h(px(theme.borders.hairline))
-                .flex_1()
-                .bg(theme.colors.divider)
+        let vertical = self.axis == DividerAxis::Vertical;
+        let weight = px(theme.borders.hairline);
+        let color = theme.colors.hairline_strong;
+        let rule = move || {
+            let bar = div().flex_1().bg(color);
+            if vertical {
+                bar.w(weight)
+            } else {
+                bar.h(weight)
+            }
         };
         let spec = self.ident.as_ref().map(|ident| {
             let mut spec = NodeSpec::new(ident.semantic_id(), Role::Separator);
@@ -198,25 +276,41 @@ impl RenderOnce for Divider {
             }
             spec
         });
+        let inset = self.inset.map(|inset| px(theme.space(inset)));
 
         let element = div()
             .flex()
-            .flex_row()
             .items_center()
-            .w_full()
             .font_fallbacks(gpui_kit_assets::text_fallbacks())
             .gap(px(theme.space(Space::Sm)))
-            .child(rule())
-            .when_some(self.label.clone(), |element, label| {
-                element.child(
-                    div()
+            .map(|element| {
+                if vertical {
+                    element
+                        .flex_col()
+                        .h_full()
                         .flex_none()
-                        .text_size(px(theme.typography.caption.size))
-                        .text_color(theme.colors.text_faint)
-                        .child(label),
-                )
+                        .when_some(inset, |element, inset| element.py(inset))
+                } else {
+                    element
+                        .flex_row()
+                        .w_full()
+                        .when_some(inset, |element, inset| element.px(inset))
+                }
             })
-            .when(self.label.is_some(), |element| element.child(rule()));
+            .child(rule())
+            .when(!vertical, |element| {
+                element
+                    .when_some(self.label.clone(), |element, label| {
+                        element.child(
+                            div()
+                                .flex_none()
+                                .text_size(px(theme.typography.caption.size))
+                                .text_color(theme.colors.text_faint)
+                                .child(label),
+                        )
+                    })
+                    .when(self.label.is_some(), |element| element.child(rule()))
+            });
         match spec {
             Some(spec) => element.semantic_in(cx, spec).into_any_element(),
             None => element.into_any_element(),

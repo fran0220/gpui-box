@@ -349,18 +349,27 @@ impl Render for Dialog {
 
         let mut card = surface(&theme, Elevation::Modal)
             .w(px(360.0))
-            .p_token(&theme, Space::Lg)
-            .gap_token(&theme, Space::Sm)
             .track_focus(&self.focus_handle)
             .on_key_down(cx.listener(Self::on_navigation_key));
         if self.dismissable {
             card = card.on_key_down(cx.listener(Self::on_dismiss_key));
         }
+        let header = panel::band(&theme).children(heading).children(description);
+        let body = body.map(|body| panel::band(&theme).child(body));
+        // The actions sit in their own band under a seam. A question and the
+        // answer to it are two things, and without the line the buttons read
+        // as floating on the same plane as the copy that asked.
+        let footer = actions.map(|actions| {
+            div()
+                .column()
+                .flex_none()
+                .child(panel::seam(&theme))
+                .child(panel::band(&theme).child(actions))
+        });
         let card = card
-            .children(heading)
-            .children(description)
+            .child(header)
             .children(body)
-            .children(actions)
+            .children(footer)
             .semantic_in(cx, spec);
 
         let mut overlay = Overlay::modal(self.ident.child("overlay"))

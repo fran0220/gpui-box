@@ -265,25 +265,43 @@ fn party_gauge(
                 )
                 .into_any_element()
         }
-        PartyGaugeState::Unavailable(reason) => div()
-            .column()
-            .gap_token(theme, Space::Xs)
-            .type_scale(theme, TypeScale::Caption)
-            .child(
-                div()
-                    .text_tone(theme, TextTone::Muted)
-                    .child(gauge.label.clone()),
-            )
-            .child(div().text_color(theme.colors.warning).child(reason.clone()))
-            .semantic_in(
-                cx,
-                NodeSpec::new(ident.semantic_id(), Role::Status)
-                    .text(gauge.label)
-                    .value("unavailable")
-                    .description(reason)
-                    .invalid(true),
-            )
-            .into_any_element(),
+        PartyGaugeState::Unavailable(reason) => {
+            let unavailable = cx.strings().text(StringKey::GameGaugeUnavailable);
+            div()
+                .column()
+                .gap_token(theme, Space::Xs)
+                .type_scale(theme, TypeScale::Caption)
+                .child(
+                    div()
+                        .row()
+                        .justify_between()
+                        .gap_token(theme, Space::Sm)
+                        .child(
+                            div()
+                                .text_tone(theme, TextTone::Muted)
+                                .child(gauge.label.clone()),
+                        )
+                        .child(
+                            div()
+                                .text_color(theme.colors.warning)
+                                .child(unavailable.clone()),
+                        ),
+                )
+                .child(
+                    div()
+                        .text_tone(theme, TextTone::Muted)
+                        .child(reason.clone()),
+                )
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(ident.semantic_id(), Role::Status)
+                        .text(gauge.label)
+                        .value("unavailable")
+                        .description(reason)
+                        .invalid(true),
+                )
+                .into_any_element()
+        }
     }
 }
 
@@ -503,7 +521,7 @@ fn objective_state(
         ),
         ObjectiveState::Active => (
             strings.text(StringKey::GameObjectiveActive),
-            Tone::Accent,
+            Tone::Info,
             None,
         ),
         ObjectiveState::Completed => (
@@ -672,16 +690,27 @@ fn ability_control(
         });
     }
 
-    let metadata = div()
+    // Every card lays out the same slots in the same order — status and
+    // shortcut on one line, then the numbers, then the reason, then the
+    // meter — so four abilities in four states still read as one control.
+    let status_row = div()
         .row()
-        .flex_wrap()
+        .items_center()
+        .justify_between()
         .gap_token(theme, Space::Xs)
         .child(Badge::new(status).id(ident.child("state")).tone(tone))
         .children(ability.shortcut.map(|shortcut| {
             Badge::new(shortcut)
                 .id(ident.child("shortcut"))
                 .tone(Tone::Neutral)
-        }))
+        }));
+
+    let has_charges = ability.charges.is_some();
+    let has_cost = ability.cost.is_some();
+    let numbers = div()
+        .row()
+        .flex_wrap()
+        .gap_token(theme, Space::Xs)
         .children(ability.charges.map(|charges| {
             let current = cx
                 .numbers()
@@ -703,8 +732,18 @@ fn ability_control(
                     .format(StringKey::GameAbilityCost, &[cost.as_ref()]),
             )
             .id(ident.child("cost"))
-            .tone(Tone::Info)
+            .tone(Tone::Neutral)
         }));
+    let has_numbers = has_charges || has_cost;
+
+    let meter = match ability.state {
+        AbilityState::CoolingDown {
+            remaining_fraction, ..
+        } => {
+            Some(ProgressBar::new(ident.child("cooldown")).fraction(1.0 - remaining_fraction.get()))
+        }
+        _ => None,
+    };
 
     div()
         .column()
@@ -713,21 +752,18 @@ fn ability_control(
         .p_token(theme, Space::Md)
         .card_surface(theme, CardVariant::Outlined)
         .child(button)
-        .child(metadata)
+        .child(status_row)
+        .children(has_numbers.then_some(numbers))
         .children(reason.map(|reason| {
             div()
                 .type_scale(theme, TypeScale::Caption)
                 .text_color(tone_color(tone, theme))
                 .child(reason)
         }))
-        .children(match ability.state {
-            AbilityState::CoolingDown {
-                remaining_fraction, ..
-            } => Some(
-                ProgressBar::new(ident.child("cooldown")).fraction(1.0 - remaining_fraction.get()),
-            ),
-            _ => None,
-        })
+        // The meter keeps the last slot on every card, whether or not this
+        // ability has one, so a cooling card is not taller in a different
+        // place than a ready one.
+        .child(div().column().flex_1().justify_end().children(meter))
         .into_any_element()
 }
 
@@ -867,7 +903,7 @@ impl RenderOnce for RewardReveal {
         };
         let state_tone = match state {
             RewardState::Hidden => Tone::Neutral,
-            RewardState::Revealed => Tone::Accent,
+            RewardState::Revealed => Tone::Info,
             RewardState::Claimed => Tone::Success,
             RewardState::Unavailable(_) => Tone::Warning,
         };
@@ -921,7 +957,11 @@ impl RenderOnce for RewardReveal {
                     Some(elapsed) => particles.sample_at(elapsed),
                     None => particles,
                 };
-                div().absolute().inset_0().opacity(0.45).child(particles)
+                div()
+                    .absolute()
+                    .inset_0()
+                    .opacity(theme.opacity.muted)
+                    .child(particles)
             });
 
         div()
@@ -932,13 +972,17 @@ impl RenderOnce for RewardReveal {
             .p_token(&theme, Space::Lg)
             .card_surface(&theme, CardVariant::Outlined)
             .overflow_hidden()
-            .children(effect)
             .child(
                 div()
                     .relative()
+                    // The celebration is clipped to the heading band: loose in
+                    // the card it surfaced as a stray glow in the gaps between
+                    // the item tiles, which reads as a rendering fault.
+                    .overflow_hidden()
                     .row_reading(direction)
                     .justify_between()
                     .gap_token(&theme, Space::Md)
+                    .children(effect)
                     .child(
                         div()
                             .min_w_0()
@@ -974,7 +1018,13 @@ impl RenderOnce for RewardReveal {
                     .text_color(theme.colors.warning)
                     .child(reason)
             }))
-            .children(action.map(|action| div().relative().child(action)))
+            .children(action.map(|action| {
+                div()
+                    .relative()
+                    .row_reading(direction)
+                    .justify_end()
+                    .child(div().flex_none().child(action))
+            }))
             .semantic_in(
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::Group)
@@ -1002,12 +1052,12 @@ fn reward_item(
         .justify_center()
         .rounded_full()
         .overflow_hidden()
-        .bg(theme.colors.raised)
+        .bg(theme.colors.sunken)
         .children(item.image.map(|image| gpui::img(image).size_full()))
         .children(item.icon.map(|icon| {
             glyph(icon)
                 .size(px(20.0))
-                .text_color(theme.colors.accent_strong)
+                .text_color(theme.colors.text_muted)
         }));
     div()
         .row()
@@ -1017,6 +1067,7 @@ fn reward_item(
         .p_token(theme, Space::Sm)
         .radius(theme, Radius::Card)
         .bg(theme.colors.raised)
+        .hairline(theme)
         .child(art)
         .child(
             div()
@@ -1043,7 +1094,7 @@ fn reward_item(
                     .format(StringKey::GameRewardQuantity, &[quantity.as_ref()]),
             )
             .id(ident.child("quantity"))
-            .tone(Tone::Accent)
+            .tone(Tone::Neutral)
         }))
         .semantic_in(
             cx,
