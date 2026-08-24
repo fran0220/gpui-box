@@ -385,6 +385,12 @@ pub(crate) struct A11yNodeBuilder {
     /// `HashMap<NodeId, Node>` to remove the need for `seen_ids`
     all_nodes: Vec<(NodeId, accesskit::Node)>,
     seen_ids: FxHashSet<NodeId>,
+    /// Role-bearing element identities present in this frame. A local
+    /// [`ElementId`] is accepted only when it resolves to exactly one node in
+    /// the active window, which is what lets deferred overlays refer back to
+    /// their trigger without retaining last frame's global path.
+    relationship_nodes: FxHashMap<ElementId, SmallVec<[NodeId; 1]>>,
+    relationships: Vec<(NodeId, AccessibilityRelationship)>,
     /// The node that GPUI considers focused. Note that this may be different to
     /// what is reported to accesskit - see [`Self::active_descendant`]
     focus: Option<NodeId>,
@@ -404,6 +410,8 @@ impl A11yNodeBuilder {
             nodes_stack: SmallVec::new(),
             all_nodes: Vec::new(),
             seen_ids: FxHashSet::default(),
+            relationship_nodes: FxHashMap::default(),
+            relationships: Vec::new(),
             focus: None,
             active_descendant: None,
             #[cfg(debug_assertions)]
@@ -415,6 +423,24 @@ impl A11yNodeBuilder {
     #[cfg(debug_assertions)]
     pub(crate) fn record_node_info(&mut self, id: NodeId, info: debug::NodeDebugInfo) {
         self.node_info.insert(id, info);
+    }
+
+    pub(crate) fn register_element_relationships(
+        &mut self,
+        element_id: ElementId,
+        node_id: NodeId,
+        relationships: &[AccessibilityRelationship],
+    ) {
+        self.relationship_nodes
+            .entry(element_id)
+            .or_default()
+            .push(node_id);
+        self.relationships.extend(
+            relationships
+                .iter()
+                .cloned()
+                .map(|relationship| (node_id, relationship)),
+        );
     }
 
     #[must_use]
@@ -486,6 +512,8 @@ impl A11yNodeBuilder {
         self.ids_stack.clear();
         self.nodes_stack.clear();
         self.seen_ids.clear();
+        self.relationship_nodes.clear();
+        self.relationships.clear();
         #[cfg(debug_assertions)]
         self.node_info.clear();
         let mut root_node = accesskit::Node::new(accesskit::Role::Window);
@@ -570,6 +598,7 @@ impl A11yNodeBuilder {
                 self.all_nodes.push((id, node));
             }
         }
+        self.resolve_relationships();
 
         let focus = match self.active_descendant {
             Some(id) if self.has_node(id) => id,
@@ -594,6 +623,60 @@ impl A11yNodeBuilder {
         };
 
         Self::repair_tree_update(update)
+    }
+
+    fn resolve_relationships(&mut self) {
+        let node_indices: FxHashMap<NodeId, usize> = self
+            .all_nodes
+            .iter()
+            .enumerate()
+            .map(|(index, (node_id, _))| (*node_id, index))
+            .collect();
+        let relationships = std::mem::take(&mut self.relationships);
+
+        for (source, relationship) in relationships {
+            let target_id = match &relationship {
+                AccessibilityRelationship::LabelledBy(target)
+                | AccessibilityRelationship::DescribedBy(target)
+                | AccessibilityRelationship::Labels(target)
+                | AccessibilityRelationship::Describes(target) => target,
+            };
+            let Some(targets) = self.relationship_nodes.get(target_id) else {
+                continue;
+            };
+            if targets.len() != 1 {
+                log::warn!(
+                    "a11y: relationship target `{target_id}` resolves to {} nodes; \
+                     omitting the ambiguous relationship",
+                    targets.len()
+                );
+                continue;
+            }
+            let target = targets[0];
+            let (owner, related, labelled) = match relationship {
+                AccessibilityRelationship::LabelledBy(_) => (source, target, true),
+                AccessibilityRelationship::DescribedBy(_) => (source, target, false),
+                AccessibilityRelationship::Labels(_) => (target, source, true),
+                AccessibilityRelationship::Describes(_) => (target, source, false),
+            };
+            if owner == related {
+                log::warn!(
+                    "a11y: node {owner:?} has a relationship to itself; omitting the relationship"
+                );
+                continue;
+            }
+            let Some(index) = node_indices.get(&owner).copied() else {
+                continue;
+            };
+            let node = &mut self.all_nodes[index].1;
+            if labelled {
+                if !node.labelled_by().contains(&related) {
+                    node.push_labelled_by(related);
+                }
+            } else if !node.described_by().contains(&related) {
+                node.push_described_by(related);
+            }
+        }
     }
 
     /// Accesskit panics on invalid [`TreeUpdate`]s. This function defensively
@@ -637,6 +720,44 @@ impl A11yNodeBuilder {
                     .collect();
                 node.set_children(valid);
             }
+
+            let valid_labelled_by: Vec<NodeId> = node
+                .labelled_by()
+                .iter()
+                .copied()
+                .filter(|related| node_ids.contains(related))
+                .collect();
+            if valid_labelled_by.len() != node.labelled_by().len() {
+                log::error!(
+                    "a11y: Node {:?} has labelled-by references outside the active tree; \
+                     stripping invalid relationships.",
+                    id
+                );
+                if valid_labelled_by.is_empty() {
+                    node.clear_labelled_by();
+                } else {
+                    node.set_labelled_by(valid_labelled_by);
+                }
+            }
+
+            let valid_described_by: Vec<NodeId> = node
+                .described_by()
+                .iter()
+                .copied()
+                .filter(|related| node_ids.contains(related))
+                .collect();
+            if valid_described_by.len() != node.described_by().len() {
+                log::error!(
+                    "a11y: Node {:?} has described-by references outside the active tree; \
+                     stripping invalid relationships.",
+                    id
+                );
+                if valid_described_by.is_empty() {
+                    node.clear_described_by();
+                } else {
+                    node.set_described_by(valid_described_by);
+                }
+            }
         }
 
         update
@@ -648,7 +769,7 @@ mod tests {
     // Import specific items rather than glob-importing `super`, which would pull
     // in gpui's own `test` attribute macro and shadow the standard one.
     use super::{A11y, A11yNodeBuilder, ROOT_NODE_ID};
-    use crate::FocusId;
+    use crate::{AccessibilityRelationship, ElementId, FocusId};
     use accesskit::{NodeId, Role};
     use std::sync::{Arc, atomic::AtomicBool};
 
@@ -770,6 +891,99 @@ mod tests {
 
         let update = builder.finalize();
         assert_eq!(update.focus, focused);
+    }
+
+    #[test]
+    fn relationships_resolve_after_all_subtrees_prepaint() {
+        let mut builder = new_builder();
+        let label = NodeId(1);
+        let description = NodeId(2);
+        let control = NodeId(3);
+        let control_key = ElementId::from("control");
+
+        assert!(builder.push(label, test_node()));
+        builder.register_element_relationships(
+            ElementId::from("label"),
+            label,
+            &[AccessibilityRelationship::Labels(control_key.clone())],
+        );
+        builder.pop();
+
+        assert!(builder.push(description, test_node()));
+        builder.register_element_relationships(
+            ElementId::from("description"),
+            description,
+            &[AccessibilityRelationship::Describes(control_key.clone())],
+        );
+        builder.pop();
+
+        // The target appears after both sources, matching a deferred overlay
+        // that prepaints after its ordinary trigger subtree.
+        assert!(builder.push(control, test_node()));
+        builder.register_element_relationships(control_key, control, &[]);
+        builder.pop();
+
+        let update = builder.finalize();
+        let control_node = update
+            .nodes
+            .iter()
+            .find(|(node_id, _)| *node_id == control)
+            .map(|(_, node)| node)
+            .expect("control node");
+        assert_eq!(control_node.labelled_by(), &[label]);
+        assert_eq!(control_node.described_by(), &[description]);
+    }
+
+    #[test]
+    fn relationships_disappear_with_missing_or_ambiguous_endpoints() {
+        let mut builder = new_builder();
+        let source = NodeId(1);
+        let first_target = NodeId(2);
+        let second_target = NodeId(3);
+        let target_key = ElementId::from("target");
+
+        assert!(builder.push(source, test_node()));
+        builder.register_element_relationships(
+            ElementId::from("source"),
+            source,
+            &[
+                AccessibilityRelationship::LabelledBy(target_key.clone()),
+                AccessibilityRelationship::DescribedBy(ElementId::from("missing")),
+            ],
+        );
+        builder.pop();
+        for target in [first_target, second_target] {
+            assert!(builder.push(target, test_node()));
+            builder.register_element_relationships(target_key.clone(), target, &[]);
+            builder.pop();
+        }
+
+        let update = builder.finalize();
+        let source_node = update
+            .nodes
+            .iter()
+            .find(|(node_id, _)| *node_id == source)
+            .map(|(_, node)| node)
+            .expect("source node");
+        assert!(source_node.labelled_by().is_empty());
+        assert!(source_node.described_by().is_empty());
+
+        builder.begin_frame(None);
+        assert!(builder.push(source, test_node()));
+        builder.register_element_relationships(
+            ElementId::from("source"),
+            source,
+            &[AccessibilityRelationship::LabelledBy(target_key)],
+        );
+        builder.pop();
+        let next = builder.finalize();
+        let source_node = next
+            .nodes
+            .iter()
+            .find(|(node_id, _)| *node_id == source)
+            .map(|(_, node)| node)
+            .expect("source node next frame");
+        assert!(source_node.labelled_by().is_empty());
     }
 
     #[test]

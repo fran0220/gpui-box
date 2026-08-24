@@ -36,11 +36,8 @@ impl Tooltip {
         }
     }
 
-    /// Records the control this explains in deterministic semantic snapshots.
-    ///
-    /// GPUI does not currently expose a native cross-tree described-by
-    /// relation. Callers should also publish this help as a literal accessible
-    /// description on the role-bearing trigger when that association matters.
+    /// Associates this help with its role-bearing control in deterministic
+    /// snapshots and GPUI's native accessibility tree.
     pub fn describes(mut self, control: impl Into<SharedString>) -> Self {
         self.describes = Some(control.into());
         self

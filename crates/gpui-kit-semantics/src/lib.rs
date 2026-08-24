@@ -105,11 +105,13 @@ pub struct Node {
     pub role: Role,
     pub parent: Option<String>,
     /// The control this node names, for a label that belongs to a field it is
-    /// not the parent of. A test finds the field by reading its label.
+    /// not the parent of. A test finds the field by reading its label; GPUI
+    /// projects the same association to AccessKit when both ids resolve.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub labels: Option<String>,
-    /// The diagnostic identity this node describes. This does not imply
-    /// native tree parentage or a platform described-by relationship.
+    /// The diagnostic identity this node describes. This never changes tree
+    /// parentage and becomes an AccessKit described-by relationship when both
+    /// ids resolve in the active window.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub describes: Option<String>,
     pub text: Option<String>,
@@ -622,8 +624,8 @@ impl NodeSpec {
         self
     }
 
-    /// Records which semantic node this node describes without claiming a
-    /// native relationship or changing actual tree topology.
+    /// Records which semantic node this node describes without changing actual
+    /// tree topology. GPUI projects it to AccessKit when both ids resolve.
     pub fn describes(mut self, control: impl Into<SharedString>) -> Self {
         self.describes = Some(control.into());
         self
@@ -756,6 +758,12 @@ where
     }
     if let Some(description) = &spec.description {
         element = element.aria_description(redact_sensitive_text(description));
+    }
+    if let Some(target) = &spec.labels {
+        element = element.aria_labels(target.clone());
+    }
+    if let Some(target) = &spec.describes {
+        element = element.aria_describes(target.clone());
     }
     if let Some(focus) = &spec.focus {
         element = element.track_focus(focus);

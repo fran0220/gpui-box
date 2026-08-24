@@ -170,10 +170,15 @@ visually inspected in both themes and checked on Metal and WARP.
 
 Build on the same shaped editable layout and per-window context.
 
+Status: same-window labelled-by and described-by relationships now resolve
+after deferred prepaint and disappear with either endpoint. Kit form labels,
+help/error text, search labels, and deferred tooltips use that native AccessKit
+path. Native-child handoff and platform adapter/session proofs remain open.
+
 1. Publish editable per-grapheme positions/widths, visual rows, selection, and
    native caret geometry from the layout that painted the text.
-2. Add GPUI relationships for labelled-by/described-by that resolve across
-   deferred subtrees in one window and disappear when either endpoint leaves.
+2. Keep the completed GPUI labelled-by/described-by resolver covered across
+   deferred subtrees, ambiguous identities, and endpoint removal.
 3. Add platform-view/native-child handoff so an embedded media or browser view
    participates in one accessibility hierarchy rather than becoming a second
    unnamed root.

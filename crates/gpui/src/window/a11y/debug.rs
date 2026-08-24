@@ -314,6 +314,28 @@ fn node_to_json(
             }),
         );
     }
+    let relation_ids = |ids: &[NodeId]| {
+        ids.iter()
+            .map(|related| {
+                ephemeral
+                    .get(related)
+                    .cloned()
+                    .unwrap_or_else(|| related.0.to_string())
+            })
+            .collect::<Vec<_>>()
+    };
+    if !node.labelled_by().is_empty() {
+        aria.insert(
+            "labelled_by".into(),
+            json!(relation_ids(node.labelled_by())),
+        );
+    }
+    if !node.described_by().is_empty() {
+        aria.insert(
+            "described_by".into(),
+            json!(relation_ids(node.described_by())),
+        );
+    }
 
     // Boolean / enum states.
     if let Some(v) = node.is_selected() {

@@ -67,6 +67,24 @@ fn a_label_names_the_control_it_belongs_to(cx: &mut TestAppContext) {
         "a test that knows only the label must be able to reach the control"
     );
     assert!(harness.node("workspace.name").is_some());
+
+    let tree = harness.accessibility_tree();
+    let nodes = tree["nodes"].as_object().expect("native nodes");
+    let label_id = nodes
+        .iter()
+        .find(|(_, node)| node["element_id"] == "Name(\"workspace.name.field.label\")")
+        .map(|(id, _)| id)
+        .expect("native label");
+    let control = nodes
+        .values()
+        .find(|node| {
+            node["element_id"] == "Name(\"workspace.name\")" && node["aria"]["role"] == "TextInput"
+        })
+        .expect("native text input");
+    assert_eq!(
+        control["aria"]["labelled_by"],
+        serde_json::json!([label_id])
+    );
 }
 
 #[gpui::test]
@@ -107,6 +125,33 @@ fn an_error_is_added_to_the_description_rather_than_replacing_it(cx: &mut TestAp
             .expect("published")
             .invalid
     );
+
+    let tree = harness.accessibility_tree();
+    let nodes = tree["nodes"].as_object().expect("native nodes");
+    let related = nodes
+        .iter()
+        .filter(|(_, node)| {
+            matches!(
+                node["element_id"].as_str(),
+                Some("Name(\"workspace.name.field.description\")")
+                    | Some("Name(\"workspace.name.field.error\")")
+            )
+        })
+        .map(|(id, _)| id.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    let control = nodes
+        .values()
+        .find(|node| {
+            node["element_id"] == "Name(\"workspace.name\")" && node["aria"]["role"] == "TextInput"
+        })
+        .expect("native text input");
+    let described_by = control["aria"]["described_by"]
+        .as_array()
+        .expect("native described-by")
+        .iter()
+        .map(|id| id.as_str().expect("ephemeral node id"))
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(described_by, related);
 }
 
 #[gpui::test]

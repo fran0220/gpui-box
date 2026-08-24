@@ -20,8 +20,11 @@ button.semantic_in(
 The probe stretches over its parent and records bounds during prepaint. It
 paints nothing and does not consume input. The same call also projects the
 supported role, name, value, control state, focus, range, and widget selection
-into GPUI's AccessKit tree. See [Accessibility](accessibility.md) for the exact
-platform capability matrix and unsupported boundaries.
+into GPUI's AccessKit tree. `NodeSpec::labels` and `NodeSpec::describes` also
+become native labelled-by and described-by relationships when both stable ids
+resolve uniquely in the active window, including across deferred overlays. See
+[Accessibility](accessibility.md) for the exact platform capability matrix and
+unsupported boundaries.
 
 ## Frame lifecycle
 
@@ -67,6 +70,7 @@ A node reports:
 - hovered and pressed;
 - optionally `checked`, `expanded`, `level`, `busy`, `invalid`, `required`, a
   numeric `value_min`/`value_max`/`value_now` range, and a `value`.
+- optional non-topological `labels` and `describes` relationships.
 
 `value` has one meaning across the library — what a control holds, how much a
 container holds, the name of a state, or the reason a row was refused. The

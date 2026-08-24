@@ -119,11 +119,12 @@ impl RenderOnce for FormField {
         let field_id = self.ident.semantic_id();
         let label_ident = self.ident.child("label");
         let description = self.shown_description();
+        let control = self.control.clone();
 
         let mut label_spec = NodeSpec::new(label_ident.semantic_id(), Role::Text)
             .parent(field_id.clone())
             .text(self.label.clone());
-        if let Some(control) = self.control.clone() {
+        if let Some(control) = control.clone() {
             label_spec = label_spec.labels(control);
         }
 
@@ -146,27 +147,29 @@ impl RenderOnce for FormField {
             .semantic_in(cx, label_spec);
 
         let description = description.map(|text| {
-            foundation_text(&theme, TypeScale::Caption, text.clone())
+            let mut spec = NodeSpec::new(self.ident.child("description").semantic_id(), Role::Text)
+                .parent(field_id.clone())
+                .text(text.clone());
+            if let Some(control) = control.clone() {
+                spec = spec.describes(control);
+            }
+            foundation_text(&theme, TypeScale::Caption, text)
                 .text_tone(&theme, gpui_kit_theme::TextTone::Muted)
-                .semantic_in(
-                    cx,
-                    NodeSpec::new(self.ident.child("description").semantic_id(), Role::Text)
-                        .parent(field_id.clone())
-                        .text(text),
-                )
+                .semantic_in(cx, spec)
         });
 
         let error = self.error.clone().map(|text| {
-            foundation_text(&theme, TypeScale::Caption, text.clone())
+            let mut spec = NodeSpec::new(self.ident.child("error").semantic_id(), Role::Status)
+                .parent(field_id.clone())
+                .invalid(true)
+                .text(text.clone());
+            if let Some(control) = control.clone() {
+                spec = spec.describes(control);
+            }
+            foundation_text(&theme, TypeScale::Caption, text)
                 .text_color(theme.colors.danger)
                 .mt_token(&theme, Space::Sm)
-                .semantic_in(
-                    cx,
-                    NodeSpec::new(self.ident.child("error").semantic_id(), Role::Status)
-                        .parent(field_id.clone())
-                        .invalid(true)
-                        .text(text),
-                )
+                .semantic_in(cx, spec)
         });
 
         div()

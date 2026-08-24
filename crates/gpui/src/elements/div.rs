@@ -903,7 +903,7 @@ pub trait InteractiveElement: Sized {
 
     #[cfg(any(test, feature = "test-support"))]
     /// Set a key that can be used to look up this element's bounds
-    /// in the [`crate::VisualTestContext::debug_bounds`] map
+    /// with `VisualTestContext::debug_bounds`.
     /// This is a noop in release builds
     fn debug_selector(mut self, f: impl FnOnce() -> String) -> Self {
         self.interactivity().debug_selector = Some(f());
@@ -912,7 +912,7 @@ pub trait InteractiveElement: Sized {
 
     #[cfg(not(any(test, feature = "test-support")))]
     /// Set a key that can be used to look up this element's bounds
-    /// in the [`crate::VisualTestContext::debug_bounds`] map
+    /// with `VisualTestContext::debug_bounds`.
     /// This is a noop in release builds
     #[inline]
     fn debug_selector(self, _: impl FnOnce() -> String) -> Self {
@@ -1333,6 +1333,48 @@ pub trait StatefulInteractiveElement: InteractiveElement {
     /// for example a settings subtitle or a hint.
     fn aria_description(mut self, description: impl Into<SharedString>) -> Self {
         self.interactivity().aria.description = Some(description.into());
+        self
+    }
+
+    /// Name this element with another role-bearing element in the same
+    /// window. The target id must resolve uniquely for the active frame.
+    fn aria_labelled_by(mut self, target: impl Into<ElementId>) -> Self {
+        self.interactivity()
+            .aria
+            .relationships
+            .push(crate::AccessibilityRelationship::LabelledBy(target.into()));
+        self
+    }
+
+    /// Describe this element with another role-bearing element in the same
+    /// window. The target id must resolve uniquely for the active frame.
+    fn aria_described_by(mut self, target: impl Into<ElementId>) -> Self {
+        self.interactivity()
+            .aria
+            .relationships
+            .push(crate::AccessibilityRelationship::DescribedBy(target.into()));
+        self
+    }
+
+    /// Use this element as a label for another role-bearing element in the
+    /// same window. This inverse form lets a label declare the relationship
+    /// without rebuilding the control it names.
+    fn aria_labels(mut self, target: impl Into<ElementId>) -> Self {
+        self.interactivity()
+            .aria
+            .relationships
+            .push(crate::AccessibilityRelationship::Labels(target.into()));
+        self
+    }
+
+    /// Use this element as a description for another role-bearing element in
+    /// the same window. This inverse form supports deferred tooltips and help
+    /// text rendered outside the control's element subtree.
+    fn aria_describes(mut self, target: impl Into<ElementId>) -> Self {
+        self.interactivity()
+            .aria
+            .relationships
+            .push(crate::AccessibilityRelationship::Describes(target.into()));
         self
     }
 
@@ -1906,6 +1948,10 @@ impl Element for Div {
         self.interactivity.write_a11y_info(node);
     }
 
+    fn a11y_relationships(&self) -> &[crate::AccessibilityRelationship] {
+        &self.interactivity.aria.relationships
+    }
+
     fn a11y_synthetic_children(
         &mut self,
         _prepaint: &mut Self::PrepaintState,
@@ -2094,6 +2140,7 @@ impl IntoElement for Div {
 pub(crate) struct AriaProperties {
     pub(crate) label: Option<SharedString>,
     pub(crate) description: Option<SharedString>,
+    pub(crate) relationships: Vec<crate::AccessibilityRelationship>,
     pub(crate) keyshortcuts: Option<SharedString>,
     pub(crate) selected: Option<bool>,
     pub(crate) expanded: Option<bool>,
@@ -4047,6 +4094,10 @@ where
 
     fn write_a11y_info(&self, node: &mut accesskit::Node) {
         self.element.write_a11y_info(node);
+    }
+
+    fn a11y_relationships(&self) -> &[crate::AccessibilityRelationship] {
+        self.element.a11y_relationships()
     }
 
     fn a11y_synthetic_children(

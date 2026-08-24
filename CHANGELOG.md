@@ -117,6 +117,14 @@ else that is waiting.
 
 ### Added
 
+**Labels and help now reach the native accessibility relationship graph.**
+Role-bearing GPUI elements can declare labelled-by and described-by in either
+direction. The per-window resolver runs after deferred prepaint, aggregates
+multiple descriptions, rejects ambiguous ids, and removes a relationship in
+the same frame either endpoint disappears. Kit semantic labels, form help and
+errors, search labels, and deferred tooltips use the native AccessKit relation
+without changing their deterministic diagnostic vocabulary.
+
 **Rich text now has one storage-neutral edit vocabulary.**
 `RichTextDocument` carries stable block identity, hard block boundaries, soft
 line breaks, complete inline style and link coverage, logical alignment, and

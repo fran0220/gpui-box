@@ -86,6 +86,7 @@ not evidence that a particular screen reader announces every property correctly.
 | Capability | macOS AX | Windows UIA | Linux AT-SPI (planned) | Browser semantic DOM |
 |---|---|---|---|---|
 | Role and accessible name | Native AX smoke verified | Bridged; native session unverified | Adapter exists; non-gating and unverified | Button/dialog roles and names browser-smoke verified |
+| Labelled-by and described-by | Same-window AccessKit relationships, including deferred overlays, verified deterministically; native AX relation unverified | Same AccessKit structure; native UIA relation unverified | Same AccessKit structure; native AT-SPI relation unverified | AccessKit structure exists; semantic DOM relationship projection unverified |
 | String value and placeholder | Bridged; deterministic tree verified | Bridged; native session unverified | Bridged; native session unverified | Mirrored; text editing browser-smoke verified |
 | Disabled, invalid, required, busy | Disabled native AX smoke verified; other states deterministic only | Bridged; native session unverified | Bridged; native session unverified | Mirrored; screen-reader announcement unverified |
 | Checked, expanded, widget selection | Checked native AX smoke verified; expanded/selection deterministic only | Bridged; native session unverified | Bridged; native session unverified | Mirrored; screen-reader announcement unverified |
@@ -100,13 +101,16 @@ not evidence that a particular screen reader announces every property correctly.
 
 `hovered` and pointer `pressed` remain diagnostic-only transient state. Semantic
 `parent` records actual diagnostic tree parentage; `labels` and `describes`
-record non-topological diagnostic relationships for tests. The native tree
-follows GPUI's rendered element nesting, so no cross-tree labelled-by,
-described-by, or reparenting claim is made. Literal descriptions can be
-published on a native role-bearing node, but GPUI does not yet expose a native
-cross-tree described-by relationship. Tooltip triggers therefore opt into the
-same literal description as their visible tooltip instead of claiming that
-native relationship.
+record non-topological diagnostic relationships for tests and project to
+AccessKit labelled-by and described-by when both role-bearing element ids
+resolve uniquely in the active window. Resolution runs after ordinary and
+deferred prepaint, supports either declaration direction and multiple
+descriptions, and omits missing, duplicate, self-referential, or removed
+endpoints rather than retaining stale node ids. The native tree still follows
+GPUI's rendered element nesting; relationships do not reparent nodes. Literal
+descriptions remain available and may coexist with a relationship. Form labels,
+help/error text, hidden search labels, and visible deferred tooltips use the
+relationship path.
 
 Editable controls publish UTF-8 character lengths, generation-scoped text runs,
 selection/caret positions, and `SetValue` and
@@ -138,8 +142,8 @@ joins them only inside one declared selection scope, and never publishes text
 from an unmounted or sensitive participant. Live regions are explicit opt-in:
 static Status nodes are not live, ordinary toasts are polite, and danger toasts
 are assertive, with the whole toast marked atomic. Announcement speech
-and timing, editable per-grapheme geometry and native caret geometry, and native
-child nodes remain separate platform work.
+and timing, platform verification of editable text ranges/caret bounds, and
+native child nodes remain separate platform work.
 
 Open dialogs publish a modal native Dialog node, and open menus and visible
 tooltips publish separate native Menu and Tooltip nodes; each role-bearing node
@@ -147,7 +151,8 @@ leaves the AccessKit tree when its deferred overlay closes. Focus containment
 and restoration are component behavior, while platform screen-reader ordering
 around deferred overlays remains unverified. Deferred hover-card and popover
 surfaces are non-modal Groups and become siblings of their trigger group under
-the native Window root; no unsupported cross-deferred relationship is claimed.
+the native Window root. A tooltip may describe its trigger across that sibling
+boundary without changing either node's parentage.
 Menu keyboard focus remains on the Menu container, while GPUI's active-descendant
 bridge reports the current stable MenuItem as AccessKit focus only while that
 container owns keyboard focus. Moving the menu cursor updates the reported

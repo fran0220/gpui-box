@@ -88,7 +88,17 @@ primitives. Kit's storage-neutral `RichTextDocument` now supplies stable block
 identity, composite inline marks and links, paragraph/list metadata, and typed
 edit intents. A caller-owned `RichTextEditSession` applies those intents and
 owns composition and undo transactions without parsing or persisting a file
-format. The visible editor is still being completed on top of that model.
+format. `RichTextEditor` projects the session through the same shaped geometry,
+including selection, caret, IME, clipboard, diagnostics, links, lists,
+alignment, and a token-backed toolbar.
+
+Role-bearing elements can declare `aria_labelled_by`, `aria_described_by`, or
+their inverse `aria_labels` and `aria_describes` forms. GPUI resolves the
+referenced element id after ordinary and deferred prepaint in the active
+window. A missing, duplicate, or removed endpoint produces no relationship for
+that frame; no stale AccessKit node id is retained. Kit's `NodeSpec::labels`
+and `NodeSpec::describes` project through this native relation path as well as
+remaining visible in deterministic semantic snapshots.
 
 `ScrollTarget` gives overflowing containers, uniform lists, and measured
 variable-height lists one offset, extent, viewport, and mutation contract.

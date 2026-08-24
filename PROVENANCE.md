@@ -107,6 +107,12 @@ framework boundary and use the existing shaping and Unicode segmentation
 dependencies; no editor, document-format, grammar, language-server, or product
 source is imported.
 
+The per-window labelled-by and described-by resolver, including inverse
+label/description declarations, deferred-subtree resolution, ambiguous-target
+refusal, and stale-endpoint removal, is subsequent GPUI Box work. It fills the
+existing AccessKit relationship properties from role-bearing GPUI element
+identities and imports no accessibility adapter, product, or UI source.
+
 The window-owned document-selection coordinator, caller-declared reading order,
 overlay scope isolation, truthful virtualized-copy coverage, and aggregate
 clipboard path are subsequent GPUI Box work above that selectable-text

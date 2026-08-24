@@ -95,6 +95,11 @@ fn resting_on_a_control_publishes_help_linked_to_it(cx: &mut TestAppContext) {
         trigger.1["aria"]["description"],
         "Writes the theme to a file on disk"
     );
+    assert_eq!(
+        trigger.1["aria"]["described_by"],
+        serde_json::json!([tooltips[0].0]),
+        "the deferred tooltip is a native description of its trigger"
+    );
     let native_window = &nodes[tree["root"].as_str().expect("native window root")];
     assert!(
         native_window["children"]
@@ -140,4 +145,17 @@ fn help_leaves_with_the_pointer(cx: &mut TestAppContext) {
                 && node["aria"]["role"] == "Tooltip"
         })
     }));
+    let trigger = tree["nodes"]
+        .as_object()
+        .and_then(|nodes| {
+            nodes.values().find(|node| {
+                node["element_id"] == "Name(\"settings.export\")"
+                    && node["aria"]["role"] == "Button"
+            })
+        })
+        .expect("native trigger remains mounted");
+    assert!(
+        trigger["aria"].get("described_by").is_none(),
+        "a relationship must leave with its deferred endpoint"
+    );
 }

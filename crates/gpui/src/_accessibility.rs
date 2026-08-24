@@ -188,6 +188,39 @@
 //! label property on a parent [`div`] without duplicating the text in the
 //! accessibility tree.
 //!
+//! ### Relationships
+//!
+//! A label, hint, error, or deferred tooltip may be outside the control's
+//! rendered subtree. Role-bearing interactive elements can declare that
+//! non-topological association in either direction:
+//! ```rust
+//! # use gpui::*;
+//! let label = div()
+//!     .id("workspace-name-label")
+//!     .role(Role::Label)
+//!     .aria_labels("workspace-name")
+//!     .child(text!("Workspace name"));
+//! let control = div()
+//!     .id("workspace-name")
+//!     .role(Role::TextInput)
+//!     .aria_described_by("workspace-name-help");
+//! let help = div()
+//!     .id("workspace-name-help")
+//!     .role(Role::Label)
+//!     .child(text!("Shown to collaborators"));
+//! # let _ = (label, control, help);
+//! ```
+//! [`StatefulInteractiveElement::aria_labelled_by`] and
+//! [`StatefulInteractiveElement::aria_described_by`] put the reference on the
+//! control; [`StatefulInteractiveElement::aria_labels`] and
+//! [`StatefulInteractiveElement::aria_describes`] let the visible text declare
+//! the inverse. GPUI resolves these after ordinary and deferred prepaint, so
+//! declaration order and overlay placement do not matter. The referenced
+//! [`ElementId`] must identify exactly one role-bearing node in the active
+//! window. Missing, duplicate, self-referential, or removed endpoints produce
+//! no relationship for that frame. Relationship ids must be stable business
+//! identities and must not contain secret or user-authored text.
+//!
 //! ### Handling actions
 //!
 //! Assistive technology can dispatch actions to the UI. While many users of

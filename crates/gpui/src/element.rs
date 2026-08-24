@@ -44,6 +44,25 @@ use std::{
     sync::Arc,
 };
 
+/// A non-topological relationship between two accessibility nodes.
+///
+/// The referenced [`ElementId`] must identify exactly one role-bearing element
+/// in the active window. Unlike layout parentage, relationships are resolved
+/// after every ordinary and deferred subtree has prepainted, so either endpoint
+/// may appear first. An absent or ambiguous endpoint omits the relationship for
+/// that frame instead of retaining a stale node id.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum AccessibilityRelationship {
+    /// The current node is named by the referenced node.
+    LabelledBy(ElementId),
+    /// The current node is described by the referenced node.
+    DescribedBy(ElementId),
+    /// The current node names the referenced node.
+    Labels(ElementId),
+    /// The current node describes the referenced node.
+    Describes(ElementId),
+}
+
 /// Implemented by types that participate in laying out and painting the contents of a window.
 /// Elements form a tree and are laid out according to web-based layout rules, as implemented by Taffy.
 /// You can create custom elements by implementing this trait, see the module-level documentation
@@ -120,6 +139,14 @@ pub trait Element: 'static + IntoElement {
     ///
     /// See the [accessibility guide](crate::_accessibility) for an overview.
     fn write_a11y_info(&self, _node: &mut accesskit::Node) {}
+
+    /// Returns this element's non-topological accessibility relationships.
+    ///
+    /// Called only when [`Element::a11y_role`] returns `Some`. GPUI resolves
+    /// the referenced element identities after deferred prepaint completes.
+    fn a11y_relationships(&self) -> &[AccessibilityRelationship] {
+        &[]
+    }
 
     /// Add synthetic child nodes to an [`Element`] that has an
     /// [`.id()`][Element::id] and a [`.role()`][Element::a11y_role].
@@ -389,6 +416,13 @@ impl<E: Element> Drawable<E> {
                     self.element.write_a11y_info(&mut node);
                     window.a11y.node_bounds.insert(node_id, bounds);
                     pushed_a11y_node = window.a11y.nodes.push(node_id, node);
+                    if pushed_a11y_node && let Some(element_id) = global_id.0.last() {
+                        window.a11y.nodes.register_element_relationships(
+                            element_id.clone(),
+                            node_id,
+                            self.element.a11y_relationships(),
+                        );
+                    }
                     #[cfg(debug_assertions)]
                     if pushed_a11y_node {
                         let view = window
