@@ -242,15 +242,18 @@ impl Element for TextAreaElement {
                 }
                 self.area.update(cx, |area, cx| {
                     let grew = area.visible_rows() != visible_rows;
+                    let scroll_changed = area.scroll_offset() != scroll_offset;
                     area.set_visible_rows(visible_rows);
                     area.set_scroll_offset(scroll_offset);
-                    let accessibility_layout_changed =
+                    let layout_changed =
                         area.set_last_layout(layout, prepaint.source_text.clone(), bounds);
-                    // Only a changed height needs another frame; notifying on
-                    // every frame would redraw forever. Accessibility needs
-                    // one more frame when newly shaped visual rows become
-                    // available to the parent node.
-                    if grew || accessibility_layout_changed {
+                    // Geometry and accessibility consumers need one
+                    // corrective frame when shaped rows, bounds, or scrolling
+                    // change. Notifying on every paint would redraw forever.
+                    if grew || layout_changed || scroll_changed {
+                        if layout_changed || scroll_changed {
+                            cx.emit(crate::controls::textarea::TextAreaEvent::GeometryChanged);
+                        }
                         cx.notify();
                     }
                 });

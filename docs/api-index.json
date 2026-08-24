@@ -4503,19 +4503,25 @@
       "commands": [
         "set_placeholder(placeholder: impl Into<SharedString>, cx: &mut Context<Self>)",
         "set_arrows_claimed(claimed: bool)",
+        "set_completion_claimed(claimed: bool)",
         "set_value(value: impl Into<SharedString>, cx: &mut Context<Self>)",
         "insert(text: &str, cx: &mut Context<Self>)",
+        "replace_range(range: Range<usize>, text: &str, cx: &mut Context<Self>) -> Option<Range<usize>>",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)",
         "set_read_only(read_only: bool, cx: &mut Context<Self>)",
-        "set_invalid(invalid: bool, cx: &mut Context<Self>)"
+        "set_invalid(invalid: bool, cx: &mut Context<Self>)",
+        "set_selected_range(range: Range<usize>, cx: &mut Context<Self>)"
       ],
       "queries": [
         "arrows_claimed() -> bool",
+        "completion_claimed() -> bool",
         "value() -> &SharedString",
         "is_empty() -> bool",
         "is_disabled() -> bool",
         "selected_range() -> Range<usize>",
         "cursor_offset() -> usize",
+        "bounds_for_range(range: Range<usize>) -> Option<Vec<Bounds<Pixels>>>",
+        "caret_bounds() -> Option<Bounds<Pixels>>",
         "cursor_row() -> usize",
         "measured() -> Option<Measured>"
       ],
@@ -4527,6 +4533,10 @@
         "Pasted",
         "MoveUp",
         "MoveDown",
+        "AcceptCompletion",
+        "DismissCompletion",
+        "SelectionChanged",
+        "GeometryChanged",
         "Focus",
         "Blur"
       ],
@@ -12266,6 +12276,10 @@
         "Pasted",
         "MoveUp",
         "MoveDown",
+        "AcceptCompletion",
+        "DismissCompletion",
+        "SelectionChanged",
+        "GeometryChanged",
         "Focus",
         "Blur"
       ],

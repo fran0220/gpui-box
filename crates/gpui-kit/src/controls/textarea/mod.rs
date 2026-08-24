@@ -41,6 +41,7 @@ use gpui::{
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, TypeScale};
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::controls::text_edit;
 use crate::foundation::{
@@ -86,6 +87,8 @@ actions!(
         Paste,
         Submit,
         Cancel,
+        AcceptCompletion,
+        DismissCompletion,
         ShowCharacterPalette,
     ]
 );
@@ -103,9 +106,20 @@ pub const KEY_CONTEXT: &str = "TextArea";
 /// handler which of the two it just got.
 const SUBMIT_CONTEXT: &str = "TextAreaSubmits";
 
+/// The marker published while an owner has an open completion surface.
+///
+/// Enter and escape must be resolved by the keymap before a raw key listener
+/// can see them, so accepting or dismissing completion is a text-area
+/// primitive even though the menu and its candidates belong to the owner.
+const COMPLETION_CONTEXT: &str = "TextAreaCompletes";
+
 /// The whole context such an area declares: the shared one, so every other
 /// binding still reaches it, plus the marker.
 const SUBMIT_KEY_CONTEXT: &str = "TextArea TextAreaSubmits";
+
+const COMPLETION_KEY_CONTEXT: &str = "TextArea TextAreaCompletes";
+
+const SUBMIT_COMPLETION_KEY_CONTEXT: &str = "TextArea TextAreaSubmits TextAreaCompletes";
 
 /// The visible rows a text area occupies when the caller asks for none.
 const DEFAULT_ROWS: usize = 3;
@@ -155,18 +169,36 @@ pub(crate) fn install(cx: &mut App) {
         KeyBinding::new(
             "enter",
             Newline,
-            Some(&format!("{KEY_CONTEXT} && !{SUBMIT_CONTEXT}")),
+            Some(&format!(
+                "{KEY_CONTEXT} && !{SUBMIT_CONTEXT} && !{COMPLETION_CONTEXT}"
+            )),
         ),
         KeyBinding::new(
             "enter",
             Submit,
-            Some(&format!("{KEY_CONTEXT} && {SUBMIT_CONTEXT}")),
+            Some(&format!(
+                "{KEY_CONTEXT} && {SUBMIT_CONTEXT} && !{COMPLETION_CONTEXT}"
+            )),
+        ),
+        KeyBinding::new(
+            "enter",
+            AcceptCompletion,
+            Some(&format!("{KEY_CONTEXT} && {COMPLETION_CONTEXT}")),
         ),
         // Bound in both, because a modified enter means the same thing in
         // both: the one that is not the common act.
         KeyBinding::new("shift-enter", Newline, Some(KEY_CONTEXT)),
         KeyBinding::new(&format!("{primary}-enter"), Submit, Some(KEY_CONTEXT)),
-        KeyBinding::new("escape", Cancel, Some(KEY_CONTEXT)),
+        KeyBinding::new(
+            "escape",
+            Cancel,
+            Some(&format!("{KEY_CONTEXT} && !{COMPLETION_CONTEXT}")),
+        ),
+        KeyBinding::new(
+            "escape",
+            DismissCompletion,
+            Some(&format!("{KEY_CONTEXT} && {COMPLETION_CONTEXT}")),
+        ),
         KeyBinding::new(&format!("{primary}-home"), DocumentStart, Some(KEY_CONTEXT)),
         KeyBinding::new(&format!("{primary}-end"), DocumentEnd, Some(KEY_CONTEXT)),
         KeyBinding::new(
@@ -314,6 +346,14 @@ pub enum TextAreaEvent {
     MoveUp,
     /// Down, on the same terms.
     MoveDown,
+    /// Enter, while the owner has claimed completion keys. No text changed.
+    AcceptCompletion,
+    /// Escape, on the same terms. Ordinary cancellation was not emitted.
+    DismissCompletion,
+    /// The caret or selection moved, including as the result of an edit.
+    SelectionChanged(Range<usize>),
+    /// Painted text geometry changed and current-frame range bounds are ready.
+    GeometryChanged,
     Focus,
     Blur,
 }
@@ -347,6 +387,8 @@ pub struct TextArea {
     /// Set from the host's render while a surface over the area is listing
     /// options, because that is the only thing that knows there is one.
     arrows_claimed: bool,
+    /// Whether enter and escape belong to the open completion surface.
+    completion_claimed: bool,
     /// The rows the frame decided to occupy, which grows with the text until
     /// `max_rows` and is measured rather than guessed.
     visible_rows: usize,
@@ -403,6 +445,7 @@ impl TextArea {
             enter: Enter::Opens,
             frame: Frame::Own,
             arrows_claimed: false,
+            completion_claimed: false,
             visible_rows: DEFAULT_ROWS,
             scroll_offset: px(0.0),
             goal_x: None,
@@ -523,6 +566,21 @@ impl TextArea {
         self.arrows_claimed
     }
 
+    /// Hands enter, escape, and the unmodified vertical arrows to a completion
+    /// surface without changing shift-enter or the platform submit chord.
+    ///
+    /// This is intentionally separate from [`Self::set_arrows_claimed`]: an
+    /// owner can use the older arrow handoff for a surface that has no accept
+    /// action, while a completion surface gets one coherent key contract.
+    /// There is no notify because owners set this during their own render.
+    pub fn set_completion_claimed(&mut self, claimed: bool) {
+        self.completion_claimed = claimed;
+    }
+
+    pub fn completion_claimed(&self) -> bool {
+        self.completion_claimed
+    }
+
     pub fn max_length(mut self, max_length: usize) -> Self {
         self.max_length = Some(max_length);
         self.edit.rules_mut().max_length = Some(max_length);
@@ -539,6 +597,7 @@ impl TextArea {
 
     /// Replaces the text from the host side, for example when a form resets.
     pub fn set_value(&mut self, value: impl Into<SharedString>, cx: &mut Context<Self>) {
+        let selection_before = self.edit.selection();
         // A value the host set is not a step the reader can walk back
         // through, so it ends the history rather than joining it.
         self.edit.set_text(&value.into());
@@ -546,6 +605,7 @@ impl TextArea {
         self.scroll_offset = px(0.0);
         self.goal_x = None;
         cx.emit(TextAreaEvent::Change(self.edit.text().clone()));
+        self.emit_selection_if_changed(selection_before, cx);
         cx.notify();
     }
 
@@ -557,6 +617,40 @@ impl TextArea {
     /// everything else, so it is one undo step and it reports one change.
     pub fn insert(&mut self, text: &str, cx: &mut Context<Self>) {
         self.apply_edit(None, text, text_edit::Cause::Paste, cx);
+    }
+
+    /// Replaces a caller-named UTF-8 byte range as one undoable edit.
+    ///
+    /// Completion surfaces use this to replace the trigger and query without
+    /// manufacturing selection gestures. Ranges must name UTF-8 and grapheme
+    /// boundaries; invalid ranges, disabled and read-only areas are refused.
+    /// The returned range is what survived the area's normalisation and length
+    /// rules.
+    pub fn replace_range(
+        &mut self,
+        range: Range<usize>,
+        text: &str,
+        cx: &mut Context<Self>,
+    ) -> Option<Range<usize>> {
+        let value = self.edit.text();
+        let grapheme_boundary = |offset| {
+            offset == value.len()
+                || value
+                    .grapheme_indices(true)
+                    .any(|(boundary, _)| boundary == offset)
+        };
+        if self.disabled
+            || self.read_only
+            || range.start > range.end
+            || value.get(range.clone()).is_none()
+            || !grapheme_boundary(range.start)
+            || !grapheme_boundary(range.end)
+        {
+            return None;
+        }
+        let start = range.start;
+        self.apply_byte_edit(range, text, text_edit::Cause::Paste, cx);
+        Some(start..self.cursor_offset())
     }
 
     pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
@@ -593,6 +687,49 @@ impl TextArea {
         } else {
             self.edit.selection().end
         }
+    }
+
+    /// Moves the selection from the host side using UTF-8 byte offsets.
+    /// Invalid offsets are clamped to surrounding grapheme boundaries by the
+    /// shared editable-text buffer.
+    pub fn set_selected_range(&mut self, range: Range<usize>, cx: &mut Context<Self>) {
+        self.select_range(range, cx);
+    }
+
+    /// Painted rectangles for a byte range in window coordinates.
+    ///
+    /// Nothing is returned until the current value has been shaped. Wrapped
+    /// and bidirectional ranges can produce more than one rectangle; callers
+    /// that need only the insertion point should use [`Self::caret_bounds`].
+    pub fn bounds_for_range(&self, range: Range<usize>) -> Option<Vec<Bounds<Pixels>>> {
+        if self.last_layout_text != *self.edit.text()
+            || range.start > range.end
+            || self.edit.text().get(range.clone()).is_none()
+        {
+            return None;
+        }
+        let layout = self.last_layout.as_ref()?;
+        let bounds = self.last_bounds?;
+        Some(layout.bounds_for_range(
+            range,
+            point(bounds.left(), bounds.top() - self.scroll_offset),
+            gpui::TextAlign::Left,
+            bounds.size.width,
+        ))
+    }
+
+    /// The current insertion rectangle in window coordinates.
+    pub fn caret_bounds(&self) -> Option<Bounds<Pixels>> {
+        if self.last_layout_text != *self.edit.text() || !self.edit.selection().is_empty() {
+            return None;
+        }
+        let layout = self.last_layout.as_ref()?;
+        let bounds = self.last_bounds?;
+        Some(layout.caret_bounds(
+            self.cursor_offset(),
+            point(bounds.left(), bounds.top() - self.scroll_offset),
+            px(1.0),
+        ))
     }
 
     /// The visual row the caret sits on, counting wrapped rows.
@@ -654,6 +791,7 @@ impl TextArea {
     ) -> bool {
         let rows = layout.visual_rows(&text);
         let changed = self.last_layout_text != text
+            || self.last_bounds != Some(bounds)
             || self
                 .last_layout
                 .as_ref()
@@ -696,10 +834,21 @@ impl TextArea {
         cause: text_edit::Cause,
         cx: &mut Context<Self>,
     ) {
+        let range = self.edit_range(range_utf16);
+        self.apply_byte_edit(range, new_text, cause, cx);
+    }
+
+    fn apply_byte_edit(
+        &mut self,
+        range: Range<usize>,
+        new_text: &str,
+        cause: text_edit::Cause,
+        cx: &mut Context<Self>,
+    ) {
         if self.disabled || self.read_only {
             return;
         }
-        let range = self.edit_range(range_utf16);
+        let selection_before = self.edit.selection();
         // A key that arrives while an input method is composing ends the
         // composition, so the run is one step rather than merging with what
         // follows it.
@@ -710,44 +859,62 @@ impl TextArea {
             self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
             cx.emit(TextAreaEvent::Change(self.edit.text().clone()));
         }
+        self.emit_selection_if_changed(selection_before, cx);
         cx.notify();
     }
 
     fn undo(&mut self, _: &Undo, _: &mut Window, cx: &mut Context<Self>) {
+        let selection_before = self.edit.selection();
         if self.disabled || self.read_only || !self.edit.undo() {
             return;
         }
         self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
         self.goal_x = None;
         cx.emit(TextAreaEvent::Change(self.edit.text().clone()));
+        self.emit_selection_if_changed(selection_before, cx);
         cx.notify();
     }
 
     fn redo(&mut self, _: &Redo, _: &mut Window, cx: &mut Context<Self>) {
+        let selection_before = self.edit.selection();
         if self.disabled || self.read_only || !self.edit.redo() {
             return;
         }
         self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
         self.goal_x = None;
         cx.emit(TextAreaEvent::Change(self.edit.text().clone()));
+        self.emit_selection_if_changed(selection_before, cx);
         cx.notify();
     }
 
+    fn emit_selection_if_changed(&self, selection_before: Range<usize>, cx: &mut Context<Self>) {
+        let selection = self.edit.selection();
+        if selection != selection_before {
+            cx.emit(TextAreaEvent::SelectionChanged(selection));
+        }
+    }
+
     fn move_to(&mut self, offset: usize, cx: &mut Context<Self>) {
+        let selection_before = self.edit.selection();
         self.edit.set_caret(offset);
         self.goal_x = None;
+        self.emit_selection_if_changed(selection_before, cx);
         cx.notify();
     }
 
     fn select_to(&mut self, offset: usize, cx: &mut Context<Self>) {
+        let selection_before = self.edit.selection();
         self.edit.extend_selection(offset);
         self.goal_x = None;
+        self.emit_selection_if_changed(selection_before, cx);
         cx.notify();
     }
 
     fn select_range(&mut self, range: Range<usize>, cx: &mut Context<Self>) {
+        let selection_before = self.edit.selection();
         self.edit.set_selection(range, false);
         self.goal_x = None;
+        self.emit_selection_if_changed(selection_before, cx);
         cx.notify();
     }
 
@@ -834,7 +1001,7 @@ impl TextArea {
     }
 
     fn up(&mut self, _: &Up, _: &mut Window, cx: &mut Context<Self>) {
-        if self.arrows_claimed {
+        if self.arrows_claimed || self.completion_claimed {
             cx.emit(TextAreaEvent::MoveUp);
             return;
         }
@@ -842,7 +1009,7 @@ impl TextArea {
     }
 
     fn down(&mut self, _: &Down, _: &mut Window, cx: &mut Context<Self>) {
-        if self.arrows_claimed {
+        if self.arrows_claimed || self.completion_claimed {
             cx.emit(TextAreaEvent::MoveDown);
             return;
         }
@@ -1030,6 +1197,19 @@ impl TextArea {
         cx.emit(TextAreaEvent::Cancel);
     }
 
+    fn accept_completion(&mut self, _: &AcceptCompletion, _: &mut Window, cx: &mut Context<Self>) {
+        cx.emit(TextAreaEvent::AcceptCompletion);
+    }
+
+    fn dismiss_completion(
+        &mut self,
+        _: &DismissCompletion,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        cx.emit(TextAreaEvent::DismissCompletion);
+    }
+
     fn show_character_palette(
         &mut self,
         _: &ShowCharacterPalette,
@@ -1200,6 +1380,7 @@ impl EntityInputHandler for TextArea {
         if self.disabled || self.read_only {
             return;
         }
+        let selection_before = self.edit.selection();
         let range = self.edit_range(range_utf16);
         // The composing selection is reported relative to the replacement,
         // not to the whole value, so it is converted against exactly that
@@ -1215,6 +1396,7 @@ impl EntityInputHandler for TextArea {
             self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
             cx.emit(TextAreaEvent::Change(self.edit.text().clone()));
         }
+        self.emit_selection_if_changed(selection_before, cx);
         cx.notify();
     }
 
@@ -1279,9 +1461,11 @@ impl Render for TextArea {
             // The second identifier is what the two enter bindings are written
             // against, so what enter means travels with the area rather than
             // with the keymap.
-            .key_context(match self.enter {
-                Enter::Opens => KEY_CONTEXT,
-                Enter::Submits => SUBMIT_KEY_CONTEXT,
+            .key_context(match (self.enter, self.completion_claimed) {
+                (Enter::Opens, false) => KEY_CONTEXT,
+                (Enter::Submits, false) => SUBMIT_KEY_CONTEXT,
+                (Enter::Opens, true) => COMPLETION_KEY_CONTEXT,
+                (Enter::Submits, true) => SUBMIT_COMPLETION_KEY_CONTEXT,
             })
             .when(!self.disabled, |element| {
                 element.track_focus(&self.focus_handle)
@@ -1329,6 +1513,8 @@ impl Render for TextArea {
                     })
                     .on_action(cx.listener(Self::submit))
                     .on_action(cx.listener(Self::cancel))
+                    .on_action(cx.listener(Self::accept_completion))
+                    .on_action(cx.listener(Self::dismiss_completion))
                     .on_action(cx.listener(Self::show_character_palette))
                     .on_mouse_down(MouseButton::Left, cx.listener(Self::on_mouse_down))
                     .on_mouse_move(cx.listener(Self::on_mouse_move))
@@ -1395,12 +1581,14 @@ impl Render for TextArea {
                                 ) else {
                                     return;
                                 };
+                                let selection_before = area.edit.selection();
                                 area.edit.set_selection(
                                     anchor.min(focus)..anchor.max(focus),
                                     focus < anchor,
                                 );
                                 area.edit.set_marked(None);
                                 area.goal_x = None;
+                                area.emit_selection_if_changed(selection_before, cx);
                                 cx.notify();
                             });
                         },

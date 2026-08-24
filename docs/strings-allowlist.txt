@@ -179,7 +179,10 @@ Tag
 TagInput
 Text
 TextArea
+TextArea TextAreaCompletes
 TextArea TextAreaSubmits
+TextArea TextAreaSubmits TextAreaCompletes
+TextAreaCompletes
 TextAreaSubmits
 TextInput
 ThinkingBlock
@@ -293,8 +296,10 @@ x1b[F
 x1b[H
 x1b[Z
 {:02X}{:02X}{:02X}
-{KEY_CONTEXT} && !{SUBMIT_CONTEXT}
-{KEY_CONTEXT} && {SUBMIT_CONTEXT}
+{KEY_CONTEXT} && !{COMPLETION_CONTEXT}
+{KEY_CONTEXT} && !{SUBMIT_CONTEXT} && !{COMPLETION_CONTEXT}
+{KEY_CONTEXT} && {COMPLETION_CONTEXT}
+{KEY_CONTEXT} && {SUBMIT_CONTEXT} && !{COMPLETION_CONTEXT}
 {name} is not a slot this component names; it offers {:?}
 {number}. 
 {pad}> 

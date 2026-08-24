@@ -692,6 +692,94 @@ fn the_arrows_can_be_claimed_by_whatever_is_listing_over_the_area(cx: &mut TestA
 }
 
 #[gpui::test]
+fn completion_claims_accept_dismiss_and_arrows_without_changing_submit_chords(
+    cx: &mut TestAppContext,
+) {
+    let (mut harness, slot) = area(cx, |area| area.text("query"));
+    let events = reported(&mut harness, &slot);
+    let entity = slot.borrow().clone().expect("area was built");
+
+    harness.click("form.notes");
+    let completion = entity.clone();
+    harness.update(move |_, cx| {
+        completion.update(cx, |area, cx| {
+            area.set_completion_claimed(true);
+            cx.notify();
+        });
+    });
+    harness.keystrokes("up down enter escape");
+    harness.keystrokes(&primary("enter"));
+
+    let events = events.borrow();
+    assert!(events.contains(&TextAreaEvent::MoveUp));
+    assert!(events.contains(&TextAreaEvent::MoveDown));
+    assert!(events.contains(&TextAreaEvent::AcceptCompletion));
+    assert!(events.contains(&TextAreaEvent::DismissCompletion));
+    assert!(events.contains(&TextAreaEvent::Submit));
+    assert!(!events.contains(&TextAreaEvent::Cancel));
+    drop(events);
+    assert_eq!(value(&mut harness, &slot), "query");
+}
+
+#[gpui::test]
+fn a_completion_replacement_is_unicode_safe_and_one_undo_step(cx: &mut TestAppContext) {
+    let original = "Hello @ál";
+    let (mut harness, slot) = area(cx, move |area| area.text(original));
+    let events = reported(&mut harness, &slot);
+    let entity = slot.borrow().clone().expect("area was built");
+
+    harness.click("form.notes");
+    let replacement = entity.clone();
+    let replaced = harness.update(move |_, cx| {
+        replacement.update(cx, |area, cx| {
+            area.set_selected_range(0..0, cx);
+            area.replace_range(6..original.len(), "@Ada", cx)
+        })
+    });
+
+    assert_eq!(replaced, Some(6..10));
+    assert_eq!(value(&mut harness, &slot), "Hello @Ada");
+    assert!(
+        events
+            .borrow()
+            .contains(&TextAreaEvent::SelectionChanged(10..10))
+    );
+    harness.keystrokes(&primary("z"));
+    assert_eq!(value(&mut harness, &slot), original);
+}
+
+#[gpui::test]
+fn range_geometry_is_only_published_for_the_shaped_value(cx: &mut TestAppContext) {
+    let (mut harness, slot) = area(cx, |area| area.text("alpha beta"));
+    let events = reported(&mut harness, &slot);
+    let entity = slot.borrow().clone().expect("area was built");
+    harness.frame();
+
+    let (caret, word) = harness.update(|_, cx| {
+        let area = entity.read(cx);
+        (area.caret_bounds(), area.bounds_for_range(0..5))
+    });
+    assert!(caret.is_some());
+    assert!(word.is_some_and(|bounds| !bounds.is_empty()));
+
+    let changed = entity.clone();
+    let stale = harness.update(move |_, cx| {
+        changed.update(cx, |area, cx| {
+            area.set_value("next", cx);
+            area.caret_bounds()
+        })
+    });
+    assert!(stale.is_none());
+    harness.frame();
+    assert!(
+        harness
+            .update(|_, cx| entity.read(cx).caret_bounds())
+            .is_some()
+    );
+    assert!(events.borrow().contains(&TextAreaEvent::GeometryChanged));
+}
+
+#[gpui::test]
 fn a_paste_that_is_not_text_is_reported_rather_than_dropped(cx: &mut TestAppContext) {
     let (mut harness, slot) = area(cx, |area| area);
     let events = reported(&mut harness, &slot);
