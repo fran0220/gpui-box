@@ -2057,14 +2057,16 @@ mod tests {
 
     #[test]
     fn virtual_file_descriptors_are_bounded_and_preserve_name_and_size() {
-        let mut descriptor = FILEDESCRIPTORW::default();
-        descriptor.dwFlags = FD_FILESIZE.0 as u32;
-        descriptor.nFileSizeLow = 37;
         let mut name = [0u16; 260];
         for (destination, source) in name.iter_mut().zip("photo.png".encode_utf16()) {
             *destination = source;
         }
-        descriptor.cFileName = name;
+        let descriptor = FILEDESCRIPTORW {
+            dwFlags: FD_FILESIZE.0 as u32,
+            nFileSizeLow: 37,
+            cFileName: name,
+            ..Default::default()
+        };
 
         let mut bytes = 1u32.to_le_bytes().to_vec();
         bytes.extend_from_slice(unsafe {
