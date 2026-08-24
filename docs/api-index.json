@@ -13357,7 +13357,7 @@
       "uses": [
         "Menu"
       ],
-      "example": "fn menu(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_menus(window, cx);\n    let menus = cx.global::<SceneMenus>();\n    let menu = menus.menu.clone();\n    let hung = menus.hung.clone();\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(560.0))\n        .h(px(560.0))\n        // An open surface is an overlay and takes no room in the flow, so the\n        // scene reserves what the first menu occupies. Without it the caption\n        // below is drawn under that menu and cannot be read.\n        .child(div().h(px(230.0)).child(menu))\n        .child(caption(\n            &theme,\n            \"a trigger against the trailing edge hangs its surface from that edge instead\",\n        ))\n        .child(div().w_full().flex().justify_end().child(hung))\n        .into_any_element()\n}"
+      "example": "fn menu(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_menus(window, cx);\n    let menus = cx.global::<SceneMenus>();\n    let menu = menus.menu.clone();\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(560.0))\n        .h(px(320.0))\n        // An open surface is an overlay and takes no room in the flow, so the\n        // scene reserves the panel's review area explicitly.\n        .child(div().h(px(300.0)).child(menu))\n        .into_any_element()\n}"
     },
     {
       "name": "context-menu",

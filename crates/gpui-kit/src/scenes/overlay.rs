@@ -239,7 +239,6 @@ pub(super) fn tooltip(_window: &mut Window, cx: &mut App) -> AnyElement {
 /// every frame. Building them once is also what makes the capture static.
 pub(super) struct SceneMenus {
     menu: Entity<Menu>,
-    hung: Entity<Menu>,
     context: Entity<ContextMenu>,
     palette: Entity<CommandPalette>,
     popover: Entity<Popover>,
@@ -297,14 +296,6 @@ pub(super) fn ensure_menus(window: &mut Window, cx: &mut App) {
         menu.open_submenu("share", window, cx);
     });
 
-    let hung = cx.new(|cx| {
-        Menu::new("scene.menu.hung", window, cx)
-            .trigger("Model")
-            .items(menu_items())
-            .hang(Hang::End)
-    });
-    hung.update(cx, |menu, cx| menu.open(window, cx));
-
     let context = cx.new(|cx| {
         ContextMenu::new("scene.context.run", window, cx)
             .name("Run actions")
@@ -360,7 +351,6 @@ pub(super) fn ensure_menus(window: &mut Window, cx: &mut App) {
 
     cx.set_global(SceneMenus {
         menu,
-        hung,
         context,
         palette,
         popover,
@@ -389,20 +379,13 @@ pub(super) fn menu(window: &mut Window, cx: &mut App) -> AnyElement {
     ensure_menus(window, cx);
     let menus = cx.global::<SceneMenus>();
     let menu = menus.menu.clone();
-    let hung = menus.hung.clone();
     let theme = cx.theme().clone();
     stack(&theme)
         .w(px(560.0))
-        .h(px(560.0))
+        .h(px(320.0))
         // An open surface is an overlay and takes no room in the flow, so the
-        // scene reserves what the first menu occupies. Without it the caption
-        // below is drawn under that menu and cannot be read.
-        .child(div().h(px(230.0)).child(menu))
-        .child(caption(
-            &theme,
-            "a trigger against the trailing edge hangs its surface from that edge instead",
-        ))
-        .child(div().w_full().flex().justify_end().child(hung))
+        // scene reserves the panel's review area explicitly.
+        .child(div().h(px(300.0)).child(menu))
         .into_any_element()
 }
 
