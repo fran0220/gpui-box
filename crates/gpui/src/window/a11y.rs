@@ -677,6 +677,35 @@ impl A11yNodeBuilder {
                 node.push_described_by(related);
             }
         }
+
+        // AccessKit keeps these relationships in the platform-independent
+        // tree, but not every native adapter exposes relationship-valued
+        // properties. Preserve the references above and also project their
+        // text onto an otherwise unnamed/undescribed owner so those adapters
+        // still announce the complete accessible name and description. A
+        // caller's explicit scalar always wins.
+        let related_text = self
+            .all_nodes
+            .iter()
+            .filter_map(|(id, node)| {
+                node.label()
+                    .or_else(|| node.value())
+                    .filter(|text| !text.is_empty())
+                    .map(|text| (*id, text.to_owned()))
+            })
+            .collect::<FxHashMap<_, _>>();
+        for (_, node) in &mut self.all_nodes {
+            if node.label().is_none()
+                && let Some(label) = relationship_text(node.labelled_by(), &related_text)
+            {
+                node.set_label(label);
+            }
+            if node.description().is_none()
+                && let Some(description) = relationship_text(node.described_by(), &related_text)
+            {
+                node.set_description(description);
+            }
+        }
     }
 
     /// Accesskit panics on invalid [`TreeUpdate`]s. This function defensively
@@ -762,6 +791,19 @@ impl A11yNodeBuilder {
 
         update
     }
+}
+
+fn relationship_text(
+    related: &[NodeId],
+    text_by_node: &FxHashMap<NodeId, String>,
+) -> Option<String> {
+    let text = related
+        .iter()
+        .filter_map(|id| text_by_node.get(id))
+        .map(String::as_str)
+        .collect::<Vec<_>>()
+        .join(" ");
+    (!text.is_empty()).then_some(text)
 }
 
 #[cfg(test)]
@@ -901,7 +943,9 @@ mod tests {
         let control = NodeId(3);
         let control_key = ElementId::from("control");
 
-        assert!(builder.push(label, test_node()));
+        let mut label_node = test_node();
+        label_node.set_label("Workspace name");
+        assert!(builder.push(label, label_node));
         builder.register_element_relationships(
             ElementId::from("label"),
             label,
@@ -909,7 +953,9 @@ mod tests {
         );
         builder.pop();
 
-        assert!(builder.push(description, test_node()));
+        let mut description_node = test_node();
+        description_node.set_label("Shown throughout the workspace");
+        assert!(builder.push(description, description_node));
         builder.register_element_relationships(
             ElementId::from("description"),
             description,
@@ -932,6 +978,49 @@ mod tests {
             .expect("control node");
         assert_eq!(control_node.labelled_by(), &[label]);
         assert_eq!(control_node.described_by(), &[description]);
+        assert_eq!(control_node.label(), Some("Workspace name"));
+        assert_eq!(
+            control_node.description(),
+            Some("Shown throughout the workspace")
+        );
+    }
+
+    #[test]
+    fn relationship_text_does_not_override_explicit_scalars() {
+        let mut builder = new_builder();
+        let control = NodeId(1);
+        let related = NodeId(2);
+        let related_key = ElementId::from("related");
+
+        let mut control_node = test_node();
+        control_node.set_label("Explicit name");
+        control_node.set_description("Explicit description");
+        assert!(builder.push(control, control_node));
+        builder.register_element_relationships(
+            ElementId::from("control"),
+            control,
+            &[
+                AccessibilityRelationship::LabelledBy(related_key.clone()),
+                AccessibilityRelationship::DescribedBy(related_key.clone()),
+            ],
+        );
+        builder.pop();
+
+        let mut related_node = test_node();
+        related_node.set_label("Related text");
+        assert!(builder.push(related, related_node));
+        builder.register_element_relationships(related_key, related, &[]);
+        builder.pop();
+
+        let update = builder.finalize();
+        let control_node = update
+            .nodes
+            .iter()
+            .find(|(node_id, _)| *node_id == control)
+            .map(|(_, node)| node)
+            .expect("control node");
+        assert_eq!(control_node.label(), Some("Explicit name"));
+        assert_eq!(control_node.description(), Some("Explicit description"));
     }
 
     #[test]

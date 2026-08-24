@@ -91,6 +91,9 @@ owns composition and undo transactions without parsing or persisting a file
 format. `RichTextEditor` projects the session through the same shaped geometry,
 including selection, caret, IME, clipboard, diagnostics, links, lists,
 alignment, and a token-backed toolbar.
+All three editors capture the exact shaped cells during prepaint and publish
+AccessKit per-grapheme positions, widths, and run bounds from that current-frame
+geometry; they do not run a second accessibility layout.
 
 Role-bearing elements can declare `aria_labelled_by`, `aria_described_by`, or
 their inverse `aria_labels` and `aria_describes` forms. GPUI resolves the
@@ -98,7 +101,10 @@ referenced element id after ordinary and deferred prepaint in the active
 window. A missing, duplicate, or removed endpoint produces no relationship for
 that frame; no stale AccessKit node id is retained. Kit's `NodeSpec::labels`
 and `NodeSpec::describes` project through this native relation path as well as
-remaining visible in deterministic semantic snapshots.
+remaining visible in deterministic semantic snapshots. Because native adapters
+do not consume the references uniformly, resolution also derives an absent
+scalar label or description from the related node text. Explicit scalar values
+still win and the references remain present.
 
 `ScrollTarget` gives overflowing containers, uniform lists, and measured
 variable-height lists one offset, extent, viewport, and mutation contract.

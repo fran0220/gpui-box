@@ -261,6 +261,7 @@ pub struct TextInput {
     last_bounds: Option<Bounds<Pixels>>,
     accessibility_revision: u64,
     accessible_snapshot: Arc<Mutex<Option<text_edit::PublishedAccessibleText>>>,
+    accessible_geometry: Arc<Mutex<Option<text_edit::AccessibleTextGeometry>>>,
     /// Held so the focus listeners live as long as the input does.
     _subscriptions: Vec<Subscription>,
 }
@@ -302,6 +303,7 @@ impl TextInput {
             last_bounds: None,
             accessibility_revision: 0,
             accessible_snapshot: Arc::default(),
+            accessible_geometry: Arc::default(),
             _subscriptions: subscriptions,
         }
     }
@@ -1186,6 +1188,7 @@ impl Render for TextInput {
             (self.edit.selection().start, self.edit.selection().end)
         };
         let accessible_snapshot = self.accessible_snapshot.clone();
+        let accessible_geometry = self.accessible_geometry.clone();
         let selection_representable = text_edit::accessible_text_is_representable(&content);
         let accessible_rows = std::iter::once(0..content.len()).collect::<Vec<_>>();
         let accessibility_revision = self.accessibility_revision;
@@ -1249,6 +1252,10 @@ impl Render for TextInput {
             .when(!self.secret, |element| {
                 element
                     .a11y_synthetic_children(move |builder| {
+                        let geometry = accessible_geometry
+                            .lock()
+                            .unwrap_or_else(|poisoned| poisoned.into_inner())
+                            .take();
                         let ids = text_edit::publish_accessible_text(
                             builder,
                             &content,
@@ -1257,6 +1264,7 @@ impl Render for TextInput {
                             accessible_direction,
                             &accessible_rows,
                             accessibility_revision,
+                            geometry.as_ref(),
                         );
                         *accessible_snapshot
                             .lock()

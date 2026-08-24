@@ -283,6 +283,17 @@ fn multiline_text_reaches_the_accesskit_text_pattern(cx: &mut TestAppContext) {
     assert_eq!(first_run["aria"]["character_lengths"][0], 3);
     assert_eq!(first_run["aria"]["character_lengths"][1], 11);
     assert_eq!(first_run["aria"]["character_lengths"][2], 1);
+    let positions = first_run["aria"]["character_positions"]
+        .as_array()
+        .expect("painted grapheme positions");
+    let widths = first_run["aria"]["character_widths"]
+        .as_array()
+        .expect("painted grapheme widths");
+    assert_eq!(positions.len(), 3);
+    assert_eq!(widths.len(), 3);
+    assert!(positions[1].as_f64().expect("second position") > 0.0);
+    assert!(widths[0].as_f64().expect("first width") > 0.0);
+    assert!(widths[1].as_f64().expect("second width") > 0.0);
     assert_eq!(first_run["aria"]["text_direction"], "LeftToRight");
     assert!(first_run["aria"].get("next_on_line").is_none());
     assert_eq!(second_run["aria"]["value"], "אב");

@@ -258,6 +258,20 @@ fn editable_text_reaches_the_accesskit_text_pattern(cx: &mut TestAppContext) {
     assert_eq!(run["aria"]["character_lengths"][0], 1);
     assert_eq!(run["aria"]["character_lengths"][1], 4);
     assert_eq!(run["aria"]["character_lengths"][2], 2);
+    let positions = run["aria"]["character_positions"]
+        .as_array()
+        .expect("painted grapheme positions");
+    let widths = run["aria"]["character_widths"]
+        .as_array()
+        .expect("painted grapheme widths");
+    assert_eq!(positions.len(), 3);
+    assert_eq!(widths.len(), 3);
+    assert!(positions[1].as_f64().expect("second position") > 0.0);
+    assert!(
+        widths
+            .iter()
+            .all(|width| width.as_f64().expect("grapheme width") > 0.0)
+    );
     assert_eq!(
         field["aria"]["text_selection"]["anchor"]["character_index"],
         3

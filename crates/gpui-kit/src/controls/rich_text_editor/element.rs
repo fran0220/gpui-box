@@ -13,6 +13,7 @@ use gpui_kit_theme::{ActiveTheme, Radius};
 use crate::content::{
     RichTextAlignment, RichTextBlock, RichTextFormat, RichTextListKind, RichTextSelection,
 };
+use crate::controls::text_edit;
 use crate::foundation::direction::ActiveDirection;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -315,6 +316,35 @@ impl Element for RichTextEditorElement {
                 ));
             }
         }
+
+        let accessible_geometry = text_edit::AccessibleTextGeometry::capture(
+            projection.text().clone(),
+            window.scale_factor(),
+            |range| {
+                let mut bounds_for_grapheme = Vec::new();
+                for (block, projected) in blocks.iter().zip(projection.blocks()) {
+                    let Some(layout) = block.layout.as_ref() else {
+                        continue;
+                    };
+                    let start = range.start.max(projected.start);
+                    let end = range.end.min(projected.end);
+                    if start >= end {
+                        continue;
+                    }
+                    bounds_for_grapheme.extend(layout.layout.bounds_for_range(
+                        start - projected.start..end - projected.start,
+                        block.screen_origin,
+                        layout.align,
+                        layout.width,
+                    ));
+                }
+                bounds_for_grapheme
+            },
+        );
+        *editor
+            .accessible_geometry
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(accessible_geometry);
 
         PrepaintState {
             blocks,

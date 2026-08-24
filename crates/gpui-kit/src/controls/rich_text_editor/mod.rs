@@ -261,6 +261,7 @@ pub struct RichTextEditor {
     content_height: Pixels,
     accessibility_revision: u64,
     accessible_snapshot: Arc<Mutex<Option<gpui::PublishedAccessibleText>>>,
+    accessible_geometry: Arc<Mutex<Option<text_edit::AccessibleTextGeometry>>>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -316,6 +317,7 @@ impl RichTextEditor {
             content_height: px(0.0),
             accessibility_revision: 0,
             accessible_snapshot: Arc::default(),
+            accessible_geometry: Arc::default(),
             _subscriptions: subscriptions,
         }
     }
@@ -1536,6 +1538,7 @@ impl Render for RichTextEditor {
         let accessible_rows = self.accessible_rows(cx);
         let selection_representable = text_edit::accessible_text_is_representable(&content);
         let accessible_snapshot = self.accessible_snapshot.clone();
+        let accessible_geometry = self.accessible_geometry.clone();
         let accessibility_revision = self.accessibility_revision;
         let accessible_direction = if cx.layout_direction().is_rtl() {
             gpui::accesskit::TextDirection::RightToLeft
@@ -1620,6 +1623,10 @@ impl Render for RichTextEditor {
             })
             .when_some(accessible_rows.clone(), move |element, rows| {
                 element.a11y_synthetic_children(move |builder| {
+                    let geometry = accessible_geometry
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner())
+                        .take();
                     let snapshot = text_edit::publish_accessible_text(
                         builder,
                         &content,
@@ -1628,6 +1635,7 @@ impl Render for RichTextEditor {
                         accessible_direction,
                         &rows,
                         accessibility_revision,
+                        geometry.as_ref(),
                     );
                     *accessible_snapshot
                         .lock()

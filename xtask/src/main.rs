@@ -129,6 +129,8 @@ fn accessibility_check() -> Result<()> {
     thread::sleep(Duration::from_secs(1));
     editable_accessibility_check()?;
     thread::sleep(Duration::from_secs(1));
+    form_accessibility_check()?;
+    thread::sleep(Duration::from_secs(1));
     dialog_accessibility_check()?;
     thread::sleep(Duration::from_secs(1));
     menu_accessibility_check()?;
@@ -153,13 +155,14 @@ fn editable_accessibility_check() -> Result<()> {
             "API token|AXTextField|true||false",
             "Disabled|AXTextField|false|read only|false",
             "Email|AXTextField|true|edited@example.com|true",
+            "Email geometry|true",
         ] {
             if !output.lines().any(|line| line.trim() == expected) {
                 bail!("macOS editable AX tree is missing `{expected}`; received:\n{output}");
             }
         }
         println!(
-            "macOS AX editable names, values, enabled state, requested focus, and editing match"
+            "macOS AX editable names, values, enabled state, requested focus, editing, and character/caret bounds match"
         );
         Ok(())
     })();
@@ -175,6 +178,33 @@ fn editable_accessibility_check() -> Result<()> {
             .context("reap the editable accessibility smoke gallery")?;
         Ok(())
     })();
+    result.and(cleanup)
+}
+
+#[cfg(target_os = "macos")]
+fn form_accessibility_check() -> Result<()> {
+    let executable = root().join("target/debug/gpui-box-gallery");
+    let mut gallery = Command::new(&executable)
+        .args(["--scene", "form", "--theme", "studio-light"])
+        .current_dir(root())
+        .spawn()
+        .context("launch the form macOS accessibility smoke gallery")?;
+
+    let result = (|| {
+        let output = swift_ax_check(gallery.id(), "form")?;
+        for expected in [
+            "Workspace name|Shown wherever this workspace appears. A workspace with this name already exists.",
+            "Retention|How long a finished run is kept. This workspace allows at most 60 days.",
+        ] {
+            if !output.lines().any(|line| line.trim() == expected) {
+                bail!("macOS form AX tree is missing `{expected}`; received:\n{output}");
+            }
+        }
+        println!("macOS AX field labels and complete help/error descriptions match");
+        Ok(())
+    })();
+
+    let cleanup = cleanup_gallery(&mut gallery, "form accessibility smoke gallery");
     result.and(cleanup)
 }
 
@@ -503,6 +533,30 @@ func moveMouse(_ point: CGPoint) {
     CGEvent(mouseEventSource: nil, mouseType: .mouseMoved,
             mouseCursorPosition: point, mouseButton: .left)?.post(tap: .cghidEventTap)
 }
+func boundsForRange(_ element: AXUIElement, _ range: CFRange) -> CGRect? {
+    var mutableRange = range
+    guard let rangeValue = AXValueCreate(.cfRange, &mutableRange) else { return nil }
+    var rawBounds: CFTypeRef?
+    guard AXUIElementCopyParameterizedAttributeValue(
+        element,
+        kAXBoundsForRangeParameterizedAttribute as CFString,
+        rangeValue,
+        &rawBounds
+    ) == .success, let rawBounds else { return nil }
+    let boundsValue = rawBounds as! AXValue
+    guard AXValueGetType(boundsValue) == .cgRect else { return nil }
+    var bounds = CGRect.zero
+    return AXValueGetValue(boundsValue, .cgRect, &bounds) ? bounds : nil
+}
+func selectedRange(_ element: AXUIElement) -> CFRange? {
+    guard let rawValue = attribute(element, kAXSelectedTextRangeAttribute as CFString) else {
+        return nil
+    }
+    let value = rawValue as! AXValue
+    guard AXValueGetType(value) == .cfRange else { return nil }
+    var range = CFRange()
+    return AXValueGetValue(value, .cfRange, &range) ? range : nil
+}
 func fail(_ message: String) -> Never {
     FileHandle.standardError.write(Data((message + "\n").utf8))
     exit(1)
@@ -557,6 +611,33 @@ case "editable":
     print(editableLine("API token", redactValue: true))
     print(editableLine("Disabled"))
     print(editableLine("Email"))
+    let editedLength = 18
+    guard pollUntil({
+        guard let first = boundsForRange(email, CFRange(location: 0, length: 1)),
+              let middle = boundsForRange(email, CFRange(location: 5, length: 1)),
+              let caret = boundsForRange(email, CFRange(location: editedLength, length: 0)),
+              let selection = selectedRange(email) else { return false }
+        return first.width > 0 && first.height > 0 &&
+               middle.width > 0 && middle.height > 0 &&
+               first.origin.x != middle.origin.x &&
+               caret.height > 0 && caret.origin.x > middle.origin.x &&
+               selection.location == editedLength && selection.length == 0
+    }) else {
+        fail("Email did not expose range-dependent character bounds and its end caret")
+    }
+    print("Email geometry|true")
+
+case "form":
+    guard pollUntil({ matches("AXTextField", "", "Workspace name").count == 1 &&
+                      matches("AXTextField", "", "Retention").count == 1 }) else {
+        fail("labelled form AXTextFields did not appear")
+    }
+    guard let workspace = matches("AXTextField", "", "Workspace name").first,
+          let retention = matches("AXTextField", "", "Retention").first else {
+        fail("labelled form AXTextFields disappeared")
+    }
+    print("Workspace name|\(string(workspace, kAXHelpAttribute as CFString))")
+    print("Retention|\(string(retention, kAXHelpAttribute as CFString))")
 
 case "dialog":
     let dialogTitle = "Replace the existing theme?"

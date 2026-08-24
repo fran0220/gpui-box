@@ -124,6 +124,10 @@ multiple descriptions, rejects ambiguous ids, and removes a relationship in
 the same frame either endpoint disappears. Kit semantic labels, form help and
 errors, search labels, and deferred tooltips use the native AccessKit relation
 without changing their deterministic diagnostic vocabulary.
+Adapters do not consume those references uniformly, so the same resolver also
+derives an absent scalar name or description from the related node text while
+preserving the references and explicit-scalar precedence. The macOS native
+smoke verifies complete form names and help/error descriptions.
 
 **Rich text now has one storage-neutral edit vocabulary.**
 `RichTextDocument` carries stable block identity, hard block boundaries, soft
@@ -150,6 +154,15 @@ used by both controls.
 follows source replacement without choosing a rich-text format. The controls
 no longer carry private edit or character-geometry engines; product document
 policy remains separate.
+
+**Editable native ranges use the geometry that was painted.** GPUI exposes its
+generic per-grapheme AccessKit publisher at the framework boundary. `TextInput`,
+`TextArea`, and `RichTextEditor` capture current-frame shaped cells during
+prepaint, including horizontal/vertical scroll, wrapping, alignment, bidi, and
+segmented input direction, then publish positions, widths, and run bounds
+without reshaping. Deterministic tests cover all three controls and the macOS
+native smoke queries distinct character rectangles, the selected range, and
+the end-caret rectangle.
 
 **The loading family says six different things.** `PulseLoader` breathes,
 `Spinner` turns an open arc whose gap is what says the ring is not a position,

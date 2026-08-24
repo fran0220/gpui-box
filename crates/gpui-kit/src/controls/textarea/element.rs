@@ -13,7 +13,7 @@ use gpui::{
 };
 use gpui_kit_theme::ActiveTheme;
 
-use super::TextArea;
+use super::{TextArea, text_edit};
 
 pub struct TextAreaElement {
     area: Entity<TextArea>,
@@ -166,6 +166,17 @@ impl Element for TextAreaElement {
         );
 
         let origin = point(bounds.left(), bounds.top() - scroll_offset);
+        let accessible_geometry = text_edit::AccessibleTextGeometry::capture(
+            source_text.clone(),
+            window.scale_factor(),
+            |range| {
+                layout.bounds_for_range(range, origin, gpui::TextAlign::Left, bounds.size.width)
+            },
+        );
+        *area
+            .accessible_geometry
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(accessible_geometry);
         let cursor = (selected.is_empty()).then(|| {
             fill(
                 layout.caret_bounds(cursor, origin, px(1.5)),

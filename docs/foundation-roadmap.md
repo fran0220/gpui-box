@@ -173,12 +173,16 @@ Build on the same shaped editable layout and per-window context.
 Status: same-window labelled-by and described-by relationships now resolve
 after deferred prepaint and disappear with either endpoint. Kit form labels,
 help/error text, search labels, and deferred tooltips use that native AccessKit
-path. Native-child handoff and platform adapter/session proofs remain open.
+path, with an absent-scalar fallback for adapters that do not consume the
+references. Editable controls now publish current-frame painted character and
+caret geometry, and macOS verifies both contracts in a native AX session.
+Native-child handoff plus Windows and Linux adapter/session proofs remain open.
 
-1. Publish editable per-grapheme positions/widths, visual rows, selection, and
-   native caret geometry from the layout that painted the text.
-2. Keep the completed GPUI labelled-by/described-by resolver covered across
-   deferred subtrees, ambiguous identities, and endpoint removal.
+1. Keep the completed editable per-grapheme positions/widths, visual rows,
+   selection, and native caret geometry tied to the layout that painted text.
+2. Keep the completed GPUI labelled-by/described-by resolver and scalar
+   fallback covered across deferred subtrees, ambiguous identities, and
+   endpoint removal.
 3. Add platform-view/native-child handoff so an embedded media or browser view
    participates in one accessibility hierarchy rather than becoming a second
    unnamed root.

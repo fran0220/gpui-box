@@ -12,8 +12,11 @@ use gpui::{
     Window, fill, point, px, relative,
 };
 use gpui_kit_theme::ActiveTheme;
+use unicode_segmentation::UnicodeSegmentation;
 
-use super::TextInput;
+use crate::foundation::direction::ActiveDirection;
+
+use super::{TextInput, text_edit};
 
 pub struct TextElement {
     input: Entity<TextInput>,
@@ -156,6 +159,40 @@ impl Element for TextElement {
         };
 
         let origin = point(bounds.left() - scroll_offset, bounds.top());
+        let accessible_geometry = (!input.is_secret()).then(|| {
+            let source = input.value().clone();
+            let scale_factor = window.scale_factor();
+            if let Some(slots) = input.visual_slots() {
+                let rtl = cx.layout_direction().is_rtl();
+                text_edit::AccessibleTextGeometry::capture(source.clone(), scale_factor, |range| {
+                    let boundary_x = |offset: usize| {
+                        let boundary = source[..offset.min(source.len())].graphemes(true).count()
+                            as f32
+                            / slots as f32;
+                        if rtl {
+                            bounds.right() - bounds.size.width * boundary
+                        } else {
+                            bounds.left() + bounds.size.width * boundary
+                        }
+                    };
+                    let start = boundary_x(range.start);
+                    let end = boundary_x(range.end);
+                    vec![Bounds::from_corners(
+                        point(start.min(end), bounds.top()),
+                        point(start.max(end), bounds.bottom()),
+                    )]
+                })
+            } else {
+                text_edit::AccessibleTextGeometry::capture(source, scale_factor, |range| {
+                    let range = input.display_offset(range.start)..input.display_offset(range.end);
+                    layout.bounds_for_range(range, origin, gpui::TextAlign::Left, bounds.size.width)
+                })
+            }
+        });
+        *input
+            .accessible_geometry
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = accessible_geometry;
         let (selection, cursor) = if custom_visual {
             (Vec::new(), None)
         } else if selected.is_empty() {

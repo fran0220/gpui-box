@@ -102,6 +102,42 @@ fn enter_is_a_hard_break_and_shift_enter_is_a_soft_break(cx: &mut TestAppContext
 }
 
 #[gpui::test]
+fn rich_text_publishes_painted_character_geometry(cx: &mut TestAppContext) {
+    let document = RichTextDocument::new([
+        RichTextBlock::new("first", "a😀"),
+        RichTextBlock::new("second", "tail"),
+    ])
+    .expect("fixture is valid");
+    let (mut harness, _, _) = editor(cx, document, |editor| {
+        editor.toolbar(false).name("Document")
+    });
+
+    let tree = harness.accessibility_tree();
+    let nodes = tree["nodes"].as_object().expect("nodes");
+    let field = nodes
+        .values()
+        .find(|node| {
+            node["element_id"] == "Name(\"form.rich\")"
+                && node["aria"]["role"] == "MultilineTextInput"
+        })
+        .expect("native rich text input");
+    let first_run_id = field["children"][0].as_str().expect("first text run id");
+    let first_run = &nodes[first_run_id];
+    assert_eq!(first_run["aria"]["value"], "a😀\n");
+    let positions = first_run["aria"]["character_positions"]
+        .as_array()
+        .expect("painted grapheme positions");
+    let widths = first_run["aria"]["character_widths"]
+        .as_array()
+        .expect("painted grapheme widths");
+    assert_eq!(positions.len(), 3);
+    assert_eq!(widths.len(), 3);
+    assert!(positions[1].as_f64().expect("second position") > 0.0);
+    assert!(widths[0].as_f64().expect("first width") > 0.0);
+    assert!(widths[1].as_f64().expect("second width") > 0.0);
+}
+
+#[gpui::test]
 fn formatting_shortcuts_change_the_caller_owned_session(cx: &mut TestAppContext) {
     let document = RichTextDocument::plain("first", "quiet evidence").expect("fixture is valid");
     let (mut harness, session, _) = editor(cx, document, |editor| editor.toolbar(false));

@@ -163,7 +163,7 @@ pub fn publish_accessible_text(
 /// Bounds returned by `bounds_for_range` are in GPUI logical pixels. They are
 /// scaled here to the physical coordinates used by the parent AccessKit node.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn publish_accessible_text_with_geometry(
+pub fn publish_accessible_text_with_geometry(
     builder: &mut A11ySubtreeBuilder,
     text: &str,
     anchor_byte: usize,
