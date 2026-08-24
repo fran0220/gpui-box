@@ -10,6 +10,19 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ### Changed
 
+**Text-area completions have one product-neutral seam.** `TextArea` exposes
+current-frame range and caret geometry, explicit selection, and a one-step
+undoable range replacement. Completion claim, accept, dismiss, selection, and
+geometry events let a caller coordinate a popup without replacing the editor's
+input engine. `MentionInput` builds on that seam with `@` trigger detection,
+locale-aware candidate matching, stable candidate identity, caret-anchored
+presentation, keyboard and pointer acceptance, and distinct loading,
+refreshing, empty, no-match, unavailable, error, and stale-error states. Hosts
+still own candidate retrieval, exact replacement text, and the semantic link
+between inserted plain text and an accepted identity. GPUI's cross-tree active
+descendant relationship keeps keyboard focus on that editor while projecting
+the active option from its deferred popup to AccessKit.
+
 **Waiting is grey, and the theme owns it.** The three-stop loader gradient is
 gone. `color.loader` now carries four neutral roles — `mark` (the moving part:
 a bar's fill, a spinner's arc, a breathing dot), `track` (the groove it

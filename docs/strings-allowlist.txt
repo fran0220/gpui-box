@@ -103,6 +103,8 @@ LoadMore
 LogStream
 MakeWay
 Markdown
+MentionCandidate
+MentionInput
 Menu
 Menubar
 MessageList
@@ -226,6 +228,7 @@ an actionable card has one
 an actionable row has one
 array
 camelCase
+candidate value
 checked above
 empty
 empty array

@@ -2479,6 +2479,43 @@
       ]
     },
     {
+      "name": "MentionInput",
+      "kind": "view",
+      "path": "gpui_kit::controls::MentionInput",
+      "source": "crates/gpui-kit/src/controls/mention.rs",
+      "summary": "A multiline editor with one caret-anchored mention completion surface.",
+      "construct": [
+        "new(ident: impl Into<Ident>, editor: Entity<TextArea>, cx: &mut Context<Self>) -> Self"
+      ],
+      "options": [
+        "suggestions(suggestions: AsyncValue<Vec<MentionCandidate>, SharedString>) -> Self",
+        "candidates(candidates: impl IntoIterator<Item = MentionCandidate>) -> Self"
+      ],
+      "commands": [
+        "set_suggestions(suggestions: AsyncValue<Vec<MentionCandidate>, SharedString>, cx: &mut Context<Self>)"
+      ],
+      "queries": [
+        "suggestions_state() -> &AsyncValue<Vec<MentionCandidate>, SharedString>",
+        "editor() -> &Entity<TextArea>",
+        "active_query() -> Option<&MentionQuery>",
+        "is_open() -> bool"
+      ],
+      "slots": [],
+      "reports": [
+        "Changed",
+        "Submitted",
+        "Cancelled",
+        "Pasted",
+        "Focused",
+        "Blurred",
+        "QueryChanged",
+        "Accepted"
+      ],
+      "scenes": [
+        "mention-input"
+      ]
+    },
+    {
       "name": "Menu",
       "kind": "view",
       "path": "gpui_kit::overlay::Menu",
@@ -4518,6 +4555,7 @@
         "value() -> &SharedString",
         "is_empty() -> bool",
         "is_disabled() -> bool",
+        "is_read_only() -> bool",
         "selected_range() -> Range<usize>",
         "cursor_offset() -> usize",
         "bounds_for_range(range: Range<usize>) -> Option<Vec<Bounds<Pixels>>>",
@@ -9261,6 +9299,54 @@
       "queries": []
     },
     {
+      "name": "MentionCandidate",
+      "path": "gpui_kit::controls::MentionCandidate",
+      "summary": "One caller-owned answer to a mention query.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<SharedString>, label: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "description(description: impl Into<SharedString>) -> Self",
+        "replacement(replacement: impl Into<SharedString>) -> Self",
+        "search_terms(terms: impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
+        "unavailable(reason: impl Into<SharedString>) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "refusal() -> Option<&SharedString>"
+      ]
+    },
+    {
+      "name": "MentionInputEvent",
+      "path": "gpui_kit::controls::MentionInputEvent",
+      "summary": "What a mention editor reports without applying caller-owned meaning.",
+      "variants": [
+        "Changed",
+        "Submitted",
+        "Cancelled",
+        "Pasted",
+        "Focused",
+        "Blurred",
+        "QueryChanged",
+        "Accepted"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "MentionQuery",
+      "path": "gpui_kit::controls::MentionQuery",
+      "summary": "The active token, in UTF-8 byte offsets into the editor's current value.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "MenuEvent",
       "path": "gpui_kit::overlay::MenuEvent",
       "summary": "What a menu reports. The owner decides what any of it means.",
@@ -13219,6 +13305,18 @@
         "TextArea"
       ],
       "example": "fn textarea(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_inputs(window, cx);\n    let inputs = cx.global::<SceneInputs>();\n    let (notes, review, frozen, message, asked, told) = (\n        inputs.notes.clone(),\n        inputs.review.clone(),\n        inputs.frozen.clone(),\n        inputs.message.clone(),\n        inputs.asked.clone(),\n        inputs.told.clone(),\n    );\n    let theme = cx.theme().clone();\n\n    div()\n        .flex()\n        .flex_col()\n        .gap(px(theme.space(Space::Md)))\n        .p(px(theme.space(Space::Lg)))\n        .w(px(360.0))\n        .child(\n            FormField::new(\"scene.textarea.notes.field\", \"Release notes\")\n                .control(\"scene.textarea.notes\")\n                .description(\"Shown to everyone who opens this run.\")\n                .child(notes),\n        )\n        .child(\n            FormField::new(\"scene.textarea.review.field\", \"Review\")\n                .control(\"scene.textarea.review\")\n                .child(review),\n        )\n        .child(\n            FormField::new(\"scene.textarea.frozen.field\", \"Policy\")\n                .control(\"scene.textarea.frozen\")\n                .child(frozen),\n        )\n        // The other enter policy, for text that is a message rather than a\n        // value. Nothing about it looks different, which is the point: what\n        // changes is which key is the common act.\n        .child(message)\n        .child(caption(\n            &theme,\n            \"a frame that measures its text rather than its rows: the same pill \\\n             holds one line, and becomes a panel for a message that outgrew it\",\n        ))\n        .child(asked)\n        .child(told)\n        .into_any_element()\n}"
+    },
+    {
+      "name": "mention-input",
+      "capture": "cargo run -p xtask -- headless capture mention-input",
+      "kind": "exhibit",
+      "subjects": [
+        "MentionInput"
+      ],
+      "uses": [
+        "MentionInput"
+      ],
+      "example": "fn mention_input(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_mention_input(window, cx);\n    let input = cx.global::<SceneMentionInput>().input.clone();\n    let theme = cx.theme().clone();\n    div()\n        .column()\n        .gap_token(&theme, Space::Sm)\n        .p_token(&theme, Space::Lg)\n        .w(px(420.0))\n        .child(caption(\n            &theme,\n            \"the editor owns text; the anchored menu owns only @query completion\",\n        ))\n        .child(input)\n        .into_any_element()\n}"
     },
     {
       "name": "rich-text-editor",

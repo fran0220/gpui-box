@@ -1075,6 +1075,58 @@ pub(super) fn textarea(window: &mut Window, cx: &mut App) -> AnyElement {
         .into_any_element()
 }
 
+pub(super) struct SceneMentionInput {
+    input: Entity<MentionInput>,
+}
+
+impl Global for SceneMentionInput {}
+
+pub(super) fn ensure_mention_input(window: &mut Window, cx: &mut App) {
+    if cx.has_global::<SceneMentionInput>() {
+        return;
+    }
+    let editor = cx.new(|cx| {
+        TextArea::new("scene.mention.editor", window, cx)
+            .text("Please ask @ad")
+            .placeholder("Message the team")
+            .enter(Enter::Submits)
+            .rows(2)
+    });
+    let input = cx.new(|cx| {
+        MentionInput::new("scene.mention", editor.clone(), cx).candidates([
+            MentionCandidate::new("ada", "Ada Lovelace")
+                .description("Compiler group")
+                .replacement("@Ada"),
+            MentionCandidate::new("adam", "Adam Stokes")
+                .description("Release engineering")
+                .replacement("@Adam"),
+            MentionCandidate::new("admin", "Workspace administrators")
+                .description("Group mention")
+                .replacement("@admins")
+                .unavailable("Group mentions are disabled here"),
+        ])
+    });
+    window.focus(&editor.read(cx).focus_handle(cx), cx);
+    cx.set_global(SceneMentionInput { input });
+}
+
+pub(super) fn mention_input(window: &mut Window, cx: &mut App) -> AnyElement {
+    ensure_mention_input(window, cx);
+    let input = cx.global::<SceneMentionInput>().input.clone();
+    let theme = cx.theme().clone();
+    div()
+        .column()
+        .gap_token(&theme, Space::Sm)
+        .p_token(&theme, Space::Lg)
+        .w(px(420.0))
+        .child(caption(
+            &theme,
+            "the editor owns text; the anchored menu owns only @query completion",
+        ))
+        .child(input)
+        .into_any_element()
+}
+
 pub(super) struct SceneRichTextEditor {
     editor: Entity<RichTextEditor>,
 }

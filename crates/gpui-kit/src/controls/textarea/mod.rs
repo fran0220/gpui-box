@@ -677,6 +677,18 @@ impl TextArea {
         self.disabled
     }
 
+    pub fn is_read_only(&self) -> bool {
+        self.read_only
+    }
+
+    pub(crate) fn semantic_id(&self) -> SharedString {
+        self.ident.semantic_id()
+    }
+
+    pub(crate) fn element_id(&self) -> gpui::ElementId {
+        self.ident.element_id()
+    }
+
     pub fn selected_range(&self) -> Range<usize> {
         self.edit.selection()
     }
@@ -1269,7 +1281,8 @@ impl TextArea {
             .disabled(self.disabled)
             .read_only(self.read_only)
             .invalid(self.invalid)
-            .required(self.required);
+            .required(self.required)
+            .expanded(self.completion_claimed);
         if !self.disabled {
             spec = spec.focus(&self.focus_handle);
         }

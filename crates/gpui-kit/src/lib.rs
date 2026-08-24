@@ -172,6 +172,9 @@ pub mod prelude {
     pub use crate::controls::keymap_editor::{
         KeymapBinding, KeymapCommand, KeymapEditor, KeymapEditorEvent,
     };
+    pub use crate::controls::mention::{
+        MentionCandidate, MentionInput, MentionInputEvent, MentionQuery,
+    };
     pub use crate::controls::number_input::{NumberInput, NumberInputEvent};
     pub use crate::controls::rich_text_editor::{
         RichTextDiagnostic, RichTextDiagnosticSeverity, RichTextEditor, RichTextEditorEvent,

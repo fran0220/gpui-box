@@ -739,6 +739,16 @@ string_keys! {
     TreeChildrenUnavailable => "tree.children-unavailable", "Could not load this branch";
     TreeEmpty => "tree.empty", "No items";
     TextAreaCount => "textarea.count", "{0} of {1}";
+    // Mention completion.
+    MentionSuggestions => "mention.suggestions", "Mention suggestions";
+    MentionIdle => "mention.idle", "Mention suggestions have not been requested";
+    MentionLoading => "mention.loading", "Loading mention suggestions";
+    MentionRefreshing => "mention.refreshing", "Updating mention suggestions";
+    MentionEmpty => "mention.empty", "No mention suggestions";
+    MentionNoMatch => "mention.no-match", "No mentions match this search";
+    MentionUnavailable => "mention.unavailable", "Mentions unavailable";
+    MentionError => "mention.error", "Could not load mentions";
+    MentionStale => "mention.stale", "Suggestions may be out of date";
     // Structured rich text editing. Document text and link destinations remain
     // caller-owned; this vocabulary names the editor's own controls.
     RichTextPlaceholder => "rich-text.placeholder", "Write…";

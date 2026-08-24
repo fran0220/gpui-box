@@ -59,7 +59,7 @@ use content::{
 use controls::{
     actions, auth_sign_in, auth_verification, button, cascader, choice, color_picker, copy_button,
     dropzone, filter_bar, find_replace, form, inline_edit, input, keybinding, keymap_editor,
-    rich_text_editor, search_field, settings, textarea, toggle, upload_list,
+    mention_input, rich_text_editor, search_field, settings, textarea, toggle, upload_list,
 };
 use data::{
     data_grid, data_grid_editing, diagnostics_list, drag_list, drag_tree, flow, kanban, list,
@@ -213,6 +213,11 @@ pub fn catalog() -> Vec<Scene> {
             name: "textarea",
             build: textarea,
             shows: Shows::Subjects(&["TextArea"]),
+        },
+        Scene {
+            name: "mention-input",
+            build: mention_input,
+            shows: Shows::Subjects(&["MentionInput"]),
         },
         Scene {
             name: "rich-text-editor",

@@ -17,7 +17,7 @@ input, and an entry in `docs/components.md`.
 | Family | Components |
 |---|---|
 | Action | `Button`, `IconButton`, `ButtonGroup`, `SplitButton`, `Toggle`, `ToggleGroup`, `CopyButton` |
-| Text entry | `TextInput`, `PasswordInput`, `OneTimeCodeInput`, `TextArea`, `RichTextEditor`, `NumberInput`, `TagInput`, `InlineEdit`, `SearchField`, `FindReplace`, `UploadList` |
+| Text entry | `TextInput`, `PasswordInput`, `OneTimeCodeInput`, `TextArea`, `MentionInput`, `RichTextEditor`, `NumberInput`, `TagInput`, `InlineEdit`, `SearchField`, `FindReplace`, `UploadList` |
 | Choice | `Select`, `Cascader`, `Combobox`, `Checkbox`, `Radio`, `Switch`, `Slider`, `SegmentedControl`, `ColorPicker`, `ColorSwatch` |
 | Form | `FormField`, `SettingsRow`, `SettingsSection` |
 | Navigation | `Tabs`, `Accordion`, `Collapsible`, `Breadcrumb`, `Sidebar`, `AnchorList`, `Pagination`, `Wizard`, `UndoHistory` |
@@ -455,12 +455,16 @@ is for. `Cascader`, `AnchorList`, and `DiagnosticsList` are also covered above;
 they compose the existing popover/menu, navigation, list, filter, badge, and
 status vocabulary instead of creating parallel application infrastructure.
 
-Then: mentions in a text field. Settings search is now closed by `SettingsList`:
-it filters sections and rows through the installed locale matcher, includes
-visible row copy and explicit caller-authored aliases/control vocabulary,
-preserves the settings page's familiar order, counts the result, and presents a
-distinct no-match state. `UndoHistory` covers the caller-owned revision list
-and reports restore intents without keeping or mutating an undo stack.
+Mentions in a text field and settings search now share Kit contracts.
+`MentionInput` owns trigger detection, querying, stable candidate focus,
+caret-anchored presentation, and completion insertion while callers own
+candidate retrieval, stable identity, exact replacement text, and the semantic
+attachment of accepted identity to plain text. `SettingsList` filters sections
+and rows through the installed locale matcher, includes visible row copy and
+explicit caller-authored aliases/control vocabulary, preserves the settings
+page's familiar order, counts the result, and presents a distinct no-match
+state. `UndoHistory` covers the caller-owned revision list and reports restore
+intents without keeping or mutating an undo stack.
 
 Application forms now cover date, time, range, files, and repeating sections.
 Date facts come from `DateAdapter`; file admissibility and display names come
@@ -503,7 +507,7 @@ presentation contract downstream.
 | Text range highlighting | `HighlightedText`, `LogStream`, `CodeView` and `DiffView` render caller-supplied ranges while constructing their text. GPUI still has no API that marks a substring of an arbitrary already-rendered text element, which blocks a generic find-in-page overlay. |
 | Writing direction | `LayoutDirection` supplies logical row order, start/end spacing and borders, text alignment, directional glyph mirroring, and reading-order keyboard traversal across controls, navigation, menus, calendars, trees, structured views, and schema forms. Unicode bidi shaping keeps mixed Arabic/Hebrew, Latin, punctuation, and numbers in logical order. Host-owned localized copy, locale formatting, and a larger language-specific bidi corpus remain integration work rather than component geometry. |
 | Number, date, and quantity formatting | `NumberAdapter` owns every library-authored numeric shape — grouped counts and decimals, editable parsing, plural category, count-of-total, percent, multiplier, dimensions, ordinals, signed deltas, lower bounds, and affix placement. `Strings` owns every phrase and its zero/one/two/few/many/other variants. Dates remain the parallel `DateAdapter` contract. See "Numbers a catalogue cannot fix alone" below. |
-| Assistive technology gaps | Basic semantics, grapheme-based editable and read-only text runs, shared shaped character/caret geometry, selection actions, explicit live-region properties, and same-window labelled-by/described-by relationships now reach GPUI's AccessKit platform tree. macOS and Windows natively verify relationship-derived field name/help and editable character/caret geometry; Windows additionally verifies ValuePattern editing and MenuItem focus/invocation/lifetime. Native-child handoff, platform live-event verification, remaining Windows overlay/event sessions, and Linux AT-SPI validation are active foundation work; see `docs/accessibility.md` and `docs/foundation-roadmap.md`. |
+| Assistive technology gaps | Basic semantics, grapheme-based editable and read-only text runs, shared shaped character/caret geometry, selection actions, explicit live-region properties, same-window labelled-by/described-by relationships, and deferred-overlay active descendants now reach GPUI's AccessKit platform tree. macOS and Windows natively verify relationship-derived field name/help and editable character/caret geometry; Windows additionally verifies ValuePattern editing and MenuItem focus/invocation/lifetime. Cross-tree completion focus is deterministic only. Native-child handoff, platform live-event verification, remaining Windows overlay/event sessions, and Linux AT-SPI validation are active foundation work; see `docs/accessibility.md` and `docs/foundation-roadmap.md`. |
 | Validation vocabulary | `ValidationState` is the caller-owned `Pending` / `Validating` / `Invalid { reason }` / `Valid` ladder. `FormField` presents it without painting in-flight work as failure; `SchemaForm` keeps field and whole-form validation separate and blocks submission while an explicitly managed check is pending or validating. Rules and timing remain host-owned. |
 | Schema field participation | `FieldVisibility` records the result of a host-owned condition without evaluating it. Hidden fields are absent from rendering and field validation; `HiddenSubmission::Omit` removes the subtree only from `submission_values`, while `Include` preserves its complete held subtree. `values` stays lossless, and a hidden object or repeated-list parent governs every descendant. |
 | Settings search | `SettingsList` takes the query a host commonly receives from `SearchField` and owns matching, filtering, result counting, and the no-match state for complete `SettingsSection` builders. Label, description, badge, displayed value, management reason, section context, and `SettingsRow::search_terms` all use the installed `SearchMatcher`; text hidden inside an arbitrary caller control must be named explicitly. Matches retain section and row order rather than turning preferences into a ranked command palette. |
