@@ -171,14 +171,19 @@ visually inspected in both themes and checked on Metal and WARP.
 Build on the same shaped editable layout and per-window context.
 
 Status: same-window labelled-by and described-by relationships now resolve
-after deferred prepaint and disappear with either endpoint. Kit form labels,
-help/error text, search labels, and deferred tooltips use that native AccessKit
+after deferred prepaint and disappear with either endpoint. Cross-tree active
+descendants now project a deferred overlay option as AccessKit focus only while
+its uniquely identified same-window owner has real GPUI keyboard focus, without
+reparenting or retaining stale endpoints. Kit form labels, help/error text,
+search labels, and deferred tooltips use the native AccessKit relationship
 path, with an absent-scalar fallback for adapters that do not consume the
 references. Editable controls now publish current-frame painted character and
-caret geometry. macOS verifies both contracts in a native AX session; Windows
-now verifies ValuePattern editing, TextPattern character bounds/end caret,
-relationship-derived form name/description, and MenuItem focus/invocation/
-lifetime in an interactive UIA session. Native-child handoff, Linux AT-SPI,
+caret geometry. macOS verifies the label/description and editable contracts in
+a native AX session; Windows now verifies ValuePattern editing, TextPattern
+character bounds/end caret, relationship-derived form name/description, and
+MenuItem focus/invocation/lifetime in an interactive UIA session. Cross-tree
+active-descendant behavior is covered deterministically, while native macOS AX
+and Windows UIA sessions remain unverified. Native-child handoff, Linux AT-SPI,
 Windows Dialog/Tooltip/Status and live-event sessions, and screen-reader speech
 proof remain open.
 
@@ -187,12 +192,15 @@ proof remain open.
 2. Keep the completed GPUI labelled-by/described-by resolver and scalar
    fallback covered across deferred subtrees, ambiguous identities, and
    endpoint removal.
-3. Add platform-view/native-child handoff so an embedded media or browser view
+3. Keep cross-tree active-descendant projection covered across focused-owner
+   validation, ambiguous identities, self-reference, and endpoint removal;
+   complete native macOS AX and Windows UIA validation.
+4. Add platform-view/native-child handoff so an embedded media or browser view
    participates in one accessibility hierarchy rather than becoming a second
    unnamed root.
-4. Make live-region creation/update/removal observable at the platform adapter
+5. Make live-region creation/update/removal observable at the platform adapter
    boundary and test announcement events without asserting synthesized speech.
-5. Keep secrets out of text runs, values, relationships, debug trees, and
+6. Keep secrets out of text runs, values, relationships, debug trees, and
    action payloads.
 
 Validation is layered:

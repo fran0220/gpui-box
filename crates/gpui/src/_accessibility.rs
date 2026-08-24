@@ -221,6 +221,25 @@
 //! no relationship for that frame. Relationship ids must be stable business
 //! identities and must not contain secret or user-authored text.
 //!
+//! A completion menu is commonly rendered in a deferred overlay rather than
+//! under the editor that keeps keyboard focus. Its active option can declare
+//! that cross-tree ownership from the option side:
+//! ```rust
+//! # use gpui::*;
+//! let editor = div().id("composer").role(Role::TextInput);
+//! let option = div()
+//!     .id("composer.option.ada")
+//!     .role(Role::ListBoxOption)
+//!     .aria_active_descendant_of("composer")
+//!     .child(text!("Ada"));
+//! # let _ = (editor, option);
+//! ```
+//! GPUI reports the option as AccessKit focus only while the referenced node
+//! owns keyboard focus and both ids resolve uniquely in the current frame. It
+//! does not reparent the overlay. Use [`.aria_active_descendant()`]
+//! [StatefulInteractiveElement::aria_active_descendant] for an ordinary
+//! rendered descendant of its focused composite.
+//!
 //! ### Handling actions
 //!
 //! Assistive technology can dispatch actions to the UI. While many users of

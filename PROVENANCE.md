@@ -109,13 +109,14 @@ framework boundary and use the existing shaping and Unicode segmentation
 dependencies; no editor, document-format, grammar, language-server, or product
 source is imported.
 
-The per-window labelled-by and described-by resolver, including inverse
-label/description declarations, deferred-subtree resolution, ambiguous-target
-refusal, stale-endpoint removal, and absent-scalar text fallback is subsequent
-GPUI Box work. It fills the existing AccessKit relationship properties from
-role-bearing GPUI element identities while supplying native adapters the same
-resolved name/help text when they do not consume those properties. It imports
-no accessibility adapter, product, or UI source.
+The per-window labelled-by, described-by, and cross-tree active-descendant
+resolver, including inverse label/description declarations, deferred-subtree
+resolution, focused-owner validation, ambiguous-target refusal, stale-endpoint
+removal, and absent-scalar text fallback is subsequent GPUI Box work. It fills
+the existing AccessKit relationship and focus projection from role-bearing GPUI
+element identities while supplying native adapters the same resolved name/help
+text when they do not consume those properties. It imports no accessibility
+adapter, product, or UI source.
 
 The window-owned document-selection coordinator, caller-declared reading order,
 overlay scope isolation, truthful virtualized-copy coverage, and aggregate

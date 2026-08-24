@@ -91,6 +91,7 @@ not evidence that a particular screen reader announces every property correctly.
 | Disabled, invalid, required, busy | Disabled native AX smoke verified; other states deterministic only | Bridged; native session unverified | Bridged; native session unverified | Mirrored; screen-reader announcement unverified |
 | Checked, expanded, widget selection | Checked native AX smoke verified; expanded/selection deterministic only | Bridged; native session unverified | Bridged; native session unverified | Mirrored; screen-reader announcement unverified |
 | Focus | GPUI focus is projected and assistive-technology-requested focus has a native AX smoke check | Native UIA `SetFocus` verified: keyboard focus, global focused element, and one focus-changed event agree; Tab navigation is not claimed | GPUI focus action is routed to its owning handle; native AT-SPI session unverified | DOM focus action and ownership browser-smoke verified |
+| Cross-tree active descendant | Same-window AccessKit focus projection verified deterministically; native AX session unverified | Same AccessKit focus projection verified deterministically; native UIA session unverified | Same AccessKit structure; native AT-SPI session unverified | AccessKit structure exists; semantic DOM projection unverified |
 | Numeric min, max, current value | Bridged; deterministic tree verified | Bridged; native session unverified | Bridged; native session unverified | Mirrored; AT interaction unverified |
 | Editable text | Native AX name/value/enabled/focus/editing plus range-dependent character geometry verified; grapheme-based TextRun structure verified deterministically | Native ValuePattern editing and distinct non-empty TextPattern character rectangles verified | Same AccessKit structure; native session unverified | Keyboard editing browser-smoke verified |
 | Text selection and caret | Selection/caret structure and actions verified deterministically; native AX selected range and caret bounds verified, selection mutation unverified | Native TextPattern logical end caret verified; selection mutation remains unverified | Same AccessKit structure; native AT-SPI interaction unverified | Mirrored; browser AT mutation unverified |
@@ -111,6 +112,16 @@ GPUI's rendered element nesting; relationships do not reparent nodes. Literal
 descriptions remain available and may coexist with a relationship. Form labels,
 help/error text, hidden search labels, and visible deferred tooltips use the
 relationship path.
+
+A role-bearing option in a deferred overlay may declare
+`aria_active_descendant_of(owner)` when keyboard focus remains on a composite
+outside that overlay's rendered subtree. End-of-frame resolution projects the
+option as AccessKit focus only when the owner id resolves uniquely in the same
+window, owns real GPUI keyboard focus for that frame, and is not the option
+itself. Missing, duplicate, self-referential, unfocused, or removed endpoints
+produce no projection, and neither node is reparented. Ordinary same-subtree
+`aria_active_descendant` behavior is unchanged. This tree behavior is covered
+deterministically; native macOS AX and Windows UIA sessions remain unverified.
 
 Native adapters do not expose AccessKit references uniformly: macOS did not
 derive an `AXTitle` or `AXHelp` from them, Windows derives a name from

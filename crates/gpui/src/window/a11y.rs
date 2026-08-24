@@ -639,7 +639,8 @@ impl A11yNodeBuilder {
                 AccessibilityRelationship::LabelledBy(target)
                 | AccessibilityRelationship::DescribedBy(target)
                 | AccessibilityRelationship::Labels(target)
-                | AccessibilityRelationship::Describes(target) => target,
+                | AccessibilityRelationship::Describes(target)
+                | AccessibilityRelationship::ActiveDescendantOf(target) => target,
             };
             let Some(targets) = self.relationship_nodes.get(target_id) else {
                 continue;
@@ -653,11 +654,21 @@ impl A11yNodeBuilder {
                 continue;
             }
             let target = targets[0];
+            if matches!(
+                relationship,
+                AccessibilityRelationship::ActiveDescendantOf(_)
+            ) {
+                if self.focus == Some(target) && source != target {
+                    self.set_active_descendant(source);
+                }
+                continue;
+            }
             let (owner, related, labelled) = match relationship {
                 AccessibilityRelationship::LabelledBy(_) => (source, target, true),
                 AccessibilityRelationship::DescribedBy(_) => (source, target, false),
                 AccessibilityRelationship::Labels(_) => (target, source, true),
                 AccessibilityRelationship::Describes(_) => (target, source, false),
+                AccessibilityRelationship::ActiveDescendantOf(_) => unreachable!(),
             };
             if owner == related {
                 log::warn!(
@@ -920,6 +931,100 @@ mod tests {
 
         let update = builder.finalize();
         assert_eq!(update.focus, ROOT_NODE_ID);
+    }
+
+    #[test]
+    fn active_descendant_relationship_crosses_sibling_subtrees() {
+        let mut builder = new_builder();
+        let editor = NodeId(1);
+        let option = NodeId(2);
+        let editor_key = ElementId::from("editor");
+
+        assert!(builder.push(editor, test_node()));
+        builder.register_element_relationships(editor_key.clone(), editor, &[]);
+        builder.set_focus(editor);
+        builder.pop();
+
+        // The option is not a rendered descendant of the editor: this is the
+        // shape produced by a deferred completion popup.
+        assert!(builder.push(option, test_node()));
+        builder.register_element_relationships(
+            ElementId::from("option"),
+            option,
+            &[AccessibilityRelationship::ActiveDescendantOf(editor_key)],
+        );
+        builder.pop();
+
+        let update = builder.finalize();
+        assert_eq!(update.focus, option);
+    }
+
+    #[test]
+    fn cross_tree_active_descendant_requires_its_owner_to_be_focused() {
+        let mut builder = new_builder();
+        let editor = NodeId(1);
+        let other = NodeId(2);
+        let option = NodeId(3);
+        let editor_key = ElementId::from("editor");
+
+        assert!(builder.push(editor, test_node()));
+        builder.register_element_relationships(editor_key.clone(), editor, &[]);
+        builder.pop();
+        assert!(builder.push(other, test_node()));
+        builder.set_focus(other);
+        builder.pop();
+        assert!(builder.push(option, test_node()));
+        builder.register_element_relationships(
+            ElementId::from("option"),
+            option,
+            &[AccessibilityRelationship::ActiveDescendantOf(editor_key)],
+        );
+        builder.pop();
+
+        let update = builder.finalize();
+        assert_eq!(update.focus, other);
+    }
+
+    #[test]
+    fn cross_tree_active_descendant_refuses_self_and_ambiguous_owners() {
+        let mut builder = new_builder();
+        let owner = NodeId(1);
+        let owner_key = ElementId::from("owner");
+
+        assert!(builder.push(owner, test_node()));
+        builder.register_element_relationships(
+            owner_key.clone(),
+            owner,
+            &[AccessibilityRelationship::ActiveDescendantOf(
+                owner_key.clone(),
+            )],
+        );
+        builder.set_focus(owner);
+        builder.pop();
+
+        let update = builder.finalize();
+        assert_eq!(update.focus, owner);
+
+        let mut builder = new_builder();
+        let duplicate = NodeId(2);
+        let option = NodeId(3);
+        assert!(builder.push(owner, test_node()));
+        builder.register_element_relationships(owner_key.clone(), owner, &[]);
+        builder.set_focus(owner);
+        builder.pop();
+        assert!(builder.push(duplicate, test_node()));
+        builder.register_element_relationships(owner_key.clone(), duplicate, &[]);
+        builder.pop();
+        assert!(builder.push(option, test_node()));
+        builder.register_element_relationships(
+            ElementId::from("option"),
+            option,
+            &[AccessibilityRelationship::ActiveDescendantOf(owner_key)],
+        );
+        builder.pop();
+
+        let update = builder.finalize();
+        assert_eq!(update.focus, owner);
     }
 
     #[test]

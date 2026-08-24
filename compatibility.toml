@@ -40,6 +40,9 @@ commands = ["cargo run -p xtask -- web check", "cargo run -p xtask -- web build"
 ci_gated = true
 limitations = ["native media playback is unavailable", "threaded COOP/COEP not claimed", "screen-reader announcements not covered"]
 
+[framework_accessibility]
+cross_tree_active_descendant = "A role-bearing overlay option may refer to one uniquely identified focused owner in the same window; GPUI projects AccessKit focus without reparenting either node."
+
 [release_validation]
 dependency_graph = "cargo run -p xtask -- dependencies check"
 publication_plan = "cargo run -p xtask -- package plan"

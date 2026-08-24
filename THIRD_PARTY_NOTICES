@@ -50,11 +50,11 @@ composition, grouped undo/redo, UTF-8/UTF-16 arithmetic, shaped editable
 geometry, alignment-aware hit testing, reveal scrolling, current-frame
 AccessKit character/run bounds, and generic normalized style runs are GPUI Box
 work and import no editor, document-format, grammar, or product source.
-The per-window labelled-by and described-by resolver, inverse relationship
-declarations, deferred-subtree resolution, stale-endpoint removal, and
-absent-scalar name/description fallback are GPUI Box work over AccessKit's
-existing relationship properties and import no additional adapter or product
-source.
+The per-window labelled-by, described-by, and cross-tree active-descendant
+resolver, inverse relationship declarations, deferred-subtree resolution,
+focused-owner validation, stale-endpoint removal, and absent-scalar
+name/description fallback are GPUI Box work over AccessKit's existing
+relationship/focus projection and import no additional source.
 The window-owned document-selection coordinator, isolated selection scopes,
 virtualized-copy coverage, and generic scroll-target contract are GPUI Box work
 over existing framework state and import no editor, product, or third-party

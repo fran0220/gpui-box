@@ -1408,6 +1408,20 @@ pub trait StatefulInteractiveElement: InteractiveElement {
         self
     }
 
+    /// Report this element as the active descendant of a focused role-bearing
+    /// element elsewhere in the same window.
+    ///
+    /// This is the deferred-overlay form of [`Self::aria_active_descendant`].
+    /// The referenced id must resolve uniquely, and must own GPUI keyboard
+    /// focus in the current frame; otherwise the claim is ignored. It does not
+    /// reparent either accessibility node.
+    fn aria_active_descendant_of(mut self, owner: impl Into<ElementId>) -> Self {
+        self.interactivity().aria.relationships.push(
+            crate::AccessibilityRelationship::ActiveDescendantOf(owner.into()),
+        );
+        self
+    }
+
     /// Contribute synthetic accessibility nodes — nodes that don't correspond
     /// to any element — as children of this element's a11y node. For example,
     /// text runs describing an editor's text content.

@@ -61,6 +61,9 @@ pub enum AccessibilityRelationship {
     Labels(ElementId),
     /// The current node describes the referenced node.
     Describes(ElementId),
+    /// The current node is the active descendant of the referenced focused
+    /// composite, even when an overlay places the two in separate subtrees.
+    ActiveDescendantOf(ElementId),
 }
 
 /// Implemented by types that participate in laying out and painting the contents of a window.
