@@ -153,13 +153,15 @@ own; both are exercised through every control and overlay that uses them.
 - **Persisting a layout.** `SplitLayout` converts to and from plain records so
   a host can write it out, and this crate takes no serialization dependency to
   do it for them.
-- **Language intelligence and document policy.** Basic rich-text editing is a
-  framework and Kit gap, not permanently out of scope; its staged contract is
-  in `docs/foundation-roadmap.md`. Grammar/LSP facts, diagnostics, folding and
-  multi-caret policy, persistence, collaboration, and conversion to a product
-  document format remain host work. Syntax colouring still stops at four
-  built-in classes on the eight languages `content::highlight` knows. A host
-  that has a grammar installs its own spans, and those facts win.
+- **Language intelligence and document policy.** The shared editable buffer,
+  geometry, style coverage, rich document, and caller-owned edit session now
+  exist. The visible basic rich editor remains an active Kit gap tracked in
+  `docs/foundation-roadmap.md`, not permanently out of scope. Grammar/LSP
+  facts, diagnostics, folding and multi-caret policy, persistence,
+  collaboration, and conversion to a product document format remain host
+  work. Syntax colouring still stops at four built-in classes on the eight
+  languages `content::highlight` knows. A host that has a grammar installs its
+  own spans, and those facts win.
 - **Doing what a document says.** `Markdown` draws HTML as the characters
   somebody wrote, reports a link rather than opening it, and names an image
   rather than fetching it. There is no HTML renderer here, no URL policy, and

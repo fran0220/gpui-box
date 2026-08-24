@@ -10649,6 +10649,275 @@
       ]
     },
     {
+      "name": "RichTextAlignment",
+      "path": "gpui_kit::content::RichTextAlignment",
+      "summary": "Logical paragraph alignment. Start and end follow reading direction.",
+      "variants": [
+        "Start",
+        "Center",
+        "End"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "RichTextBlock",
+      "path": "gpui_kit::content::RichTextBlock",
+      "summary": "One paragraph-like block and its complete inline style coverage.",
+      "variants": [],
+      "construct": [
+        "new(id: impl Into<RichTextBlockId>, text: impl Into<SharedString>) -> Self"
+      ],
+      "options": [
+        "with_paragraph(paragraph: RichTextParagraphStyle) -> Self",
+        "with_style(range: Range<usize>, style: RichTextInlineStyle) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "id() -> &RichTextBlockId",
+        "text() -> &SharedString",
+        "styles() -> &EditableStyleRuns<RichTextInlineStyle>",
+        "paragraph() -> RichTextParagraphStyle"
+      ]
+    },
+    {
+      "name": "RichTextBlockId",
+      "path": "gpui_kit::content::RichTextBlockId",
+      "summary": "Stable caller-visible identity for one rich-text block.",
+      "variants": [],
+      "construct": [
+        "new(value: impl Into<SharedString>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "as_str() -> &str"
+      ]
+    },
+    {
+      "name": "RichTextDocument",
+      "path": "gpui_kit::content::RichTextDocument",
+      "summary": "A non-empty storage-neutral rich-text document.",
+      "variants": [],
+      "construct": [
+        "new(blocks: impl IntoIterator<Item = RichTextBlock>) -> Result<Self, RichTextError>",
+        "empty(block_id: impl Into<RichTextBlockId>) -> Result<Self, RichTextError>",
+        "plain(block_id: impl Into<RichTextBlockId>, text: impl Into<SharedString>) -> Result<Self, RichTextError>"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "blocks() -> &[RichTextBlock]",
+        "block(id: &RichTextBlockId) -> Option<&RichTextBlock>",
+        "selection_at_start() -> RichTextSelection",
+        "selection_at_end() -> RichTextSelection"
+      ]
+    },
+    {
+      "name": "RichTextEditResult",
+      "path": "gpui_kit::content::RichTextEditResult",
+      "summary": "What one command changed.",
+      "variants": [],
+      "construct": [],
+      "options": [
+        "changed() -> bool"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "RichTextEditSession",
+      "path": "gpui_kit::content::RichTextEditSession",
+      "summary": "Caller-owned editing state and reusable rich-document transaction history.",
+      "variants": [],
+      "construct": [
+        "new(document: RichTextDocument) -> Self"
+      ],
+      "options": [],
+      "commands": [
+        "forbid_history()",
+        "replace_document(document: RichTextDocument, selection: RichTextSelection) -> Result<(), RichTextError>",
+        "apply(intent: RichTextIntent) -> Result<RichTextEditResult, RichTextError>"
+      ],
+      "queries": [
+        "document() -> &RichTextDocument",
+        "selection() -> &RichTextSelection",
+        "pending_style() -> &RichTextInlineStyle",
+        "marked_range() -> Option<&RichTextRange>",
+        "can_undo() -> bool",
+        "can_redo() -> bool"
+      ]
+    },
+    {
+      "name": "RichTextError",
+      "path": "gpui_kit::content::RichTextError",
+      "summary": "Invalid caller-owned document or position data.",
+      "variants": [
+        "EmptyDocument",
+        "EmptyBlockId",
+        "DuplicateBlockId",
+        "UnknownBlock"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "RichTextFormat",
+      "path": "gpui_kit::content::RichTextFormat",
+      "summary": "Inline formats whose active state can be toggled independently.",
+      "variants": [
+        "Bold",
+        "Italic",
+        "Underline",
+        "Strike",
+        "Code"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "RichTextInlineStyle",
+      "path": "gpui_kit::content::RichTextInlineStyle",
+      "summary": "The complete inline style at one source byte.",
+      "variants": [],
+      "construct": [],
+      "options": [
+        "with_format(format: RichTextFormat, active: bool) -> Self",
+        "with_link(destination: Option<SharedString>) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "format(format: RichTextFormat) -> bool",
+        "link() -> Option<&SharedString>"
+      ]
+    },
+    {
+      "name": "RichTextInputKind",
+      "path": "gpui_kit::content::RichTextInputKind",
+      "summary": "What supplied a text replacement, for transaction grouping.",
+      "variants": [
+        "Typing",
+        "Deleting",
+        "Paste",
+        "Cut"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "RichTextIntent",
+      "path": "gpui_kit::content::RichTextIntent",
+      "summary": "A typed command accepted by RichTextEditSession::apply.",
+      "variants": [
+        "Select",
+        "Replace",
+        "InsertSoftBreak",
+        "InsertHardBreak",
+        "BackspaceAtStart",
+        "ToggleFormat",
+        "SetLink",
+        "SetAlignment",
+        "SetList",
+        "ChangeListDepth",
+        "Compose",
+        "EndComposition",
+        "Undo",
+        "Redo"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "RichTextListItem",
+      "path": "gpui_kit::content::RichTextListItem",
+      "summary": "List metadata for one paragraph.",
+      "variants": [],
+      "construct": [
+        "new(kind: RichTextListKind) -> Self"
+      ],
+      "options": [
+        "depth(depth: u8) -> Self"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "RichTextListKind",
+      "path": "gpui_kit::content::RichTextListKind",
+      "summary": "The marker family of a list item.",
+      "variants": [
+        "Unordered",
+        "Ordered"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "RichTextParagraphStyle",
+      "path": "gpui_kit::content::RichTextParagraphStyle",
+      "summary": "Block presentation metadata independent of any storage syntax.",
+      "variants": [],
+      "construct": [],
+      "options": [
+        "with_alignment(alignment: RichTextAlignment) -> Self",
+        "with_list(list: Option<RichTextListItem>) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "alignment() -> RichTextAlignment",
+        "list() -> Option<RichTextListItem>"
+      ]
+    },
+    {
+      "name": "RichTextPosition",
+      "path": "gpui_kit::content::RichTextPosition",
+      "summary": "One UTF-8 position inside a stable block.",
+      "variants": [],
+      "construct": [
+        "new(block: impl Into<RichTextBlockId>, offset: usize) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "RichTextRange",
+      "path": "gpui_kit::content::RichTextRange",
+      "summary": "One normalized document range.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "RichTextSelection",
+      "path": "gpui_kit::content::RichTextSelection",
+      "summary": "An anchor and moving head. Their order is preserved across bidi and drag selection; document operations normalize them only while applying an edit.",
+      "variants": [],
+      "construct": [
+        "new(anchor: RichTextPosition, head: RichTextPosition) -> Self",
+        "caret(position: RichTextPosition) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "is_caret() -> bool"
+      ]
+    },
+    {
       "name": "Room",
       "path": "gpui_kit::overlay::Room",
       "summary": "Where a surface goes and how much of it there can be.",

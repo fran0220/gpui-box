@@ -33,6 +33,7 @@ pub mod log_stream;
 pub mod markdown;
 pub mod message_list;
 pub mod outline;
+pub mod rich_text;
 #[cfg(all(feature = "terminal", not(target_family = "wasm")))]
 pub mod terminal;
 pub mod transport;
@@ -58,6 +59,12 @@ pub use message_list::{
     Attachment, DeliveryState, Message, MessageBody, MessageList, Reaction, streaming_since,
 };
 pub use outline::{Mark, Outline};
+pub use rich_text::{
+    RichTextAlignment, RichTextBlock, RichTextBlockId, RichTextDocument, RichTextEditResult,
+    RichTextEditSession, RichTextError, RichTextFormat, RichTextInlineStyle, RichTextInputKind,
+    RichTextIntent, RichTextListItem, RichTextListKind, RichTextParagraphStyle, RichTextPosition,
+    RichTextRange, RichTextSelection,
+};
 #[cfg(all(feature = "terminal", not(target_family = "wasm")))]
 pub use terminal::{
     CellHit, CellSide, CellSnapshot, CursorSnapshot, Emulator, GridGeometry, GridPoint, GridSize,

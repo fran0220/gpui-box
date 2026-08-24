@@ -117,9 +117,12 @@ their documented noise envelope.
 
 Status: the framework `EditBuffer`, `EditableTextLayout`, and generic
 `EditableStyleRuns` primitives exist, and both plain Kit fields consume the
-shared edit and geometry authorities. The product-neutral rich document,
-formatting intents, editor presentation, and their platform/visual acceptance
-remain to be completed in this phase.
+shared edit and geometry authorities. Kit's storage-neutral
+`RichTextDocument` and caller-owned `RichTextEditSession` now provide stable
+block identity, paragraph/list metadata, inline marks and links, grapheme-safe
+typed intents, composition, and document-level undo/redo. Editor presentation,
+input wiring, diagnostics, and platform/visual acceptance remain to be
+completed in this phase.
 
 ### Framework primitive
 

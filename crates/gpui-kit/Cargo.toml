@@ -61,6 +61,7 @@ gpui = { package = "gpui-box", path = "../gpui", features = ["test-support"] }
 # calendar compiled in.
 gpui-kit = { package = "gpui-box-kit", path = ".", features = ["fixtures"] }
 gpui-kit-testkit = { package = "gpui-box-kit-testkit", path = "../gpui-kit-testkit", features = ["test-support"] }
+proptest.workspace = true
 
 [lints]
 workspace = true

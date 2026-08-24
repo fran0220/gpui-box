@@ -145,8 +145,12 @@ pub mod prelude {
         DiffPresentation, DiffView, DiffViewEvent, FitMode, ImageFrame, ImageRequest, ImageSize,
         ImageState, ImageViewer, ImageViewerEvent, Language, LineMark, LogEntry, LogStream,
         LogStreamState, Mark, Markdown, MarkdownEvent, Message, MessageBody, MessageList, Outline,
-        Reaction, TrackStep, TransportBar, TransportDuration, TransportEvent, TransportState,
-        ViewportState, strip_ansi, word_spans,
+        Reaction, RichTextAlignment, RichTextBlock, RichTextBlockId, RichTextDocument,
+        RichTextEditResult, RichTextEditSession, RichTextError, RichTextFormat,
+        RichTextInlineStyle, RichTextInputKind, RichTextIntent, RichTextListItem, RichTextListKind,
+        RichTextParagraphStyle, RichTextPosition, RichTextRange, RichTextSelection, TrackStep,
+        TransportBar, TransportDuration, TransportEvent, TransportState, ViewportState, strip_ansi,
+        word_spans,
     };
     pub use crate::controls::auth::{
         OneTimeCodeInput, OneTimeCodeInputEvent, PasswordInput, PasswordInputEvent,

@@ -212,6 +212,8 @@ Yes
 `{id}` names a parent `{parent}` that is absent
 a built source was just matched
 a keyframe list is never empty
+a rich-text block id cannot be empty
+a rich-text document needs one block
 ability charge maximum must be positive
 ability charges cannot exceed their maximum
 an actionable card has one
@@ -227,6 +229,7 @@ false
 game fraction must be between 0 and 1
 game fraction must be finite
 glTF
+handled before mutation
 markdown stream closed `{end:?}` past its root
 month unknown
 more than one root: {}
@@ -245,6 +248,9 @@ platform
 policy-owned particle recipes must remain valid
 records the root does not reach
 redacted, {shape}
+rich text is never blockless
+rich-text block `{id}` does not exist
+rich-text block id `{id}` is repeated
 series is nonempty
 slot was filled
 soft break

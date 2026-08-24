@@ -82,9 +82,12 @@ bidirectional lines that paint answer byte/point hit tests, visual-row ranges,
 selection fragments, caret and platform range bounds, and reveal scrolling.
 `TextInput` and `TextArea` both consume it. `EditableStyleRuns<S>` keeps
 grapheme-safe, complete, normalized caller-owned style coverage across source
-replacement. Theme, storage format, paragraph policy, and formatting intents
-remain outside these framework primitives; the Kit rich-editor vocabulary is
-the next layer of the foundation.
+replacement. Theme and document policy remain outside these framework
+primitives. Kit's storage-neutral `RichTextDocument` now supplies stable block
+identity, composite inline marks and links, paragraph/list metadata, and typed
+edit intents. A caller-owned `RichTextEditSession` applies those intents and
+owns composition and undo transactions without parsing or persisting a file
+format. The visible editor is still being completed on top of that model.
 
 `ScrollTarget` gives overflowing containers, uniform lists, and measured
 variable-height lists one offset, extent, viewport, and mutation contract.

@@ -117,6 +117,16 @@ else that is waiting.
 
 ### Added
 
+**Rich text now has one storage-neutral edit vocabulary.**
+`RichTextDocument` carries stable block identity, hard block boundaries, soft
+line breaks, complete inline style and link coverage, logical alignment, and
+ordered or unordered list metadata without choosing Markdown, HTML, or a
+durable format. Caller-owned `RichTextEditSession` applies typed selection,
+replacement, formatting, link, list, split, merge, IME composition, undo, and
+redo intents with grapheme-safe boundaries. External document replacement and
+secret-history refusal cannot resurrect superseded text. The visible
+`RichTextEditor` and its toolbar remain the next part of this foundation.
+
 **Editable text has one framework authority.** `gpui::EditBuffer` now owns the
 grapheme-safe selection, replacement, marked-composition, grouped undo/redo,
 secret-history refusal, input limits, and UTF-8/UTF-16 arithmetic consumed by

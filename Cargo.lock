@@ -2517,6 +2517,7 @@ dependencies = [
  "gpui-box-kit-tokens",
  "gpui-box-media",
  "image",
+ "proptest",
  "pulldown-cmark",
  "rasterlottie",
  "serde",
