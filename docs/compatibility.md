@@ -76,9 +76,15 @@ uses the component's whole-value copy intent.
 `TextArea`, and later rich editors. It owns grapheme-safe selection,
 replacement and marked-composition transactions, grouped undo/redo,
 single-/multi-line normalization, byte and grapheme limits, and UTF-8/UTF-16
-conversion. Secret controls permanently refuse history. Layout, theme, and
-document-format policy are deliberately outside this buffer; editable shaping
-and rich inline/paragraph vocabulary remain the next layer of the foundation.
+conversion. Secret controls permanently refuse history. `EditableTextLayout`
+is the corresponding shaped-geometry authority: the same wrapped and
+bidirectional lines that paint answer byte/point hit tests, visual-row ranges,
+selection fragments, caret and platform range bounds, and reveal scrolling.
+`TextInput` and `TextArea` both consume it. `EditableStyleRuns<S>` keeps
+grapheme-safe, complete, normalized caller-owned style coverage across source
+replacement. Theme, storage format, paragraph policy, and formatting intents
+remain outside these framework primitives; the Kit rich-editor vocabulary is
+the next layer of the foundation.
 
 `ScrollTarget` gives overflowing containers, uniform lists, and measured
 variable-height lists one offset, extent, viewport, and mutation contract.

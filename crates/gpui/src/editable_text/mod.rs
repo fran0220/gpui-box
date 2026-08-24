@@ -8,9 +8,13 @@
 
 mod buffer;
 mod history;
+mod layout;
+mod style_runs;
 
 pub use buffer::{EditBuffer, EditOutcome, EditRules};
 pub use history::EditCause;
+pub use layout::EditableTextLayout;
+pub use style_runs::{EditableStyleRun, EditableStyleRuns};
 
 use std::ops::Range;
 

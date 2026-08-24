@@ -7,9 +7,9 @@
 //! need.
 
 use gpui::{
-    App, Bounds, Element, ElementId, ElementInputHandler, Entity, GlobalElementId, IntoElement,
-    LayoutId, PaintQuad, Pixels, ShapedLine, Style, TextRun, UnderlineStyle, Window, fill, point,
-    px, relative, size,
+    App, Bounds, EditableTextLayout, Element, ElementId, ElementInputHandler, Entity,
+    GlobalElementId, IntoElement, LayoutId, PaintQuad, Pixels, Style, TextRun, UnderlineStyle,
+    Window, fill, point, px, relative,
 };
 use gpui_kit_theme::ActiveTheme;
 
@@ -26,9 +26,9 @@ impl TextElement {
 }
 
 pub struct PrepaintState {
-    line: Option<ShapedLine>,
+    layout: Option<EditableTextLayout>,
     cursor: Option<PaintQuad>,
-    selection: Option<PaintQuad>,
+    selection: Vec<PaintQuad>,
     scroll_offset: Pixels,
     custom_visual: bool,
 }
@@ -138,60 +138,47 @@ impl Element for TextElement {
         };
 
         let font_size = style.font_size.to_pixels(window.rem_size());
-        let line = window
+        let line_height = window.line_height();
+        let lines = window
             .text_system()
-            .shape_line(display_text, font_size, &runs, None);
+            .shape_text(display_text.clone(), font_size, &runs, None, None)
+            .map(|lines| lines.into_iter().collect::<Vec<_>>())
+            .unwrap_or_default();
+        let layout = EditableTextLayout::new(display_text.as_ref(), lines, line_height);
 
         // Long text scrolls under a fixed frame, so the caret stays visible
         // instead of being painted outside the control.
-        let cursor_x = line.x_for_index(cursor);
         let previous = self.input.read(cx).scroll_offset();
-        let mut scroll_offset = if custom_visual {
+        let scroll_offset = if custom_visual {
             px(0.0)
         } else {
-            previous.min(line.width - bounds.size.width).max(px(0.0))
+            layout.horizontal_scroll_offset_to_reveal(cursor, bounds.size.width, previous)
         };
-        if !custom_visual {
-            if cursor_x - scroll_offset > bounds.size.width {
-                scroll_offset = cursor_x - bounds.size.width;
-            }
-            if cursor_x < scroll_offset {
-                scroll_offset = cursor_x;
-            }
-            if line.width <= bounds.size.width {
-                scroll_offset = px(0.0);
-            }
-        }
 
-        let left = bounds.left() - scroll_offset;
+        let origin = point(bounds.left() - scroll_offset, bounds.top());
         let (selection, cursor) = if custom_visual {
-            (None, None)
+            (Vec::new(), None)
         } else if selected.is_empty() {
             (
-                None,
+                Vec::new(),
                 Some(fill(
-                    Bounds::new(
-                        point(left + cursor_x, bounds.top()),
-                        size(px(1.5), bounds.size.height),
-                    ),
+                    layout.caret_bounds(cursor, origin, px(1.5)),
                     theme.colors.accent,
                 )),
             )
         } else {
             (
-                Some(fill(
-                    Bounds::from_corners(
-                        point(left + line.x_for_index(selected.start), bounds.top()),
-                        point(left + line.x_for_index(selected.end), bounds.bottom()),
-                    ),
-                    theme.colors.selected,
-                )),
+                layout
+                    .bounds_for_range(selected, origin, gpui::TextAlign::Left, bounds.size.width)
+                    .into_iter()
+                    .map(|bounds| fill(bounds, theme.colors.selected))
+                    .collect(),
                 None,
             )
         };
 
         PrepaintState {
-            line: Some(line),
+            layout: Some(layout),
             cursor,
             selection,
             scroll_offset,
@@ -223,23 +210,25 @@ impl Element for TextElement {
 
         let scroll_offset = prepaint.scroll_offset;
         window.with_content_mask(Some(gpui::ContentMask { bounds }), |window| {
-            if let Some(selection) = prepaint.selection.take() {
+            for selection in prepaint.selection.drain(..) {
                 window.paint_quad(selection);
             }
-            if let Some(line) = prepaint.line.take() {
+            if let Some(layout) = prepaint.layout.take() {
                 if !prepaint.custom_visual {
-                    line.paint(
-                        point(bounds.origin.x - scroll_offset, bounds.origin.y),
-                        window.line_height(),
-                        gpui::TextAlign::Left,
-                        None,
-                        window,
-                        cx,
-                    )
-                    .ok();
+                    for (line, top) in layout.painted_lines() {
+                        line.paint(
+                            point(bounds.origin.x - scroll_offset, bounds.origin.y + top),
+                            layout.line_height(),
+                            gpui::TextAlign::Left,
+                            None,
+                            window,
+                            cx,
+                        )
+                        .ok();
+                    }
                 }
                 self.input.update(cx, |input, _| {
-                    input.set_last_layout(line, bounds);
+                    input.set_last_layout(layout, bounds);
                     input.set_scroll_offset(scroll_offset);
                 });
             }

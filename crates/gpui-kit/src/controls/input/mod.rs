@@ -30,11 +30,11 @@ use std::ops::Range;
 use std::sync::{Arc, Mutex};
 
 use gpui::{
-    AccessibleAction, App, Bounds, ClipboardItem, Context, CursorStyle, EntityInputHandler,
-    EventEmitter, FocusHandle, Focusable, InteractiveElement, IntoElement, KeyBinding, MouseButton,
-    MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement, Pixels, Point, Render, ShapedLine,
-    SharedString, StatefulInteractiveElement, Styled, Subscription, UTF16Selection, Window,
-    accesskit::ActionData, actions, div, prelude::FluentBuilder as _, px,
+    AccessibleAction, App, Bounds, ClipboardItem, Context, CursorStyle, EditableTextLayout,
+    EntityInputHandler, EventEmitter, FocusHandle, Focusable, InteractiveElement, IntoElement,
+    KeyBinding, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement, Pixels,
+    Point, Render, SharedString, StatefulInteractiveElement, Styled, Subscription, UTF16Selection,
+    Window, accesskit::ActionData, actions, div, point, prelude::FluentBuilder as _, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize};
@@ -257,7 +257,7 @@ pub struct TextInput {
     visual_slots: Option<usize>,
     scroll_offset: Pixels,
     is_selecting: bool,
-    last_layout: Option<ShapedLine>,
+    last_layout: Option<EditableTextLayout>,
     last_bounds: Option<Bounds<Pixels>>,
     accessibility_revision: u64,
     accessible_snapshot: Arc<Mutex<Option<text_edit::PublishedAccessibleText>>>,
@@ -515,8 +515,8 @@ impl TextInput {
         self.scroll_offset = offset;
     }
 
-    pub(crate) fn set_last_layout(&mut self, line: ShapedLine, bounds: Bounds<Pixels>) {
-        self.last_layout = Some(line);
+    pub(crate) fn set_last_layout(&mut self, layout: EditableTextLayout, bounds: Bounds<Pixels>) {
+        self.last_layout = Some(layout);
         self.last_bounds = Some(bounds);
     }
 
@@ -657,17 +657,14 @@ impl TextInput {
         if position.y > bounds.bottom() {
             return self.edit.text().len();
         }
-        let Some(line) = self.last_layout.as_ref() else {
+        let Some(layout) = self.last_layout.as_ref() else {
             return 0;
         };
-        let x = position.x - bounds.left() + self.scroll_offset;
-        let display_index = if x <= px(0.0) {
-            0
-        } else if x >= line.width {
-            self.display_text().len()
-        } else {
-            line.index_for_x(x).unwrap_or(self.display_text().len())
-        };
+        let local = point(
+            position.x - bounds.left() + self.scroll_offset,
+            position.y - bounds.top(),
+        );
+        let display_index = layout.offset_for_position(local);
         self.content_offset_for_display(display_index)
     }
 
@@ -1138,18 +1135,13 @@ impl EntityInputHandler for TextInput {
                 gpui::point(start.max(end), bounds.bottom()),
             ));
         }
-        let line = self.last_layout.as_ref()?;
-        Some(Bounds::from_corners(
-            gpui::point(
-                bounds.left() + line.x_for_index(self.display_offset(range.start))
-                    - self.scroll_offset,
-                bounds.top(),
-            ),
-            gpui::point(
-                bounds.left() + line.x_for_index(self.display_offset(range.end))
-                    - self.scroll_offset,
-                bounds.bottom(),
-            ),
+        let layout = self.last_layout.as_ref()?;
+        let display_range = self.display_offset(range.start)..self.display_offset(range.end);
+        Some(layout.enclosing_bounds_for_range(
+            display_range,
+            point(bounds.left() - self.scroll_offset, bounds.top()),
+            gpui::TextAlign::Left,
+            bounds.size.width,
         ))
     }
 

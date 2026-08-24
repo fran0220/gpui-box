@@ -27,18 +27,17 @@
 //! ```
 
 mod element;
-pub(crate) mod layout;
 
 use std::ops::Range;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use gpui::{
-    AccessibleAction, App, Bounds, ClipboardItem, Context, CursorStyle, EntityInputHandler,
-    EventEmitter, FocusHandle, Focusable, InteractiveElement, IntoElement, KeyBinding, MouseButton,
-    MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement, Pixels, Point, Render,
-    SharedString, StatefulInteractiveElement, Styled, Subscription, UTF16Selection, Window,
-    accesskit::ActionData, actions, div, point, prelude::FluentBuilder as _, px,
+    AccessibleAction, App, Bounds, ClipboardItem, Context, CursorStyle, EditableTextLayout,
+    EntityInputHandler, EventEmitter, FocusHandle, Focusable, InteractiveElement, IntoElement,
+    KeyBinding, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement, Pixels,
+    Point, Render, SharedString, StatefulInteractiveElement, Styled, Subscription, UTF16Selection,
+    Window, accesskit::ActionData, actions, div, point, prelude::FluentBuilder as _, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, TypeScale};
@@ -49,7 +48,6 @@ use crate::foundation::{
 };
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 use element::TextAreaElement;
-use layout::Layout;
 
 actions!(
     gpui_kit_textarea,
@@ -357,7 +355,7 @@ pub struct TextArea {
     /// down keys through a short line does not drag the caret leftwards.
     goal_x: Option<Pixels>,
     is_selecting: bool,
-    last_layout: Option<Layout>,
+    last_layout: Option<EditableTextLayout>,
     last_layout_text: SharedString,
     last_bounds: Option<Bounds<Pixels>>,
     /// Bumped once per layout pass, so a host that resizes the frame around
@@ -648,16 +646,16 @@ impl TextArea {
 
     pub(crate) fn set_last_layout(
         &mut self,
-        layout: Layout,
+        layout: EditableTextLayout,
         text: SharedString,
         bounds: Bounds<Pixels>,
     ) -> bool {
-        let rows = layout.accessible_rows(&text);
+        let rows = layout.visual_rows(&text);
         let changed = self.last_layout_text != text
             || self
                 .last_layout
                 .as_ref()
-                .map(|layout| layout.accessible_rows(&text))
+                .map(|layout| layout.visual_rows(&text))
                 != Some(rows);
         self.last_layout = Some(layout);
         self.last_layout_text = text;
@@ -670,7 +668,7 @@ impl TextArea {
         (self.last_layout_text == *self.edit.text()).then(|| {
             self.last_layout
                 .as_ref()
-                .map(|layout| layout.accessible_rows(self.edit.text()))
+                .map(|layout| layout.visual_rows(self.edit.text()))
                 .unwrap_or_else(|| std::iter::once(0..0).collect())
         })
     }
@@ -1227,17 +1225,11 @@ impl EntityInputHandler for TextArea {
     ) -> Option<Bounds<Pixels>> {
         let layout = self.last_layout.as_ref()?;
         let range = self.range_from_utf16(&range_utf16);
-        let start = layout.position_for_offset(range.start);
-        let end = layout.position_for_offset(range.end);
-        Some(Bounds::from_corners(
-            point(
-                bounds.left() + start.x,
-                bounds.top() + start.y - self.scroll_offset,
-            ),
-            point(
-                bounds.left() + end.x,
-                bounds.top() + end.y + layout.line_height() - self.scroll_offset,
-            ),
+        Some(layout.enclosing_bounds_for_range(
+            range,
+            point(bounds.left(), bounds.top() - self.scroll_offset),
+            gpui::TextAlign::Left,
+            bounds.size.width,
         ))
     }
 

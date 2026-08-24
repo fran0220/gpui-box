@@ -354,7 +354,7 @@ fn floor_grapheme_boundary(text: &str, offset: usize) -> usize {
         .unwrap_or(0)
 }
 
-fn clamp_grapheme_range(text: &str, range: Range<usize>) -> Range<usize> {
+pub(crate) fn clamp_grapheme_range(text: &str, range: Range<usize>) -> Range<usize> {
     let start = floor_grapheme_boundary(text, range.start);
     let end = floor_grapheme_boundary(text, range.end);
     start.min(end)..start.max(end)

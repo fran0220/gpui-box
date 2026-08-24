@@ -7,14 +7,13 @@
 //! motion keys, and the input method all need.
 
 use gpui::{
-    App, Bounds, Element, ElementId, ElementInputHandler, Entity, GlobalElementId, IntoElement,
-    LayoutId, PaintQuad, Pixels, Style, TextRun, UnderlineStyle, Window, fill, point, px, relative,
-    size,
+    App, Bounds, EditableTextLayout, Element, ElementId, ElementInputHandler, Entity,
+    GlobalElementId, IntoElement, LayoutId, PaintQuad, Pixels, Style, TextRun, UnderlineStyle,
+    Window, fill, point, px, relative,
 };
 use gpui_kit_theme::ActiveTheme;
 
 use super::TextArea;
-use super::layout::Layout;
 
 pub struct TextAreaElement {
     area: Entity<TextArea>,
@@ -27,7 +26,7 @@ impl TextAreaElement {
 }
 
 pub struct PrepaintState {
-    layout: Option<Layout>,
+    layout: Option<EditableTextLayout>,
     source_text: gpui::SharedString,
     cursor: Option<PaintQuad>,
     selection: Vec<PaintQuad>,
@@ -150,7 +149,7 @@ impl Element for TextAreaElement {
             )
             .map(|lines| lines.into_iter().collect::<Vec<_>>())
             .unwrap_or_default();
-        let layout = Layout::new(lines, line_height);
+        let layout = EditableTextLayout::new(source_text.as_ref(), lines, line_height);
         // A placeholder never grows the frame: only what was typed does.
         let visible_rows = if empty {
             min_rows
@@ -160,54 +159,25 @@ impl Element for TextAreaElement {
 
         // Long text scrolls under a fixed frame, so the caret stays visible
         // instead of being painted outside the control.
-        let caret = layout.position_for_offset(cursor);
-        let mut scroll_offset = self
-            .area
-            .read(cx)
-            .scroll_offset()
-            .min((layout.height() - bounds.size.height).max(px(0.0)))
-            .max(px(0.0));
-        if caret.y < scroll_offset {
-            scroll_offset = caret.y;
-        }
-        if caret.y + line_height > scroll_offset + bounds.size.height {
-            scroll_offset = caret.y + line_height - bounds.size.height;
-        }
+        let scroll_offset = layout.scroll_offset_to_reveal(
+            cursor,
+            bounds.size.height,
+            self.area.read(cx).scroll_offset(),
+        );
 
         let origin = point(bounds.left(), bounds.top() - scroll_offset);
         let cursor = (selected.is_empty()).then(|| {
             fill(
-                Bounds::new(
-                    point(origin.x + caret.x, origin.y + caret.y),
-                    size(px(1.5), line_height),
-                ),
+                layout.caret_bounds(cursor, origin, px(1.5)),
                 theme.colors.accent,
             )
         });
 
-        let mut selection = Vec::new();
-        if !selected.is_empty() {
-            let first = layout.row_for_offset(selected.start);
-            let last = layout.row_for_offset(selected.end);
-            for row in first..=last {
-                let span = layout.row_range(row);
-                let start = selected.start.max(span.start);
-                let end = selected.end.min(span.end);
-                if start > end {
-                    continue;
-                }
-                let left = layout.position_for_offset(start);
-                let right = layout.position_for_offset(end);
-                let top = line_height * row as f32;
-                selection.push(fill(
-                    Bounds::from_corners(
-                        point(origin.x + left.x, origin.y + top),
-                        point(origin.x + right.x, origin.y + top + line_height),
-                    ),
-                    theme.colors.selected,
-                ));
-            }
-        }
+        let selection = layout
+            .bounds_for_range(selected, origin, gpui::TextAlign::Left, bounds.size.width)
+            .into_iter()
+            .map(|bounds| fill(bounds, theme.colors.selected))
+            .collect();
 
         PrepaintState {
             layout: Some(layout),

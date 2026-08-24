@@ -120,8 +120,13 @@ else that is waiting.
 **Editable text has one framework authority.** `gpui::EditBuffer` now owns the
 grapheme-safe selection, replacement, marked-composition, grouped undo/redo,
 secret-history refusal, input limits, and UTF-8/UTF-16 arithmetic consumed by
-both `TextInput` and `TextArea`. The controls no longer carry a private copy of
-that edit engine; visual layout and product document policy remain separate.
+both `TextInput` and `TextArea`. `EditableTextLayout` now owns the wrapped and
+bidirectional offset/point mapping, visual rows, range fragments, caret bounds,
+platform range envelope, and minimal reveal scroll used by both controls.
+`EditableStyleRuns<S>` supplies grapheme-safe, normalized style coverage that
+follows source replacement without choosing a rich-text format. The controls
+no longer carry private edit or character-geometry engines; product document
+policy remains separate.
 
 **The loading family says six different things.** `PulseLoader` breathes,
 `Spinner` turns an open arc whose gap is what says the ring is not a position,
