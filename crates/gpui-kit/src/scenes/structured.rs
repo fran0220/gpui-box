@@ -161,6 +161,7 @@ pub(super) fn schema_form(window: &mut Window, cx: &mut App) -> AnyElement {
             // An error the host returned rather than one the form derived:
             // only the host knows this path is outside the workspace.
             form.set_error("path", "That path is outside the workspace.", cx);
+            let _ = form.set_field_validation("encoding", ValidationState::Validating, cx);
             form.set_files("attachments", vec!["/workspace/brief.md".into()], cx)
                 .expect("the scene's permissive file policy accepts its fixture");
             form.add_list_item("headers", window, cx);

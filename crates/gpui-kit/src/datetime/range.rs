@@ -11,7 +11,7 @@ use gpui::{
     Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Space, TextTone, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Radius, Space, TextTone, TypeScale};
 
 use crate::datetime::adapter::{Day, SharedDateAdapter};
 use crate::datetime::calendar::{Calendar, CalendarEvent, DayMark};
@@ -128,6 +128,8 @@ pub struct RangePicker {
     calendar: Entity<Calendar>,
     range: Option<DayRange>,
     disabled: bool,
+    /// Validation owned by a surrounding form.
+    invalid: bool,
     /// Held so the calendar subscription lives as long as the picker does.
     _subscriptions: Vec<Subscription>,
 }
@@ -166,6 +168,7 @@ impl RangePicker {
             calendar,
             range: None,
             disabled: false,
+            invalid: false,
             _subscriptions: vec![subscription],
         }
     }
@@ -201,6 +204,19 @@ impl RangePicker {
         self.disabled = disabled;
         self.calendar
             .update(cx, |calendar, cx| calendar.set_disabled(disabled, cx));
+        cx.notify();
+    }
+
+    pub fn invalid(mut self, invalid: bool) -> Self {
+        self.invalid = invalid;
+        self
+    }
+
+    pub fn set_invalid(&mut self, invalid: bool, cx: &mut Context<Self>) {
+        if self.invalid == invalid {
+            return;
+        }
+        self.invalid = invalid;
         cx.notify();
     }
 
@@ -313,6 +329,16 @@ impl Render for RangePicker {
         let (summary, tone) = self.summary(cx);
         let state = self.state();
         let blocked = self.blocked();
+        let calendar = if self.invalid {
+            div()
+                .border(px(theme.borders.hairline))
+                .border_color(theme.colors.danger)
+                .radius(&theme, Radius::Card)
+                .child(self.calendar.clone())
+                .into_any_element()
+        } else {
+            self.calendar.clone().into_any_element()
+        };
 
         let blocked_line = match &blocked {
             BlockedReport::Unchecked => Some(
@@ -367,7 +393,7 @@ impl Render for RangePicker {
             .flex_none()
             .gap_token(&theme, Space::Sm)
             .track_focus(&self.focus_handle)
-            .child(self.calendar.clone())
+            .child(calendar)
             .child(
                 div()
                     .column()
@@ -380,6 +406,7 @@ impl Render for RangePicker {
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::Group)
                     .disabled(self.disabled)
+                    .invalid(self.invalid)
                     .value(state.name()),
             )
     }

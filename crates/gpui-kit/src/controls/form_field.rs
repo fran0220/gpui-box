@@ -1,8 +1,8 @@
 //! The label, description, and error a control wears.
 //!
-//! A field never decides whether a control is valid. It shows the error the
-//! host handed it, publishes that the control is invalid and whether it is
-//! required, and otherwise stays out of the way.
+//! A field never decides whether or when a control is valid. It presents the
+//! caller-owned validation state, publishes validating separately from
+//! invalid, and otherwise stays out of the way.
 
 use gpui::{
     AnyElement, App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div,
@@ -13,6 +13,8 @@ use gpui_kit_theme::{ActiveTheme, Space, TypeScale};
 
 use crate::foundation::{Ident, StyledExt, text as foundation_text};
 use crate::overlay::Kbd;
+use crate::state::ValidationState;
+use crate::strings::{ActiveStrings, StringKey};
 
 /// A labelled control, with the secondary text a typist needs around it.
 ///
@@ -28,7 +30,7 @@ pub struct FormField {
     label: SharedString,
     control: Option<SharedString>,
     description: Option<SharedString>,
-    error: Option<SharedString>,
+    validation: ValidationState,
     hint: Option<SharedString>,
     required: bool,
     children: Vec<AnyElement>,
@@ -42,7 +44,7 @@ impl std::fmt::Debug for FormField {
             .field("label", &self.label)
             .field("control", &self.control)
             .field("required", &self.required)
-            .field("invalid", &self.error.is_some())
+            .field("validation", &self.validation)
             .finish()
     }
 }
@@ -54,7 +56,7 @@ impl FormField {
             label: label.into(),
             control: None,
             description: None,
-            error: None,
+            validation: ValidationState::Pending,
             hint: None,
             required: false,
             children: Vec::new(),
@@ -76,9 +78,18 @@ impl FormField {
         self
     }
 
+    /// What the caller currently knows about this field's validation.
+    pub fn validation(mut self, validation: ValidationState) -> Self {
+        self.validation = validation;
+        self
+    }
+
     /// What the host says is wrong, in the host's own words.
+    ///
+    /// This is the compatibility shorthand for
+    /// `validation(ValidationState::invalid(error))`.
     pub fn error(mut self, error: impl Into<SharedString>) -> Self {
-        self.error = Some(error.into());
+        self.validation = ValidationState::invalid(error);
         self
     }
 
@@ -94,12 +105,16 @@ impl FormField {
     }
 
     pub fn is_invalid(&self) -> bool {
-        self.error.is_some()
+        self.validation.is_invalid()
+    }
+
+    pub fn is_validating(&self) -> bool {
+        self.validation.is_busy()
     }
 
     /// The description, unless the error would repeat it word for word.
     fn shown_description(&self) -> Option<SharedString> {
-        match (&self.description, &self.error) {
+        match (&self.description, self.validation.reason()) {
             (Some(description), Some(error)) if description == error => None,
             (description, _) => description.clone(),
         }
@@ -115,7 +130,8 @@ impl ParentElement for FormField {
 impl RenderOnce for FormField {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let invalid = self.error.is_some();
+        let invalid = self.validation.is_invalid();
+        let busy = self.validation.is_busy();
         let field_id = self.ident.semantic_id();
         let label_ident = self.ident.child("label");
         let description = self.shown_description();
@@ -158,7 +174,7 @@ impl RenderOnce for FormField {
                 .semantic_in(cx, spec)
         });
 
-        let error = self.error.clone().map(|text| {
+        let error = self.validation.reason().cloned().map(|text| {
             let mut spec = NodeSpec::new(self.ident.child("error").semantic_id(), Role::Status)
                 .parent(field_id.clone())
                 .invalid(true)
@@ -172,6 +188,22 @@ impl RenderOnce for FormField {
                 .semantic_in(cx, spec)
         });
 
+        let validating = busy.then(|| {
+            let text = cx.strings().text(StringKey::Validating);
+            let mut spec =
+                NodeSpec::new(self.ident.child("validation").semantic_id(), Role::Status)
+                    .parent(field_id.clone())
+                    .busy(true)
+                    .text(text.clone());
+            if let Some(control) = control {
+                spec = spec.describes(control);
+            }
+            foundation_text(&theme, TypeScale::Caption, text)
+                .text_tone(&theme, gpui_kit_theme::TextTone::Muted)
+                .mt_token(&theme, Space::Sm)
+                .semantic_in(cx, spec)
+        });
+
         div()
             .column()
             .w_full()
@@ -180,11 +212,13 @@ impl RenderOnce for FormField {
             .children(self.children)
             .children(description)
             .children(error)
+            .children(validating)
             .semantic_in(
                 cx,
                 NodeSpec::new(field_id, Role::Field)
                     .text(self.label.clone())
                     .required(self.required)
+                    .busy(busy)
                     .invalid(invalid),
             )
     }

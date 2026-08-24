@@ -1322,9 +1322,11 @@
       ],
       "options": [
         "value(day: Day) -> Self",
-        "required(required: bool) -> Self"
+        "required(required: bool) -> Self",
+        "invalid(invalid: bool) -> Self"
       ],
       "commands": [
+        "set_invalid(invalid: bool, cx: &mut Context<Self>)",
         "set_value(day: Option<Day>, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)",
         "open(cx: &mut Context<Self>)",
@@ -1628,6 +1630,7 @@
         "accepts<S: Into<SharedString>>(kinds: impl IntoIterator<Item = S>) -> Self",
         "icon(icon: Icon) -> Self",
         "state(state: DropzoneState) -> Self",
+        "invalid(invalid: bool) -> Self",
         "on_drop(handler: impl Fn(&DragItem, &mut Window, &mut App) + 'static) -> Self",
         "on_files(handler: impl Fn(&ExternalPaths, &mut Window, &mut App) + 'static) -> Self"
       ],
@@ -1830,13 +1833,15 @@
       "options": [
         "control(control: impl Into<SharedString>) -> Self",
         "description(description: impl Into<SharedString>) -> Self",
+        "validation(validation: ValidationState) -> Self",
         "error(error: impl Into<SharedString>) -> Self",
         "hint(keystroke: impl Into<SharedString>) -> Self",
         "required(required: bool) -> Self"
       ],
       "commands": [],
       "queries": [
-        "is_invalid() -> bool"
+        "is_invalid() -> bool",
+        "is_validating() -> bool"
       ],
       "slots": [],
       "reports": [],
@@ -2793,9 +2798,11 @@
         "precision(precision: usize) -> Self",
         "unit(unit: impl Into<SharedString>) -> Self",
         "prefix(prefix: impl Into<SharedString>) -> Self",
-        "required(required: bool) -> Self"
+        "required(required: bool) -> Self",
+        "invalid(invalid: bool) -> Self"
       ],
       "commands": [
+        "set_invalid(invalid: bool, cx: &mut Context<Self>)",
         "set_value(value: f64, cx: &mut Context<Self>)",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)"
       ],
@@ -3368,12 +3375,14 @@
         "new(ident: impl Into<Ident>, adapter: SharedDateAdapter, window: &mut Window, cx: &mut Context<Self>) -> Self"
       ],
       "options": [
-        "range(range: DayRange) -> Self"
+        "range(range: DayRange) -> Self",
+        "invalid(invalid: bool) -> Self"
       ],
       "commands": [
         "set_overlay(overlay: impl Fn(Day) -> Option<DayMark> + 'static, cx: &mut Context<Self>)",
         "set_range(range: Option<DayRange>, cx: &mut Context<Self>)",
-        "set_disabled(disabled: bool, cx: &mut Context<Self>)"
+        "set_disabled(disabled: bool, cx: &mut Context<Self>)",
+        "set_invalid(invalid: bool, cx: &mut Context<Self>)"
       ],
       "queries": [
         "calendar() -> &Entity<Calendar>",
@@ -3541,12 +3550,18 @@
         "add_list_item(path: impl Into<SharedString>, window: &mut Window, cx: &mut Context<Self>) -> bool",
         "remove_list_item(path: impl Into<SharedString>, index: usize, cx: &mut Context<Self>) -> bool",
         "move_list_item(path: impl Into<SharedString>, from: usize, to: usize, cx: &mut Context<Self>) -> bool",
+        "set_field_validation(path: impl Into<SharedString>, validation: ValidationState, cx: &mut Context<Self>) -> bool",
+        "clear_field_validation(path: impl Into<SharedString>, cx: &mut Context<Self>) -> bool",
+        "set_validation(validation: ValidationState, cx: &mut Context<Self>)",
+        "clear_validation(cx: &mut Context<Self>)",
         "set_error(path: impl Into<SharedString>, message: impl Into<SharedString>, cx: &mut Context<Self>)",
         "clear_host_errors(cx: &mut Context<Self>)",
         "validate(cx: &mut Context<Self>) -> bool",
         "set_disabled(disabled: bool, cx: &mut Context<Self>)"
       ],
       "queries": [
+        "field_validation(path: &str, cx: &App) -> Option<ValidationState>",
+        "validation() -> Option<&ValidationState>",
         "values(cx: &App) -> Vec<(SharedString, FieldValue)>",
         "unrenderable() -> &[UnrenderableField]",
         "has_unrenderable_required() -> bool"
@@ -4258,6 +4273,7 @@
         "description(description: impl Into<SharedString>) -> Self",
         "named(name: impl Into<SharedString>) -> Self",
         "on(on: bool) -> Self",
+        "invalid(invalid: bool) -> Self",
         "on_change(handler: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self"
       ],
       "commands": [],
@@ -4574,11 +4590,13 @@
       ],
       "options": [
         "value(value: TimeOfDay) -> Self",
-        "seconds(seconds: bool) -> Self"
+        "seconds(seconds: bool) -> Self",
+        "invalid(invalid: bool) -> Self"
       ],
       "commands": [
         "set_value(value: TimeOfDay, cx: &mut Context<Self>)",
-        "set_disabled(disabled: bool, cx: &mut Context<Self>)"
+        "set_disabled(disabled: bool, cx: &mut Context<Self>)",
+        "set_invalid(invalid: bool, cx: &mut Context<Self>)"
       ],
       "queries": [
         "current() -> TimeOfDay",
@@ -12712,6 +12730,25 @@
       ]
     },
     {
+      "name": "ValidationState",
+      "path": "gpui_kit::state::ValidationState",
+      "summary": "What a caller currently knows about one validation target.",
+      "variants": [
+        "Pending",
+        "Validating",
+        "Invalid",
+        "Valid"
+      ],
+      "construct": [
+        "invalid(reason: impl Into<SharedString>) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "reason() -> Option<&SharedString>"
+      ]
+    },
+    {
       "name": "ValueKind",
       "path": "gpui_kit::structured::ValueKind",
       "summary": "What kind of thing a row holds, which is the one fact its node publishes.",
@@ -13145,7 +13182,7 @@
         "SegmentedControl",
         "TagInput"
       ],
-      "example": "fn form(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_form(window, cx);\n    let form = cx.global::<SceneForm>();\n    let (name, retention, region, labels) = (\n        form.name.clone(),\n        form.retention.clone(),\n        form.region.clone(),\n        form.labels.clone(),\n    );\n    let theme = cx.theme().clone();\n\n    // No fixed height and nothing pushed to the bottom: a form is a stack of\n    // fields one gap apart, and the 250px of nothing that a pinned last field\n    // opened up is not a rhythm anything else in the library keeps.\n    stack(&theme)\n        .w(px(420.0))\n        .child(\n            FormField::new(\"scene.form.name.form-field\", \"Workspace name\")\n                .control(\"scene.form.name\")\n                .required(true)\n                // The description says what the field is for and the error\n                // says what went wrong; neither answers for the other.\n                .description(\"Shown wherever this workspace appears.\")\n                .error(\"A workspace with this name already exists.\")\n                .child(name),\n        )\n        .child(\n            FormField::new(\"scene.form.retention.form-field\", \"Retention\")\n                .control(\"scene.form.retention\")\n                .required(true)\n                .description(\"How long a finished run is kept.\")\n                .error(\"This workspace allows at most 60 days.\")\n                .child(retention),\n        )\n        .child(\n            FormField::new(\"scene.form.visibility.form-field\", \"Visibility\")\n                .control(\"scene.form.visibility\")\n                .description(\"Who can open the runs in this workspace.\")\n                .child(\n                    SegmentedControl::new(\"scene.form.visibility\")\n                        .label(\"Visibility\")\n                        .segments([\n                            Segment::new(\"private\", \"Private\"),\n                            Segment::new(\"team\", \"Team\"),\n                            Segment::new(\"public\", \"Public\").disabled(true),\n                        ])\n                        .selected(\"team\")\n                        .on_select(|_, _, _| {}),\n                ),\n        )\n        .child(\n            FormField::new(\"scene.form.labels.form-field\", \"Labels\")\n                .control(\"scene.form.labels\")\n                // The keystroke lives in the hint, so the description does not\n                // spend a second line repeating it.\n                .description(\"At most five, and each one only once.\")\n                .hint(\"enter\")\n                .child(labels),\n        )\n        .child(\n            FormField::new(\"scene.form.region.form-field\", \"All Agent models\")\n                .control(\"scene.form.region\")\n                .description(\"Choose a chat-capable model for direct runs.\")\n                .child(region),\n        )\n        .into_any_element()\n}"
+      "example": "fn form(window: &mut Window, cx: &mut App) -> AnyElement {\n    ensure_form(window, cx);\n    let form = cx.global::<SceneForm>();\n    let (name, retention, region, labels) = (\n        form.name.clone(),\n        form.retention.clone(),\n        form.region.clone(),\n        form.labels.clone(),\n    );\n    let theme = cx.theme().clone();\n\n    // No fixed height and nothing pushed to the bottom: a form is a stack of\n    // fields one gap apart, and the 250px of nothing that a pinned last field\n    // opened up is not a rhythm anything else in the library keeps.\n    stack(&theme)\n        .w(px(420.0))\n        .child(\n            FormField::new(\"scene.form.name.form-field\", \"Workspace name\")\n                .control(\"scene.form.name\")\n                .required(true)\n                // The description says what the field is for and the error\n                // says what went wrong; neither answers for the other.\n                .description(\"Shown wherever this workspace appears.\")\n                .error(\"A workspace with this name already exists.\")\n                .child(name),\n        )\n        .child(\n            FormField::new(\"scene.form.retention.form-field\", \"Retention\")\n                .control(\"scene.form.retention\")\n                .required(true)\n                .description(\"How long a finished run is kept.\")\n                .error(\"This workspace allows at most 60 days.\")\n                .child(retention),\n        )\n        .child(\n            FormField::new(\"scene.form.visibility.form-field\", \"Visibility\")\n                .control(\"scene.form.visibility\")\n                .description(\"Who can open the runs in this workspace.\")\n                .validation(ValidationState::Validating)\n                .child(\n                    SegmentedControl::new(\"scene.form.visibility\")\n                        .label(\"Visibility\")\n                        .segments([\n                            Segment::new(\"private\", \"Private\"),\n                            Segment::new(\"team\", \"Team\"),\n                            Segment::new(\"public\", \"Public\").disabled(true),\n                        ])\n                        .selected(\"team\")\n                        .on_select(|_, _, _| {}),\n                ),\n        )\n        .child(\n            FormField::new(\"scene.form.labels.form-field\", \"Labels\")\n                .control(\"scene.form.labels\")\n                // The keystroke lives in the hint, so the description does not\n                // spend a second line repeating it.\n                .description(\"At most five, and each one only once.\")\n                .hint(\"enter\")\n                .child(labels),\n        )\n        .child(\n            FormField::new(\"scene.form.region.form-field\", \"All Agent models\")\n                .control(\"scene.form.region\")\n                .description(\"Choose a chat-capable model for direct runs.\")\n                .child(region),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "auth-sign-in",
@@ -14272,7 +14309,7 @@
       "uses": [
         "SchemaForm"
       ],
-      "example": "fn schema_form(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneSchemaForm>() {\n        set_schema_file_policy(DefaultSchemaFilePolicy, cx);\n        let form = cx.new(|cx| SchemaForm::new(\"scene.schema\", scene_schema(), window, cx));\n        form.update(cx, |form, cx| {\n            // An error the host returned rather than one the form derived:\n            // only the host knows this path is outside the workspace.\n            form.set_error(\"path\", \"That path is outside the workspace.\", cx);\n            form.set_files(\"attachments\", vec![\"/workspace/brief.md\".into()], cx)\n                .expect(\"the scene's permissive file policy accepts its fixture\");\n            form.add_list_item(\"headers\", window, cx);\n        });\n        cx.set_global(SceneSchemaForm { form });\n    }\n    let form = cx.global::<SceneSchemaForm>().form.clone();\n    let theme = cx.theme().clone();\n    stack(&theme).w(px(520.0)).child(form).into_any_element()\n}"
+      "example": "fn schema_form(window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneSchemaForm>() {\n        set_schema_file_policy(DefaultSchemaFilePolicy, cx);\n        let form = cx.new(|cx| SchemaForm::new(\"scene.schema\", scene_schema(), window, cx));\n        form.update(cx, |form, cx| {\n            // An error the host returned rather than one the form derived:\n            // only the host knows this path is outside the workspace.\n            form.set_error(\"path\", \"That path is outside the workspace.\", cx);\n            let _ = form.set_field_validation(\"encoding\", ValidationState::Validating, cx);\n            form.set_files(\"attachments\", vec![\"/workspace/brief.md\".into()], cx)\n                .expect(\"the scene's permissive file policy accepts its fixture\");\n            form.add_list_item(\"headers\", window, cx);\n        });\n        cx.set_global(SceneSchemaForm { form });\n    }\n    let form = cx.global::<SceneSchemaForm>().form.clone();\n    let theme = cx.theme().clone();\n    stack(&theme).w(px(520.0)).child(form).into_any_element()\n}"
     },
     {
       "name": "server-list",

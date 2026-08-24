@@ -342,6 +342,7 @@ pub struct Switch {
     description: Option<SharedString>,
     on: bool,
     disabled: bool,
+    invalid: bool,
     size: ControlSize,
     on_change: Option<ToggleHandler>,
 }
@@ -368,6 +369,7 @@ impl Switch {
             description: None,
             on: false,
             disabled: false,
+            invalid: false,
             size: ControlSize::Md,
             on_change: None,
         }
@@ -396,6 +398,11 @@ impl Switch {
 
     pub fn on(mut self, on: bool) -> Self {
         self.on = on;
+        self
+    }
+
+    pub fn invalid(mut self, invalid: bool) -> Self {
+        self.invalid = invalid;
         self
     }
 
@@ -450,6 +457,11 @@ impl RenderOnce for Switch {
                 .colors
                 .hairline_strong
                 .lerp(theme.colors.accent, drawn))
+            .when(self.invalid, |track| {
+                track
+                    .border(px(theme.borders.hairline))
+                    .border_color(theme.colors.danger)
+            })
             .child(
                 div()
                     .size(knob)
@@ -482,6 +494,7 @@ impl RenderOnce for Switch {
                 self.label.clone().or_else(|| self.name.clone()),
                 self.disabled,
             )
+            .invalid(self.invalid)
             .checked(self.on),
         )
     }

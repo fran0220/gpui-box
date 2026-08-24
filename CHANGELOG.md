@@ -94,6 +94,18 @@ controls are now told when the form is showing an error about them, and
 already had, for an owner that learns the answer is wrong after building the
 control. A number still works this out for itself.
 
+**Validation has a state before failure.** `ValidationState` gives fields and
+forms one caller-owned `Pending`, `Validating`, `Invalid { reason }`, and
+`Valid` vocabulary. `FormField` publishes validating as busy and shows it in a
+quiet caption rather than red invalid chrome. `SchemaForm` tracks field and
+whole-form validation separately, routes repeated-field paths to their stable
+child forms, blocks submission while an explicitly managed check is pending or
+in flight, rejects stale paths instead of creating invisible blockers, and
+shows a form refusal once instead of painting every field red.
+Number, date, time, range, switch, and file-drop controls now accept host
+invalidity in addition to their own parser/range/drag state, so every schema
+field can agree with the reason beside it.
+
 **An accordion body turns with the reading order.** The header honoured RTL and
 the body did not, so a disclosed section read as belonging to the one on the
 other side. Turning the text alone was not enough: a shrink-to-fit child is

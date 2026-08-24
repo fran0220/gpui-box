@@ -7,6 +7,7 @@ use std::rc::Rc;
 use gpui::{
     AppContext, Context, IntoElement, Render, SharedString, Subscription, TestAppContext, Window,
 };
+use gpui_kit::datetime::fixture::FixtureDateAdapter;
 use gpui_kit::prelude::*;
 use gpui_kit_semantics::{Node, Role, Snapshot};
 use gpui_kit_testkit::harness::Harness;
@@ -431,6 +432,10 @@ fn a_host_error_appears_next_to_its_field(cx: &mut TestAppContext) {
     );
     assert!(harness.node("form.path").expect("published").invalid);
     assert!(
+        harness.node("form").expect("published").invalid,
+        "a form with an invalid field must not claim the submission is valid"
+    );
+    assert!(
         harness
             .node("form.path.control")
             .expect("published")
@@ -461,6 +466,141 @@ fn a_host_error_appears_next_to_its_field(cx: &mut TestAppContext) {
             .invalid,
         "withdrawing the error withdraws the refusal it drew"
     );
+}
+
+#[gpui::test]
+fn field_and_form_validation_are_separate_caller_owned_ladders(cx: &mut TestAppContext) {
+    let schema = Schema::new().field(
+        SchemaField::new(
+            "name",
+            SchemaKind::Text {
+                placeholder: None,
+                secret: false,
+            },
+        )
+        .label("Name"),
+    );
+    let (mut harness, form) = form_harness(cx, schema);
+
+    harness.update(|_, cx| {
+        form.update(cx, |form, cx| {
+            assert!(form.set_field_validation("name", ValidationState::Pending, cx));
+            assert_eq!(
+                form.field_validation("name", cx),
+                Some(ValidationState::Pending)
+            );
+            assert!(
+                !form.validate(cx),
+                "an explicitly managed field that has not been checked cannot submit"
+            );
+        });
+    });
+    harness.frame();
+    assert!(!harness.node("form.name").expect("field").invalid);
+    assert!(!harness.node("form.name").expect("field").busy);
+
+    harness.update(|_, cx| {
+        form.update(cx, |form, cx| {
+            assert!(form.set_field_validation("name", ValidationState::Validating, cx));
+            assert!(!form.validate(cx));
+        });
+    });
+    harness.frame();
+    assert!(harness.node("form.name").expect("field").busy);
+    assert!(!harness.node("form.name").expect("field").invalid);
+    assert!(harness.node("form").expect("form").busy);
+    assert!(!harness.node("form").expect("form").invalid);
+    assert_eq!(
+        harness
+            .node("form.name.validation")
+            .expect("field validation status")
+            .text
+            .as_deref(),
+        Some("Validating…")
+    );
+
+    harness.update(|_, cx| {
+        form.update(cx, |form, cx| {
+            assert!(form.set_field_validation(
+                "name",
+                ValidationState::invalid("This name is already in use."),
+                cx,
+            ));
+        });
+    });
+    harness.frame();
+    assert!(harness.node("form.name").expect("field").invalid);
+    assert!(harness.node("form.name.control").expect("control").invalid);
+    assert_eq!(
+        harness
+            .node("form.name.error")
+            .expect("field refusal")
+            .text
+            .as_deref(),
+        Some("This name is already in use.")
+    );
+
+    harness.update(|_, cx| {
+        form.update(cx, |form, cx| {
+            assert!(form.set_field_validation("name", ValidationState::Valid, cx));
+            form.set_validation(
+                ValidationState::invalid("The account cannot create another workspace."),
+                cx,
+            );
+            assert_eq!(
+                form.validation(),
+                Some(&ValidationState::invalid(
+                    "The account cannot create another workspace."
+                ))
+            );
+        });
+    });
+    harness.frame();
+    assert!(harness.node("form").expect("form").invalid);
+    assert!(
+        !harness.node("form.name").expect("field").invalid,
+        "a form-level refusal must not be copied onto a field"
+    );
+    assert!(!harness.node("form.name.control").expect("control").invalid);
+    assert_eq!(
+        harness
+            .node("form.validation")
+            .expect("one form-level refusal")
+            .text
+            .as_deref(),
+        Some("The account cannot create another workspace.")
+    );
+
+    harness.update(|_, cx| {
+        form.update(cx, |form, cx| {
+            form.set_validation(ValidationState::Validating, cx);
+            assert!(!form.validate(cx));
+        });
+    });
+    harness.frame();
+    assert!(harness.node("form").expect("form").busy);
+    assert!(!harness.node("form").expect("form").invalid);
+    assert!(harness.node("form.validation").expect("status").busy);
+
+    harness.update(|_, cx| {
+        form.update(cx, |form, cx| {
+            form.set_validation(ValidationState::Valid, cx);
+            assert!(form.validate(cx));
+            assert!(
+                !form.set_field_validation(
+                    "field-that-does-not-exist",
+                    ValidationState::Pending,
+                    cx
+                ),
+                "a stale asynchronous result must not create an invisible submission blocker"
+            );
+            assert!(form.validate(cx));
+        });
+    });
+    harness.frame();
+    assert!(!harness.node("form").expect("form").busy);
+    assert!(!harness.node("form").expect("form").invalid);
+    assert!(harness.node("form.validation").is_none());
 }
 
 #[gpui::test]
@@ -573,6 +713,85 @@ impl SchemaFilePolicy for WorkspaceFiles {
                 .to_string_lossy()
         )
         .into()
+    }
+}
+
+#[gpui::test]
+fn every_schema_control_publishes_caller_owned_invalidity(cx: &mut TestAppContext) {
+    let schema = Schema::new()
+        .field(SchemaField::new(
+            "number",
+            SchemaKind::Number(NumberBounds::new()),
+        ))
+        .field(SchemaField::new("boolean", SchemaKind::Boolean))
+        .field(SchemaField::new("date", SchemaKind::Date))
+        .field(SchemaField::new("time", SchemaKind::Time))
+        .field(SchemaField::new("range", SchemaKind::DateRange))
+        .field(SchemaField::new(
+            "files",
+            SchemaKind::Files { max: Some(1) },
+        ));
+    let held: Rc<RefCell<Option<gpui::Entity<SchemaForm>>>> = Rc::new(RefCell::new(None));
+    let sink = Rc::clone(&held);
+    let mut harness = Harness::new(
+        cx,
+        |cx| {
+            gpui_kit::install(cx);
+            set_date_adapter(FixtureDateAdapter::pinned(2024, 3, 14), cx);
+            set_schema_file_policy(WorkspaceFiles, cx);
+        },
+        move |window, cx| {
+            let mut slot = sink.borrow_mut();
+            slot.get_or_insert_with(|| {
+                cx.new(|cx| SchemaForm::new("form", schema.clone(), window, cx))
+            })
+            .clone()
+            .into_any_element()
+        },
+    );
+    let form = held.borrow().clone().expect("built");
+    let paths = ["number", "boolean", "date", "time", "range", "files"];
+
+    harness.update(|_, cx| {
+        form.update(cx, |form, cx| {
+            for path in paths {
+                assert!(form.set_field_validation(
+                    path,
+                    ValidationState::invalid("The host refused this value."),
+                    cx,
+                ));
+            }
+        });
+    });
+    harness.frame();
+    for path in paths {
+        let id = format!("form.{path}.control");
+        assert!(
+            harness
+                .node(&id)
+                .unwrap_or_else(|| panic!("{path} control is published"))
+                .invalid,
+            "{path} control must agree with the invalid reason beside it"
+        );
+    }
+
+    harness.update(|_, cx| {
+        form.update(cx, |form, cx| {
+            for path in paths {
+                assert!(form.set_field_validation(path, ValidationState::Valid, cx));
+            }
+        });
+    });
+    harness.frame();
+    for path in paths {
+        let id = format!("form.{path}.control");
+        assert!(
+            !harness
+                .node(&id)
+                .unwrap_or_else(|| panic!("{path} control is published"))
+                .invalid,
+            "withdrawing host invalidity must restore the {path} control"
+        );
     }
 }
 
@@ -829,7 +1048,21 @@ fn repeated_items_keep_identity_while_exported_paths_follow_position(cx: &mut Te
         assert!(values.contains(&("items[1].name".into(), FieldValue::Text("Beta".into()))));
         assert_eq!(form.read(cx).unrenderable()[0].path, "items[0].host_value");
         assert_eq!(form.read(cx).unrenderable()[1].path, "items[1].host_value");
+        form.update(cx, |form, cx| {
+            assert!(form.set_field_validation(
+                "items[0].name",
+                ValidationState::invalid("The host refused Alpha."),
+                cx,
+            ));
+        });
     });
+    harness.frame();
+    assert!(
+        harness
+            .node("form.items.control.item-0.name")
+            .expect("the stable first item is published")
+            .invalid
+    );
 
     harness.click("form.items.control.item-0.move-down");
     assert!(
@@ -844,7 +1077,19 @@ fn repeated_items_keep_identity_while_exported_paths_follow_position(cx: &mut Te
         assert!(values.contains(&("items[1].name".into(), FieldValue::Text("Alpha".into()))));
         assert_eq!(form.read(cx).unrenderable()[0].path, "items[0].host_value");
         assert_eq!(form.read(cx).unrenderable()[1].path, "items[1].host_value");
+        assert_eq!(form.read(cx).field_validation("items[0].name", cx), None);
+        assert_eq!(
+            form.read(cx).field_validation("items[1].name", cx),
+            Some(ValidationState::invalid("The host refused Alpha."))
+        );
     });
+    assert!(
+        harness
+            .node("form.items.control.item-0.name")
+            .expect("the moved item keeps its semantic identity")
+            .invalid,
+        "validation must move with the stable item rather than its old index"
+    );
 
     assert!(
         harness

@@ -58,6 +58,9 @@ pub struct NumberInput {
     size: ControlSize,
     disabled: bool,
     required: bool,
+    /// Validation owned by a surrounding form, separate from this control's
+    /// parse and range checks.
+    invalid: bool,
     /// What a reader should call this control, when the visible label lives
     /// outside it.
     name: Option<SharedString>,
@@ -112,6 +115,7 @@ impl NumberInput {
             size: ControlSize::Md,
             disabled: false,
             required: false,
+            invalid: false,
             name: None,
             seeded: false,
             _subscriptions: vec![subscription],
@@ -191,6 +195,16 @@ impl NumberInput {
         self
     }
 
+    pub fn invalid(mut self, invalid: bool) -> Self {
+        self.invalid = invalid;
+        self
+    }
+
+    pub fn set_invalid(&mut self, invalid: bool, cx: &mut Context<Self>) {
+        self.invalid = invalid;
+        cx.notify();
+    }
+
     /// Replaces the number from the host side.
     ///
     /// The host already knows the number it just set, so this reports
@@ -240,9 +254,13 @@ impl NumberInput {
         self.field.read(cx).value().trim().is_empty()
     }
 
-    /// Whether what the field holds is something the control was told to
-    /// accept. An empty field holds no number and says nothing about one.
+    /// Whether either the surrounding field or this control's parser/range
+    /// check currently refuses the value. An intrinsically empty field says
+    /// nothing about a number, but caller-owned invalidity still applies.
     pub fn is_invalid(&self, cx: &App) -> bool {
+        if self.invalid {
+            return true;
+        }
         if self.is_empty(cx) {
             return false;
         }
@@ -252,9 +270,10 @@ impl NumberInput {
         }
     }
 
-    /// Why the field is invalid, in words, or `None` when it is not. This and
-    /// [`Self::is_invalid`] read the same range, so a control cannot be drawn
-    /// as wrong without being able to say what is wrong with it.
+    /// Why this control's own parser or range check refuses the field.
+    /// Caller-owned invalidity is explained by its surrounding
+    /// [`FormField`](crate::controls::form_field::FormField) rather than
+    /// duplicated here.
     pub fn invalid_reason(&self, cx: &App) -> Option<SharedString> {
         if self.is_empty(cx) {
             return None;

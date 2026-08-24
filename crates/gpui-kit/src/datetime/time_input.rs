@@ -75,6 +75,8 @@ pub struct TimeInput {
     typed: String,
     size: ControlSize,
     disabled: bool,
+    /// Validation owned by a surrounding form.
+    invalid: bool,
 }
 
 impl std::fmt::Debug for TimeInput {
@@ -114,6 +116,7 @@ impl TimeInput {
             typed: String::new(),
             size: ControlSize::Md,
             disabled: false,
+            invalid: false,
         }
     }
 
@@ -141,6 +144,16 @@ impl TimeInput {
 
     pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
         self.disabled = disabled;
+        cx.notify();
+    }
+
+    pub fn invalid(mut self, invalid: bool) -> Self {
+        self.invalid = invalid;
+        self
+    }
+
+    pub fn set_invalid(&mut self, invalid: bool, cx: &mut Context<Self>) {
+        self.invalid = invalid;
         cx.notify();
     }
 
@@ -482,6 +495,7 @@ impl Render for TimeInput {
                     self.size,
                     FieldState::default()
                         .focused(focused)
+                        .invalid(self.invalid)
                         .disabled(self.disabled),
                 )
                 .children(cells)
@@ -493,6 +507,7 @@ impl Render for TimeInput {
                 NodeSpec::new(self.ident.semantic_id(), Role::Group)
                     .focus(&self.focus_handle)
                     .disabled(self.disabled)
+                    .invalid(self.invalid)
                     .value(self.adapter.format_time(self.value)),
             )
     }

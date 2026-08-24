@@ -23,13 +23,13 @@
 //! A form that quietly dropped a required argument it did not understand would
 //! produce an invalid call, and the reader would be told they got it wrong.
 //!
-//! # Whose error is on screen
+//! # Whose validation is on screen
 //!
-//! Two sources, kept apart. [`SchemaForm::validate`] marks required fields
-//! nobody filled in, which is all this component can judge on its own;
-//! [`SchemaForm::set_error`] shows an error the host returned, in the host's
-//! own words. A host error outranks a derived one on the same field, because
-//! the host knows something the form does not.
+//! The form's required/range checks, caller-owned field validation, and
+//! caller-owned whole-form validation stay separate. [`SchemaForm::validate`]
+//! marks only what this component can judge; [`SchemaForm::set_field_validation`]
+//! and [`SchemaForm::set_validation`] advance checks owned by the caller. A
+//! whole-form refusal never paints every field red.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -61,6 +61,7 @@ use crate::display::badge::Tone;
 use crate::display::status::Callout;
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt, rule, text};
+use crate::state::ValidationState;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// The file field the form is asking the host to acquire paths for.
@@ -456,8 +457,11 @@ pub struct SchemaForm {
     /// Reordering changes the prefix without changing any control identity.
     export_prefix: SharedString,
     fields: Vec<Field>,
-    /// What the host said is wrong, by path.
-    host_errors: BTreeMap<SharedString, SharedString>,
+    /// Validation the host owns, by field path. A missing entry means this
+    /// field has no host-side validation contract; explicit Pending does.
+    field_validation: BTreeMap<SharedString, ValidationState>,
+    /// Validation about the submission as a whole, kept apart from fields.
+    validation: Option<ValidationState>,
     /// What the form worked out is missing, by path. Cleared by every edit to
     /// that field, so an answered complaint does not stay on screen.
     derived_errors: BTreeMap<SharedString, SharedString>,
@@ -492,7 +496,8 @@ impl SchemaForm {
             ident,
             export_prefix: SharedString::default(),
             fields: Vec::new(),
-            host_errors: BTreeMap::new(),
+            field_validation: BTreeMap::new(),
+            validation: None,
             derived_errors: BTreeMap::new(),
             unrenderable: Vec::new(),
             base_unrenderable: 0,
@@ -1271,28 +1276,105 @@ impl SchemaForm {
         }
     }
 
+    /// Advances caller-owned validation for one field.
+    ///
+    /// Pending and Validating block submission but never draw invalid chrome.
+    /// A repeated field path such as `items[0].name` is routed to that stable
+    /// child form.
+    pub fn set_field_validation(
+        &mut self,
+        path: impl Into<SharedString>,
+        validation: ValidationState,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let path = path.into();
+        if let Some((form, child_path)) = self.repeated_child(path.as_ref()) {
+            return form.update(cx, |form, cx| {
+                form.set_field_validation(child_path, validation, cx)
+            });
+        }
+        if !self.fields.iter().any(|field| field.path == path) {
+            return false;
+        }
+        self.field_validation.insert(path, validation);
+        self.sync_control_validity(cx);
+        cx.notify();
+        true
+    }
+
+    /// The caller-owned validation registered for one current field path.
+    ///
+    /// Repeated item paths are resolved through their current position while
+    /// the state itself stays with the stable child form across reorders.
+    pub fn field_validation(&self, path: &str, cx: &App) -> Option<ValidationState> {
+        if let Some((form, child_path)) = self.repeated_child(path) {
+            return form.read(cx).field_validation(child_path.as_ref(), cx);
+        }
+        self.field_validation.get(path).cloned()
+    }
+
+    /// Removes caller-owned validation for one field. The form's own required
+    /// and range checks remain independent.
+    pub fn clear_field_validation(
+        &mut self,
+        path: impl Into<SharedString>,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let path = path.into();
+        if let Some((form, child_path)) = self.repeated_child(path.as_ref()) {
+            return form.update(cx, |form, cx| form.clear_field_validation(child_path, cx));
+        }
+        if self.field_validation.remove(&path).is_none() {
+            return false;
+        }
+        self.sync_control_validity(cx);
+        cx.notify();
+        true
+    }
+
+    /// Advances validation for the complete form. A form-level invalid reason
+    /// is presented once and never copied onto individual fields.
+    pub fn set_validation(&mut self, validation: ValidationState, cx: &mut Context<Self>) {
+        self.validation = Some(validation);
+        cx.notify();
+    }
+
+    /// The caller-owned validation registered for the complete form.
+    pub fn validation(&self) -> Option<&ValidationState> {
+        self.validation.as_ref()
+    }
+
+    /// Removes the whole-form validation contract.
+    pub fn clear_validation(&mut self, cx: &mut Context<Self>) {
+        self.validation = None;
+        cx.notify();
+    }
+
     /// Shows an error the host returned, next to the field it is about.
+    ///
+    /// This is the compatibility shorthand for setting that field to
+    /// [`ValidationState::Invalid`].
     pub fn set_error(
         &mut self,
         path: impl Into<SharedString>,
         message: impl Into<SharedString>,
         cx: &mut Context<Self>,
     ) {
-        let path = path.into();
-        let message = message.into();
-        if let Some((form, child_path)) = self.repeated_child(path.as_ref()) {
-            form.update(cx, |form, cx| form.set_error(child_path, message, cx));
-            return;
-        }
-        self.host_errors.insert(path, message);
-        self.sync_control_validity(cx);
-        cx.notify();
+        let _ = self.set_field_validation(path, ValidationState::invalid(message), cx);
     }
 
     /// Withdraws every error the host reported. What the form worked out for
     /// itself is untouched, because the host did not put it there.
     pub fn clear_host_errors(&mut self, cx: &mut Context<Self>) {
-        self.host_errors.clear();
+        self.field_validation
+            .retain(|_, validation| !validation.is_invalid());
+        if self
+            .validation
+            .as_ref()
+            .is_some_and(ValidationState::is_invalid)
+        {
+            self.validation = None;
+        }
         for item in self
             .fields
             .iter()
@@ -1368,6 +1450,7 @@ impl SchemaForm {
         repeated_answerable
             && self.derived_errors.is_empty()
             && !self.unrenderable.iter().any(|field| field.required)
+            && self.managed_validation_allows_submit()
     }
 
     /// Every field and what it holds, including the ones the form could not
@@ -1513,24 +1596,77 @@ impl SchemaForm {
         }
     }
 
-    /// The error shown on a field. The host's outranks the form's, because the
-    /// host knows something the form does not.
+    /// The effective validation shown on a field. A host refusal outranks the
+    /// form's own reason; local invalidity outranks non-failing host activity.
     ///
     /// A control that draws itself as invalid is asked why last of all, so the
     /// red border a number gets for leaving its range always arrives with the
     /// range beside it rather than on its own.
-    fn error_for(&self, field: &Field, cx: &App) -> Option<SharedString> {
-        if let Some(error) = self
-            .host_errors
+    fn validation_for(&self, field: &Field, cx: &App) -> ValidationState {
+        if let Some(validation) = self
+            .field_validation
             .get(&field.path)
-            .or_else(|| self.derived_errors.get(&field.path))
+            .filter(|validation| validation.is_invalid())
         {
-            return Some(error.clone());
+            return validation.clone();
         }
-        match &field.control {
-            Control::Number(number) => number.read(cx).invalid_reason(cx),
-            _ => None,
+        if let Some(error) = self.derived_errors.get(&field.path) {
+            return ValidationState::invalid(error.clone());
         }
+        if let Control::Number(number) = &field.control
+            && let Some(reason) = number.read(cx).invalid_reason(cx)
+        {
+            return ValidationState::invalid(reason);
+        }
+        self.field_validation
+            .get(&field.path)
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    fn managed_validation_allows_submit(&self) -> bool {
+        self.validation
+            .as_ref()
+            .is_none_or(|validation| matches!(validation, ValidationState::Valid))
+            && self
+                .field_validation
+                .values()
+                .all(|validation| matches!(validation, ValidationState::Valid))
+    }
+
+    fn validation_is_busy(&self, cx: &App) -> bool {
+        self.validation
+            .as_ref()
+            .is_some_and(ValidationState::is_busy)
+            || self
+                .fields
+                .iter()
+                .any(|field| self.validation_for(field, cx).is_busy())
+            || self.fields.iter().any(|field| match &field.control {
+                Control::Repeated(repeated) => repeated
+                    .items
+                    .iter()
+                    .any(|item| item.form.read(cx).validation_is_busy(cx)),
+                _ => false,
+            })
+    }
+
+    fn validation_is_invalid(&self, cx: &App) -> bool {
+        self.validation
+            .as_ref()
+            .is_some_and(ValidationState::is_invalid)
+            || self
+                .fields
+                .iter()
+                .any(|field| self.validation_for(field, cx).is_invalid())
+            || self.unrenderable.iter().any(|field| field.required)
+            || self.fields.iter().any(|field| match &field.control {
+                Control::Repeated(repeated) => repeated
+                    .items
+                    .iter()
+                    .any(|item| item.form.read(cx).validation_is_invalid(cx)),
+                _ => false,
+            })
     }
 
     /// Tells every control whether the form is showing an error about it.
@@ -1544,18 +1680,15 @@ impl SchemaForm {
             .fields
             .iter()
             .enumerate()
-            .map(|(index, field)| {
-                (
-                    index,
-                    self.host_errors.contains_key(&field.path)
-                        || self.derived_errors.contains_key(&field.path),
-                )
-            })
+            .map(|(index, field)| (index, self.validation_for(field, cx).is_invalid()))
             .collect();
         for (index, refused) in refused {
             match &self.fields[index].control {
                 Control::Text(input) => {
                     input.update(cx, |input, cx| input.set_invalid(refused, cx))
+                }
+                Control::Number(number) => {
+                    number.update(cx, |number, cx| number.set_invalid(refused, cx))
                 }
                 Control::Choice(select) => {
                     select.update(cx, |select, cx| select.set_invalid(refused, cx))
@@ -1564,6 +1697,15 @@ impl SchemaForm {
                     combobox.update(cx, |combobox, cx| combobox.set_invalid(refused, cx))
                 }
                 Control::List(tags) => tags.update(cx, |tags, cx| tags.set_invalid(refused, cx)),
+                Control::Date(input) => {
+                    input.update(cx, |input, cx| input.set_invalid(refused, cx))
+                }
+                Control::Time(input) => {
+                    input.update(cx, |input, cx| input.set_invalid(refused, cx))
+                }
+                Control::DateRange(picker) => {
+                    picker.update(cx, |picker, cx| picker.set_invalid(refused, cx))
+                }
                 _ => {}
             }
         }
@@ -1598,6 +1740,46 @@ impl Render for SchemaForm {
                 &[cx.numbers().count(self.unrenderable.len()).as_ref()],
             )
         });
+        let busy = self.validation_is_busy(cx);
+        let invalid = self.validation_is_invalid(cx);
+        let validation = match self.validation.clone() {
+            Some(ValidationState::Validating) => {
+                let validation_text = strings.text(StringKey::Validating);
+                Some(
+                    text(&theme, TypeScale::Caption, validation_text.clone())
+                        .text_tone(&theme, TextTone::Muted)
+                        .semantic_in(
+                            cx,
+                            NodeSpec::new(
+                                self.ident.child("validation").semantic_id(),
+                                Role::Status,
+                            )
+                            .parent(self.ident.semantic_id())
+                            .text(validation_text)
+                            .busy(true),
+                        )
+                        .into_any_element(),
+                )
+            }
+            Some(ValidationState::Invalid { reason }) => {
+                let ident = self.ident.child("validation");
+                Some(
+                    div()
+                        .child(
+                            Callout::new(reason.clone(), Tone::Danger).id(ident.child("callout")),
+                        )
+                        .semantic_in(
+                            cx,
+                            NodeSpec::new(ident.semantic_id(), Role::Status)
+                                .parent(self.ident.semantic_id())
+                                .text(reason)
+                                .invalid(true),
+                        )
+                        .into_any_element(),
+                )
+            }
+            Some(ValidationState::Pending | ValidationState::Valid) | None => None,
+        };
 
         let rows: Vec<AnyElement> = self
             .fields
@@ -1611,6 +1793,7 @@ impl Render for SchemaForm {
             .w_full()
             .gap_token(&theme, Space::Md)
             .children(rows)
+            .children(validation)
             .when_some(summary, |element, summary| {
                 let ident = self.ident.child("unrenderable");
                 element.child(
@@ -1644,7 +1827,9 @@ impl Render for SchemaForm {
             .semantic_in(
                 cx,
                 NodeSpec::new(self.ident.semantic_id(), Role::Form)
-                    .value(cx.numbers().count(count)),
+                    .value(cx.numbers().count(count))
+                    .busy(busy)
+                    .invalid(invalid),
             )
     }
 }
@@ -1682,17 +1867,15 @@ impl SchemaForm {
         }
 
         let control_ident = ident.child("control");
-        let error = self.error_for(field, cx);
+        let validation = self.validation_for(field, cx);
+        let invalid = validation.is_invalid();
         let mut form_field = FormField::new(ident.clone(), field.label.clone())
             .control(control_ident.semantic_id())
-            .required(field.required);
+            .required(field.required)
+            .validation(validation);
         if let Some(description) = field.description.clone() {
             form_field = form_field.description(description);
         }
-        if let Some(error) = error.clone() {
-            form_field = form_field.error(error);
-        }
-
         let body: AnyElement = match &field.control {
             Control::Text(input) => input.clone().into_any_element(),
             Control::Number(number) => number.clone().into_any_element(),
@@ -1710,6 +1893,7 @@ impl SchemaForm {
                     cx.strings().text(StringKey::SchemaFilesDrop),
                 )
                 .hint(cx.strings().text(StringKey::SchemaFilesDropHint))
+                .invalid(invalid)
                 .disabled(self.disabled)
                 .when(!self.disabled, |dropzone| {
                     dropzone.on_files(move |external, _, cx| {
@@ -1796,6 +1980,12 @@ impl SchemaForm {
                     .children(files.refusal.clone().map(|refusal| {
                         Callout::new(refusal, Tone::Danger).id(control_ident.child("refusal"))
                     }))
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(control_ident.semantic_id(), Role::Group)
+                            .disabled(self.disabled)
+                            .invalid(invalid),
+                    )
                     .into_any_element()
             }
             Control::Repeated(repeated) => {
@@ -1924,6 +2114,7 @@ impl SchemaForm {
                     // switch carries the same name rather than going unnamed.
                     .named(field.label.clone())
                     .on(on)
+                    .invalid(invalid)
                     .disabled(self.disabled)
                     .when(!self.disabled, |switch| {
                         switch.on_change(move |next, _, cx| {

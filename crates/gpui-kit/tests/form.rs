@@ -174,6 +174,34 @@ fn a_field_without_an_error_invents_no_validity(cx: &mut TestAppContext) {
     let (mut harness, _slot) = field(cx, |field| field.description("Shown everywhere."));
     let node = harness.node("workspace.name.field").expect("published");
     assert!(!node.invalid);
+    assert!(!node.busy);
+    assert!(harness.node("workspace.name.field.error").is_none());
+}
+
+#[gpui::test]
+fn validating_is_busy_without_becoming_invalid(cx: &mut TestAppContext) {
+    let (mut harness, _slot) = field(cx, |field| field.validation(ValidationState::Validating));
+
+    let field = harness.node("workspace.name.field").expect("published");
+    assert!(field.busy);
+    assert!(!field.invalid);
+    let validation = harness
+        .node("workspace.name.field.validation")
+        .expect("the in-flight state is visible and published");
+    assert_eq!(validation.text.as_deref(), Some("Validating…"));
+    assert!(validation.busy);
+    assert!(!validation.invalid);
+    assert!(harness.node("workspace.name.field.error").is_none());
+}
+
+#[gpui::test]
+fn valid_is_quiet_but_distinct_in_the_caller_owned_contract(cx: &mut TestAppContext) {
+    let (mut harness, _slot) = field(cx, |field| field.validation(ValidationState::Valid));
+
+    let field = harness.node("workspace.name.field").expect("published");
+    assert!(!field.busy);
+    assert!(!field.invalid);
+    assert!(harness.node("workspace.name.field.validation").is_none());
     assert!(harness.node("workspace.name.field.error").is_none());
 }
 

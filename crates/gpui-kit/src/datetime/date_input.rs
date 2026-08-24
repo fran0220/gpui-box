@@ -58,6 +58,8 @@ pub struct DateInput {
     size: ControlSize,
     disabled: bool,
     required: bool,
+    /// Validation owned by a surrounding form, separate from adapter refusal.
+    invalid: bool,
     /// Whether the seeded day has been put on screen. The text belongs to the
     /// typist afterwards, so it is written once.
     seeded: bool,
@@ -113,6 +115,7 @@ impl DateInput {
             size: ControlSize::Md,
             disabled: false,
             required: false,
+            invalid: false,
             seeded: false,
             _subscriptions: subscriptions,
         }
@@ -127,6 +130,16 @@ impl DateInput {
     pub fn required(mut self, required: bool) -> Self {
         self.required = required;
         self
+    }
+
+    pub fn invalid(mut self, invalid: bool) -> Self {
+        self.invalid = invalid;
+        self
+    }
+
+    pub fn set_invalid(&mut self, invalid: bool, cx: &mut Context<Self>) {
+        self.invalid = invalid;
+        cx.notify();
     }
 
     /// Replaces the day from the host side.
@@ -198,7 +211,7 @@ impl DateInput {
     }
 
     pub fn is_invalid(&self) -> bool {
-        self.message.is_some()
+        self.invalid || self.message.is_some()
     }
 
     pub fn open(&mut self, cx: &mut Context<Self>) {

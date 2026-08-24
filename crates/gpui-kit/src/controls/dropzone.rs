@@ -68,6 +68,9 @@ pub struct Dropzone {
     kinds: Vec<SharedString>,
     pinned: Option<DropzoneState>,
     disabled: bool,
+    /// Validation owned by a surrounding field, separate from a live drag
+    /// payload this zone itself refuses.
+    invalid: bool,
     icon: Option<Icon>,
     on_drop: Option<DropHandler>,
     on_files: Option<FilesHandler>,
@@ -99,6 +102,7 @@ impl Dropzone {
             kinds: vec![SharedString::new_static(FILE_KIND)],
             pinned: None,
             disabled: false,
+            invalid: false,
             icon: Some(Icon::Paperclip),
             on_drop: None,
             on_files: None,
@@ -135,6 +139,11 @@ impl Dropzone {
     /// position could produce.
     pub fn state(mut self, state: DropzoneState) -> Self {
         self.pinned = Some(state);
+        self
+    }
+
+    pub fn invalid(mut self, invalid: bool) -> Self {
+        self.invalid = invalid;
         self
     }
 
@@ -186,11 +195,14 @@ impl RenderOnce for Dropzone {
             _ => DropzoneState::Idle,
         });
 
-        let (border, text) = match state {
+        let (mut border, text) = match state {
             DropzoneState::Idle => (theme.colors.hairline_strong, theme.colors.text_muted),
             DropzoneState::Accepting => (theme.colors.accent, theme.colors.text),
             DropzoneState::Refusing => (theme.colors.danger, theme.colors.danger),
         };
+        if self.invalid {
+            border = theme.colors.danger;
+        }
         // The zone always says what it is. A refusal is a second line under
         // that, in the tone of a refusal, so a refusing zone is still
         // recognisably the same target and not an unlabelled red box.
@@ -286,7 +298,7 @@ impl RenderOnce for Dropzone {
                 .value(state.name())
                 .disabled(self.disabled)
                 .selected(state == DropzoneState::Accepting)
-                .invalid(state == DropzoneState::Refusing),
+                .invalid(self.invalid || state == DropzoneState::Refusing),
         );
 
         // The measurement has to be of the zone itself, not of what it

@@ -466,6 +466,7 @@ pub(super) fn form(window: &mut Window, cx: &mut App) -> AnyElement {
             FormField::new("scene.form.visibility.form-field", "Visibility")
                 .control("scene.form.visibility")
                 .description("Who can open the runs in this workspace.")
+                .validation(ValidationState::Validating)
                 .child(
                     SegmentedControl::new("scene.form.visibility")
                         .label("Visibility")

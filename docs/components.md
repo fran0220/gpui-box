@@ -823,11 +823,13 @@ report.
 
 ### A field says what is wrong without taking back what it said
 
-`FormField` shows the description and the error together. They answer different
-questions — what the field is for, and what went wrong this time — and swapping
-one for the other loses an answer the typist still needs. The exception is a
-pair that says the same thing twice: when the error repeats the description
-word for word, only the error is drawn.
+`FormField` takes a caller-owned `ValidationState`: `Pending`, `Validating`,
+`Invalid { reason }`, or `Valid`. Validating is a muted busy status, never red;
+invalid shows the caller's reason and publishes invalid; pending and valid add
+no invented success or failure sentence. The description and an invalid reason
+are shown together because they answer different questions — what the field is
+for, and what went wrong this time. When both repeat the same sentence word for
+word, only the invalid reason is drawn.
 
 `NumberInput` and `TagInput` extend the same rule to what the host holds. A
 number outside the range stays on screen exactly as it is, published `invalid`;
@@ -1017,7 +1019,7 @@ turns a number into text.
 | Component | Kind | Reports | Notes |
 |---|---|---|---|
 | `JsonView` | builder | a path and the disclosure state it should take, and the row that was picked | A structured value over a caller-supplied `JsonValue`. Virtualized, so only the rows the viewport holds are laid out or published. `null`, an empty container, and a key the document does not hold are three presentations, and a withheld subtree reads as withheld |
-| `SchemaForm` | view | a field that changed, a file field whose picker was requested, and a submit | A form built from a caller-supplied `Schema` over the existing controls. Date shapes use the host's `DateAdapter`; `Files` uses a host `SchemaFilePolicy` without owning an OS picker; repeating `List` owns stable add/remove UI and nested values. A field it cannot draw states so where the control would have been and is still reported by `values` |
+| `SchemaForm` | view | a field that changed, a file field whose picker was requested, and a submit | A form built from a caller-supplied `Schema` over the existing controls. Caller-owned field and whole-form validation stay separate; pending/validating managed checks block submission without becoming invalid. Date shapes use the host's `DateAdapter`; `Files` uses a host `SchemaFilePolicy` without owning an OS picker; repeating `List` owns stable add/remove UI and nested values. A field it cannot draw states so where the control would have been and is still reported by `values` |
 | `ServerList` | builder | a server that was picked, a failed one that should be tried again, and a server whose offerings should be shown | What is connected and what each connection offers. Five states, none of them a shade of another, and an empty answer that is not an unasked question |
 | `OfferingCatalog` | builder | activation carrying `{server_id, offering_id}` | Searchable Tool, Skill, and Resource results aggregated across caller-owned servers. Search text and kind filters are caller supplied; duplicate names remain attributed, stale data remains visible, and the component performs no install, invocation, trust, permission, or network policy |
 
@@ -1066,18 +1068,26 @@ filled in.
 A form that quietly dropped an argument it did not understand would send an
 invalid call and let the reader be blamed for it.
 
-Errors come from two places and stay apart. `validate` marks required fields
-nobody filled in, which is all the form can judge on its own; `set_error` shows
-what the host returned, in the host's words, and outranks the form's own on the
-same field. Both are drawn by `FormField`, next to the control they are about.
+Validation has three sources and they stay apart. `validate` marks required and
+range-invalid fields, which is all the form can judge on its own.
+`set_field_validation(path, state)` advances a caller-owned check on one field;
+`set_validation(state)` advances a check or refusal about the complete form. A
+field's `Pending` or `Validating` state blocks `validate` from approving a
+submission but never paints invalid chrome. A whole-form refusal is shown once
+and makes the form invalid without copying the reason or red chrome onto every
+field. Field validation setters return `false` for a path the current form does
+not hold, so an asynchronous answer for a removed repeated item cannot become
+an invisible submission blocker. `set_error` remains shorthand for an invalid
+field state in the host's own words.
 
 Files keep the same boundary. The form owns its drop target, selected rows,
 maximum count, removal, and `FilesRequested` event. The installed
 `SchemaFilePolicy` decides whether a complete candidate selection is admissible
 and supplies display names; the host opens the platform picker and returns paths
 through `set_files`. A repeating `List` needs no host policy: it creates nested
-forms with monotonic visual identity, reports indexed values and errors, and
-applies the same date/file adapter requirements recursively.
+forms with monotonic visual identity, routes indexed field validation to the
+stable child form, reports indexed values and errors, and applies the same
+date/file adapter requirements recursively.
 
 ### Five connection states, and an answer that was empty
 

@@ -6,6 +6,62 @@
 //! library-level [`Loadable`] / [`AsyncValue`] types, answer the same
 //! question.
 
+use gpui::SharedString;
+
+/// What a caller currently knows about one validation target.
+///
+/// The target can be a field or a whole form. Keeping both on the same ladder
+/// prevents an in-flight check from being painted as a failure and prevents a
+/// form-level refusal from being copied onto every field. The caller advances
+/// the state; the Kit owns neither validation rules nor timing.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum ValidationState {
+    /// No check has completed yet.
+    #[default]
+    Pending,
+    /// A check is in flight. This is busy, never invalid.
+    Validating,
+    /// The check completed with the caller's reason.
+    Invalid { reason: SharedString },
+    /// The check completed successfully.
+    Valid,
+}
+
+impl ValidationState {
+    /// Builds an invalid state without making callers spell the storage type.
+    pub fn invalid(reason: impl Into<SharedString>) -> Self {
+        Self::Invalid {
+            reason: reason.into(),
+        }
+    }
+
+    /// The stable state name used by semantic diagnostics.
+    pub const fn name(&self) -> &'static str {
+        match self {
+            Self::Pending => "pending",
+            Self::Validating => "validating",
+            Self::Invalid { .. } => "invalid",
+            Self::Valid => "valid",
+        }
+    }
+
+    pub const fn is_busy(&self) -> bool {
+        matches!(self, Self::Validating)
+    }
+
+    pub const fn is_invalid(&self) -> bool {
+        matches!(self, Self::Invalid { .. })
+    }
+
+    /// The caller's reason, only when validation failed.
+    pub fn reason(&self) -> Option<&SharedString> {
+        match self {
+            Self::Invalid { reason } => Some(reason),
+            _ => None,
+        }
+    }
+}
+
 /// What a surface knows about its own content.
 ///
 /// This is not a description of activity. A transport that is playing and one

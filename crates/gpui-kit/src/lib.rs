@@ -301,7 +301,7 @@ pub mod prelude {
         MenubarMenu, Notification, NotificationCenter, NotificationCenterEvent, Overlay, Placement,
         Popover, PopoverEvent, Toast, ToastCorner, ToastLayer, Tooltip, Tooltipped, UnreadCount,
     };
-    pub use crate::state::{AsyncStatus, AsyncValue, HasPhase, Loadable, Phase};
+    pub use crate::state::{AsyncStatus, AsyncValue, HasPhase, Loadable, Phase, ValidationState};
     pub use crate::strings::{
         ActiveNumbers, ActiveSearch, ActiveStrings, EnglishNumbers, EnglishSearch, NumberAdapter,
         Plural, SearchMatcher, SharedNumberAdapter, SharedSearchMatcher, StringKey, Strings,

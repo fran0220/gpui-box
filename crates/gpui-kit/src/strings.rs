@@ -93,6 +93,7 @@ string_keys! {
     Dismiss => "common.dismiss", "Dismiss";
     TryAgain => "common.try-again", "Try again";
     Loading => "common.loading", "Loading";
+    Validating => "common.validating", "Validating…";
     LoadMore => "load-more.action", "Load more";
     LoadMoreLoading => "load-more.loading", "Loading more";
     LoadMoreEnd => "load-more.end", "No more items";
