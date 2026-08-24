@@ -13,37 +13,38 @@
 
 use std::ops::Range;
 
-use gpui::SharedString;
+use crate::SharedString;
+use unicode_segmentation::UnicodeSegmentation;
 
 use super::history::{EditHistory, EditSelection};
 use super::{fit_to_max_graphemes, fit_to_max_length};
 
-pub(crate) use super::history::EditCause as Cause;
+use super::history::EditCause;
 
 /// What a particular control accepts.
 #[derive(Clone, Copy, Debug, Default)]
-pub(crate) struct EditRules {
+pub struct EditRules {
     /// A byte limit, applied by trimming an over-long insertion rather than
     /// refusing it.
-    pub(crate) max_length: Option<usize>,
+    pub max_length: Option<usize>,
     /// A limit in user-perceived characters, for a field whose slots are
     /// graphemes rather than bytes.
-    pub(crate) max_graphemes: Option<usize>,
+    pub max_graphemes: Option<usize>,
     /// True for a field that holds one line, where a newline arriving from a
     /// paste becomes a space rather than a second line nobody can see.
-    pub(crate) single_line: bool,
+    pub single_line: bool,
 }
 
 /// The result of an edit: what actually happened, for the caller to report.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct EditOutcome {
+pub struct EditOutcome {
     /// Whether the text is different from what it was.
-    pub(crate) changed: bool,
+    pub changed: bool,
 }
 
 /// One control's editable value.
 #[derive(Debug)]
-pub(crate) struct EditBuffer {
+pub struct EditBuffer {
     text: SharedString,
     /// A caret is an empty selection, so one range describes both.
     selection: Range<usize>,
@@ -69,38 +70,46 @@ impl Default for EditBuffer {
 }
 
 impl EditBuffer {
-    pub(crate) fn new(rules: EditRules) -> Self {
+    /// Creates an empty editable value governed by `rules`.
+    pub fn new(rules: EditRules) -> Self {
         Self {
             rules,
             ..Default::default()
         }
     }
 
-    pub(crate) fn text(&self) -> &SharedString {
+    /// Returns the current UTF-8 value.
+    pub fn text(&self) -> &SharedString {
         &self.text
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
+    /// Returns whether the current value is empty.
+    pub fn is_empty(&self) -> bool {
         self.text.is_empty()
     }
 
-    pub(crate) fn selection(&self) -> Range<usize> {
+    /// Returns the current normalized UTF-8 selection range.
+    pub fn selection(&self) -> Range<usize> {
         self.selection.clone()
     }
 
-    pub(crate) fn is_reversed(&self) -> bool {
+    /// Returns whether the selection focus precedes its anchor.
+    pub fn is_reversed(&self) -> bool {
         self.reversed
     }
 
-    pub(crate) fn marked(&self) -> Option<Range<usize>> {
+    /// Returns the UTF-8 range currently owned by an input composition.
+    pub fn marked(&self) -> Option<Range<usize>> {
         self.marked.clone()
     }
 
-    pub(crate) fn set_marked(&mut self, marked: Option<Range<usize>>) {
-        self.marked = marked;
+    /// Replaces the marked-composition range without changing text.
+    pub fn set_marked(&mut self, marked: Option<Range<usize>>) {
+        self.marked = marked.map(|range| self.clamp(range));
     }
 
-    pub(crate) fn rules_mut(&mut self) -> &mut EditRules {
+    /// Returns the limits applied to subsequent replacements.
+    pub fn rules_mut(&mut self) -> &mut EditRules {
         &mut self.rules
     }
 
@@ -109,17 +118,19 @@ impl EditBuffer {
     /// A credential that could be undone back into view would outlive the
     /// moment it was replaced, so a secret field never has a history rather
     /// than having one it clears.
-    pub(crate) fn forbid_history(&mut self) {
+    pub fn forbid_history(&mut self) {
         if !self.history.is_disabled() {
             self.history = EditHistory::disabled();
         }
     }
 
-    pub(crate) fn can_undo(&self) -> bool {
+    /// Returns whether an edit can be undone.
+    pub fn can_undo(&self) -> bool {
         self.history.can_undo()
     }
 
-    pub(crate) fn can_redo(&self) -> bool {
+    /// Returns whether an undone edit can be replayed.
+    pub fn can_redo(&self) -> bool {
         self.history.can_redo()
     }
 
@@ -131,21 +142,22 @@ impl EditBuffer {
         }
     }
 
-    pub(crate) fn set_caret(&mut self, offset: usize) {
-        let offset = offset.min(self.text.len());
+    /// Collapses the selection to the nearest valid offset at or before `offset`.
+    pub fn set_caret(&mut self, offset: usize) {
+        let offset = floor_grapheme_boundary(&self.text, offset);
         self.selection = offset..offset;
         self.reversed = false;
     }
 
-    pub(crate) fn set_selection(&mut self, range: Range<usize>, reversed: bool) {
-        let end = self.text.len();
-        self.selection = range.start.min(end)..range.end.min(end);
+    /// Sets a normalized selection and which endpoint carries focus.
+    pub fn set_selection(&mut self, range: Range<usize>, reversed: bool) {
+        self.selection = self.clamp(range);
         self.reversed = reversed;
     }
 
     /// Moves the end that is moving, keeping the other one anchored.
-    pub(crate) fn extend_selection(&mut self, offset: usize) {
-        let offset = offset.min(self.text.len());
+    pub fn extend_selection(&mut self, offset: usize) {
+        let offset = floor_grapheme_boundary(&self.text, offset);
         if self.reversed {
             self.selection.start = offset;
         } else {
@@ -162,7 +174,7 @@ impl EditBuffer {
     /// The insertion is normalised and trimmed to the control's rules first,
     /// so what is recorded is what was actually kept rather than what was
     /// offered.
-    pub(crate) fn replace(&mut self, range: Range<usize>, text: &str, cause: Cause) -> EditOutcome {
+    pub fn replace(&mut self, range: Range<usize>, text: &str, cause: EditCause) -> EditOutcome {
         let range = self.clamp(range);
         let insertion = self.fit(&range, text);
 
@@ -193,7 +205,7 @@ impl EditBuffer {
             selection_before,
             self.selection_state(),
         );
-        if cause == Cause::Programmatic {
+        if cause == EditCause::Programmatic {
             self.history.clear();
         }
         EditOutcome { changed: true }
@@ -203,7 +215,7 @@ impl EditBuffer {
     ///
     /// The composition is not a step of its own until it ends; see
     /// [`EditBuffer::end_composition`].
-    pub(crate) fn replace_and_mark(
+    pub fn replace_and_mark(
         &mut self,
         range: Range<usize>,
         text: &str,
@@ -230,7 +242,10 @@ impl EditBuffer {
             // The caller reports this range relative to the composing
             // replacement, not the whole value. Converting it against the
             // already-mutated value can land inside an astral scalar.
-            Some(inside) => inside.start + range.start..inside.end + range.start,
+            Some(inside) => {
+                let inside = clamp_grapheme_range(&insertion, inside);
+                inside.start + range.start..inside.end + range.start
+            }
             None => {
                 let caret = range.start + insertion.len();
                 caret..caret
@@ -241,7 +256,7 @@ impl EditBuffer {
     }
 
     /// Closes a composition, recording the whole run as one step.
-    pub(crate) fn end_composition(&mut self) {
+    pub fn end_composition(&mut self) {
         if !self.history.is_composing() {
             return;
         }
@@ -255,7 +270,7 @@ impl EditBuffer {
     }
 
     /// Applies the last transaction backwards. Returns whether anything moved.
-    pub(crate) fn undo(&mut self) -> bool {
+    pub fn undo(&mut self) -> bool {
         let Some(step) = self.history.undo() else {
             return false;
         };
@@ -263,7 +278,7 @@ impl EditBuffer {
     }
 
     /// Applies the last undone transaction forwards.
-    pub(crate) fn redo(&mut self) -> bool {
+    pub fn redo(&mut self) -> bool {
         let Some(step) = self.history.redo() else {
             return false;
         };
@@ -283,7 +298,7 @@ impl EditBuffer {
 
     /// Puts a value in place without it becoming a step the reader can walk
     /// back through, and forgets the steps that described the old one.
-    pub(crate) fn set_text(&mut self, text: &str) -> EditOutcome {
+    pub fn set_text(&mut self, text: &str) -> EditOutcome {
         // A host value is stored as it was given when the control can show
         // it. Only a single-line field rewrites one, because it has nowhere
         // to put a line break and would otherwise hold text nobody can see.
@@ -303,10 +318,7 @@ impl EditBuffer {
     }
 
     fn clamp(&self, range: Range<usize>) -> Range<usize> {
-        let end = self.text.len();
-        let start = floor_boundary(&self.text, range.start.min(end));
-        let stop = floor_boundary(&self.text, range.end.min(end));
-        start.min(stop)..stop.max(start)
+        clamp_grapheme_range(&self.text, range)
     }
 
     fn normalise(&self, text: &str) -> String {
@@ -324,17 +336,28 @@ impl EditBuffer {
     }
 }
 
-/// The nearest character boundary at or below `offset`.
+/// The nearest extended-grapheme boundary at or below `offset`.
 ///
 /// An offset that arrived from an input method or a stored transaction can
-/// point inside a multi-byte scalar after the text around it moved. Slicing
-/// there would panic, so it is walked back to somewhere that exists.
-fn floor_boundary(text: &str, offset: usize) -> usize {
-    let mut offset = offset.min(text.len());
-    while offset > 0 && !text.is_char_boundary(offset) {
-        offset -= 1;
+/// point inside a multi-byte scalar or a user-perceived character after the
+/// text around it moved. Slicing there would panic or split the character, so
+/// it is walked back to a boundary the editor can expose.
+fn floor_grapheme_boundary(text: &str, offset: usize) -> usize {
+    let offset = offset.min(text.len());
+    if offset == text.len() {
+        return text.len();
     }
-    offset
+    text.grapheme_indices(true)
+        .map(|(index, _)| index)
+        .take_while(|index| *index <= offset)
+        .last()
+        .unwrap_or(0)
+}
+
+fn clamp_grapheme_range(text: &str, range: Range<usize>) -> Range<usize> {
+    let start = floor_grapheme_boundary(text, range.start);
+    let end = floor_grapheme_boundary(text, range.end);
+    start.min(end)..start.max(end)
 }
 
 #[cfg(test)]
@@ -346,14 +369,14 @@ mod tests {
             single_line: true,
             ..Default::default()
         });
-        buffer.replace(0..0, text, Cause::Programmatic);
+        buffer.replace(0..0, text, EditCause::Programmatic);
         buffer
     }
 
     #[test]
     fn an_edit_can_be_taken_back_and_put_again() {
         let mut buffer = buffer("alpha");
-        buffer.replace(5..5, " beta", Cause::Paste);
+        buffer.replace(5..5, " beta", EditCause::Paste);
         assert_eq!(buffer.text().as_ref(), "alpha beta");
 
         assert!(buffer.undo());
@@ -369,7 +392,7 @@ mod tests {
     fn undo_restores_the_selection_the_edit_replaced() {
         let mut buffer = buffer("alpha beta");
         buffer.set_selection(0..5, false);
-        buffer.replace(0..5, "gamma", Cause::Paste);
+        buffer.replace(0..5, "gamma", EditCause::Paste);
         assert_eq!(buffer.text().as_ref(), "gamma beta");
 
         buffer.undo();
@@ -385,7 +408,7 @@ mod tests {
     fn a_run_of_typing_is_taken_back_as_one_word() {
         let mut buffer = buffer("");
         for (index, letter) in "abc".chars().enumerate() {
-            buffer.replace(index..index, &letter.to_string(), Cause::Typing);
+            buffer.replace(index..index, &letter.to_string(), EditCause::Typing);
         }
         assert_eq!(buffer.text().as_ref(), "abc");
 
@@ -401,8 +424,8 @@ mod tests {
             single_line: true,
             ..Default::default()
         });
-        buffer.replace(0..0, "abc", Cause::Typing);
-        buffer.replace(3..3, "defghij", Cause::Paste);
+        buffer.replace(0..0, "abc", EditCause::Typing);
+        buffer.replace(3..3, "defghij", EditCause::Paste);
         assert_eq!(buffer.text().as_ref(), "abcdef");
 
         buffer.undo();
@@ -416,14 +439,14 @@ mod tests {
     #[test]
     fn a_single_line_field_turns_a_pasted_newline_into_a_space() {
         let mut buffer = buffer("");
-        buffer.replace(0..0, "one\ntwo", Cause::Paste);
+        buffer.replace(0..0, "one\ntwo", EditCause::Paste);
         assert_eq!(buffer.text().as_ref(), "one two");
     }
 
     #[test]
     fn a_value_the_host_set_cannot_be_undone_back_out() {
         let mut buffer = buffer("");
-        buffer.replace(0..0, "typed", Cause::Typing);
+        buffer.replace(0..0, "typed", EditCause::Typing);
         buffer.set_text("from the host");
 
         assert!(!buffer.can_undo());
@@ -434,8 +457,8 @@ mod tests {
     fn a_secret_field_keeps_no_way_back_to_what_it_held() {
         let mut buffer = buffer("");
         buffer.forbid_history();
-        buffer.replace(0..0, "hunter2", Cause::Typing);
-        buffer.replace(0..7, "", Cause::Deleting);
+        buffer.replace(0..0, "hunter2", EditCause::Typing);
+        buffer.replace(0..7, "", EditCause::Deleting);
 
         assert!(!buffer.can_undo());
         assert!(!buffer.undo());
@@ -464,14 +487,32 @@ mod tests {
     fn an_offset_inside_a_character_is_walked_back_rather_than_panicking() {
         let mut buffer = buffer("é");
         // One byte into a two-byte scalar.
-        buffer.replace(1..1, "x", Cause::Typing);
+        buffer.replace(1..1, "x", EditCause::Typing);
         assert_eq!(buffer.text().as_ref(), "xé");
+    }
+
+    #[test]
+    fn selections_and_edits_never_split_an_extended_grapheme() {
+        let mut buffer = buffer("ae\u{301}👩‍💻z");
+        buffer.set_selection(2..10, false);
+        assert_eq!(buffer.selection(), 1..4);
+
+        buffer.replace(5..15, "x", EditCause::Typing);
+        assert_eq!(buffer.text().as_ref(), "ae\u{301}xz");
+    }
+
+    #[test]
+    fn composition_selection_is_clamped_inside_its_replacement() {
+        let mut buffer = buffer("");
+        buffer.replace_and_mark(0..0, "e\u{301}", Some(1..2));
+        assert_eq!(buffer.selection(), 0..0);
+        assert_eq!(buffer.marked(), Some(0..3));
     }
 
     #[test]
     fn an_edit_that_changes_nothing_is_not_a_step() {
         let mut buffer = buffer("abc");
-        let outcome = buffer.replace(1..1, "", Cause::Deleting);
+        let outcome = buffer.replace(1..1, "", EditCause::Deleting);
 
         assert!(!outcome.changed);
         assert!(!buffer.can_undo());

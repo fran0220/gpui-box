@@ -96,6 +96,14 @@ force Kit highlights to recompose text into separate layout elements. They use
 the workspace's existing Unicode segmentation and bidirectional libraries and
 import no editor or product source.
 
+The product-neutral editable-text buffer, grapheme-safe selection and
+replacement transactions, marked-composition lifecycle, grouped undo/redo,
+length policy, and UTF-8/UTF-16 conversion are also subsequent GPUI Box work.
+They move the shared authority used by Kit's plain text controls to the
+framework boundary and use the existing Unicode segmentation dependency; no
+editor, document-format, grammar, language-server, or product source is
+imported.
+
 The window-owned document-selection coordinator, caller-declared reading order,
 overlay scope isolation, truthful virtualized-copy coverage, and aggregate
 clipboard path are subsequent GPUI Box work above that selectable-text

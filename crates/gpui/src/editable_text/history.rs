@@ -25,15 +25,15 @@ use std::ops::Range;
 
 /// How far the caret and its selection reached, and which end was moving.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct EditSelection {
-    pub(crate) range: Range<usize>,
-    pub(crate) reversed: bool,
+pub(super) struct EditSelection {
+    pub(super) range: Range<usize>,
+    pub(super) reversed: bool,
 }
 
 impl EditSelection {
     /// A caret, which is a selection that reached nowhere.
     #[cfg(test)]
-    pub(crate) fn caret(offset: usize) -> Self {
+    pub(super) fn caret(offset: usize) -> Self {
         Self {
             range: offset..offset,
             reversed: false,
@@ -44,7 +44,7 @@ impl EditSelection {
 /// What the reader did, which decides whether an edit joins the step before
 /// it and whether it is remembered at all.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum EditCause {
+pub enum EditCause {
     /// Text the reader typed or an input method committed.
     Typing,
     /// A backspace or a delete.
@@ -96,18 +96,18 @@ impl EditTransaction {
 /// One step to apply, handed back by [`EditHistory::undo`] or
 /// [`EditHistory::redo`].
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct EditStep {
+pub(super) struct EditStep {
     /// The range of the current text to replace.
-    pub(crate) range: Range<usize>,
+    pub(super) range: Range<usize>,
     /// What to put there.
-    pub(crate) text: String,
+    pub(super) text: String,
     /// Where the caret belongs once it is applied.
-    pub(crate) selection: EditSelection,
+    pub(super) selection: EditSelection,
 }
 
 /// The transactions of one editable control.
 #[derive(Clone, Debug, Default)]
-pub(crate) struct EditHistory {
+pub(super) struct EditHistory {
     done: Vec<EditTransaction>,
     undone: Vec<EditTransaction>,
     /// A history that refuses to record. A secret field sets this and never
@@ -129,28 +129,28 @@ struct CompositionStart {
 
 impl EditHistory {
     /// A history that records nothing, for a field holding a credential.
-    pub(crate) fn disabled() -> Self {
+    pub(super) fn disabled() -> Self {
         Self {
             disabled: true,
             ..Default::default()
         }
     }
 
-    pub(crate) fn is_disabled(&self) -> bool {
+    pub(super) fn is_disabled(&self) -> bool {
         self.disabled
     }
 
-    pub(crate) fn can_undo(&self) -> bool {
+    pub(super) fn can_undo(&self) -> bool {
         !self.done.is_empty()
     }
 
-    pub(crate) fn can_redo(&self) -> bool {
+    pub(super) fn can_redo(&self) -> bool {
         !self.undone.is_empty()
     }
 
     /// Forgets everything. The value stopped being the one these transactions
     /// describe, so they no longer describe anything.
-    pub(crate) fn clear(&mut self) {
+    pub(super) fn clear(&mut self) {
         self.done.clear();
         self.undone.clear();
         self.composing = None;
@@ -162,7 +162,7 @@ impl EditHistory {
     /// Repeated calls while a composition is already open are ignored, which
     /// is what makes the whole run one step rather than one step per keypress
     /// the input method consumed.
-    pub(crate) fn begin_composition(
+    pub(super) fn begin_composition(
         &mut self,
         range: Range<usize>,
         before: &str,
@@ -180,7 +180,7 @@ impl EditHistory {
 
     /// Records the whole composition as one transaction, if it changed
     /// anything.
-    pub(crate) fn end_composition(&mut self, after: &str, selection: EditSelection) {
+    pub(super) fn end_composition(&mut self, after: &str, selection: EditSelection) {
         let Some(start) = self.composing.take() else {
             return;
         };
@@ -198,7 +198,7 @@ impl EditHistory {
         self.undone.clear();
     }
 
-    pub(crate) fn is_composing(&self) -> bool {
+    pub(super) fn is_composing(&self) -> bool {
         self.composing.is_some()
     }
 
@@ -206,7 +206,7 @@ impl EditHistory {
     ///
     /// A replay records nothing, or undo would only ever undo itself. A
     /// programmatic value clears the history instead of joining it.
-    pub(crate) fn record(
+    pub(super) fn record(
         &mut self,
         start: usize,
         before: &str,
@@ -249,7 +249,7 @@ impl EditHistory {
     }
 
     /// The step that takes the last transaction back.
-    pub(crate) fn undo(&mut self) -> Option<EditStep> {
+    pub(super) fn undo(&mut self) -> Option<EditStep> {
         let transaction = self.done.pop()?;
         let step = EditStep {
             range: transaction.range_after(),
@@ -261,7 +261,7 @@ impl EditHistory {
     }
 
     /// The step that puts it back.
-    pub(crate) fn redo(&mut self) -> Option<EditStep> {
+    pub(super) fn redo(&mut self) -> Option<EditStep> {
         let transaction = self.undone.pop()?;
         let step = EditStep {
             range: transaction.range_before(),

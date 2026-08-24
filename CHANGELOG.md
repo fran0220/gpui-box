@@ -117,6 +117,12 @@ else that is waiting.
 
 ### Added
 
+**Editable text has one framework authority.** `gpui::EditBuffer` now owns the
+grapheme-safe selection, replacement, marked-composition, grouped undo/redo,
+secret-history refusal, input limits, and UTF-8/UTF-16 arithmetic consumed by
+both `TextInput` and `TextArea`. The controls no longer carry a private copy of
+that edit engine; visual layout and product document policy remain separate.
+
 **The loading family says six different things.** `PulseLoader` breathes,
 `Spinner` turns an open arc whose gap is what says the ring is not a position,
 `Skeleton` is the shape of absent content, `BarLoader` is the strip form for a

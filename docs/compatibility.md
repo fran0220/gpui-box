@@ -72,6 +72,14 @@ Select All, and AccessKit selection continue to use the shaped text geometry of
 each participant. A host that needs a complete copy of unmounted content still
 uses the component's whole-value copy intent.
 
+`EditBuffer` is the shared editable-value authority for `TextInput`,
+`TextArea`, and later rich editors. It owns grapheme-safe selection,
+replacement and marked-composition transactions, grouped undo/redo,
+single-/multi-line normalization, byte and grapheme limits, and UTF-8/UTF-16
+conversion. Secret controls permanently refuse history. Layout, theme, and
+document-format policy are deliberately outside this buffer; editable shaping
+and rich inline/paragraph vocabulary remain the next layer of the foundation.
+
 `ScrollTarget` gives overflowing containers, uniform lists, and measured
 variable-height lists one offset, extent, viewport, and mutation contract.
 Kit scrollbars bind to that target instead of wrapping a virtualized list in a
