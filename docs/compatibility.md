@@ -44,10 +44,12 @@ See [`performance-testing.md`](performance-testing.md).
 Client-drawn desktop titlebars share one framework contract. Nested `Client`
 areas override an enclosing `Drag` strip, caption controls preserve their
 platform identities, and `Window::request_close` follows the same vetoable
-close path as native chrome. Windows maps maximize to `HTMAXBUTTON` for Snap
-Layout; macOS keeps native traffic lights; Linux reports the same requests to
-its compositor-backed window implementation; browser builds expose no desktop
-caption controls.
+close path as native chrome. A native hit-test request carries its own current
+position into the rendered-frame lookup instead of borrowing the previous
+pointer event. Windows therefore maps maximize to `HTMAXBUTTON` on entry for
+Snap Layout; macOS keeps native traffic lights; Linux reports the same requests
+to its compositor-backed window implementation; browser builds expose no
+desktop caption controls.
 
 Renderer-backed linear, elliptical radial, and conic gradients accept two
 through eight ordered color stops for both quads and filled paths. Radial

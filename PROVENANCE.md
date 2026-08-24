@@ -62,10 +62,11 @@ existing host has detached and released its final handle clone.
 
 Window-control hit testing that gives a later-painted nested caption control or
 explicit client area precedence over its enclosing drag area, vetoable
-programmatic close requests, and corrected Windows horizontal/vertical
-resize-frame metrics for transparent title bars are also subsequent GPUI Box
-work. They change only framework-owned window behavior and use the existing
-operating-system window APIs; they import no additional source.
+programmatic close requests, current-request-position native caption hit tests,
+and corrected Windows horizontal/vertical resize-frame metrics for transparent
+title bars are also subsequent GPUI Box work. They change only framework-owned
+window behavior and use the existing operating-system window APIs; they import
+no additional source.
 
 The renderer-backed linear, elliptical radial, and conic gradient primitives
 with up to eight ordered color stops are also subsequent GPUI Box work. Their

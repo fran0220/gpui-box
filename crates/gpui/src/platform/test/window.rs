@@ -29,7 +29,8 @@ pub(crate) struct TestWindowState {
     renderer: Option<Box<dyn PlatformHeadlessRenderer>>,
     pub(crate) should_close_handler: Option<Box<dyn FnMut() -> bool>>,
     close_handler: Option<Box<dyn FnOnce()>>,
-    hit_test_window_control_callback: Option<Box<dyn FnMut() -> Option<WindowControlArea>>>,
+    hit_test_window_control_callback:
+        Option<Box<dyn FnMut(Point<Pixels>) -> Option<WindowControlArea>>>,
     input_callback: Option<Box<dyn FnMut(PlatformInput) -> DispatchEventResult>>,
     active_status_change_callback: Option<Box<dyn FnMut(bool)>>,
     hover_status_change_callback: Option<Box<dyn FnMut(bool)>>,
@@ -156,6 +157,18 @@ impl TestWindow {
         let result = callback(event);
         self.0.lock().input_callback = Some(callback);
         !result.propagate
+    }
+
+    pub fn simulate_window_control_hit_test(
+        &self,
+        position: Point<Pixels>,
+    ) -> Option<WindowControlArea> {
+        let mut lock = self.0.lock();
+        let mut callback = lock.hit_test_window_control_callback.take()?;
+        drop(lock);
+        let result = callback(position);
+        self.0.lock().hit_test_window_control_callback = Some(callback);
+        result
     }
 
     pub fn external_drag_files(&self) -> Vec<(PathBuf, bool)> {
@@ -356,7 +369,10 @@ impl PlatformWindow for TestWindow {
         self.0.lock().close_handler = Some(callback);
     }
 
-    fn on_hit_test_window_control(&self, callback: Box<dyn FnMut() -> Option<WindowControlArea>>) {
+    fn on_hit_test_window_control(
+        &self,
+        callback: Box<dyn FnMut(Point<Pixels>) -> Option<WindowControlArea>>,
+    ) {
         self.0.lock().hit_test_window_control_callback = Some(callback);
     }
 

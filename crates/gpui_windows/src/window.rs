@@ -47,7 +47,7 @@ type RequestFrameCallback = Box<dyn FnMut(RequestFrameOptions)>;
 type WindowEventCallback = Box<dyn FnMut(PlatformInput) -> DispatchEventResult>;
 type WindowStatusCallback = Box<dyn FnMut(bool)>;
 type WindowResizeCallback = Box<dyn FnMut(Size<Pixels>, f32)>;
-type HitTestWindowControlCallback = Box<dyn FnMut() -> Option<WindowControlArea>>;
+type HitTestWindowControlCallback = Box<dyn FnMut(Point<Pixels>) -> Option<WindowControlArea>>;
 
 impl std::ops::Deref for WindowsWindow {
     type Target = WindowsWindowInner;
@@ -1002,7 +1002,10 @@ impl PlatformWindow for WindowsWindow {
         self.state.callbacks.close.set(Some(callback));
     }
 
-    fn on_hit_test_window_control(&self, callback: Box<dyn FnMut() -> Option<WindowControlArea>>) {
+    fn on_hit_test_window_control(
+        &self,
+        callback: Box<dyn FnMut(Point<Pixels>) -> Option<WindowControlArea>>,
+    ) {
         self.0
             .state
             .callbacks

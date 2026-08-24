@@ -1890,10 +1890,11 @@ impl Window {
         });
         platform_window.on_hit_test_window_control({
             let mut cx = cx.to_async();
-            Box::new(move || {
+            Box::new(move |position| {
                 handle
                     .update(&mut cx, |_, window, _cx| {
-                        window_control_at_mouse(&window.rendered_frame, &window.mouse_hit_test)
+                        let hit_test = window.rendered_frame.hit_test(position);
+                        window_control_at_mouse(&window.rendered_frame, &hit_test)
                     })
                     .log_err()
                     .unwrap_or(None)
@@ -7814,6 +7815,29 @@ mod tests {
             );
         })
         .expect("window remains available");
+    }
+
+    #[gpui::test]
+    fn platform_window_control_hit_test_uses_the_requested_position(cx: &mut TestAppContext) {
+        let window: AnyWindowHandle = cx.add_window(|_, _| NestedWindowControls).into();
+        cx.update_window(window, |_, window, cx| {
+            window.draw(cx).clear(cx);
+        })
+        .expect("window remains available");
+
+        let platform_window = cx.test_window(window);
+        assert_eq!(
+            platform_window.simulate_window_control_hit_test(point(px(20.), px(20.))),
+            Some(WindowControlArea::Close)
+        );
+        assert_eq!(
+            platform_window.simulate_window_control_hit_test(point(px(60.), px(20.))),
+            Some(WindowControlArea::Client)
+        );
+        assert_eq!(
+            platform_window.simulate_window_control_hit_test(point(px(100.), px(60.))),
+            Some(WindowControlArea::Drag)
+        );
     }
 
     struct FrameStatsView;

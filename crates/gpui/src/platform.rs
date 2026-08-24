@@ -867,7 +867,16 @@ pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
     fn on_resize(&self, callback: Box<dyn FnMut(Size<Pixels>, f32)>);
     fn on_moved(&self, callback: Box<dyn FnMut()>);
     fn on_should_close(&self, callback: Box<dyn FnMut() -> bool>);
-    fn on_hit_test_window_control(&self, callback: Box<dyn FnMut() -> Option<WindowControlArea>>);
+    /// Registers the hit test for client-drawn window chrome.
+    ///
+    /// The platform supplies the position from the native hit-test request
+    /// itself. Using the last delivered pointer event is one movement behind
+    /// on Windows, where `WM_NCHITTEST` precedes `WM_MOUSEMOVE`, and can make a
+    /// maximize button report client area on entry instead of `HTMAXBUTTON`.
+    fn on_hit_test_window_control(
+        &self,
+        callback: Box<dyn FnMut(Point<Pixels>) -> Option<WindowControlArea>>,
+    );
     fn on_close(&self, callback: Box<dyn FnOnce()>);
     fn on_appearance_changed(&self, callback: Box<dyn FnMut()>);
     fn on_button_layout_changed(&self, _callback: Box<dyn FnMut()>) {}
