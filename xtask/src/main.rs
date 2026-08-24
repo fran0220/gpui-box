@@ -3,9 +3,9 @@ use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 use std::thread;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, bail};
@@ -309,7 +309,7 @@ fn toast_accessibility_check() -> Result<()> {
     result.and(cleanup)
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 fn cleanup_gallery(gallery: &mut std::process::Child, description: &str) -> Result<()> {
     if gallery.try_wait()?.is_none() {
         gallery
@@ -353,9 +353,71 @@ fn swift_ax_check(pid: u32, mode: &str) -> Result<String> {
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "windows")]
 fn accessibility_check() -> Result<()> {
-    bail!("the native accessibility smoke check currently requires macOS")
+    step("cargo", &["build", "-p", "gpui-box-gallery"], None)?;
+    let executable = root().join("target/debug/gpui-box-gallery.exe");
+    for (scene, mode) in [("input", "editable"), ("form", "form"), ("menu", "menu")] {
+        let mut gallery = Command::new(&executable)
+            .args(["--scene", scene, "--theme", "studio-light"])
+            .current_dir(root())
+            .spawn()
+            .with_context(|| format!("launch the {scene} Windows UI Automation gallery"))?;
+        let result = windows_uia_check(gallery.id(), mode).map(|output| {
+            println!("Windows UIA {mode}: {}", output.trim());
+        });
+        let cleanup = cleanup_gallery(&mut gallery, "Windows UI Automation gallery");
+        result.and(cleanup)?;
+        thread::sleep(Duration::from_secs(1));
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn windows_uia_check(pid: u32, mode: &str) -> Result<String> {
+    let script = root().join("tools/accessibility/windows-smoke.ps1");
+    let mut child = Command::new("powershell.exe")
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+        ])
+        .arg(script)
+        .arg("-TargetProcessId")
+        .arg(pid.to_string())
+        .args(["-Mode", mode])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .with_context(|| format!("launch the bounded native Windows UIA {mode} check"))?;
+    let deadline = Instant::now() + Duration::from_secs(30);
+    while child.try_wait()?.is_none() {
+        if Instant::now() >= deadline {
+            child
+                .kill()
+                .context("stop the timed-out native UIA check")?;
+            let _ = child.wait();
+            bail!("native Windows UIA {mode} check timed out after 30 seconds");
+        }
+        thread::sleep(Duration::from_millis(50));
+    }
+    let output = child
+        .wait_with_output()
+        .context("reap the native Windows UIA check")?;
+    if !output.status.success() {
+        bail!(
+            "native Windows UIA {mode} check failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+fn accessibility_check() -> Result<()> {
+    bail!("the native accessibility smoke check currently requires macOS or Windows")
 }
 
 #[cfg(target_os = "macos")]
