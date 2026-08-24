@@ -12,11 +12,11 @@ $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 
-# The Windows PowerShell UIAutomationTypes assembly does not expose a named
-# identifier for newer UIA properties. LookupById is the documented bridge for
-# properties whose numerical identifier is known; FullDescription is 30159.
-$FullDescriptionProperty =
-    [System.Windows.Automation.AutomationProperty]::LookupById(30159)
+# Windows PowerShell ships a legacy managed UIAutomationTypes assembly whose
+# process-local identifier table stops before newer properties. Its documented
+# LookupById(30159) consequently returns null for FullDescription even on a
+# current OS. The native IUIAutomation API accepts the property id directly.
+Add-Type -Path (Join-Path $PSScriptRoot "windows-native-uia.cs")
 
 function Find-All {
     param(
@@ -61,6 +61,19 @@ function Find-Unique {
         Start-Sleep -Milliseconds 100
     } while ([DateTime]::UtcNow -lt $deadline)
     throw "expected one $ControlType named '$Name', found $($matches.Count)"
+}
+
+function Native-FullDescription {
+    param(
+        [string]$Name,
+        [int]$ControlTypeId
+    )
+
+    return [GpuiBox.Accessibility.NativeUia]::FullDescription(
+        $TargetProcessId,
+        $ControlTypeId,
+        $Name
+    )
 }
 
 function Wait-Until {
@@ -182,14 +195,8 @@ switch ($Mode) {
     "form" {
         $workspace = Find-Unique -ControlType ([System.Windows.Automation.ControlType]::Edit) -Name "Workspace name"
         $retention = Find-Unique -ControlType ([System.Windows.Automation.ControlType]::Edit) -Name "Retention"
-        $workspaceHelp = [string]$workspace.GetCurrentPropertyValue(
-            $FullDescriptionProperty,
-            $true
-        )
-        $retentionHelp = [string]$retention.GetCurrentPropertyValue(
-            $FullDescriptionProperty,
-            $true
-        )
+        $workspaceHelp = Native-FullDescription -Name $workspace.Current.Name -ControlTypeId 50004
+        $retentionHelp = Native-FullDescription -Name $retention.Current.Name -ControlTypeId 50004
         if ($workspaceHelp -ne "Shown wherever this workspace appears. A workspace with this name already exists.") {
             throw "Workspace name FullDescription was '$workspaceHelp'"
         }
