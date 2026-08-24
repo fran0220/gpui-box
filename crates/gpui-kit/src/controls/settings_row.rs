@@ -7,7 +7,7 @@
 //!
 //! [`SettingsList`] is the matching boundary for a complete settings page. It
 //! filters the visible words and caller-supplied search terms through the
-//! installed [`SearchMatcher`](crate::strings::SearchMatcher), preserves the
+//! installed [`SearchMatcher`], preserves the
 //! familiar section and row order, counts the answer, and owns the honest
 //! no-match state. The caller still owns the query and commonly gets it from a
 //! [`SearchField`](crate::controls::search::SearchField).
