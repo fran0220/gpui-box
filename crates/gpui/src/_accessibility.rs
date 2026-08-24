@@ -236,8 +236,8 @@
 //! ```
 //! GPUI reports the option as AccessKit focus only while the referenced node
 //! owns keyboard focus and both ids resolve uniquely in the current frame. It
-//! does not reparent the overlay. Use [`.aria_active_descendant()`]
-//! [StatefulInteractiveElement::aria_active_descendant] for an ordinary
+//! does not reparent the overlay. Use
+//! [`StatefulInteractiveElement::aria_active_descendant`] for an ordinary
 //! rendered descendant of its focused composite.
 //!
 //! ### Handling actions
