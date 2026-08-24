@@ -96,7 +96,6 @@ InlineEdit
 JsonView
 KeybindingRecorder
 KeymapEditor
-Layout
 List
 ListItem
 ListRow
