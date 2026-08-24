@@ -88,7 +88,7 @@ function Pattern {
 
 function One-CharacterRange {
     param(
-        [System.Windows.Automation.TextPatternRange]$Document,
+        $Document,
         [int]$Offset
     )
 
@@ -117,7 +117,7 @@ function One-CharacterRange {
 }
 
 function First-Bounds {
-    param([System.Windows.Automation.TextPatternRange]$Range)
+    param($Range)
 
     $rectangles = @($Range.GetBoundingRectangles())
     if ($rectangles.Count -eq 0) {
