@@ -322,6 +322,10 @@ string_keys! {
     // Settings row.
     SettingsManagedBy => "settings.managed-by", "Managed by {0}";
     SettingsInapplicable => "settings.inapplicable", "Not available here";
+    SettingsEmpty => "settings.empty", "No settings available";
+    SettingsNoResults => "settings.no-results", "No settings match this search";
+    SettingsResultOne => "settings.result-one", "1 setting";
+    SettingsResultMany => "settings.result-many", "{0} settings";
 
     // Tag field and tag.
     TagInputPlaceholder => "tag-input.placeholder", "Add";

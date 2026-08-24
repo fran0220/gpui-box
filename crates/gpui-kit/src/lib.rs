@@ -181,7 +181,7 @@ pub mod prelude {
     };
     pub use crate::controls::segmented::{Segment, SegmentedControl};
     pub use crate::controls::select::{Select, SelectEvent, SelectOption};
-    pub use crate::controls::settings_row::{SettingsRow, SettingsSection};
+    pub use crate::controls::settings_row::{SettingsList, SettingsRow, SettingsSection};
     pub use crate::controls::slider::Slider;
     pub use crate::controls::split_button::SplitButton;
     pub use crate::controls::tag_input::{TagInput, TagInputEvent};

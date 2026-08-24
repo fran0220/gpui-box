@@ -492,7 +492,7 @@ pub fn catalog() -> Vec<Scene> {
         Scene {
             name: "settings",
             build: settings,
-            shows: Shows::Subjects(&["SettingsRow", "SettingsSection"]),
+            shows: Shows::Subjects(&["SettingsList", "SettingsRow", "SettingsSection"]),
         },
         Scene {
             name: "detail",

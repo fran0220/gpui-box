@@ -455,9 +455,12 @@ is for. `Cascader`, `AnchorList`, and `DiagnosticsList` are also covered above;
 they compose the existing popover/menu, navigation, list, filter, badge, and
 status vocabulary instead of creating parallel application infrastructure.
 
-Then: mentions in a text field and search within settings. `UndoHistory` now
-covers the caller-owned revision list and reports restore intents without
-keeping or mutating an undo stack.
+Then: mentions in a text field. Settings search is now closed by `SettingsList`:
+it filters sections and rows through the installed locale matcher, includes
+visible row copy and explicit caller-authored aliases/control vocabulary,
+preserves the settings page's familiar order, counts the result, and presents a
+distinct no-match state. `UndoHistory` covers the caller-owned revision list
+and reports restore intents without keeping or mutating an undo stack.
 
 Application forms now cover date, time, range, files, and repeating sections.
 Date facts come from `DateAdapter`; file admissibility and display names come
@@ -503,6 +506,7 @@ presentation contract downstream.
 | Assistive technology gaps | Basic semantics, grapheme-based editable and read-only text runs, shared shaped character/caret geometry, selection actions, explicit live-region properties, and same-window labelled-by/described-by relationships now reach GPUI's AccessKit platform tree. macOS and Windows natively verify relationship-derived field name/help and editable character/caret geometry; Windows additionally verifies ValuePattern editing and MenuItem focus/invocation/lifetime. Native-child handoff, platform live-event verification, remaining Windows overlay/event sessions, and Linux AT-SPI validation are active foundation work; see `docs/accessibility.md` and `docs/foundation-roadmap.md`. |
 | Validation vocabulary | `ValidationState` is the caller-owned `Pending` / `Validating` / `Invalid { reason }` / `Valid` ladder. `FormField` presents it without painting in-flight work as failure; `SchemaForm` keeps field and whole-form validation separate and blocks submission while an explicitly managed check is pending or validating. Rules and timing remain host-owned. |
 | Schema field participation | `FieldVisibility` records the result of a host-owned condition without evaluating it. Hidden fields are absent from rendering and field validation; `HiddenSubmission::Omit` removes the subtree only from `submission_values`, while `Include` preserves its complete held subtree. `values` stays lossless, and a hidden object or repeated-list parent governs every descendant. |
+| Settings search | `SettingsList` takes the query a host commonly receives from `SearchField` and owns matching, filtering, result counting, and the no-match state for complete `SettingsSection` builders. Label, description, badge, displayed value, management reason, section context, and `SettingsRow::search_terms` all use the installed `SearchMatcher`; text hidden inside an arbitrary caller control must be named explicitly. Matches retain section and row order rather than turning preferences into a ranked command palette. |
 | Composition | `Slotted` lets a caller replace a node a component authored rather than only configure it. A component publishes only positions its public state model can actually reach as `SLOTS`, and a name outside that list panics rather than silently rendering nothing. Surfaces with loading and failure phases offer those distinct slots; an empty-only collection offers only `empty`. No component yet slots a node that is not a whole-region state. |
 | Size response | `Responsive` builds its content from its own measured width, so a component laid out in a sidebar and in a full-width page arranges itself differently without either of them consulting the window. `ContainerSize` reports `Unmeasured` for the one frame before there is a width rather than guessing at one. `Toolbar` now measures its cut from the widths it recorded last frame; `overflow_after` remains for a caller who already knows. What is still missing is a declarative breakpoint vocabulary — every caller writes its own thresholds — and there is no way to respond to a size a component cannot itself be given, such as the width of a sibling. |
 | Style escape hatch | `ThemeOverlay` installs a caller-adjusted `Theme` for one subtree and pops it afterwards, in every element phase, so an override cannot reach a sibling. What comes back is a whole `Theme`, so the subtree still reads a complete token set and a component inside it cannot tell it was overridden. There is still no way to override *one property of one instance* without constructing a theme for it, which is deliberate: a per-instance colour is how a library stops being one. |

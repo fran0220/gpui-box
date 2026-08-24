@@ -4,7 +4,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use gpui::{IntoElement, ParentElement, SharedString, TestAppContext};
+use gpui::{App, IntoElement, ParentElement, SharedString, TestAppContext};
 use gpui_kit::prelude::*;
 use gpui_kit_semantics::Role;
 use gpui_kit_testkit::harness::Harness;
@@ -159,6 +159,144 @@ fn a_dimmed_section_drops_the_heading_action_it_cannot_honour(cx: &mut TestAppCo
     assert!(
         harness.node("settings.sync.now").is_none(),
         "an action that cannot apply is not offered"
+    );
+}
+
+#[gpui::test]
+fn settings_search_filters_rows_from_caller_metadata_and_counts_the_answer(
+    cx: &mut TestAppContext,
+) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        SettingsList::new("settings.results")
+            .query("engine")
+            .section(
+                SettingsSection::new("settings.general", "General")
+                    .row(
+                        SettingsRow::new("settings.general.autosave", "Save automatically")
+                            .description("Write changes as they happen")
+                            .control(Switch::new("settings.general.autosave.switch").on(true)),
+                    )
+                    .row(
+                        SettingsRow::new("settings.general.runtime", "Native runtime")
+                            .description("Runs work on this machine")
+                            .search_terms(["engine", "local executor"])
+                            .control(Switch::new("settings.general.runtime.switch").on(false)),
+                    ),
+            )
+            .section(
+                SettingsSection::new("settings.sync", "Synchronisation").row(
+                    SettingsRow::new("settings.sync.history", "Sync history")
+                        .control(Switch::new("settings.sync.history.switch").on(false)),
+                ),
+            )
+            .into_any_element()
+    });
+
+    assert_eq!(
+        harness.node("settings.results").expect("published").value,
+        Some("1".to_string())
+    );
+    let status = harness.node("settings.results.status").expect("published");
+    assert_eq!(status.text.as_deref(), Some("1 setting"));
+    assert_eq!(status.value.as_deref(), Some("1"));
+    assert!(harness.node("settings.general.runtime").is_some());
+    assert!(harness.node("settings.general.runtime.switch").is_some());
+    assert!(harness.node("settings.general.autosave").is_none());
+    assert!(harness.node("settings.sync").is_none());
+}
+
+#[gpui::test]
+fn a_section_match_keeps_all_of_its_rows_in_their_familiar_order(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        SettingsList::new("settings.results")
+            .query("sync")
+            .section(
+                SettingsSection::new("settings.sync", "Synchronisation")
+                    .row(SettingsRow::new("settings.sync.settings", "Sync settings"))
+                    .row(SettingsRow::new("settings.sync.history", "Sync history")),
+            )
+            .into_any_element()
+    });
+
+    assert_eq!(
+        harness
+            .node("settings.results.status")
+            .expect("published")
+            .text
+            .as_deref(),
+        Some("2 settings")
+    );
+    let snapshot = harness.snapshot();
+    let rows: Vec<_> = snapshot
+        .nodes
+        .iter()
+        .filter(|node| node.role == Role::Row)
+        .map(|node| node.id.as_str())
+        .collect();
+    assert_eq!(rows, ["settings.sync.settings", "settings.sync.history"]);
+}
+
+#[gpui::test]
+fn a_settings_query_with_no_answer_is_not_an_empty_unsearched_page(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        SettingsList::new("settings.results")
+            .query("terminal")
+            .section(
+                SettingsSection::new("settings.general", "General").row(
+                    SettingsRow::new("settings.general.autosave", "Save automatically")
+                        .control(Switch::new("settings.general.autosave.switch").on(true)),
+                ),
+            )
+            .into_any_element()
+    });
+
+    assert_eq!(
+        harness
+            .node("settings.results.empty")
+            .expect("published")
+            .text
+            .as_deref(),
+        Some("No settings match this search")
+    );
+    assert!(harness.node("settings.general").is_none());
+    assert!(harness.node("settings.general.autosave.switch").is_none());
+}
+
+#[derive(Debug)]
+struct TestLocaleSearch;
+
+impl SearchMatcher for TestLocaleSearch {
+    fn rank(&self, query: &str, label: &str) -> Option<usize> {
+        (query == "机器" && label == "engine").then_some(0)
+    }
+}
+
+#[gpui::test]
+fn settings_search_uses_the_installed_locale_matcher(cx: &mut TestAppContext) {
+    let install = |cx: &mut App| {
+        gpui_kit::install(cx);
+        set_search(TestLocaleSearch, cx);
+    };
+    let mut harness = Harness::new(cx, install, |_, _| {
+        SettingsList::new("settings.results")
+            .query("机器")
+            .section(
+                SettingsSection::new("settings.general", "General").row(
+                    SettingsRow::new("settings.general.runtime", "Native runtime")
+                        .search_terms(["engine"]),
+                ),
+            )
+            .into_any_element()
+    });
+
+    assert!(harness.node("settings.general.runtime").is_some());
+    assert_eq!(
+        harness
+            .node("settings.results.status")
+            .expect("published")
+            .value
+            .as_deref(),
+        Some("1")
     );
 }
 

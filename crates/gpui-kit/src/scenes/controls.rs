@@ -1210,64 +1210,85 @@ pub(super) fn dropzone(_window: &mut Window, cx: &mut App) -> AnyElement {
 
 pub(super) fn settings(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
+    let general = || {
+        SettingsSection::new("scene.settings.general", "General")
+            .description("How this workspace behaves")
+            .row(
+                SettingsRow::new("scene.settings.general.autosave", "Save automatically")
+                    .description("Write changes as they happen")
+                    .control(
+                        Switch::new("scene.settings.general.autosave.switch")
+                            .named("Save automatically")
+                            .on(true)
+                            .on_change(|_, _, _| {}),
+                    ),
+            )
+            .row(
+                SettingsRow::new("scene.settings.general.runtime", "Native runtime")
+                    .description("Runs work on this machine instead of a host")
+                    .badge("Requires restart")
+                    .search_terms(["engine", "local executor"])
+                    .control(
+                        Switch::new("scene.settings.general.runtime.switch")
+                            .named("Native runtime")
+                            .on(false)
+                            .on_change(|_, _, _| {}),
+                    ),
+            )
+            .row(
+                SettingsRow::new("scene.settings.general.telemetry", "Usage reporting")
+                    .description("Nobody on this machine can change this")
+                    .value("Off")
+                    .managed("your administrator"),
+            )
+    };
+    let sync = || {
+        SettingsSection::new("scene.settings.sync", "Synchronisation")
+            .description("What travels between machines")
+            .dimmed_by("This workspace is local, so nothing synchronises.")
+            .row(
+                SettingsRow::new("scene.settings.sync.settings", "Sync settings")
+                    .description("Keyboard, theme, and editor preferences")
+                    .value("Off")
+                    .control(
+                        Switch::new("scene.settings.sync.settings.switch")
+                            .named("Sync settings")
+                            .on(false)
+                            .on_change(|_, _, _| {}),
+                    ),
+            )
+            .row(
+                SettingsRow::new("scene.settings.sync.history", "Sync history")
+                    .description("Runs and transcripts from the last 30 days")
+                    .value("Off")
+                    .control(
+                        Switch::new("scene.settings.sync.history.switch")
+                            .named("Sync history")
+                            .on(false)
+                            .on_change(|_, _, _| {}),
+                    ),
+            )
+    };
+
     stack(&theme)
-        .w(px(620.0))
+        .w_full()
         .child(
-            SettingsSection::new("scene.settings.general", "General")
-                .description("How this workspace behaves")
-                .row(
-                    SettingsRow::new("scene.settings.general.autosave", "Save automatically")
-                        .description("Write changes as they happen")
-                        .control(
-                            Switch::new("scene.settings.general.autosave.switch")
-                                .named("Save automatically")
-                                .on(true)
-                                .on_change(|_, _, _| {}),
-                        ),
+            row(&theme)
+                .w_full()
+                .items_start()
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .child(SettingsList::new("scene.settings.all").section(general())),
                 )
-                .row(
-                    SettingsRow::new("scene.settings.general.runtime", "Native runtime")
-                        .description("Runs work on this machine instead of a host")
-                        .badge("Requires restart")
-                        .control(
-                            Switch::new("scene.settings.general.runtime.switch")
-                                .named("Native runtime")
-                                .on(false)
-                                .on_change(|_, _, _| {}),
-                        ),
-                )
-                .row(
-                    SettingsRow::new("scene.settings.general.telemetry", "Usage reporting")
-                        .description("Nobody on this machine can change this")
-                        .value("Off")
-                        .managed("your administrator"),
-                ),
-        )
-        .child(
-            SettingsSection::new("scene.settings.sync", "Synchronisation")
-                .description("What travels between machines")
-                .dimmed_by("This workspace is local, so nothing synchronises.")
-                .row(
-                    SettingsRow::new("scene.settings.sync.settings", "Sync settings")
-                        .description("Keyboard, theme, and editor preferences")
-                        .value("Off")
-                        .control(
-                            Switch::new("scene.settings.sync.settings.switch")
-                                .named("Sync settings")
-                                .on(false)
-                                .on_change(|_, _, _| {}),
-                        ),
-                )
-                .row(
-                    SettingsRow::new("scene.settings.sync.history", "Sync history")
-                        .description("Runs and transcripts from the last 30 days")
-                        .value("Off")
-                        .control(
-                            Switch::new("scene.settings.sync.history.switch")
-                                .named("Sync history")
-                                .on(false)
-                                .on_change(|_, _, _| {}),
-                        ),
+                .child(
+                    div().flex_1().min_w_0().child(
+                        SettingsList::new("scene.settings.filtered")
+                            .query("sync")
+                            .section(general())
+                            .section(sync()),
+                    ),
                 ),
         )
         .into_any_element()

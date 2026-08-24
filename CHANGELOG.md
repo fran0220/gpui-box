@@ -123,6 +123,13 @@ modern FullDescription property that PowerShell's legacy managed identifier
 table cannot represent. Narrator speech, selection mutation, remaining overlay
 lifetime, and announcement events stay explicitly unverified.
 
+**A settings page no longer invents its own filter.** `SettingsList` searches
+the words `SettingsRow` already displays plus caller-authored aliases and
+opaque-control vocabulary through the installed locale matcher. It filters
+whole sections without reordering familiar settings, publishes the exact
+result count through `NumberAdapter`, and distinguishes an unpopulated page
+from a non-empty page whose query matched nothing.
+
 **An accordion body turns with the reading order.** The header honoured RTL and
 the body did not, so a disclosed section read as belonging to the one on the
 other side. Turning the text alone was not enough: a shrink-to-fit child is

@@ -3770,6 +3770,30 @@
       ]
     },
     {
+      "name": "SettingsList",
+      "kind": "builder",
+      "path": "gpui_kit::controls::SettingsList",
+      "source": "crates/gpui-kit/src/controls/settings_row.rs",
+      "summary": "Settings sections filtered by one caller-owned query.",
+      "construct": [
+        "new(ident: impl Into<Ident>) -> Self"
+      ],
+      "options": [
+        "query(query: impl Into<SharedString>) -> Self",
+        "section(section: SettingsSection) -> Self",
+        "sections(sections: impl IntoIterator<Item = SettingsSection>) -> Self"
+      ],
+      "commands": [],
+      "queries": [],
+      "slots": [
+        "empty"
+      ],
+      "reports": [],
+      "scenes": [
+        "settings"
+      ]
+    },
+    {
       "name": "SettingsRow",
       "kind": "builder",
       "path": "gpui_kit::controls::SettingsRow",
@@ -3783,6 +3807,7 @@
         "badge(badge: impl Into<SharedString>) -> Self",
         "value(value: impl Into<SharedString>) -> Self",
         "control(control: impl IntoElement) -> Self",
+        "search_terms(terms: impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
         "managed(controller: impl Into<SharedString>) -> Self"
       ],
       "commands": [],
@@ -13833,14 +13858,16 @@
       "capture": "cargo run -p xtask -- headless capture settings",
       "kind": "exhibit",
       "subjects": [
+        "SettingsList",
         "SettingsRow",
         "SettingsSection"
       ],
       "uses": [
+        "SettingsList",
         "SettingsRow",
         "SettingsSection"
       ],
-      "example": "fn settings(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(620.0))\n        .child(\n            SettingsSection::new(\"scene.settings.general\", \"General\")\n                .description(\"How this workspace behaves\")\n                .row(\n                    SettingsRow::new(\"scene.settings.general.autosave\", \"Save automatically\")\n                        .description(\"Write changes as they happen\")\n                        .control(\n                            Switch::new(\"scene.settings.general.autosave.switch\")\n                                .named(\"Save automatically\")\n                                .on(true)\n                                .on_change(|_, _, _| {}),\n                        ),\n                )\n                .row(\n                    SettingsRow::new(\"scene.settings.general.runtime\", \"Native runtime\")\n                        .description(\"Runs work on this machine instead of a host\")\n                        .badge(\"Requires restart\")\n                        .control(\n                            Switch::new(\"scene.settings.general.runtime.switch\")\n                                .named(\"Native runtime\")\n                                .on(false)\n                                .on_change(|_, _, _| {}),\n                        ),\n                )\n                .row(\n                    SettingsRow::new(\"scene.settings.general.telemetry\", \"Usage reporting\")\n                        .description(\"Nobody on this machine can change this\")\n                        .value(\"Off\")\n                        .managed(\"your administrator\"),\n                ),\n        )\n        .child(\n            SettingsSection::new(\"scene.settings.sync\", \"Synchronisation\")\n                .description(\"What travels between machines\")\n                .dimmed_by(\"This workspace is local, so nothing synchronises.\")\n                .row(\n                    SettingsRow::new(\"scene.settings.sync.settings\", \"Sync settings\")\n                        .description(\"Keyboard, theme, and editor preferences\")\n                        .value(\"Off\")\n                        .control(\n                            Switch::new(\"scene.settings.sync.settings.switch\")\n                                .named(\"Sync settings\")\n                                .on(false)\n                                .on_change(|_, _, _| {}),\n                        ),\n                )\n                .row(\n                    SettingsRow::new(\"scene.settings.sync.history\", \"Sync history\")\n                        .description(\"Runs and transcripts from the last 30 days\")\n                        .value(\"Off\")\n                        .control(\n                            Switch::new(\"scene.settings.sync.history.switch\")\n                                .named(\"Sync history\")\n                                .on(false)\n                                .on_change(|_, _, _| {}),\n                        ),\n                ),\n        )\n        .into_any_element()\n}"
+      "example": "fn settings(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    let general = || {\n        SettingsSection::new(\"scene.settings.general\", \"General\")\n            .description(\"How this workspace behaves\")\n            .row(\n                SettingsRow::new(\"scene.settings.general.autosave\", \"Save automatically\")\n                    .description(\"Write changes as they happen\")\n                    .control(\n                        Switch::new(\"scene.settings.general.autosave.switch\")\n                            .named(\"Save automatically\")\n                            .on(true)\n                            .on_change(|_, _, _| {}),\n                    ),\n            )\n            .row(\n                SettingsRow::new(\"scene.settings.general.runtime\", \"Native runtime\")\n                    .description(\"Runs work on this machine instead of a host\")\n                    .badge(\"Requires restart\")\n                    .search_terms([\"engine\", \"local executor\"])\n                    .control(\n                        Switch::new(\"scene.settings.general.runtime.switch\")\n                            .named(\"Native runtime\")\n                            .on(false)\n                            .on_change(|_, _, _| {}),\n                    ),\n            )\n            .row(\n                SettingsRow::new(\"scene.settings.general.telemetry\", \"Usage reporting\")\n                    .description(\"Nobody on this machine can change this\")\n                    .value(\"Off\")\n                    .managed(\"your administrator\"),\n            )\n    };\n    let sync = || {\n        SettingsSection::new(\"scene.settings.sync\", \"Synchronisation\")\n            .description(\"What travels between machines\")\n            .dimmed_by(\"This workspace is local, so nothing synchronises.\")\n            .row(\n                SettingsRow::new(\"scene.settings.sync.settings\", \"Sync settings\")\n                    .description(\"Keyboard, theme, and editor preferences\")\n                    .value(\"Off\")\n                    .control(\n                        Switch::new(\"scene.settings.sync.settings.switch\")\n                            .named(\"Sync settings\")\n                            .on(false)\n                            .on_change(|_, _, _| {}),\n                    ),\n            )\n            .row(\n                SettingsRow::new(\"scene.settings.sync.history\", \"Sync history\")\n                    .description(\"Runs and transcripts from the last 30 days\")\n                    .value(\"Off\")\n                    .control(\n                        Switch::new(\"scene.settings.sync.history.switch\")\n                            .named(\"Sync history\")\n                            .on(false)\n                            .on_change(|_, _, _| {}),\n                    ),\n            )\n    };\n\n    stack(&theme)\n        .w_full()\n        .child(\n            row(&theme)\n                .w_full()\n                .items_start()\n                .child(\n                    div()\n                        .flex_1()\n                        .min_w_0()\n                        .child(SettingsList::new(\"scene.settings.all\").section(general())),\n                )\n                .child(\n                    div().flex_1().min_w_0().child(\n                        SettingsList::new(\"scene.settings.filtered\")\n                            .query(\"sync\")\n                            .section(general())\n                            .section(sync()),\n                    ),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "detail",

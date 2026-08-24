@@ -155,6 +155,7 @@ SegmentedControl
 Select
 Self
 ServerList
+SettingsList
 SettingsRow
 SettingsSection
 Sidebar
