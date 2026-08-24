@@ -132,7 +132,8 @@ grapheme-safe selection, replacement, marked-composition, grouped undo/redo,
 secret-history refusal, input limits, and UTF-8/UTF-16 arithmetic consumed by
 both `TextInput` and `TextArea`. `EditableTextLayout` now owns the wrapped and
 bidirectional offset/point mapping, visual rows, range fragments, caret bounds,
-platform range envelope, and minimal reveal scroll used by both controls.
+platform range envelope, alignment-aware hit testing, and minimal reveal scroll
+used by both controls.
 `EditableStyleRuns<S>` supplies grapheme-safe, normalized style coverage that
 follows source replacement without choosing a rich-text format. The controls
 no longer carry private edit or character-geometry engines; product document

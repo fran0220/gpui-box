@@ -100,11 +100,12 @@ The product-neutral editable-text buffer, grapheme-safe selection and
 replacement transactions, marked-composition lifecycle, grouped undo/redo,
 length policy, and UTF-8/UTF-16 conversion are also subsequent GPUI Box work.
 The wrapped and bidirectional editable layout, byte/point and visual-row
-mapping, selection/caret geometry, reveal-scroll projection, and generic
-normalized style runs are part of the same subsequent work. They move the
-shared authority used by Kit's plain text controls to the framework boundary
-and use the existing shaping and Unicode segmentation dependencies; no editor,
-document-format, grammar, language-server, or product source is imported.
+mapping, alignment-aware hit testing, selection/caret geometry, reveal-scroll
+projection, and generic normalized style runs are part of the same subsequent
+work. They move the shared authority used by Kit's plain text controls to the
+framework boundary and use the existing shaping and Unicode segmentation
+dependencies; no editor, document-format, grammar, language-server, or product
+source is imported.
 
 The window-owned document-selection coordinator, caller-declared reading order,
 overlay scope isolation, truthful virtualized-copy coverage, and aggregate

@@ -291,7 +291,23 @@ impl WrappedLineLayout {
         position: Point<Pixels>,
         line_height: Pixels,
     ) -> Result<usize, usize> {
-        self._index_for_position(position, line_height, false)
+        self._index_for_position(position, line_height, false, None)
+    }
+
+    /// The index at a painted position when visual rows use an alignment.
+    ///
+    /// `align_width` must be the same width passed while painting. This keeps
+    /// editable hit testing on centered and right-aligned text in the same
+    /// geometry authority as the glyphs rather than making an editor reverse
+    /// the paint offset itself.
+    pub fn index_for_position_aligned(
+        &self,
+        position: Point<Pixels>,
+        line_height: Pixels,
+        align: TextAlign,
+        align_width: Pixels,
+    ) -> Result<usize, usize> {
+        self._index_for_position(position, line_height, false, Some((align, align_width)))
     }
 
     /// The closest index to a given position in this layout for the given line height.
@@ -304,7 +320,19 @@ impl WrappedLineLayout {
         position: Point<Pixels>,
         line_height: Pixels,
     ) -> Result<usize, usize> {
-        self._index_for_position(position, line_height, true)
+        self._index_for_position(position, line_height, true, None)
+    }
+
+    /// The closest index to a painted position when visual rows use an
+    /// alignment.
+    pub fn closest_index_for_position_aligned(
+        &self,
+        position: Point<Pixels>,
+        line_height: Pixels,
+        align: TextAlign,
+        align_width: Pixels,
+    ) -> Result<usize, usize> {
+        self._index_for_position(position, line_height, true, Some((align, align_width)))
     }
 
     fn _index_for_position(
@@ -312,6 +340,7 @@ impl WrappedLineLayout {
         mut position: Point<Pixels>,
         line_height: Pixels,
         closest: bool,
+        alignment: Option<(TextAlign, Pixels)>,
     ) -> Result<usize, usize> {
         let wrapped_line_ix = (position.y / line_height) as usize;
 
@@ -343,6 +372,14 @@ impl WrappedLineLayout {
             wrapped_line_end_index = self.unwrapped_layout.len;
             wrapped_line_end_x = self.unwrapped_layout.width;
         };
+
+        if let Some((align, align_width)) = alignment {
+            position.x -= Self::alignment_offset(
+                align,
+                align_width,
+                wrapped_line_end_x - wrapped_line_start_x,
+            );
+        }
 
         let mut position_in_unwrapped_line = position;
         position_in_unwrapped_line.x += wrapped_line_start_x;
@@ -392,6 +429,56 @@ impl WrappedLineLayout {
         }
 
         None
+    }
+
+    /// Returns the painted pixel position for a byte index when visual rows
+    /// use an alignment.
+    ///
+    /// The returned x coordinate includes the alignment offset inside
+    /// `align_width`; y remains relative to the line origin.
+    pub fn position_for_index_aligned(
+        &self,
+        index: usize,
+        line_height: Pixels,
+        align: TextAlign,
+        align_width: Pixels,
+    ) -> Option<Point<Pixels>> {
+        let mut position = self.position_for_index(index, line_height)?;
+        let row = (position.y / line_height) as usize;
+        let (start_x, end_x) = self.row_x_bounds(row)?;
+        position.x += Self::alignment_offset(align, align_width, end_x - start_x);
+        Some(position)
+    }
+
+    fn row_x_bounds(&self, row: usize) -> Option<(Pixels, Pixels)> {
+        if row > self.wrap_boundaries.len() {
+            return None;
+        }
+        let start_x = if row == 0 {
+            Pixels::ZERO
+        } else {
+            let boundary = self.wrap_boundaries[row - 1];
+            self.unwrapped_layout.runs[boundary.run_ix].glyphs[boundary.glyph_ix]
+                .position
+                .x
+        };
+        let end_x = if row < self.wrap_boundaries.len() {
+            let boundary = self.wrap_boundaries[row];
+            self.unwrapped_layout.runs[boundary.run_ix].glyphs[boundary.glyph_ix]
+                .position
+                .x
+        } else {
+            self.unwrapped_layout.width
+        };
+        Some((start_x, end_x))
+    }
+
+    fn alignment_offset(align: TextAlign, align_width: Pixels, row_width: Pixels) -> Pixels {
+        match align {
+            TextAlign::Left => Pixels::ZERO,
+            TextAlign::Center => (align_width - row_width) / 2.0,
+            TextAlign::Right => align_width - row_width,
+        }
     }
 
     /// Returns the painted rectangles occupied by a UTF-8 byte range.
@@ -1154,6 +1241,43 @@ mod tests {
                 Bounds::new(point(px(35.), px(7.)), size(px(10.), px(16.))),
                 Bounds::new(point(px(25.), px(23.)), size(px(10.), px(16.))),
             ]
+        );
+    }
+
+    #[test]
+    fn aligned_positions_and_hit_tests_share_wrapped_row_geometry() {
+        let mut layout = wrapped_layout(&[(0, 0.), (1, 10.), (2, 20.), (3, 30.)], 4, 40.);
+        layout.wrap_boundaries.push(WrapBoundary {
+            run_ix: 0,
+            glyph_ix: 2,
+        });
+        layout.wrap_width = Some(px(20.));
+
+        assert_eq!(
+            layout.position_for_index_aligned(1, px(16.), TextAlign::Right, px(40.)),
+            Some(point(px(30.), px(0.)))
+        );
+        assert_eq!(
+            layout.position_for_index_aligned(3, px(16.), TextAlign::Right, px(40.)),
+            Some(point(px(30.), px(16.)))
+        );
+        assert_eq!(
+            layout.closest_index_for_position_aligned(
+                point(px(30.), px(24.)),
+                px(16.),
+                TextAlign::Right,
+                px(40.),
+            ),
+            Ok(3)
+        );
+        assert_eq!(
+            layout.closest_index_for_position_aligned(
+                point(px(19.), px(24.)),
+                px(16.),
+                TextAlign::Right,
+                px(40.),
+            ),
+            Err(2)
         );
     }
 

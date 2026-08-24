@@ -47,8 +47,9 @@ Rounded shaped-text backgrounds added with that primitive are GPUI Box work as
 well.
 The editable-text buffer, grapheme-safe edit/selection transactions, marked
 composition, grouped undo/redo, UTF-8/UTF-16 arithmetic, shaped editable
-geometry, reveal scrolling, and generic normalized style runs are GPUI Box
-work and import no editor, document-format, grammar, or product source.
+geometry, alignment-aware hit testing, reveal scrolling, and generic normalized
+style runs are GPUI Box work and import no editor, document-format, grammar, or
+product source.
 The window-owned document-selection coordinator, isolated selection scopes,
 virtualized-copy coverage, and generic scroll-target contract are GPUI Box work
 over existing framework state and import no editor, product, or third-party

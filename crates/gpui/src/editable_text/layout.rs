@@ -122,6 +122,30 @@ impl EditableTextLayout {
         )
     }
 
+    /// The painted position of an offset when every hard line uses the same
+    /// alignment and width.
+    pub fn position_for_offset_aligned(
+        &self,
+        offset: usize,
+        align: TextAlign,
+        align_width: Pixels,
+    ) -> Point<Pixels> {
+        if self.lines.is_empty() {
+            return point(px(0.0), px(0.0));
+        }
+        let offset = offset.min(self.text_len);
+        let index = self.line_for_offset(offset);
+        let local = offset.saturating_sub(self.starts[index]);
+        let line = &self.lines[index];
+        let position = line
+            .position_for_index_aligned(local.min(line.len()), self.line_height, align, align_width)
+            .unwrap_or_default();
+        point(
+            position.x,
+            position.y + self.line_height * self.rows[index] as f32,
+        )
+    }
+
     /// The visual row containing a UTF-8 byte offset.
     pub fn row_for_offset(&self, offset: usize) -> usize {
         let y = self.position_for_offset(offset).y;
@@ -136,6 +160,22 @@ impl EditableTextLayout {
             ((position.y / self.line_height) as usize).min(self.total_rows - 1)
         };
         self.offset_at_row(row, position.x)
+    }
+
+    /// The offset nearest a painted point when every hard line uses the same
+    /// alignment and width.
+    pub fn offset_for_position_aligned(
+        &self,
+        position: Point<Pixels>,
+        align: TextAlign,
+        align_width: Pixels,
+    ) -> usize {
+        let row = if position.y < px(0.0) {
+            0
+        } else {
+            ((position.y / self.line_height) as usize).min(self.total_rows - 1)
+        };
+        self.offset_at_row_aligned(row, position.x, align, align_width)
     }
 
     /// The offset at an x coordinate on one visual row.
@@ -154,6 +194,30 @@ impl EditableTextLayout {
         );
         let offset = line
             .closest_index_for_position(local, self.line_height)
+            .unwrap_or_else(|offset| offset);
+        (self.starts[index] + offset).min(self.text_len)
+    }
+
+    /// The offset at an x coordinate on one aligned visual row.
+    pub fn offset_at_row_aligned(
+        &self,
+        row: usize,
+        x: Pixels,
+        align: TextAlign,
+        align_width: Pixels,
+    ) -> usize {
+        if self.lines.is_empty() {
+            return 0;
+        }
+        let row = row.min(self.total_rows - 1);
+        let index = self.line_for_row(row);
+        let line = &self.lines[index];
+        let local = point(
+            x,
+            self.line_height * (row - self.rows[index]) as f32 + self.line_height / 2.0,
+        );
+        let offset = line
+            .closest_index_for_position_aligned(local, self.line_height, align, align_width)
             .unwrap_or_else(|offset| offset);
         (self.starts[index] + offset).min(self.text_len)
     }
@@ -246,6 +310,22 @@ impl EditableTextLayout {
         )
     }
 
+    /// The caret rectangle when every hard line uses the given alignment.
+    pub fn caret_bounds_aligned(
+        &self,
+        offset: usize,
+        origin: Point<Pixels>,
+        width: Pixels,
+        align: TextAlign,
+        align_width: Pixels,
+    ) -> Bounds<Pixels> {
+        let position = self.position_for_offset_aligned(offset, align, align_width);
+        Bounds::new(
+            point(origin.x + position.x, origin.y + position.y),
+            size(width, self.line_height),
+        )
+    }
+
     /// The smallest rectangle containing a logical range.
     ///
     /// Input-method and native accessibility APIs often accept one rectangle
@@ -260,13 +340,13 @@ impl EditableTextLayout {
         align_width: Pixels,
     ) -> Bounds<Pixels> {
         if range.is_empty() {
-            return self.caret_bounds(range.start, origin, px(0.0));
+            return self.caret_bounds_aligned(range.start, origin, px(0.0), align, align_width);
         }
         let mut fragments = self
             .bounds_for_range(range.clone(), origin, align, align_width)
             .into_iter();
         let Some(first) = fragments.next() else {
-            return self.caret_bounds(range.start, origin, px(0.0));
+            return self.caret_bounds_aligned(range.start, origin, px(0.0), align, align_width);
         };
         fragments.fold(first, |bounds, fragment| {
             Bounds::from_corners(

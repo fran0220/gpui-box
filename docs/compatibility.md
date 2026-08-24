@@ -79,7 +79,8 @@ single-/multi-line normalization, byte and grapheme limits, and UTF-8/UTF-16
 conversion. Secret controls permanently refuse history. `EditableTextLayout`
 is the corresponding shaped-geometry authority: the same wrapped and
 bidirectional lines that paint answer byte/point hit tests, visual-row ranges,
-selection fragments, caret and platform range bounds, and reveal scrolling.
+selection fragments, aligned caret and hit geometry, platform range bounds,
+and reveal scrolling.
 `TextInput` and `TextArea` both consume it. `EditableStyleRuns<S>` keeps
 grapheme-safe, complete, normalized caller-owned style coverage across source
 replacement. Theme and document policy remain outside these framework
