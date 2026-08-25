@@ -39,6 +39,7 @@ mod shader_compilation {
             "underline",
             "monochrome_sprite",
             "subpixel_sprite",
+            "overlay_subpixel_sprite",
             "polychrome_sprite",
             "backdrop_blur",
             "backdrop_glass",

@@ -1276,6 +1276,20 @@ SubpixelSpriteFragmentOutput subpixel_sprite_fragment(MonochromeSpriteFragmentIn
     return output;
 }
 
+MonochromeSpriteVertexOutput overlay_subpixel_sprite_vertex(uint vertex_id: SV_VertexID, uint instance_id: SV_InstanceID) {
+    return monochrome_sprite_vertex(vertex_id, instance_id);
+}
+
+float4 overlay_subpixel_sprite_fragment(MonochromeSpriteFragmentInput input): SV_Target {
+    float3 sample = t_sprite.Sample(s_sprite, input.tile_position).rgb;
+    if (is_bgr) {
+        sample = sample.bgr;
+    }
+    float3 alpha_corrected = apply_contrast_and_gamma_correction3(sample, input.color.rgb, subpixel_enhanced_contrast, gamma_ratios);
+    float coverage = max(alpha_corrected.r, max(alpha_corrected.g, alpha_corrected.b));
+    return float4(input.color.rgb, input.color.a * coverage);
+}
+
 /*
 **
 **              Polychrome sprites

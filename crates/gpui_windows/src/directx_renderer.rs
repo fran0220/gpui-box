@@ -130,6 +130,7 @@ struct DirectXRenderPipelines {
     underline_pipeline: PipelineState<Underline>,
     mono_sprites: PipelineState<MonochromeSprite>,
     subpixel_sprites: PipelineState<SubpixelSprite>,
+    overlay_subpixel_sprites: PipelineState<SubpixelSprite>,
     poly_sprites: PipelineState<PolychromeSprite>,
     poly_additive_blend: ID3D11BlendState,
     poly_screen_blend: ID3D11BlendState,
@@ -496,7 +497,7 @@ impl DirectXRenderer {
                 _ => [0.0f32; 4],
             },
         )?;
-        self.draw_scene(scene)?;
+        self.draw_scene(scene, false)?;
         self.present()
     }
 
@@ -519,7 +520,7 @@ impl DirectXRenderer {
             .render_target_view
             .clone();
         self.pre_draw(&render_target_view, &[0.0f32; 4])?;
-        self.draw_scene(scene)?;
+        self.draw_scene(scene, false)?;
 
         let devices = self.devices.as_ref().context("devices missing")?;
         let resources = self.resources.as_ref().context("resources missing")?;
@@ -616,7 +617,7 @@ impl DirectXRenderer {
                 _ => [0.0; 4],
             },
         )?;
-        self.draw_scene(&base_scene)?;
+        self.draw_scene(&base_scene, false)?;
 
         let overlay_view = self
             .overlay_resources
@@ -625,7 +626,7 @@ impl DirectXRenderer {
             .render_target_view
             .clone();
         self.pre_draw(&overlay_view, &[0.0; 4])?;
-        self.draw_scene(&overlay_scene)?;
+        self.draw_scene(&overlay_scene, true)?;
 
         unsafe {
             self.resources
@@ -670,9 +671,9 @@ impl DirectXRenderer {
         ))
     }
 
-    fn draw_scene(&mut self, scene: &Scene) -> Result<()> {
+    fn draw_scene(&mut self, scene: &Scene, transparent_overlay: bool) -> Result<()> {
         self.collect_probes();
-        self.upload_scene_buffers(scene)?;
+        self.upload_scene_buffers(scene, transparent_overlay)?;
         let annotation = self
             .devices
             .as_ref()
@@ -710,7 +711,12 @@ impl DirectXRenderer {
                     self.draw_monochrome_sprites(texture_id, range.start, range.len())
                 }
                 PrimitiveBatch::SubpixelSprites { texture_id, range } => {
-                    self.draw_subpixel_sprites(texture_id, range.start, range.len())
+                    self.draw_subpixel_sprites(
+                        texture_id,
+                        range.start,
+                        range.len(),
+                        transparent_overlay,
+                    )
                 }
                 PrimitiveBatch::PolychromeSprites {
                     texture_id,
@@ -1029,7 +1035,7 @@ impl DirectXRenderer {
         Ok(())
     }
 
-    fn upload_scene_buffers(&mut self, scene: &Scene) -> Result<()> {
+    fn upload_scene_buffers(&mut self, scene: &Scene, transparent_overlay: bool) -> Result<()> {
         let devices = self.devices.as_ref().context("devices missing")?;
 
         if !scene.shadows.is_empty() {
@@ -1065,7 +1071,12 @@ impl DirectXRenderer {
         }
 
         if !scene.subpixel_sprites.is_empty() {
-            self.pipelines.subpixel_sprites.update_buffer(
+            let pipeline = if transparent_overlay {
+                &mut self.pipelines.overlay_subpixel_sprites
+            } else {
+                &mut self.pipelines.subpixel_sprites
+            };
+            pipeline.update_buffer(
                 &devices.device,
                 &devices.device_context,
                 &scene.subpixel_sprites,
@@ -1275,13 +1286,19 @@ impl DirectXRenderer {
         texture_id: AtlasTextureId,
         start: usize,
         len: usize,
+        transparent_overlay: bool,
     ) -> Result<()> {
         if len == 0 {
             return Ok(());
         }
         let devices = self.devices.as_ref().context("devices missing")?;
         let texture_view = self.atlas.get_texture_view(texture_id);
-        self.pipelines.subpixel_sprites.draw_range_with_texture(
+        let pipeline = if transparent_overlay {
+            &self.pipelines.overlay_subpixel_sprites
+        } else {
+            &self.pipelines.subpixel_sprites
+        };
+        pipeline.draw_range_with_texture(
             &devices.device_context,
             &texture_view,
             self.globals
@@ -1502,6 +1519,18 @@ impl DirectXRenderPipelines {
             512,
             create_blend_state_for_subpixel_rendering(device)?,
         )?;
+        // Scene production normally rerasterizes overlay glyphs as
+        // monochrome. This alpha-writing fallback is the final renderer
+        // invariant for retained/replayed subpixel atlas tiles that cross the
+        // split: collapse their RGB coverage to one mask instead of submitting
+        // ClearType's deliberately alpha-less blend state to DirectComposition.
+        let overlay_subpixel_sprites = PipelineState::new(
+            device,
+            "overlay_subpixel_sprite_pipeline",
+            ShaderModule::OverlaySubpixelSprite,
+            512,
+            create_blend_state(device)?,
+        )?;
         let backdrop_blur = BackdropPipeline::new(
             device,
             ShaderModule::BackdropBlur,
@@ -1532,6 +1561,7 @@ impl DirectXRenderPipelines {
             underline_pipeline,
             mono_sprites,
             subpixel_sprites,
+            overlay_subpixel_sprites,
             poly_sprites,
             poly_additive_blend,
             poly_screen_blend,
@@ -2663,6 +2693,7 @@ pub(crate) mod shader_resources {
         PathSprite,
         MonochromeSprite,
         SubpixelSprite,
+        OverlaySubpixelSprite,
         PolychromeSprite,
         EmojiRasterization,
         BackdropBlur,
@@ -2735,6 +2766,10 @@ pub(crate) mod shader_resources {
                 ShaderModule::SubpixelSprite => match target {
                     ShaderTarget::Vertex => SUBPIXEL_SPRITE_VERTEX_BYTES,
                     ShaderTarget::Fragment => SUBPIXEL_SPRITE_FRAGMENT_BYTES,
+                },
+                ShaderModule::OverlaySubpixelSprite => match target {
+                    ShaderTarget::Vertex => OVERLAY_SUBPIXEL_SPRITE_VERTEX_BYTES,
+                    ShaderTarget::Fragment => OVERLAY_SUBPIXEL_SPRITE_FRAGMENT_BYTES,
                 },
                 ShaderModule::PolychromeSprite => match target {
                     ShaderTarget::Vertex => POLYCHROME_SPRITE_VERTEX_BYTES,
@@ -2841,6 +2876,7 @@ pub(crate) mod shader_resources {
                 ShaderModule::PathSprite => "path_sprite",
                 ShaderModule::MonochromeSprite => "monochrome_sprite",
                 ShaderModule::SubpixelSprite => "subpixel_sprite",
+                ShaderModule::OverlaySubpixelSprite => "overlay_subpixel_sprite",
                 ShaderModule::PolychromeSprite => "polychrome_sprite",
                 ShaderModule::EmojiRasterization => "emoji_rasterization",
                 // Both backdrop passes share one vertex shader, which draws

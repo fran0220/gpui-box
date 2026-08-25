@@ -61,7 +61,9 @@ Text on the opaque base plane retains platform subpixel rendering; text in the
 transparent overlay plane uses grayscale antialiasing because RGB subpixel
 coverage cannot carry meaningful alpha through native composition. Dialogs,
 menus, prompts, drag previews, and tooltips therefore keep visible glyphs above
-native surfaces without weakening ordinary document text.
+native surfaces without weakening ordinary document text. Cache reuse includes
+the owning plane, and Direct3D converts any retained RGB coverage that still
+crosses the split into one alpha-writing mask as the renderer's final invariant.
 
 Renderer-backed linear, elliptical radial, and conic gradients accept two
 through eight ordered color stops for both quads and filled paths. Radial

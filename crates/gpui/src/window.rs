@@ -3345,6 +3345,11 @@ impl Window {
         #[cfg(any(feature = "inspector", debug_assertions))]
         let inspector_element = self.prepaint_inspector(_inspector_width, cx);
 
+        // Deferred draws and subsequent window-level overlays paint on the
+        // transparent scene plane. Mark that ownership during prepaint too:
+        // a cached view that previously lived on the opaque root must rerender
+        // rather than replay subpixel glyph sprites into the alpha plane.
+        self.begin_overlay_scene_paint();
         self.prepaint_deferred_draws(cx);
 
         let mut prompt_element = None;
@@ -3373,6 +3378,7 @@ impl Window {
         self.mouse_hit_test = self.next_frame.hit_test(self.mouse_position);
 
         // Now actually paint the elements.
+        self.painting_transparent_overlay = false;
         self.invalidator.set_phase(DrawPhase::Paint);
         root_element.paint(self, cx);
 
@@ -3431,6 +3437,10 @@ impl Window {
 
     fn begin_overlay_scene_paint(&mut self) {
         self.painting_transparent_overlay = self.scene_overlay_enabled.get();
+    }
+
+    pub(crate) fn is_painting_transparent_overlay(&self) -> bool {
+        self.painting_transparent_overlay
     }
 
     fn prepaint_tooltip(&mut self, cx: &mut App) -> Option<AnyElement> {
@@ -7779,13 +7789,14 @@ mod tests {
     };
 
     use crate::{
-        AnyWindowHandle, AppContext as _, Bounds, Context, DragMoveEvent, Empty,
+        AnyWindowHandle, AppContext as _, Bounds, Context, DragMoveEvent, Empty, Entity,
         ExternalDragPayload, ExternalDrop, ExternalDropData, ExternalDropEvent, ExternalDropItem,
         ExternalImage, ExternalPaths, FileDragPaths, FileDropEvent, FocusHandle, FontId,
         ImageFormat, InputEvent as _, InteractiveElement as _, IntoElement, MouseButton,
         MouseDownEvent, MouseMoveEvent, ParentElement, Pixels, Point, Render,
-        StatefulInteractiveElement as _, Styled, TestAppContext, TextRenderingMode, Window,
-        WindowAppearance, WindowControlArea, WindowOptions, canvas, div, point, px, size,
+        StatefulInteractiveElement as _, StyleRefinement, Styled, TestAppContext,
+        TextRenderingMode, Window, WindowAppearance, WindowControlArea, WindowOptions, canvas,
+        deferred, div, point, px, size,
     };
 
     use super::window_control_at_mouse;
@@ -7795,6 +7806,38 @@ mod tests {
     impl Render for EmptyView {
         fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
             div()
+        }
+    }
+
+    struct CachedOverlayText {
+        subpixel_decisions: Rc<RefCell<Vec<bool>>>,
+    }
+
+    impl Render for CachedOverlayText {
+        fn render(&mut self, window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+            self.subpixel_decisions
+                .borrow_mut()
+                .push(window.should_use_subpixel_rendering(FontId(0), px(14.)));
+            div().size_full().child("Overlay text")
+        }
+    }
+
+    struct MovesCachedTextToOverlay {
+        text: Entity<CachedOverlayText>,
+        deferred: bool,
+    }
+
+    impl Render for MovesCachedTextToOverlay {
+        fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+            let text = self
+                .text
+                .clone()
+                .cached(StyleRefinement::default().size_full());
+            div().size_full().child(if self.deferred {
+                deferred(text).into_any_element()
+            } else {
+                text.into_any_element()
+            })
         }
     }
 
@@ -7874,6 +7917,49 @@ mod tests {
             assert!(window.should_use_subpixel_rendering(FontId(0), px(14.)));
         })
         .expect("window remains available");
+    }
+
+    #[gpui::test]
+    fn cached_text_repaints_when_it_moves_to_a_transparent_scene_overlay(cx: &mut TestAppContext) {
+        cx.update(|cx| cx.set_text_rendering_mode(TextRenderingMode::Subpixel));
+        let subpixel_decisions = Rc::new(RefCell::new(Vec::new()));
+        let window = cx.add_window({
+            let subpixel_decisions = subpixel_decisions.clone();
+            move |_, cx| MovesCachedTextToOverlay {
+                text: cx.new(|_| CachedOverlayText { subpixel_decisions }),
+                deferred: false,
+            }
+        });
+        let platform_window = cx.test_window(window.into());
+        platform_window.set_subpixel_rendering_supported(true);
+        platform_window.set_scene_overlay_supported(true);
+        subpixel_decisions.borrow_mut().clear();
+        window
+            .update(cx, |root, _, cx| {
+                root.text.update(cx, |_, cx| cx.notify());
+            })
+            .expect("window remains available");
+
+        cx.update_window(window.into(), |_, window, cx| {
+            window
+                .enable_scene_overlay()
+                .expect("test platform should accept a scene overlay");
+            window.draw(cx).clear(cx);
+        })
+        .expect("window remains available");
+        assert_eq!(&*subpixel_decisions.borrow(), &[true]);
+
+        window
+            .update(cx, |root, _, cx| {
+                root.deferred = true;
+                cx.notify();
+            })
+            .expect("window remains available");
+        cx.update_window(window.into(), |_, window, cx| {
+            window.draw(cx).clear(cx);
+        })
+        .expect("window remains available");
+        assert_eq!(&*subpixel_decisions.borrow(), &[true, false]);
     }
 
     #[gpui::test]
