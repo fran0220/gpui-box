@@ -122,6 +122,28 @@ struct OverlayResources {
     render_target_view: Option<ID3D11RenderTargetView>,
 }
 
+/// The texture and view that own the scene currently being drawn.
+///
+/// Offscreen passes must restore this view before the next primitive batch;
+/// layered windows draw their base and overlay scenes through the same
+/// pipelines, so the primary swap-chain target is not always the active one.
+struct SceneRenderTarget {
+    texture: ID3D11Texture2D,
+    view: Option<ID3D11RenderTargetView>,
+}
+
+impl SceneRenderTarget {
+    fn new(
+        texture: &Option<ID3D11Texture2D>,
+        view: &Option<ID3D11RenderTargetView>,
+    ) -> Result<Self> {
+        Ok(Self {
+            texture: texture.as_ref().context("missing render target")?.clone(),
+            view: Some(view.as_ref().context("missing render target view")?.clone()),
+        })
+    }
+}
+
 struct DirectXRenderPipelines {
     shadow_pipeline: PipelineState<Shadow>,
     quad_pipeline: PipelineState<Quad>,
@@ -484,20 +506,18 @@ impl DirectXRenderer {
             // and so likely do not have the textures anymore that are required for drawing
             return Ok(());
         }
-        let render_target_view = self
-            .resources
-            .as_ref()
-            .context("resources missing")?
-            .render_target_view
-            .clone();
+        let render_target = {
+            let resources = self.resources.as_ref().context("resources missing")?;
+            SceneRenderTarget::new(&resources.render_target, &resources.render_target_view)?
+        };
         self.pre_draw(
-            &render_target_view,
+            &render_target.view,
             &match background_appearance {
                 WindowBackgroundAppearance::Opaque => [1.0f32; 4],
                 _ => [0.0f32; 4],
             },
         )?;
-        self.draw_scene(scene, false)?;
+        self.draw_scene(scene, &render_target, false)?;
         self.present()
     }
 
@@ -513,14 +533,12 @@ impl DirectXRenderer {
             !self.skip_draws,
             "the renderer is recovering from a lost device and has no textures to draw with"
         );
-        let render_target_view = self
-            .resources
-            .as_ref()
-            .context("resources missing")?
-            .render_target_view
-            .clone();
-        self.pre_draw(&render_target_view, &[0.0f32; 4])?;
-        self.draw_scene(scene, false)?;
+        let render_target = {
+            let resources = self.resources.as_ref().context("resources missing")?;
+            SceneRenderTarget::new(&resources.render_target, &resources.render_target_view)?
+        };
+        self.pre_draw(&render_target.view, &[0.0f32; 4])?;
+        self.draw_scene(scene, &render_target, false)?;
 
         let devices = self.devices.as_ref().context("devices missing")?;
         let resources = self.resources.as_ref().context("resources missing")?;
@@ -604,29 +622,28 @@ impl DirectXRenderer {
         overlay_scene.replay(split..scene.len(), scene);
         overlay_scene.finish();
 
-        let base_view = self
-            .resources
-            .as_ref()
-            .context("resources missing")?
-            .render_target_view
-            .clone();
+        let base_target = {
+            let resources = self.resources.as_ref().context("resources missing")?;
+            SceneRenderTarget::new(&resources.render_target, &resources.render_target_view)?
+        };
         self.pre_draw(
-            &base_view,
+            &base_target.view,
             &match background_appearance {
                 WindowBackgroundAppearance::Opaque => [1.0; 4],
                 _ => [0.0; 4],
             },
         )?;
-        self.draw_scene(&base_scene, false)?;
+        self.draw_scene(&base_scene, &base_target, false)?;
 
-        let overlay_view = self
-            .overlay_resources
-            .as_ref()
-            .context("overlay resources missing")?
-            .render_target_view
-            .clone();
-        self.pre_draw(&overlay_view, &[0.0; 4])?;
-        self.draw_scene(&overlay_scene, true)?;
+        let overlay_target = {
+            let resources = self
+                .overlay_resources
+                .as_ref()
+                .context("overlay resources missing")?;
+            SceneRenderTarget::new(&resources.render_target, &resources.render_target_view)?
+        };
+        self.pre_draw(&overlay_target.view, &[0.0; 4])?;
+        self.draw_scene(&overlay_scene, &overlay_target, true)?;
 
         unsafe {
             self.resources
@@ -671,7 +688,12 @@ impl DirectXRenderer {
         ))
     }
 
-    fn draw_scene(&mut self, scene: &Scene, transparent_overlay: bool) -> Result<()> {
+    fn draw_scene(
+        &mut self,
+        scene: &Scene,
+        render_target: &SceneRenderTarget,
+        transparent_overlay: bool,
+    ) -> Result<()> {
         self.collect_probes();
         self.upload_scene_buffers(scene, transparent_overlay)?;
         let annotation = self
@@ -693,7 +715,7 @@ impl DirectXRenderer {
                 let Some(glass) = pending_glass.next() else {
                     break;
                 };
-                self.draw_backdrop_glass(glass, &mut remaining_backdrop_passes)?;
+                self.draw_backdrop_glass(glass, render_target, &mut remaining_backdrop_passes)?;
             }
             let _annotation = annotation
                 .as_ref()
@@ -703,7 +725,7 @@ impl DirectXRenderer {
                 PrimitiveBatch::Quads(range) => self.draw_quads(range.start, range.len()),
                 PrimitiveBatch::Paths(range) => {
                     let paths = &scene.paths[range];
-                    self.draw_paths_to_intermediate(paths)?;
+                    self.draw_paths_to_intermediate(paths, render_target)?;
                     self.draw_paths_from_intermediate(paths)
                 }
                 PrimitiveBatch::Underlines(range) => self.draw_underlines(range.start, range.len()),
@@ -750,7 +772,7 @@ impl DirectXRenderer {
         // A surface ordered above everything painted has no batch after it to
         // trigger on, and still has a backdrop.
         for glass in pending_glass {
-            self.draw_backdrop_glass(glass, &mut remaining_backdrop_passes)?;
+            self.draw_backdrop_glass(glass, render_target, &mut remaining_backdrop_passes)?;
         }
         if !self.probe_requests.is_empty() {
             self.probe_pending = std::mem::take(&mut self.probe_requests);
@@ -768,6 +790,7 @@ impl DirectXRenderer {
     fn draw_backdrop_glass(
         &mut self,
         glass: &BackdropGlass,
+        render_target: &SceneRenderTarget,
         remaining_passes: &mut usize,
     ) -> Result<()> {
         let probe_slot = glass.material.probe;
@@ -788,10 +811,6 @@ impl DirectXRenderer {
         let devices = self.devices.as_ref().context("devices missing")?;
         let resources = self.resources.as_ref().context("resources missing")?;
         let device_context = &devices.device_context;
-        let render_target = resources
-            .render_target
-            .as_ref()
-            .context("missing render target")?;
         let backdrop_params_buffer = self
             .globals
             .backdrop_params_buffer
@@ -804,7 +823,7 @@ impl DirectXRenderer {
         unsafe {
             // Take the backdrop out of the render target. Everything painted
             // below this order is in it, and nothing above it has been drawn.
-            device_context.CopyResource(&resources.backdrop_snapshot, render_target);
+            device_context.CopyResource(&resources.backdrop_snapshot, &render_target.texture);
             device_context.RSSetViewports(Some(slice::from_ref(&resources.viewport)));
             device_context.PSSetConstantBuffers(
                 2,
@@ -876,8 +895,7 @@ impl DirectXRenderer {
         update_buffer(device_context, backdrop_params_buffer, &[params])?;
         unsafe {
             device_context.PSSetShaderResources(0, Some(&[None]));
-            device_context
-                .OMSetRenderTargets(Some(slice::from_ref(&resources.render_target_view)), None);
+            device_context.OMSetRenderTargets(Some(slice::from_ref(&render_target.view)), None);
         }
         self.pipelines
             .backdrop_glass
@@ -1126,7 +1144,11 @@ impl DirectXRenderer {
         )
     }
 
-    fn draw_paths_to_intermediate(&mut self, paths: &[Path<ScaledPixels>]) -> Result<()> {
+    fn draw_paths_to_intermediate(
+        &mut self,
+        paths: &[Path<ScaledPixels>],
+        render_target: &SceneRenderTarget,
+    ) -> Result<()> {
         if paths.is_empty() {
             return Ok(());
         }
@@ -1183,10 +1205,11 @@ impl DirectXRenderer {
                 0,
                 RENDER_TARGET_FORMAT,
             );
-            // Restore main render target
+            // Restore the scene target. In a layered window this may be the
+            // transparent overlay rather than the primary swap chain.
             devices
                 .device_context
-                .OMSetRenderTargets(Some(slice::from_ref(&resources.render_target_view)), None);
+                .OMSetRenderTargets(Some(slice::from_ref(&render_target.view)), None);
         }
 
         Ok(())

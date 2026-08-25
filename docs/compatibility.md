@@ -64,6 +64,9 @@ menus, prompts, drag previews, and tooltips therefore keep visible glyphs above
 native surfaces without weakening ordinary document text. Cache reuse includes
 the owning plane, and Direct3D converts any retained RGB coverage that still
 crosses the split into one alpha-writing mask as the renderer's final invariant.
+Direct3D path and backdrop passes restore the plane that invoked them after
+using their scratch targets, so subsequent overlay batches cannot leak into the
+opaque base scene.
 
 Renderer-backed linear, elliptical radial, and conic gradients accept two
 through eight ordered color stops for both quads and filled paths. Radial

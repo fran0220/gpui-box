@@ -26,7 +26,8 @@ programmatic close requests, current-request-position native caption hit tests,
 corrected Windows transparent-titlebar resize-frame metrics, and host-reserved
 Toast edges are GPUI Box work over existing platform and layout APIs and import
 no additional source. Grayscale glyph rasterization on transparent native
-scene-overlay planes is GPUI Box renderer work and likewise imports no source.
+scene-overlay planes and Direct3D offscreen-pass target restoration are GPUI
+Box renderer work and likewise import no source.
 The renderer-backed linear, elliptical radial, and conic gradient primitives
 for up to eight ordered stops, including their Metal, Direct3D, WGPU, and
 WebGL shaders, are GPUI Box work and import no additional source.

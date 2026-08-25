@@ -17,7 +17,9 @@ RGB subpixel atlas tiles that nevertheless reach the transparent split as
 coverage masks and writes real alpha for DirectComposition instead of using
 ClearType's deliberately alpha-less blend state. Moving or replaying a dialog,
 menu, prompt, drag preview, or tooltip across the native-view boundary can no
-longer retain its shapes while dropping its glyphs.
+longer retain its shapes while dropping its glyphs. Direct3D path and backdrop
+passes also restore the scene plane that invoked them instead of unconditionally
+returning later batches to the primary swap chain.
 
 **Text-area completions have one product-neutral seam.** `TextArea` exposes
 current-frame range and caret geometry, explicit selection, and a one-step
