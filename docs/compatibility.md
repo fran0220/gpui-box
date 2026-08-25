@@ -56,6 +56,13 @@ already occupied by its own chrome through `ToastLayer::reserved_edges`.
 `StatusBar::height` exposes the matching shared strip height, so applications
 do not copy framework geometry to keep persistent notifications clear.
 
+Native child views sit between GPUI's base and deferred-overlay scene planes.
+Text on the opaque base plane retains platform subpixel rendering; text in the
+transparent overlay plane uses grayscale antialiasing because RGB subpixel
+coverage cannot carry meaningful alpha through native composition. Dialogs,
+menus, prompts, drag previews, and tooltips therefore keep visible glyphs above
+native surfaces without weakening ordinary document text.
+
 Renderer-backed linear, elliptical radial, and conic gradients accept two
 through eight ordered color stops for both quads and filled paths. Radial
 centres and radii are normalized to the painted bounds; conic gradients start

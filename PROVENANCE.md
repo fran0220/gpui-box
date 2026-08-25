@@ -64,10 +64,10 @@ Window-control hit testing that gives a later-painted nested caption control or
 explicit client area precedence over its enclosing drag area, vetoable
 programmatic close requests, current-request-position native caption hit tests,
 corrected Windows horizontal/vertical resize-frame metrics for transparent
-title bars, and host-reserved Toast edges are also subsequent GPUI Box work.
-They change only framework-owned window and overlay behavior and use the
-existing operating-system and GPUI layout APIs; they import no additional
-source.
+title bars, host-reserved Toast edges, and grayscale glyph rasterization on
+transparent native scene-overlay planes are also subsequent GPUI Box work. They
+change only framework-owned window and overlay behavior and use the existing
+operating-system and GPUI layout APIs; they import no additional source.
 
 The renderer-backed linear, elliptical radial, and conic gradient primitives
 with up to eight ordered color stops are also subsequent GPUI Box work. Their

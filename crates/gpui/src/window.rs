@@ -1138,6 +1138,14 @@ pub struct Window {
     pub(crate) invalidator: WindowInvalidator,
     pub(crate) removed: bool,
     pub(crate) platform_window: Box<dyn PlatformWindow>,
+    /// Whether the platform accepted a transparent scene plane above native
+    /// child views. This is window state rather than frame state: once native
+    /// hosting creates the plane, every later deferred overlay uses it.
+    scene_overlay_enabled: Cell<bool>,
+    /// True only while painting primitives that will land on that transparent
+    /// plane. Subpixel glyphs require a known opaque destination, so text in
+    /// this phase must use grayscale antialiasing.
+    painting_transparent_overlay: bool,
     display_id: Option<DisplayId>,
     is_resizable: bool,
     is_minimizable: bool,
@@ -1965,6 +1973,8 @@ impl Window {
             invalidator,
             removed: false,
             platform_window,
+            scene_overlay_enabled: Cell::new(false),
+            painting_transparent_overlay: false,
             display_id,
             is_resizable,
             is_minimizable,
@@ -2166,15 +2176,21 @@ impl Window {
     /// views hosted by this window.
     ///
     /// The root scene remains on the primary surface. Deferred elements and
-    /// window-level overlays are rendered on the transparent plane.
+    /// window-level overlays are rendered on the transparent plane. Glyphs on
+    /// that plane use grayscale antialiasing because subpixel coverage cannot
+    /// be alpha-composited; root-scene text keeps the platform rendering mode.
     pub fn enable_scene_overlay(&self) -> anyhow::Result<()> {
-        self.platform_window.enable_scene_overlay()
+        self.platform_window.enable_scene_overlay()?;
+        self.scene_overlay_enabled.set(true);
+        Ok(())
     }
 
     /// Creates a native surface slot between the root scene and GPUI's
     /// deferred/window-level overlay scene.
     pub fn create_native_surface(&self) -> anyhow::Result<Rc<dyn crate::PlatformNativeSurface>> {
-        self.platform_window.create_native_surface()
+        let surface = self.platform_window.create_native_surface()?;
+        self.scene_overlay_enabled.set(true);
+        Ok(surface)
     }
 
     /// Mark the window as dirty, scheduling it to be redrawn on the next frame.
@@ -3284,6 +3300,7 @@ impl Window {
     fn draw_roots(&mut self, cx: &mut App) {
         self.invalidator.set_phase(DrawPhase::Prepaint);
         self.tooltip_bounds.take();
+        self.painting_transparent_overlay = false;
 
         self.a11y.sync_active_flag();
         if self.a11y.is_active() {
@@ -3367,6 +3384,7 @@ impl Window {
         // support use this boundary to render the remainder on a transparent
         // surface above native children.
         self.next_frame.overlay_scene_start = self.next_frame.scene.len();
+        self.begin_overlay_scene_paint();
 
         self.paint_deferred_draws(cx);
 
@@ -3380,6 +3398,8 @@ impl Window {
 
         #[cfg(any(feature = "inspector", debug_assertions))]
         self.paint_inspector_hitbox(cx);
+
+        self.painting_transparent_overlay = false;
 
         // a11y may have been activated/deactivated halfway through the frame
         let a11y_active_start_of_frame = self.a11y.is_active();
@@ -3407,6 +3427,10 @@ impl Window {
                 self.platform_window.a11y_tree_update(tree_update);
             }
         }
+    }
+
+    fn begin_overlay_scene_paint(&mut self) {
+        self.painting_transparent_overlay = self.scene_overlay_enabled.get();
     }
 
     fn prepaint_tooltip(&mut self, cx: &mut App) -> Option<AnyElement> {
@@ -4943,6 +4967,16 @@ impl Window {
     }
 
     fn should_use_subpixel_rendering(&self, font_id: FontId, font_size: Pixels) -> bool {
+        // Deferred draws and other window-level overlays move to a transparent
+        // native plane when a window hosts native child views. ClearType-style
+        // RGB coverage cannot be alpha-composited from that plane; on Windows
+        // its blend state deliberately writes no alpha at all. Rasterize those
+        // glyphs as monochrome sprites while preserving subpixel text on the
+        // opaque base plane.
+        if self.painting_transparent_overlay {
+            return false;
+        }
+
         if self.platform_window.background_appearance() != WindowBackgroundAppearance::Opaque {
             return false;
         }
@@ -7747,11 +7781,11 @@ mod tests {
     use crate::{
         AnyWindowHandle, AppContext as _, Bounds, Context, DragMoveEvent, Empty,
         ExternalDragPayload, ExternalDrop, ExternalDropData, ExternalDropEvent, ExternalDropItem,
-        ExternalImage, ExternalPaths, FileDragPaths, FileDropEvent, FocusHandle, ImageFormat,
-        InputEvent as _, InteractiveElement as _, IntoElement, MouseButton, MouseDownEvent,
-        MouseMoveEvent, ParentElement, Pixels, Point, Render, StatefulInteractiveElement as _,
-        Styled, TestAppContext, Window, WindowAppearance, WindowControlArea, WindowOptions, canvas,
-        div, point, px, size,
+        ExternalImage, ExternalPaths, FileDragPaths, FileDropEvent, FocusHandle, FontId,
+        ImageFormat, InputEvent as _, InteractiveElement as _, IntoElement, MouseButton,
+        MouseDownEvent, MouseMoveEvent, ParentElement, Pixels, Point, Render,
+        StatefulInteractiveElement as _, Styled, TestAppContext, TextRenderingMode, Window,
+        WindowAppearance, WindowControlArea, WindowOptions, canvas, div, point, px, size,
     };
 
     use super::window_control_at_mouse;
@@ -7813,6 +7847,31 @@ mod tests {
                 window_control_at_mouse(&window.rendered_frame, &window.mouse_hit_test),
                 Some(WindowControlArea::Drag)
             );
+        })
+        .expect("window remains available");
+    }
+
+    #[gpui::test]
+    fn transparent_scene_overlays_disable_subpixel_text_only_above_the_split(
+        cx: &mut TestAppContext,
+    ) {
+        cx.update(|cx| cx.set_text_rendering_mode(TextRenderingMode::Subpixel));
+        let window: AnyWindowHandle = cx.add_window(|_, _| EmptyView).into();
+        let platform_window = cx.test_window(window);
+        platform_window.set_subpixel_rendering_supported(true);
+        platform_window.set_scene_overlay_supported(true);
+
+        cx.update_window(window, |_, window, _| {
+            assert!(window.should_use_subpixel_rendering(FontId(0), px(14.)));
+
+            window
+                .enable_scene_overlay()
+                .expect("test platform should accept a scene overlay");
+            window.begin_overlay_scene_paint();
+            assert!(!window.should_use_subpixel_rendering(FontId(0), px(14.)));
+
+            window.painting_transparent_overlay = false;
+            assert!(window.should_use_subpixel_rendering(FontId(0), px(14.)));
         })
         .expect("window remains available");
     }
