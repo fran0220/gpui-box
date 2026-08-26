@@ -958,7 +958,15 @@ pub fn redact_sensitive_text(text: &str) -> String {
 }
 
 fn looks_like_jwt(text: &str) -> bool {
-    text.split('.').count() == 3 && text.len() >= 32
+    // A real JWT is one unbroken base64url token whose header segment encodes
+    // `{"` — the `eyJ` prefix. Requiring that shape keeps bearer tokens out of
+    // the exported tree without eating prose: a sentence that names a file and
+    // ends with a full stop also splits into three dot-separated pieces, but
+    // it carries spaces and does not start with `eyJ`.
+    text.len() >= 32
+        && text.starts_with("eyJ")
+        && !text.chars().any(char::is_whitespace)
+        && text.split('.').count() == 3
 }
 
 fn looks_like_secret_assignment(text: &str) -> bool {
@@ -1083,6 +1091,17 @@ mod tests {
             assert_eq!(redact_sensitive_text(secret), "[REDACTED]");
         }
         assert_eq!(redact_sensitive_text("Token usage"), "Token usage");
+    }
+
+    #[test]
+    fn a_sentence_naming_a_file_is_not_a_jwt() {
+        for prose in [
+            "Rewound — Files only — to prompt 7: put back fix5-check.txt.",
+            "Comes back cleanly: ui-journey-64725.txt. Nothing else moved.",
+            "version 1.2.3 is what the manifest asks for today",
+        ] {
+            assert_eq!(redact_sensitive_text(prose), prose);
+        }
     }
 
     #[test]
