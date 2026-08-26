@@ -47,6 +47,13 @@ use crate::display::badge::{Badge, Tone};
 use crate::foundation::{CardVariant, Ident, StyledExt, text};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
+/// How tall a gauge's groove is drawn.
+///
+/// A groove thin enough to pass for a rule between rows tells a reader
+/// nothing, and the outlined groove that means "nobody has this number" needs
+/// room for its own hairline to read as an outline rather than as a fill.
+const GAUGE_HEIGHT: f32 = 8.0;
+
 /// How a number was arrived at.
 ///
 /// There is no third variant meaning "unspecified": a caller that cannot say
@@ -536,7 +543,7 @@ impl RenderOnce for ContextGauge {
             .child(if unavailable {
                 div()
                     .w_full()
-                    .h(px(4.0))
+                    .h(px(GAUGE_HEIGHT))
                     .rounded_full()
                     .border(px(theme.borders.hairline))
                     .border_color(theme.colors.hairline_strong)
@@ -544,7 +551,7 @@ impl RenderOnce for ContextGauge {
                 div()
                     .relative()
                     .w_full()
-                    .h(px(4.0))
+                    .h(px(GAUGE_HEIGHT))
                     .rounded_full()
                     .overflow_hidden()
                     .bg(theme.colors.track)
@@ -611,5 +618,44 @@ impl NodeSpecExt for NodeSpec {
             Some(label) => self.text(label),
             None => self,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gpui_kit_theme::Theme;
+
+    /// The three gauges — a proportion, a reading with no ceiling, and a
+    /// number nobody has — are told apart by the shape of the groove. A
+    /// groove only as tall as a couple of hairlines leaves the outlined one
+    /// with no interior, and all three collapse onto the rule between rows.
+    #[test]
+    fn the_groove_is_taller_than_the_outline_it_may_be_drawn_as() {
+        for theme in [Theme::studio_dark(), Theme::studio_light()] {
+            assert!(
+                GAUGE_HEIGHT >= theme.borders.hairline * 4.0,
+                "{}: a groove of {GAUGE_HEIGHT} leaves no interior inside a hairline of {}",
+                theme.id,
+                theme.borders.hairline
+            );
+        }
+    }
+
+    /// A limit nobody stated and a reading nobody has are separate facts, so
+    /// they are separate claims: neither draws a proportion, and only the
+    /// second has no quantity at all.
+    #[test]
+    fn an_unknown_limit_and_an_unavailable_reading_are_not_the_same_absence() {
+        let unknown = ContextGauge::new("gauge", Reading::measured(48_000.0, "48,000 tokens"));
+        let unavailable = ContextGauge::new("gauge", Reading::unavailable())
+            .limit(Limit::measured(128_000.0, "128,000 tokens"));
+
+        assert_eq!(unknown.fraction(), None);
+        assert_eq!(unavailable.fraction(), None);
+        assert!(unknown.used.quantity().is_some());
+        assert!(unavailable.used.quantity().is_none());
+        assert!(!unknown.limit.is_known());
+        assert!(unavailable.limit.is_known());
     }
 }

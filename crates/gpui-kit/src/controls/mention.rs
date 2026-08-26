@@ -10,11 +10,14 @@
 
 use std::ops::Range;
 
+use std::cell::Cell;
+use std::rc::Rc;
+
 use gpui::{
-    AnyElement, App, Context, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement,
-    IntoElement, MouseButton, ParentElement, Render, ScrollHandle, SharedString,
-    StatefulInteractiveElement, Styled, Subscription, Window, div, point, prelude::FluentBuilder,
-    px,
+    AnyElement, App, Bounds, Context, Entity, EventEmitter, FocusHandle, Focusable,
+    InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels, Render, ScrollHandle,
+    SharedString, StatefulInteractiveElement, Styled, Subscription, Window, div, point,
+    prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -155,6 +158,9 @@ pub struct MentionInput {
     focused: bool,
     scroll: ScrollHandle,
     reveal_active: bool,
+    /// Where the editor was painted on the previous frame, so the completion
+    /// surface can clear the whole control instead of only the caret.
+    editor_bounds: Rc<Cell<Bounds<Pixels>>>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -191,6 +197,7 @@ impl MentionInput {
             focused: false,
             scroll: ScrollHandle::new(),
             reveal_active: false,
+            editor_bounds: Rc::default(),
             _subscriptions: vec![subscription, observation],
         }
     }
@@ -707,13 +714,19 @@ impl Render for MentionInput {
         self.editor
             .update(cx, |editor, _| editor.set_completion_claimed(open));
         let theme = cx.theme().clone();
+        let editor_bottom = self.editor_bounds.get().bottom();
         let popup = open
             .then(|| self.editor.read(cx).caret_bounds())
             .flatten()
             .map(|caret| {
+                // The caret sits on one line inside a multiline editor, so
+                // hanging the surface off it covers the rest of the field and
+                // the focus ring around it. The query is still what the caret
+                // is on, so the column stays with the caret and only the row
+                // comes from the control.
                 let position = point(
                     caret.left(),
-                    caret.bottom() + px(popover::trigger_gap(&theme)),
+                    caret.bottom().max(editor_bottom) + px(popover::trigger_gap(&theme)),
                 );
                 let menu = self.menu(cx);
                 popover::at(
@@ -723,7 +736,13 @@ impl Render for MentionInput {
                     menu,
                 )
             });
+        let measured = Rc::clone(&self.editor_bounds);
         div()
+            .on_children_prepainted(move |bounds, window, _| {
+                if let Some(editor) = bounds.first() {
+                    crate::layout::measure::record(&measured, *editor, window);
+                }
+            })
             .id(self.ident.element_id())
             .w_full()
             .child(self.editor.clone())

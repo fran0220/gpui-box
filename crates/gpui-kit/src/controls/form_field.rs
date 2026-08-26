@@ -146,6 +146,7 @@ impl RenderOnce for FormField {
 
         let label_element = foundation_text(&theme, TypeScale::Label, self.label.clone())
             .row()
+            .items_center()
             .gap_token(&theme, Space::Xs)
             .when(self.required, |element| {
                 element.child(
@@ -153,12 +154,12 @@ impl RenderOnce for FormField {
                         .text_color(theme.colors.danger),
                 )
             })
+            // Beside the label rather than at the far end of the field: a
+            // keystroke pushed to the opposite edge of a wide row has nothing
+            // next to it and reads as a control of its own rather than as
+            // part of the thing it operates.
             .when_some(self.hint.clone(), |element, keystroke| {
-                element.child(
-                    div()
-                        .ml_auto()
-                        .child(Kbd::new(keystroke).id(self.ident.child("hint"))),
-                )
+                element.child(Kbd::new(keystroke).id(self.ident.child("hint")))
             })
             .semantic_in(cx, label_spec);
 

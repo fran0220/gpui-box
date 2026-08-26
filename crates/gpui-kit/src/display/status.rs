@@ -6,7 +6,9 @@ use gpui::{
 };
 use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Surface, TypeScale};
+use gpui_kit_theme::{
+    ActiveTheme, ColorChoice, ControlSize, Radius, Space, Surface, TypeScale, Variant,
+};
 
 use crate::controls::button::IconButton;
 use crate::display::badge::Tone;
@@ -56,22 +58,40 @@ fn severity_mark(tone: Tone, theme: &gpui_kit_theme::Theme) -> AnyElement {
     }
 }
 
+/// The tone a page-level report wears across its whole surface.
+///
+/// The Light tier is sized for a chip. Laid across a strip at full strength
+/// it put the warning banner ahead of the refusal beneath it, which is the
+/// weighting that took the wash off reports in the first place — so a strip
+/// takes a share of it, and every tone takes the same share.
+fn banner_wash(theme: &gpui_kit_theme::Theme, color: gpui::Hsla) -> gpui::Hsla {
+    const SHARE: f32 = 0.4;
+    let tier = theme
+        .variant_colors(Variant::Light, &ColorChoice::Custom(color))
+        .background;
+    tier.opacity(tier.a * SHARE)
+}
+
 /// The band at the reading edge that carries the severity.
 ///
 /// A report used to be a wash of its own colour across the whole surface,
 /// which made a yellow one heavier than the red one above it for no reason
 /// anybody meant. The colour is spent on a rail and a glyph instead, so two
 /// severities differ by hue and by picture and never by weight.
-fn tone_rail(
+pub(crate) fn tone_rail(
     theme: &gpui_kit_theme::Theme,
     color: gpui::Hsla,
     direction: crate::foundation::LayoutDirection,
 ) -> gpui::Div {
+    // Inset by the corner it sits inside. `overflow_hidden` masks to the
+    // frame's box and not to its radius, so a rail run to the full height
+    // kept its square corners against a rounded report.
     let bar = div()
         .absolute()
-        .top_0()
-        .bottom_0()
+        .top(px(theme.radii.card))
+        .bottom(px(theme.radii.card))
         .w(px(theme.effects.selection_rail_width))
+        .rounded_full()
         .flex_none()
         .bg(color);
     if direction.is_rtl() {
@@ -405,6 +425,18 @@ impl RenderOnce for Banner {
             .py_token(&theme, Space::Md)
             .radius(&theme, Radius::Card)
             .surface(&theme, Surface::Panel)
+            // A page-level report is read from across the window, where a
+            // rail two and a half pixels wide is not a colour anybody has
+            // seen yet. The wash is the Light tier's colour at a fraction of
+            // its strength, so the tone reaches the surface without the
+            // surface being spent on it.
+            .child(
+                div()
+                    .absolute()
+                    .inset_0()
+                    .radius(&theme, Radius::Card)
+                    .bg(banner_wash(&theme, color)),
+            )
             .child(tone_rail(&theme, color, cx.layout_direction()))
             .child(severity_mark(self.tone, &theme))
             .child(

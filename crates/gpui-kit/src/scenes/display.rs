@@ -498,8 +498,11 @@ pub(super) fn chart(_window: &mut Window, cx: &mut App) -> AnyElement {
             .min_w_0()
             .gap(px(theme.space(Space::Md)))
     };
+    // The frame this is reviewed in is 920 wide, and a stack wider than it
+    // does not scroll: it runs off the right edge, which is how the second
+    // column came to be reviewed with its plots and their end points cut.
     stack(&theme)
-        .w(px(1060.0))
+        .w(px(920.0))
         .child(caption(
             &theme,
             "host-owned series, host-owned axis wording, no invented scale",
@@ -789,20 +792,24 @@ pub(super) fn heatmap(_window: &mut Window, cx: &mut App) -> AnyElement {
     // once it carries a period somebody would look at.
     let days = ["Mon", "Tue", "Wed", "Thu", "Fri"];
     // Week-starting dates. Each column is joined on by its own key and prints
-    // the day of the month, which is what fits over a cell; the month itself
-    // is in the caption, where a calendar puts it.
+    // the day of the month, which is what fits over a cell; the month it came
+    // from is the group header over the run of columns that share it, because
+    // `3 10 17 24` three times over names nothing on its own.
     let starts = [6, 13, 20, 27, 3, 10, 17, 24, 3, 10, 17, 24];
-    let weeks: Vec<(String, String)> = starts
+    let month_of = |column: usize| ["January", "February", "March"][column / 4];
+    let weeks: Vec<HeatAxis> = starts
         .iter()
         .enumerate()
-        .map(|(column, day)| (format!("w{column}"), day.to_string()))
+        .map(|(column, day)| {
+            HeatAxis::new(format!("w{column}"), day.to_string()).group(month_of(column))
+        })
         .collect();
     let mut cells = Vec::new();
     for (row, day) in days.iter().enumerate() {
         for (column, week) in weeks.iter().enumerate() {
-            let month = ["January", "February", "March"][column / 4];
-            let mut cell = HeatCell::new(format!("{day}-{}", week.0), *day, week.0.clone())
-                .label(format!("{day}, {month} {}", week.1));
+            let month = month_of(column);
+            let mut cell = HeatCell::new(format!("{day}-{}", week.id), *day, week.id.clone())
+                .label(format!("{day}, {month} {}", week.label));
             // Deterministic, and holed in two places so the difference between
             // "nothing was measured" and "zero was measured" has somewhere to
             // show itself.
@@ -824,6 +831,10 @@ pub(super) fn heatmap(_window: &mut Window, cx: &mut App) -> AnyElement {
         .child(
             Heatmap::new("scene.heatmap.ready", "Fixture activity")
                 .rows(days)
+                // The ramp is neutral until a caller says whose quantity it
+                // is. This matrix is the run activity the rest of the frame
+                // is already reading in the accent, so it hands that over.
+                .tint(theme.colors.accent)
                 .columns(weeks.clone())
                 .cells(cells),
         )
@@ -1185,16 +1196,27 @@ pub(super) fn avatar(_window: &mut Window, cx: &mut App) -> AnyElement {
 /// matched nothing; collapsing them is how a refusal gets shown as an absence.
 pub(super) fn empty_state(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
+    // An empty state fills the region whose contents are missing. Drawn on
+    // bare canvas it reads as loose centred text with no edge to be centred
+    // in, which is the one thing it never is in a product.
+    let region = |state: EmptyState| {
+        div()
+            .w_full()
+            .radius(&theme, Radius::Card)
+            .surface(&theme, Surface::Panel)
+            .hairline(&theme)
+            .child(state)
+    };
     stack(&theme)
         .w(px(560.0))
         .child(caption(&theme, "Nothing has been started yet"))
-        .child(
+        .child(region(
             EmptyState::new("scene.empty-state.unstarted", "No runs yet")
                 .kind(EmptyKind::Unstarted)
                 .detail("A run appears here once one has been started."),
-        )
+        ))
         .child(caption(&theme, "The host refused, and says so"))
-        .child(
+        .child(region(
             EmptyState::new(
                 "scene.empty-state.unavailable",
                 "The host refused the request",
@@ -1206,15 +1228,15 @@ pub(super) fn empty_state(_window: &mut Window, cx: &mut App) -> AnyElement {
                     .label("Try again")
                     .on_click(|_, _| {}),
             ),
-        )
+        ))
         .child(caption(&theme, "A collection that really is empty"))
-        .child(
+        .child(region(
             EmptyState::new("scene.empty-state.empty", "No runs match “failing”")
                 .kind(EmptyKind::Empty)
                 .detail("Clear the filter to see every run."),
-        )
+        ))
         .child(caption(&theme, "It was tried, and it failed"))
-        .child(
+        .child(region(
             EmptyState::new("scene.empty-state.failed", "The run could not be read")
                 .kind(EmptyKind::Failed)
                 .detail("The snapshot on disk is from a newer version of the format.")
@@ -1223,16 +1245,16 @@ pub(super) fn empty_state(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .label("Reload")
                         .on_click(|_, _| {}),
                 ),
-        )
+        ))
         .child(caption(
             &theme,
             "The host refused because the reader is not allowed",
         ))
-        .child(
+        .child(region(
             EmptyState::new("scene.empty-state.unauthorized", "This workspace is locked")
                 .kind(EmptyKind::Unauthorized)
                 .detail("Ask an owner to grant access."),
-        )
+        ))
         .into_any_element()
 }
 
@@ -1331,7 +1353,10 @@ pub(super) fn banner(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)
         .w(px(560.0))
-        .child(caption(&theme, "A page-level report, dismissable"))
+        .child(caption(
+            &theme,
+            "A report the reader may put away, because the caller gave it somewhere to go",
+        ))
         .child(
             Banner::new(
                 "scene.banner.warning",
@@ -1347,6 +1372,10 @@ pub(super) fn banner(_window: &mut Window, cx: &mut App) -> AnyElement {
             )
             .on_dismiss(|_, _| {}),
         )
+        .child(caption(
+            &theme,
+            "A refusal the caller did not offer a way out of, so no dismiss appears",
+        ))
         .child(
             Banner::new(
                 "scene.banner.danger",

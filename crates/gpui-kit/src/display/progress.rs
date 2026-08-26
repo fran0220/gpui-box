@@ -234,15 +234,31 @@ impl RenderOnce for ProgressBar {
                         .justify_between()
                         .items_center()
                         .text_size(px(theme.typography.body.size))
+                        .gap(px(theme.space(Space::Sm)))
                         .text_color(theme.colors.text_muted)
-                        .child(label)
-                        .when_some(display, |element, display| {
-                            element.child(div().text_color(theme.colors.text).child(display))
-                        })
-                        .when_some(pace, |element, pace| {
-                            element.child(div().text_color(theme.colors.warning).child(pace))
-                        })
-                        .children(cancel),
+                        .child(div().flex_1().min_w_0().child(label))
+                        // Count, pace and control are one trailing group. Left
+                        // to `justify_between` they were spread across
+                        // whatever width was going spare, so two bars that
+                        // report the same thing started their counts at two
+                        // different places.
+                        .child(
+                            div()
+                                .flex()
+                                .flex_row()
+                                .flex_none()
+                                .items_center()
+                                .gap(px(theme.space(Space::Sm)))
+                                .when_some(display, |element, display| {
+                                    element
+                                        .child(div().text_color(theme.colors.text).child(display))
+                                })
+                                .when_some(pace, |element, pace| {
+                                    element
+                                        .child(div().text_color(theme.colors.warning).child(pace))
+                                })
+                                .children(cancel),
+                        ),
                 )
             })
             .child(

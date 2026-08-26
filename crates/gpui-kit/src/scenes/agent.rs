@@ -522,19 +522,29 @@ pub(super) fn agent_run_canvas(_window: &mut Window, cx: &mut App) -> AnyElement
         ])
         .aggregation(AggregationSnapshot::new(3, 2).conflicts(1));
 
+    // Laid out down the frame rather than across it, and drawn at 1:1. Four
+    // node columns and the relationship wording between them are wider than
+    // any frame this is reviewed in, and the zoom that made them fit put the
+    // node bodies and the edge labels below the size at which they are text
+    // at all: the picture said the canvas was empty and its nodes unreadable,
+    // which is a claim about the component that was not true.
     stack(&theme)
-        .w(px(860.0))
+        .w(px(920.0))
         .child(
             div()
                 .w_full()
-                .h(px(420.0))
+                .h(px(830.0))
                 .surface(&theme, Surface::Panel)
                 .radius(&theme, Radius::Card)
                 .overflow_hidden()
                 .child(
                     AgentRunCanvas::new("scene.agent-run-canvas", run)
+                        .layout(AgentRunLayout::LayeredVertical)
                         .selected([RunSubjectId::Agent("researcher".into())])
-                        .viewport(GraphViewport::new(gpui::point(0.0, 0.0), 0.5))
+                        // Panned far enough right for the retry loop, which
+                        // routes around the outside of the column it returns
+                        // to, to bring its own wording with it.
+                        .viewport(GraphViewport::new(gpui::point(80.0, 0.0), 1.0))
                         .on_event(|_, _, _| {}),
                 ),
         )
@@ -815,6 +825,9 @@ pub(super) fn tool_call(_window: &mut Window, cx: &mut App) -> AnyElement {
 pub(super) fn step_list(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)
+        // A step list fills the column it is given. Given the whole canvas the
+        // status column ended up a screen away from the step it reports on.
+        .w(px(560.0))
         .child(caption(&theme, "A run somebody counted"))
         .child(
             StepList::new("scene.steps.counted")

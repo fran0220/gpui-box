@@ -1,6 +1,7 @@
 //! A graph the pointer arranges.
 
 use super::support::*;
+use crate::canvas::grid_ground;
 
 #[derive(Debug)]
 pub(super) struct SceneGraph {
@@ -263,51 +264,129 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
 
 pub(super) fn canvas_tools(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
-    let member = |label: &'static str| {
-        div()
-            .w(px(150.0))
-            .p_token(&theme, Space::Sm)
-            .card_surface(&theme, CardVariant::Outlined)
-            .type_scale(&theme, TypeScale::Caption)
-            .text_tone(&theme, TextTone::Primary)
-            .child(label)
+    // The chrome is only worth looking at over the thing it is chrome for.
+    // Reviewed on the plain scene ground, with grey placeholders standing in
+    // for the nodes, a region read as an empty box next to two pills and said
+    // nothing about what a region is for.
+    let member = |id: &'static str,
+                  title: &'static str,
+                  color: &'static str,
+                  state: NodeState,
+                  action: &'static str,
+                  metric: (&'static str, &'static str)| {
+        GraphNode::new(id, title)
+            .color(color)
+            .width(236.0)
+            .state(state)
+            .action(action)
+            .metric(metric.0, metric.1)
     };
-    let members = |left: &'static str, right: &'static str| {
+    let members = |left: AnyElement, right: AnyElement| {
         div()
             .row()
-            .gap_token(&theme, Space::Sm)
-            .child(member(left))
-            .child(member(right))
+            .items_start()
+            .gap_token(&theme, Space::Md)
+            .child(left)
+            .child(right)
     };
     stack(&theme)
-        .w(px(560.0))
+        .w(px(920.0))
         .child(caption(
             &theme,
             "overview, chrome, and a named region; the host still owns pan and zoom",
         ))
         .child(
-            CanvasToolbar::new("scene.canvas.toolbar", "125%")
-                .snap(true)
-                .on_action(|_, _, _| {}),
-        )
-        .child(
-            Minimap::new("scene.canvas.minimap")
-                .marks([
-                    MinimapMark::new("ingest", 0.08, 0.42, 0.18, 0.16),
-                    MinimapMark::new("validate", 0.36, 0.18, 0.20, 0.16),
-                    MinimapMark::new("publish", 0.68, 0.48, 0.18, 0.16),
-                ])
-                .view(MinimapView::new(0.22, 0.20, 0.40, 0.36))
-                .on_pan(|_, _, _, _| {}),
-        )
-        .child(
-            NodeGroup::new("scene.canvas.group", "Ingest")
-                .selected(true)
-                .child(members("Stream ingest", "Validate & enrich")),
-        )
-        .child(
-            NodeGroup::new("scene.canvas.group.quiet", "Observe")
-                .child(members("Observe quality", "Publish artifact")),
+            div()
+                .relative()
+                .w_full()
+                .column()
+                .gap_token(&theme, Space::Md)
+                .p_token(&theme, Space::Md)
+                .radius(&theme, Radius::Card)
+                .surface(&theme, Surface::Canvas)
+                .overflow_hidden()
+                .child(grid_ground(&theme))
+                .child(
+                    div()
+                        .relative()
+                        .row()
+                        .items_start()
+                        .gap_token(&theme, Space::Md)
+                        .child(
+                            div().flex_1().min_w_0().child(
+                                CanvasToolbar::new("scene.canvas.toolbar", "125%")
+                                    .snap(true)
+                                    .on_action(|_, _, _| {}),
+                            ),
+                        )
+                        .child(
+                            div().w(px(240.0)).flex_none().child(
+                                Minimap::new("scene.canvas.minimap")
+                                    .marks([
+                                        MinimapMark::new("ingest", 0.08, 0.42, 0.18, 0.16),
+                                        MinimapMark::new("validate", 0.36, 0.18, 0.20, 0.16),
+                                        MinimapMark::new("publish", 0.68, 0.48, 0.18, 0.16),
+                                    ])
+                                    .view(MinimapView::new(0.22, 0.20, 0.40, 0.36))
+                                    .on_pan(|_, _, _, _| {}),
+                            ),
+                        ),
+                )
+                // A region bounds part of a canvas rather than all of it, so
+                // each one is only as wide as the nodes it encloses and the
+                // grid keeps showing around them. Stretched to the frame, the
+                // boundary stopped meaning "these nodes" and started meaning
+                // "everything", which is what left half of each box empty.
+                .child(
+                    div().relative().w(px(540.0)).child(
+                        NodeGroup::new("scene.canvas.group", "Ingest")
+                            .selected(true)
+                            .child(members(
+                                member(
+                                    "scene.canvas.node.ingest",
+                                    "Stream ingest",
+                                    "teal",
+                                    NodeState::Succeeded,
+                                    "orders.v2 · partition 18",
+                                    ("rate", "3.2k/s"),
+                                )
+                                .into_any_element(),
+                                member(
+                                    "scene.canvas.node.validate",
+                                    "Validate & enrich",
+                                    "indigo",
+                                    NodeState::Running,
+                                    "schema + fraud signals",
+                                    ("p95", "18 ms"),
+                                )
+                                .into_any_element(),
+                            )),
+                    ),
+                )
+                .child(
+                    div().relative().w(px(540.0)).ml(px(120.0)).child(
+                        NodeGroup::new("scene.canvas.group.quiet", "Observe").child(members(
+                            member(
+                                "scene.canvas.node.observe",
+                                "Observe quality",
+                                "orange",
+                                NodeState::Failed,
+                                "drift threshold exceeded",
+                                ("rejected", "94"),
+                            )
+                            .into_any_element(),
+                            member(
+                                "scene.canvas.node.publish",
+                                "Publish artifact",
+                                "lime",
+                                NodeState::Pending,
+                                "waiting for commit",
+                                ("queued", "1"),
+                            )
+                            .into_any_element(),
+                        )),
+                    ),
+                ),
         )
         .into_any_element()
 }

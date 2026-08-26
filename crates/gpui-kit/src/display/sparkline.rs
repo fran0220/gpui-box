@@ -16,8 +16,8 @@
 
 use gpui::{
     AnyElement, App, Hsla, InteractiveElement, IntoElement, ParentElement, PathBuilder, RenderOnce,
-    SharedString, Styled, Window, canvas, div, linear_color_stop, linear_gradient_stops, point,
-    prelude::FluentBuilder, px, relative,
+    SharedString, Styled, Window, canvas, div, linear_color_stop, linear_gradient_stops, point, px,
+    relative,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
@@ -219,7 +219,7 @@ impl RenderOnce for Sparkline {
             return div()
                 .w_full()
                 .h_full()
-                .child(plot(&theme, points, self.tint, stale, true))
+                .child(plot(&theme, points, self.tint, stale))
                 .into_any_element();
         }
         let (body, spec): (AnyElement, NodeSpec) = match &self.state {
@@ -421,18 +421,24 @@ fn reading_body(
                         .flex_1()
                         .min_w_0()
                         .h(px(PLOT_HEIGHT))
-                        .child(plot(&theme, points, tint, is_stale, false)),
+                        .child(plot(&theme, points, tint, is_stale)),
                 )
+                // A reserved width rather than one the longest reading
+                // decides. Sized by its own text, this column is a different
+                // width on every card, which leaves the plots beside them
+                // different widths too and the readings in a ragged edge no
+                // reader can scan down.
                 .child(
                     div()
                         .column()
                         .flex_none()
+                        .w(px(EXTREMES_WIDTH))
                         .justify_between()
                         .h(px(PLOT_HEIGHT))
                         .type_scale(&theme, TypeScale::Caption)
                         .text_color(theme.colors.text_faint)
-                        .child(maximum)
-                        .child(minimum),
+                        .child(div().truncate().child(maximum))
+                        .child(div().truncate().child(minimum)),
                 ),
         )
         .into_any_element()
@@ -440,6 +446,18 @@ fn reading_body(
 
 /// How tall a framed plot is.
 const PLOT_HEIGHT: f32 = 72.0;
+
+/// How wide the column holding the maximum and the minimum is.
+const EXTREMES_WIDTH: f32 = 116.0;
+
+/// The radius of the latest-sample mark, as a multiple of the line weight.
+const MARK_RADIUS: f32 = 1.8;
+
+/// The band kept clear on every side of a plot so a reading at the edge of the
+/// normalized square still has room for its own mark.
+fn plot_inset(stroke: f32) -> f32 {
+    (stroke * MARK_RADIUS).max(stroke / 2.0)
+}
 
 /// The band across the middle of the plot, as a fraction of its height.
 ///
@@ -456,7 +474,6 @@ fn plot(
     points: Vec<SparklinePoint>,
     tint: Option<Hsla>,
     stale: bool,
-    embedded: bool,
 ) -> impl IntoElement {
     // A trend is data, so it is neutral until a caller says whose it is; a
     // reading that is no longer verified draws quieter than one that is, which
@@ -479,10 +496,10 @@ fn plot(
         .h_full()
         .overflow_hidden()
         .radius(theme, Radius::Small)
-        // A framed plot is a well of its own; an embedded one is a mark on
-        // the surface that already framed it, and a second floor under it
-        // reads as a hole cut in that surface.
-        .when(!embedded, |plot| plot.surface(theme, Surface::Sunken))
+        // The mark sits on the surface that already framed it. A well of its
+        // own put a second floor under the line, and against a dark theme
+        // that floor was the loudest shape on the card: a black box with a
+        // trend somewhere inside it rather than a trend on a card.
         .child(
             div()
                 .absolute()
@@ -517,9 +534,14 @@ fn paint_series(
     if points.len() < 2 {
         return;
     }
-    let inset = stroke / 2.0;
-    let width = (f32::from(bounds.size.width) - stroke).max(0.0);
-    let height = (f32::from(bounds.size.height) - stroke).max(0.0);
+    // The latest sample is drawn as a disc around the point, so the plot has
+    // to reserve that radius on every side. Inset by half the line weight
+    // instead, the mark on a reading at x = 1 or y = 1 was cut in half by the
+    // edge of the box it was inside.
+    let radius = stroke * MARK_RADIUS;
+    let inset = plot_inset(stroke);
+    let width = (f32::from(bounds.size.width) - inset * 2.0).max(0.0);
+    let height = (f32::from(bounds.size.height) - inset * 2.0).max(0.0);
     if width <= 0.0 || height <= 0.0 {
         return;
     }
@@ -529,7 +551,9 @@ fn paint_series(
             bounds.origin.y + px(inset + (1.0 - sample.y) * height),
         )
     };
-    let floor = bounds.origin.y + px(inset + height);
+    // The wash reaches the bottom of the plot rather than the bottom of the
+    // reserved band: an area that stops short reads as a second baseline.
+    let floor = bounds.origin.y + bounds.size.height;
 
     // The area first, so the line sits on top of its own fill rather than
     // being half covered by it.
@@ -566,7 +590,6 @@ fn paint_series(
     // unverified one is a ring, so the state is legible in the plot and not
     // only in the sentence beside it.
     let last = at(points[points.len() - 1]);
-    let radius = stroke * 1.8;
     let mut mark = if stale {
         PathBuilder::stroke(px(stroke))
     } else {
@@ -608,6 +631,16 @@ mod tests {
             "9 req/s",
         );
         assert_eq!(reading.published_points(), 2);
+    }
+
+    #[test]
+    fn a_reading_at_the_edge_of_the_square_keeps_room_for_its_own_mark() {
+        let stroke = gpui_kit_theme::Theme::studio_dark().borders.thick;
+        let inset = plot_inset(stroke);
+        assert!(inset >= stroke * MARK_RADIUS);
+        // A plot 200 wide places x = 1 far enough in that the whole disc fits.
+        let last = inset + 1.0 * (200.0 - inset * 2.0);
+        assert!(last + stroke * MARK_RADIUS <= 200.0 + f32::EPSILON * 200.0);
     }
 
     #[test]

@@ -43,6 +43,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TypeScale};
 
 use crate::controls::button::Button;
+use crate::foundation::direction::ActiveDirection;
 use crate::foundation::{Ident, Sizable, StyledExt};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -214,15 +215,11 @@ impl RenderOnce for FailurePanel {
             .relative()
             .bg(theme.colors.panel)
             .hairline(&theme)
-            .child(
-                div()
-                    .absolute()
-                    .left_0()
-                    .top_0()
-                    .bottom_0()
-                    .w(px(theme.effects.selection_rail_width))
-                    .bg(theme.colors.danger),
-            )
+            .child(crate::display::status::tone_rail(
+                &theme,
+                theme.colors.danger,
+                cx.layout_direction(),
+            ))
             .child(
                 div()
                     .row()
@@ -252,8 +249,12 @@ impl RenderOnce for FailurePanel {
             // a node of its own so a test can prove it survived.
             .child(
                 div()
+                    // The host's sentence is the panel's subject, so it is
+                    // read at full strength. Muted, it sat at the same weight
+                    // as the detail and the attempt count below it and the
+                    // three read as one grey block.
                     .type_scale(&theme, TypeScale::Body)
-                    .text_color(theme.colors.text_muted)
+                    .text_color(theme.colors.text)
                     .child(self.reason.clone())
                     .semantic_in(
                         cx,
@@ -266,7 +267,7 @@ impl RenderOnce for FailurePanel {
                 element.child(
                     div()
                         .type_scale(&theme, TypeScale::Caption)
-                        .text_color(theme.colors.text_faint)
+                        .text_color(theme.colors.text_muted)
                         .child(detail),
                 )
             })

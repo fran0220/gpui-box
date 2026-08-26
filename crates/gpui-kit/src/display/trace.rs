@@ -33,6 +33,14 @@ const BAR_HEIGHT: f32 = 18.0;
 const AXIS_HEIGHT: f32 = 22.0;
 const TICK_HEIGHT: f32 = 4.0;
 const TICK_LABEL_WIDTH: f32 = 64.0;
+/// The room kept outside the two ends of the track.
+///
+/// Every tick label is centred on its own gridline, including the ones at the
+/// ends, so a reading always names the line under it. Without a gutter the
+/// label at `0` would need half its width from outside the component, and the
+/// track would begin at the frame edge — which is what made the first bar
+/// look as though it started before the axis did.
+const AXIS_GUTTER: f32 = TICK_LABEL_WIDTH / 2.0;
 /// Where the grid is drawn when the host names no ticks of its own. Quarters
 /// of a normalized axis are true without inventing a clock, so they carry a
 /// line and no text; only a host-supplied tick may carry wording.
@@ -472,6 +480,13 @@ fn waterfall(
         .into_any_element()
 }
 
+/// The column every row measures its normalized positions inside: the same
+/// flexible width with the same gutter, so a gridline, a bar and a tick label
+/// at the same reading land on the same pixel.
+fn track_column() -> gpui::Div {
+    div().flex_1().min_w_0().px(px(AXIS_GUTTER))
+}
+
 fn grid_layer(
     ticks: &[AxisTick],
     with_label: bool,
@@ -504,7 +519,7 @@ fn grid_layer(
             ),
         );
     }
-    layer = layer.child(div().flex_1().min_w_0().relative().children(lines));
+    layer = layer.child(track_column().child(div().relative().size_full().children(lines)));
     if with_duration {
         layer = layer.child(div().w(px(DURATION_WIDTH)).flex_none());
     }
@@ -557,13 +572,7 @@ fn span_row(
         fill.bg(color.opacity(if current { 0.92 } else { 0.72 }))
     };
 
-    let mut track = div()
-        .relative()
-        .flex_1()
-        .min_w_0()
-        .h(px(BAR_HEIGHT))
-        .overflow_hidden()
-        .child(fill);
+    let mut track = div().relative().size_full().overflow_hidden().child(fill);
     if !with_label {
         // The waterfall names each span at its own bar. After the bar while
         // there is room after it, before it once there is not.
@@ -586,6 +595,7 @@ fn span_row(
         };
         track = track.child(name);
     }
+    let track = track_column().h(px(BAR_HEIGHT)).child(track);
 
     let mut row = div()
         .id(ident.element_id())
@@ -667,36 +677,28 @@ fn axis_row(
     });
     let labels = ticks.iter().filter_map(|tick| {
         let text = tick.label.clone()?;
-        let mut anchor = div()
-            .absolute()
-            .top(px(TICK_HEIGHT + theme.borders.hairline))
-            .left(relative(tick.at))
-            .w_0()
-            .h_0();
-        // The first and last ticks read against the ends of the track; the
-        // ones between it are centred on their own line.
-        let text = div()
-            .type_scale(theme, TypeScale::Caption)
-            .text_color(theme.colors.text_faint)
-            .child(text);
-        anchor = if tick.at <= 0.0 {
-            anchor.child(text.absolute().left_0().w(px(TICK_LABEL_WIDTH)))
-        } else if tick.at >= 1.0 {
-            anchor.child(
-                text.absolute()
-                    .left(px(-TICK_LABEL_WIDTH))
-                    .w(px(TICK_LABEL_WIDTH))
-                    .text_align(gpui::TextAlign::Right),
-            )
-        } else {
-            anchor.child(
-                text.absolute()
-                    .left(px(-TICK_LABEL_WIDTH / 2.0))
-                    .w(px(TICK_LABEL_WIDTH))
-                    .text_align(gpui::TextAlign::Center),
-            )
-        };
-        Some(anchor)
+        // Every reading is centred on the line it names, the ends included.
+        // Aligned to the ends of the track instead, the two outermost
+        // readings sat beside their own gridlines while every reading between
+        // them sat on one, and a reader had to know which rule applied where.
+        Some(
+            div()
+                .absolute()
+                .top(px(TICK_HEIGHT + theme.borders.hairline))
+                .left(relative(tick.at))
+                .w_0()
+                .h_0()
+                .child(
+                    div()
+                        .absolute()
+                        .left(px(-TICK_LABEL_WIDTH / 2.0))
+                        .w(px(TICK_LABEL_WIDTH))
+                        .text_align(gpui::TextAlign::Center)
+                        .type_scale(theme, TypeScale::Caption)
+                        .text_color(theme.colors.text_faint)
+                        .child(text),
+                ),
+        )
     });
 
     let baseline = div()
@@ -717,13 +719,14 @@ fn axis_row(
         row = row.child(div().w(px(LABEL_WIDTH)).flex_none());
     }
     row = row.child(
-        div()
-            .flex_1()
-            .min_w_0()
-            .relative()
-            .child(baseline)
-            .children(marks)
-            .children(labels),
+        track_column().child(
+            div()
+                .relative()
+                .size_full()
+                .child(baseline)
+                .children(marks)
+                .children(labels),
+        ),
     );
     if with_duration {
         row = row.child(div().w(px(DURATION_WIDTH)).flex_none());

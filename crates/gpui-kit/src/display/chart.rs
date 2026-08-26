@@ -20,7 +20,8 @@ use std::rc::Rc;
 use gpui::{
     AnyElement, App, Bounds, CursorStyle, Hsla, InteractiveElement, IntoElement, ParentElement,
     PathBuilder, Pixels, Point, RenderOnce, SharedString, StatefulInteractiveElement, Styled,
-    Window, canvas, div, linear_color_stop, linear_gradient_stops, point, px, relative,
+    Window, canvas, div, linear_color_stop, linear_gradient_stops, point, prelude::FluentBuilder,
+    px, relative,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
@@ -789,6 +790,9 @@ impl RenderOnce for ScatterChart {
 /// How tall every plot region in this module is.
 const PLOT_HEIGHT: f32 = 160.0;
 
+/// How far the current-point readout stands off the corner of the plot.
+const TOOLTIP_MARGIN: f32 = 8.0;
+
 #[derive(Debug, Clone)]
 struct ActivePoint {
     selection: ChartSelection,
@@ -1178,13 +1182,7 @@ fn ready_chart(
         .into_any_element()
     };
     let current_tip = current.as_ref().map(|current| {
-        current_tooltip(
-            ident,
-            current,
-            crosshair_position.unwrap_or_else(|| point(0.0, 0.0)),
-            theme,
-            cx,
-        )
+        current_tooltip(ident, current, tooltip_anchor(&active, current), theme, cx)
     });
     let mut plot = div()
         .on_children_prepainted({
@@ -1442,10 +1440,34 @@ fn series_legend(
         .into_any_element()
 }
 
+/// Which corner of the plot the current-point readout stands in, as
+/// `(against the leading edge, against the floor)`.
+///
+/// The half of the plot the sample is not in, and then the side of that half
+/// the series is furthest from. A fixed corner covered whatever happened to
+/// be drawn there — including the very point it was naming — and the sample's
+/// own height says nothing about the height of the series at the other end of
+/// the plot, so the data in the half the readout is going to is what decides.
+fn tooltip_anchor(active: &[ActivePoint], current: &ActivePoint) -> (bool, bool) {
+    let leading = current.point.position.x > 0.5;
+    let (total, count) = active
+        .iter()
+        .filter(|point| (point.point.position.x <= 0.5) == leading)
+        .fold((0.0f32, 0usize), |(total, count), point| {
+            (total + point.point.position.y.clamp(0.0, 1.0), count + 1)
+        });
+    let height = if count == 0 {
+        0.5
+    } else {
+        total / count as f32
+    };
+    (leading, height >= 0.5)
+}
+
 fn current_tooltip(
     ident: &Ident,
     current: &ActivePoint,
-    shown: Point<f32>,
+    (leading, floor): (bool, bool),
     theme: &gpui_kit_theme::Theme,
     cx: &App,
 ) -> AnyElement {
@@ -1457,8 +1479,20 @@ fn current_tooltip(
         .semantic_id();
     div()
         .absolute()
-        .left(relative(shown.x.clamp(0.0, 0.72)))
-        .top(px(8.0))
+        .map(|tip| {
+            if leading {
+                tip.left(px(TOOLTIP_MARGIN))
+            } else {
+                tip.right(px(TOOLTIP_MARGIN))
+            }
+        })
+        .map(|tip| {
+            if floor {
+                tip.bottom(px(TOOLTIP_MARGIN))
+            } else {
+                tip.top(px(TOOLTIP_MARGIN))
+            }
+        })
         .column()
         .gap(px(1.0))
         .px_token(theme, Space::Xs)
@@ -2756,6 +2790,42 @@ mod tests {
             step_point(&active, Some(&ChartSelection::new("cpu", "late")), "down"),
             Some(ChartSelection::new("memory", "nearest"))
         );
+    }
+
+    #[test]
+    fn the_readout_stands_clear_of_the_sample_and_of_the_series_beside_it() {
+        let theme = gpui_kit_theme::Theme::studio_dark();
+        let rising = active_points(
+            &[ChartSeries::new("cpu", "CPU").points([
+                point_at("start", 0.0, 0.20),
+                point_at("mid", 0.5, 0.30),
+                point_at("now", 0.75, 0.70),
+            ])],
+            &theme,
+        );
+        let current = rising
+            .iter()
+            .find(|point| point.selection.point_id.as_ref() == "now")
+            .expect("the sample is published")
+            .clone();
+        // The sample is on the trailing half, so the readout crosses to the
+        // leading one; the series is low over there, so it takes the ceiling.
+        assert_eq!(tooltip_anchor(&rising, &current), (true, false));
+
+        let falling = active_points(
+            &[ChartSeries::new("cpu", "CPU").points([
+                point_at("now", 0.25, 0.30),
+                point_at("later", 0.75, 0.80),
+                point_at("last", 1.0, 0.90),
+            ])],
+            &theme,
+        );
+        let current = falling
+            .iter()
+            .find(|point| point.selection.point_id.as_ref() == "now")
+            .expect("the sample is published")
+            .clone();
+        assert_eq!(tooltip_anchor(&falling, &current), (false, true));
     }
 }
 

@@ -523,6 +523,11 @@ impl Render for Drawer {
                 div()
                     .column()
                     .flex_1()
+                    // A flex child refuses to shrink below its content unless
+                    // it is told to, so an unwrapped line of description would
+                    // widen the header past the panel, push the close control
+                    // off the edge, and be clipped mid-word by the surface.
+                    .min_w_0()
                     .gap_token(&theme, Space::Xs)
                     .children(heading)
                     .children(description),

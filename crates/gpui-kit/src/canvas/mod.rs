@@ -43,6 +43,7 @@ mod node;
 mod toolbar;
 
 pub use edge::{EdgeKind, GraphEdge, GraphEndpoint, PortSide};
+pub(crate) use graph::grid_ground;
 pub use graph::{
     GraphInteraction, GraphState, GraphViewport, NodeGraph, NodeGraphEvent, Placed, layered_layout,
 };

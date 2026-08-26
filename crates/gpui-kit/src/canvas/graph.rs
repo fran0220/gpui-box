@@ -1976,6 +1976,25 @@ fn graph_minimap(
         .into_any_element()
 }
 
+/// The canvas ground on its own, unpanned and unzoomed.
+///
+/// A region, a lasso or a piece of canvas chrome has to be shown standing on
+/// the same ground a graph does, and painting a second grid next to this one
+/// is how the two come to disagree about what a canvas looks like. This is
+/// that ground without a graph on it: no nodes, no edges, no viewport.
+pub(crate) fn grid_ground(theme: &gpui_kit_theme::Theme) -> impl IntoElement {
+    let color = theme.colors.node.grid;
+    let major = theme.colors.node.grid_strong;
+    canvas(
+        |_, _, _| {},
+        move |bounds, _, window, _| {
+            paint_grid(window, bounds, 0.0, 0.0, GRID_STEP, color, major);
+        },
+    )
+    .absolute()
+    .inset_0()
+}
+
 /// Paints the dot grid the canvas sits on.
 ///
 /// The grid is anchored to the pan offset rather than to the viewport, so it

@@ -162,12 +162,14 @@ impl MenuItem {
         self.destructive
     }
 
-    /// The foreground a row uses. A refused row stays muted even when marked
-    /// destructive, so refusal remains visible.
+    /// The foreground a row uses.
+    ///
+    /// A refused row keeps the colour it would have had and is dimmed as a
+    /// whole instead, the way every other refused row in the library is. Flat
+    /// grey text at caption weight is what a section label looks like, so a
+    /// recoloured row stopped reading as a command at all.
     fn foreground(&self, theme: &Theme) -> gpui::Hsla {
-        if self.disabled {
-            theme.colors.text_disabled
-        } else if self.destructive {
+        if self.destructive {
             theme.colors.danger
         } else {
             theme.colors.text
@@ -524,6 +526,9 @@ fn row<V: 'static>(
             let row = popover::menu_row(theme, false, active || opened)
                 .id(row_ident.element_id())
                 .when(active, |element| element.aria_active_descendant())
+                .when(item.disabled, |element| {
+                    element.opacity(theme.opacity.disabled)
+                })
                 .when(!item.disabled, |element| {
                     element.cursor_pointer().pressable(cx)
                 })
@@ -552,9 +557,7 @@ fn row<V: 'static>(
                     element.child(
                         icon(Icon::AltArrowRight)
                             .size(px(12.0))
-                            .text_color(if item.disabled {
-                                theme.colors.text_disabled
-                            } else if item.destructive {
+                            .text_color(if item.destructive {
                                 theme.colors.danger
                             } else {
                                 theme.colors.text_muted
@@ -1426,5 +1429,20 @@ mod tests {
         let items = vec![item];
         let mut state = MenuState::default();
         assert_eq!(state.activate(&items, &[0]), Activation::Ignored);
+    }
+
+    #[test]
+    fn a_refused_row_keeps_the_colour_of_the_command_it_is() {
+        // Flat grey at caption weight is what a section label looks like, so
+        // a refused row that was recoloured stopped reading as a command.
+        // Refusal is carried by dimming the whole row instead.
+        let theme = Theme::studio_dark();
+        let refused = MenuItem::command("publish", "Publish").disabled(true);
+        assert_eq!(refused.foreground(&theme), theme.colors.text);
+        let refused_destructive = MenuItem::command("delete", "Delete")
+            .destructive(true)
+            .disabled(true);
+        assert_eq!(refused_destructive.foreground(&theme), theme.colors.danger);
+        assert!(theme.opacity.disabled < 1.0);
     }
 }

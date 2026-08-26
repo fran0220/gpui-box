@@ -543,15 +543,21 @@ impl Combobox {
             self.reveal_active = false;
         }
 
+        // The inset above and below the rows belongs to the card, not to the
+        // scrolled content: padding inside the viewport scrolls away with the
+        // first row, which leaves a part-row cut off flush against the card's
+        // rounded top edge instead of clipped by a viewport inside it.
+        let inset = theme.space(Space::Xs);
         let viewport = div()
-            .p(px(theme.space(Space::Xs)))
+            .px(px(inset))
             .column()
-            .max_h(px(geometry.max_height))
+            .max_h(px((geometry.max_height - inset * 2.0).max(0.0)))
             .id(self.ident.child("menu.scroll").element_id())
             .overflow_y_scroll()
             .track_scroll(&self.scroll)
             .children(rows);
         let list = popover::card_flush(&theme)
+            .py(px(inset))
             .w(px(geometry.width))
             .max_h(px(geometry.max_height))
             .id(menu_ident.element_id())

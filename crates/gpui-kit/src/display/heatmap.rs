@@ -2,8 +2,8 @@
 //!
 //! The host supplies every cell identity, its row and column, an optional
 //! intensity on a five-step ladder, and the words a hover shows. This
-//! component maps intensity onto the theme accent and distinguishes a measured
-//! zero from a cell nobody observed.
+//! component cuts the five steps from one ramp colour the caller may name,
+//! and distinguishes a measured zero from a cell nobody observed.
 
 use gpui::{
     App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window,
@@ -109,7 +109,18 @@ impl HasPhase for HeatmapState {
 /// Perceptual rather than linear: the gap a reader has to see is between one
 /// step and the next, and equal alpha increments do not produce equal steps
 /// against either a dark or a light ground.
-const STEPS: [f32; 5] = [0.06, 0.22, 0.40, 0.62, 0.88];
+///
+/// The first step is a measured zero, so it has to be a fill somebody can see
+/// rather than a hint of one. At a fraction low enough to disappear into the
+/// canvas behind it, a matrix reported nothing measured and a matrix that
+/// measured nothing were the same picture.
+const STEPS: [f32; 5] = [0.18, 0.34, 0.52, 0.72, 0.94];
+
+/// How much of the ramp colour one intensity step takes. A step above the
+/// ladder clamps to the top of it rather than wrapping to the bottom.
+fn step_alpha(level: u8) -> f32 {
+    STEPS[usize::from(level).min(STEPS.len() - 1)]
+}
 
 /// One row or column of the grid: what a cell joins on, and what is printed.
 ///
@@ -122,6 +133,8 @@ const STEPS: [f32; 5] = [0.06, 0.22, 0.40, 0.62, 0.88];
 pub struct HeatAxis {
     pub id: SharedString,
     pub label: SharedString,
+    /// The larger period this entry belongs to, if the host names one.
+    pub group: Option<SharedString>,
 }
 
 impl HeatAxis {
@@ -129,7 +142,22 @@ impl HeatAxis {
         Self {
             id: id.into(),
             label: label.into(),
+            group: None,
         }
+    }
+
+    /// The period this column belongs to, printed once over the run of
+    /// columns that share it.
+    ///
+    /// A column prints what fits over a cell, which for a calendar is a day
+    /// and not a date. Repeated across a quarter that is four columns headed
+    /// `3`, `10`, `17`, `24` three times over, and a reader has no way to
+    /// tell the second run from the third. The host already knows which
+    /// period each column came from; it says so here rather than being made
+    /// to fit the whole date into sixteen pixels.
+    pub fn group(mut self, group: impl Into<SharedString>) -> Self {
+        self.group = Some(group.into());
+        self
     }
 }
 
@@ -138,6 +166,7 @@ impl From<SharedString> for HeatAxis {
         Self {
             id: value.clone(),
             label: value,
+            group: None,
         }
     }
 }
@@ -357,6 +386,29 @@ fn matrix(
     theme: &gpui_kit_theme::Theme,
     cx: &App,
 ) -> gpui::AnyElement {
+    let groups = column_groups(columns);
+    let gap = theme.space(Space::Xs);
+    let group_header = (!groups.is_empty()).then(|| {
+        div()
+            .row()
+            .items_center()
+            .gap(px(gap))
+            .child(div().w(px(ROW_LABEL)).flex_none())
+            .children(groups.into_iter().map(|(label, span)| {
+                div()
+                    // The run of cells the period covers, gaps included, so
+                    // the name sits over its own columns and not near them.
+                    .w(px(
+                        span as f32 * CELL + (span.saturating_sub(1)) as f32 * gap
+                    ))
+                    .flex_none()
+                    .truncate()
+                    .type_scale(theme, TypeScale::Caption)
+                    .text_color(theme.colors.text_muted)
+                    .child(label)
+            }))
+    });
+
     let header = div()
         .row()
         .items_center()
@@ -404,9 +456,30 @@ fn matrix(
     div()
         .column()
         .gap_token(theme, Space::Xs)
+        .children(group_header)
         .child(header)
         .children(body)
         .into_any_element()
+}
+
+/// The runs of adjacent columns that name the same period, and how many
+/// columns each run covers.
+///
+/// Adjacency is what a header can span, so a period that the host interleaved
+/// with another is reported as the two runs it was actually drawn in rather
+/// than as one label stretched over columns that do not belong to it. One
+/// column without a period cancels the whole row: a header with a hole in it
+/// says the columns under the hole belong to the period before them.
+fn column_groups(columns: &[HeatAxis]) -> Vec<(SharedString, usize)> {
+    let mut runs: Vec<(SharedString, usize)> = Vec::new();
+    for column in columns {
+        match (&column.group, runs.last_mut()) {
+            (Some(group), Some((last, span))) if last == group => *span += 1,
+            (Some(group), _) => runs.push((group.clone(), 1)),
+            (None, _) => return Vec::new(),
+        }
+    }
+    runs
 }
 
 /// How wide a row's name is allowed to be before it truncates.
@@ -426,10 +499,7 @@ fn heat_cell(
     let ident = row.child(id.as_ref());
     let (fill, missing) = match cell.and_then(|cell| cell.level) {
         None => (theme.colors.canvas, true),
-        Some(level) => (
-            ramp.opacity(STEPS[usize::from(level).min(STEPS.len() - 1)]),
-            false,
-        ),
+        Some(level) => (ramp.opacity(step_alpha(level)), false),
     };
 
     let mut square = div()
@@ -438,10 +508,14 @@ fn heat_cell(
         .flex_none()
         .radius(theme, Radius::Small)
         .bg(fill)
+        // An unobserved cell is an outline with nothing in it, and the outline
+        // is the strong hairline rather than the quiet one: against the
+        // lowest step of the ramp a faint edge read as one more shade of the
+        // quantity instead of as the absence of a reading.
         .when(missing, |element| {
             element
                 .border(px(theme.borders.hairline))
-                .border_color(theme.colors.hairline)
+                .border_color(theme.colors.hairline_strong)
                 .surface(theme, Surface::Canvas)
         });
 
@@ -482,6 +556,43 @@ mod tests {
         assert_eq!(empty.level, Some(0));
         assert_eq!(missing.level, None);
         assert_ne!(empty, missing);
+    }
+
+    #[test]
+    fn a_period_header_spans_only_the_columns_next_to_each_other() {
+        let columns = [
+            HeatAxis::new("w0", "3").group("January"),
+            HeatAxis::new("w1", "10").group("January"),
+            HeatAxis::new("w2", "7").group("February"),
+            HeatAxis::new("w3", "14").group("January"),
+        ];
+        assert_eq!(
+            column_groups(&columns),
+            vec![
+                (SharedString::from("January"), 2),
+                (SharedString::from("February"), 1),
+                (SharedString::from("January"), 1),
+            ]
+        );
+    }
+
+    #[test]
+    fn one_column_without_a_period_cancels_the_header() {
+        let columns = [
+            HeatAxis::new("w0", "3").group("January"),
+            HeatAxis::new("w1", "10"),
+        ];
+        assert!(column_groups(&columns).is_empty());
+    }
+
+    #[test]
+    fn the_ramp_climbs_and_its_lowest_step_is_still_a_fill() {
+        let ladder: Vec<f32> = (0..6).map(step_alpha).collect();
+        // A measured zero has to be visible against the ground behind it.
+        assert!(ladder[0] >= 0.15);
+        assert!(ladder[..5].windows(2).all(|pair| pair[0] < pair[1]));
+        // And a level past the ladder takes the top of it, not the bottom.
+        assert_eq!(ladder[5], ladder[4]);
     }
 
     #[test]

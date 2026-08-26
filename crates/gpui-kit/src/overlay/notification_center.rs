@@ -500,13 +500,10 @@ impl NotificationCenter {
                             .text_color(theme.colors.text_muted)
                             .child(detail)
                     }))
-                    .children(action.map(|action| {
-                        div()
-                            .row()
-                            .justify_end()
-                            .pt(px(theme.space(Space::Xs)))
-                            .child(action)
-                    })),
+                    // The offer belongs to the report above it, so it starts
+                    // where the report does. Pushed to the far edge it opened
+                    // a band of empty row between the two.
+                    .children(action.map(|action| div().row().flex_none().child(action))),
             )
             .child(dismiss)
             .semantic_in(

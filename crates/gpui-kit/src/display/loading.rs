@@ -634,9 +634,10 @@ impl RenderOnce for RefreshVeil {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let spec = busy_spec(&self.ident, self.label.clone());
-        // The mark sits in its own chip rather than straight over the
-        // letterforms it is veiling: a spinner drawn across text collides
-        // with it in exactly the frame a reader is trying to keep reading.
+        // The mark sits in its own chip below the content rather than over the
+        // letterforms it is veiling: a chip drawn across text collides with it
+        // in exactly the frame a reader is trying to keep reading, and one
+        // taller than short content would overflow onto whatever sits above.
         let chip = div()
             .flex()
             .flex_row()
@@ -650,19 +651,20 @@ impl RenderOnce for RefreshVeil {
             .child(Spinner::new(self.ident.child("spin")))
             .when_some_label(&theme, self.label.clone());
         div()
-            .relative()
+            .flex()
+            .flex_col()
+            .items_center()
+            .gap(px(theme.space(Space::Sm)))
             .w_full()
-            .child(self.content)
             .child(
-                div()
-                    .absolute()
-                    .inset_0()
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .bg(theme.surface(Surface::Panel).opacity(theme.opacity.scrim))
-                    .child(chip),
+                div().relative().w_full().child(self.content).child(
+                    div()
+                        .absolute()
+                        .inset_0()
+                        .bg(theme.surface(Surface::Panel).opacity(theme.opacity.scrim)),
+                ),
             )
+            .child(chip)
             .semantic_in(cx, spec)
     }
 }

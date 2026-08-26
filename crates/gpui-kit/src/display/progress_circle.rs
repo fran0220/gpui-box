@@ -26,6 +26,13 @@ type CancelHandler = Rc<dyn Fn(&mut Window, &mut App)>;
 /// How much larger the ring is than the control step it is sized from.
 const RING_SCALE: f32 = 1.4;
 
+/// How thick the ring is, as a share of its diameter.
+///
+/// A border width does not scale: at `border.thick` the largest ring in the
+/// size ramp was the same hairline as the smallest, and an arc one twelfth of
+/// the way across a hairline groove cannot be told from the groove.
+const RING_STROKE: f32 = 0.11;
+
 /// A ring for work in a place too tight for a bar.
 #[derive(IntoElement)]
 pub struct ProgressCircle {
@@ -125,7 +132,7 @@ impl RenderOnce for ProgressCircle {
         let theme = cx.theme().clone();
         let metrics = theme.control.get(self.size);
         let diameter = (metrics.height * RING_SCALE).round();
-        let stroke = theme.borders.thick;
+        let stroke = ring_stroke(&theme, diameter);
         let radius = (diameter - stroke) / 2.0;
         let track = signature::track(&theme);
         // The pace is part of the picture, not only of the caption: a
@@ -226,6 +233,11 @@ impl RenderOnce for ProgressCircle {
     }
 }
 
+/// How thick a ring of this diameter is drawn, never thinner than a border.
+fn ring_stroke(theme: &gpui_kit_theme::Theme, diameter: f32) -> f32 {
+    (diameter * RING_STROKE).round().max(theme.borders.thick)
+}
+
 /// How much of the ring the travelling arc covers when the extent is unknown.
 ///
 /// Short enough that the gap is unmistakable — a nearly closed ring would read
@@ -309,5 +321,48 @@ pub(crate) fn arc(
     }
     if let Ok(path) = builder.build() {
         window.paint_path(path, color);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gpui_kit_theme::Theme;
+
+    /// A ring reports its position by the difference between the arc and the
+    /// groove behind it. At a fixed border width the whole size ramp drew the
+    /// same hairline, and a quarter turn of a hairline is not a reading.
+    #[test]
+    fn the_ring_thickens_with_the_size_it_is_drawn_at() {
+        for theme in [Theme::studio_dark(), Theme::studio_light()] {
+            let mut previous = 0.0_f32;
+            for size in [
+                ControlSize::Xs,
+                ControlSize::Sm,
+                ControlSize::Md,
+                ControlSize::Lg,
+            ] {
+                let diameter = (theme.control.get(size).height * RING_SCALE).round();
+                let stroke = ring_stroke(&theme, diameter);
+                assert!(
+                    stroke >= theme.borders.thick,
+                    "{}: a {size:?} ring strokes at {stroke}, under the border at {}",
+                    theme.id,
+                    theme.borders.thick
+                );
+                assert!(
+                    stroke >= previous,
+                    "{}: a {size:?} ring at {stroke} is thinner than the step below it \
+                     at {previous}",
+                    theme.id
+                );
+                previous = stroke;
+            }
+            assert!(
+                previous > theme.borders.thick,
+                "{}: the largest ring never grew past a border at {previous}",
+                theme.id
+            );
+        }
     }
 }
