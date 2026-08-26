@@ -795,20 +795,24 @@ pub(super) fn actions(window: &mut Window, cx: &mut App) -> AnyElement {
         )
         .child(
             row(&theme).child(
+                // A range picker built the way a host would build one: the
+                // track is the group's, the answers that are not current stay
+                // bare on it, and the one that is holds a chip in the colour
+                // the library reserves for the current answer.
                 ButtonGroup::new("scene.actions.range")
                     .children([
                         Button::new("scene.actions.range.day")
                             .label("Day")
-                            .secondary()
+                            .ghost()
                             .on_click(|_, _| {}),
                         Button::new("scene.actions.range.week")
                             .label("Week")
-                            .secondary()
+                            .variant(gpui_kit_theme::Variant::Light)
                             .selected(true)
                             .on_click(|_, _| {}),
                         Button::new("scene.actions.range.month")
                             .label("Month")
-                            .secondary()
+                            .ghost()
                             .on_click(|_, _| {}),
                     ])
                     .small(),
@@ -1351,10 +1355,17 @@ pub(super) fn settings(_window: &mut Window, cx: &mut App) -> AnyElement {
             row(&theme)
                 .w_full()
                 .items_start()
+                // The filtered list opens with its own count, so the
+                // unfiltered one is given a line saying what it is. Without
+                // it the two pages start at different heights and nothing in
+                // the picture says why one column sits lower than the other.
                 .child(
                     div()
                         .flex_1()
                         .min_w_0()
+                        .column()
+                        .gap_token(&theme, Space::Md)
+                        .child(caption(&theme, "no query, so every section"))
                         .child(SettingsList::new("scene.settings.all").section(general())),
                 )
                 .child(

@@ -16,7 +16,7 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TextTone, TypeScale};
 use gpui_kit_assets::Icon;
 
 use crate::controls::button::{ButtonJoin, IconButton};
-use crate::controls::field::{FieldState, field_shell};
+use crate::controls::field::{FieldState, field_shell, nested_control_size};
 use crate::datetime::adapter::{Clock, SharedDateAdapter, TimeOfDay};
 use crate::foundation::direction::ActiveDirection;
 use crate::foundation::stepping::bounded_step;
@@ -338,36 +338,42 @@ impl Render for TimeInput {
         let focused = self.focus_handle.is_focused(window);
         let segments = self.segments();
         let last = segments.len().saturating_sub(1);
-        // Every segment holds two characters, so every segment is the same
-        // width. Sizing each one to its own glyphs is what put the colons of
+        // Every segment holds two characters, so no segment is narrower than
+        // two. Sizing each one to its own glyphs is what put the colons of
         // one field at different places from the colons of the field beside
-        // it.
+        // it; a caption wider than two digits then widens the column it
+        // names, because a caption that does not occupy its own width prints
+        // over the one next to it.
         let cell_width = px(metrics.font_size * 2.0);
 
-        // The mark between two segments, and the same mark drawn in nothing
-        // so the caption row keeps the columns the value row set.
-        let separator = |index: usize, visible: bool| {
+        // A caption and the value it names are one column, so the column is
+        // built once and both rows of it are laid out together. The mark
+        // between two segments is a column of the same shape with nothing on
+        // its caption line.
+        let separator = |index: usize| {
             (index != last && segments[index] != Segment::Meridiem).then(|| {
-                foundation_text(
-                    &theme,
-                    TypeScale::Body,
-                    if segments[index + 1] == Segment::Meridiem {
-                        SharedString::new_static(" ")
-                    } else {
-                        SharedString::new_static(":")
-                    },
-                )
-                .flex_none()
-                .text_color(match visible {
-                    true => theme.colors.text_faint,
-                    false => gpui::transparent_black(),
-                })
-                .into_any_element()
+                let mark = if segments[index + 1] == Segment::Meridiem {
+                    SharedString::new_static(" ")
+                } else {
+                    SharedString::new_static(":")
+                };
+                div()
+                    .flex_none()
+                    .column()
+                    .items_center()
+                    .child(
+                        foundation_text(&theme, TypeScale::Caption, SharedString::new_static(" "))
+                            .text_color(gpui::transparent_black()),
+                    )
+                    .child(
+                        foundation_text(&theme, TypeScale::Body, mark)
+                            .text_color(theme.colors.text_faint),
+                    )
+                    .into_any_element()
             })
         };
 
         let mut cells: Vec<gpui::AnyElement> = Vec::new();
-        let mut labels: Vec<gpui::AnyElement> = Vec::new();
         for (index, segment) in segments.iter().copied().enumerate() {
             let ident = self.ident.child(segment.key());
             let text = self.segment_text(segment);
@@ -378,9 +384,10 @@ impl Render for TimeInput {
                 div()
                     .id(ident.element_id())
                     .flex_none()
-                    .w(cell_width)
-                    .flex()
-                    .justify_center()
+                    .min_w(cell_width)
+                    .column()
+                    .items_center()
+                    .px_token(&theme, Space::Xs)
                     .radius(&theme, gpui_kit_theme::Radius::Small)
                     .when(active, |element| element.bg(theme.colors.selected))
                     .when(!self.disabled, |element| {
@@ -391,6 +398,20 @@ impl Render for TimeInput {
                             },
                         ))
                     })
+                    .child(
+                        foundation_text(
+                            &theme,
+                            TypeScale::Caption,
+                            cx.strings().text(segment.label()),
+                        )
+                        .text_tone(
+                            &theme,
+                            match active {
+                                true => TextTone::Primary,
+                                false => TextTone::Faint,
+                            },
+                        ),
+                    )
                     .child(
                         foundation_text(&theme, TypeScale::Body, text.clone()).text_tone(
                             &theme,
@@ -413,37 +434,14 @@ impl Render for TimeInput {
                     )
                     .into_any_element(),
             );
-            cells.extend(separator(index, true));
-
-            labels.push(
-                div()
-                    .flex_none()
-                    .w(cell_width)
-                    .flex()
-                    .justify_center()
-                    .child(
-                        foundation_text(
-                            &theme,
-                            TypeScale::Caption,
-                            cx.strings().text(segment.label()),
-                        )
-                        .text_tone(
-                            &theme,
-                            match active {
-                                true => TextTone::Primary,
-                                false => TextTone::Faint,
-                            },
-                        ),
-                    )
-                    .into_any_element(),
-            );
-            labels.extend(separator(index, false));
+            cells.extend(separator(index));
         }
 
         // The two arrows step the segment the keyboard is on, which is the
         // same thing the up and down keys do. Without them the field says
         // nothing about being adjustable at all.
         let control = cx.entity().downgrade();
+        let stepper_size = nested_control_size(self.size);
         let steppers = (!self.disabled).then(|| {
             let stepper = control.clone();
             let up = IconButton::new(
@@ -453,7 +451,7 @@ impl Render for TimeInput {
             )
             .secondary()
             .join(ButtonJoin::Leading)
-            .control_size(self.size)
+            .control_size(stepper_size)
             .semantic_parent(self.ident.semantic_id())
             .on_click(move |_window, cx| {
                 stepper.update(cx, |input, cx| input.step(1, cx)).ok();
@@ -466,7 +464,7 @@ impl Render for TimeInput {
             )
             .secondary()
             .join(ButtonJoin::Trailing)
-            .control_size(self.size)
+            .control_size(stepper_size)
             .semantic_parent(self.ident.semantic_id())
             .on_click(move |_window, cx| {
                 stepper.update(cx, |input, cx| input.step(-1, cx)).ok();
@@ -482,13 +480,6 @@ impl Render for TimeInput {
             .track_focus(&self.focus_handle)
             .when(!self.disabled, |element| element.tab_index(0))
             .on_key_down(cx.listener(Self::on_key_down))
-            .child(
-                div()
-                    .row()
-                    // The captions start where the field's own content starts.
-                    .px(px(metrics.padding_x))
-                    .children(labels),
-            )
             .child(
                 field_shell(
                     &theme,

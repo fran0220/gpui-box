@@ -16,7 +16,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, TypeScale};
 
 use crate::controls::button::IconButton;
-use crate::controls::field::{FieldState, field_shell};
+use crate::controls::field::{FieldState, field_shell, nested_control_size};
 use crate::controls::input::{TextInput, TextInputEvent};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text as foundation_text};
 use crate::reactive::Signal;
@@ -512,6 +512,7 @@ impl Render for NumberInput {
         }
 
         let control = cx.entity().downgrade();
+        let stepper_size = nested_control_size(self.size);
         let decrement = IconButton::new(
             self.ident.child("decrement"),
             Icon::ArrowDown,
@@ -519,7 +520,7 @@ impl Render for NumberInput {
         )
         .secondary()
         .join(crate::controls::button::ButtonJoin::Trailing)
-        .control_size(self.size)
+        .control_size(stepper_size)
         .semantic_parent(self.ident.semantic_id())
         .disabled(!can_decrement)
         .on_click({
@@ -538,7 +539,7 @@ impl Render for NumberInput {
         )
         .secondary()
         .join(crate::controls::button::ButtonJoin::Leading)
-        .control_size(self.size)
+        .control_size(stepper_size)
         .semantic_parent(self.ident.semantic_id())
         .disabled(!can_increment)
         .on_click(move |_window, cx| {

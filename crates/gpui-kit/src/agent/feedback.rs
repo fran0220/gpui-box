@@ -11,7 +11,7 @@ use gpui::{
 };
 use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ColorChoice, Radius, Space, Surface, TypeScale, Variant};
 
 use crate::display::icon::{Icon as IconView, IconTone};
 use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
@@ -120,11 +120,20 @@ impl RenderOnce for FeedbackRating {
         // One selected treatment for both rows. A vote said "selected" with
         // an accent wash and accent lettering while a tag said it with a wash
         // alone, so the same fact was drawn two ways inside one control.
+        //
+        // The wash is the light tier of the accent rather than the neutral
+        // selected role: a cast vote sat one hairline away from an uncast
+        // one, and a rating whose two answers look alike reports nothing.
+        let chosen = theme.variant_colors(
+            Variant::Light,
+            &ColorChoice::Semantic(gpui_kit_theme::SemanticColor::Accent),
+        );
         let selected_chip = |element: gpui::Stateful<gpui::Div>, selected: bool| {
             if selected {
                 element
-                    .bg(theme.colors.selected)
-                    .border_color(theme.colors.hairline_strong)
+                    .bg(chosen.background)
+                    .border_color(chosen.text)
+                    .text_color(chosen.text)
             } else {
                 element
             }
@@ -152,7 +161,7 @@ impl RenderOnce for FeedbackRating {
             )
             .type_scale(&theme, TypeScale::Caption)
             .child(IconView::new(glyph).small().tone(if selected {
-                IconTone::Primary
+                IconTone::Accent
             } else {
                 IconTone::Faint
             }))

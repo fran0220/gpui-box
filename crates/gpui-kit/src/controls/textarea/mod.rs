@@ -1676,8 +1676,14 @@ impl Render for TextArea {
                     .well(&theme)
                     // The same drawn boundary every field in the library
                     // carries; invalidity recolours it rather than adding one.
+                    // A refused area gives the line up instead: with the same
+                    // outline as the areas around it, the only thing saying it
+                    // could not be typed in was the weight of text somebody
+                    // else wrote.
                     .border_color(if self.invalid {
                         theme.colors.danger
+                    } else if self.disabled {
+                        gpui::transparent_black()
                     } else {
                         theme.colors.hairline
                     })

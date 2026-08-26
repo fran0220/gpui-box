@@ -658,40 +658,54 @@ impl Render for FindReplace {
             .column()
             .w_full()
             .gap_token(&theme, Space::Sm)
+            // Finding and replacing is one bar, so the two rows sit in one
+            // container: left to stand on the page they were two rows whose
+            // edges only nearly agreed, with the way out floating clear of
+            // both of them.
             .child(
                 div()
-                    .row_reading(direction)
+                    .column()
                     .w_full()
-                    .items_center()
-                    .gap_token(&theme, Space::Sm)
-                    .child(div().flex_1().min_w_0().child(self.search.clone()))
-                    .child(close),
-            )
-            .child(
-                div()
-                    .row_reading(direction)
-                    .w_full()
-                    .gap_token(&theme, Space::Sm)
+                    .gap_token(&theme, Space::Xs)
+                    .p_token(&theme, Space::Xs)
+                    .radius(&theme, Radius::Card)
+                    .surface(&theme, Surface::Sunken)
+                    .hairline(&theme)
                     .child(
                         div()
-                            .flex_1()
-                            .min_w_0()
-                            .flex()
+                            .row_reading(direction)
+                            .w_full()
                             .items_center()
-                            .px_token(&theme, Space::Sm)
-                            .py_token(&theme, Space::Xs)
-                            // The two rows are the same bar twice. Left to
-                            // their contents they differed by four pixels,
-                            // which is enough to read as a mistake.
-                            .min_h(px(
-                                theme.control.get(self.size).height + 2.0 * theme.space(Space::Xs)
-                            ))
-                            .radius(&theme, Radius::Card)
-                            .frame(&theme, Surface::Panel, Elevation::Raised)
-                            .child(self.replacement.clone()),
+                            .gap_token(&theme, Space::Sm)
+                            .child(div().flex_1().min_w_0().child(self.search.clone()))
+                            .child(close),
                     )
-                    .child(replace_one)
-                    .child(replace_all),
+                    .child(
+                        div()
+                            .row_reading(direction)
+                            .w_full()
+                            .gap_token(&theme, Space::Sm)
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .flex()
+                                    .items_center()
+                                    .px_token(&theme, Space::Sm)
+                                    .py_token(&theme, Space::Xs)
+                                    // The two rows are the same bar twice.
+                                    // Left to their contents they differed by
+                                    // four pixels, which is enough to read as
+                                    // a mistake.
+                                    .min_h(px(theme.control.get(self.size).height
+                                        + 2.0 * theme.space(Space::Xs)))
+                                    .radius(&theme, Radius::Card)
+                                    .frame(&theme, Surface::Panel, Elevation::Raised)
+                                    .child(self.replacement.clone()),
+                            )
+                            .child(replace_one)
+                            .child(replace_all),
+                    ),
             )
             .children(uncountable)
             .semantic_in(

@@ -226,7 +226,8 @@
       "sunken": "{neutral.25}",
       "panel": "{neutral.100}",
       "raised": "{neutral.200}",
-      "overlay": "{neutral.150}"
+      "overlay": "{neutral.150}",
+      "scrim": "#12404f"
     },
     "text": {
       "primary": "{neutral.800}",
@@ -285,7 +286,7 @@
       "evidenceWash": "{neutral.900}/0a"
     },
     "loader": {
-      "mark": "{neutral.700}",
+      "mark": "#268bd2",
       "track": "{neutral.900}/24",
       "placeholder": "{neutral.900}/14",
       "sheen": "{neutral.900}/29"

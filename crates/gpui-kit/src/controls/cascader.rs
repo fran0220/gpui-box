@@ -619,11 +619,35 @@ impl Cascader {
         {
             columns.push(self.state_column(option, window, cx));
         }
+        // Each level is its own panel with its own rule beside it. Laid out
+        // as bare columns in one box they centred against each other, so a
+        // branch and the list it opened read as two unrelated lists that
+        // happened to be side by side rather than as one column and its
+        // child.
+        let direction = cx.layout_direction();
+        let last = columns.len().saturating_sub(1);
+        let panels = columns.into_iter().enumerate().map(|(index, column)| {
+            div()
+                .flex_none()
+                .self_stretch()
+                .column()
+                .p(px(theme.space(Space::Xs)))
+                .when(index != last, |panel| {
+                    panel
+                        .border_color(theme.colors.divider)
+                        .map(|panel| match direction.is_rtl() {
+                            true => panel.border_l(px(theme.borders.hairline)),
+                            false => panel.border_r(px(theme.borders.hairline)),
+                        })
+                })
+                .child(column)
+                .into_any_element()
+        });
         let card = popover::card_flush(&theme)
-            .p(px(theme.space(Space::Xs)))
             .flex()
-            .row_reading(cx.layout_direction())
-            .children(columns)
+            .row_reading(direction)
+            .items_stretch()
+            .children(panels)
             .id(self.ident.child("menu").element_id())
             .semantic_in(
                 cx,

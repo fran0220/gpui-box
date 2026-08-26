@@ -131,6 +131,10 @@ impl Element for RichTextEditorElement {
         let paragraph_gap = px(theme.spacing.sm);
         let list_gap = px(theme.spacing.xs);
         let marker_width = px(theme.spacing.lg);
+        // The marker is set against the trailing edge of the room reserved for
+        // it, which is exactly where the item's text begins: without a gap
+        // taken out of that box the bullet touches the first letter.
+        let marker_box = (marker_width - px(theme.spacing.xs)).max(px(1.0));
         let mut top = px(0.0);
         let mut blocks = Vec::with_capacity(document.blocks().len());
 
@@ -231,7 +235,7 @@ impl Element for RichTextEditorElement {
                 screen_origin: point(bounds.left() + left, bounds.top() + top),
                 marker,
                 marker_origin: point(bounds.left() + indent, bounds.top() + top),
-                marker_width,
+                marker_width: marker_box,
             });
             top += height;
             if index + 1 < document.blocks().len() {

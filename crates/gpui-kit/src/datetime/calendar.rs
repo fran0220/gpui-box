@@ -15,7 +15,10 @@ use gpui::{
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TextTone, Theme, TypeScale};
+use gpui_kit_theme::{
+    ActiveTheme, ColorChoice, Elevation, Radius, SemanticColor, Space, Surface, TextTone, Theme,
+    TypeScale, Variant,
+};
 
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -517,7 +520,18 @@ impl Calendar {
         let background = if selected || endpoint {
             Some(theme.colors.accent)
         } else if banded {
-            Some(theme.colors.selected)
+            // Membership of a run is the same fact the endpoints state, one
+            // tier quieter, so it takes the accent's own light tier. The
+            // neutral selection wash was the colour a pointer leaves behind,
+            // which made a chosen range read as a row somebody was hovering.
+            Some(
+                theme
+                    .variant_colors(
+                        Variant::Light,
+                        &ColorChoice::Semantic(SemanticColor::Accent),
+                    )
+                    .background,
+            )
         } else {
             None
         };

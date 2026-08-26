@@ -145,9 +145,11 @@ pub(super) fn scroll_area(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .child(filler(&theme, "Output", 20)),
                 ),
         )
-        // Nothing overflows here, so no scrollbar is drawn or published, and
-        // the content is sized to fill the box rather than to leave a hole
-        // that would be mistaken for the difference being demonstrated.
+        // Nothing overflows here, so no scrollbar is drawn or published and
+        // no edge fades. The area is as tall as what it holds rather than a
+        // height guessed at and hoped to be enough: a box a few pixels short
+        // of its content draws the scrollbar and the fade of the card above
+        // while claiming to be the card that does neither.
         .child(caption(&theme, "Fits: no scrollbar, no fade"))
         .child(
             div()
@@ -158,7 +160,7 @@ pub(super) fn scroll_area(_window: &mut Window, cx: &mut App) -> AnyElement {
                     ScrollArea::new("scene.scroll.summary")
                         .label("Summary")
                         .vertical()
-                        .height(120.0)
+                        .fit_height()
                         .child(filler(&theme, "Summary", 4)),
                 ),
         )
@@ -401,9 +403,13 @@ pub(super) fn split_tree(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .child(
                     SplitTree::new("scene.tree.workspace")
                         .layout(layout)
-                        .pane("files", filler(&theme, "Files", 6))
-                        .pane("editor", filler(&theme, "main.rs", 6))
-                        .pane("terminal", filler(&theme, "Terminal", 2))
+                        // Each pane holds enough to reach the bottom of the
+                        // room the tree gave it: a pane drawn half empty says
+                        // the divider above it is in the wrong place, which is
+                        // the one thing this scene is not about.
+                        .pane("files", filler(&theme, "Files", 13))
+                        .pane("editor", filler(&theme, "main.rs", 7))
+                        .pane("terminal", filler(&theme, "Terminal", 4))
                         // The rail is narrower than any label, so the collapsed
                         // leaf is drawn as the room it still holds.
                         .pane("outline", div())
@@ -437,7 +443,11 @@ pub(super) fn ide_shell(_window: &mut Window, cx: &mut App) -> AnyElement {
             div().flex_1().min_h(px(0.0)).child(
                 Dock::new("scene.shell")
                     .share(DockRegion::Left, 0.24)
-                    .share(DockRegion::Bottom, 0.3)
+                    // The bottom region holds one refused panel, and a refusal
+                    // is a sentence rather than a document: given a third of
+                    // the frame it reads as a region that lost its content
+                    // instead of as a panel the host would not open.
+                    .share(DockRegion::Bottom, 0.17)
                     .panel(
                         DockRegion::Left,
                         DockPanel::new("files", "Files")

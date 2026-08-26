@@ -300,6 +300,10 @@ pub(super) fn pagination(window: &mut Window, cx: &mut App) -> AnyElement {
 
     stack(&theme)
         .w(px(620.0))
+        .child(caption(
+            &theme,
+            "a known total, with the page size the host offered",
+        ))
         .child(
             Pagination::new("scene.pagination.known")
                 .page(9)
@@ -309,6 +313,10 @@ pub(super) fn pagination(window: &mut Window, cx: &mut App) -> AnyElement {
         )
         // A host that only knows there is another page says exactly that: no
         // last-page control, no numbers, and no total.
+        .child(caption(
+            &theme,
+            "an unknown total: no numbers, no last page, and no count invented",
+        ))
         .child(
             Pagination::new("scene.pagination.unknown")
                 .page(3)

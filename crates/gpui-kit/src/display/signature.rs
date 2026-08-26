@@ -1,11 +1,12 @@
-//! The working mark: the one neutral colour work in progress paints with.
+//! The working mark: the one colour work in progress paints with.
 //!
-//! Accent stays the compact action and focus colour, and waiting is not
-//! information — so the mark carries no hue at all. Surfaces that report a
-//! position or a wait paint from here so a progress bar, a ring, a transport
-//! scrubber and a loader cannot invent four different "working" colours, and
-//! every one of them stays caller-themable through `color.loader.*` rather
-//! than through anything welded in.
+//! Every theme points the mark at its accent, so the moving part of a bar, a
+//! ring, a scrubber or a loader is legible at any stroke; the groove, the
+//! placeholder and the sheen stay grey, so waiting has one voice rather than
+//! four. Surfaces that report a position or a wait paint from here so the
+//! family cannot invent different "working" colours, and every one of them
+//! stays caller-themable through `color.loader.*` rather than through
+//! anything welded in.
 //!
 //! The mark never enters the semantic tree. A progress node still publishes
 //! its fraction and its busy flag; a reader that asked what the surface
@@ -120,18 +121,19 @@ mod tests {
     use super::*;
     use gpui_kit_theme::Theme;
 
-    /// Waiting is not information, so no loader role may carry a hue that
-    /// says anything: colour on a loading surface is the caller's meaning,
-    /// and the caller sets it through the token document.
+    /// The quiet loader roles may not carry a hue that says anything:
+    /// colour on a groove, a placeholder or a sheen is the caller's meaning,
+    /// and the caller sets it through the token document. Only the mark
+    /// speaks, and it speaks in the accent.
     ///
     /// Stated against the theme's own semantic colours rather than against a
     /// fixed saturation, because a neutral ramp is allowed the faint cast
     /// that makes it belong to its appearance — `studio-light` builds its
-    /// greys on a cool near-black. What is ruled out is a loader role
+    /// greys on a cool near-black. What is ruled out is a quiet role
     /// carrying enough colour to read as one of the meanings the semantic
     /// roles exist to carry.
     #[test]
-    fn no_loader_role_carries_a_meaningful_hue() {
+    fn no_quiet_loader_role_carries_a_meaningful_hue() {
         for theme in [Theme::studio_dark(), Theme::studio_light()] {
             let quietest_meaning = [
                 theme.colors.accent,
@@ -144,7 +146,6 @@ mod tests {
             .map(|color| color.s)
             .fold(f32::INFINITY, f32::min);
             for (name, color) in [
-                ("mark", mark(&theme)),
                 ("track", track(&theme)),
                 ("placeholder", theme.colors.loader_placeholder),
                 ("sheen", theme.colors.loader_sheen),
@@ -160,13 +161,16 @@ mod tests {
         }
     }
 
+    /// One working colour for the whole family: the mark is the accent, so a
+    /// bar, a ring, a spinner and a scrubber cannot drift apart, and a theme
+    /// restyles all of them by moving one token.
     #[test]
-    fn the_working_mark_is_not_the_accent() {
+    fn the_working_mark_is_the_accent() {
         for theme in [Theme::studio_dark(), Theme::studio_light()] {
-            assert_ne!(
+            assert_eq!(
                 mark(&theme),
                 theme.colors.accent,
-                "working colour collapsed onto accent in {}",
+                "working colour drifted from accent in {}",
                 theme.id
             );
         }

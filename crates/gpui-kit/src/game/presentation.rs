@@ -433,7 +433,12 @@ fn objective_row(
         .id(ident.element_id())
         .column()
         .gap_token(theme, Space::Xs)
+        // A child objective is inset on both edges rather than only the one
+        // reading starts at. Indented on one side alone it keeps the column's
+        // far edge, so the card reads as a card of the wrong width sitting
+        // under the one above it instead of as a card nested inside it.
         .ms(direction, px(depth as f32 * theme.space(Space::Lg)))
+        .me(direction, px(depth as f32 * theme.space(Space::Lg)))
         .p_token(theme, Space::Md)
         .card_surface(theme, CardVariant::Outlined)
         .bg(if chosen {

@@ -35,11 +35,11 @@ use std::rc::Rc;
 
 use gpui::{
     App, FocusHandle, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div,
-    prelude::FluentBuilder,
+    prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::ControlSize;
+use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Variant};
 
 use crate::controls::button::{Button, ButtonJoin, ButtonVariant};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
@@ -216,6 +216,15 @@ impl RenderOnce for Toggle {
 
         Button::new(self.ident.clone())
             .variant(self.variant)
+            // In is a different surface, not the same surface with a line
+            // under it. A toggle out is a neutral chip, so a toggle in takes
+            // the light tier of the accent: the wash and the lettering both
+            // change, which is what makes a run of them readable at a glance
+            // and readable to anyone who cannot separate two neighbouring
+            // greys.
+            .when(self.pressed && !self.disabled, |button| {
+                button.variant(Variant::Light)
+            })
             .control_size(self.size)
             .join(self.join)
             .disabled(self.disabled)
@@ -473,21 +482,14 @@ fn next_set(
 
 impl RenderOnce for ToggleGroup {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let theme = cx.theme().clone();
         let parent = self.ident.semantic_id();
-        let last = self.items.len().saturating_sub(1);
         let actionable = !self.disabled && self.on_change.is_some();
 
         let toggles = self
             .items
             .iter()
-            .enumerate()
-            .map(|(index, item)| {
-                let join = match (index, last) {
-                    (_, 0) => ButtonJoin::Alone,
-                    (0, _) => ButtonJoin::Leading,
-                    (index, last) if index == last => ButtonJoin::Trailing,
-                    _ => ButtonJoin::Middle,
-                };
+            .map(|item| {
                 let refused = self.disabled || item.disabled;
                 let id = item.id.clone();
                 let handler = actionable
@@ -499,7 +501,6 @@ impl RenderOnce for ToggleGroup {
                 Toggle::new(self.ident.child(item.id.as_ref()))
                     .variant(self.variant)
                     .control_size(self.size)
-                    .join(join)
                     .semantic_parent(parent.clone())
                     .pressed(self.pressed.contains(&item.id))
                     .disabled(refused)
@@ -521,13 +522,15 @@ impl RenderOnce for ToggleGroup {
             })
             .collect::<Vec<_>>();
 
-        // No gap: the toggles are joined, so their shared corners are already
-        // flattened. A gap between them leaves square edges facing across a
-        // hole, which is a run that has been taken apart rather than one
-        // frame.
+        // Separate controls, drawn separately. A joined run says the strip is
+        // one answer, and two toggles that are both in then share one
+        // unbroken edge, so a reader cannot see where the first ends. Each
+        // toggle keeps its own corners and a gap holds them apart, which is
+        // also what a segmented control does not look like.
         div()
             .row_reading(cx.layout_direction())
             .flex_none()
+            .gap(px(theme.space(Space::Xs)))
             .children(toggles)
             .semantic_in(cx, {
                 let mut spec = NodeSpec::new(parent, Role::Toolbar).disabled(self.disabled);

@@ -36,6 +36,20 @@ impl FieldState {
     }
 }
 
+/// The size an adornment control takes when it sits *inside* a field.
+///
+/// A stepper built at the field's own size fills the field edge to edge, so it
+/// reads as a block wedged into the field's rounded end rather than as a
+/// control the field contains. One step down leaves the field's own corners
+/// and borders visible around it.
+pub fn nested_control_size(size: ControlSize) -> ControlSize {
+    match size {
+        ControlSize::Lg => ControlSize::Md,
+        ControlSize::Md => ControlSize::Sm,
+        ControlSize::Sm | ControlSize::Xs => ControlSize::Xs,
+    }
+}
+
 /// The surface, focus and invalid treatment every editable control wears.
 ///
 /// `TextInput` renders inside it, and the composed fields — `NumberInput`,
@@ -73,4 +87,38 @@ pub fn field_shell(theme: &Theme, size: ControlSize, state: FieldState) -> gpui:
         } else {
             theme.colors.text
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gpui_kit_theme::Theme;
+
+    /// A stepper has to be shorter than the field around it, or the field's
+    /// own corners and border are behind it rather than around it.
+    #[test]
+    fn an_adornment_is_shorter_than_the_field_that_holds_it() {
+        let theme = Theme::default();
+        for size in ControlSize::ALL {
+            let nested = nested_control_size(size);
+            assert!(
+                theme.control.get(nested).height <= theme.control.get(size).height,
+                "{size:?} holds {nested:?}"
+            );
+        }
+        assert!(
+            theme
+                .control
+                .get(nested_control_size(ControlSize::Md))
+                .height
+                < theme.control.get(ControlSize::Md).height
+        );
+    }
+
+    /// The smallest control has nothing under it, so it holds its own size
+    /// rather than resolving to one the token scale does not have.
+    #[test]
+    fn the_smallest_field_still_resolves_to_a_size() {
+        assert_eq!(nested_control_size(ControlSize::Xs), ControlSize::Xs);
+    }
 }

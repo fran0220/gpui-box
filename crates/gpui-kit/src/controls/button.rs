@@ -340,15 +340,16 @@ impl RenderOnce for Button {
         // primary, so the current answer is the *lightest* thing in a run
         // instead of the darkest. The accent is spent on one rail along the
         // bottom edge, which is the same mark a chosen tab or step carries.
+        //
+        // A button that opted into the shared tiers already carries a paint
+        // that says which answer is current, so selection leaves it alone:
+        // washing a tier over with the neutral one throws away the colour the
+        // caller asked for and leaves the rail as the only mark.
         let unified = self.unified(&theme);
         let paint = if self.disabled {
             theme.colors.text_disabled
-        } else if let Some((tier, resolved)) = &unified {
-            if self.selected && *tier != Variant::Filled {
-                theme.colors.text
-            } else {
-                resolved.text
-            }
+        } else if let Some((_, resolved)) = &unified {
+            resolved.text
         } else if self.selected && self.variant != ButtonVariant::Primary {
             theme.colors.text
         } else {
@@ -452,10 +453,14 @@ impl RenderOnce for Button {
             element.w(px(metrics.height)).px(px(0.0))
         })
         .map(|element| joined(element, &theme, self.join, direction))
-        .when(self.selected && !self.disabled, |element| {
-            element.bg(theme.colors.active)
-        })
-        .selected_column(&theme, self.selected && !self.disabled)
+        .when(
+            self.selected && !self.disabled && !on_shared_tiers,
+            |element| element.bg(theme.colors.active),
+        )
+        // The rail is the neutral treatment's half of the statement. A tier
+        // already says which answer is current in colour, and the rail then
+        // squares off the two corners the chip is rounded on.
+        .selected_column(&theme, self.selected && !self.disabled && !on_shared_tiers)
         .id(self.ident.element_id())
         .when_some(self.focus_handle.clone(), |element, handle| {
             element.track_focus(&handle)
@@ -845,9 +850,18 @@ impl RenderOnce for ButtonGroup {
             })
             .collect::<Vec<_>>();
 
+        // The frame the group is named for is a track: a recessed container
+        // the run sits in. Without it a run of chips beside a run of loose
+        // buttons is the same picture, and whichever chip is the current
+        // answer has nothing to be raised *against*.
+        let theme = cx.theme().clone();
+        let inset = px(theme.borders.hairline * 2.0);
         div()
             .row_reading(cx.layout_direction())
             .flex_none()
+            .p(inset)
+            .radius(&theme, Radius::Control)
+            .surface(&theme, gpui_kit_theme::Surface::Sunken)
             .children(buttons)
             .semantic_in(cx, NodeSpec::new(parent, Role::Toolbar))
     }

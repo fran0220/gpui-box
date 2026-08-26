@@ -313,8 +313,13 @@ impl RenderOnce for SegmentedControl {
             });
         }
 
+        // The strip is as wide as its segments and no wider. Left to stretch,
+        // it fills whatever column it was dropped into and the last segment
+        // is followed by a run of empty track, which reads as a segment that
+        // has lost its label.
         div()
             .column()
+            .items_start()
             .gap(px(theme.space(Space::Xs)))
             .child(strip)
             .semantic_in(cx, {

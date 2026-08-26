@@ -440,6 +440,12 @@ impl TokenDocument {
         self.resolved(path, value)
     }
 
+    /// The modal veil. Separate from [`TokenDocument::surface`] because the
+    /// scrim never carries text and never joins the surface ordering.
+    pub fn scrim(&self) -> Color {
+        self.resolved("color.surface.scrim", self.color.surface.scrim.as_str())
+    }
+
     pub fn text(&self, role: TextTone) -> Color {
         let (path, value) = match role {
             TextTone::Primary => ("color.text.primary", self.color.text.primary.as_str()),
@@ -944,7 +950,7 @@ pub enum SemanticColor {
     Info,
 }
 
-/// The four neutral paint roles of work in progress. See [`LoaderColors`].
+/// The four paint roles of work in progress. See [`LoaderColors`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LoaderColor {
     /// The moving part: a bar's fill, a spinner's arc, a breathing dot.
@@ -1443,7 +1449,7 @@ impl ColorTokens {
     /// A `Vec` of owned paths rather than a fixed array, because the series
     /// scale is addressed by index and has no name to be `'static` about.
     fn entries(&self) -> Vec<(String, &str)> {
-        let fixed: [(&'static str, &str); 54] = [
+        let fixed: [(&'static str, &str); 55] = [
             ("color.agent.read", &self.agent.read),
             ("color.agent.network", &self.agent.network),
             ("color.agent.shell", &self.agent.shell),
@@ -1466,6 +1472,7 @@ impl ColorTokens {
             ("color.surface.panel", &self.surface.panel),
             ("color.surface.raised", &self.surface.raised),
             ("color.surface.overlay", &self.surface.overlay),
+            ("color.surface.scrim", &self.surface.scrim),
             ("color.text.primary", &self.text.primary),
             ("color.text.muted", &self.text.muted),
             ("color.text.faint", &self.text.faint),
@@ -1535,6 +1542,12 @@ pub struct SurfaceColors {
     pub panel: String,
     pub raised: String,
     pub overlay: String,
+    /// The veil painted over the page behind a modal surface, at
+    /// `opacity.scrim`. Not a text-bearing surface, so it takes no part in
+    /// the surface ordering: on a near-black backdrop a pure-black veil
+    /// disappears, which is why dark themes declare a cast the page does not
+    /// have instead of more black.
+    pub scrim: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -1643,13 +1656,14 @@ pub struct AgentColors {
     pub evidence_wash: String,
 }
 
-/// The neutral vocabulary of work in progress.
+/// The vocabulary of work in progress.
 ///
-/// Waiting is not information, so nothing here is allowed a hue: the set is
-/// grey by contract and any colour a loading surface shows is the caller's
-/// own meaning, not the library's decoration. `mark` is the moving part — a
-/// bar's fill, a spinner's arc, a breathing dot — and is the only member held
-/// to a legibility floor. `track` is the groove that mark travels, quieter
+/// `mark` is the moving part — a bar's fill, a spinner's arc, a breathing
+/// dot. Every theme points it at its accent so the moving part is legible at
+/// any stroke, and it is the only member held to a legibility floor; a
+/// caller who means something beyond "working" still says so with its own
+/// tone. The quiet roles stay grey: waiting has one voice, not four.
+/// `track` is the groove that mark travels, quieter
 /// than the mark by construction. `placeholder` is the shape of absent
 /// content, held *inside* a loudness band because a skeleton that outshouts
 /// real content is a defect, not an emphasis. `sheen` is the highlight that

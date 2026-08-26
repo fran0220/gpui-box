@@ -295,6 +295,12 @@ impl RenderOnce for Slider {
             // Ticks are drawn over both halves of the track, and over the
             // fill they invert: under the fill a hairline mark is invisible,
             // which is how a scale with marks came to show none.
+            //
+            // Over the fill the mark is a tint of the colour that reads on
+            // it, and it stops at the groove's own height. Drawn in the page
+            // colour and taller than the groove, it punched a hole clean
+            // through the selected span, and a range with holes in it is a
+            // range that is not the one the caller reported.
             .children(self.marks.iter().filter_map(|mark| {
                 if *mark < self.min || *mark > self.max {
                     return None;
@@ -311,10 +317,14 @@ impl RenderOnce for Slider {
                         .left(gpui::relative(at))
                         .ml(px(-1.0))
                         .w(px(2.0))
-                        .h(track_height + px(4.0))
+                        .h(if filled {
+                            track_height
+                        } else {
+                            track_height + px(4.0)
+                        })
                         .rounded_full()
                         .bg(if filled {
-                            theme.colors.canvas
+                            theme.colors.text_on_accent.opacity(theme.opacity.muted)
                         } else {
                             theme.colors.hairline_strong
                         }),

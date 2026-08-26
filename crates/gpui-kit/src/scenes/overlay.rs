@@ -599,7 +599,10 @@ pub(super) fn frost(_window: &mut Window, cx: &mut App) -> AnyElement {
                         ),
                 ),
         )
-        .child(caption(&theme, "The same glass over a panel surface"))
+        .child(caption(
+            &theme,
+            "The same glass, blurred further and raised above the panel",
+        ))
         .child(
             div()
                 .relative()
@@ -616,7 +619,13 @@ pub(super) fn frost(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .w(px(280.0))
                         .child(
                             Frost::new("scene.frost.rail")
-                                .surface(gpui_kit_theme::Surface::Panel)
+                                // A surface a step above the page it covers.
+                                // Tinted with the page's own colour the glass
+                                // had no surface of its own: at any alpha, a
+                                // fill the colour of what is behind it adds
+                                // nothing, and the rail's words landed
+                                // directly on the words of the file list.
+                                .surface(gpui_kit_theme::Surface::Raised)
                                 .radius(Radius::Dialog)
                                 .blur(32.0)
                                 .child(card(

@@ -277,7 +277,13 @@ impl Render for KeybindingRecorder {
         } else if conflicted {
             theme.colors.danger
         } else {
-            theme.colors.hairline
+            // Every state of the recorder is drawn as a line around the same
+            // well, so the resting state needs a line a reader can actually
+            // see: at the field hairline, a bound recorder beside a
+            // conflicted one looked like a chip lying on the panel next to a
+            // field, which is two different controls rather than one in two
+            // states.
+            theme.colors.hairline_strong
         };
 
         // Recording has to be unmistakable: a recorder that looks like a text
@@ -343,6 +349,12 @@ impl Render for KeybindingRecorder {
             .px(px(metrics.padding_x))
             .gap(px(metrics.gap))
             .items_center()
+            // What the field holds is one short thing whatever state it is
+            // in, and the field is wider than any of them. Left at the
+            // leading edge, a two-key chord sat against one end of an
+            // otherwise empty box while the words of the other states filled
+            // it, so the four states of one control did not line up.
+            .justify_center()
             .radius(&theme, Radius::Control)
             .border(px(if recording {
                 theme.borders.thick

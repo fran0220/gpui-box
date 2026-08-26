@@ -110,14 +110,24 @@ fn described(theme: &Theme) -> gpui::Div {
             .py_token(theme, Space::Md)
             .radius(theme, Radius::Card)
             .well(theme)
+            // The slot stays drawn at every head. At the start of the run the
+            // mark has not arrived yet, and a cell with nothing in it reads
+            // as a frame that failed to render rather than as the frame where
+            // the motion has not begun.
             .child(
-                sample.apply(
-                    div()
-                        .w(px(56.0))
-                        .h(px(24.0))
-                        .radius(theme, Radius::Control)
-                        .bg(theme.colors.accent),
-                ),
+                div()
+                    .w(px(56.0))
+                    .h(px(24.0))
+                    .radius(theme, Radius::Control)
+                    .bg(theme.colors.track)
+                    .child(
+                        sample.apply(
+                            div()
+                                .size_full()
+                                .radius(theme, Radius::Control)
+                                .bg(theme.colors.accent),
+                        ),
+                    ),
             )
             .child(caption(theme, label))
     };

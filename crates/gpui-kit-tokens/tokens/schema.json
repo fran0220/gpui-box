@@ -107,14 +107,15 @@
     "surfaceColors": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["backdrop", "canvas", "sunken", "panel", "raised", "overlay"],
+      "required": ["backdrop", "canvas", "sunken", "panel", "raised", "overlay", "scrim"],
       "properties": {
         "backdrop": { "$ref": "#/$defs/color" },
         "canvas": { "$ref": "#/$defs/color" },
         "sunken": { "$ref": "#/$defs/color" },
         "panel": { "$ref": "#/$defs/color" },
         "raised": { "$ref": "#/$defs/color" },
-        "overlay": { "$ref": "#/$defs/color" }
+        "overlay": { "$ref": "#/$defs/color" },
+        "scrim": { "$ref": "#/$defs/color" }
       }
     },
     "textColors": {

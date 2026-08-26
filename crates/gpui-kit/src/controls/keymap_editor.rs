@@ -2,14 +2,16 @@
 
 use gpui::{
     AppContext, Context, Entity, EventEmitter, InteractiveElement, IntoElement, ParentElement,
-    Render, SharedString, Styled, Subscription, Window, div, px,
+    Render, SharedString, Styled, Subscription, Window, div, prelude::FluentBuilder as _, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Space, TypeScale};
 
 use crate::controls::button::Button;
 use crate::controls::keybinding_recorder::{KeybindingRecorder, KeybindingRecorderEvent};
-use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text as foundation_text};
+use crate::foundation::{
+    CardVariant, Disableable, Ident, Sizable, StyledExt, text as foundation_text,
+};
 use crate::overlay::Kbd;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -309,10 +311,13 @@ impl Render for KeymapEditor {
         let root_id = self.ident.semantic_id();
         let disabled = self.disabled;
         let entity = cx.entity().clone();
-        div()
-            .id(self.ident.element_id())
-            .column()
-            .gap_token(&theme, Space::Md)
+        let header = div()
+            .row()
+            .w_full()
+            .px(px(theme.space(Space::Md)))
+            .py(px(theme.space(Space::Sm)))
+            .border_b(px(theme.borders.hairline))
+            .border_color(theme.colors.hairline)
             .child(
                 foundation_text(
                     &theme,
@@ -331,8 +336,17 @@ impl Render for KeymapEditor {
                         .parent(root_id.clone())
                         .value(cx.numbers().count(count)),
                 ),
-            )
-            .children(visible.into_iter().map(|command| {
+            );
+        // Commands are a list, and a list separated only by air is a set of
+        // unrelated panels floating on the page. One surface holds them, and
+        // a rule between two of them says where one command ends.
+        let rows = div()
+            .column()
+            .w_full()
+            .card_surface(&theme, CardVariant::Outlined)
+            .overflow_hidden()
+            .child(header)
+            .children(visible.into_iter().enumerate().map(|(position, command)| {
                 let row = self.ident.child(command.id.as_ref());
                 let refused = command.refusal.is_some();
                 let actionable = !disabled && !refused;
@@ -415,8 +429,12 @@ impl Render for KeymapEditor {
                         .child(
                             div()
                                 .row()
-                                .flex_1()
+                                // Not a spacer: what removes a binding
+                                // belongs beside the binding it removes, and
+                                // a stretched middle pushed it the width of
+                                // the panel away from the chip it acts on.
                                 .min_w_0()
+                                .overflow_hidden()
                                 .gap_token(&theme, Space::Sm)
                                 .children(binding.conflict.clone().map(|reason| {
                                     foundation_text(&theme, TypeScale::Body, reason.clone())
@@ -495,8 +513,14 @@ impl Render for KeymapEditor {
                 let defaults = command.default_bindings.iter().cloned().map(Kbd::new);
                 div()
                     .column()
+                    .w_full()
                     .gap_token(&theme, Space::Sm)
-                    .p(px(theme.space(Space::Sm)))
+                    .p(px(theme.space(Space::Md)))
+                    .when(position > 0, |command| {
+                        command
+                            .border_t(px(theme.borders.hairline))
+                            .border_color(theme.colors.hairline)
+                    })
                     .child(
                         div()
                             .row()
@@ -581,7 +605,14 @@ impl Render for KeymapEditor {
                             .text(command.label)
                             .disabled(disabled || refused),
                     )
-            }))
+            }));
+
+        div()
+            .id(self.ident.element_id())
+            .column()
+            .w_full()
+            .gap_token(&theme, Space::Md)
+            .child(rows)
             .semantic_in(cx, NodeSpec::new(root_id, Role::Group).disabled(disabled))
     }
 }

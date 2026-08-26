@@ -12,7 +12,7 @@ use gpui::{
     prelude::FluentBuilder as _, px,
 };
 use gpui_kit_assets::Icon;
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Surface, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Space, TypeScale};
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::controls::button::Button;
@@ -605,32 +605,37 @@ impl Render for OneTimeCodeInput {
             let selected = selected_start <= index && index < selected_end;
             let active = focused && selection.is_empty() && cursor == index;
             let filled = index < length;
-            div()
-                .flex_1()
-                .h(px(metrics.height))
-                .flex()
-                .items_center()
-                .justify_center()
-                .radius(&theme, Radius::Control)
-                .surface(&theme, Surface::Sunken)
-                .border(px(theme.borders.hairline))
-                .border_color(if self.invalid {
-                    theme.colors.danger
-                } else if active {
-                    theme.colors.focus
-                } else if filled {
-                    theme.colors.hairline_strong
-                } else {
-                    theme.colors.hairline
-                })
-                .when(selected, |slot| slot.bg(theme.colors.selected))
-                .when(active, |slot| slot.shadow(theme.focus_ring()))
-                .when(self.disabled, |slot| slot.opacity(theme.opacity.disabled))
-                .child(
-                    foundation_text(&theme, TypeScale::Label, if filled { "•" } else { "" })
-                        .text_size(px(metrics.font_size))
-                        .text_color(theme.colors.text),
-                )
+            // A slot is a field of the same family as the ones above it in a
+            // form, so it is built from the same chrome rather than from a
+            // second description of what a field looks like.
+            field_shell(
+                &theme,
+                self.size,
+                FieldState::default()
+                    .focused(active)
+                    .invalid(self.invalid)
+                    .disabled(self.disabled),
+            )
+            .w_auto()
+            .flex_1()
+            .px_0()
+            .justify_center()
+            // A slot is a sixth of the width a text field gets, and at the
+            // field hairline six of them read as one unrendered strip rather
+            // than as six places. The line is drawn at the weight that
+            // survives being that narrow; the cell the caret is in takes the
+            // focus colour and the ring, so which place the next character
+            // lands in is never a guess.
+            .when(!self.invalid && !active, |slot| {
+                slot.border_color(theme.colors.hairline_strong)
+            })
+            .when(active, |slot| slot.border_color(theme.colors.focus))
+            .when(selected, |slot| slot.bg(theme.colors.selected))
+            .child(
+                foundation_text(&theme, TypeScale::Label, if filled { "•" } else { "" })
+                    .text_size(px(metrics.font_size))
+                    .text_color(theme.colors.text),
+            )
         });
 
         div()

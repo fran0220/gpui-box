@@ -162,6 +162,10 @@ pub struct Colors {
     pub panel: Hsla,
     pub raised: Hsla,
     pub overlay: Hsla,
+    /// The modal veil, drawn over the page at `opacity.scrim`. Dark themes
+    /// declare a cast the page does not have, because more black over a
+    /// near-black backdrop is invisible.
+    pub scrim: Hsla,
     pub text: Hsla,
     pub text_muted: Hsla,
     pub text_faint: Hsla,
@@ -182,11 +186,11 @@ pub struct Colors {
     pub warning: Hsla,
     pub success: Hsla,
     pub info: Hsla,
-    /// The neutral vocabulary of work in progress: the moving mark, the
-    /// groove it travels, the shape of absent content, and the highlight that
-    /// crosses it. Grey by contract; any colour a loading surface shows is
-    /// the caller's meaning, not the library's. See
-    /// `gpui_kit_tokens::LoaderColors`.
+    /// The vocabulary of work in progress: the moving mark, the groove it
+    /// travels, the shape of absent content, and the highlight that crosses
+    /// it. The mark carries the theme's accent so the moving part is legible
+    /// at any stroke; the quiet roles stay grey. Both are the token
+    /// document's to change. See `gpui_kit_tokens::LoaderColors`.
     pub loader_mark: Hsla,
     pub loader_track: Hsla,
     pub loader_placeholder: Hsla,
@@ -566,6 +570,7 @@ impl Theme {
                 panel: color(tokens.surface(Surface::Panel)),
                 raised: color(tokens.surface(Surface::Raised)),
                 overlay: color(tokens.surface(Surface::Overlay)),
+                scrim: color(tokens.scrim()),
                 text: color(tokens.text(TextTone::Primary)),
                 text_muted: color(tokens.text(TextTone::Muted)),
                 text_faint: color(tokens.text(TextTone::Faint)),

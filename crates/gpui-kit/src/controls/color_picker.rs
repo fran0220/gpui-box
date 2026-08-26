@@ -14,7 +14,7 @@ use gpui::{
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
 
-use crate::foundation::{Disableable, FocusRing, Ident, StyledExt};
+use crate::foundation::{CardVariant, Disableable, FocusRing, Ident, StyledExt};
 use crate::layout::measure;
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -260,6 +260,11 @@ impl RenderOnce for ColorPicker {
             .column()
             .w(px(220.0))
             .gap_token(&theme, Space::Sm)
+            // Board, runs and swatches are one instrument. Loose on the page
+            // they are a stack of unrelated rectangles, and nothing says where
+            // the picker ends and whatever it was placed next to begins.
+            .p_token(&theme, Space::Sm)
+            .card_surface(&theme, CardVariant::Outlined)
             .child(
                 div()
                     .row()
@@ -326,8 +331,13 @@ fn saturation_board(
         .relative()
         .w_full()
         .h(px(120.0))
-        .radius(&theme, Radius::Small)
+        // The board and the two runs are one instrument, so the plane is
+        // bounded the way the runs are rather than left as the one square
+        // rectangle among rounded ones.
+        .radius(&theme, Radius::Control)
         .overflow_hidden()
+        .border(px(theme.borders.hairline))
+        .border_color(theme.colors.hairline_strong)
         .cursor(CursorStyle::Crosshair)
         .bg(hsv_to_hsla(hue, 1.0, 1.0, 1.0))
         .child(div().absolute().inset_0().bg(linear_gradient_stops(
@@ -401,6 +411,8 @@ fn saturation_board(
 /// and a hue run are the same object at different jobs.
 const TRACK_HEIGHT: f32 = 12.0;
 const CHECKER: f32 = TRACK_HEIGHT / 2.0;
+/// How wide the handle on either channel is.
+const THUMB: f32 = 12.0;
 /// How many squares the checkerboard lays down before it runs out. The track
 /// clips, so the count only has to exceed the widest picker.
 const CHECKER_COLUMNS: usize = 64;
@@ -463,29 +475,45 @@ fn channel_track(
         .h(px(TRACK_HEIGHT))
         // The clipped part is the gradient, not the handle. Rounding the
         // whole thing cut the handle to a half-circle whenever the value sat
-        // at either end of the run.
+        // at either end of the run. A run of colour is a track, so it is
+        // rounded to its own height and carries the same line every other
+        // track in the library carries.
         .child(
             div()
                 .absolute()
                 .inset_0()
-                .radius(theme, Radius::Small)
+                .rounded(px(TRACK_HEIGHT / 2.0))
                 .overflow_hidden()
+                .border(px(theme.borders.hairline))
+                .border_color(theme.colors.hairline_strong)
                 .when(transparency, |element| {
                     element.children(checkerboard(theme))
                 })
                 .child(div().absolute().inset_0().bg(fill)),
         )
+        // The handle travels between the two positions where it is still
+        // wholly on the track, so neither end of the run puts half of it in
+        // the air. The reported value maps onto the same travel, which is
+        // what keeps the handle under the pointer that is dragging it.
         .child(
             div()
                 .absolute()
-                .top(px(-2.0))
-                .left(relative(value.clamp(0.0, 1.0)))
-                .ml(px(-5.0))
-                .size(px(10.0))
-                .rounded_full()
-                .bg(theme.colors.raised)
-                .border(px(theme.borders.hairline))
-                .border_color(theme.colors.hairline_strong),
+                .top_0()
+                .bottom_0()
+                .left(px(THUMB / 2.0))
+                .right(px(THUMB / 2.0))
+                .child(
+                    div()
+                        .absolute()
+                        .top(px((TRACK_HEIGHT - THUMB) / 2.0))
+                        .left(relative(value.clamp(0.0, 1.0)))
+                        .ml(px(-THUMB / 2.0))
+                        .size(px(THUMB))
+                        .rounded_full()
+                        .bg(theme.colors.raised)
+                        .border(px(theme.borders.hairline))
+                        .border_color(theme.colors.hairline_strong),
+                ),
         );
 
     if let Some(handler) = report {
@@ -494,9 +522,14 @@ fn channel_track(
             let handler = Rc::clone(&handler);
             move |position: gpui::Point<gpui::Pixels>, window: &mut Window, cx: &mut App| {
                 let bounds = measured.get();
-                let width = f32::from(bounds.size.width).max(1.0);
-                let next = ((f32::from(position.x - bounds.origin.x)) / width).clamp(0.0, 1.0);
-                handler(next, window, cx);
+                handler(
+                    channel_fraction(
+                        f32::from(position.x - bounds.origin.x),
+                        f32::from(bounds.size.width),
+                    ),
+                    window,
+                    cx,
+                );
             }
         };
         let down = pick.clone();
@@ -522,6 +555,18 @@ fn channel_track(
                 .range(0.0, 1.0, value),
         )
         .into_any_element()
+}
+
+/// Where along a channel a pointer `offset` from the track's leading edge is.
+///
+/// The handle is a disc that has to stay wholly on the track, so it travels
+/// between two centres a half-handle in from either end. The reported value
+/// maps onto that same travel: mapping it onto the full width instead would
+/// leave the handle trailing the pointer that is dragging it, and neither end
+/// of the run reachable.
+fn channel_fraction(offset: f32, width: f32) -> f32 {
+    let travel = (width - THUMB).max(1.0);
+    ((offset - THUMB / 2.0) / travel).clamp(0.0, 1.0)
 }
 
 fn hue_fill() -> gpui::Background {
@@ -649,6 +694,23 @@ mod tests {
     fn hex_is_derived_from_the_hsla_value() {
         let red = hsla(0.0, 1.0, 0.5, 1.0);
         assert_eq!(hex_of(red).as_ref(), "#FF0000");
+    }
+
+    #[test]
+    fn a_channel_reaches_both_ends_where_the_handle_still_fits() {
+        let width = 200.0;
+        assert_eq!(channel_fraction(THUMB / 2.0, width), 0.0);
+        assert_eq!(channel_fraction(width - THUMB / 2.0, width), 1.0);
+        assert!((channel_fraction(width / 2.0, width) - 0.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn a_pointer_beyond_either_end_of_a_channel_stays_on_it() {
+        assert_eq!(channel_fraction(-40.0, 200.0), 0.0);
+        assert_eq!(channel_fraction(400.0, 200.0), 1.0);
+        // A track narrower than its own handle still reports a value rather
+        // than dividing by what is left of it.
+        assert!(channel_fraction(1.0, THUMB).is_finite());
     }
 
     #[test]

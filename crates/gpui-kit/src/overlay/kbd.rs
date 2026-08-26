@@ -48,20 +48,26 @@ impl RenderOnce for Kbd {
         let published = self.ident.as_ref().map(|ident| {
             NodeSpec::new(ident.semantic_id(), Role::Text).text(self.keystroke.clone())
         });
+        // A cap is sized from the same control step its chip is, rather than
+        // from the caption scale, and a cap the symbol face has to draw is
+        // sized a step above that. Those glyphs are drawn well inside their
+        // em, so at caption size the mark a reader has to recognise came out
+        // at around seven pixels and ⌫, ⌦ and ⇥ stopped being separable from
+        // each other.
+        let metrics = theme.control.get(gpui_kit_theme::ControlSize::Sm);
         let element =
             div()
                 .row()
                 .gap(px(theme.spacing.xs / 2.0))
                 .children(self.caps(cx).into_iter().map(|cap| {
+                    let size = if drawn_by_symbol_face(cap.as_ref()) {
+                        theme.typography.subtitle.size
+                    } else {
+                        metrics.font_size
+                    };
                     div()
-                        .h(px(theme
-                            .control
-                            .get(gpui_kit_theme::ControlSize::Sm)
-                            .height))
-                        .min_w(px(theme
-                            .control
-                            .get(gpui_kit_theme::ControlSize::Sm)
-                            .height))
+                        .h(px(metrics.height))
+                        .min_w(px(metrics.height))
                         .px(px(theme.spacing.xs))
                         .flex()
                         .items_center()
@@ -70,7 +76,7 @@ impl RenderOnce for Kbd {
                         .bg(theme.colors.hover)
                         .font_family(theme.typography.mono.clone())
                         .font_fallbacks(gpui_kit_assets::key_fallbacks())
-                        .text_size(px(theme.typography.caption.size))
+                        .text_size(px(size))
                         .text_color(theme.colors.text_muted)
                         .child(cap)
                 }));
@@ -79,6 +85,15 @@ impl RenderOnce for Kbd {
             None => element.into_any_element(),
         }
     }
+}
+
+/// Whether a cap contains a glyph the bundled fallback face has to draw.
+///
+/// The arrows are not among them: the mono face draws those itself, at the
+/// same size as the letters beside them.
+fn drawn_by_symbol_face(cap: &str) -> bool {
+    cap.chars()
+        .any(|glyph| matches!(glyph, '⌘' | '⌃' | '⌥' | '⇧' | '⏎' | '⌫' | '⌦' | '⇥' | '␣'))
 }
 
 /// Splits a keystroke into the caps to draw.
@@ -198,6 +213,17 @@ mod tests {
         assert_eq!(
             caps("up", false, &Strings::new()),
             vec![SharedString::from("↑")]
+        );
+    }
+
+    #[test]
+    fn the_caps_that_need_the_symbol_face_are_the_ones_it_draws() {
+        assert!(drawn_by_symbol_face("⌘⇧P"));
+        assert!(drawn_by_symbol_face("⌫"));
+        assert!(!drawn_by_symbol_face("esc"));
+        assert!(
+            !drawn_by_symbol_face("↑"),
+            "the mono face draws the arrows itself"
         );
     }
 

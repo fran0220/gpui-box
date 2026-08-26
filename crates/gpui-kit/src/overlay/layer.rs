@@ -323,7 +323,9 @@ fn scrim_frame(
         .h(viewport.height)
         .flex();
     if visible {
-        frame = frame.bg(gpui::black().opacity(theme.opacity.scrim));
+        // The veil colour is the token document's: dark themes carry a cast
+        // the page does not have, because black over near-black is invisible.
+        frame = frame.bg(theme.colors.scrim.opacity(theme.opacity.scrim));
     }
     if let Some(handler) = on_dismiss {
         frame = frame.on_click(move |_: &ClickEvent, window, cx| handler(window, cx));

@@ -265,6 +265,10 @@ struct Strip {
     /// reader: once a tab has been shown, scrolling away from it is allowed to
     /// stick.
     showed: Option<SharedString>,
+    /// Whether the tab that was last brought into view still has to be moved
+    /// clear of the fade. It cannot be done on the frame that asks for the
+    /// scroll, because the tab has no bounds until it has been laid out once.
+    clearing: bool,
 }
 
 /// A row of tabs. The strip publishes one [`Role::Tab`] node per tab.
@@ -796,18 +800,29 @@ impl RenderOnce for Tabs {
         let mut scroll = None;
         if let Some(state) = &state {
             let mut state = state.borrow_mut();
+            let showing = self
+                .selected
+                .as_ref()
+                .and_then(|id| self.tabs.iter().position(|tab| &tab.id == id));
             if state.showed != self.selected {
-                if let Some(index) = self
-                    .selected
-                    .as_ref()
-                    .and_then(|id| self.tabs.iter().position(|tab| &tab.id == id))
-                {
+                if let Some(index) = showing {
                     // Applied in the next prepaint, once the tabs have bounds
                     // to be scrolled to, and by the minimum that puts the tab
                     // fully on screen.
                     state.scroll.scroll_to_item(index);
                 }
                 state.showed = self.selected.clone();
+                state.clearing = showing.is_some();
+            }
+            // The minimum that puts a tab on screen leaves it flush against
+            // the end it came from, which is exactly where the fade is: the
+            // strip would dim the label it had just gone to fetch. So a tab
+            // the strip brought into view is moved a band clear of the end,
+            // on the frame that first has bounds to measure it by.
+            if let (true, Some(index)) = (state.clearing, showing)
+                && clear_the_fade(&state.scroll, index, FADE_BAND)
+            {
+                state.clearing = false;
             }
             // Read as a distance from the start, because which sign means
             // "scrolled onward" is a detail of the platform's scroll
@@ -890,9 +905,15 @@ impl RenderOnce for Tabs {
                 }
                 let overflow_ident = self.ident.child("overflow");
                 div()
-                    .flex()
                     .flex_none()
-                    .child(menu)
+                    .column()
+                    // The trigger stands where a tab would, so it is built
+                    // like one: a row of the tab height with the underline
+                    // lane beneath it. Without the lane the strip's own
+                    // bottom alignment hangs the trigger a rail's width
+                    // below the labels and breaks the line they sit on.
+                    .child(div().row().h(px(metrics.height)).items_center().child(menu))
+                    .child(div().h(px(theme.effects.selection_rail_width)))
                     // The trigger says how many tabs moved here, so a snapshot
                     // shows that they were relocated and not dropped.
                     .semantic_in(
@@ -935,6 +956,54 @@ impl RenderOnce for Tabs {
     }
 }
 
+/// Moves the strip so the tab at `index` sits at least `band` from both ends
+/// of its viewport, and reports whether there was anything measured to do it
+/// with.
+///
+/// The nudge is bounded by the strip's own travel, so a tab at either end of
+/// the row stays exactly where it is — and no fade is painted over it there
+/// either, because there is nothing behind that end to fade towards.
+fn clear_the_fade(scroll: &ScrollHandle, index: usize, band: f32) -> bool {
+    let Some(tab) = scroll.bounds_for_item(index) else {
+        return false;
+    };
+    let viewport = scroll.bounds();
+    if viewport.size.width <= px(0.0) {
+        return false;
+    }
+    let offset = scroll.offset();
+    // A tab's bounds are where layout put it, before the strip was scrolled,
+    // which is the same frame of reference the scroll offset is stated in.
+    let start = f32::from(tab.left() + offset.x) - f32::from(viewport.left());
+    let end = f32::from(viewport.right()) - f32::from(tab.right() + offset.x);
+    let nudge = fade_nudge(start, end, band);
+    if nudge != 0.0 {
+        // A strip's offset runs from zero back to minus its travel, so a
+        // nudge that would take it past either end is a tab already at that
+        // end, where there is nothing behind the edge to fade towards.
+        let travel = f32::from(scroll.max_offset().x).abs();
+        let travelled = (f32::from(offset.x) - nudge).clamp(-travel, 0.0);
+        scroll.set_offset(point(px(travelled), offset.y));
+    }
+    true
+}
+
+/// How far the strip has to travel onward for a tab `start` from one end and
+/// `end` from the other to clear a fade `band` wide at both.
+///
+/// A tab wider than the room between the two fades cannot clear both, so the
+/// end it is closer to wins and the other stays dimmed: moving it off one
+/// fade and onto the other would say the tab is at an edge it is not at.
+fn fade_nudge(start: f32, end: f32, band: f32) -> f32 {
+    if end < band && end <= start {
+        band - end
+    } else if start < band && start < end {
+        -(band - start)
+    } else {
+        0.0
+    }
+}
+
 /// The next tab that can be chosen in `delta`'s direction, skipping refusals.
 ///
 /// Movement stops at the ends instead of wrapping, so arrowing past the last
@@ -949,4 +1018,35 @@ fn step(tabs: &[TabItem], selected: Option<&SharedString>, delta: isize) -> Opti
 /// it is positive.
 fn edge(tabs: &[TabItem], delta: isize) -> Option<SharedString> {
     step(tabs, None, -delta)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_tab_already_clear_of_both_fades_is_not_moved() {
+        assert_eq!(fade_nudge(40.0, 40.0, FADE_BAND), 0.0);
+        assert_eq!(fade_nudge(FADE_BAND, FADE_BAND, FADE_BAND), 0.0);
+    }
+
+    #[test]
+    fn a_tab_flush_against_an_end_is_moved_a_whole_band_clear_of_it() {
+        // Flush against the far end: the strip travels onward.
+        assert_eq!(fade_nudge(200.0, 0.0, FADE_BAND), FADE_BAND);
+        // Flush against the near end: the strip travels back.
+        assert_eq!(fade_nudge(0.0, 200.0, FADE_BAND), -FADE_BAND);
+        // Part of the way under a fade is moved by what is left of it.
+        assert_eq!(fade_nudge(200.0, 10.0, FADE_BAND), FADE_BAND - 10.0);
+    }
+
+    #[test]
+    fn a_tab_too_wide_to_clear_both_fades_clears_the_end_it_is_nearer() {
+        let nudge = fade_nudge(4.0, 8.0, FADE_BAND);
+        assert!(
+            nudge < 0.0,
+            "the nearer end wins rather than the tab being shuffled between two fades"
+        );
+        assert_eq!(nudge, -(FADE_BAND - 4.0));
+    }
 }
