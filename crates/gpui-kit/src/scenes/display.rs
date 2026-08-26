@@ -488,9 +488,9 @@ pub(super) fn chart(_window: &mut Window, cx: &mut App) -> AnyElement {
         ChartPoint::new("00:45", 0.75, 0.58, "00:45", "58%"),
         ChartPoint::new("01:00", 1.0, 0.61, "01:00", "61%"),
     ];
-    // Two columns rather than one tall stack. The family is ten surfaces, and
-    // a column of ten runs off the bottom of the frame that holds it, which
-    // is how the last of them came to be reviewed as half a picture.
+    // Three columns rather than one tall stack. The family is eleven surfaces
+    // once truthful empty/stale states are included, and even two columns run
+    // the final plots below the fixed review frame.
     let column = || {
         div()
             .column()
@@ -498,9 +498,9 @@ pub(super) fn chart(_window: &mut Window, cx: &mut App) -> AnyElement {
             .min_w_0()
             .gap(px(theme.space(Space::Md)))
     };
-    // The frame this is reviewed in is 920 wide, and a stack wider than it
-    // does not scroll: it runs off the right edge, which is how the second
-    // column came to be reviewed with its plots and their end points cut.
+    // The frame this is reviewed in is 920 wide. Every column flexes inside
+    // that width so the third one earns vertical room without escaping at the
+    // right edge.
     stack(&theme)
         .w(px(920.0))
         .child(caption(
@@ -577,27 +577,6 @@ pub(super) fn chart(_window: &mut Window, cx: &mut App) -> AnyElement {
                                 )]),
                             )
                             .donut(),
-                        )
-                        .child(
-                            StackedBarChart::new(
-                                "scene.chart.stacked",
-                                "Fixture mix",
-                                ChartState::Ready(vec![
-                                    ChartSeries::new("cpu", "CPU")
-                                        .points([
-                                            ChartPoint::new("alpha", 0.0, 0.30, "Alpha", "30%"),
-                                            ChartPoint::new("beta", 0.5, 0.20, "Beta", "20%"),
-                                        ])
-                                        .tint(identity_tint(&theme, "agent.read")),
-                                    ChartSeries::new("memory", "Memory")
-                                        .points([
-                                            ChartPoint::new("alpha", 0.0, 0.25, "Alpha", "25%"),
-                                            ChartPoint::new("beta", 0.5, 0.40, "Beta", "40%"),
-                                        ])
-                                        .tint(identity_tint(&theme, "agent.shell")),
-                                ]),
-                            )
-                            .axes(ChartAxes::default().y_ends("0", "max")),
                         ),
                 )
                 .child(
@@ -649,6 +628,30 @@ pub(super) fn chart(_window: &mut Window, cx: &mut App) -> AnyElement {
                             .crosshair()
                             .current("samples", "b")
                             .on_current(|_, _, _| {})
+                            .axes(ChartAxes::default().y_ends("0", "max")),
+                        ),
+                )
+                .child(
+                    column()
+                        .child(
+                            StackedBarChart::new(
+                                "scene.chart.stacked",
+                                "Fixture mix",
+                                ChartState::Ready(vec![
+                                    ChartSeries::new("cpu", "CPU")
+                                        .points([
+                                            ChartPoint::new("alpha", 0.0, 0.30, "Alpha", "30%"),
+                                            ChartPoint::new("beta", 0.5, 0.20, "Beta", "20%"),
+                                        ])
+                                        .tint(identity_tint(&theme, "agent.read")),
+                                    ChartSeries::new("memory", "Memory")
+                                        .points([
+                                            ChartPoint::new("alpha", 0.0, 0.25, "Alpha", "25%"),
+                                            ChartPoint::new("beta", 0.5, 0.40, "Beta", "40%"),
+                                        ])
+                                        .tint(identity_tint(&theme, "agent.shell")),
+                                ]),
+                            )
                             .axes(ChartAxes::default().y_ends("0", "max")),
                         )
                         .child(RadarChart::new(
@@ -1641,6 +1644,38 @@ pub(super) fn progress_circle(_window: &mut Window, cx: &mut App) -> AnyElement 
                 .child(
                     ProgressCircle::new("scene.progress-circle.contact")
                         .label("Contacting the host"),
+                ),
+        )
+        .child(caption(
+            &theme,
+            "unknown, stalled, and paused work remain different facts",
+        ))
+        .child(
+            row(&theme)
+                .gap(px(theme.spacing.lg))
+                .child(
+                    div()
+                        .column()
+                        .items_center()
+                        .gap_token(&theme, Space::Xs)
+                        .child(
+                            ProgressCircle::new("scene.progress-circle.stalled")
+                                .label("Upload stalled")
+                                .stalled(true),
+                        )
+                        .child(caption(&theme, "Stalled")),
+                )
+                .child(
+                    div()
+                        .column()
+                        .items_center()
+                        .gap_token(&theme, Space::Xs)
+                        .child(
+                            ProgressCircle::new("scene.progress-circle.paused")
+                                .label("Upload paused")
+                                .paused(true),
+                        )
+                        .child(caption(&theme, "Paused")),
                 ),
         )
         .child(caption(&theme, "the size ramp"))

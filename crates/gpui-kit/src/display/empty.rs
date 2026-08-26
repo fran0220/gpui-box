@@ -59,6 +59,7 @@ impl EmptyKind {
 pub struct EmptyState {
     ident: Ident,
     kind: EmptyKind,
+    glyph: Option<Icon>,
     title: SharedString,
     detail: Option<SharedString>,
     action: Option<AnyElement>,
@@ -80,6 +81,7 @@ impl EmptyState {
         Self {
             ident: ident.into(),
             kind: EmptyKind::default(),
+            glyph: None,
             title: title.into(),
             detail: None,
             action: None,
@@ -88,6 +90,16 @@ impl EmptyState {
 
     pub fn kind(mut self, kind: EmptyKind) -> Self {
         self.kind = kind;
+        self
+    }
+
+    /// Replaces the generic state mark when the empty surface has a concrete
+    /// product-neutral subject, such as a document, image, or folder.
+    ///
+    /// The state still decides its semantic value and tone; this changes only
+    /// the noun the picture names.
+    pub fn icon(mut self, glyph: Icon) -> Self {
+        self.glyph = Some(glyph);
         self
     }
 
@@ -112,7 +124,7 @@ impl RenderOnce for EmptyState {
         // glyph is two different sentences a reader is asked to tell apart by
         // their wording alone, which is how a withdrawn run and an empty list
         // came to look like the same thing.
-        let (glyph, tint) = match self.kind {
+        let (default_glyph, tint) = match self.kind {
             EmptyKind::Empty => (Icon::Archive, theme.colors.text_faint),
             EmptyKind::Unstarted => (Icon::Document, theme.colors.text_faint),
             EmptyKind::Queued => (Icon::List, theme.colors.text_faint),
@@ -122,6 +134,7 @@ impl RenderOnce for EmptyState {
             EmptyKind::Failed => (Icon::Danger, theme.colors.danger),
             EmptyKind::Unauthorized => (Icon::Key, theme.colors.warning),
         };
+        let glyph = self.glyph.unwrap_or(default_glyph);
 
         let content = div()
             .flex()

@@ -32,8 +32,11 @@ use gpui::{
 };
 use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, AgentColor, Radius, Space, TextTone, Theme, TypeScale};
+use gpui_kit_theme::{
+    ActiveTheme, AgentColor, ControlSize, Radius, Space, TextTone, Theme, TypeScale,
+};
 
+use crate::controls::button::Button;
 use crate::display::badge::Tone;
 use crate::display::icon::{Icon as IconView, IconTone};
 use crate::display::status::StatusDot;
@@ -634,7 +637,7 @@ impl RenderOnce for ToolCall {
         let retry = self
             .on_retry
             .filter(|_| retryable)
-            .map(|handler| inline_retry(&ident, &theme, handler, cx));
+            .map(|handler| inline_retry(&ident, handler, cx));
         let line = div()
             .row()
             .w_full()
@@ -694,40 +697,18 @@ impl RenderOnce for ToolCall {
     }
 }
 
-fn inline_retry(call: &Ident, theme: &Theme, handler: RetryHandler, cx: &mut App) -> AnyElement {
+fn inline_retry(call: &Ident, handler: RetryHandler, cx: &mut App) -> AnyElement {
     let ident = call.child("retry");
     let label = cx.strings().text(StringKey::TryAgain);
-    let key_handler = Rc::clone(&handler);
-    div()
-        .id(ident.element_id())
-        .flex_none()
-        .cursor_pointer()
-        .tab_index(0)
-        .pressable(cx)
-        .focus_ring(theme)
-        // The only pressable thing on a failed row used to be caption text
-        // beside caption text, so the recovery action was indistinguishable
-        // from the duration next to it. A quiet outline says it is a control
-        // without raising the row's voice.
-        .px_token(theme, Space::Xs)
-        .radius(theme, Radius::Small)
-        .hairline(theme)
-        .type_scale(theme, TypeScale::Caption)
-        .text_tone(theme, TextTone::Muted)
-        .child(label.clone())
-        .on_click(move |_, window, cx| handler(window, cx))
-        .on_key_down(move |event, window, cx| {
-            if matches!(event.keystroke.key.as_str(), "enter" | "space") {
-                key_handler(window, cx);
-                cx.stop_propagation();
-            }
-        })
-        .semantic_in(
-            cx,
-            NodeSpec::new(ident.semantic_id(), Role::Button)
-                .parent(call.semantic_id())
-                .text(label),
-        )
+    // Retry is an ordinary action, so it uses the ordinary control instead
+    // of maintaining a second, caption-sized implementation of button focus,
+    // keyboard activation, press response, and semantic state in this row.
+    Button::new(ident)
+        .label(label)
+        .secondary()
+        .control_size(ControlSize::Xs)
+        .semantic_parent(call.semantic_id())
+        .on_click(move |window, cx| handler(window, cx))
         .into_any_element()
 }
 

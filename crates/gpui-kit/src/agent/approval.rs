@@ -398,6 +398,7 @@ impl Render for ApprovalPrompt {
 
         let outcome = self.outcome(cx);
         let prompt = cx.entity().downgrade();
+        let standing_ident = self.ident.child("standing");
 
         let decline = pending.then(|| {
             let prompt = prompt.clone();
@@ -443,7 +444,7 @@ impl Render for ApprovalPrompt {
                         .label(scope.label(cx))
                         .secondary()
                         .control_size(ControlSize::Sm)
-                        .semantic_parent(self.ident.semantic_id())
+                        .semantic_parent(standing_ident.semantic_id())
                         .track_focus(handle)
                         .on_click(move |_window, cx| {
                             let chosen = chosen.clone();
@@ -503,13 +504,29 @@ impl Render for ApprovalPrompt {
                                 .children(approve),
                         )
                         .when(!always.is_empty(), |element| {
+                            let label = cx.strings().text(StringKey::ApprovalStanding);
                             element.child(
                                 div()
-                                    .flex()
-                                    .flex_row()
-                                    .flex_wrap()
-                                    .gap_token(&theme, Space::Sm)
-                                    .children(always),
+                                    .column()
+                                    .gap_token(&theme, Space::Xs)
+                                    .child(
+                                        text(&theme, TypeScale::Caption, label.clone())
+                                            .text_color(theme.colors.text_muted),
+                                    )
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .flex_row()
+                                            .flex_wrap()
+                                            .gap_token(&theme, Space::Sm)
+                                            .children(always),
+                                    )
+                                    .semantic_in(
+                                        cx,
+                                        NodeSpec::new(standing_ident.semantic_id(), Role::Group)
+                                            .parent(self.ident.semantic_id())
+                                            .text(label),
+                                    ),
                             )
                         }),
                 )

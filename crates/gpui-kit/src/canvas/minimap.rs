@@ -1,22 +1,28 @@
 //! A caller-owned overview of a larger canvas.
 //!
 //! Marks and the viewport rectangle are already normalized by the host into
-//! the `0..=1` square. Clicking reports the normalized point; the host pans.
+//! the `0..=1` square. Clicking reports the normalized point; when the
+//! overview is focusable, the arrow keys report a point one twentieth of the
+//! canvas away from the current viewport centre. The host applies every pan.
 
 use std::rc::Rc;
 
 use gpui::{
     App, InteractiveElement, IntoElement, MouseButton, ParentElement, RenderOnce, SharedString,
-    Styled, Window, div, px, relative,
+    Styled, Window, div, prelude::FluentBuilder, px, relative,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Surface};
 
-use crate::foundation::{Ident, StyledExt};
+use crate::foundation::{FocusRing, Ident, Pressable, StyledExt};
 use crate::layout::measure;
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type PanHandler = Rc<dyn Fn(f32, f32, &mut Window, &mut App)>;
+
+/// A minimap is normalized, so a fixed normalized step remains independent
+/// of the host's canvas units while still offering twenty stops per axis.
+const KEYBOARD_PAN_STEP: f32 = 0.05;
 
 /// One already-normalized mark on the overview.
 #[derive(Debug, Clone, PartialEq)]
@@ -147,6 +153,35 @@ impl RenderOnce for Minimap {
         });
         let measured = measure::cell(&self.ident.semantic_id(), window, cx);
         let handler = self.on_pan;
+        let (keyboard_x, keyboard_y) = self.view.map_or((0.5, 0.5), |view| {
+            (
+                (view.x + view.width / 2.0).clamp(0.0, 1.0),
+                (view.y + view.height / 2.0).clamp(0.0, 1.0),
+            )
+        });
+        let horizontal = cx.numbers().decimal(f64::from(keyboard_x * 100.0), 0);
+        let vertical = cx.numbers().decimal(f64::from(keyboard_y * 100.0), 0);
+        let position = cx.strings().format(
+            StringKey::GraphMinimapPosition,
+            &[horizontal.as_ref(), vertical.as_ref()],
+        );
+        let actionable = handler.is_some();
+        let mut spec = NodeSpec::new(
+            self.ident.semantic_id(),
+            if actionable {
+                Role::Slider
+            } else {
+                Role::Status
+            },
+        )
+        .text(cx.strings().text(StringKey::GraphMinimap))
+        .value(position);
+        if actionable {
+            // The semantic protocol has one scalar range. Publish the
+            // horizontal centre there, and keep both axes in the value text
+            // that a reader hears.
+            spec = spec.range(0.0, 1.0, keyboard_x);
+        }
         let mut frame = div()
             .on_children_prepainted({
                 let measured = Rc::clone(&measured);
@@ -164,18 +199,24 @@ impl RenderOnce for Minimap {
             .surface(&theme, Surface::Overlay)
             .elevation(&theme, Elevation::Raised)
             .overflow_hidden()
+            .when(actionable, |element| {
+                element
+                    .cursor_pointer()
+                    .tab_index(0)
+                    .pressable(cx)
+                    .focus_ring(&theme)
+            })
+            // The prepaint hook reports child bounds. Keep a full-frame
+            // measuring child first so normalized pointer coordinates are
+            // based on the overview, not whichever mark happens to come first.
+            .child(div().absolute().inset_0())
             .children(marks)
             .children(viewport)
-            .semantic_in(
-                cx,
-                NodeSpec::new(self.ident.semantic_id(), Role::Status)
-                    .text(cx.strings().text(StringKey::GraphMinimap))
-                    .value("minimap"),
-            );
+            .semantic_in(cx, spec);
         if let Some(handler) = handler {
-            frame = frame.on_mouse_down_with_pointer_capture(
-                MouseButton::Left,
-                move |event, window, cx| {
+            let pointer = Rc::clone(&handler);
+            frame = frame
+                .on_mouse_down_with_pointer_capture(MouseButton::Left, move |event, window, cx| {
                     let bounds = measured.get();
                     let width = f32::from(bounds.size.width).max(1.0);
                     let height = f32::from(bounds.size.height).max(1.0);
@@ -183,9 +224,19 @@ impl RenderOnce for Minimap {
                         .clamp(0.0, 1.0);
                     let y = ((f32::from(event.position.y) - f32::from(bounds.origin.y)) / height)
                         .clamp(0.0, 1.0);
-                    handler(x, y, window, cx);
-                },
-            );
+                    pointer(x, y, window, cx);
+                })
+                .on_key_down(move |event, window, cx| {
+                    let (x, y) = match event.keystroke.key.as_str() {
+                        "left" => (keyboard_x - KEYBOARD_PAN_STEP, keyboard_y),
+                        "right" => (keyboard_x + KEYBOARD_PAN_STEP, keyboard_y),
+                        "up" => (keyboard_x, keyboard_y - KEYBOARD_PAN_STEP),
+                        "down" => (keyboard_x, keyboard_y + KEYBOARD_PAN_STEP),
+                        _ => return,
+                    };
+                    handler(x.clamp(0.0, 1.0), y.clamp(0.0, 1.0), window, cx);
+                    cx.stop_propagation();
+                });
         }
         frame
     }

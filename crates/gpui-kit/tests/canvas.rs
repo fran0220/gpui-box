@@ -11,6 +11,7 @@ use gpui::{
     TouchPhase, div, point, prelude::*, px,
 };
 use gpui_kit::prelude::*;
+use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_testkit::harness::Harness;
 
 type Calls = Rc<RefCell<Vec<NodeGraphEvent>>>;
@@ -789,4 +790,159 @@ fn output_capture_delivers_an_outside_release(cx: &mut TestAppContext) {
             .any(|event| matches!(event, NodeGraphEvent::ViewportChanged(_))),
         "outside mouse-up releases capture and clears the port gesture"
     );
+}
+
+#[gpui::test]
+fn canvas_toolbar_actions_share_pointer_keyboard_and_disabled_contracts(cx: &mut TestAppContext) {
+    let calls = Rc::new(RefCell::new(Vec::new()));
+    let active_sink = Rc::clone(&calls);
+    let disabled_sink = Rc::clone(&calls);
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let active_sink = Rc::clone(&active_sink);
+        let disabled_sink = Rc::clone(&disabled_sink);
+        div()
+            .column()
+            .child(
+                CanvasToolbar::new("toolbar", "125%")
+                    .snap(true)
+                    .on_action(move |action, _, _| active_sink.borrow_mut().push(action)),
+            )
+            .child(
+                CanvasToolbar::new("toolbar.disabled", "100%")
+                    .disabled(true)
+                    .on_action(move |action, _, _| disabled_sink.borrow_mut().push(action)),
+            )
+            .child(CanvasToolbar::new("toolbar.read-only", "100%"))
+            .into_any_element()
+    });
+
+    assert_eq!(
+        harness.node("toolbar.fit").expect("fit").parent.as_deref(),
+        Some("toolbar")
+    );
+    assert!(harness.node("toolbar.snap").expect("snap").checked == Some(true));
+    for (id, key, action) in [
+        ("toolbar.fit", "enter", CanvasToolbarAction::Fit),
+        ("toolbar.snap", "space", CanvasToolbarAction::Snap),
+        ("toolbar.arrange", "enter", CanvasToolbarAction::Arrange),
+    ] {
+        harness.click(id);
+        calls.borrow_mut().clear();
+        harness.keystrokes(key);
+        assert_eq!(calls.borrow().as_slice(), [action]);
+    }
+
+    calls.borrow_mut().clear();
+    let disabled = harness
+        .node("toolbar.disabled.fit")
+        .expect("disabled action remains published");
+    assert!(disabled.disabled);
+    harness.click("toolbar.disabled.fit");
+    assert!(calls.borrow().is_empty());
+    assert!(
+        harness
+            .node("toolbar.read-only.fit")
+            .expect("read-only action remains published")
+            .disabled,
+        "an action without a caller-owned handler must not claim availability"
+    );
+}
+
+#[gpui::test]
+fn minimap_pointer_and_keyboard_pan_report_normalized_caller_owned_points(cx: &mut TestAppContext) {
+    let calls = Rc::new(RefCell::new(Vec::new()));
+    let sink = Rc::clone(&calls);
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let sink = Rc::clone(&sink);
+        Minimap::new("minimap")
+            .marks([MinimapMark::new("node", 0.2, 0.3, 0.1, 0.1)])
+            .view(MinimapView::new(0.4, 0.4, 0.2, 0.2))
+            .on_pan(move |x, y, _, _| sink.borrow_mut().push((x, y)))
+            .into_any_element()
+    });
+    harness.frame();
+
+    let minimap = harness.node("minimap").expect("minimap");
+    assert_eq!(minimap.role, Role::Slider);
+    assert_eq!(
+        minimap.value.as_deref(),
+        Some("Horizontal 50%; vertical 50%.")
+    );
+    assert_eq!(
+        (minimap.value_min, minimap.value_max, minimap.value_now),
+        (Some(0.0), Some(1.0), Some(0.5))
+    );
+    let mark = harness.node("minimap.mark.node").expect("business mark");
+    assert_eq!(mark.text.as_deref(), Some("node"));
+
+    let bounds = harness.bounds("minimap").expect("measured minimap");
+    let pointer = point(
+        bounds.left() + bounds.size.width * 0.75,
+        bounds.top() + bounds.size.height * 0.25,
+    );
+    harness
+        .context()
+        .simulate_mouse_down(pointer, MouseButton::Left, Modifiers::none());
+    harness
+        .context()
+        .simulate_mouse_up(pointer, MouseButton::Left, Modifiers::none());
+    let (x, y) = calls.borrow()[0];
+    assert!((x - 0.75).abs() < 0.01, "pointer x: {x}");
+    assert!((y - 0.25).abs() < 0.01, "pointer y: {y}");
+
+    calls.borrow_mut().clear();
+    harness.click("minimap");
+    calls.borrow_mut().clear();
+    harness.keystrokes("right down");
+    assert_eq!(calls.borrow().len(), 2);
+    assert_eq!(calls.borrow()[0], (0.55, 0.5));
+    assert_eq!(calls.borrow()[1], (0.5, 0.55));
+    assert_eq!(
+        harness
+            .node("minimap")
+            .expect("caller-owned view")
+            .value
+            .as_deref(),
+        Some("Horizontal 50%; vertical 50%."),
+        "the component reports pan requests and applies none"
+    );
+}
+
+#[gpui::test]
+fn node_group_publishes_its_boundary_selection_and_child_relationship(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, cx| {
+        div()
+            .w(px(320.0))
+            .child(
+                NodeGroup::new("group", "Ingest").selected(true).child(
+                    div().w(px(120.0)).h(px(48.0)).semantic_in(
+                        cx,
+                        NodeSpec::new("group.member", Role::Group)
+                            .parent("group")
+                            .text("Member"),
+                    ),
+                ),
+            )
+            .into_any_element()
+    });
+    harness.frame();
+
+    let group = harness.node("group").expect("group boundary");
+    assert_eq!(group.role, Role::Group);
+    assert_eq!(group.text.as_deref(), Some("Ingest"));
+    assert!(group.selected);
+    assert_eq!(
+        harness
+            .node("group.member")
+            .expect("member")
+            .parent
+            .as_deref(),
+        Some("group")
+    );
+    let group_bounds = harness.bounds("group").expect("group bounds");
+    let child_bounds = harness.bounds("group.member").expect("child bounds");
+    assert!(group_bounds.left() <= child_bounds.left());
+    assert!(group_bounds.right() >= child_bounds.right());
+    assert!(group_bounds.top() <= child_bounds.top());
+    assert!(group_bounds.bottom() >= child_bounds.bottom());
 }

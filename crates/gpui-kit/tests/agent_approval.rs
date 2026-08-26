@@ -130,8 +130,15 @@ fn every_always_states_its_scope(cx: &mut TestAppContext) {
     let path = harness
         .node("approval.write.always.path")
         .expect("published");
+    let standing = harness
+        .node("approval.write.standing")
+        .expect("standing grants are grouped and named");
+    assert_eq!(standing.role, gpui_kit::semantics::Role::Group);
+    assert_eq!(standing.text.as_deref(), Some("Standing approvals"));
     assert_eq!(session.text.as_deref(), Some("Always for this session"));
     assert_eq!(path.text.as_deref(), Some("Always in /work/report"));
+    assert_eq!(session.parent.as_deref(), Some("approval.write.standing"));
+    assert_eq!(path.parent.as_deref(), Some("approval.write.standing"));
 
     harness.click("approval.write.always.path");
     assert_eq!(

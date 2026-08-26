@@ -738,3 +738,48 @@ fn every_upload_row_dismisses_from_the_same_column(cx: &mut TestAppContext) {
         "the retry reached into the column every row dismisses from"
     );
 }
+
+#[gpui::test]
+fn a_prompt_slot_answers_the_keyboard_and_a_disabled_one_does_not(cx: &mut TestAppContext) {
+    let calls = Rc::new(RefCell::new(Vec::new()));
+    let sink = Rc::clone(&calls);
+    let mut active = harness(cx, move |_, _| {
+        let sink = Rc::clone(&sink);
+        PromptBuilder::new("prompt", "Review")
+            .body("Review {path}")
+            .slots([PromptSlot::new("path", "path").value("src/lib.rs")])
+            .on_slot(move |slot, _, _| sink.borrow_mut().push(slot.id.to_string()))
+            .into_any_element()
+    });
+
+    let slot = active.node("prompt.slot.path").expect("published");
+    assert_eq!(slot.role, Role::Button);
+    assert!(!slot.disabled);
+    active.click("prompt.slot.path");
+    calls.borrow_mut().clear();
+    active.keystrokes("enter");
+    assert_eq!(*calls.borrow(), vec!["path"]);
+
+    drop(active);
+    calls.borrow_mut().clear();
+    let blocked = Rc::clone(&calls);
+    let mut disabled = harness(cx, move |_, _| {
+        let blocked = Rc::clone(&blocked);
+        PromptBuilder::new("disabled-prompt", "Review")
+            .body("Review {path}")
+            .slots([PromptSlot::new("path", "path")])
+            .disabled(true)
+            .on_slot(move |slot, _, _| blocked.borrow_mut().push(slot.id.to_string()))
+            .into_any_element()
+    });
+
+    assert!(
+        disabled
+            .node("disabled-prompt.slot.path")
+            .expect("published")
+            .disabled
+    );
+    disabled.click("disabled-prompt.slot.path");
+    disabled.keystrokes("enter");
+    assert!(calls.borrow().is_empty());
+}

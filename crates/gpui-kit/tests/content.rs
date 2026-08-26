@@ -8,6 +8,7 @@ use gpui::{
     IntoElement, Modifiers, MouseMoveEvent, ParentElement, Styled, TestAppContext, div, point, px,
 };
 use gpui_kit::prelude::*;
+use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_testkit::harness::Harness;
 
 #[gpui::test]
@@ -38,6 +39,34 @@ fn an_unknown_extent_reports_no_position(cx: &mut TestAppContext) {
     let node = harness.node("index.progress").expect("published");
     assert_eq!(node.value_now, None, "an unknown extent must not claim one");
     assert!(node.busy);
+}
+
+#[gpui::test]
+fn a_refresh_veil_keeps_verified_content_published_while_it_reports_busy(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, cx| {
+        RefreshVeil::new(
+            "refresh",
+            div().child("Last verified value").semantic_in(
+                cx,
+                NodeSpec::new("refresh.verified", Role::Status).text("Last verified value"),
+            ),
+        )
+        .label("Refreshing")
+        .into_any_element()
+    });
+
+    let refresh = harness.node("refresh").expect("refresh status");
+    assert_eq!(refresh.role, Role::Progress);
+    assert!(refresh.busy);
+    assert_eq!(refresh.text.as_deref(), Some("Refreshing"));
+    assert_eq!(
+        harness
+            .node("refresh.verified")
+            .expect("verified child remains published")
+            .text
+            .as_deref(),
+        Some("Last verified value")
+    );
 }
 
 #[gpui::test]

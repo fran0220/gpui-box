@@ -10,12 +10,13 @@ use gpui::{
     App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
     StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
+use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TypeScale};
 
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::foundation::slot::{self, Slots, Slotted};
-use crate::foundation::{Disableable, FocusRing, Ident, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Pressable, StyledExt};
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -162,6 +163,7 @@ impl RenderOnce for PromptBuilder {
                         cx.strings().text(StringKey::PromptEmpty),
                     )
                     .kind(EmptyKind::Empty)
+                    .icon(Icon::Document)
                     .into_any_element()
                 }),
                 NodeSpec::new(self.ident.semantic_id(), Role::Region)
@@ -188,6 +190,7 @@ impl RenderOnce for PromptBuilder {
                     .into_iter()
                     .map(|slot| {
                         let handler = self.on_slot.clone().filter(|_| !self.disabled);
+                        let actionable = handler.is_some();
                         let id = slot.id.clone();
                         let filled = !slot.value.is_empty();
                         // A slot that carries a value and a slot still waiting
@@ -200,7 +203,7 @@ impl RenderOnce for PromptBuilder {
                             .id(self.ident.child("slot").child(id.as_ref()).element_id())
                             .focus_ring(&theme)
                             .px(px(theme.space(Space::Xs)))
-                            .py(px(2.0))
+                            .py_token(&theme, Space::Xs)
                             .radius(&theme, Radius::Small)
                             .hairline(&theme)
                             .type_scale(&theme, TypeScale::Caption)
@@ -227,10 +230,25 @@ impl RenderOnce for PromptBuilder {
                                     Role::Button,
                                 )
                                 .text(slot.name.clone())
-                                .value(slot.value.clone()),
+                                .value(slot.value.clone())
+                                .disabled(!actionable),
                             );
                         if let Some(handler) = handler {
-                            chip = chip.on_click(move |_, window, cx| handler(&slot, window, cx));
+                            let click_handler = Rc::clone(&handler);
+                            let click_slot = slot.clone();
+                            chip = chip
+                                .cursor_pointer()
+                                .tab_index(0)
+                                .pressable(cx)
+                                .on_click(move |_, window, cx| {
+                                    click_handler(&click_slot, window, cx)
+                                })
+                                .on_key_down(move |event, window, cx| {
+                                    if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                                        handler(&slot, window, cx);
+                                        cx.stop_propagation();
+                                    }
+                                });
                         }
                         chip
                     })

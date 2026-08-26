@@ -30,9 +30,9 @@
 //! alongside [`Table::rows`] rather than replacing it, because a table of six
 //! settings should not have to be written as a closure over an index.
 //!
-//! A table has no keyboard navigation of its own — a click is its only way to
-//! report a row — so a caller that moves the selection somewhere the viewport
-//! has never drawn brings it into view with
+//! A table has no directional keyboard navigation of its own. Focused rows do
+//! answer Enter and Space, but a caller that moves the selection somewhere the
+//! viewport has never drawn brings it into view with
 //! [`crate::data::reveal_row`], naming the table's body as
 //! `<table ident>.body`. A surface that wants the keyboard to walk a
 //! collection larger than its viewport wants [`crate::data::DataGrid`], which
@@ -653,7 +653,16 @@ impl Body {
 
         if let (true, Some(handler)) = (actionable, self.on_select.clone()) {
             let id = row.id.clone();
-            element = element.on_click(move |_, window, cx| handler(id.clone(), window, cx));
+            let click = Rc::clone(&handler);
+            let clicked = id.clone();
+            element = element
+                .on_click(move |_, window, cx| click(clicked.clone(), window, cx))
+                .on_key_down(move |event, window, cx| {
+                    if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                        handler(id.clone(), window, cx);
+                        cx.stop_propagation();
+                    }
+                });
         }
 
         let mut spec = NodeSpec::new(ident.semantic_id(), Role::Row)

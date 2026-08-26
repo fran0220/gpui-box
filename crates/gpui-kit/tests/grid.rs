@@ -465,6 +465,13 @@ fn the_header_box_says_what_it_can_speak_for(cx: &mut TestAppContext) {
         vec!["loaded"],
         "the box asks for the loaded rows and nothing wider"
     );
+    reports.selections.borrow_mut().clear();
+    harness.keystrokes("space");
+    assert_eq!(
+        *reports.selections.borrow(),
+        vec!["loaded"],
+        "the same loaded-only request is available from the keyboard"
+    );
 
     // Two of the loaded rows selected is neither all nor none.
     let (mut harness, _reports) = grid(
@@ -539,6 +546,13 @@ fn the_bulk_bar_states_the_selection_it_actually_has(cx: &mut TestAppContext) {
 
     harness.click("data.bulk.select-all");
     assert_eq!(*reports.selections.borrow(), vec!["everything"]);
+    reports.selections.borrow_mut().clear();
+    harness.keystrokes("enter");
+    assert_eq!(
+        *reports.selections.borrow(),
+        vec!["everything"],
+        "the wider selection is not pointer-only"
+    );
 
     harness.click("data.bulk.dismiss");
     assert_eq!(*reports.selections.borrow(), vec!["everything", "clear"]);

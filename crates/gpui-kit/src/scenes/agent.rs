@@ -1100,5 +1100,10 @@ pub(super) fn artifact_preview(_window: &mut Window, cx: &mut App) -> AnyElement
                 ArtifactPreviewState::Unavailable("The artifact host is offline.".into()),
             ),
         )
+        .child(
+            ArtifactPreview::new("scene.artifact.error", "notes.md").state(
+                ArtifactPreviewState::Error("The artifact parser rejected this result.".into()),
+            ),
+        )
         .into_any_element()
 }

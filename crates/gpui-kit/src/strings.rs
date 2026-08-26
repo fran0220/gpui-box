@@ -402,6 +402,7 @@ string_keys! {
     ApprovalAlwaysTool => "approval.always-tool", "Always for {0}";
     ApprovalAlwaysPath => "approval.always-path", "Always in {0}";
     ApprovalAlwaysHost => "approval.always-host", "Always on {0}";
+    ApprovalStanding => "approval.standing", "Standing approvals";
     ApprovalPending => "approval.pending", "Waiting for your answer";
     ApprovalDeclined => "approval.declined", "Declined";
     ApprovalApproved => "approval.approved", "Approved: {0}";
@@ -500,6 +501,7 @@ string_keys! {
     ColorPresets => "color.presets", "Presets";
     ColorRecent => "color.recent", "Recent";
     GraphMinimap => "graph.minimap", "Overview";
+    GraphMinimapPosition => "graph.minimap-position", "Horizontal {0}%; vertical {1}%.";
     GraphFit => "graph.fit", "Fit to view";
     GraphSnap => "graph.snap", "Snap to grid";
     GraphArrange => "graph.arrange", "Arrange";

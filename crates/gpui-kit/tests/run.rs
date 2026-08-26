@@ -304,6 +304,14 @@ fn only_a_failed_call_installs_the_retry_handler(cx: &mut TestAppContext) {
     );
     harness.click("call.failed.retry");
     assert_eq!(*calls.borrow(), vec!["failed".to_string()]);
+
+    calls.borrow_mut().clear();
+    harness.keystrokes("enter");
+    assert_eq!(
+        *calls.borrow(),
+        vec!["failed".to_string()],
+        "the standard retry control answers the keyboard as well as the pointer"
+    );
 }
 
 #[gpui::test]

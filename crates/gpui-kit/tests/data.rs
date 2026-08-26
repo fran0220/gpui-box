@@ -4,7 +4,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use gpui::{IntoElement, SharedString, Styled, TestAppContext};
+use gpui::{IntoElement, ParentElement, SharedString, Styled, TestAppContext, div};
 use gpui_kit::data::glide_to_row;
 use gpui_kit::motion::engage_end;
 use gpui_kit::prelude::*;
@@ -418,6 +418,13 @@ fn a_disabled_table_row_installs_no_handler(cx: &mut TestAppContext) {
 
     harness.click("data.table.run-a04");
     assert_eq!(*selects.borrow(), vec!["run-a04".to_string()]);
+    selects.borrow_mut().clear();
+    harness.keystrokes("space");
+    assert_eq!(
+        *selects.borrow(),
+        vec!["run-a04".to_string()],
+        "a focusable selectable row answers the keyboard"
+    );
     assert!(
         harness
             .node("data.table.run-b12")
@@ -722,4 +729,85 @@ fn a_glide_travels_to_its_row_rather_than_arriving_at_it(cx: &mut TestAppContext
         harness.node("data.flow.record-0000").is_some(),
         "however the travel went, it ends on the row that was asked for"
     );
+}
+
+#[gpui::test]
+fn kanban_cards_and_move_targets_answer_the_keyboard(cx: &mut TestAppContext) {
+    let (calls, sink) = recorder::<String>();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let card_sink = sink.clone();
+        let move_sink = sink.clone();
+        KanbanBoard::new("work.board")
+            .columns([
+                KanbanColumn::new("todo", "Todo"),
+                KanbanColumn::new("done", "Done"),
+            ])
+            .cards([KanbanCard::new("review", "Review", "todo")])
+            .held("review")
+            .on_card(move |card, _, _| card_sink.borrow_mut().push(format!("card:{}", card.id)))
+            .on_move(move |card, column, _, _| {
+                move_sink
+                    .borrow_mut()
+                    .push(format!("move:{}:{column}", card.id))
+            })
+            .into_any_element()
+    });
+
+    let card = harness
+        .node("work.board.card.review")
+        .expect("the card is published");
+    assert_eq!(card.role, Role::Button);
+    assert_eq!(card.parent.as_deref(), Some("work.board.column.todo"));
+    harness.click("work.board.card.review");
+    calls.borrow_mut().clear();
+    harness.keystrokes("space");
+    assert_eq!(*calls.borrow(), vec!["card:review"]);
+
+    let landing = harness
+        .node("work.board.move.done")
+        .expect("the other column offers a move target");
+    assert_eq!(landing.role, Role::Button);
+    assert_eq!(landing.parent.as_deref(), Some("work.board.column.done"));
+    harness.click("work.board.move.done");
+    calls.borrow_mut().clear();
+    harness.keystrokes("enter");
+    assert_eq!(*calls.borrow(), vec!["move:review:done"]);
+}
+
+#[gpui::test]
+fn kanban_cards_do_not_claim_an_action_the_caller_did_not_supply(cx: &mut TestAppContext) {
+    let (calls, sink) = recorder::<String>();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let sink = sink.clone();
+        div()
+            .column()
+            .child(
+                KanbanBoard::new("read-only.board")
+                    .columns([KanbanColumn::new("todo", "Todo")])
+                    .cards([KanbanCard::new("review", "Review", "todo")]),
+            )
+            .child(
+                KanbanBoard::new("disabled.board")
+                    .columns([KanbanColumn::new("todo", "Todo")])
+                    .cards([KanbanCard::new("review", "Review", "todo")])
+                    .disabled(true)
+                    .on_card(move |card, _, _| sink.borrow_mut().push(card.id.to_string())),
+            )
+            .into_any_element()
+    });
+
+    assert_eq!(
+        harness
+            .node("read-only.board.card.review")
+            .expect("read-only card")
+            .role,
+        Role::Group
+    );
+    let disabled = harness
+        .node("disabled.board.card.review")
+        .expect("disabled card");
+    assert_eq!(disabled.role, Role::Button);
+    assert!(disabled.disabled);
+    harness.click("disabled.board.card.review");
+    assert!(calls.borrow().is_empty());
 }

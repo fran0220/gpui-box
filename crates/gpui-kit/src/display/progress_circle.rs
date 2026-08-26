@@ -143,8 +143,6 @@ impl RenderOnce for ProgressCircle {
             ProgressPace::Stalled => theme.colors.warning,
             ProgressPace::Paused => signature::mark(&theme).opacity(theme.opacity.muted),
         };
-        let muted = signature::mark(&theme).opacity(theme.opacity.muted);
-
         // The published position is the caller's number from the frame it
         // changes; only the arc takes its time getting there.
         let drawn = self.value.fraction.map(|fraction| {
@@ -162,7 +160,9 @@ impl RenderOnce for ProgressCircle {
         // but a part that travels at a constant rate is the one shape nobody
         // reads as a position, because a position does not lap itself. Under
         // reduced motion there is no travel to rely on, so it falls back to
-        // tinting the whole ring, which claims nothing either.
+        // the same short arc parked at the top. A fully tinted ring looked
+        // like work at ninety-something percent, which invented the position
+        // this branch exists to avoid.
         let still = motion::reduce_motion(cx) || !self.value.is_moving();
         let ring: AnyElement = if drawn.is_none() && !still {
             let period = MotionSpec::new(
@@ -181,7 +181,6 @@ impl RenderOnce for ProgressCircle {
                             stroke,
                             track,
                             mark,
-                            muted,
                             None,
                             Some(phase),
                         ))
@@ -189,8 +188,7 @@ impl RenderOnce for ProgressCircle {
                 )
                 .into_any_element()
         } else {
-            ring_canvas(diameter, radius, stroke, track, mark, muted, drawn, None)
-                .into_any_element()
+            ring_canvas(diameter, radius, stroke, track, mark, drawn, None).into_any_element()
         };
 
         let centre = self.centre.clone().map(|reading| {
@@ -255,10 +253,9 @@ fn ring_canvas(
     stroke: f32,
     track: Hsla,
     mark: Hsla,
-    muted: Hsla,
     drawn: Option<f32>,
-    // Where the travelling arc has got to, or `None` for the still ring that
-    // reduced motion falls back to.
+    // Where the travelling arc has got to, or `None` for its reduced-motion
+    // poster at the top of the ring.
     phase: Option<f32>,
 ) -> impl IntoElement {
     canvas(
@@ -280,7 +277,15 @@ fn ring_canvas(
                     phase + TRAVELLING_ARC,
                     mark,
                 ),
-                (None, None) => arc(window, centre, radius, stroke, 0.0, 1.0, muted),
+                (None, None) => arc(
+                    window,
+                    centre,
+                    radius,
+                    stroke,
+                    -TRAVELLING_ARC / 2.0,
+                    TRAVELLING_ARC / 2.0,
+                    mark,
+                ),
             }
         },
     )

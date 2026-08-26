@@ -14,7 +14,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ColorChoice, Radius, Space, Surface, TypeScale, Variant};
 
 use crate::display::icon::{Icon as IconView, IconTone};
-use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
 use crate::strings::{ActiveStrings, StringKey};
 
 type VoteHandler = Rc<dyn Fn(FeedbackVote, &mut Window, &mut App)>;
@@ -140,6 +140,7 @@ impl RenderOnce for FeedbackRating {
         };
         let vote_chip = |vote: FeedbackVote, label: SharedString, selected: bool| {
             let handler = self.on_vote.clone().filter(|_| !self.disabled);
+            let actionable = handler.is_some();
             let glyph = match vote {
                 FeedbackVote::Up => Glyph::ArrowUp,
                 FeedbackVote::Down => Glyph::ArrowDown,
@@ -169,11 +170,24 @@ impl RenderOnce for FeedbackRating {
             .semantic_in(
                 cx,
                 NodeSpec::new(self.ident.child(vote.name()).semantic_id(), Role::Button)
+                    .parent(self.ident.semantic_id())
                     .text(vote.name())
-                    .selected(selected),
+                    .selected(selected)
+                    .disabled(!actionable),
             );
             if let Some(handler) = handler {
-                chip = chip.on_click(move |_, window, cx| handler(vote, window, cx));
+                let click = Rc::clone(&handler);
+                chip = chip
+                    .cursor_pointer()
+                    .tab_index(0)
+                    .pressable(cx)
+                    .on_click(move |_, window, cx| click(vote, window, cx))
+                    .on_key_down(move |event, window, cx| {
+                        if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                            handler(vote, window, cx);
+                            cx.stop_propagation();
+                        }
+                    });
             }
             chip
         };
@@ -183,9 +197,11 @@ impl RenderOnce for FeedbackRating {
             .map(|(id, label)| {
                 let selected = self.current_tag.as_ref() == Some(&id);
                 let handler = self.on_tag.clone().filter(|_| !self.disabled);
+                let actionable = handler.is_some();
                 let mut chip = selected_chip(
                     div()
                         .id(self.ident.child("tag").child(id.as_ref()).element_id())
+                        .focus_ring(&theme)
                         .px(px(theme.space(Space::Xs)))
                         .py(px(2.0))
                         .radius(&theme, Radius::Small)
@@ -200,13 +216,26 @@ impl RenderOnce for FeedbackRating {
                         self.ident.child("tag").child(id.as_ref()).semantic_id(),
                         Role::Button,
                     )
+                    .parent(self.ident.semantic_id())
                     .text(label)
-                    .selected(selected),
+                    .selected(selected)
+                    .disabled(!actionable),
                 );
                 if let Some(handler) = handler {
                     let reported = id.clone();
-                    chip =
-                        chip.on_click(move |_, window, cx| handler(reported.clone(), window, cx));
+                    let click = Rc::clone(&handler);
+                    let clicked = reported.clone();
+                    chip = chip
+                        .cursor_pointer()
+                        .tab_index(0)
+                        .pressable(cx)
+                        .on_click(move |_, window, cx| click(clicked.clone(), window, cx))
+                        .on_key_down(move |event, window, cx| {
+                            if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                                handler(reported.clone(), window, cx);
+                                cx.stop_propagation();
+                            }
+                        });
                 }
                 chip
             })

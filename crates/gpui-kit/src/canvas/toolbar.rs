@@ -5,14 +5,12 @@
 
 use std::rc::Rc;
 
-use gpui::{
-    App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
-    StatefulInteractiveElement, Styled, Window, div, px,
-};
+use gpui::{App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div, px};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Surface, TypeScale};
 
-use crate::foundation::{Disableable, FocusRing, Ident, StyledExt};
+use crate::controls::button::Button;
+use crate::foundation::{Disableable, Ident, Selectable, Sizable, StyledExt};
 use crate::strings::{ActiveStrings, StringKey};
 
 type ActionHandler = Rc<dyn Fn(CanvasToolbarAction, &mut Window, &mut App)>;
@@ -94,36 +92,19 @@ impl Disableable for CanvasToolbar {
 impl RenderOnce for CanvasToolbar {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
+        let actionable = self.on_action.is_some() && !self.disabled;
         let button = |action: CanvasToolbarAction, selected: bool| {
             let label = cx.strings().text(action.key());
-            let handler = self.on_action.clone().filter(|_| !self.disabled);
-            let mut chip = div()
-                .id(self.ident.child(action.name()).element_id())
-                .focus_ring(&theme)
-                .px(px(theme.space(Space::Sm)))
-                .py(px(theme.space(Space::Xs)))
-                .radius(&theme, Radius::Small)
-                .bg(if selected {
-                    theme.colors.selected
-                } else {
-                    theme.colors.raised
-                })
-                .border(px(theme.borders.hairline))
-                .border_color(if selected {
-                    theme.colors.hairline_strong
-                } else {
-                    theme.colors.hairline
-                })
-                .type_scale(&theme, TypeScale::Caption)
-                .child(label.clone())
-                .semantic_in(
-                    cx,
-                    NodeSpec::new(self.ident.child(action.name()).semantic_id(), Role::Button)
-                        .text(label)
-                        .selected(selected),
-                );
+            let handler = self.on_action.clone().filter(|_| actionable);
+            let mut chip = Button::new(self.ident.child(action.name()))
+                .label(label)
+                .secondary()
+                .control_size(ControlSize::Xs)
+                .selected(selected)
+                .disabled(!actionable)
+                .semantic_parent(self.ident.semantic_id());
             if let Some(handler) = handler {
-                chip = chip.on_click(move |_, window, cx| handler(action, window, cx));
+                chip = chip.on_click(move |window, cx| handler(action, window, cx));
             }
             chip
         };

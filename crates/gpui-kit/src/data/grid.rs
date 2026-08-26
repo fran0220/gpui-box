@@ -1498,7 +1498,17 @@ impl DataGrid {
             } else {
                 SelectionChange::Loaded
             };
-            element = element.on_click(move |_, window, cx| handler(&next, window, cx));
+            let click = Rc::clone(&handler);
+            let clicked = next.clone();
+            element = element
+                .pressable(cx)
+                .on_click(move |_, window, cx| click(&clicked, window, cx))
+                .on_key_down(move |event, window, cx| {
+                    if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                        handler(&next, window, cx);
+                        cx.stop_propagation();
+                    }
+                });
         }
 
         Some(
@@ -3000,12 +3010,14 @@ impl RenderOnce for BulkBar {
 
         if let Some((handler, total)) = wider {
             let ident = self.ident.child("select-all");
+            let click = Rc::clone(&handler);
             bar = bar.child(
                 div()
                     .id(ident.element_id())
                     .flex_none()
                     .cursor_pointer()
                     .tab_index(0)
+                    .pressable(cx)
                     .focus_ring(&theme)
                     .child(
                         text(
@@ -3018,7 +3030,13 @@ impl RenderOnce for BulkBar {
                         )
                         .text_color(theme.colors.accent),
                     )
-                    .on_click(move |_, window, cx| handler(window, cx))
+                    .on_click(move |_, window, cx| click(window, cx))
+                    .on_key_down(move |event, window, cx| {
+                        if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                            handler(window, cx);
+                            cx.stop_propagation();
+                        }
+                    })
                     .semantic_in(
                         cx,
                         NodeSpec::new(ident.semantic_id(), Role::Button)

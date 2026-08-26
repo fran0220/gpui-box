@@ -765,3 +765,125 @@ symbol-only faces a fallback list exists to name. See the CHANGELOG.
 Closing pass: 2026-08-24, against `snapshots/headless/macos/scenes` at the
 capture taken after the last fix landed, both themes read wherever a contrast
 or colour question came up.
+
+## Quality score — full public catalog, 2026-08-26
+
+This pass supersedes the current-status conclusions above without rewriting
+that historical audit. It reviewed all 180 public components in
+`docs/api-index.json` against their current Rust API and implementation,
+declared exhibits, both macOS `studio-dark` and `studio-light` headless
+baselines, and focused behavior tests. Scores use this 100-point rubric:
+
+| Dimension | Points | Review question |
+|---|---:|---|
+| Truthful states and correctness (T) | 25 | Are loading, empty, unavailable, error, ready, and refresh states distinct and geometrically correct? |
+| Interaction and semantics (I) | 20 | Are pointer, keyboard, focus, disabled behavior, and stable semantic targets complete? |
+| Visual hierarchy, rhythm, and contrast (V) | 25 | Is the component legible, balanced, token-driven, and credible in both themes? |
+| Product-neutral API and boundary (A) | 15 | Is policy caller-owned and reusable infrastructure implemented at the correct boundary? |
+| Tests, exhibits, and cross-theme evidence (E) | 15 | Do focused tests and declared scenes make the contract reviewable and regression-resistant? |
+
+The acceptance threshold is **90/100 with no blocker, major interaction
+defect, or critical boundary defect**. A high total cannot compensate for one
+of those failures.
+
+### Result
+
+| Family | Components | Average | Floor | Passing |
+|---|---:|---:|---:|---:|
+| Controls + datetime | 41 | 94.2 | 90 | 41 |
+| Display + motion + effects | 47 | 93.8 | 91 | 47 |
+| Navigation + layout + overlay | 34 | 97.1 | 93 | 34 |
+| Data + structured | 11 | 96.9 | 94 | 11 |
+| Content + media | 15 | 95.8 | 93 | 15 |
+| Agent + game + canvas | 32 | 93.8 | 90 | 32 |
+| **Catalog** | **180** | **94.9** | **90** | **180** |
+
+The review initially found eleven real failures and one visual claim that did
+not survive direct verification. Remediation completed keyboard activation for
+`BulkBar`, `DataGrid`, `Table`, `JsonView`, `FeedbackRating`, `CanvasToolbar`,
+and `Minimap`; corrected Minimap pointer geometry; and added focused evidence
+for `AgentActivityLine`, `AgentRunIssues`, `ArtifactPreview`, and `NodeGroup`.
+The `RefreshVeil` source and both baselines already put the status chip below,
+not over, the verified content; a focused test now protects the retained value.
+
+The same pass also made unknown `ProgressCircle` state visually distinct from
+high determinate progress, reflowed the chart exhibit so every chart subject is
+visible, completed keyboard and semantic activation for `KanbanBoard` and
+`PromptBuilder`, added a product-neutral empty-state icon override, separated
+standing approval scopes from immediate approval actions, and replaced
+`ToolCall`'s local retry control with the standard `Button`. Direct re-review
+confirmed that `AspectRatio` and `Responsive` already had adequate geometry
+tests and representative exhibits. No component remains below the quality
+threshold.
+
+### Component scorecard
+
+These are final totals under the rubric above. Family membership follows the
+API index; repeated public names in different families are scored in their own
+context.
+
+**Controls + datetime (41):**
+
+`Button` 94 · `ButtonGroup` 92 · `Cascader` 95 · `Checkbox` 94 ·
+`ColorPicker` 91 · `ColorSwatch` 90 · `Combobox` 95 · `CopyButton` 94 ·
+`Dropzone` 94 · `FilterBar` 93 · `FindReplace` 94 · `FormField` 95 ·
+`IconButton` 94 · `InlineEdit` 94 · `KeybindingRecorder` 95 ·
+`KeymapEditor` 95 · `MentionInput` 96 · `NumberInput` 95 ·
+`OneTimeCodeInput` 96 · `PasswordInput` 96 · `Radio` 94 ·
+`RichTextEditor` 95 · `SearchField` 95 · `SegmentedControl` 94 · `Select` 95 ·
+`SettingsList` 92 · `SettingsRow` 94 · `SettingsSection` 93 · `Slider` 95 ·
+`SplitButton` 94 · `Switch` 95 · `TagInput` 94 · `TextArea` 96 ·
+`TextInput` 94 · `Toggle` 93 · `ToggleGroup` 95 · `UploadList` 95 ·
+`Calendar` 95 · `DateInput` 94 · `RangePicker` 94 · `TimeInput` 94.
+
+**Display + motion + effects (47):**
+
+`AnimatedNumber` 93 · `AreaChart` 95 · `Avatar` 93 · `AvatarGroup` 92 ·
+`Badge` 94 · `Banner` 94 · `BarChart` 93 · `BarLoader` 91 · `Callout` 93 ·
+`Card` 94 · `ChartLegend` 94 · `DescriptionList` 94 · `Divider` 93 ·
+`EmptyState` 97 · `FailurePanel` 96 · `GaugeChart` 92 · `Heatmap` 92 ·
+`HighlightedText` 94 · `Icon` 96 · `LineChart` 97 · `ListRow` 94 ·
+`LoadMore` 94 · `MetricCard` 94 · `OutcomePanel` 95 · `PieChart` 93 ·
+`ProgressBar` 96 · `ProgressCircle` 96 · `PulseLoader` 91 · `RadarChart` 92 ·
+`RefreshVeil` 94 · `ScatterChart` 95 · `Skeleton` 92 · `SpanTimeline` 93 ·
+`Sparkline` 96 · `Spinner` 91 · `StackedBarChart` 93 · `StageProgress` 94 ·
+`StaleMark` 94 · `StateView` 96 · `StatusDot` 92 · `StatusLine` 93 ·
+`Tag` 95 · `Timeline` 94 · `TraceView` 94 · `CinematicEffect` 94 ·
+`EffectParticles` 95 · `MicroMark` 91.
+
+**Navigation + layout + overlay (34):**
+
+`Accordion` 94 · `AnchorList` 97 · `Breadcrumb` 94 · `Collapsible` 97 ·
+`Pagination` 98 · `Sidebar` 96 · `Tabs` 98 · `UndoHistory` 98 · `Wizard` 98 ·
+`AspectRatio` 93 · `DesktopTitlebar` 97 · `Dock` 98 · `Responsive` 95 ·
+`ScrollArea` 98 · `ScrollFade` 94 · `SplitPane` 98 · `SplitTree` 98 ·
+`StatusBar` 97 · `Toolbar` 97 · `CommandPalette` 98 · `ContextMenu` 98 ·
+`Dialog` 99 · `Drawer` 98 · `Frost` 95 · `Glass` 99 · `HoverCard` 98 ·
+`Kbd` 98 · `Menu` 98 · `Menubar` 98 · `NotificationCenter` 98 ·
+`Overlay` 98 · `Popover` 97 · `ToastLayer` 98 · `Tooltip` 98.
+
+**Data + structured (11):**
+
+`BulkBar` 96 · `DataGrid` 98 · `DiagnosticsList` 96 · `Flow` 96 ·
+`KanbanBoard` 97 · `List` 94 · `Table` 98 · `Tree` 98 · `TreeGrid` 96 ·
+`JsonView` 99 · `SchemaForm` 98.
+
+**Content + media (15):**
+
+`AgentDocument` 96 · `BrowserPanel` 96 · `CodeView` 94 · `DiffView` 98 ·
+`ImageViewer` 96 · `LogStream` 97 · `Markdown` 97 · `MessageList` 97 ·
+`Outline` 93 · `Terminal` 96 · `TransportBar` 98 · `AudioPlayer` 96 ·
+`AudioWaveform` 93 · `ModelViewer` 97 · `VideoPlayer` 93.
+
+**Agent + game + canvas (32):**
+
+`AgentActivityLine` 94 · `AgentAvatar` 93 · `AgentCard` 92 · `AgentGroup` 90 ·
+`AgentRoster` 94 · `AgentRunCanvas` 95 · `AgentRunIssues` 93 ·
+`ApprovalPrompt` 95 · `ArtifactPreview` 95 · `ContextGauge` 94 ·
+`CostMeter` 94 · `FeedbackRating` 96 · `OfferingCatalog` 94 ·
+`PermissionMatrix` 95 · `PersonaDialogue` 93 · `PersonaPortrait` 92 ·
+`PromptBuilder` 92 · `ServerList` 95 · `StepList` 94 · `SubagentTree` 93 ·
+`ThinkingBlock` 94 · `ToolCall` 96 · `VoiceReactive` 91 · `AbilityBar` 93 ·
+`ObjectiveTracker` 94 · `PartyRoster` 93 · `RewardReveal` 92 ·
+`CanvasToolbar` 96 · `GraphNode` 94 · `Minimap` 96 · `NodeGraph` 96 ·
+`NodeGroup` 94.

@@ -18,7 +18,7 @@ use crate::controls::button::{ButtonVariant, IconButton};
 use crate::display::badge::{Badge, Tone};
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::foundation::slot::{self, Slots, Slotted};
-use crate::foundation::{Disableable, Ident, Sizable, StyledExt};
+use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt};
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -298,6 +298,7 @@ impl RenderOnce for KanbanBoard {
                             .iter()
                             .filter(|card| card.column == column.id)
                             .map(|card| {
+                                let interactive = self.on_card.is_some();
                                 let handler = self.on_card.clone().filter(|_| !self.disabled);
                                 let lifted = held.as_ref() == Some(&card.id);
                                 let mut tile = div()
@@ -335,25 +336,52 @@ impl RenderOnce for KanbanBoard {
                                                 .text_color(theme.colors.text_muted)
                                                 .child(card.detail.clone()),
                                         )
-                                    })
-                                    .semantic_in(
-                                        cx,
-                                        NodeSpec::new(
-                                            self.ident
-                                                .child("card")
-                                                .child(card.id.as_ref())
-                                                .semantic_id(),
-                                            Role::Button,
-                                        )
-                                        .text(card.title.clone())
-                                        .value(card.column.clone()),
-                                    );
+                                    });
                                 if let Some(handler) = handler {
-                                    let card = card.clone();
+                                    let click_handler = Rc::clone(&handler);
+                                    let click_card = card.clone();
+                                    let key_card = card.clone();
                                     tile = tile
-                                        .on_click(move |_, window, cx| handler(&card, window, cx));
+                                        .cursor_pointer()
+                                        .tab_index(0)
+                                        .focus_ring(&theme)
+                                        .pressable(cx)
+                                        .on_click(move |_, window, cx| {
+                                            click_handler(&click_card, window, cx)
+                                        })
+                                        .on_key_down(move |event, window, cx| {
+                                            if matches!(
+                                                event.keystroke.key.as_str(),
+                                                "enter" | "space"
+                                            ) {
+                                                handler(&key_card, window, cx);
+                                                cx.stop_propagation();
+                                            }
+                                        });
                                 }
-                                tile
+                                tile.semantic_in(
+                                    cx,
+                                    NodeSpec::new(
+                                        self.ident
+                                            .child("card")
+                                            .child(card.id.as_ref())
+                                            .semantic_id(),
+                                        if interactive {
+                                            Role::Button
+                                        } else {
+                                            Role::Group
+                                        },
+                                    )
+                                    .parent(
+                                        self.ident
+                                            .child("column")
+                                            .child(column.id.as_ref())
+                                            .semantic_id(),
+                                    )
+                                    .text(card.title.clone())
+                                    .value(card.column.clone())
+                                    .disabled(interactive && self.disabled),
+                                )
                             })
                             .collect::<Vec<_>>();
                         let empty = cards.is_empty();
@@ -385,9 +413,26 @@ impl RenderOnce for KanbanBoard {
                         let landing = carried
                             .as_ref()
                             .filter(|card| card.column != column.id)
-                            .filter(|_| self.on_move.is_some() && !self.disabled)
-                            .map(|card| {
+                            .filter(|_| !self.disabled)
+                            .zip(self.on_move.clone())
+                            .map(|(card, handler)| {
+                                let ident = self.ident.child("move").child(column.id.as_ref());
+                                let parent = self
+                                    .ident
+                                    .child("column")
+                                    .child(column.id.as_ref())
+                                    .semantic_id();
+                                let label = cx.strings().format(
+                                    StringKey::KanbanMoveHere,
+                                    &[card.title.as_ref(), column.title.as_ref()],
+                                );
+                                let click_handler = Rc::clone(&handler);
+                                let click_card = card.clone();
+                                let key_card = card.clone();
+                                let click_column = column.id.clone();
+                                let key_column = column.id.clone();
                                 div()
+                                    .id(ident.element_id())
                                     .w_full()
                                     .p_token(&theme, Space::Sm)
                                     .radius(&theme, Radius::Control)
@@ -399,12 +444,29 @@ impl RenderOnce for KanbanBoard {
                                     .justify_center()
                                     .type_scale(&theme, TypeScale::Caption)
                                     .text_color(theme.colors.text_muted)
-                                    .child(cx.strings().format(
-                                        StringKey::KanbanMoveHere,
-                                        &[card.title.as_ref(), column.title.as_ref()],
-                                    ))
+                                    .cursor_pointer()
+                                    .tab_index(0)
+                                    .focus_ring(&theme)
+                                    .pressable(cx)
+                                    .child(label.clone())
+                                    .on_click(move |_, window, cx| {
+                                        click_handler(&click_card, click_column.clone(), window, cx)
+                                    })
+                                    .on_key_down(move |event, window, cx| {
+                                        if matches!(event.keystroke.key.as_str(), "enter" | "space")
+                                        {
+                                            handler(&key_card, key_column.clone(), window, cx);
+                                            cx.stop_propagation();
+                                        }
+                                    })
+                                    .semantic_in(
+                                        cx,
+                                        NodeSpec::new(ident.semantic_id(), Role::Button)
+                                            .parent(parent)
+                                            .text(label),
+                                    )
                             });
-                        let mut lane = div()
+                        div()
                             .id(self
                                 .ident
                                 .child("column")
@@ -481,19 +543,7 @@ impl RenderOnce for KanbanBoard {
                                 )
                                 .text(column.title.clone())
                                 .value(tally),
-                            );
-                        if let (Some(handler), Some(held_id)) = (
-                            self.on_move.clone().filter(|_| !self.disabled),
-                            held.clone(),
-                        ) && let Some(card) =
-                            self.cards.iter().find(|card| card.id == held_id).cloned()
-                        {
-                            let column_id = column.id.clone();
-                            lane = lane.on_click(move |_, window, cx| {
-                                handler(&card, column_id.clone(), window, cx);
-                            });
-                        }
-                        lane
+                            )
                     })
                     .collect::<Vec<_>>();
                 div()

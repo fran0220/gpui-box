@@ -140,6 +140,13 @@ fn opening_a_value_reports_the_path_and_applies_nothing(cx: &mut TestAppContext)
 
     harness.click("json.steps.toggle");
     assert_eq!(calls.borrow().as_slice(), ["steps:true"]);
+    calls.borrow_mut().clear();
+    harness.keystrokes("enter");
+    assert_eq!(
+        calls.borrow().as_slice(),
+        ["steps:true"],
+        "the focusable disclosure answers the keyboard"
+    );
     assert!(
         harness.node("json.steps/0").is_none(),
         "the view opens nothing itself: the caller owns the disclosure"

@@ -132,9 +132,11 @@ pub fn audit(snapshot: &Snapshot) -> Vec<Finding> {
                         report(Problem::ValueOutOfRange);
                     }
                 }
-                // An indeterminate wait has no position to report, and
-                // inventing one would be a lie about progress.
-                _ if node.busy && node.role == Role::Progress => {}
+                // Indeterminate progress has no position to report, whether
+                // it is running, paused, or stalled. Requiring `busy` here
+                // would force the latter two to lie about active work; only a
+                // partial range is malformed.
+                (None, None, None) if node.role == Role::Progress => {}
                 _ => report(Problem::MissingRange),
             }
         }
@@ -284,6 +286,13 @@ mod tests {
         let mut spinner = node("saving", Role::Progress);
         spinner.busy = true;
         assert!(audit(&snapshot(vec![spinner])).is_empty());
+    }
+
+    #[test]
+    fn paused_indeterminate_work_needs_neither_a_position_nor_a_busy_claim() {
+        let mut progress = node("upload", Role::Progress);
+        progress.value = Some("Paused".into());
+        assert!(audit(&snapshot(vec![progress])).is_empty());
     }
 
     #[test]

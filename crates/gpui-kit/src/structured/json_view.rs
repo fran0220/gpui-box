@@ -759,12 +759,21 @@ fn row_element(
         if let (true, Some(handler)) = (toggleable, view.on_toggle.clone()) {
             let path = line.path.clone();
             let open = line.open;
-            glyph = glyph.on_click(move |_, window, cx| {
-                handler(path.clone(), !open, window, cx);
-                // A disclosure is not a selection, so the row beneath must not
-                // also report one.
-                cx.stop_propagation();
-            });
+            let click = Rc::clone(&handler);
+            let clicked = path.clone();
+            glyph = glyph
+                .on_click(move |_, window, cx| {
+                    click(clicked.clone(), !open, window, cx);
+                    // A disclosure is not a selection, so the row beneath must not
+                    // also report one.
+                    cx.stop_propagation();
+                })
+                .on_key_down(move |event, window, cx| {
+                    if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                        handler(path.clone(), !open, window, cx);
+                        cx.stop_propagation();
+                    }
+                });
         }
 
         glyph.semantic_in(
