@@ -29,7 +29,7 @@
 //! - [`overlay`] — anchored and modal surfaces, menus, notifications.
 //! - [`interaction`] — drag and drop, the one gesture that starts in one
 //!   component and finishes in another.
-//! - [`motion`] — token-driven animation.
+//! - [`mod@motion`] — token-driven animation.
 //! - [`effects`] — semantic visual events, quality policy, replay, and budgets.
 //! - [`reactive`] — caller-owned [`Signal`](reactive::Signal)s,
 //!   [`Binding`](reactive::Binding)s, and a [`Form`](reactive::Form) whose
