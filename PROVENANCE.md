@@ -316,6 +316,55 @@ turn off upstream, and this repository opens no pty and spawns no process,
 which stays the host's job. Recorded here rather than left implicit, because a
 UI crate that links a process spawner should have to say so.
 
+## P11: bundled theme preset palettes
+
+- Destinations: `crates/gpui-kit-tokens/tokens/{catppuccin-mocha,
+  catppuccin-latte,nord,tokyo-night,gruvbox-dark,dracula,solarized-dark,
+  solarized-light}.json`
+- Scope: hexadecimal palette values transcribed from each upstream colour
+  scheme into this repository's own token document shape
+
+| Preset | Upstream | License | Copyright |
+| --- | --- | --- | --- |
+| `catppuccin-mocha`, `catppuccin-latte` | <https://github.com/catppuccin/catppuccin> | MIT | Copyright (c) 2021 Catppuccin |
+| `nord` | <https://github.com/nordtheme/nord> | MIT | Copyright (c) 2016-present Sven Greb |
+| `tokyo-night` | <https://github.com/enkia/tokyo-night-vscode-theme> | MIT | Copyright (c) 2019 enkia |
+| `gruvbox-dark` | <https://github.com/morhetz/gruvbox> | MIT | Copyright (c) 2018 Pavel Pertsev |
+| `dracula` | <https://github.com/dracula/dracula-theme> | MIT | Copyright (c) 2016 Dracula Theme |
+| `solarized-dark`, `solarized-light` | <https://github.com/altercation/solarized> | MIT | Copyright (c) 2011 Ethan Schoonover |
+
+No upstream file is vendored: each preset is a token document written here,
+carrying the same key set as `studio-dark.json`, whose colour values are the
+published hexadecimal palettes above. Nothing outside the palette — spacing,
+motion, elevation, control metrics — comes from upstream.
+
+Where a published value could not clear this repository's contrast, surface
+separation, tone distinction, line visibility or placeholder loudness gates, it
+was moved along its own lightness ramp by the smallest step that passes and the
+hue was kept. Those are the presets' own values and are not attributed to
+upstream:
+
+- `nord`: `nord11` `#bf616a` lightened to `#cf7c85` for `danger` and the diff's
+  removed sign, and the Aurora tints lightened for the five agent families,
+  which carry the body text floor rather than the identity floor. The ANSI
+  table keeps `#bf616a` unchanged.
+- `solarized-dark` and `solarized-light`: the `base01`/`base00`/`base0`/`base1`
+  ladder is the scheme's defining low-contrast feature and cannot seat five
+  distinguishable text tones over six surfaces, so both presets carry their own
+  five-rung grey ladder in Solarized's hue with the upstream steps kept in
+  `palette.neutral.300` and `.500` and across the ANSI table. `red`, `yellow`,
+  `green`, `cyan` and `blue` are moved a step where a surface required it.
+- `catppuccin-latte`: `yellow`, `green`, `teal` and `magenta` darkened for the
+  page they sit on, and `mauve` darkened where it paints code.
+- `gruvbox-dark`: bright `purple` `#d3869b` lightened to `#d992a5` for the
+  agent family tint only.
+
+Two non-colour tokens are also theme-owned rather than upstream:
+`effect.focusRingAlpha` is 1 in `catppuccin-latte`, `solarized-light` and
+`solarized-dark`, and `opacity.disabled` is raised in the two light presets,
+because both schemes' text sits closer to their page than the studio pair's
+does.
+
 ## P07: Hash Function Prospector `lowbias32`
 
 - Source: <https://github.com/skeeto/hash-prospector>

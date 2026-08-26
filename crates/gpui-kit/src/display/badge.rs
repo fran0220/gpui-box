@@ -4,7 +4,7 @@ use gpui::{
 };
 use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ColorChoice, ControlSize, Theme, TypeScale, Variant};
 
 use crate::foundation::{Ident, Sizable, StyledExt};
 
@@ -72,6 +72,8 @@ pub struct Badge {
     label: SharedString,
     tone: Tone,
     tint: Option<Hsla>,
+    variant: Option<Variant>,
+    color: Option<ColorChoice>,
     size: ControlSize,
     glyph: Option<Glyph>,
     dot: bool,
@@ -85,6 +87,8 @@ impl Badge {
             label: label.into(),
             tone: Tone::default(),
             tint: None,
+            variant: None,
+            color: None,
             size: ControlSize::Sm,
             glyph: None,
             dot: false,
@@ -161,6 +165,23 @@ impl Badge {
         self.tint = Some(tint);
         self
     }
+
+    /// Puts the badge on the shared presentation tiers.
+    ///
+    /// The tone still answers *how it is going* and is still what the node
+    /// publishes; the tier only decides how loudly the colour is worn. See
+    /// [`Theme::variant_colors`].
+    pub fn variant(mut self, variant: Variant) -> Self {
+        self.variant = Some(variant);
+        self
+    }
+
+    /// The colour the shared tiers resolve against, when the badge is on
+    /// them. Without one, the tone's own colour (or the tint) is used.
+    pub fn color(mut self, color: impl Into<ColorChoice>) -> Self {
+        self.color = Some(color.into());
+        self
+    }
 }
 
 impl Sizable for Badge {
@@ -183,17 +204,34 @@ impl RenderOnce for Badge {
         // be read through its own background; what identifies it is the
         // colour of the text, with just enough behind it to bound the shape.
         let wash = 0.12;
-        let (foreground, background) = match (self.tint, self.tone) {
-            // A tint is a colour the caller chose on purpose, so it takes the
-            // coloured treatment even at Neutral: the tone says nothing about
-            // severity there, which is exactly the case an identity colour is
-            // for.
-            (Some(tint), _) => (tint, tint.opacity(wash)),
-            (None, Tone::Neutral) => (theme.colors.text_muted, theme.colors.hover),
-            (None, tone) => {
-                let color = tone.color(&theme);
-                (color, color.opacity(wash))
-            }
+        let (foreground, background, tier_border) = if let Some(variant) = self.variant {
+            // On the shared tiers the badge reads the same resolver as every
+            // other coloured surface. The colour is the caller's choice,
+            // falling back to the tint or to the tone's own colour, so a
+            // badge that only sets a tier keeps saying what it already said.
+            let choice = self.color.clone().unwrap_or_else(|| match self.tint {
+                Some(tint) => ColorChoice::Custom(tint),
+                None => match self.tone {
+                    Tone::Neutral => ColorChoice::Custom(theme.colors.text_muted),
+                    tone => ColorChoice::Custom(tone.color(&theme)),
+                },
+            });
+            let resolved = theme.variant_colors(variant, &choice);
+            (resolved.text, resolved.background, resolved.border)
+        } else {
+            let (foreground, background) = match (self.tint, self.tone) {
+                // A tint is a colour the caller chose on purpose, so it takes
+                // the coloured treatment even at Neutral: the tone says
+                // nothing about severity there, which is exactly the case an
+                // identity colour is for.
+                (Some(tint), _) => (tint, tint.opacity(wash)),
+                (None, Tone::Neutral) => (theme.colors.text_muted, theme.colors.hover),
+                (None, tone) => {
+                    let color = tone.color(&theme);
+                    (color, color.opacity(wash))
+                }
+            };
+            (foreground, background, None)
         };
 
         let step = theme.control.get(self.size);
@@ -205,7 +243,12 @@ impl RenderOnce for Badge {
             .px(px(step.padding_x * 0.6))
             .rounded_full()
             .map(|element| {
-                if self.outlined {
+                if let Some(border) = tier_border {
+                    element
+                        .bg(background)
+                        .border(px(theme.borders.hairline))
+                        .border_color(border)
+                } else if self.outlined {
                     element
                         .border(px(theme.borders.hairline))
                         .border_color(foreground.opacity(0.45))

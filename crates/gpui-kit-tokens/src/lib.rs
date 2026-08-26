@@ -17,6 +17,14 @@ pub use color::{Color, Palette, contrast_ratio, over};
 
 const STUDIO_DARK_JSON: &str = include_str!("../tokens/studio-dark.json");
 const STUDIO_LIGHT_JSON: &str = include_str!("../tokens/studio-light.json");
+const CATPPUCCIN_MOCHA_JSON: &str = include_str!("../tokens/catppuccin-mocha.json");
+const CATPPUCCIN_LATTE_JSON: &str = include_str!("../tokens/catppuccin-latte.json");
+const NORD_JSON: &str = include_str!("../tokens/nord.json");
+const TOKYO_NIGHT_JSON: &str = include_str!("../tokens/tokyo-night.json");
+const GRUVBOX_DARK_JSON: &str = include_str!("../tokens/gruvbox-dark.json");
+const DRACULA_JSON: &str = include_str!("../tokens/dracula.json");
+const SOLARIZED_DARK_JSON: &str = include_str!("../tokens/solarized-dark.json");
+const SOLARIZED_LIGHT_JSON: &str = include_str!("../tokens/solarized-light.json");
 #[cfg(test)]
 const TOKEN_SCHEMA_JSON: &str = include_str!("../tokens/schema.json");
 
@@ -89,7 +97,16 @@ impl TokenDocument {
             }
         }
         for (path, value) in self.color.entries() {
-            Color::resolve(path, value, &self.color.palette)?;
+            Color::resolve(&path, value, &self.color.palette)?;
+        }
+        if self.color.sequence.categorical.len() != SEQUENCE_LENGTH {
+            return invalid(
+                "color.sequence.categorical",
+                &format!(
+                    "must carry exactly {SEQUENCE_LENGTH} colors in order, and carries {}",
+                    self.color.sequence.categorical.len()
+                ),
+            );
         }
         for (path, layers) in self.elevation.levels() {
             for (index, layer) in layers.iter().enumerate() {
@@ -213,6 +230,10 @@ impl TokenDocument {
             return invalid("effect.selectionRailWidth", "must be positive");
         }
 
+        if self.effect.rail_width <= 0.0 {
+            return invalid("effect.railWidth", "must be positive");
+        }
+
         for (path, value) in [
             ("effect.edgeFadeBand", self.effect.edge_fade_band),
             ("effect.glowBlur", self.effect.glow_blur),
@@ -252,6 +273,9 @@ impl TokenDocument {
             ("effect.selectedRingAlpha", self.effect.selected_ring_alpha),
             ("effect.focusRingAlpha", self.effect.focus_ring_alpha),
             ("effect.glowAlpha", self.effect.glow_alpha),
+            ("effect.sheenAlpha", self.effect.sheen_alpha),
+            ("effect.areaWashAlpha", self.effect.area_wash_alpha),
+            ("effect.headerTintAlpha", self.effect.header_tint_alpha),
             ("effect.glassAlpha", self.effect.glass_alpha),
             ("effect.glassLiquidAlpha", self.effect.glass_liquid_alpha),
             ("effect.glassDispersion", self.effect.glass_dispersion),
@@ -488,6 +512,46 @@ impl TokenDocument {
             SemanticColor::Info => ("color.semantic.info", self.color.semantic.info.as_str()),
         };
         self.resolved(path, value)
+    }
+
+    /// The categorical series scale, in the order a chart consumes it.
+    ///
+    /// Ordered rather than named, because a series is chosen by index: the
+    /// third slice of a donut is the third entry, and a caller with more
+    /// series than entries cycles. See [`Self::sequence_color`].
+    pub fn sequence(&self) -> Vec<Color> {
+        (0..self.color.sequence.categorical.len())
+            .map(|index| self.sequence_color(index))
+            .collect()
+    }
+
+    /// The `index`th series colour, cycling past the end of the scale.
+    ///
+    /// Cycling rather than clamping: a tenth series that repeats the second
+    /// colour is a chart the reader can still take apart by position, and one
+    /// that repeats the last colour forever is not.
+    pub fn sequence_color(&self, index: usize) -> Color {
+        let entries = &self.color.sequence.categorical;
+        let index = index % entries.len();
+        self.resolved(
+            &format!("color.sequence.categorical.{index}"),
+            &entries[index],
+        )
+    }
+
+    /// One paint role of the node canvas.
+    pub fn node(&self, role: NodeColor) -> Color {
+        let value = match role {
+            NodeColor::HeaderWash => self.color.node.header_wash.as_str(),
+            NodeColor::PortIdle => self.color.node.port_idle.as_str(),
+            NodeColor::PortConnected => self.color.node.port_connected.as_str(),
+            NodeColor::Edge => self.color.node.edge.as_str(),
+            NodeColor::EdgeActive => self.color.node.edge_active.as_str(),
+            NodeColor::LabelWash => self.color.node.label_wash.as_str(),
+            NodeColor::Grid => self.color.node.grid.as_str(),
+            NodeColor::GridStrong => self.color.node.grid_strong.as_str(),
+        };
+        self.resolved(role.path(), value)
     }
 
     pub fn agent(&self, role: AgentColor) -> Color {
@@ -758,9 +822,70 @@ pub fn studio_light() -> &'static TokenDocument {
     })
 }
 
-/// Every theme shipped with the library, in registration order.
+/// The two themes this library designs against, in registration order.
+///
+/// The presets in [`presets`] are deliberately not here: this set is what the
+/// visual baselines are captured in, and every scene is rendered once per
+/// member of it. See [`all`] for the whole shipped catalog.
 pub fn bundled() -> [&'static TokenDocument; 2] {
     [studio_dark(), studio_light()]
+}
+
+macro_rules! preset {
+    ($name:ident, $json:ident, $file:literal) => {
+        #[doc = concat!("The `", $file, "` preset, transcribed from its upstream scheme.")]
+        pub fn $name() -> &'static TokenDocument {
+            static TOKENS: OnceLock<TokenDocument> = OnceLock::new();
+            TOKENS.get_or_init(|| {
+                TokenDocument::parse($json).expect(concat!(
+                    "tokens/",
+                    $file,
+                    " must pass TokenDocument::validate"
+                ))
+            })
+        }
+    };
+}
+
+preset!(
+    catppuccin_mocha,
+    CATPPUCCIN_MOCHA_JSON,
+    "catppuccin-mocha.json"
+);
+preset!(
+    catppuccin_latte,
+    CATPPUCCIN_LATTE_JSON,
+    "catppuccin-latte.json"
+);
+preset!(nord, NORD_JSON, "nord.json");
+preset!(tokyo_night, TOKYO_NIGHT_JSON, "tokyo-night.json");
+preset!(gruvbox_dark, GRUVBOX_DARK_JSON, "gruvbox-dark.json");
+preset!(dracula, DRACULA_JSON, "dracula.json");
+preset!(solarized_dark, SOLARIZED_DARK_JSON, "solarized-dark.json");
+preset!(
+    solarized_light,
+    SOLARIZED_LIGHT_JSON,
+    "solarized-light.json"
+);
+
+/// The community schemes shipped alongside the studio pair, in registration
+/// order.
+pub fn presets() -> [&'static TokenDocument; 8] {
+    [
+        catppuccin_mocha(),
+        catppuccin_latte(),
+        nord(),
+        tokyo_night(),
+        gruvbox_dark(),
+        dracula(),
+        solarized_dark(),
+        solarized_light(),
+    ]
+}
+
+/// Every theme shipped with the library: the studio pair, then the presets.
+pub fn all() -> Vec<&'static TokenDocument> {
+    bundled().into_iter().chain(presets()).collect()
 }
 
 pub fn studio_dark_json() -> &'static str {
@@ -878,6 +1003,45 @@ impl AgentColor {
             Self::Edit => "color.agent.edit",
             Self::External => "color.agent.external",
             Self::EvidenceWash => "color.agent.evidenceWash",
+        }
+    }
+}
+
+/// One paint role of the node canvas. See [`NodeColors`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NodeColor {
+    HeaderWash,
+    PortIdle,
+    PortConnected,
+    Edge,
+    EdgeActive,
+    LabelWash,
+    Grid,
+    GridStrong,
+}
+
+impl NodeColor {
+    pub const ALL: [Self; 8] = [
+        Self::HeaderWash,
+        Self::PortIdle,
+        Self::PortConnected,
+        Self::Edge,
+        Self::EdgeActive,
+        Self::LabelWash,
+        Self::Grid,
+        Self::GridStrong,
+    ];
+
+    pub fn path(self) -> &'static str {
+        match self {
+            Self::HeaderWash => "color.node.headerWash",
+            Self::PortIdle => "color.node.portIdle",
+            Self::PortConnected => "color.node.portConnected",
+            Self::Edge => "color.node.edge",
+            Self::EdgeActive => "color.node.edgeActive",
+            Self::LabelWash => "color.node.labelWash",
+            Self::Grid => "color.node.grid",
+            Self::GridStrong => "color.node.gridStrong",
         }
     }
 }
@@ -1265,6 +1429,8 @@ pub struct ColorTokens {
     pub text: TextColors,
     pub interactive: InteractiveColors,
     pub semantic: SemanticColors,
+    pub sequence: SequenceColors,
+    pub node: NodeColors,
     pub agent: AgentColors,
     pub loader: LoaderColors,
     pub syntax: SyntaxColors,
@@ -1272,8 +1438,12 @@ pub struct ColorTokens {
 }
 
 impl ColorTokens {
-    fn entries(&self) -> [(&'static str, &str); 46] {
-        [
+    /// Every role, paired with the source string the document declares it as.
+    ///
+    /// A `Vec` of owned paths rather than a fixed array, because the series
+    /// scale is addressed by index and has no name to be `'static` about.
+    fn entries(&self) -> Vec<(String, &str)> {
+        let fixed: [(&'static str, &str); 54] = [
             ("color.agent.read", &self.agent.read),
             ("color.agent.network", &self.agent.network),
             ("color.agent.shell", &self.agent.shell),
@@ -1323,7 +1493,31 @@ impl ColorTokens {
             ("color.loader.track", &self.loader.track),
             ("color.loader.placeholder", &self.loader.placeholder),
             ("color.loader.sheen", &self.loader.sheen),
-        ]
+            ("color.node.headerWash", &self.node.header_wash),
+            ("color.node.portIdle", &self.node.port_idle),
+            ("color.node.portConnected", &self.node.port_connected),
+            ("color.node.edge", &self.node.edge),
+            ("color.node.edgeActive", &self.node.edge_active),
+            ("color.node.labelWash", &self.node.label_wash),
+            ("color.node.grid", &self.node.grid),
+            ("color.node.gridStrong", &self.node.grid_strong),
+        ];
+        fixed
+            .into_iter()
+            .map(|(path, value)| (path.to_string(), value))
+            .chain(
+                self.sequence
+                    .categorical
+                    .iter()
+                    .enumerate()
+                    .map(|(index, value)| {
+                        (
+                            format!("color.sequence.categorical.{index}"),
+                            value.as_str(),
+                        )
+                    }),
+            )
+            .collect()
     }
 }
 
@@ -1376,6 +1570,62 @@ pub struct SemanticColors {
     pub warning: String,
     pub success: String,
     pub info: String,
+}
+
+/// How many colours a categorical series scale carries.
+///
+/// Eight is a series a reader can hold at once and a legend can name. It is
+/// fixed rather than open so a chart that cycles the scale repeats a colour
+/// at a position both the theme and the caller can predict.
+pub const SEQUENCE_LENGTH: usize = 8;
+
+/// The categorical series scale: distinct hues in a fixed order.
+///
+/// The hues differ rather than the lightnesses, which is the whole point. A
+/// chart drawn in four steps of one hue tells a reader that its four series
+/// are four degrees of one thing, and the four series of a donut are not
+/// ordered at all. The order here is the order a series takes them in, so two
+/// charts of the same data agree on which slice is which.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SequenceColors {
+    pub categorical: Vec<String>,
+}
+
+/// The vocabulary a node canvas paints in.
+///
+/// A graph is read by following its connections, so the parts that carry the
+/// connection are roles rather than one grey borrowed from the control
+/// vocabulary: an idle port and a connected one are different facts, and a
+/// resting edge and a live one are different facts, and neither pair can be
+/// told apart when both are `interactive.hairline`.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NodeColors {
+    /// The tint behind a node's header band when the node declares no
+    /// category colour of its own. A band on the node's own surface, not a
+    /// second surface: it is held to the line floor rather than the surface
+    /// separation one.
+    pub header_wash: String,
+    /// An unconnected port.
+    pub port_idle: String,
+    /// A port an edge lands on. Further from the canvas than `portIdle` by
+    /// contract, because "attached" is the state a reader scans a graph for.
+    pub port_connected: String,
+    /// A resting connection. Quiet by design: a canvas is mostly edges, and
+    /// an edge drawn at a control boundary's loudness turns the graph into a
+    /// mesh.
+    pub edge: String,
+    /// A connection carrying traffic, or under the pointer.
+    pub edge_active: String,
+    /// The chip behind an edge label. Nearly opaque, because the label sits
+    /// on the canvas *and* on whatever edge passes under it.
+    pub label_wash: String,
+    /// The canvas dot grid, and its major interval. Barely visible on
+    /// purpose, which is why both are held to the line floor: a grid typed at
+    /// an alpha that rounds away is a canvas the author believes is ruled.
+    pub grid: String,
+    pub grid_strong: String,
 }
 
 /// Quiet classification paint for evidence in an agent transcript.
@@ -1725,11 +1975,67 @@ pub struct EffectTokens {
     /// How much thicker a pressable glass surface reads while pressed, as a
     /// factor on its refraction. 1 is a surface that does not deform.
     pub glass_press_depth: f32,
+    /// How strongly a raised surface catches light along its top edge.
+    ///
+    /// The scalar of a gradient rather than a gradient: this library composes
+    /// one from a colour and an alpha ladder the way [`Self::glow_alpha`] is
+    /// composed, so a theme sets how much light there is and the component
+    /// decides which edge it falls on. Light themes carry less of it, because
+    /// a white highlight on a near-white surface has nowhere to go and reads
+    /// as a smudge rather than as a lit edge.
+    pub sheen_alpha: f32,
+    /// The alpha an area fill starts at under a chart line, fading to nothing
+    /// at the baseline.
+    pub area_wash_alpha: f32,
+    /// How strongly a node's header band takes the node's category colour.
+    pub header_tint_alpha: f32,
+    /// How wide an identity rail is, in pixels: a node's category stripe, a
+    /// callout's edge.
+    ///
+    /// Distinct from [`Self::selection_rail_width`], which marks *which row
+    /// the collection is on* and is therefore transient. This one says what a
+    /// thing is, is drawn whether or not anybody is looking at it, and is
+    /// wider because it has to read as part of the surface rather than as a
+    /// state on top of it.
+    pub rail_width: f32,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_shipped_theme_parses_and_validates() {
+        let ids: Vec<&str> = all().iter().map(|tokens| tokens.meta.id.as_str()).collect();
+        assert_eq!(
+            ids,
+            [
+                "studio-dark",
+                "studio-light",
+                "catppuccin-mocha",
+                "catppuccin-latte",
+                "nord",
+                "tokyo-night",
+                "gruvbox-dark",
+                "dracula",
+                "solarized-dark",
+                "solarized-light",
+            ]
+        );
+        for tokens in all() {
+            tokens
+                .validate()
+                .unwrap_or_else(|error| panic!("{} is invalid: {error}", tokens.meta.id));
+        }
+    }
+
+    /// The visual baselines are captured once per bundled theme, so a preset
+    /// that leaked into this set would multiply the snapshot catalog.
+    #[test]
+    fn the_presets_stay_out_of_the_bundled_pair() {
+        assert_eq!(bundled().len(), 2);
+        assert_eq!(presets().len(), 8);
+    }
 
     #[test]
     fn bundled_document_is_valid_and_typed() {
@@ -1922,6 +2228,87 @@ mod tests {
         value["color"]["surface"]["legacyCanvas"] = serde_json::json!("#000000");
         let error = TokenDocument::parse(&value.to_string()).expect_err("unknown nested field");
         assert!(error.to_string().contains("unknown field `legacyCanvas`"));
+    }
+
+    #[test]
+    fn a_series_scale_of_the_wrong_length_is_rejected() {
+        for length in [SEQUENCE_LENGTH - 1, SEQUENCE_LENGTH + 1] {
+            let mut value: serde_json::Value =
+                serde_json::from_str(studio_dark_json()).expect("bundled JSON");
+            let entries = value["color"]["sequence"]["categorical"]
+                .as_array()
+                .expect("the scale is a list")
+                .clone();
+            value["color"]["sequence"]["categorical"] = serde_json::Value::Array(
+                entries
+                    .iter()
+                    .cycle()
+                    .take(length)
+                    .cloned()
+                    .collect::<Vec<_>>(),
+            );
+            let error =
+                TokenDocument::parse(&value.to_string()).expect_err("a mis-sized series scale");
+            let message = error.to_string();
+            assert!(message.contains("color.sequence.categorical"), "{message}");
+            assert!(message.contains(&SEQUENCE_LENGTH.to_string()), "{message}");
+            assert!(message.contains(&length.to_string()), "{message}");
+        }
+    }
+
+    /// A series is consumed by index and a caller with more series than the
+    /// scale has colours keeps drawing, so the scale wraps rather than
+    /// running out or repeating its last entry forever.
+    #[test]
+    fn the_series_scale_cycles_rather_than_ending() {
+        let tokens = studio_dark();
+        let series = tokens.sequence();
+        assert_eq!(series.len(), SEQUENCE_LENGTH);
+        assert_eq!(tokens.sequence_color(0), series[0]);
+        assert_eq!(tokens.sequence_color(SEQUENCE_LENGTH), series[0]);
+        assert_eq!(tokens.sequence_color(SEQUENCE_LENGTH + 3), series[3]);
+    }
+
+    #[test]
+    fn every_shipped_theme_carries_the_whole_canvas_vocabulary() {
+        for tokens in all() {
+            for role in NodeColor::ALL {
+                // Resolving is the assertion: an undeclared reference panics
+                // in `resolved`, and a theme that declared the role as
+                // nothing at all would be transparent.
+                assert!(
+                    tokens.node(role).alpha > 0.0,
+                    "{} draws nothing for {}",
+                    tokens.meta.id,
+                    role.path()
+                );
+            }
+        }
+    }
+
+    /// Depth is a contact shadow plus a soft key, so each step above flat
+    /// casts both. A single layer is the cast that made every raised surface
+    /// in the library read as a sticker.
+    #[test]
+    fn every_step_above_flat_casts_a_contact_shadow_under_its_key() {
+        for tokens in all() {
+            assert!(tokens.elevation(Elevation::Flat).layers.is_empty());
+            for level in [Elevation::Raised, Elevation::Overlay, Elevation::Modal] {
+                let step = tokens.elevation(level);
+                assert_eq!(step.layers.len(), 2, "{} {level:?}", tokens.meta.id);
+                let (ambient, key) = (&step.layers[0], &step.layers[1]);
+                assert!(
+                    ambient.y < key.y && ambient.blur < key.blur,
+                    "{} {level:?} draws its contact shadow no tighter than its key",
+                    tokens.meta.id
+                );
+                assert!(
+                    ambient.color.alpha < key.color.alpha,
+                    "{} {level:?} draws its contact shadow no quieter than its key",
+                    tokens.meta.id
+                );
+            }
+        }
     }
 
     #[test]

@@ -44,6 +44,7 @@ use gpui_kit_theme::ControlSize;
 use crate::controls::button::{Button, ButtonJoin, ButtonVariant};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{Disableable, Ident, Selectable, Sizable};
+use crate::reactive::Binding;
 
 /// Reports the state the toggle should take next.
 type PressHandler = Rc<dyn Fn(bool, &mut Window, &mut App)>;
@@ -178,6 +179,15 @@ impl Toggle {
     pub fn on_press(mut self, handler: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self {
         self.on_press = Some(Rc::new(handler));
         self
+    }
+
+    /// Draws what the caller's [`Binding`] currently holds, and writes back
+    /// through it. Sugar for [`Self::pressed`] and [`Self::on_press`].
+    pub fn bind(self, binding: &Binding<bool>, cx: &App) -> Self {
+        let pressed = binding.get(cx);
+        let binding = binding.clone();
+        self.pressed(pressed)
+            .on_press(move |next, _window, cx| binding.set(cx, next))
     }
 
     fn actionable(&self) -> bool {
@@ -403,6 +413,18 @@ impl ToggleGroup {
     ) -> Self {
         self.on_change = Some(Rc::new(handler));
         self
+    }
+
+    /// Draws the set the caller's [`Binding`] holds, and writes the set a
+    /// press asks for. Sugar for [`Self::pressed`] and [`Self::on_change`].
+    ///
+    /// The set is the whole answer, in both directions, so
+    /// [`ToggleSelection`] keeps deciding what a press does to it.
+    pub fn bind(self, binding: &Binding<Vec<SharedString>>, cx: &App) -> Self {
+        let pressed = binding.get(cx);
+        let binding = binding.clone();
+        self.pressed(pressed)
+            .on_change(move |next, _pressed, _window, cx| binding.set(cx, next))
     }
 }
 

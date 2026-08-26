@@ -197,3 +197,41 @@ License: Apache-2.0
 Copyright 2016 Joe Wilm and the Alacritty Project Contributors
 Scope: the escape-sequence state machine and grid behind
 content::terminal::Emulator, behind the `terminal` feature of gpui-box-kit.
+
+Bundled theme preset palettes
+--------------------------------------------------------------------------------
+Scope: hexadecimal palette values transcribed into the token documents
+crates/gpui-kit-tokens/tokens/{catppuccin-mocha,catppuccin-latte,nord,
+tokyo-night,gruvbox-dark,dracula,solarized-dark,solarized-light}.json. No
+upstream file is vendored and no upstream code is linked; see PROVENANCE.md P11
+for the values that were adjusted to clear this repository's contrast gates.
+
+Catppuccin
+Source: https://github.com/catppuccin/catppuccin
+License: MIT
+Copyright (c) 2021 Catppuccin
+
+Nord
+Source: https://github.com/nordtheme/nord
+License: MIT
+Copyright (c) 2016-present Sven Greb
+
+Tokyo Night
+Source: https://github.com/enkia/tokyo-night-vscode-theme
+License: MIT
+Copyright (c) 2019 enkia
+
+gruvbox
+Source: https://github.com/morhetz/gruvbox
+License: MIT
+Copyright (c) 2018 Pavel Pertsev
+
+Dracula
+Source: https://github.com/dracula/dracula-theme
+License: MIT
+Copyright (c) 2016 Dracula Theme
+
+Solarized
+Source: https://github.com/altercation/solarized
+License: MIT
+Copyright (c) 2011 Ethan Schoonover

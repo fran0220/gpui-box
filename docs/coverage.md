@@ -228,6 +228,20 @@ the opposite: things a general-purpose library is expected to have that this
 one does not have yet. They are recorded here so that the difference between a
 decision and a debt stays visible.
 
+### Shared presentation tiers cover Button, Badge, and Tag first, 2026-08-26
+
+`Theme::variant_colors` resolves the seven shared tiers (`Filled`, `Light`,
+`Outline`, `Subtle`, `Default`, `Transparent`, `White`) against a palette
+group, a semantic role, or an explicit paint, and `Button`, `IconButton`,
+`Badge`, and `Tag` accept `.variant(..)` / `.color(..)` on top of their
+existing vocabularies without moving a pixel of the defaults. The other
+coloured surfaces — `Callout`, `Banner`, `StatusDot`, `StatusLine`,
+`ProgressBar`, `ProgressCircle` — still speak only their tone or caller
+tint. That is a debt, not a decision: they should adopt the same resolver
+so a light red chip and a light red callout agree on what light red is.
+Until they do, their colour treatment is theirs alone and is reviewed in
+their own scenes.
+
 ### A product backdrop that the bundled ramp still cannot 1:1, 2026-08-18
 
 `Surface::Backdrop` and multi-layer elevation close the two kit-side holes a

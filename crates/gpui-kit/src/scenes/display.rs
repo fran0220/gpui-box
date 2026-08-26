@@ -83,6 +83,26 @@ pub(super) fn badge(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .id("scene.badge.tinted-warning"),
                 ),
         )
+        .child(caption(
+            &theme,
+            "The shared tiers, resolved against a palette colour",
+        ))
+        .children(["grape", "cyan"].map(|group| {
+            row(&theme).children(
+                [
+                    Variant::Filled,
+                    Variant::Light,
+                    Variant::Outline,
+                    Variant::Subtle,
+                ]
+                .map(|tier| {
+                    Badge::new(tier.name())
+                        .variant(tier)
+                        .color(SharedString::from(group))
+                        .id(format!("scene.badge.{group}.{}", tier.name()))
+                }),
+            )
+        }))
         .into_any_element()
 }
 
@@ -1036,6 +1056,26 @@ pub(super) fn tag(_window: &mut Window, cx: &mut App) -> AnyElement {
                 Tag::new("scene.tag.selected", "selected")
                     .selected(true)
                     .on_remove(|_, _| {}),
+            ),
+        )
+        .child(caption(
+            &theme,
+            "The shared tiers, resolved against a palette colour",
+        ))
+        .child(
+            row(&theme).children(
+                [
+                    Variant::Filled,
+                    Variant::Light,
+                    Variant::Outline,
+                    Variant::Subtle,
+                ]
+                .map(|tier| {
+                    Tag::new(format!("scene.tag.lime.{}", tier.name()), tier.name())
+                        .variant(tier)
+                        .color("lime")
+                        .on_remove(|_, _| {})
+                }),
             ),
         )
         .into_any_element()

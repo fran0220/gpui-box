@@ -7,12 +7,16 @@
 //! does own is the part that is the same every time: the backdrop, the
 //! stacking of edges beneath nodes, and the five states a canvas can be in.
 
-use std::{cell::Cell, collections::HashMap, rc::Rc};
+use std::{
+    cell::Cell,
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 use gpui::{
-    AnyElement, App, Bounds, InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels,
-    Point, RenderOnce, ScrollDelta, SharedString, Styled, Window, canvas, div, point, px, relative,
-    size,
+    AnyElement, App, Bounds, Hsla, InteractiveElement, IntoElement, MouseButton, ParentElement,
+    Pixels, Point, RenderOnce, ScrollDelta, SharedString, Styled, Window, canvas, div, point,
+    prelude::FluentBuilder, px, relative, size,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -30,7 +34,7 @@ use crate::strings::{ActiveStrings, StringKey};
 
 use super::edge::{
     Anchor, Axis, GraphEdge, GraphEndpoint, OrthogonalRoute, PortSide, RouteTransform, paint_route,
-    paint_route_stroke, route_orthogonal, route_preview,
+    paint_route_stroke, route_corner, route_orthogonal, route_preview,
 };
 use super::node::{GraphNode, GraphPort, NODE_WIDTH, PortDirection};
 
@@ -309,6 +313,8 @@ struct PortGeometry {
 struct NodeGeometry {
     id: SharedString,
     bounds: Bounds<f32>,
+    /// The one colour that stands for this node where the card is not drawn.
+    tint: Hsla,
     ports: Vec<PortGeometry>,
 }
 #[derive(Debug, Clone)]
@@ -595,6 +601,7 @@ impl NodeGraph {
             .map(|placed| {
                 let id = placed.node.ident().semantic_id();
                 let bounds = placed.bounds(theme, measured_heights.get(&id).copied());
+                let tint = placed.node.node_tint(theme);
                 let port_counts =
                     placed
                         .node
@@ -643,7 +650,12 @@ impl NodeGraph {
                         }
                     })
                     .collect();
-                NodeGeometry { id, bounds, ports }
+                NodeGeometry {
+                    id,
+                    bounds,
+                    tint,
+                    ports,
+                }
             })
             .collect()
     }
@@ -1097,7 +1109,8 @@ impl RenderOnce for NodeGraph {
             }
         };
         let stroke = theme.borders.hairline;
-        let grid_color = theme.colors.hairline;
+        let grid_color = theme.colors.node.grid;
+        let grid_major = theme.colors.node.grid_strong;
         let draw_grid = self.grid;
         let edge_theme = theme.clone();
         let painted_routes = routes.clone();
@@ -1117,6 +1130,7 @@ impl RenderOnce for NodeGraph {
                         viewport.offset.y,
                         GRID_STEP * viewport.zoom,
                         grid_color,
+                        grid_major,
                     );
                 }
                 for routed in painted_routes {
@@ -1145,6 +1159,7 @@ impl RenderOnce for NodeGraph {
                         stroke * 1.5,
                         color.opacity(0.88),
                         None,
+                        route_corner(&edge_theme),
                     );
                 }
             },
@@ -1188,7 +1203,7 @@ impl RenderOnce for NodeGraph {
                     .whitespace_nowrap()
                     .px(px(theme.spacing.xs * viewport.zoom))
                     .rounded(px(theme.radius(Radius::Small) * viewport.zoom))
-                    .bg(theme.colors.canvas)
+                    .bg(theme.colors.node.label_wash)
                     .text_size(px(theme.typography.caption.size * viewport.zoom))
                     .text_color(theme.colors.text_muted)
                     .child(label);
@@ -1257,17 +1272,30 @@ impl RenderOnce for NodeGraph {
                         .items_center()
                         .justify_center()
                         .rounded_full()
-                        .hairline_strong(&theme)
+                        // At rest this control is the quietest mark on the
+                        // canvas. One disconnect chip per connection, drawn at
+                        // full strength, puts the loudest ring on the canvas
+                        // at the midpoint of every edge and buries the graph
+                        // under its own affordances. It stays present rather
+                        // than appearing on hover, because a control nobody
+                        // can see until they are already on it is a control
+                        // that cannot be found or tabbed to.
+                        .border(px(theme.borders.hairline))
+                        .border_color(theme.colors.hairline)
                         .bg(theme.colors.canvas)
                         .cursor_pointer()
                         .tab_index(0)
                         .focus_ring(&theme)
                         .pressable(cx)
-                        .hover(|style| style.bg(theme.colors.hover))
+                        .hover(|style| {
+                            style
+                                .bg(theme.colors.hover)
+                                .border_color(theme.colors.hairline_strong)
+                        })
                         .child(
                             icon(Icon::Close)
                                 .size(px(9.0 * viewport.zoom))
-                                .text_color(theme.colors.text_muted),
+                                .text_color(theme.colors.text_faint),
                         )
                         .on_mouse_down_with_pointer_capture(MouseButton::Left, |_, _, cx| {
                             cx.stop_propagation()
@@ -1320,6 +1348,24 @@ impl RenderOnce for NodeGraph {
             })
             .collect();
 
+        // Which ports are wired is something the graph already knows and used
+        // to throw away. A port that is named by an edge and a port that is
+        // waiting for one are the two states a reader is looking for when they
+        // open a graph editor at all.
+        let wired: HashSet<(SharedString, SharedString)> = self
+            .edges
+            .iter()
+            .flat_map(|edge| {
+                [
+                    edge.source_port()
+                        .map(|port| (edge.from().clone(), port.clone())),
+                    edge.target_port()
+                        .map(|port| (edge.to().clone(), port.clone())),
+                ]
+            })
+            .flatten()
+            .collect();
+
         let mut ports = Vec::new();
         for node in geometry.iter().filter(|_| !compact) {
             let Some(placed) = self
@@ -1356,16 +1402,19 @@ impl RenderOnce for NodeGraph {
                     .and_then(|preview| preview.target.as_ref())
                     .filter(|(target, _)| target == &endpoint)
                     .map(|(_, valid)| *valid);
+                let connected = wired.contains(&(node.id.clone(), port_geometry.id.clone()));
+                // A wired port wears the connection's own colour and a free
+                // one stays neutral, so "what is already joined up" is read
+                // off the ports without tracing a single wire. The two states
+                // differ in fill as well as in hue, which is what keeps them
+                // apart for a reader who cannot separate the two colours.
                 let color = match target {
                     Some(true) => theme.colors.success,
                     Some(false) => theme.colors.danger,
-                    // Which way a port faces is said by two neutral weights,
-                    // not by a hue: a graph whose every output is accent-blue
-                    // spends the colour that marks a live edge on the ports
-                    // that are merely there.
-                    None if port.direction() == PortDirection::Output => theme.colors.text_muted,
-                    None => theme.colors.hairline_strong,
+                    None if connected => theme.colors.node.port_connected,
+                    None => theme.colors.node.port_idle,
                 };
+                let filled = target.is_some() || connected;
                 // The chip is what keeps a port name off the wire that runs
                 // under it: without clearance either side the stroke touches
                 // the letterforms and the two read as one mark.
@@ -1374,7 +1423,7 @@ impl RenderOnce for NodeGraph {
                     .whitespace_nowrap()
                     .px(px(theme.spacing.xs * viewport.zoom))
                     .rounded(px(theme.radius(Radius::Small) * viewport.zoom))
-                    .bg(theme.colors.canvas)
+                    .bg(theme.colors.node.label_wash)
                     .text_size(px(theme.typography.caption.size * viewport.zoom))
                     .text_color(theme.colors.text_muted)
                     .child(port.label().clone());
@@ -1406,9 +1455,26 @@ impl RenderOnce for NodeGraph {
                     .w(px(diameter))
                     .h(px(diameter))
                     .rounded_full()
-                    .border(px(theme.borders.hairline))
-                    .border_color(theme.colors.canvas)
-                    .bg(color)
+                    // A free port is a ring on the canvas and a wired one is
+                    // solid. The ring is drawn in the port's own colour and
+                    // filled with the canvas, so an empty socket reads as
+                    // empty rather than as a paler version of a full one.
+                    .when(filled, |element| {
+                        element
+                            .bg(color)
+                            .border(px(theme.borders.hairline))
+                            .border_color(theme.colors.canvas)
+                    })
+                    .when(!filled, |element| {
+                        element
+                            .bg(theme.colors.canvas)
+                            .border(px(theme.borders.hairline * 2.0))
+                            .border_color(color)
+                    })
+                    // Reaching for a 12px target is easier when the target
+                    // answers, and a port that grows under the pointer is the
+                    // one affordance a connection gesture has before it starts.
+                    .hover(|style| style.bg(theme.colors.node.port_connected))
                     .child(label);
                 if editable {
                     view = view.cursor_pointer();
@@ -1853,7 +1919,11 @@ fn graph_minimap(
                         .top(relative(y))
                         .w(relative(w.max(0.04)))
                         .h(relative(h.max(0.04)))
-                        .bg(theme.colors.loader_placeholder)
+                        .rounded(px(theme.radius(Radius::Small) * 0.5))
+                        // A mark carries the node's own colour, so the
+                        // overview is the same graph seen small rather than a
+                        // second diagram a reader has to map back by position.
+                        .bg(node.tint.opacity(0.7))
                 })
                 .collect::<Vec<_>>()
         })
@@ -1873,9 +1943,16 @@ fn graph_minimap(
             .w(relative((view.size.width / width).clamp(0.04, 1.0 - x)))
             .h(relative((view.size.height / height).clamp(0.04, 1.0 - y)))
             .radius(theme, Radius::Small)
+            // The rectangle is where the reader already is, so it is drawn as
+            // a frame rather than as a highlight: filling it in the text
+            // colour made the one part of the overview they can already see
+            // the loudest thing in it.
             .border(px(theme.borders.hairline))
-            .border_color(theme.colors.text)
-            .bg(theme.colors.selected)
+            .border_color(theme.colors.accent)
+            .bg(theme
+                .colors
+                .accent
+                .opacity(theme.effects.selected_ring_alpha))
     });
     div()
         .id(ident.element_id())
@@ -1912,22 +1989,43 @@ fn paint_grid(
     pan_y: f32,
     step: f32,
     color: gpui::Hsla,
+    major: gpui::Hsla,
 ) {
-    let first = |pan: f32| pan.rem_euclid(step);
-    let mut y = first(pan_y);
+    // Every dot the same weight is a texture, not a grid: it says the canvas
+    // has a surface but not how far anything has been dragged. Marking one
+    // interval in a heavier dot gives the pan a ruler to move against, and it
+    // is the same interval whatever the zoom, so distance keeps its meaning.
+    const MAJOR: i32 = 5;
+
+    let first = |pan: f32| {
+        let offset = pan.rem_euclid(step * MAJOR as f32);
+        (offset - step * MAJOR as f32, (offset / step).round() as i32)
+    };
+    let (start_y, origin_row) = first(pan_y);
+    let (start_x, origin_column) = first(pan_x);
+
+    let mut y = start_y;
+    let mut row = -MAJOR + origin_row;
     while y < f32::from(bounds.size.height) {
-        let mut x = first(pan_x);
+        let mut x = start_x;
+        let mut column = -MAJOR + origin_column;
         while x < f32::from(bounds.size.width) {
-            window.paint_quad(gpui::fill(
-                Bounds::new(
-                    point(bounds.origin.x + px(x), bounds.origin.y + px(y)),
-                    size(px(GRID_DOT), px(GRID_DOT)),
-                ),
-                color,
-            ));
+            if y >= 0.0 && x >= 0.0 {
+                let heavy = row.rem_euclid(MAJOR) == 0 && column.rem_euclid(MAJOR) == 0;
+                let dot = if heavy { GRID_DOT * 1.5 } else { GRID_DOT };
+                window.paint_quad(gpui::fill(
+                    Bounds::new(
+                        point(bounds.origin.x + px(x), bounds.origin.y + px(y)),
+                        size(px(dot), px(dot)),
+                    ),
+                    if heavy { major } else { color },
+                ));
+            }
             x += step;
+            column += 1;
         }
         y += step;
+        row += 1;
     }
 }
 
@@ -2116,6 +2214,7 @@ mod tests {
         let geometry = [NodeGeometry {
             id: SharedString::from("a"),
             bounds: placed.bounds(&theme, None),
+            tint: theme.colors.text_faint,
             ports: Vec::new(),
         }];
         let first = route_signature(&geometry, &[]);
@@ -2123,6 +2222,7 @@ mod tests {
         let shifted = [NodeGeometry {
             id: SharedString::from("a"),
             bounds: moved.bounds(&theme, None),
+            tint: theme.colors.text_faint,
             ports: Vec::new(),
         }];
         assert_ne!(first, route_signature(&shifted, &[]));

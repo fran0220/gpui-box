@@ -18,6 +18,7 @@ use crate::foundation::{
     text as foundation_text,
 };
 use crate::motion::{self, Interpolate};
+use crate::reactive::Binding;
 
 type ToggleHandler = Rc<dyn Fn(bool, &mut Window, &mut App)>;
 type ActionHandler = Rc<dyn Fn(&mut Window, &mut App)>;
@@ -89,6 +90,20 @@ impl Checkbox {
     pub fn on_change(mut self, handler: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self {
         self.on_change = Some(Rc::new(handler));
         self
+    }
+
+    /// Draws what the caller's [`Binding`] currently holds, and writes back
+    /// through it.
+    ///
+    /// This is exactly [`Self::checked`] and [`Self::on_change`] against one
+    /// caller-owned value, and nothing else changes: the box still draws what
+    /// the caller says is true, so a caller that refuses a change still sees
+    /// the checkmark stay where it was.
+    pub fn bind(self, binding: &Binding<bool>, cx: &App) -> Self {
+        let checked = binding.get(cx);
+        let binding = binding.clone();
+        self.checked(checked)
+            .on_change(move |next, _window, cx| binding.set(cx, next))
     }
 
     fn actionable(&self) -> bool {
@@ -246,6 +261,23 @@ impl Radio {
     pub fn on_select(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
         self.on_select = Some(Rc::new(handler));
         self
+    }
+
+    /// Draws selected while the caller's value equals `value`, and writes
+    /// `value` when it is picked.
+    ///
+    /// A radio is one answer out of several, so it binds a value rather than
+    /// a flag: every button in the group binds the same [`Binding`] with its
+    /// own value, and the exclusivity is the equality, not a rule this
+    /// component enforces.
+    pub fn bind_value<T>(self, binding: &Binding<T>, value: T, cx: &App) -> Self
+    where
+        T: Clone + PartialEq + 'static,
+    {
+        let selected = binding.get(cx) == value;
+        let binding = binding.clone();
+        self.selected(selected)
+            .on_select(move |_window, cx| binding.set(cx, value.clone()))
     }
 }
 
@@ -409,6 +441,15 @@ impl Switch {
     pub fn on_change(mut self, handler: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self {
         self.on_change = Some(Rc::new(handler));
         self
+    }
+
+    /// Draws what the caller's [`Binding`] currently holds, and writes back
+    /// through it. Sugar for [`Self::on`] and [`Self::on_change`].
+    pub fn bind(self, binding: &Binding<bool>, cx: &App) -> Self {
+        let on = binding.get(cx);
+        let binding = binding.clone();
+        self.on(on)
+            .on_change(move |next, _window, cx| binding.set(cx, next))
     }
 }
 

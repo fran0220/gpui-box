@@ -5,13 +5,13 @@ use std::sync::Arc;
 use gpui::{App, BorrowAppContext, BoxShadow, Global, Hsla, Rgba, SharedString, point, px};
 use gpui_kit_tokens::{
     BorderWeight, Color, DensityScale, InteractiveColor, OpacityRole, TokenDocument, TokenError,
-    bundled,
+    bundled, presets,
 };
 
 pub use gpui_kit_tokens::{
     AgentColor, Appearance, ControlSize, Density, Elevation, Layer, LoaderColor, MotionDuration,
-    MotionEasing, Palette, Radius, SemanticColor, Space, SpringPreset, SpringTokens, Surface,
-    SyntaxColor, TextTone, TypeScale,
+    MotionEasing, NodeColor, Palette, Radius, SEQUENCE_LENGTH, SemanticColor, Space, SpringPreset,
+    SpringTokens, Surface, SyntaxColor, TextTone, TypeScale,
 };
 
 /// Reads the active theme from any context that dereferences to [`App`].
@@ -27,6 +27,106 @@ impl ActiveTheme for App {
         Theme::get(self)
     }
 }
+
+/// The presentation tiers a coloured component can take, loudest first.
+///
+/// One vocabulary for every coloured surface, resolved by
+/// [`Theme::variant_colors`] so components cannot each invent a private
+/// meaning for "light". `Default` is the neutral tier: it reads the theme's
+/// own surface colours and ignores the colour choice entirely.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Variant {
+    /// A solid block of the colour with on-accent text.
+    Filled,
+    /// A wash of the colour under text in the colour.
+    Light,
+    /// A hairline of the colour around text in the colour.
+    Outline,
+    /// Text in the colour that gains a wash only under the pointer.
+    Subtle,
+    /// The neutral control surface; the colour choice is not consulted.
+    #[default]
+    Default,
+    /// Text in the colour with no surface of its own.
+    Transparent,
+    /// A white surface with text in the colour, for tinted backdrops.
+    White,
+}
+
+impl Variant {
+    /// The stable name a semantic node publishes for the tier.
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Filled => "filled",
+            Self::Light => "light",
+            Self::Outline => "outline",
+            Self::Subtle => "subtle",
+            Self::Default => "default",
+            Self::Transparent => "transparent",
+            Self::White => "white",
+        }
+    }
+}
+
+/// The colour a variant is resolved against.
+///
+/// A palette group keeps the choice in the token document, so a retint or a
+/// theme switch re-resolves it; a semantic role follows the theme's meaning;
+/// an explicit paint is the caller's own and travels unchanged.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ColorChoice {
+    /// A palette group by name, such as `"indigo"`; steps are chosen per
+    /// appearance by the resolver.
+    Palette(SharedString),
+    /// One of the theme's semantic roles.
+    Semantic(SemanticColor),
+    /// An explicit caller-owned paint.
+    Custom(Hsla),
+}
+
+impl From<SemanticColor> for ColorChoice {
+    fn from(role: SemanticColor) -> Self {
+        Self::Semantic(role)
+    }
+}
+
+impl From<Hsla> for ColorChoice {
+    fn from(paint: Hsla) -> Self {
+        Self::Custom(paint)
+    }
+}
+
+impl From<&'static str> for ColorChoice {
+    fn from(group: &'static str) -> Self {
+        Self::Palette(group.into())
+    }
+}
+
+impl From<SharedString> for ColorChoice {
+    fn from(group: SharedString) -> Self {
+        Self::Palette(group)
+    }
+}
+
+/// The resolved paints of one variant tier in one colour.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct VariantColors {
+    pub background: Hsla,
+    pub background_hover: Hsla,
+    pub background_active: Hsla,
+    pub text: Hsla,
+    /// Only the Outline tier draws one.
+    pub border: Option<Hsla>,
+}
+
+/// The palette steps each role prefers, first available wins. The filled step
+/// matches the open-color convention of shade six as the saturated middle;
+/// the readable steps sit far enough from the page to carry text.
+const FILLED_STEPS: &[&str] = &["600", "500", "400"];
+const HOVER_STEPS: &[&str] = &["700", "600", "500"];
+const ACTIVE_STEPS: &[&str] = &["800", "700", "600"];
+const READABLE_STEPS_DARK: &[&str] = &["300", "200", "400"];
+const READABLE_STEPS_LIGHT: &[&str] = &["700", "800", "600"];
 
 #[derive(Debug, Clone)]
 pub struct Theme {
@@ -91,6 +191,12 @@ pub struct Colors {
     pub loader_track: Hsla,
     pub loader_placeholder: Hsla,
     pub loader_sheen: Hsla,
+    /// The categorical series scale, in order. Indexed by a chart and cycled
+    /// past its end. See `gpui_kit_tokens::SequenceColors`.
+    pub sequence: SequenceScale,
+    /// The node canvas vocabulary: ports, edges, the label chip and the
+    /// grid. See `gpui_kit_tokens::NodeColors`.
+    pub node: NodePalette,
     /// Quiet tool-family tints and the wash behind expanded transcript
     /// evidence. See `gpui_kit_tokens::AgentColors`.
     pub agent: AgentPalette,
@@ -123,6 +229,59 @@ pub struct SyntaxPalette {
     pub added_wash: Hsla,
     pub removed: Hsla,
     pub removed_wash: Hsla,
+}
+
+/// The resolved categorical series scale.
+///
+/// A list rather than named fields, because a series is chosen by position:
+/// the third slice is the third colour, and a caller with more series than
+/// the scale has colours reads through [`Self::get`], which wraps.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SequenceScale {
+    pub categorical: Vec<Hsla>,
+}
+
+impl SequenceScale {
+    /// The colour of series `index`, cycling past the end of the scale.
+    pub fn get(&self, index: usize) -> Hsla {
+        self.categorical[index % self.categorical.len()]
+    }
+
+    pub fn len(&self) -> usize {
+        self.categorical.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.categorical.is_empty()
+    }
+}
+
+/// The resolved node canvas vocabulary.
+#[derive(Debug, Clone, Copy)]
+pub struct NodePalette {
+    pub header_wash: Hsla,
+    pub port_idle: Hsla,
+    pub port_connected: Hsla,
+    pub edge: Hsla,
+    pub edge_active: Hsla,
+    pub label_wash: Hsla,
+    pub grid: Hsla,
+    pub grid_strong: Hsla,
+}
+
+impl NodePalette {
+    pub fn get(&self, role: NodeColor) -> Hsla {
+        match role {
+            NodeColor::HeaderWash => self.header_wash,
+            NodeColor::PortIdle => self.port_idle,
+            NodeColor::PortConnected => self.port_connected,
+            NodeColor::Edge => self.edge,
+            NodeColor::EdgeActive => self.edge_active,
+            NodeColor::LabelWash => self.label_wash,
+            NodeColor::Grid => self.grid,
+            NodeColor::GridStrong => self.grid_strong,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -357,6 +516,19 @@ pub struct Effects {
     pub glass_contrast_flip_low: f32,
     pub glass_contrast_flip_high: f32,
     pub glass_press_depth: f32,
+    /// How strongly a raised surface catches light along its top edge. The
+    /// gradient itself is composed by the component, the way [`Theme::glow`]
+    /// composes a bloom from a colour and an alpha.
+    pub sheen_alpha: f32,
+    /// The alpha an area fill starts at under a chart line, fading to nothing
+    /// at the baseline.
+    pub area_wash_alpha: f32,
+    /// How strongly a node header band takes its category colour.
+    pub header_tint_alpha: f32,
+    /// How wide an identity rail is, in pixels: a node's category stripe, a
+    /// callout's edge. Distinct from `selection_rail_width`, which reports a
+    /// transient state rather than what a thing is.
+    pub rail_width: f32,
 }
 
 impl Theme {
@@ -418,6 +590,19 @@ impl Theme {
                 loader_track: color(tokens.loader(LoaderColor::Track)),
                 loader_placeholder: color(tokens.loader(LoaderColor::Placeholder)),
                 loader_sheen: color(tokens.loader(LoaderColor::Sheen)),
+                sequence: SequenceScale {
+                    categorical: tokens.sequence().into_iter().map(color).collect(),
+                },
+                node: NodePalette {
+                    header_wash: color(tokens.node(NodeColor::HeaderWash)),
+                    port_idle: color(tokens.node(NodeColor::PortIdle)),
+                    port_connected: color(tokens.node(NodeColor::PortConnected)),
+                    edge: color(tokens.node(NodeColor::Edge)),
+                    edge_active: color(tokens.node(NodeColor::EdgeActive)),
+                    label_wash: color(tokens.node(NodeColor::LabelWash)),
+                    grid: color(tokens.node(NodeColor::Grid)),
+                    grid_strong: color(tokens.node(NodeColor::GridStrong)),
+                },
                 agent: AgentPalette {
                     read: color(tokens.agent(AgentColor::Read)),
                     network: color(tokens.agent(AgentColor::Network)),
@@ -576,6 +761,10 @@ impl Theme {
                 glass_contrast_flip_low: tokens.effect.glass_contrast_flip_low,
                 glass_contrast_flip_high: tokens.effect.glass_contrast_flip_high,
                 glass_press_depth: tokens.effect.glass_press_depth,
+                sheen_alpha: tokens.effect.sheen_alpha,
+                area_wash_alpha: tokens.effect.area_wash_alpha,
+                header_tint_alpha: tokens.effect.header_tint_alpha,
+                rail_width: tokens.effect.rail_width,
             },
             palette: Arc::new(tokens.color.palette.clone()),
         }
@@ -742,6 +931,165 @@ impl Theme {
         }]
     }
 
+    /// Resolves the shared presentation tiers for one colour.
+    ///
+    /// Every coloured component reads the same seven tiers through this one
+    /// resolver, so "a light indigo chip" and "a light indigo button" agree
+    /// on what light and indigo mean. The tier decides how loud the colour
+    /// is; the colour itself is the caller's, named as a palette group, a
+    /// semantic role, or an explicit paint.
+    pub fn variant_colors(&self, variant: Variant, color: &ColorChoice) -> VariantColors {
+        let transparent = Hsla {
+            h: 0.0,
+            s: 0.0,
+            l: 0.0,
+            a: 0.0,
+        };
+        // Default is the neutral tier and carries no colour at all, so it is
+        // resolved before the colour is: a colour on a Default control would
+        // be a colour the control then refuses to show.
+        if variant == Variant::Default {
+            return VariantColors {
+                background: self.colors.raised,
+                background_hover: self.colors.active,
+                background_active: self.colors.active,
+                text: self.colors.text,
+                border: None,
+            };
+        }
+
+        let base = self.resolve_color_choice(color);
+        let readable = self.readable_shade(color, base);
+        let (hover, active) = self.pressed_shades(color, base);
+        match variant {
+            Variant::Default => unreachable!("resolved above"),
+            Variant::Filled => VariantColors {
+                background: base,
+                background_hover: hover,
+                background_active: active,
+                text: self.colors.text_on_accent,
+                border: None,
+            },
+            Variant::Light => VariantColors {
+                background: base.opacity(0.15),
+                background_hover: base.opacity(0.22),
+                background_active: base.opacity(0.28),
+                text: readable,
+                border: None,
+            },
+            Variant::Outline => VariantColors {
+                background: transparent,
+                background_hover: base.opacity(0.08),
+                background_active: base.opacity(0.12),
+                text: readable,
+                border: Some(readable),
+            },
+            Variant::Subtle => VariantColors {
+                background: transparent,
+                background_hover: base.opacity(0.12),
+                background_active: base.opacity(0.18),
+                text: readable,
+                border: None,
+            },
+            Variant::Transparent => VariantColors {
+                background: transparent,
+                background_hover: transparent,
+                background_active: transparent,
+                text: readable,
+                border: None,
+            },
+            Variant::White => {
+                let white = Hsla {
+                    h: 0.0,
+                    s: 0.0,
+                    l: 1.0,
+                    a: 1.0,
+                };
+                VariantColors {
+                    background: white,
+                    background_hover: Hsla { l: 0.96, ..white },
+                    background_active: Hsla { l: 0.92, ..white },
+                    text: base,
+                    border: None,
+                }
+            }
+        }
+    }
+
+    /// The single paint a colour choice stands for in this theme.
+    ///
+    /// A palette group resolves to its filled step; a group the active
+    /// document does not carry falls back to the accent rather than to a
+    /// guessed colour, so an unrecognised name is visible as "the theme's
+    /// own colour" instead of as an arbitrary one.
+    fn resolve_color_choice(&self, color: &ColorChoice) -> Hsla {
+        match color {
+            ColorChoice::Semantic(role) => self.semantic_color(*role),
+            ColorChoice::Custom(paint) => *paint,
+            ColorChoice::Palette(group) => self
+                .ramp_step(group, FILLED_STEPS)
+                .unwrap_or(self.colors.accent),
+        }
+    }
+
+    /// The shade of the colour that reads as text on this theme's surfaces.
+    fn readable_shade(&self, color: &ColorChoice, base: Hsla) -> Hsla {
+        if let ColorChoice::Palette(group) = color {
+            let steps: &[&str] = match self.appearance {
+                Appearance::Dark => READABLE_STEPS_DARK,
+                Appearance::Light => READABLE_STEPS_LIGHT,
+            };
+            if let Some(shade) = self.ramp_step(group, steps) {
+                return shade;
+            }
+        }
+        match self.appearance {
+            Appearance::Dark => Hsla {
+                l: base.l.max(0.72),
+                ..base
+            },
+            Appearance::Light => Hsla {
+                l: base.l.min(0.40),
+                ..base
+            },
+        }
+    }
+
+    /// The hover and pressed shades of a filled colour.
+    fn pressed_shades(&self, color: &ColorChoice, base: Hsla) -> (Hsla, Hsla) {
+        if let ColorChoice::Palette(group) = color
+            && let (Some(hover), Some(active)) = (
+                self.ramp_step(group, HOVER_STEPS),
+                self.ramp_step(group, ACTIVE_STEPS),
+            )
+        {
+            return (hover, active);
+        }
+        (
+            Hsla {
+                l: (base.l - 0.05).max(0.0),
+                ..base
+            },
+            Hsla {
+                l: (base.l - 0.10).max(0.0),
+                ..base
+            },
+        )
+    }
+
+    /// The first step of `preferred` the active palette carries for `group`.
+    fn ramp_step(&self, group: &str, preferred: &[&str]) -> Option<Hsla> {
+        let steps = self.palette.get(group)?;
+        preferred
+            .iter()
+            .find_map(|step| steps.get(*step).map(|value| (*step, value.as_str())))
+            .and_then(|(step, value)| {
+                Color::resolve(&format!("{group}.{step}"), value, &self.palette)
+                    .ok()
+                    .map(color)
+            })
+    }
+
     /// The colour a surface in a named state bleeds into the pixels around it.
     ///
     /// It is the state itself made visible at the edge, which is what lets a
@@ -819,6 +1167,7 @@ impl ThemeRegistry {
     pub fn new() -> Self {
         let tokens: Vec<Arc<TokenDocument>> = bundled()
             .into_iter()
+            .chain(presets())
             .map(|document| Arc::new(document.clone()))
             .collect();
         let theme = Theme::from_tokens(&tokens[0], Density::default());
@@ -1023,6 +1372,88 @@ mod tests {
     }
 
     #[test]
+    fn variant_tiers_share_one_resolver() {
+        for theme in [Theme::studio_dark(), Theme::studio_light()] {
+            let indigo: ColorChoice = "indigo".into();
+            let filled = theme.variant_colors(Variant::Filled, &indigo);
+            let light = theme.variant_colors(Variant::Light, &indigo);
+            let outline = theme.variant_colors(Variant::Outline, &indigo);
+            let subtle = theme.variant_colors(Variant::Subtle, &indigo);
+            let transparent = theme.variant_colors(Variant::Transparent, &indigo);
+
+            // Filled is the loud tier: a solid block with on-accent text.
+            assert_eq!(filled.background.a, 1.0);
+            assert_eq!(filled.text, theme.colors.text_on_accent);
+            assert_eq!(
+                filled.background,
+                theme.palette_color("indigo.600").expect("full ramp")
+            );
+
+            // Light is a wash of the same colour, never a solid.
+            assert!(light.background.a < 0.5);
+            assert!(light.background.a > 0.0);
+
+            // Only Outline carries a border.
+            assert!(outline.border.is_some());
+            for resolved in [filled, light, subtle, transparent] {
+                assert!(resolved.border.is_none());
+            }
+
+            // Subtle and Transparent rest without a surface; only Subtle
+            // gains one under the pointer.
+            assert_eq!(subtle.background.a, 0.0);
+            assert!(subtle.background_hover.a > 0.0);
+            assert_eq!(transparent.background_hover.a, 0.0);
+        }
+    }
+
+    #[test]
+    fn the_default_tier_ignores_the_color_choice() {
+        let theme = Theme::studio_dark();
+        let indigo = theme.variant_colors(Variant::Default, &"indigo".into());
+        let red = theme.variant_colors(Variant::Default, &"red".into());
+        assert_eq!(indigo, red);
+        assert_eq!(indigo.background, theme.colors.raised);
+        assert_eq!(indigo.text, theme.colors.text);
+    }
+
+    #[test]
+    fn readable_text_follows_the_appearance() {
+        let dark = Theme::studio_dark();
+        let light = Theme::studio_light();
+        let choice: ColorChoice = "teal".into();
+        let on_dark = dark.variant_colors(Variant::Subtle, &choice).text;
+        let on_light = light.variant_colors(Variant::Subtle, &choice).text;
+        // A tinted label must move toward the text pole of its own page.
+        assert!(on_dark.l > 0.5, "dark themes read pale shades");
+        assert!(on_light.l < 0.5, "light themes read deep shades");
+    }
+
+    #[test]
+    fn an_unknown_palette_group_falls_back_to_the_accent() {
+        let theme = Theme::studio_dark();
+        let resolved = theme.variant_colors(Variant::Filled, &"mauve".into());
+        assert_eq!(resolved.background, theme.colors.accent);
+    }
+
+    #[test]
+    fn custom_and_semantic_choices_resolve_without_a_ramp() {
+        let theme = Theme::studio_dark();
+        let paint = Hsla {
+            h: 0.6,
+            s: 0.8,
+            l: 0.5,
+            a: 1.0,
+        };
+        let custom = theme.variant_colors(Variant::Filled, &paint.into());
+        assert_eq!(custom.background, paint);
+        assert!(custom.background_hover.l < paint.l);
+
+        let danger = theme.variant_colors(Variant::Filled, &SemanticColor::Danger.into());
+        assert_eq!(danger.background, theme.colors.danger);
+    }
+
+    #[test]
     fn the_registry_switches_themes_and_refuses_unknown_ids() {
         let mut registry = ThemeRegistry::new();
         assert_eq!(registry.active().id, "studio-dark");
@@ -1030,6 +1461,38 @@ mod tests {
         assert_eq!(registry.active().appearance, Appearance::Light);
         assert!(!registry.activate("studio-solarized"));
         assert_eq!(registry.active().id, "studio-light");
+    }
+
+    #[test]
+    fn every_shipped_theme_is_registered_and_the_studio_dark_one_is_active() {
+        let registry = ThemeRegistry::new();
+        assert_eq!(registry.active().id, "studio-dark");
+        let ids: Vec<String> = registry.ids().iter().map(|id| id.to_string()).collect();
+        assert_eq!(
+            ids,
+            [
+                "studio-dark",
+                "studio-light",
+                "catppuccin-mocha",
+                "catppuccin-latte",
+                "nord",
+                "tokyo-night",
+                "gruvbox-dark",
+                "dracula",
+                "solarized-dark",
+                "solarized-light",
+            ]
+        );
+    }
+
+    #[test]
+    fn every_preset_can_be_activated() {
+        let mut registry = ThemeRegistry::new();
+        for tokens in presets() {
+            assert!(registry.activate(&tokens.meta.id), "{}", tokens.meta.id);
+            assert_eq!(registry.active().id, tokens.meta.id);
+            assert_eq!(registry.active().appearance, tokens.meta.appearance);
+        }
     }
 
     #[test]
@@ -1079,6 +1542,49 @@ mod tests {
                 > theme.shadow(Elevation::Raised)[0].blur_radius
         );
         assert!(theme.layer(Layer::Toast) > theme.layer(Layer::Popover));
+    }
+
+    #[test]
+    fn the_series_scale_arrives_resolved_and_cycles() {
+        for theme in [Theme::studio_dark(), Theme::studio_light()] {
+            assert_eq!(theme.colors.sequence.len(), SEQUENCE_LENGTH);
+            assert_eq!(theme.colors.sequence.get(0), theme.colors.sequence.get(8));
+            assert_eq!(theme.colors.sequence.get(11), theme.colors.sequence.get(3));
+            // A series scale that resolved to one paint would draw a chart
+            // nobody can take apart, and every entry is opaque because a
+            // series is a fill rather than a wash.
+            assert_ne!(theme.colors.sequence.get(0), theme.colors.sequence.get(1));
+            for index in 0..SEQUENCE_LENGTH {
+                assert_eq!(theme.colors.sequence.get(index).a, 1.0);
+            }
+        }
+    }
+
+    #[test]
+    fn the_canvas_vocabulary_says_which_ports_and_edges_are_live() {
+        for theme in [Theme::studio_dark(), Theme::studio_light()] {
+            let node = theme.colors.node;
+            assert_ne!(node.port_idle, node.port_connected);
+            assert_ne!(node.edge, node.edge_active);
+            assert_eq!(node.get(NodeColor::PortIdle), node.port_idle);
+            // The chip behind an edge label has to cover the line under it.
+            assert!(node.label_wash.a > 0.9);
+            // The grid is barely there, and its major interval is louder.
+            assert!(node.grid.a < node.grid_strong.a);
+        }
+    }
+
+    /// Depth is a contact shadow plus a soft key, in that order.
+    #[test]
+    fn a_raised_surface_casts_a_contact_shadow_under_its_key() {
+        for theme in [Theme::studio_dark(), Theme::studio_light()] {
+            for level in [Elevation::Raised, Elevation::Overlay, Elevation::Modal] {
+                let shadows = theme.shadow(level);
+                assert_eq!(shadows.len(), 2, "{level:?}");
+                assert!(shadows[0].blur_radius < shadows[1].blur_radius);
+                assert!(shadows[0].offset.y < shadows[1].offset.y);
+            }
+        }
     }
 
     #[test]

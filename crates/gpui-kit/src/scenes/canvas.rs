@@ -83,6 +83,7 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                         |graph| {
                             graph.node(
                                 GraphNode::new("scene.graph.ingest", "Stream ingest")
+                                    .color("teal")
                                     .width(176.0)
                                     .state(NodeState::Succeeded)
                                     .thumbnail(scene_picture("Input preview", cx))
@@ -102,6 +103,7 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                         |graph| {
                             graph.node(
                                 GraphNode::new("scene.graph.validate", "Validate & enrich")
+                                    .color("indigo")
                                     .width(176.0)
                                     .state(NodeState::Running)
                                     .action("schema + fraud signals")
@@ -126,6 +128,7 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                         |graph| {
                             graph.node(
                                 GraphNode::new("scene.graph.persist", "Persist batch")
+                                    .color("violet")
                                     .width(176.0)
                                     .state(NodeState::Succeeded)
                                     .action("warehouse / orders")
@@ -145,6 +148,7 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                         |graph| {
                             graph.node(
                                 GraphNode::new("scene.graph.observe", "Observe quality")
+                                    .color("orange")
                                     .width(176.0)
                                     .state(NodeState::Failed)
                                     .action("drift threshold exceeded")
@@ -164,6 +168,7 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                         |graph| {
                             graph.node(
                                 GraphNode::new("scene.graph.publish", "Publish artifact")
+                                    .color("lime")
                                     .width(176.0)
                                     .state(NodeState::Pending)
                                     .action("waiting for commit")

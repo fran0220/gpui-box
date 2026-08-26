@@ -20,6 +20,7 @@ use crate::controls::field::{FieldState, field_shell};
 use crate::controls::input::{TextInput, TextInputEvent};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text as foundation_text};
+use crate::reactive::Signal;
 use crate::strings::{ActiveStrings, StringKey};
 
 const DEFAULT_CODE_SLOTS: usize = 6;
@@ -180,6 +181,43 @@ impl PasswordInput {
         self.seeded = true;
         self.field
             .update(cx, |field, cx| field.set_value(value, cx));
+    }
+
+    /// Keeps a password field and a caller-owned [`Signal`] holding the same
+    /// text.
+    ///
+    /// The signal is the caller's storage for a credential, and it stays the
+    /// caller's: nothing here writes it anywhere else, and a [`Signal`] does
+    /// not print what it holds. Neither direction fires when the two already
+    /// agree.
+    ///
+    /// The subscriptions are the binding: the caller holds them for as long
+    /// as the field and the signal should stay together.
+    #[must_use]
+    pub fn bind(field: &Entity<Self>, signal: &Signal<String>, cx: &mut App) -> Vec<Subscription> {
+        let seed = signal.get(cx);
+        field.update(cx, |field, cx| field.set_value(seed, cx));
+
+        let to_signal = {
+            let signal = signal.clone();
+            cx.subscribe(field, move |_field, event, cx| {
+                if let PasswordInputEvent::Change(text) = event {
+                    signal.set(cx, text.to_string());
+                }
+            })
+        };
+        let to_field = {
+            let field = field.clone();
+            cx.observe(signal.entity(), move |value, cx| {
+                let text = value.read(cx).clone();
+                field.update(cx, |field, cx| {
+                    if field.value(cx).as_ref() != text.as_str() {
+                        field.set_value(text, cx);
+                    }
+                });
+            })
+        };
+        vec![to_signal, to_field]
     }
 
     pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {

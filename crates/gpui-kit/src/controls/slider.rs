@@ -15,6 +15,7 @@ use crate::foundation::{
 };
 use crate::layout::measure;
 use crate::motion::{self, keyed};
+use crate::reactive::Binding;
 
 /// Set by the slider's own pointer handlers, and cleared by the render that
 /// reads it.
@@ -124,6 +125,19 @@ impl Slider {
     pub fn on_change(mut self, handler: impl Fn(f32, &mut Window, &mut App) + 'static) -> Self {
         self.on_change = Some(Rc::new(handler));
         self
+    }
+
+    /// Draws what the caller's [`Binding`] currently holds, and writes back
+    /// through it. Sugar for [`Self::value`] and [`Self::on_change`].
+    ///
+    /// A range slider has two ends and one binding cannot carry both, so this
+    /// is the single-handle case; a range keeps
+    /// [`Slider::on_range_change`].
+    pub fn bind(self, binding: &Binding<f32>, cx: &App) -> Self {
+        let value = binding.get(cx);
+        let binding = binding.clone();
+        self.value(value)
+            .on_change(move |next, _window, cx| binding.set(cx, next))
     }
 
     /// A second handle. The fill then sits between the two values rather than

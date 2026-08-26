@@ -31,6 +31,9 @@
 //!   component and finishes in another.
 //! - [`motion`] — token-driven animation.
 //! - [`effects`] — semantic visual events, quality policy, replay, and budgets.
+//! - [`reactive`] — caller-owned [`Signal`](reactive::Signal)s,
+//!   [`Binding`](reactive::Binding)s, and a [`Form`](reactive::Form) whose
+//!   results land on the [`state`] validation ladder. Nothing here renders.
 //! - [`state`] — the explicit async states a truthful surface distinguishes.
 //! - [`strings`] — every word and numeric shape this library shows, including
 //!   plural categories and editable decimal parsing, and the host's right to
@@ -49,6 +52,8 @@
 //!   drag publishes, and what the host has to do with it.
 //! - `docs/content.md` — what a rendered document is not allowed to do, and
 //!   what a conversation's five delivery states mean.
+//! - `docs/reactive.md` — the caller-owned signal, the binding a control is
+//!   handed, and where a form's result lands.
 //!
 //! ```no_run
 //! # use gpui_kit::prelude::*;
@@ -76,6 +81,7 @@ pub mod media;
 pub mod motion;
 pub mod navigation;
 pub mod overlay;
+pub mod reactive;
 pub mod scenes;
 pub mod state;
 pub mod strings;
@@ -156,7 +162,7 @@ pub mod prelude {
         OneTimeCodeInput, OneTimeCodeInputEvent, PasswordInput, PasswordInputEvent,
     };
     pub use crate::controls::button::{
-        Button, ButtonGroup, ButtonJoin, ButtonVariant, IconButton, IconPosition,
+        Button, ButtonGroup, ButtonJoin, ButtonStyle, ButtonVariant, IconButton, IconPosition,
     };
     pub use crate::controls::cascader::{Cascader, CascaderEvent, CascaderOption};
     pub use crate::controls::color_picker::{ColorPicker, ColorSwatch};
@@ -257,10 +263,10 @@ pub mod prelude {
     };
     pub use crate::foundation::slot;
     pub use crate::foundation::{
-        ActiveTheme, ControlSize, Density, Disableable, Elevation, FocusRing, HoverLift, Hoverable,
-        Ident, Layer, Pressable, Selectable, SelectedRow, Sizable, SlotRender, Slots, Slotted,
-        StyledExt, ThemeOverlay, ThemeRegistry, activate_theme, rule, rule_vertical,
-        selection_rail, set_density, text,
+        ActiveTheme, ColorChoice, ControlSize, Density, Disableable, Elevation, FocusRing,
+        HoverLift, Hoverable, Ident, Layer, Pressable, Selectable, SelectedRow, Sizable,
+        SlotRender, Slots, Slotted, StyledExt, ThemeOverlay, ThemeRegistry, Variant, VariantColors,
+        activate_theme, rule, rule_vertical, selection_rail, set_density, text,
     };
     pub use crate::game::{
         Ability, AbilityBar, AbilityBarEvent, AbilityCharges, AbilityChargesError, AbilityId,
@@ -289,8 +295,8 @@ pub mod prelude {
         NativeMediaPlayer, NativeMediaSubscription, PlatformMediaTransport, VideoPlayer,
     };
     pub use crate::motion::{
-        Flip, Flipping, Keyframe, Keyframes, Micro, MicroMark, MicroMotion, Presence, ScrollLink,
-        Shape, Shaping, Transition, Velocity, flip, micro,
+        Animator, Flip, Flipping, Keyframe, Keyframes, Micro, MicroMark, MicroMotion, MotionSample,
+        Presence, ScrollLink, Shape, Shaping, Transition, Velocity, flip, micro,
     };
     pub use crate::navigation::{
         Accordion, AccordionSection, Anchor, AnchorList, Breadcrumb, Collapsible, Crumb,
@@ -304,6 +310,7 @@ pub mod prelude {
         MenubarMenu, Notification, NotificationCenter, NotificationCenterEvent, Overlay, Placement,
         Popover, PopoverEvent, Toast, ToastCorner, ToastLayer, Tooltip, Tooltipped, UnreadCount,
     };
+    pub use crate::reactive::{Binding, Form, FormValues, Rule, Signal, validators};
     pub use crate::state::{AsyncStatus, AsyncValue, HasPhase, Loadable, Phase, ValidationState};
     pub use crate::strings::{
         ActiveNumbers, ActiveSearch, ActiveStrings, EnglishNumbers, EnglishSearch, NumberAdapter,

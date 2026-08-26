@@ -8,7 +8,7 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ColorChoice, Radius, Space, TypeScale, Variant};
 
 use crate::display::badge::Tone;
 use crate::foundation::{Disableable, FocusRing, Ident, Pressable, Selectable, StyledExt, text};
@@ -26,6 +26,8 @@ pub struct Tag {
     label: SharedString,
     tone: Tone,
     tint: Option<Hsla>,
+    variant: Option<Variant>,
+    color: Option<ColorChoice>,
     disabled: bool,
     selected: bool,
     on_remove: Option<RemoveHandler>,
@@ -51,6 +53,8 @@ impl Tag {
             label: label.into(),
             tone: Tone::Neutral,
             tint: None,
+            variant: None,
+            color: None,
             disabled: false,
             selected: false,
             on_remove: None,
@@ -66,6 +70,20 @@ impl Tag {
     /// reports alone. See [`Tone`].
     pub fn tint(mut self, tint: Hsla) -> Self {
         self.tint = Some(tint);
+        self
+    }
+
+    /// Puts the tag on the shared presentation tiers. The tone stays what
+    /// the node publishes; the tier only decides how loudly the colour is
+    /// worn. See [`gpui_kit_theme::Theme::variant_colors`].
+    pub fn variant(mut self, variant: Variant) -> Self {
+        self.variant = Some(variant);
+        self
+    }
+
+    /// The colour the shared tiers resolve against, when the tag is on them.
+    pub fn color(mut self, color: impl Into<ColorChoice>) -> Self {
+        self.color = Some(color.into());
         self
     }
 
@@ -94,7 +112,19 @@ impl Selectable for Tag {
 impl RenderOnce for Tag {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let color = self.tone.mark_color(self.tint, &theme);
+        // On the shared tiers, the resolver decides both paints; otherwise
+        // the tone (or the caller's tint) is worn as a wash whose depth also
+        // carries selection.
+        let (color, tier_surface) = if let Some(variant) = self.variant {
+            let choice = self
+                .color
+                .clone()
+                .unwrap_or_else(|| ColorChoice::Custom(self.tone.mark_color(self.tint, &theme)));
+            let resolved = theme.variant_colors(variant, &choice);
+            (resolved.text, Some(resolved))
+        } else {
+            (self.tone.mark_color(self.tint, &theme), None)
+        };
         let removable = !self.disabled && self.on_remove.is_some();
         let remove_ident = self.ident.child("remove");
 
@@ -143,7 +173,20 @@ impl RenderOnce for Tag {
             // Selection is carried by the depth of the block rather than by an
             // outline drawn round it, so the two states differ by more than a
             // line a reader has to look for.
-            .bg(color.opacity(if self.selected { 0.34 } else { 0.14 }))
+            .map(|element| match &tier_surface {
+                Some(resolved) => element
+                    .bg(if self.selected {
+                        resolved.background_active
+                    } else {
+                        resolved.background
+                    })
+                    .when_some(resolved.border, |element, border| {
+                        element
+                            .border(px(theme.borders.hairline))
+                            .border_color(border)
+                    }),
+                None => element.bg(color.opacity(if self.selected { 0.34 } else { 0.14 })),
+            })
             .when(self.disabled, |element| {
                 element.opacity(theme.opacity.disabled)
             })

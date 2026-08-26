@@ -19,6 +19,7 @@ use crate::controls::button::IconButton;
 use crate::controls::field::{FieldState, field_shell};
 use crate::controls::input::{TextInput, TextInputEvent};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text as foundation_text};
+use crate::reactive::Signal;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// How much larger a page step is than a single step.
@@ -214,6 +215,45 @@ impl NumberInput {
         self.seeded = true;
         self.write(value, cx);
         cx.notify();
+    }
+
+    /// Keeps a number field and a caller-owned [`Signal`] holding the same
+    /// number.
+    ///
+    /// Typing writes the signal, and a change to the signal writes the field.
+    /// Text that is not a number at all writes nothing: the signal keeps the
+    /// last number that was one, and the field keeps showing what was typed,
+    /// so the disagreement stays visible instead of being resolved by
+    /// guessing. A value outside the range is still a number and is still
+    /// reported, exactly as [`NumberInputEvent::Changed`] says.
+    ///
+    /// The subscriptions are the binding: the caller holds them for as long
+    /// as the field and the signal should stay together.
+    #[must_use]
+    pub fn bind(field: &Entity<Self>, signal: &Signal<f64>, cx: &mut App) -> Vec<Subscription> {
+        let seed = signal.get(cx);
+        field.update(cx, |field, cx| field.set_value(seed, cx));
+
+        let to_signal = {
+            let signal = signal.clone();
+            cx.subscribe(field, move |_field, event, cx| {
+                if let NumberInputEvent::Changed(value) = event {
+                    signal.set(cx, *value);
+                }
+            })
+        };
+        let to_field = {
+            let field = field.clone();
+            cx.observe(signal.entity(), move |value, cx| {
+                let number = *value.read(cx);
+                field.update(cx, |field, cx| {
+                    if field.current() != Some(number) {
+                        field.set_value(number, cx);
+                    }
+                });
+            })
+        };
+        vec![to_signal, to_field]
     }
 
     fn write(&mut self, value: f64, cx: &mut Context<Self>) {

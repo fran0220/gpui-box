@@ -23,6 +23,7 @@ use crate::foundation::{
     Disableable, Ident, Selectable, Sizable, StyledExt, text as foundation_text,
 };
 use crate::interaction::dnd::{self, DragItem, DropAxis, DropIntent, DropPosition, RowTarget};
+use crate::reactive::Signal;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// What a tag field reports. The owner decides what any of it means.
@@ -161,6 +162,64 @@ impl TagInput {
 
     /// Replaces the set from the host side, which is how an addition or a
     /// removal actually takes effect.
+    /// Keeps a tag field and a caller-owned [`Signal`] holding the same set.
+    ///
+    /// The field reports what the typist asked for and never applies it, so
+    /// this is what applying it looks like: an addition appends, a removal
+    /// drops the first match, and a move reorders. A duplicate and a full
+    /// field are refusals — the field is already saying so where the typist
+    /// is looking — and the set does not change.
+    ///
+    /// The subscriptions are the binding: the caller holds them for as long
+    /// as the field and the signal should stay together.
+    #[must_use]
+    pub fn bind(
+        field: &Entity<Self>,
+        signal: &Signal<Vec<SharedString>>,
+        cx: &mut App,
+    ) -> Vec<Subscription> {
+        let seed = signal.get(cx);
+        field.update(cx, |field, cx| field.set_tags(seed, cx));
+
+        let to_signal = {
+            let signal = signal.clone();
+            cx.subscribe(field, move |_field, event, cx| match event {
+                TagInputEvent::Added(tag) => {
+                    let tag = tag.clone();
+                    signal.update(cx, |tags| tags.push(tag));
+                }
+                TagInputEvent::Removed(tag) => {
+                    let tag = tag.clone();
+                    signal.update(cx, |tags| {
+                        if let Some(at) = tags.iter().position(|held| held == &tag) {
+                            tags.remove(at);
+                        }
+                    });
+                }
+                TagInputEvent::Moved { from, to } => {
+                    let (from, to) = (*from, *to);
+                    signal.update(cx, |tags| {
+                        if from < tags.len() && to < tags.len() {
+                            let moved = tags.remove(from);
+                            tags.insert(to, moved);
+                        }
+                    });
+                }
+                TagInputEvent::Duplicate(_)
+                | TagInputEvent::Refused(_)
+                | TagInputEvent::EditRequested(_) => {}
+            })
+        };
+        let to_field = {
+            let field = field.clone();
+            cx.observe(signal.entity(), move |value, cx| {
+                let tags = value.read(cx).clone();
+                field.update(cx, |field, cx| field.set_tags(tags, cx));
+            })
+        };
+        vec![to_signal, to_field]
+    }
+
     pub fn set_tags(&mut self, tags: Vec<SharedString>, cx: &mut Context<Self>) {
         self.tags = tags;
         self.targeted = None;

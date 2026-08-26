@@ -26,6 +26,12 @@
 //!   reverse;
 //! - [`Sequence`] runs specifications one after another and knows how long
 //!   they take together;
+//! - [`Motion`] writes a motion down instead of hiding it in the closure that
+//!   applies it, so what a run looks like at any point in it can be sampled
+//!   without a window; [`motion!`](crate::motion!) and
+//!   [`sequence!`](crate::sequence!) are how one is written;
+//! - [`Animator`] holds a run open as a playhead that can be played, paused,
+//!   reversed and scrubbed, and costs nothing while it is not moving;
 //! - [`Flipping::flip`] slides an element from where it was to where it is,
 //!   and [`Flipping::flip_size`] additionally resizes it;
 //! - [`Animated::animate_in`] puts any of this on an element in one call,
@@ -40,7 +46,9 @@
 //! [`Presence::animate`] honor the same preference by finishing immediately.
 
 mod animated;
+mod animator;
 mod busy;
+mod description;
 mod easing;
 mod flip;
 mod follow;
@@ -59,7 +67,9 @@ mod stagger;
 mod transition;
 
 pub use animated::{Animated, Entrance};
+pub use animator::Animator;
 pub use busy::{Activity, breath, breathe, breathe_as, breathing_dot, spin, sweep};
+pub use description::{Motion, MotionProperty, MotionSample};
 pub use easing::{CubicBezier, Easing};
 pub use flip::{Flip, Flipped, Flipping, Shape, Shaping, flip, shared_flip, tracked_ids};
 pub use follow::{AtEnd, Chase, STICK_BAND, engage_end, follow_end, follows_end, release_end};

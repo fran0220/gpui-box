@@ -149,6 +149,34 @@ because those survive interruption:
   restarting from the old target;
 - reversing a `Presence` mid-flight resumes from what is currently visible.
 
+## Describing a run, and driving it by hand
+
+A run with more than one property is written as a description rather than as
+a chain of setters. `motion!` is the grammar for one motion and `sequence!`
+places motions on one clock; both expand to the existing `MotionSpec` model,
+so no second easing or time vocabulary exists:
+
+```rust
+let arrive = motion! {
+    duration: 420;
+    ease: overshoot;
+    opacity: 0.0 => 1.0;
+    y: 12.0 => 0.0;
+};
+let opening = sequence![menu_spec, +80 arrive.spec(&theme)];
+```
+
+`Motion::sample(&theme, t)` is pure — keyframed tracks in, a `MotionSample`
+out, nothing to tick — which is why the whole description layer unit-tests
+without a window, and why a non-finite value can be caught there and fall
+back to the property's neutral instead of reaching layout.
+
+`Animator` is the clock when the caller owns the playhead: play, pause,
+reverse, scrub, and re-speed over one motion or a whole sequence. It stores
+an anchor rather than ticking, so a paused animator costs nothing and seeking
+is one assignment; `finish()` is the reduced-motion answer. See the
+`micro` scene's third strip for a described motion sampled along its run.
+
 ## Velocity handover
 
 Continuing from the value on screen is not enough on its own: a value that was

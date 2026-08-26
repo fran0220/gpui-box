@@ -41,6 +41,8 @@
         "text",
         "interactive",
         "semantic",
+        "sequence",
+        "node",
         "agent",
         "loader",
         "syntax",
@@ -52,6 +54,8 @@
         "text": { "$ref": "#/$defs/textColors" },
         "interactive": { "$ref": "#/$defs/interactiveColors" },
         "semantic": { "$ref": "#/$defs/semanticColors" },
+        "sequence": { "$ref": "#/$defs/sequenceColors" },
+        "node": { "$ref": "#/$defs/nodeColors" },
         "agent": { "$ref": "#/$defs/agentColors" },
         "loader": {
           "type": "object",
@@ -161,6 +165,43 @@
         "warning": { "$ref": "#/$defs/color" },
         "success": { "$ref": "#/$defs/color" },
         "info": { "$ref": "#/$defs/color" }
+      }
+    },
+    "sequenceColors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["categorical"],
+      "properties": {
+        "categorical": {
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "items": { "$ref": "#/$defs/color" }
+        }
+      }
+    },
+    "nodeColors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "headerWash",
+        "portIdle",
+        "portConnected",
+        "edge",
+        "edgeActive",
+        "labelWash",
+        "grid",
+        "gridStrong"
+      ],
+      "properties": {
+        "headerWash": { "$ref": "#/$defs/color" },
+        "portIdle": { "$ref": "#/$defs/color" },
+        "portConnected": { "$ref": "#/$defs/color" },
+        "edge": { "$ref": "#/$defs/color" },
+        "edgeActive": { "$ref": "#/$defs/color" },
+        "labelWash": { "$ref": "#/$defs/color" },
+        "grid": { "$ref": "#/$defs/color" },
+        "gridStrong": { "$ref": "#/$defs/color" }
       }
     },
     "agentColors": {
@@ -546,7 +587,11 @@
         "glassMergeDistance",
         "glassContrastFlipLow",
         "glassContrastFlipHigh",
-        "glassPressDepth"
+        "glassPressDepth",
+        "sheenAlpha",
+        "areaWashAlpha",
+        "headerTintAlpha",
+        "railWidth"
       ],
       "properties": {
         "edgeFadeBand": { "$ref": "#/$defs/positiveNumber" },
@@ -569,7 +614,11 @@
         "glassMergeDistance": { "$ref": "#/$defs/positiveNumber" },
         "glassContrastFlipLow": { "type": "number", "minimum": 0, "maximum": 1 },
         "glassContrastFlipHigh": { "type": "number", "minimum": 0, "maximum": 1 },
-        "glassPressDepth": { "type": "number", "minimum": 1 }
+        "glassPressDepth": { "type": "number", "minimum": 1 },
+        "sheenAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "areaWashAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "headerTintAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "railWidth": { "$ref": "#/$defs/strictlyPositiveNumber" }
       }
     }
   }

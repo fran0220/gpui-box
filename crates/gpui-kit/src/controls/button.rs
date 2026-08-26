@@ -7,7 +7,10 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlMetrics, ControlSize, Radius, Theme, TypeScale};
+use gpui_kit_theme::{
+    ActiveTheme, ColorChoice, ControlMetrics, ControlSize, Radius, Theme, TypeScale, Variant,
+    VariantColors,
+};
 
 use crate::display::icon::{Icon as IconView, IconTone};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
@@ -26,6 +29,30 @@ pub enum ButtonVariant {
     Ghost,
     Danger,
     Link,
+}
+
+/// Either presentation vocabulary a button accepts.
+///
+/// [`ButtonVariant`] is the button's own weight ladder; [`Variant`] is the
+/// shared tier system every coloured component resolves through
+/// [`Theme::variant_colors`]. `.variant(..)` takes both, so a caller moving
+/// to the shared tiers changes an argument, not a method.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ButtonStyle {
+    Weight(ButtonVariant),
+    Tier(Variant),
+}
+
+impl From<ButtonVariant> for ButtonStyle {
+    fn from(variant: ButtonVariant) -> Self {
+        Self::Weight(variant)
+    }
+}
+
+impl From<Variant> for ButtonStyle {
+    fn from(tier: Variant) -> Self {
+        Self::Tier(tier)
+    }
 }
 
 /// Which side of the label the glyph sits on.
@@ -68,6 +95,8 @@ pub struct Button {
     glyph: Option<Icon>,
     icon_position: IconPosition,
     variant: ButtonVariant,
+    tier: Option<Variant>,
+    color: Option<ColorChoice>,
     size: ControlSize,
     disabled: bool,
     selected: bool,
@@ -107,6 +136,8 @@ impl Button {
             glyph: None,
             icon_position: IconPosition::Leading,
             variant: ButtonVariant::default(),
+            tier: None,
+            color: None,
             size: ControlSize::default(),
             disabled: false,
             selected: false,
@@ -173,9 +204,41 @@ impl Button {
         self
     }
 
-    pub fn variant(mut self, variant: ButtonVariant) -> Self {
-        self.variant = variant;
+    pub fn variant(mut self, variant: impl Into<ButtonStyle>) -> Self {
+        match variant.into() {
+            ButtonStyle::Weight(variant) => self.variant = variant,
+            ButtonStyle::Tier(tier) => self.tier = Some(tier),
+        }
         self
+    }
+
+    /// The colour the shared tiers are resolved against.
+    ///
+    /// Setting a colour moves the button onto [`Theme::variant_colors`]; the
+    /// tier defaults to the one the current weight maps to, so `.danger()`
+    /// with a colour keeps reading as filled intent in that colour.
+    pub fn color(mut self, color: impl Into<ColorChoice>) -> Self {
+        self.color = Some(color.into());
+        self
+    }
+
+    /// The shared paint set, when this button opted into the shared tiers.
+    fn unified(&self, theme: &Theme) -> Option<(Variant, VariantColors)> {
+        if self.tier.is_none() && self.color.is_none() {
+            return None;
+        }
+        let tier = self.tier.unwrap_or(match self.variant {
+            ButtonVariant::Primary => Variant::Filled,
+            ButtonVariant::Secondary => Variant::Default,
+            ButtonVariant::Ghost => Variant::Subtle,
+            ButtonVariant::Danger => Variant::Filled,
+            ButtonVariant::Link => Variant::Transparent,
+        });
+        let color = self.color.clone().unwrap_or(match self.variant {
+            ButtonVariant::Danger => ColorChoice::Semantic(gpui_kit_theme::SemanticColor::Danger),
+            _ => ColorChoice::Semantic(gpui_kit_theme::SemanticColor::Accent),
+        });
+        Some((tier, theme.variant_colors(tier, &color)))
     }
 
     pub fn primary(self) -> Self {
@@ -277,8 +340,15 @@ impl RenderOnce for Button {
         // primary, so the current answer is the *lightest* thing in a run
         // instead of the darkest. The accent is spent on one rail along the
         // bottom edge, which is the same mark a chosen tab or step carries.
+        let unified = self.unified(&theme);
         let paint = if self.disabled {
             theme.colors.text_disabled
+        } else if let Some((tier, resolved)) = &unified {
+            if self.selected && *tier != Variant::Filled {
+                theme.colors.text
+            } else {
+                resolved.text
+            }
         } else if self.selected && self.variant != ButtonVariant::Primary {
             theme.colors.text
         } else {
@@ -286,12 +356,20 @@ impl RenderOnce for Button {
         };
 
         let mut content: Vec<AnyElement> = Vec::new();
+        let on_shared_tiers = unified.is_some();
         if self.loading {
-            let tone = match self.variant {
-                ButtonVariant::Primary => IconTone::OnAccent,
-                ButtonVariant::Danger => IconTone::Danger,
-                ButtonVariant::Link => IconTone::Accent,
-                _ => IconTone::Muted,
+            let tone = if let Some((tier, _)) = &unified {
+                match tier {
+                    Variant::Filled => IconTone::OnAccent,
+                    _ => IconTone::Muted,
+                }
+            } else {
+                match self.variant {
+                    ButtonVariant::Primary => IconTone::OnAccent,
+                    ButtonVariant::Danger => IconTone::Danger,
+                    ButtonVariant::Link => IconTone::Accent,
+                    _ => IconTone::Muted,
+                }
             };
             content.push(
                 IconView::new(Icon::Refresh)
@@ -308,16 +386,22 @@ impl RenderOnce for Button {
                 .size(px(metrics.icon_size))
                 .flex_none()
                 .text_color(paint)
-                .when(!inert && self.variant == ButtonVariant::Ghost, |element| {
-                    element.group_hover(hover_group.clone(), |style| {
-                        style.text_color(theme.colors.text)
-                    })
-                })
-                .when(!inert && self.variant == ButtonVariant::Link, |element| {
-                    element.group_hover(hover_group.clone(), |style| {
-                        style.text_color(theme.colors.accent_strong)
-                    })
-                })
+                .when(
+                    !inert && !on_shared_tiers && self.variant == ButtonVariant::Ghost,
+                    |element| {
+                        element.group_hover(hover_group.clone(), |style| {
+                            style.text_color(theme.colors.text)
+                        })
+                    },
+                )
+                .when(
+                    !inert && !on_shared_tiers && self.variant == ButtonVariant::Link,
+                    |element| {
+                        element.group_hover(hover_group.clone(), |style| {
+                            style.text_color(theme.colors.accent_strong)
+                        })
+                    },
+                )
                 .into_any_element()
         });
         if let Some(glyph) = glyph {
@@ -330,16 +414,22 @@ impl RenderOnce for Button {
             let label = foundation_text(&theme, TypeScale::Label, label)
                 .text_size(px(metrics.font_size))
                 .text_color(paint)
-                .when(!inert && self.variant == ButtonVariant::Ghost, |element| {
-                    element.group_hover(hover_group.clone(), |style| {
-                        style.text_color(theme.colors.text)
-                    })
-                })
-                .when(!inert && self.variant == ButtonVariant::Link, |element| {
-                    element.group_hover(hover_group.clone(), |style| {
-                        style.text_color(theme.colors.accent_strong)
-                    })
-                })
+                .when(
+                    !inert && !on_shared_tiers && self.variant == ButtonVariant::Ghost,
+                    |element| {
+                        element.group_hover(hover_group.clone(), |style| {
+                            style.text_color(theme.colors.text)
+                        })
+                    },
+                )
+                .when(
+                    !inert && !on_shared_tiers && self.variant == ButtonVariant::Link,
+                    |element| {
+                        element.group_hover(hover_group.clone(), |style| {
+                            style.text_color(theme.colors.accent_strong)
+                        })
+                    },
+                )
                 .flex_none()
                 .into_any_element();
             match self.icon_position {
@@ -351,6 +441,7 @@ impl RenderOnce for Button {
         let mut button = frame(
             &theme,
             self.variant,
+            unified,
             metrics,
             self.disabled,
             self.loading,
@@ -471,6 +562,7 @@ fn foreground(theme: &Theme, variant: ButtonVariant) -> Hsla {
 fn frame(
     theme: &Theme,
     variant: ButtonVariant,
+    unified: Option<(Variant, VariantColors)>,
     metrics: ControlMetrics,
     disabled: bool,
     loading: bool,
@@ -496,6 +588,14 @@ fn frame(
     // that can actually be taken, and it leaves refused and in-flight — two
     // different answers — drawn as the same chip.
     if disabled {
+        if let Some((tier, _)) = unified {
+            // Same rule as the weights: a surfaceless tier stays bare, and a
+            // tier that had a surface trades it for the neutral one.
+            return match tier {
+                Variant::Subtle | Variant::Transparent => base,
+                _ => base.bg(theme.colors.raised),
+            };
+        }
         return match variant {
             ButtonVariant::Ghost => base,
             ButtonVariant::Link => base.px(px(0.0)),
@@ -504,6 +604,18 @@ fn frame(
     }
 
     let inert = loading;
+    if let Some((tier, resolved)) = unified {
+        return base
+            .bg(resolved.background)
+            .when_some(resolved.border, |element, border| {
+                element
+                    .border(px(theme.borders.hairline))
+                    .border_color(border)
+            })
+            .when(!inert && tier != Variant::Transparent, |element| {
+                element.hover(move |style| style.bg(resolved.background_hover))
+            });
+    }
     match variant {
         ButtonVariant::Primary => base
             .bg(theme.colors.text)
@@ -562,8 +674,14 @@ impl IconButton {
         }
     }
 
-    pub fn variant(mut self, variant: ButtonVariant) -> Self {
+    pub fn variant(mut self, variant: impl Into<ButtonStyle>) -> Self {
         self.button = self.button.variant(variant);
+        self
+    }
+
+    /// The colour the shared tiers are resolved against. See [`Button::color`].
+    pub fn color(mut self, color: impl Into<ColorChoice>) -> Self {
+        self.button = self.button.color(color);
         self
     }
 

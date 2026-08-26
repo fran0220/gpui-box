@@ -10,6 +10,16 @@ readers. Cargo package `gpui-box-kit-tokens` embeds and validates every bundled
 theme; `gpui-box-kit-theme` is the only GPUI adapter.
 `studio-dark` is the default and `studio-light` is its light counterpart.
 
+Eight further documents ship beside them — `catppuccin-mocha`,
+`catppuccin-latte`, `nord`, `tokyo-night`, `gruvbox-dark`, `dracula`,
+`solarized-dark` and `solarized-light` — with palettes transcribed from their
+upstream schemes (`PROVENANCE.md` P11). They carry the studio pair's exact key
+set, are validated by the same gates, and `ThemeRegistry::new` registers them
+after it. They are deliberately not part of `tokens::bundled()`: that pair is
+what the library designs against and captures its visual baselines in, and
+every scene is rendered once per member of it. `tokens::all()` is the whole
+shipped catalog, and `tokens::presets()` is the eight on their own.
+
 ```text
 JSON token document
     ↓
@@ -206,13 +216,71 @@ to say.
 `TokenError::Distinction` reports a violation, naming each pair, its measured
 distance and its minimum.
 
+### The series scale
+
+`color.sequence.categorical` is an ordered list of exactly eight colors, and
+the length is part of the contract: `TokenDocument::validate` rejects any
+other count, and a caller reading past the end wraps rather than running out.
+
+It exists because a chart with no categorical scale draws its series in the
+only thing it has, which is one hue at four lightnesses — and that tells a
+reader the four slices of a donut are four degrees of one quantity. The scale
+separates them by hue instead: indigo, teal, amber, pink, cyan, lime, violet,
+orange. Dark themes take a lighter step of each ramp and light themes a
+darker one, and every entry is held to the 3:1 identity floor on each of the
+three surfaces a chart is drawn on — `canvas`, `panel` and `raised`. Not
+`backdrop`: that is the substrate *behind* the page, no plot is drawn on it,
+and holding a light theme's scale to it would darken eight colours for a
+surface nobody uses.
+
+### The node canvas
+
+`color.node.*` is the vocabulary a graph is read in. Every value in it exists
+because a canvas drawn from the control vocabulary alone says nothing: with
+one grey for every port and one for every edge, a reader cannot tell what is
+attached to what without following each line by eye.
+
+| Role | What it says | Gate |
+|---|---|---|
+| `portIdle` | nothing is attached here | 1.5 L\* on `canvas` |
+| `portConnected` | an edge lands here | 3:1 on `canvas`, and 3 L\* further from the page than `portIdle` |
+| `edge` | a resting connection | 1.5 L\* on `canvas` |
+| `edgeActive` | traffic, or the pointer | 3:1 on `canvas` |
+| `grid`, `gridStrong` | the dot grid and its major interval | 1.5 L\* on `canvas` |
+| `labelWash` | the chip under an edge label | `text.muted` at 4.5:1 on it, over bare canvas **and** over an edge |
+| `headerWash` | a node's header band, uncategorised | 1.5 L\* on `raised` |
+
+The two floors are the ones the rest of the document already uses, and they
+are assigned by the same question. A canvas is mostly edges and grid, so
+drawing either at a control boundary's loudness turns a graph into a mesh:
+those carry the line rule, which only asks whether they were drawn at all. A
+connected port and a live edge are what a reader scans for, so they carry the
+identity floor. And the port pair carries the tone ladder's rule as well,
+signed the same way, because *attached* is the louder fact in both
+appearances.
+
+`labelWash` is checked twice on purpose. A chip that is legible on the bare
+canvas and too thin to cover the line running under it is exactly the label
+nobody can read, and the first check passes it happily.
+
 ## Elevation, layers, and density
 
 `elevation` describes the shadow each surface casts. A step is an ordered
 set of layers, not a single offset: `flat` is empty, and `raised`,
-`overlay` and `modal` may each carry more than one downward cast. There is
-no horizontal offset; a close contact shadow is `y` plus `blur`. Steps are
-ordered by reach — the farthest `y + blur` in the set — and
+`overlay` and `modal` each carry two downward casts. There is
+no horizontal offset; a close contact shadow is `y` plus `blur`.
+
+The two layers are an **ambient** contact shadow and a **key**. The ambient
+layer is tight, close and about 60% of the key's alpha; the key is the soft,
+further cast that was already there. A single cast puts a surface at one
+distance from the page in every direction at once, which is why one-layer
+elevation reads as a sticker printed on the page rather than as a thing above
+it — the contact shadow is what says the surface touches something. The
+ambient layer is deliberately inside the key's reach, so the ordering of the
+four steps is unchanged: reach is still the farthest `y + blur` in the set,
+and that is still the key's.
+
+Steps are ordered by reach — the farthest `y + blur` in the set — and
 `TokenDocument::validate` requires that reach to increase strictly from
 `flat` to `modal`. `zIndex` fixes the paint order of floating surfaces, and
 `density` scales spacing, control geometry and type independently. Density
@@ -261,6 +329,30 @@ edge of the row it is on, over a wash of `color.interactive.selected`.
 in a diff, a matched range in a search, a drop target — rather than a ring drawn
 around a chosen thing.
 
+Gradients are not a token group. This library composes one from a base colour
+and an alpha ladder, the way `Theme::glow` composes a bloom from
+`color` plus `effect.glowAlpha`, `glowBlur` and `glowSpread`, so what a theme
+owns is the scalars:
+
+| Token | What it sets |
+|---|---|
+| `effect.sheenAlpha` | the strength of a top-edge highlight on a raised surface |
+| `effect.areaWashAlpha` | the alpha an area fill starts at under a chart line, fading to nothing at the baseline |
+| `effect.headerTintAlpha` | how strongly a node header band takes its category colour |
+| `effect.railWidth` | how wide an identity rail is, in pixels |
+
+The three alphas are lower in light themes than in dark ones. A wash or a
+highlight is read as a departure from the surface under it, and a light theme's
+surfaces sit near the top of the range: the same alpha that lights a dark
+card's edge has nowhere to go on a near-white one and reads as a smudge, and
+the same wash under a chart line swamps the line it is meant to support.
+
+`effect.railWidth` is a different thing from `effect.selectionRailWidth`, and
+both exist. A selection rail reports which row the collection is on and is
+gone the moment another row is chosen; an identity rail says what a thing *is*
+— a node's category, a callout's severity — and is drawn whether or not
+anybody is looking at it, which is why it is the wider of the two.
+
 ## Validation
 
 `TokenDocument::validate` rejects:
@@ -275,9 +367,12 @@ around a chosen thing.
   the farthest layer) is not strictly increasing;
 - z-index layers that are not strictly increasing;
 - density factors outside 0.5–1.5, or a `comfortable` axis that is not 1;
-- a non-positive selection rail width;
+- a non-positive selection rail width, or a non-positive identity rail width;
+- a series scale that does not carry exactly eight colors;
 - required foreground/background pairs below their contrast floor;
-- a decorative line that composites into a surface it is drawn on.
+- a decorative line, a canvas grid or a resting edge that composites into a
+  surface it is drawn on;
+- an idle and a connected port a reader cannot tell apart.
 
 Run:
 

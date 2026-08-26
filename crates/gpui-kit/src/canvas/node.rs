@@ -14,7 +14,7 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Surface};
+use gpui_kit_theme::{ActiveTheme, ColorChoice, Elevation, Radius, Surface, Variant};
 
 use crate::foundation::{FocusRing, Ident, Pressable, Selectable, StyledExt};
 use crate::motion;
@@ -111,6 +111,11 @@ struct NodeMetrics {
     width: f32,
     height: Option<f32>,
     padding: f32,
+    /// The vertical inset of the header band, tighter than the body's so the
+    /// name reads as a title bar rather than as the first row of content.
+    header_padding: f32,
+    /// The identity stripe down the reading edge.
+    rail: f32,
     gap: f32,
     figure_gap: f32,
     label_size: f32,
@@ -133,6 +138,8 @@ impl NodeMetrics {
             width: scaled(width),
             height: height.map(scaled),
             padding: scaled(theme.spacing.sm),
+            header_padding: scaled(theme.spacing.xs),
+            rail: scaled(theme.effects.rail_width),
             gap: scaled(theme.spacing.xs),
             figure_gap: scaled(theme.spacing.sm),
             label_size: scaled(theme.typography.label.size),
@@ -304,6 +311,8 @@ pub struct GraphNode {
     /// What the step is doing now, for a step that is doing something.
     action: Option<SharedString>,
     state: NodeState,
+    /// What kind of step this is, in the caller's own terms.
+    category: Option<ColorChoice>,
     metrics: Vec<NodeMetric>,
     ports: Vec<GraphPort>,
     diff: Option<Diff>,
@@ -339,6 +348,7 @@ impl GraphNode {
             thumbnail_ratio: DEFAULT_THUMBNAIL_RATIO,
             action: None,
             state: NodeState::default(),
+            category: None,
             metrics: Vec::new(),
             ports: Vec::new(),
             diff: None,
@@ -380,6 +390,24 @@ impl GraphNode {
 
     pub fn state(mut self, state: NodeState) -> Self {
         self.state = state;
+        self
+    }
+
+    /// What kind of step this is, painted as the node's header and its edge
+    /// stripe.
+    ///
+    /// Category is the caller's taxonomy, not this component's: a graph of
+    /// sources, transforms and sinks and a graph of agents, tools and
+    /// approvals both need their kinds told apart at a glance, and neither
+    /// list belongs in a UI kit. It resolves through the shared
+    /// [`Variant::Light`] tier, so a teal node here and a teal chip elsewhere
+    /// are the same teal.
+    ///
+    /// This is deliberately separate from [`GraphNode::state`]. What a step
+    /// *is* does not change while it runs, and a node that changed colour on
+    /// failure would lose the identity a reader was using to find it.
+    pub fn color(mut self, category: impl Into<ColorChoice>) -> Self {
+        self.category = Some(category.into());
         self
     }
 
@@ -435,6 +463,22 @@ impl GraphNode {
 
     pub(crate) fn node_state(&self) -> NodeState {
         self.state
+    }
+
+    pub(crate) fn node_category(&self) -> Option<&ColorChoice> {
+        self.category.as_ref()
+    }
+
+    /// The one colour that stands for this node away from the card itself.
+    ///
+    /// An overview and a stripe answer the same question, so they resolve it
+    /// the same way: the category if the caller gave one, and otherwise how
+    /// the step is doing, which every node reports.
+    pub(crate) fn node_tint(&self, theme: &gpui_kit_theme::Theme) -> Hsla {
+        match self.node_category() {
+            Some(category) => theme.variant_colors(Variant::Light, category).text,
+            None => self.state.color(theme),
+        }
     }
 
     pub(crate) fn node_selected(&self) -> bool {
@@ -501,9 +545,16 @@ impl GraphNode {
     /// with three, and an edge that misses the card it joins is the one
     /// detail a reader will read as meaningful.
     pub(crate) fn measured_height(&self, theme: &gpui_kit_theme::Theme) -> f32 {
-        let mut rows = vec![theme.typography.label.line_height];
+        let header = theme.typography.label.line_height + theme.spacing.xs * 2.0;
+        if self.compact {
+            return header;
+        }
+        let mut rows = Vec::new();
         if self.thumbnail.is_some() {
-            rows.push((self.width - theme.spacing.sm * 2.0).max(0.0) / self.thumbnail_ratio);
+            // The stripe takes its width off the content before the padding
+            // does, so a picture measured here is the width one actually gets.
+            let content = self.width - theme.effects.rail_width - theme.spacing.sm * 2.0;
+            rows.push(content.max(0.0) / self.thumbnail_ratio);
         }
         if self.action.is_some() {
             rows.push(theme.typography.caption.line_height);
@@ -511,8 +562,11 @@ impl GraphNode {
         if !self.metrics.is_empty() || self.diff.is_some_and(|diff| !diff.is_empty()) {
             rows.push(theme.typography.caption.line_height);
         }
+        if rows.is_empty() {
+            return header;
+        }
         let gaps = theme.spacing.xs * (rows.len() - 1) as f32;
-        theme.spacing.sm * 2.0 + rows.iter().sum::<f32>() + gaps
+        header + theme.borders.hairline + theme.spacing.sm * 2.0 + rows.iter().sum::<f32>() + gaps
     }
 }
 
@@ -541,10 +595,27 @@ impl RenderOnce for GraphNode {
             }
         });
 
+        // A category resolves through the same tier vocabulary as every other
+        // coloured surface, so the wash behind a node's name and the wash
+        // behind a chip of that colour are one decision made once.
+        let identity = self
+            .category
+            .as_ref()
+            .map(|category| theme.variant_colors(Variant::Light, category));
+
+        // The band is what carries the node's identity, and it runs the full
+        // width of the card rather than sitting inside the padding: a tint
+        // that stops short of the edge reads as a highlighted row inside the
+        // node instead of as the node's own header.
         let header = div()
             .row()
             .w_full()
             .gap(px(metrics.gap))
+            .px(px(metrics.padding))
+            .py(px(metrics.header_padding))
+            .when_some(identity, |element, identity| {
+                element.bg(identity.background)
+            })
             .children(mark)
             .child(
                 div()
@@ -637,14 +708,50 @@ impl RenderOnce for GraphNode {
                 )
         });
 
+        // The body is a zone of its own rather than more rows under the title,
+        // so the header's tint has something to stop against. A node with
+        // nothing but a name has no body at all: an empty padded box below the
+        // title would claim there is content that failed to arrive.
+        let body = (!self.compact && (thumbnail.is_some() || action.is_some() || strip.is_some()))
+            .then(|| {
+                div()
+                    .w_full()
+                    .column()
+                    .gap(px(metrics.gap))
+                    .p(px(metrics.padding))
+                    .border_t(px(theme.borders.hairline))
+                    .border_color(theme.colors.hairline)
+                    .children(thumbnail)
+                    .children(action)
+                    .children(strip)
+            });
+
+        // The stripe runs the whole height rather than only beside the header,
+        // so a node that has scrolled until only its edge is visible still
+        // says what it is. Without a category it takes the hairline, which
+        // claims nothing: a stripe in a colour that means nothing is worse
+        // than no stripe, because a reader will look for the meaning.
+        let rail = div().flex_none().w(px(metrics.rail)).bg(identity
+            .map(|identity| identity.text)
+            .unwrap_or(theme.colors.hairline));
+
+        let stack = div()
+            .flex_1()
+            .min_w_0()
+            .column()
+            .child(header)
+            .children(body);
+
         let card = div()
             .w(px(metrics.width))
             .when_some(metrics.height, |element, height| element.h(px(height)))
-            .column()
+            // Not `row()`: that centres its children, and a stripe centred on
+            // its own zero content height is a stripe nobody can see.
+            .flex()
+            .flex_row()
             .font_fallbacks(gpui_kit_assets::text_fallbacks())
-            .gap(px(metrics.gap))
-            .p(px(metrics.padding))
             .rounded(px(metrics.radius))
+            .overflow_hidden()
             .frame(&theme, Surface::Raised, Elevation::Raised)
             // The state bleeds out of the card rather than being drawn round
             // it, so a running node and a failed one differ by the colour the
@@ -657,19 +764,29 @@ impl RenderOnce for GraphNode {
             // edge. It gets the accent all the way round instead, outward, so
             // it reads as the node being picked up rather than as a border the
             // node has always had.
+            //
+            // The ring stands off the card by a band of the card's own
+            // surface, and that gap is what carries the meaning rather than
+            // the hue: a node whose category is the accent colour would
+            // otherwise wear a ring indistinguishable from its own identity,
+            // and "selected" and "indigo" are not a distinction a reader
+            // should have to make by memory.
             .when(self.selected, |element| {
-                element.shadow(vec![gpui::BoxShadow {
-                    color: theme.colors.accent,
+                let gap = theme.effects.selection_rail_width * 0.6;
+                let ring = |spread: f32, color: Hsla| gpui::BoxShadow {
+                    color,
                     offset: gpui::point(px(0.0), px(0.0)),
                     blur_radius: px(0.0),
-                    spread_radius: px(theme.effects.selection_rail_width * 0.6),
+                    spread_radius: px(spread),
                     inset: false,
-                }])
+                };
+                element.shadow(vec![
+                    ring(gap * 2.0, theme.colors.accent),
+                    ring(gap, theme.colors.raised),
+                ])
             })
-            .child(header)
-            .when(!self.compact, |card| {
-                card.children(thumbnail).children(action).children(strip)
-            });
+            .child(rail)
+            .child(stack);
 
         // A node that takes a click is a button and a node that does not is a
         // group, so the role is decided before the spec is built rather than
@@ -866,8 +983,13 @@ mod tests {
         let thumbnail = GraphNode::new("picture", "Picture")
             .thumbnail(div())
             .measured_height(&theme);
-        let expected =
-            (NODE_WIDTH - theme.spacing.sm * 2.0) / DEFAULT_THUMBNAIL_RATIO + theme.spacing.xs;
+        // A node with nothing but a name is its header band alone. Giving it a
+        // picture opens the body zone, so it gains that zone's rule and
+        // padding as well as the picture itself.
+        let expected = theme.borders.hairline
+            + theme.spacing.sm * 2.0
+            + (NODE_WIDTH - theme.effects.rail_width - theme.spacing.sm * 2.0)
+                / DEFAULT_THUMBNAIL_RATIO;
         assert!((thumbnail - plain - expected).abs() < 0.001);
 
         let square = GraphNode::new("square", "Square")

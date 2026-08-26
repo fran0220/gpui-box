@@ -1,7 +1,7 @@
 //! Static edge data and orthogonal geometry for a node graph.
 
 use gpui::{Bounds, Hsla, PathBuilder, Pixels, Point, SharedString, Window, point, px};
-use gpui_kit_theme::Theme;
+use gpui_kit_theme::{Radius, Theme};
 
 /// The routing treatment of an edge.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -14,7 +14,7 @@ pub enum EdgeKind {
 impl EdgeKind {
     pub fn color(self, theme: &Theme) -> Hsla {
         match self {
-            Self::Flow => theme.colors.hairline_strong,
+            Self::Flow => theme.colors.node.edge,
             Self::Feedback => theme.colors.danger,
         }
     }
@@ -574,9 +574,10 @@ pub(crate) fn paint_route(
     phase: Option<f32>,
 ) {
     let active_color = match edge.kind {
-        EdgeKind::Flow => theme.colors.accent,
+        EdgeKind::Flow => theme.colors.node.edge_active,
         EdgeKind::Feedback => theme.colors.danger,
     };
+    let corner = route_corner(theme);
     if edge.active {
         paint_route_stroke(
             window,
@@ -585,6 +586,7 @@ pub(crate) fn paint_route(
             width * 5.0,
             active_color.opacity(0.14),
             edge.kind.dashes(),
+            corner,
         );
     }
     paint_route_stroke(
@@ -594,6 +596,7 @@ pub(crate) fn paint_route(
         width,
         edge.kind.color(theme),
         edge.kind.dashes(),
+        corner,
     );
     if edge.active {
         paint_route_stroke(
@@ -603,6 +606,7 @@ pub(crate) fn paint_route(
             width * 1.2,
             active_color.opacity(0.72),
             edge.kind.dashes(),
+            corner,
         );
         if let Some(phase) = phase {
             paint_comets(
@@ -612,9 +616,19 @@ pub(crate) fn paint_route(
                 width.max(1.0),
                 phase,
                 active_color,
+                corner,
             );
         }
     }
+}
+
+/// How far back from a turn a connection starts bending, in world units.
+///
+/// A connection takes the same corner as the cards it joins rather than a
+/// number of its own, so a graph does not hold two ideas about how sharp this
+/// interface is.
+pub(crate) fn route_corner(theme: &Theme) -> f32 {
+    theme.radius(Radius::Small)
 }
 
 /// Three phase-shifted traffic trails cut from the route's measured geometry.
@@ -627,6 +641,7 @@ fn paint_comets(
     width: f32,
     phase: f32,
     color: Hsla,
+    corner: f32,
 ) {
     const COMETS: usize = 3;
     const TAIL: f32 = 0.075;
@@ -635,10 +650,18 @@ fn paint_comets(
         let head = (phase + comet as f32 / COMETS as f32).rem_euclid(1.0);
         let tail = head - TAIL;
         if tail >= 0.0 {
-            paint_comet_interval(window, route, transform, width, tail, head, color);
+            paint_comet_interval(window, route, transform, width, (tail, head), color, corner);
         } else {
-            paint_comet_interval(window, route, transform, width, 0.0, head, color);
-            paint_comet_interval(window, route, transform, width, 1.0 + tail, 1.0, color);
+            paint_comet_interval(window, route, transform, width, (0.0, head), color, corner);
+            paint_comet_interval(
+                window,
+                route,
+                transform,
+                width,
+                (1.0 + tail, 1.0),
+                color,
+                corner,
+            );
         }
     }
 }
@@ -648,20 +671,84 @@ fn paint_comet_interval(
     route: &OrthogonalRoute,
     transform: RouteTransform,
     width: f32,
-    start: f32,
-    end: f32,
+    // `interval` is where the tail starts and ends along the route, as
+    // fractions of its measured length.
+    interval: (f32, f32),
     color: Hsla,
+    corner: f32,
 ) {
-    let Some(first) = route.points.first() else {
-        return;
-    };
-    let mut builder = PathBuilder::stroke(px(width * 1.9)).stroke_trim(start, end);
-    builder.move_to(transform.point(*first));
-    for point in &route.points[1..] {
-        builder.line_to(transform.point(*point));
-    }
+    let mut builder = PathBuilder::stroke(px(width * 1.9)).stroke_trim(interval.0, interval.1);
+    trace_route(&mut builder, route, transform, corner);
     if let Ok(path) = builder.build() {
         window.paint_path(path, color.opacity(0.82));
+    }
+}
+
+/// Feeds a route into a builder with its right angles rounded.
+///
+/// Both the stroke and the traffic tails trace through here, because a comet
+/// built from the raw vertices would cut the corner the stroke goes round and
+/// the two would separate at every turn.
+///
+/// A corner never takes more than half of either run it joins, so a short jog
+/// between two turns rounds to its own midpoint instead of overshooting into
+/// the segment beyond and folding the path back on itself.
+fn trace_route(
+    builder: &mut PathBuilder,
+    route: &OrthogonalRoute,
+    transform: RouteTransform,
+    corner: f32,
+) {
+    let points = &route.points;
+    let Some(first) = points.first() else {
+        return;
+    };
+    builder.move_to(transform.point(*first));
+    if !corner.is_finite() || corner <= 0.0 || points.len() < 3 {
+        for point in &points[1..] {
+            builder.line_to(transform.point(*point));
+        }
+        return;
+    }
+    for index in 1..points.len() - 1 {
+        let previous = points[index - 1];
+        let turn = points[index];
+        let next = points[index + 1];
+        let radius = corner_radius(previous, turn, next, corner);
+        if radius <= 0.0 {
+            builder.line_to(transform.point(turn));
+            continue;
+        }
+        builder.line_to(transform.point(step_towards(turn, previous, radius)));
+        builder.curve_to(
+            transform.point(step_towards(turn, next, radius)),
+            transform.point(turn),
+        );
+    }
+    if let Some(last) = points.last() {
+        builder.line_to(transform.point(*last));
+    }
+}
+
+/// How far back from one turn the bend may start.
+///
+/// Half of the shorter adjoining run is the ceiling, so two turns sharing a
+/// short jog each stop at its midpoint. Letting a bend take the whole run
+/// would put the leaving point of one corner beyond the entering point of the
+/// next, and the path would double back through itself.
+fn corner_radius(previous: Point<f32>, turn: Point<f32>, next: Point<f32>, corner: f32) -> f32 {
+    let arriving = (turn.x - previous.x).abs() + (turn.y - previous.y).abs();
+    let leaving = (next.x - turn.x).abs() + (next.y - turn.y).abs();
+    corner.min(arriving / 2.0).min(leaving / 2.0).max(0.0)
+}
+
+/// Moves `from` towards `towards` by `distance` along whichever axis
+/// separates them. A route is orthogonal, so exactly one axis ever differs.
+fn step_towards(from: Point<f32>, towards: Point<f32>, distance: f32) -> Point<f32> {
+    if from.x == towards.x {
+        point(from.x, from.y + (towards.y - from.y).signum() * distance)
+    } else {
+        point(from.x + (towards.x - from.x).signum() * distance, from.y)
     }
 }
 
@@ -672,18 +759,13 @@ pub(crate) fn paint_route_stroke(
     width: f32,
     color: Hsla,
     dashes: Option<[Pixels; 2]>,
+    corner: f32,
 ) {
-    let Some(first) = route.points.first() else {
-        return;
-    };
     let mut builder = PathBuilder::stroke(px(width));
     if let Some(dashes) = dashes {
         builder = builder.dash_array(&dashes);
     }
-    builder.move_to(transform.point(*first));
-    for point in &route.points[1..] {
-        builder.line_to(transform.point(*point));
-    }
+    trace_route(&mut builder, route, transform, corner);
     if let Ok(path) = builder.build() {
         window.paint_path(path, color);
     }
@@ -864,6 +946,40 @@ mod tests {
         assert_eq!(r.midpoint(), point(10.0, 10.0));
         assert_eq!(r.sample(2.0), point(10.0, 30.0));
     }
+    #[test]
+    fn a_bend_never_takes_more_than_half_the_run_it_leaves() {
+        // A long approach into a short jog: the jog, not the requested
+        // corner, decides how far the bend may reach.
+        let radius = corner_radius(point(0.0, 0.0), point(100.0, 0.0), point(100.0, 6.0), 8.0);
+        assert_eq!(radius, 3.0);
+
+        // With room on both sides the requested corner is what is used.
+        let radius = corner_radius(point(0.0, 0.0), point(100.0, 0.0), point(100.0, 90.0), 8.0);
+        assert_eq!(radius, 8.0);
+    }
+
+    #[test]
+    fn a_bend_at_a_turn_with_no_run_is_left_square() {
+        // Two turns on top of each other would otherwise ask for a negative
+        // reach and fold the path back through itself.
+        let radius = corner_radius(point(10.0, 10.0), point(10.0, 10.0), point(10.0, 40.0), 8.0);
+        assert_eq!(radius, 0.0);
+    }
+
+    #[test]
+    fn stepping_back_from_a_turn_stays_on_the_run() {
+        // Orthogonal by construction: exactly one axis moves, and it moves
+        // towards the neighbour rather than away from it.
+        assert_eq!(
+            step_towards(point(100.0, 40.0), point(100.0, 90.0), 8.0),
+            point(100.0, 48.0)
+        );
+        assert_eq!(
+            step_towards(point(100.0, 40.0), point(20.0, 40.0), 8.0),
+            point(92.0, 40.0)
+        );
+    }
+
     #[test]
     fn zero_length_is_safe_and_finite() {
         let r = OrthogonalRoute::new(vec![point(2.0, 3.0), point(2.0, 3.0)]);

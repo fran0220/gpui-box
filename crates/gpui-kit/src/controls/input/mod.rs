@@ -30,7 +30,7 @@ use std::ops::Range;
 use std::sync::{Arc, Mutex};
 
 use gpui::{
-    AccessibleAction, App, Bounds, ClipboardItem, Context, CursorStyle, EditableTextLayout,
+    AccessibleAction, App, Bounds, ClipboardItem, Context, CursorStyle, EditableTextLayout, Entity,
     EntityInputHandler, EventEmitter, FocusHandle, Focusable, InteractiveElement, IntoElement,
     KeyBinding, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement, Pixels,
     Point, Render, SharedString, StatefulInteractiveElement, Styled, Subscription, UTF16Selection,
@@ -43,6 +43,7 @@ use unicode_segmentation::UnicodeSegmentation;
 use crate::controls::field::{FieldState, field_shell};
 use crate::controls::text_edit;
 use crate::foundation::{ActiveDirection, Disableable, Ident, Sizable};
+use crate::reactive::Signal;
 use crate::strings::ActiveNumbers;
 use element::TextElement;
 
@@ -441,6 +442,42 @@ impl TextInput {
         self.accessibility_revision = self.accessibility_revision.wrapping_add(1);
         self.scroll_offset = px(0.0);
         cx.notify();
+    }
+
+    /// Keeps a field and a caller-owned [`Signal`] holding the same text.
+    ///
+    /// The field is seeded from the signal, typing writes the signal, and a
+    /// change to the signal writes the field. Neither direction fires when
+    /// the two already agree, which is what stops a value from travelling
+    /// round the loop and what keeps the caret where the typist left it.
+    ///
+    /// The subscriptions are the binding: the caller holds them for as long
+    /// as the field and the signal should stay together.
+    #[must_use]
+    pub fn bind(input: &Entity<Self>, signal: &Signal<String>, cx: &mut App) -> Vec<Subscription> {
+        let seed = signal.get(cx);
+        input.update(cx, |input, cx| input.set_text_quietly(seed, cx));
+
+        let to_signal = {
+            let signal = signal.clone();
+            cx.subscribe(input, move |_input, event, cx| {
+                if let TextInputEvent::Change(text) = event {
+                    signal.set(cx, text.to_string());
+                }
+            })
+        };
+        let to_input = {
+            let input = input.clone();
+            cx.observe(signal.entity(), move |value, cx| {
+                let text = value.read(cx).clone();
+                input.update(cx, |input, cx| {
+                    if input.value().as_ref() != text.as_str() {
+                        input.set_text_quietly(text, cx);
+                    }
+                });
+            })
+        };
+        vec![to_signal, to_input]
     }
 
     pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {

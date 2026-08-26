@@ -520,7 +520,9 @@
         "warning() -> Self",
         "danger() -> Self",
         "info() -> Self",
-        "tint(tint: Hsla) -> Self"
+        "tint(tint: Hsla) -> Self",
+        "variant(variant: Variant) -> Self",
+        "color(color: impl Into<ColorChoice>) -> Self"
       ],
       "commands": [],
       "queries": [],
@@ -692,7 +694,8 @@
         "semantic_parent(parent: impl Into<SharedString>) -> Self",
         "icon(glyph: Icon) -> Self",
         "icon_position(position: IconPosition) -> Self",
-        "variant(variant: ButtonVariant) -> Self",
+        "variant(variant: impl Into<ButtonStyle>) -> Self",
+        "color(color: impl Into<ColorChoice>) -> Self",
         "primary() -> Self",
         "secondary() -> Self",
         "ghost() -> Self",
@@ -929,7 +932,8 @@
         "description(description: impl Into<SharedString>) -> Self",
         "checked(checked: bool) -> Self",
         "mixed() -> Self",
-        "on_change(handler: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self"
+        "on_change(handler: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self",
+        "bind(binding: &Binding<bool>, cx: &App) -> Self"
       ],
       "commands": [],
       "queries": [],
@@ -1939,6 +1943,7 @@
         "thumbnail_ratio(ratio: f32) -> Self",
         "action(action: impl Into<SharedString>) -> Self",
         "state(state: NodeState) -> Self",
+        "color(category: impl Into<ColorChoice>) -> Self",
         "metric(label: impl Into<SharedString>, value: impl Into<SharedString>) -> Self",
         "metrics(metrics: impl IntoIterator<Item = NodeMetric>) -> Self",
         "port(port: GraphPort) -> Self",
@@ -2091,7 +2096,8 @@
         "new(ident: impl Into<Ident>, glyph: Icon, name: impl Into<SharedString>) -> Self"
       ],
       "options": [
-        "variant(variant: ButtonVariant) -> Self",
+        "variant(variant: impl Into<ButtonStyle>) -> Self",
+        "color(color: impl Into<ColorChoice>) -> Self",
         "primary() -> Self",
         "secondary() -> Self",
         "ghost() -> Self",
@@ -2822,7 +2828,8 @@
       "source": "crates/gpui-kit/src/controls/number_input.rs",
       "summary": "A number field with a step grid and, optionally, a range.",
       "construct": [
-        "new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self"
+        "new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self",
+        "bind(field: &Entity<Self>, signal: &Signal<f64>, cx: &mut App) -> Vec<Subscription>"
       ],
       "options": [
         "value(value: f64) -> Self",
@@ -3083,7 +3090,8 @@
       "source": "crates/gpui-kit/src/controls/auth.rs",
       "summary": "One sensitive password editor with a visual reveal action.",
       "construct": [
-        "new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self"
+        "new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self",
+        "bind(field: &Entity<Self>, signal: &Signal<String>, cx: &mut App) -> Vec<Subscription>"
       ],
       "options": [
         "placeholder(placeholder: impl Into<SharedString>) -> Self",
@@ -3392,7 +3400,8 @@
       "options": [
         "label(label: impl Into<SharedString>) -> Self",
         "description(description: impl Into<SharedString>) -> Self",
-        "on_select(handler: impl Fn(&mut Window, &mut App) + 'static) -> Self"
+        "on_select(handler: impl Fn(&mut Window, &mut App) + 'static) -> Self",
+        "bind_value<T>(binding: &Binding<T>, value: T, cx: &App) -> Self where T: Clone + PartialEq + 'static,"
       ],
       "commands": [],
       "queries": [],
@@ -3726,7 +3735,8 @@
         "label(label: impl Into<SharedString>) -> Self",
         "segments(segments: impl IntoIterator<Item = Segment>) -> Self",
         "selected(id: impl Into<SharedString>) -> Self",
-        "on_select(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self"
+        "on_select(handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self",
+        "bind(binding: &Binding<SharedString>, cx: &App) -> Self"
       ],
       "commands": [],
       "queries": [],
@@ -3743,7 +3753,8 @@
       "source": "crates/gpui-kit/src/controls/select.rs",
       "summary": "A closed list of options with one answer.",
       "construct": [
-        "new(ident: impl Into<Ident>, _window: &mut Window, cx: &mut Context<Self>) -> Self"
+        "new(ident: impl Into<Ident>, _window: &mut Window, cx: &mut Context<Self>) -> Self",
+        "bind(select: &Entity<Self>, signal: &Signal<Option<SharedString>>, cx: &mut App) -> Vec<Subscription>"
       ],
       "options": [
         "options(options: impl IntoIterator<Item = SelectOption>) -> Self",
@@ -3945,6 +3956,7 @@
         "step(step: f32) -> Self",
         "display(display: impl Into<SharedString>) -> Self",
         "on_change(handler: impl Fn(f32, &mut Window, &mut App) + 'static) -> Self",
+        "bind(binding: &Binding<f32>, cx: &App) -> Self",
         "high(high: f32) -> Self",
         "values(low: f32, high: f32) -> Self",
         "marks(marks: impl IntoIterator<Item = f32>) -> Self",
@@ -4340,7 +4352,8 @@
         "named(name: impl Into<SharedString>) -> Self",
         "on(on: bool) -> Self",
         "invalid(invalid: bool) -> Self",
-        "on_change(handler: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self"
+        "on_change(handler: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self",
+        "bind(binding: &Binding<bool>, cx: &App) -> Self"
       ],
       "commands": [],
       "queries": [],
@@ -4432,6 +4445,8 @@
       "options": [
         "tone(tone: Tone) -> Self",
         "tint(tint: Hsla) -> Self",
+        "variant(variant: Variant) -> Self",
+        "color(color: impl Into<ColorChoice>) -> Self",
         "on_remove(handler: impl Fn(&mut Window, &mut App) + 'static) -> Self"
       ],
       "commands": [],
@@ -4449,7 +4464,8 @@
       "source": "crates/gpui-kit/src/controls/tag_input.rs",
       "summary": "A field that collects a set of short tokens.",
       "construct": [
-        "new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self"
+        "new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self",
+        "bind(field: &Entity<Self>, signal: &Signal<Vec<SharedString>>, cx: &mut App) -> Vec<Subscription>"
       ],
       "options": [
         "tags(tags: impl IntoIterator<Item = impl Into<SharedString>>) -> Self",
@@ -4524,7 +4540,8 @@
       "summary": "Wrapped, multi-line editable text.",
       "construct": [
         "new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self",
-        "detached(ident: impl Into<Ident>, cx: &mut Context<Self>) -> Self"
+        "detached(ident: impl Into<Ident>, cx: &mut Context<Self>) -> Self",
+        "bind(area: &Entity<Self>, signal: &Signal<String>, cx: &mut App) -> Vec<Subscription>"
       ],
       "options": [
         "placeholder(placeholder: impl Into<SharedString>) -> Self",
@@ -4590,7 +4607,8 @@
       "source": "crates/gpui-kit/src/controls/input/mod.rs",
       "summary": "One line of editable text.",
       "construct": [
-        "new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self"
+        "new(ident: impl Into<Ident>, window: &mut Window, cx: &mut Context<Self>) -> Self",
+        "bind(input: &Entity<Self>, signal: &Signal<String>, cx: &mut App) -> Vec<Subscription>"
       ],
       "options": [
         "placeholder(placeholder: impl Into<SharedString>) -> Self",
@@ -4761,7 +4779,8 @@
         "join(join: ButtonJoin) -> Self",
         "semantic_parent(parent: impl Into<SharedString>) -> Self",
         "track_focus(handle: &FocusHandle) -> Self",
-        "on_press(handler: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self"
+        "on_press(handler: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self",
+        "bind(binding: &Binding<bool>, cx: &App) -> Self"
       ],
       "commands": [],
       "queries": [],
@@ -4787,7 +4806,8 @@
         "pressed(ids: impl IntoIterator<Item = SharedString>) -> Self",
         "pressed_ids<S: AsRef<str>>(ids: &[S]) -> Self",
         "variant(variant: ButtonVariant) -> Self",
-        "on_change(handler: impl Fn(Vec<SharedString>, SharedString, &mut Window, &mut App) + 'static) -> Self"
+        "on_change(handler: impl Fn(Vec<SharedString>, SharedString, &mut Window, &mut App) + 'static) -> Self",
+        "bind(binding: &Binding<Vec<SharedString>>, cx: &App) -> Self"
       ],
       "commands": [],
       "queries": [],
@@ -5725,6 +5745,39 @@
       ]
     },
     {
+      "name": "Animator",
+      "path": "gpui_kit::motion::Animator",
+      "summary": "A scrubbable playhead over a run of a known length.",
+      "variants": [],
+      "construct": [
+        "new(duration: Duration) -> Self",
+        "over(theme: &Theme, motion: &Motion) -> Self",
+        "across(sequence: &Sequence) -> Self"
+      ],
+      "options": [
+        "duration() -> Duration",
+        "speed() -> f32",
+        "is_reversed() -> bool",
+        "is_playing() -> bool",
+        "head(now: Instant) -> f32",
+        "running(now: Instant) -> bool",
+        "finished(now: Instant) -> bool",
+        "elapsed(now: Instant) -> Duration",
+        "sample(theme: &Theme, motion: &Motion, now: Instant) -> MotionSample"
+      ],
+      "commands": [
+        "play(now: Instant)",
+        "pause(now: Instant)",
+        "toggle(now: Instant)",
+        "reverse(now: Instant)",
+        "scrub(now: Instant, head: f32)",
+        "set_speed(now: Instant, speed: f32)",
+        "finish()",
+        "rewind()"
+      ],
+      "queries": []
+    },
+    {
       "name": "AnsiRun",
       "path": "gpui_kit::content::AnsiRun",
       "summary": "One coloured run of the stripped text.",
@@ -5943,6 +5996,22 @@
       "queries": []
     },
     {
+      "name": "Binding",
+      "path": "gpui_kit::reactive::Binding",
+      "summary": "A read and a write of one value, without saying where the value lives.",
+      "variants": [],
+      "construct": [
+        "new(get: impl Fn(&App) -> T + 'static, set: impl Fn(T, &mut App) + 'static) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "get(cx: &App) -> T",
+        "set(cx: &mut App, value: T)",
+        "map<U: 'static>(from: impl Fn(&T) -> U + 'static, into: impl Fn(&mut T, U) + 'static) -> Binding<U>"
+      ]
+    },
+    {
       "name": "Block",
       "path": "gpui_kit::content::Block",
       "summary": "One block of a document.",
@@ -6050,6 +6119,19 @@
         "Leading",
         "Middle",
         "Trailing"
+      ],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "ButtonStyle",
+      "path": "gpui_kit::controls::ButtonStyle",
+      "summary": "Either presentation vocabulary a button accepts.",
+      "variants": [
+        "Weight",
+        "Tier"
       ],
       "construct": [],
       "options": [],
@@ -8117,6 +8199,49 @@
       ]
     },
     {
+      "name": "Form",
+      "path": "gpui_kit::reactive::Form",
+      "summary": "A set of named text fields and the rules that judge them.",
+      "variants": [],
+      "construct": [
+        "new() -> Self"
+      ],
+      "options": [
+        "field(cx: &mut App, name: impl Into<SharedString>, initial: impl Into<String>) -> Self",
+        "rule(name: &str, rule: impl Fn(&str, &FormValues, &App) -> Result<(), SharedString> + 'static) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "names() -> Vec<SharedString>",
+        "signal(name: &str) -> Option<Signal<String>>",
+        "validation_signal(name: &str) -> Option<Signal<ValidationState>>",
+        "validation(name: &str, cx: &App) -> ValidationState",
+        "set_validation(cx: &mut App, name: &str, state: ValidationState)",
+        "values(cx: &App) -> FormValues",
+        "validate(cx: &mut App) -> bool",
+        "submit(cx: &mut App) -> Option<BTreeMap<String, String>>",
+        "watch<V: 'static>(cx: &mut Context<V>) -> Vec<Subscription>"
+      ]
+    },
+    {
+      "name": "FormValues",
+      "path": "gpui_kit::reactive::FormValues",
+      "summary": "Every field's current text, by name.",
+      "variants": [],
+      "construct": [],
+      "options": [
+        "into_map() -> BTreeMap<String, String>"
+      ],
+      "commands": [],
+      "queries": [
+        "get(name: &str) -> Option<&str>",
+        "value(name: &str) -> &str",
+        "names() -> impl Iterator<Item = &SharedString>",
+        "len() -> usize",
+        "is_empty() -> bool"
+      ]
+    },
+    {
       "name": "Frame",
       "path": "gpui_kit::controls::Frame",
       "summary": "Who draws the frame the text sits in.",
@@ -9779,6 +9904,65 @@
       "variants": [],
       "construct": [],
       "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "Motion",
+      "path": "gpui_kit::motion::Motion",
+      "summary": "A motion written as what moves rather than as a closure that moves it.",
+      "variants": [],
+      "construct": [
+        "new(duration_ms: u64) -> Self"
+      ],
+      "options": [
+        "duration(duration_ms: u64) -> Self",
+        "delay(delay_ms: u64) -> Self",
+        "eased(easing: impl Into<Easing>) -> Self",
+        "alternating() -> Self",
+        "tween(property: MotionProperty, from: f32, to: f32) -> Self",
+        "track(property: MotionProperty, stops: impl IntoIterator<Item = (f32, f32)>) -> Self"
+      ],
+      "commands": [],
+      "queries": [
+        "duration_ms() -> u64",
+        "delay_ms() -> u64",
+        "easing() -> Easing",
+        "is_alternating() -> bool",
+        "properties() -> Vec<MotionProperty>",
+        "spec(theme: &Theme) -> MotionSpec",
+        "progress(theme: &Theme, raw: f32) -> f32",
+        "sample(theme: &Theme, raw: f32) -> MotionSample"
+      ]
+    },
+    {
+      "name": "MotionProperty",
+      "path": "gpui_kit::motion::MotionProperty",
+      "summary": "A property a described motion can move.",
+      "variants": [
+        "Opacity",
+        "X",
+        "Y",
+        "Scale"
+      ],
+      "construct": [],
+      "options": [
+        "name() -> &'static str",
+        "neutral() -> f32"
+      ],
+      "commands": [],
+      "queries": []
+    },
+    {
+      "name": "MotionSample",
+      "path": "gpui_kit::motion::MotionSample",
+      "summary": "Where a described motion has got to: one value per property, ready to be applied to an element.",
+      "variants": [],
+      "construct": [],
+      "options": [
+        "get(property: MotionProperty) -> f32",
+        "apply<E: Styled + IntoElement>(element: E) -> E"
+      ],
       "commands": [],
       "queries": []
     },
@@ -11749,6 +11933,29 @@
       "queries": []
     },
     {
+      "name": "Signal",
+      "path": "gpui_kit::reactive::Signal",
+      "summary": "One caller-owned value that anything watching it is told about.",
+      "variants": [],
+      "construct": [
+        "new(cx: &mut App, value: T) -> Self",
+        "from_entity(entity: Entity<T>) -> Self",
+        "read<'a>(&'a self, cx: &'a App) -> &'a T"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": [
+        "entity() -> &Entity<T>",
+        "get(cx: &App) -> T where T: Clone,",
+        "update(cx: &mut App, change: impl FnOnce(&mut T))",
+        "replace(cx: &mut App, value: T)",
+        "set(cx: &mut App, value: T) where T: PartialEq,",
+        "watch<V: 'static>(cx: &mut Context<V>) -> Subscription",
+        "binding() -> Binding<T>",
+        "lens<F>(get: impl Fn(&T) -> &F + 'static, set: impl Fn(&mut T, F) + 'static) -> Binding<F> where F: Clone + PartialEq + 'static,"
+      ]
+    },
+    {
       "name": "SkeletonShape",
       "path": "gpui_kit::display::SkeletonShape",
       "summary": "One placeholder a skeleton can draw.",
@@ -13174,7 +13381,7 @@
       "uses": [
         "Button"
       ],
-      "example": "fn button(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(caption(&theme, \"how much weight the action carries\"))\n        .child(\n            row(&theme)\n                .child(\n                    Button::new(\"scene.button.primary\")\n                        .label(\"Primary\")\n                        .primary()\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    Button::new(\"scene.button.secondary\")\n                        .label(\"Secondary\")\n                        .secondary()\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    Button::new(\"scene.button.ghost\")\n                        .label(\"Ghost\")\n                        .ghost()\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    Button::new(\"scene.button.danger\")\n                        .label(\"Delete\")\n                        .danger()\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    Button::new(\"scene.button.link\")\n                        .label(\"Learn more\")\n                        .link()\n                        .on_click(|_, _| {}),\n                ),\n        )\n        .child(caption(\n            &theme,\n            \"refused is not in flight, and neither is the current answer\",\n        ))\n        .child(\n            row(&theme)\n                .child(\n                    Button::new(\"scene.button.disabled\")\n                        .label(\"Unavailable\")\n                        .primary()\n                        .disabled(true)\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    Button::new(\"scene.button.loading\")\n                        .label(\"Saving\")\n                        .primary()\n                        .loading(true)\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    Button::new(\"scene.button.selected\")\n                        .label(\"Selected\")\n                        .secondary()\n                        .selected(true)\n                        .on_click(|_, _| {}),\n                ),\n        )\n        .child(caption(&theme, \"the control scale, smallest to largest\"))\n        .child(\n            row(&theme)\n                .child(Button::new(\"scene.button.xs\").label(\"Extra small\").xs())\n                .child(Button::new(\"scene.button.sm\").label(\"Small\").small())\n                .child(Button::new(\"scene.button.md\").label(\"Medium\").medium())\n                .child(Button::new(\"scene.button.lg\").label(\"Large\").large()),\n        )\n        .into_any_element()\n}"
+      "example": "fn button(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(caption(&theme, \"how much weight the action carries\"))\n        .child(\n            row(&theme)\n                .child(\n                    Button::new(\"scene.button.primary\")\n                        .label(\"Primary\")\n                        .primary()\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    Button::new(\"scene.button.secondary\")\n                        .label(\"Secondary\")\n                        .secondary()\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    Button::new(\"scene.button.ghost\")\n                        .label(\"Ghost\")\n                        .ghost()\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    Button::new(\"scene.button.danger\")\n                        .label(\"Delete\")\n                        .danger()\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    Button::new(\"scene.button.link\")\n                        .label(\"Learn more\")\n                        .link()\n                        .on_click(|_, _| {}),\n                ),\n        )\n        .child(caption(\n            &theme,\n            \"refused is not in flight, and neither is the current answer\",\n        ))\n        .child(\n            row(&theme)\n                .child(\n                    Button::new(\"scene.button.disabled\")\n                        .label(\"Unavailable\")\n                        .primary()\n                        .disabled(true)\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    Button::new(\"scene.button.loading\")\n                        .label(\"Saving\")\n                        .primary()\n                        .loading(true)\n                        .on_click(|_, _| {}),\n                )\n                .child(\n                    Button::new(\"scene.button.selected\")\n                        .label(\"Selected\")\n                        .secondary()\n                        .selected(true)\n                        .on_click(|_, _| {}),\n                ),\n        )\n        .child(caption(&theme, \"the control scale, smallest to largest\"))\n        .child(\n            row(&theme)\n                .child(Button::new(\"scene.button.xs\").label(\"Extra small\").xs())\n                .child(Button::new(\"scene.button.sm\").label(\"Small\").small())\n                .child(Button::new(\"scene.button.md\").label(\"Medium\").medium())\n                .child(Button::new(\"scene.button.lg\").label(\"Large\").large()),\n        )\n        .child(caption(\n            &theme,\n            \"the shared tiers, resolved against a palette colour\",\n        ))\n        .children([\"indigo\", \"teal\", \"red\"].map(|group| {\n            row(&theme).children(\n                [\n                    Variant::Filled,\n                    Variant::Light,\n                    Variant::Outline,\n                    Variant::Subtle,\n                    Variant::Default,\n                    Variant::Transparent,\n                ]\n                .map(|tier| {\n                    Button::new(format!(\"scene.button.{group}.{}\", tier.name()))\n                        .label(tier.name())\n                        .variant(tier)\n                        .color(SharedString::from(group))\n                        .on_click(|_, _| {})\n                }),\n            )\n        }))\n        .into_any_element()\n}"
     },
     {
       "name": "badge",
@@ -13186,7 +13393,7 @@
       "uses": [
         "Badge"
       ],
-      "example": "fn badge(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(560.0))\n        .child(caption(&theme, \"Tones, which report rather than decorate\"))\n        .child(\n            row(&theme)\n                .child(Badge::new(\"Neutral\").neutral().id(\"scene.badge.neutral\"))\n                .child(Badge::new(\"Accent\").accent().id(\"scene.badge.accent\"))\n                .child(Badge::new(\"Success\").success().id(\"scene.badge.success\"))\n                .child(Badge::new(\"Warning\").warning().id(\"scene.badge.warning\"))\n                .child(Badge::new(\"Danger\").danger().id(\"scene.badge.danger\"))\n                .child(Badge::new(\"Info\").info().id(\"scene.badge.info\")),\n        )\n        .child(caption(\n            &theme,\n            \"A glyph or a mark, for a badge whose claim has a picture\",\n        ))\n        .child(\n            row(&theme)\n                .child(\n                    Badge::new(\"Passed\")\n                        .success()\n                        .icon(Icon::Check)\n                        .id(\"scene.badge.icon\"),\n                )\n                .child(Badge::new(\"Live\").success().dot(true).id(\"scene.badge.dot\"))\n                .child(\n                    Badge::new(\"Refused\")\n                        .danger()\n                        .icon(Icon::CloseCircle)\n                        .id(\"scene.badge.refused\"),\n                ),\n        )\n        .child(caption(\n            &theme,\n            \"Outlined, for a badge landing on a surface that is already washed\",\n        ))\n        .child(\n            row(&theme)\n                .child(\n                    Badge::new(\"Warning\")\n                        .warning()\n                        .outlined(true)\n                        .id(\"scene.badge.outlined-warning\"),\n                )\n                .child(\n                    Badge::new(\"Neutral\")\n                        .outlined(true)\n                        .id(\"scene.badge.outlined-neutral\"),\n                ),\n        )\n        .child(caption(&theme, \"The size ramp\"))\n        .child(\n            row(&theme)\n                .child(Badge::new(\"Extra small\").xs().id(\"scene.badge.xs\"))\n                .child(Badge::new(\"Small\").small().id(\"scene.badge.sm\"))\n                .child(Badge::new(\"Medium\").medium().id(\"scene.badge.md\"))\n                .child(Badge::new(\"Large\").large().id(\"scene.badge.lg\")),\n        )\n        // A tint says whose the badge is. The colours come from the theme's\n        // own palette rather than from literals, so a retinted document\n        // retints these too, and the tone underneath still reports itself.\n        .child(caption(\n            &theme,\n            \"An identity tint, which says whose and not how it is going\",\n        ))\n        .child(\n            row(&theme)\n                .child(\n                    Badge::new(\"Ada\")\n                        .tint(identity_tint(&theme, \"agent.external\"))\n                        .id(\"scene.badge.tinted-neutral\"),\n                )\n                .child(\n                    Badge::new(\"Grace\")\n                        .tint(identity_tint(&theme, \"agent.shell\"))\n                        .warning()\n                        .id(\"scene.badge.tinted-warning\"),\n                ),\n        )\n        .into_any_element()\n}"
+      "example": "fn badge(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(560.0))\n        .child(caption(&theme, \"Tones, which report rather than decorate\"))\n        .child(\n            row(&theme)\n                .child(Badge::new(\"Neutral\").neutral().id(\"scene.badge.neutral\"))\n                .child(Badge::new(\"Accent\").accent().id(\"scene.badge.accent\"))\n                .child(Badge::new(\"Success\").success().id(\"scene.badge.success\"))\n                .child(Badge::new(\"Warning\").warning().id(\"scene.badge.warning\"))\n                .child(Badge::new(\"Danger\").danger().id(\"scene.badge.danger\"))\n                .child(Badge::new(\"Info\").info().id(\"scene.badge.info\")),\n        )\n        .child(caption(\n            &theme,\n            \"A glyph or a mark, for a badge whose claim has a picture\",\n        ))\n        .child(\n            row(&theme)\n                .child(\n                    Badge::new(\"Passed\")\n                        .success()\n                        .icon(Icon::Check)\n                        .id(\"scene.badge.icon\"),\n                )\n                .child(Badge::new(\"Live\").success().dot(true).id(\"scene.badge.dot\"))\n                .child(\n                    Badge::new(\"Refused\")\n                        .danger()\n                        .icon(Icon::CloseCircle)\n                        .id(\"scene.badge.refused\"),\n                ),\n        )\n        .child(caption(\n            &theme,\n            \"Outlined, for a badge landing on a surface that is already washed\",\n        ))\n        .child(\n            row(&theme)\n                .child(\n                    Badge::new(\"Warning\")\n                        .warning()\n                        .outlined(true)\n                        .id(\"scene.badge.outlined-warning\"),\n                )\n                .child(\n                    Badge::new(\"Neutral\")\n                        .outlined(true)\n                        .id(\"scene.badge.outlined-neutral\"),\n                ),\n        )\n        .child(caption(&theme, \"The size ramp\"))\n        .child(\n            row(&theme)\n                .child(Badge::new(\"Extra small\").xs().id(\"scene.badge.xs\"))\n                .child(Badge::new(\"Small\").small().id(\"scene.badge.sm\"))\n                .child(Badge::new(\"Medium\").medium().id(\"scene.badge.md\"))\n                .child(Badge::new(\"Large\").large().id(\"scene.badge.lg\")),\n        )\n        // A tint says whose the badge is. The colours come from the theme's\n        // own palette rather than from literals, so a retinted document\n        // retints these too, and the tone underneath still reports itself.\n        .child(caption(\n            &theme,\n            \"An identity tint, which says whose and not how it is going\",\n        ))\n        .child(\n            row(&theme)\n                .child(\n                    Badge::new(\"Ada\")\n                        .tint(identity_tint(&theme, \"agent.external\"))\n                        .id(\"scene.badge.tinted-neutral\"),\n                )\n                .child(\n                    Badge::new(\"Grace\")\n                        .tint(identity_tint(&theme, \"agent.shell\"))\n                        .warning()\n                        .id(\"scene.badge.tinted-warning\"),\n                ),\n        )\n        .child(caption(\n            &theme,\n            \"The shared tiers, resolved against a palette colour\",\n        ))\n        .children([\"grape\", \"cyan\"].map(|group| {\n            row(&theme).children(\n                [\n                    Variant::Filled,\n                    Variant::Light,\n                    Variant::Outline,\n                    Variant::Subtle,\n                ]\n                .map(|tier| {\n                    Badge::new(tier.name())\n                        .variant(tier)\n                        .color(SharedString::from(group))\n                        .id(format!(\"scene.badge.{group}.{}\", tier.name()))\n                }),\n            )\n        }))\n        .into_any_element()\n}"
     },
     {
       "name": "card",
@@ -13476,7 +13683,7 @@
       "uses": [
         "Tag"
       ],
-      "example": "fn tag(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(caption(&theme, \"Tones, which report rather than decorate\"))\n        .child(\n            row(&theme)\n                .child(Tag::new(\"scene.tag.rust\", \"rust\").on_remove(|_, _| {}))\n                .child(\n                    Tag::new(\"scene.tag.failing\", \"failing\")\n                        .tone(Tone::Danger)\n                        .on_remove(|_, _| {}),\n                )\n                .child(\n                    Tag::new(\"scene.tag.passing\", \"passing\")\n                        .tone(Tone::Success)\n                        .on_remove(|_, _| {}),\n                )\n                .child(\n                    Tag::new(\"scene.tag.review\", \"needs review\")\n                        .tone(Tone::Warning)\n                        .on_remove(|_, _| {}),\n                ),\n        )\n        .child(caption(\n            &theme,\n            \"An identity tint, which is a fact about who and not about severity\",\n        ))\n        .child(\n            row(&theme)\n                .child(\n                    Tag::new(\"scene.tag.ada\", \"Ada\")\n                        .tint(identity_tint(&theme, \"agent.external\"))\n                        .on_remove(|_, _| {}),\n                )\n                .child(\n                    Tag::new(\"scene.tag.grace\", \"Grace\")\n                        .tint(identity_tint(&theme, \"agent.shell\"))\n                        .on_remove(|_, _| {}),\n                ),\n        )\n        .child(caption(\n            &theme,\n            \"Read-only: nothing offers to remove it, because no handler was given\",\n        ))\n        .child(row(&theme).child(Tag::new(\"scene.tag.plain\", \"read-only\")))\n        .child(caption(\n            &theme,\n            \"Disabled: the host refuses to act on it at all, and it dims to say so\",\n        ))\n        .child(\n            row(&theme).child(\n                Tag::new(\"scene.tag.pinned\", \"pinned\")\n                    .disabled(true)\n                    .on_remove(|_, _| {}),\n            ),\n        )\n        .child(caption(\n            &theme,\n            \"Singled out by the keyboard, which is what the next keystroke acts on\",\n        ))\n        .child(\n            row(&theme).child(\n                Tag::new(\"scene.tag.selected\", \"selected\")\n                    .selected(true)\n                    .on_remove(|_, _| {}),\n            ),\n        )\n        .into_any_element()\n}"
+      "example": "fn tag(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(caption(&theme, \"Tones, which report rather than decorate\"))\n        .child(\n            row(&theme)\n                .child(Tag::new(\"scene.tag.rust\", \"rust\").on_remove(|_, _| {}))\n                .child(\n                    Tag::new(\"scene.tag.failing\", \"failing\")\n                        .tone(Tone::Danger)\n                        .on_remove(|_, _| {}),\n                )\n                .child(\n                    Tag::new(\"scene.tag.passing\", \"passing\")\n                        .tone(Tone::Success)\n                        .on_remove(|_, _| {}),\n                )\n                .child(\n                    Tag::new(\"scene.tag.review\", \"needs review\")\n                        .tone(Tone::Warning)\n                        .on_remove(|_, _| {}),\n                ),\n        )\n        .child(caption(\n            &theme,\n            \"An identity tint, which is a fact about who and not about severity\",\n        ))\n        .child(\n            row(&theme)\n                .child(\n                    Tag::new(\"scene.tag.ada\", \"Ada\")\n                        .tint(identity_tint(&theme, \"agent.external\"))\n                        .on_remove(|_, _| {}),\n                )\n                .child(\n                    Tag::new(\"scene.tag.grace\", \"Grace\")\n                        .tint(identity_tint(&theme, \"agent.shell\"))\n                        .on_remove(|_, _| {}),\n                ),\n        )\n        .child(caption(\n            &theme,\n            \"Read-only: nothing offers to remove it, because no handler was given\",\n        ))\n        .child(row(&theme).child(Tag::new(\"scene.tag.plain\", \"read-only\")))\n        .child(caption(\n            &theme,\n            \"Disabled: the host refuses to act on it at all, and it dims to say so\",\n        ))\n        .child(\n            row(&theme).child(\n                Tag::new(\"scene.tag.pinned\", \"pinned\")\n                    .disabled(true)\n                    .on_remove(|_, _| {}),\n            ),\n        )\n        .child(caption(\n            &theme,\n            \"Singled out by the keyboard, which is what the next keystroke acts on\",\n        ))\n        .child(\n            row(&theme).child(\n                Tag::new(\"scene.tag.selected\", \"selected\")\n                    .selected(true)\n                    .on_remove(|_, _| {}),\n            ),\n        )\n        .child(caption(\n            &theme,\n            \"The shared tiers, resolved against a palette colour\",\n        ))\n        .child(\n            row(&theme).children(\n                [\n                    Variant::Filled,\n                    Variant::Light,\n                    Variant::Outline,\n                    Variant::Subtle,\n                ]\n                .map(|tier| {\n                    Tag::new(format!(\"scene.tag.lime.{}\", tier.name()), tier.name())\n                        .variant(tier)\n                        .color(\"lime\")\n                        .on_remove(|_, _| {})\n                }),\n            ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "avatar",
@@ -14415,7 +14622,7 @@
         "GraphNode",
         "NodeGraph"
       ],
-      "example": "fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneGraph>() {\n        cx.set_global(SceneGraph {\n            viewport: GraphViewport::default(),\n            ingest: gpui::point(24.0, 190.0),\n            validate: gpui::point(244.0, 40.0),\n            persist: gpui::point(492.0, 40.0),\n            observe: gpui::point(452.0, 300.0),\n            publish: gpui::point(648.0, 190.0),\n            selected: vec![\"scene.graph.validate\".into()],\n            deleted: Vec::new(),\n            edges: vec![\n                GraphEdge::new(\"scene.graph.ingest\", \"scene.graph.validate\")\n                    .id(\"scene.graph.edge.rows\")\n                    .ports(\"rows\", \"records\")\n                    .label(\"12.4k rows\")\n                    .active(true),\n                GraphEdge::new(\"scene.graph.validate\", \"scene.graph.persist\")\n                    .id(\"scene.graph.edge.valid\")\n                    .ports(\"valid\", \"records\")\n                    .active(true),\n                GraphEdge::new(\"scene.graph.validate\", \"scene.graph.observe\")\n                    .id(\"scene.graph.edge.telemetry\")\n                    .ports(\"telemetry\", \"events\")\n                    .label(\"telemetry\")\n                    .lane(-1),\n                GraphEdge::new(\"scene.graph.persist\", \"scene.graph.publish\")\n                    .id(\"scene.graph.edge.commit\")\n                    .ports(\"commit\", \"artifact\")\n                    .label(\"commit 8f72\")\n                    .active(true),\n                GraphEdge::new(\"scene.graph.observe\", \"scene.graph.validate\")\n                    .id(\"scene.graph.edge.retry\")\n                    .ports(\"retry\", \"retry\")\n                    .label(\"retry policy\")\n                    .lane(1)\n                    .feedback(),\n            ],\n        });\n    }\n    let scene = cx.global::<SceneGraph>();\n    let viewport = scene.viewport;\n    let ingest = scene.ingest;\n    let validate = scene.validate;\n    let persist = scene.persist;\n    let observe = scene.observe;\n    let publish = scene.publish;\n    let selected = scene.selected.clone();\n    let deleted = scene.deleted.clone();\n    let edges = scene.edges.clone();\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(\n            div().w(px(860.0)).h(px(470.0)).child(\n                NodeGraph::new(\"scene.graph\")\n                    .viewport(viewport)\n                    .zoom_range(0.55, 1.8)\n                    .minimap(true)\n                    .when(\n                        !deleted.iter().any(|id| id == \"scene.graph.ingest\"),\n                        |graph| {\n                            graph.node(\n                                GraphNode::new(\"scene.graph.ingest\", \"Stream ingest\")\n                                    .width(176.0)\n                                    .state(NodeState::Succeeded)\n                                    .thumbnail(scene_picture(\"Input preview\", cx))\n                                    .action(\"orders.v2 · partition 18\")\n                                    .metric(\"rate\", \"3.2k/s\")\n                                    .port(GraphPort::input(\"source\", \"Source\").side(PortSide::Top))\n                                    .port(GraphPort::output(\"rows\", \"Rows\"))\n                                    .port(GraphPort::output(\"errors\", \"Errors\"))\n                                    .selected(selected.iter().any(|id| id == \"scene.graph.ingest\")),\n                                ingest.x,\n                                ingest.y,\n                            )\n                        },\n                    )\n                    .when(\n                        !deleted.iter().any(|id| id == \"scene.graph.validate\"),\n                        |graph| {\n                            graph.node(\n                                GraphNode::new(\"scene.graph.validate\", \"Validate & enrich\")\n                                    .width(176.0)\n                                    .state(NodeState::Running)\n                                    .action(\"schema + fraud signals\")\n                                    .metric(\"p95\", \"18 ms\")\n                                    .port(GraphPort::input(\"records\", \"Records\"))\n                                    .port(GraphPort::input(\"retry\", \"Retry\").side(PortSide::Bottom))\n                                    .port(GraphPort::output(\"valid\", \"Valid\"))\n                                    .port(\n                                        GraphPort::output(\"telemetry\", \"Events\")\n                                            .side(PortSide::Bottom),\n                                    )\n                                    .selected(\n                                        selected.iter().any(|id| id == \"scene.graph.validate\"),\n                                    ),\n                                validate.x,\n                                validate.y,\n                            )\n                        },\n                    )\n                    .when(\n                        !deleted.iter().any(|id| id == \"scene.graph.persist\"),\n                        |graph| {\n                            graph.node(\n                                GraphNode::new(\"scene.graph.persist\", \"Persist batch\")\n                                    .width(176.0)\n                                    .state(NodeState::Succeeded)\n                                    .action(\"warehouse / orders\")\n                                    .metric(\"written\", \"12.3k\")\n                                    .port(GraphPort::input(\"records\", \"Records\"))\n                                    .port(GraphPort::output(\"commit\", \"Commit\"))\n                                    .selected(\n                                        selected.iter().any(|id| id == \"scene.graph.persist\"),\n                                    ),\n                                persist.x,\n                                persist.y,\n                            )\n                        },\n                    )\n                    .when(\n                        !deleted.iter().any(|id| id == \"scene.graph.observe\"),\n                        |graph| {\n                            graph.node(\n                                GraphNode::new(\"scene.graph.observe\", \"Observe quality\")\n                                    .width(176.0)\n                                    .state(NodeState::Failed)\n                                    .action(\"drift threshold exceeded\")\n                                    .metric(\"rejected\", \"94\")\n                                    .port(GraphPort::input(\"events\", \"Events\").side(PortSide::Top))\n                                    .port(GraphPort::output(\"retry\", \"Retry\").side(PortSide::Top))\n                                    .selected(\n                                        selected.iter().any(|id| id == \"scene.graph.observe\"),\n                                    ),\n                                observe.x,\n                                observe.y,\n                            )\n                        },\n                    )\n                    .when(\n                        !deleted.iter().any(|id| id == \"scene.graph.publish\"),\n                        |graph| {\n                            graph.node(\n                                GraphNode::new(\"scene.graph.publish\", \"Publish artifact\")\n                                    .width(176.0)\n                                    .state(NodeState::Pending)\n                                    .action(\"waiting for commit\")\n                                    .port(\n                                        GraphPort::input(\"artifact\", \"Artifact\")\n                                            .side(PortSide::Top),\n                                    )\n                                    .port(\n                                        GraphPort::output(\"release\", \"Release\")\n                                            .side(PortSide::Bottom),\n                                    )\n                                    .selected(\n                                        selected.iter().any(|id| id == \"scene.graph.publish\"),\n                                    ),\n                                publish.x,\n                                publish.y,\n                            )\n                        },\n                    )\n                    .edges(edges)\n                    .on_event(|event, _, cx| {\n                        cx.update_global::<SceneGraph, ()>(|scene, _| match event {\n                            NodeGraphEvent::ViewportChanged(viewport) => {\n                                scene.viewport = *viewport;\n                            }\n                            NodeGraphEvent::SelectionChanged { ids } => {\n                                scene.selected = ids.clone();\n                            }\n                            NodeGraphEvent::NodeMoved { id, position } => match id.as_ref() {\n                                \"scene.graph.ingest\" => scene.ingest = *position,\n                                \"scene.graph.validate\" => scene.validate = *position,\n                                \"scene.graph.persist\" => scene.persist = *position,\n                                \"scene.graph.observe\" => scene.observe = *position,\n                                \"scene.graph.publish\" => scene.publish = *position,\n                                _ => {}\n                            },\n                            NodeGraphEvent::NodeDeleted { id } => {\n                                scene.deleted.push(id.clone());\n                                scene.selected.retain(|selected| selected != id);\n                                scene\n                                    .edges\n                                    .retain(|edge| edge.from() != id && edge.to() != id);\n                            }\n                            NodeGraphEvent::ConnectionRequested { from, to } => {\n                                let id = format!(\n                                    \"scene.graph.edge.user.{}.{}.{}.{}\",\n                                    from.node, from.port, to.node, to.port\n                                );\n                                if !scene\n                                    .edges\n                                    .iter()\n                                    .any(|edge| edge.from() == &from.node && edge.to() == &to.node)\n                                {\n                                    scene.edges.push(\n                                        GraphEdge::new(from.node.clone(), to.node.clone())\n                                            .id(id)\n                                            .ports(from.port.clone(), to.port.clone())\n                                            .label(\"new connection\"),\n                                    );\n                                }\n                            }\n                            NodeGraphEvent::DisconnectRequested { id } => {\n                                scene.edges.retain(|edge| edge.edge_id() != *id);\n                            }\n                        });\n                        cx.refresh_windows();\n                    }),\n            ),\n        )\n        .child(\n            div()\n                .row()\n                .w(px(860.0))\n                .gap_token(&theme, Space::Sm)\n                .children([\n                    div()\n                        .flex_1()\n                        .h(px(132.0))\n                        .child(NodeGraph::new(\"scene.graph.loading\").state(GraphState::Loading)),\n                    div().flex_1().h(px(132.0)).child(\n                        NodeGraph::new(\"scene.graph.refused\")\n                            .state(GraphState::Refused(\"Graph access was refused\".into())),\n                    ),\n                    div().flex_1().h(px(132.0)).child(\n                        NodeGraph::new(\"scene.graph.failed\")\n                            .state(GraphState::Failed(\"Graph data could not be loaded\".into())),\n                    ),\n                ]),\n        )\n        .into_any_element()\n}"
+      "example": "fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {\n    if !cx.has_global::<SceneGraph>() {\n        cx.set_global(SceneGraph {\n            viewport: GraphViewport::default(),\n            ingest: gpui::point(24.0, 190.0),\n            validate: gpui::point(244.0, 40.0),\n            persist: gpui::point(492.0, 40.0),\n            observe: gpui::point(452.0, 300.0),\n            publish: gpui::point(648.0, 190.0),\n            selected: vec![\"scene.graph.validate\".into()],\n            deleted: Vec::new(),\n            edges: vec![\n                GraphEdge::new(\"scene.graph.ingest\", \"scene.graph.validate\")\n                    .id(\"scene.graph.edge.rows\")\n                    .ports(\"rows\", \"records\")\n                    .label(\"12.4k rows\")\n                    .active(true),\n                GraphEdge::new(\"scene.graph.validate\", \"scene.graph.persist\")\n                    .id(\"scene.graph.edge.valid\")\n                    .ports(\"valid\", \"records\")\n                    .active(true),\n                GraphEdge::new(\"scene.graph.validate\", \"scene.graph.observe\")\n                    .id(\"scene.graph.edge.telemetry\")\n                    .ports(\"telemetry\", \"events\")\n                    .label(\"telemetry\")\n                    .lane(-1),\n                GraphEdge::new(\"scene.graph.persist\", \"scene.graph.publish\")\n                    .id(\"scene.graph.edge.commit\")\n                    .ports(\"commit\", \"artifact\")\n                    .label(\"commit 8f72\")\n                    .active(true),\n                GraphEdge::new(\"scene.graph.observe\", \"scene.graph.validate\")\n                    .id(\"scene.graph.edge.retry\")\n                    .ports(\"retry\", \"retry\")\n                    .label(\"retry policy\")\n                    .lane(1)\n                    .feedback(),\n            ],\n        });\n    }\n    let scene = cx.global::<SceneGraph>();\n    let viewport = scene.viewport;\n    let ingest = scene.ingest;\n    let validate = scene.validate;\n    let persist = scene.persist;\n    let observe = scene.observe;\n    let publish = scene.publish;\n    let selected = scene.selected.clone();\n    let deleted = scene.deleted.clone();\n    let edges = scene.edges.clone();\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .child(\n            div().w(px(860.0)).h(px(470.0)).child(\n                NodeGraph::new(\"scene.graph\")\n                    .viewport(viewport)\n                    .zoom_range(0.55, 1.8)\n                    .minimap(true)\n                    .when(\n                        !deleted.iter().any(|id| id == \"scene.graph.ingest\"),\n                        |graph| {\n                            graph.node(\n                                GraphNode::new(\"scene.graph.ingest\", \"Stream ingest\")\n                                    .color(\"teal\")\n                                    .width(176.0)\n                                    .state(NodeState::Succeeded)\n                                    .thumbnail(scene_picture(\"Input preview\", cx))\n                                    .action(\"orders.v2 · partition 18\")\n                                    .metric(\"rate\", \"3.2k/s\")\n                                    .port(GraphPort::input(\"source\", \"Source\").side(PortSide::Top))\n                                    .port(GraphPort::output(\"rows\", \"Rows\"))\n                                    .port(GraphPort::output(\"errors\", \"Errors\"))\n                                    .selected(selected.iter().any(|id| id == \"scene.graph.ingest\")),\n                                ingest.x,\n                                ingest.y,\n                            )\n                        },\n                    )\n                    .when(\n                        !deleted.iter().any(|id| id == \"scene.graph.validate\"),\n                        |graph| {\n                            graph.node(\n                                GraphNode::new(\"scene.graph.validate\", \"Validate & enrich\")\n                                    .color(\"indigo\")\n                                    .width(176.0)\n                                    .state(NodeState::Running)\n                                    .action(\"schema + fraud signals\")\n                                    .metric(\"p95\", \"18 ms\")\n                                    .port(GraphPort::input(\"records\", \"Records\"))\n                                    .port(GraphPort::input(\"retry\", \"Retry\").side(PortSide::Bottom))\n                                    .port(GraphPort::output(\"valid\", \"Valid\"))\n                                    .port(\n                                        GraphPort::output(\"telemetry\", \"Events\")\n                                            .side(PortSide::Bottom),\n                                    )\n                                    .selected(\n                                        selected.iter().any(|id| id == \"scene.graph.validate\"),\n                                    ),\n                                validate.x,\n                                validate.y,\n                            )\n                        },\n                    )\n                    .when(\n                        !deleted.iter().any(|id| id == \"scene.graph.persist\"),\n                        |graph| {\n                            graph.node(\n                                GraphNode::new(\"scene.graph.persist\", \"Persist batch\")\n                                    .color(\"violet\")\n                                    .width(176.0)\n                                    .state(NodeState::Succeeded)\n                                    .action(\"warehouse / orders\")\n                                    .metric(\"written\", \"12.3k\")\n                                    .port(GraphPort::input(\"records\", \"Records\"))\n                                    .port(GraphPort::output(\"commit\", \"Commit\"))\n                                    .selected(\n                                        selected.iter().any(|id| id == \"scene.graph.persist\"),\n                                    ),\n                                persist.x,\n                                persist.y,\n                            )\n                        },\n                    )\n                    .when(\n                        !deleted.iter().any(|id| id == \"scene.graph.observe\"),\n                        |graph| {\n                            graph.node(\n                                GraphNode::new(\"scene.graph.observe\", \"Observe quality\")\n                                    .color(\"orange\")\n                                    .width(176.0)\n                                    .state(NodeState::Failed)\n                                    .action(\"drift threshold exceeded\")\n                                    .metric(\"rejected\", \"94\")\n                                    .port(GraphPort::input(\"events\", \"Events\").side(PortSide::Top))\n                                    .port(GraphPort::output(\"retry\", \"Retry\").side(PortSide::Top))\n                                    .selected(\n                                        selected.iter().any(|id| id == \"scene.graph.observe\"),\n                                    ),\n                                observe.x,\n                                observe.y,\n                            )\n                        },\n                    )\n                    .when(\n                        !deleted.iter().any(|id| id == \"scene.graph.publish\"),\n                        |graph| {\n                            graph.node(\n                                GraphNode::new(\"scene.graph.publish\", \"Publish artifact\")\n                                    .color(\"lime\")\n                                    .width(176.0)\n                                    .state(NodeState::Pending)\n                                    .action(\"waiting for commit\")\n                                    .port(\n                                        GraphPort::input(\"artifact\", \"Artifact\")\n                                            .side(PortSide::Top),\n                                    )\n                                    .port(\n                                        GraphPort::output(\"release\", \"Release\")\n                                            .side(PortSide::Bottom),\n                                    )\n                                    .selected(\n                                        selected.iter().any(|id| id == \"scene.graph.publish\"),\n                                    ),\n                                publish.x,\n                                publish.y,\n                            )\n                        },\n                    )\n                    .edges(edges)\n                    .on_event(|event, _, cx| {\n                        cx.update_global::<SceneGraph, ()>(|scene, _| match event {\n                            NodeGraphEvent::ViewportChanged(viewport) => {\n                                scene.viewport = *viewport;\n                            }\n                            NodeGraphEvent::SelectionChanged { ids } => {\n                                scene.selected = ids.clone();\n                            }\n                            NodeGraphEvent::NodeMoved { id, position } => match id.as_ref() {\n                                \"scene.graph.ingest\" => scene.ingest = *position,\n                                \"scene.graph.validate\" => scene.validate = *position,\n                                \"scene.graph.persist\" => scene.persist = *position,\n                                \"scene.graph.observe\" => scene.observe = *position,\n                                \"scene.graph.publish\" => scene.publish = *position,\n                                _ => {}\n                            },\n                            NodeGraphEvent::NodeDeleted { id } => {\n                                scene.deleted.push(id.clone());\n                                scene.selected.retain(|selected| selected != id);\n                                scene\n                                    .edges\n                                    .retain(|edge| edge.from() != id && edge.to() != id);\n                            }\n                            NodeGraphEvent::ConnectionRequested { from, to } => {\n                                let id = format!(\n                                    \"scene.graph.edge.user.{}.{}.{}.{}\",\n                                    from.node, from.port, to.node, to.port\n                                );\n                                if !scene\n                                    .edges\n                                    .iter()\n                                    .any(|edge| edge.from() == &from.node && edge.to() == &to.node)\n                                {\n                                    scene.edges.push(\n                                        GraphEdge::new(from.node.clone(), to.node.clone())\n                                            .id(id)\n                                            .ports(from.port.clone(), to.port.clone())\n                                            .label(\"new connection\"),\n                                    );\n                                }\n                            }\n                            NodeGraphEvent::DisconnectRequested { id } => {\n                                scene.edges.retain(|edge| edge.edge_id() != *id);\n                            }\n                        });\n                        cx.refresh_windows();\n                    }),\n            ),\n        )\n        .child(\n            div()\n                .row()\n                .w(px(860.0))\n                .gap_token(&theme, Space::Sm)\n                .children([\n                    div()\n                        .flex_1()\n                        .h(px(132.0))\n                        .child(NodeGraph::new(\"scene.graph.loading\").state(GraphState::Loading)),\n                    div().flex_1().h(px(132.0)).child(\n                        NodeGraph::new(\"scene.graph.refused\")\n                            .state(GraphState::Refused(\"Graph access was refused\".into())),\n                    ),\n                    div().flex_1().h(px(132.0)).child(\n                        NodeGraph::new(\"scene.graph.failed\")\n                            .state(GraphState::Failed(\"Graph data could not be loaded\".into())),\n                    ),\n                ]),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "canvas-tools",
@@ -14780,7 +14987,7 @@
       "uses": [
         "MicroMark"
       ],
-      "example": "fn micro(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    // Each motion gets a cell of its own. A still frame cannot show any of\n    // them moving, so what the picture has to carry instead is that there are\n    // five of them, that they are the same size, and which name belongs to\n    // which mark.\n    let cell = |mark: MicroMark| {\n        div()\n            .w(px(96.0))\n            .flex_none()\n            .column()\n            .items_center()\n            .justify_center()\n            .gap_token(&theme, Space::Xs)\n            .py_token(&theme, Space::Md)\n            .radius(&theme, Radius::Card)\n            .well(&theme)\n            .child(mark)\n    };\n\n    stack(&theme)\n        .w(px(560.0))\n        .child(caption(\n            &theme,\n            \"named functions of time; reduced motion leaves the glyph still\",\n        ))\n        .child(\n            row(&theme)\n                .gap_token(&theme, Space::Sm)\n                .child(cell(MicroMark::new(\n                    \"scene.micro.heartbeat\",\n                    Micro::Heartbeat,\n                    \"Hb\",\n                )))\n                .child(cell(MicroMark::new(\n                    \"scene.micro.bounce\",\n                    Micro::Bounce,\n                    \"Bn\",\n                )))\n                .child(cell(MicroMark::new(\n                    \"scene.micro.wobble\",\n                    Micro::Wobble,\n                    \"Wb\",\n                )))\n                .child(cell(MicroMark::new(\"scene.micro.pop\", Micro::Pop, \"Pp\")))\n                .child(cell(MicroMark::new(\n                    \"scene.micro.sparkle\",\n                    Micro::Sparkle,\n                    \"Sk\",\n                ))),\n        )\n        .child(caption(\n            &theme,\n            \"the same functions on things that are not glyphs\",\n        ))\n        .child(\n            row(&theme)\n                .gap_token(&theme, Space::Sm)\n                .child(div().child(Badge::new(\"12 unread\").neutral()).micro(\n                    \"scene.micro.badge\",\n                    Micro::Pop,\n                    cx,\n                ))\n                .child(div().child(Tag::new(\"scene.micro.tag\", \"fixture\")).micro(\n                    \"scene.micro.tag.mark\",\n                    Micro::Wobble,\n                    cx,\n                ))\n                .child(div().child(StatusDot::new(Tone::Success)).micro(\n                    \"scene.micro.dot\",\n                    Micro::Heartbeat,\n                    cx,\n                )),\n        )\n        .into_any_element()\n}"
+      "example": "fn micro(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    // Each motion gets a cell of its own. A still frame cannot show any of\n    // them moving, so what the picture has to carry instead is that there are\n    // five of them, that they are the same size, and which name belongs to\n    // which mark.\n    let cell = |mark: MicroMark| {\n        div()\n            .w(px(96.0))\n            .flex_none()\n            .column()\n            .items_center()\n            .justify_center()\n            .gap_token(&theme, Space::Xs)\n            .py_token(&theme, Space::Md)\n            .radius(&theme, Radius::Card)\n            .well(&theme)\n            .child(mark)\n    };\n\n    stack(&theme)\n        .w(px(560.0))\n        .child(caption(\n            &theme,\n            \"named functions of time; reduced motion leaves the glyph still\",\n        ))\n        .child(\n            row(&theme)\n                .gap_token(&theme, Space::Sm)\n                .child(cell(MicroMark::new(\n                    \"scene.micro.heartbeat\",\n                    Micro::Heartbeat,\n                    \"Hb\",\n                )))\n                .child(cell(MicroMark::new(\n                    \"scene.micro.bounce\",\n                    Micro::Bounce,\n                    \"Bn\",\n                )))\n                .child(cell(MicroMark::new(\n                    \"scene.micro.wobble\",\n                    Micro::Wobble,\n                    \"Wb\",\n                )))\n                .child(cell(MicroMark::new(\"scene.micro.pop\", Micro::Pop, \"Pp\")))\n                .child(cell(MicroMark::new(\n                    \"scene.micro.sparkle\",\n                    Micro::Sparkle,\n                    \"Sk\",\n                ))),\n        )\n        .child(caption(\n            &theme,\n            \"the same functions on things that are not glyphs\",\n        ))\n        .child(\n            row(&theme)\n                .gap_token(&theme, Space::Sm)\n                .child(div().child(Badge::new(\"12 unread\").neutral()).micro(\n                    \"scene.micro.badge\",\n                    Micro::Pop,\n                    cx,\n                ))\n                .child(div().child(Tag::new(\"scene.micro.tag\", \"fixture\")).micro(\n                    \"scene.micro.tag.mark\",\n                    Micro::Wobble,\n                    cx,\n                ))\n                .child(div().child(StatusDot::new(Tone::Success)).micro(\n                    \"scene.micro.dot\",\n                    Micro::Heartbeat,\n                    cx,\n                )),\n        )\n        .child(caption(\n            &theme,\n            \"a described motion, sampled along its own run rather than played\",\n        ))\n        .child(described(&theme))\n        .into_any_element()\n}"
     },
     {
       "name": "trace",

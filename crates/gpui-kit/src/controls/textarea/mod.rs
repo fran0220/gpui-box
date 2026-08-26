@@ -33,7 +33,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use gpui::{
-    AccessibleAction, App, Bounds, ClipboardItem, Context, CursorStyle, EditableTextLayout,
+    AccessibleAction, App, Bounds, ClipboardItem, Context, CursorStyle, EditableTextLayout, Entity,
     EntityInputHandler, EventEmitter, FocusHandle, Focusable, InteractiveElement, IntoElement,
     KeyBinding, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement, Pixels,
     Point, Render, SharedString, StatefulInteractiveElement, Styled, Subscription, UTF16Selection,
@@ -47,6 +47,7 @@ use crate::controls::text_edit;
 use crate::foundation::{
     ActiveDirection, DirectionalExt, Disableable, Ident, Sizable, StyledExt, text,
 };
+use crate::reactive::Signal;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 use element::TextAreaElement;
 
@@ -593,6 +594,42 @@ impl TextArea {
 
     pub fn is_empty(&self) -> bool {
         self.edit.is_empty()
+    }
+
+    /// Keeps an area and a caller-owned [`Signal`] holding the same text.
+    ///
+    /// The area is seeded from the signal, typing writes the signal, and a
+    /// change to the signal writes the area. Neither direction fires when the
+    /// two already agree, so the caret is not thrown to the end of the text
+    /// on every keystroke.
+    ///
+    /// The subscriptions are the binding: the caller holds them for as long
+    /// as the area and the signal should stay together.
+    #[must_use]
+    pub fn bind(area: &Entity<Self>, signal: &Signal<String>, cx: &mut App) -> Vec<Subscription> {
+        let seed = signal.get(cx);
+        area.update(cx, |area, cx| area.set_value(seed, cx));
+
+        let to_signal = {
+            let signal = signal.clone();
+            cx.subscribe(area, move |_area, event, cx| {
+                if let TextAreaEvent::Change(text) = event {
+                    signal.set(cx, text.to_string());
+                }
+            })
+        };
+        let to_area = {
+            let area = area.clone();
+            cx.observe(signal.entity(), move |value, cx| {
+                let text = value.read(cx).clone();
+                area.update(cx, |area, cx| {
+                    if area.value().as_ref() != text.as_str() {
+                        area.set_value(text, cx);
+                    }
+                });
+            })
+        };
+        vec![to_signal, to_area]
     }
 
     /// Replaces the text from the host side, for example when a form resets.

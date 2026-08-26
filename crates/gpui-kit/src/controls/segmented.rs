@@ -21,6 +21,7 @@ use crate::foundation::{
     Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt, text as foundation_text,
 };
 use crate::motion::{Flipping, flip};
+use crate::reactive::Binding;
 
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 
@@ -128,6 +129,15 @@ impl SegmentedControl {
     ) -> Self {
         self.on_select = Some(Rc::new(handler));
         self
+    }
+
+    /// Draws the segment the caller's [`Binding`] names, and writes the one
+    /// that was picked. Sugar for [`Self::selected`] and [`Self::on_select`].
+    pub fn bind(self, binding: &Binding<SharedString>, cx: &App) -> Self {
+        let selected = binding.get(cx);
+        let binding = binding.clone();
+        self.selected(selected)
+            .on_select(move |id, _window, cx| binding.set(cx, id))
     }
 
     fn actionable(&self) -> bool {

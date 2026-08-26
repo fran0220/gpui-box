@@ -28,7 +28,8 @@ pub use styled_ext::{
 pub use theme_overlay::ThemeOverlay;
 
 pub use gpui_kit_theme::{
-    ActiveTheme, ControlSize, Density, Elevation, Layer, ThemeRegistry, activate_theme, set_density,
+    ActiveTheme, ColorChoice, ControlSize, Density, Elevation, Layer, ThemeRegistry, Variant,
+    VariantColors, activate_theme, set_density,
 };
 
 /// A control that can refuse interaction.

@@ -530,6 +530,15 @@ string_keys! {
     MicroWobble => "micro.wobble", "Wobble";
     MicroPop => "micro.pop", "Pop";
     MicroSparkle => "micro.sparkle", "Sparkle";
+    // Reasons the caller-owned form rules in `gpui_kit::reactive` give. A
+    // rule is the caller's, but the words a reader reads are still this
+    // library's to hand over.
+    FormRequired => "form.required", "This field is required.";
+    FormEmail => "form.email", "Enter an email address.";
+    FormMinLengthOne => "form.min-length-one", "Use at least 1 character.";
+    FormMinLengthMany => "form.min-length-many", "Use at least {0} characters.";
+    FormFieldsDiffer => "form.fields-differ", "These do not match.";
+
     SchemaRequiredMissing => "schema.required-missing", "This field is required.";
     SchemaUnrenderableOne => "schema.unrenderable-one", "1 field cannot be shown here.";
     SchemaUnrenderableMany => "schema.unrenderable-many", "{0} fields cannot be shown here.";

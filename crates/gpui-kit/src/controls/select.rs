@@ -9,9 +9,10 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, Bounds, Context, EventEmitter, FocusHandle, Focusable, InteractiveElement,
-    IntoElement, KeyDownEvent, MouseButton, ParentElement, Pixels, Render, ScrollHandle,
-    SharedString, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    AnyElement, App, Bounds, Context, Entity, EventEmitter, FocusHandle, Focusable,
+    InteractiveElement, IntoElement, KeyDownEvent, MouseButton, ParentElement, Pixels, Render,
+    ScrollHandle, SharedString, StatefulInteractiveElement, Styled, Subscription, Window, div,
+    prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -25,6 +26,7 @@ use crate::layout::measure;
 use crate::motion;
 use crate::overlay::popover::{self, MenuKey};
 use crate::overlay::{Hang, Placement};
+use crate::reactive::Signal;
 use crate::strings::{ActiveStrings, StringKey};
 
 const MENU_MIN_WIDTH: f32 = 180.0;
@@ -238,6 +240,47 @@ impl Select {
         }
         self.reveal_active = true;
         cx.notify();
+    }
+
+    /// Keeps a select and a caller-owned [`Signal`] naming the same option.
+    ///
+    /// The signal holds the option id, and `None` is the answer being
+    /// cleared, which a select only offers when it is
+    /// [`Select::clearable`]. Picking writes the signal, and a change to the
+    /// signal moves the checkmark; neither direction fires when the two
+    /// already agree.
+    ///
+    /// The subscriptions are the binding: the caller holds them for as long
+    /// as the select and the signal should stay together.
+    #[must_use]
+    pub fn bind(
+        select: &Entity<Self>,
+        signal: &Signal<Option<SharedString>>,
+        cx: &mut App,
+    ) -> Vec<Subscription> {
+        let seed = signal.get(cx);
+        select.update(cx, |select, cx| select.set_selected(seed, cx));
+
+        let to_signal = {
+            let signal = signal.clone();
+            cx.subscribe(select, move |_select, event, cx| match event {
+                SelectEvent::Selected(id) => signal.set(cx, Some(id.clone())),
+                SelectEvent::Cleared => signal.set(cx, None),
+                SelectEvent::Opened | SelectEvent::Closed => {}
+            })
+        };
+        let to_select = {
+            let select = select.clone();
+            cx.observe(signal.entity(), move |value, cx| {
+                let id = value.read(cx).clone();
+                select.update(cx, |select, cx| {
+                    if select.selected_id() != id.as_ref() {
+                        select.set_selected(id, cx);
+                    }
+                });
+            })
+        };
+        vec![to_signal, to_select]
     }
 
     pub fn selected_id(&self) -> Option<&SharedString> {

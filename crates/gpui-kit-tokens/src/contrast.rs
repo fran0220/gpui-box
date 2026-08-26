@@ -11,8 +11,8 @@
 //! [`line_report`].
 
 use crate::{
-    AgentColor, Color, InteractiveColor, LoaderColor, SemanticColor, Surface, SyntaxColor,
-    TextTone, TokenDocument, contrast_ratio,
+    AgentColor, Color, InteractiveColor, LoaderColor, NodeColor, SemanticColor, Surface,
+    SyntaxColor, TextTone, TokenDocument, contrast_ratio,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -40,6 +40,18 @@ const GREY_MINIMUM: f32 = 1.25;
 /// to be read. Slot 8, "bright black", is the same slot one octave up and is
 /// the dim-text grey every terminal palette uses.
 const ANSI_BLACK: usize = 0;
+
+/// The surfaces a chart is drawn on: the page, a panel, and a raised card.
+///
+/// Not the backdrop, which is the substrate *behind* the page and carries no
+/// content of its own, and not the well, which a plot never sits in. Holding
+/// a series scale to the substrate would darken every light theme's scale for
+/// a surface no chart is ever drawn on.
+const CHART_SURFACES: [(&str, Surface); 3] = [
+    ("color.surface.canvas", Surface::Canvas),
+    ("color.surface.panel", Surface::Panel),
+    ("color.surface.raised", Surface::Raised),
+];
 
 /// Evaluates every required pair for one theme.
 pub fn report(tokens: &TokenDocument) -> Vec<ContrastCheck> {
@@ -287,6 +299,61 @@ pub fn report(tokens: &TokenDocument) -> Vec<ContrastCheck> {
         ));
     }
 
+    // Every series colour has to be an identity on every surface a chart can
+    // be drawn on. The regression this catches is a scale tuned against one
+    // theme's page and reused on a card, where the two palest series become
+    // one: a legend that names eight series the plot draws as seven is worse
+    // than a plot with no legend.
+    for (surface_name, surface) in CHART_SURFACES {
+        let background = tokens.surface(surface);
+        for (index, series) in tokens.sequence().into_iter().enumerate() {
+            checks.push(check(
+                &format!("color.sequence.categorical.{index}"),
+                series,
+                surface_name,
+                background,
+                NON_TEXT_MINIMUM,
+            ));
+        }
+    }
+
+    // The canvas parts that report a state rather than draw structure. A
+    // connected port and a live edge are what a reader scans a graph for, so
+    // they carry the same 3:1 an active visual identity gets; the resting
+    // edge and the grid are structure and are held to the line floor in
+    // `line_report` instead.
+    let canvas = tokens.surface(Surface::Canvas);
+    for role in [NodeColor::PortConnected, NodeColor::EdgeActive] {
+        checks.push(check(
+            role.path(),
+            tokens.node(role),
+            "color.surface.canvas",
+            canvas,
+            NON_TEXT_MINIMUM,
+        ));
+    }
+
+    // An edge label is drawn on its chip, and the chip is drawn on the canvas
+    // — over whatever edge happens to pass beneath it. So the pair is checked
+    // the way it is actually stacked, twice: once on bare canvas, and once on
+    // canvas an edge crosses. A chip too translucent to cover the line it
+    // sits on is exactly the label nobody can read, and it passes the first
+    // check happily.
+    let label_wash = tokens.node(NodeColor::LabelWash);
+    let crossed = crate::over(tokens.node(NodeColor::Edge), canvas);
+    for (behind_name, behind) in [
+        ("color.surface.canvas", canvas),
+        ("color.surface.canvas + color.node.edge", crossed),
+    ] {
+        checks.push(check(
+            "color.text.muted",
+            tokens.text(TextTone::Muted),
+            &format!("{behind_name} + {}", NodeColor::LabelWash.path()),
+            crate::over(label_wash, behind),
+            TEXT_MINIMUM,
+        ));
+    }
+
     // `accent` is the only accent that carries text. `accentStrong` is an
     // emphasis, border and hover color; it is held to the non-text minimum
     // against surfaces above, not to the body minimum against `onAccent`.
@@ -504,6 +571,39 @@ pub fn line_report(tokens: &TokenDocument) -> Vec<LineCheck> {
             minimum: LINE_MINIMUM,
         });
     }
+
+    // The canvas structure: the connections, the rule under them, and the
+    // quiet end of a port. These belong to this rule rather than to the
+    // contrast one for the reason a hairline does — a canvas is mostly edges
+    // and grid, and drawing either at a control boundary's loudness turns a
+    // graph into a mesh. What is asked here is only whether they are drawn at
+    // all, which is the failure a grid at an alpha that rounds away has.
+    let canvas = tokens.surface(Surface::Canvas);
+    for role in [
+        NodeColor::Edge,
+        NodeColor::PortIdle,
+        NodeColor::Grid,
+        NodeColor::GridStrong,
+    ] {
+        let drawn = crate::over(tokens.node(role), canvas);
+        checks.push(LineCheck {
+            line: role.path().into(),
+            surface: "color.surface.canvas".into(),
+            distance: (drawn.lightness() - canvas.lightness()).abs(),
+            minimum: LINE_MINIMUM,
+        });
+    }
+
+    // A node's header band is a band on the node's own surface rather than a
+    // surface of its own, so it is held here and not to the separation floor.
+    let raised = tokens.surface(Surface::Raised);
+    let drawn = crate::over(tokens.node(NodeColor::HeaderWash), raised);
+    checks.push(LineCheck {
+        line: NodeColor::HeaderWash.path().into(),
+        surface: "color.surface.raised".into(),
+        distance: (drawn.lightness() - raised.lightness()).abs(),
+        minimum: LINE_MINIMUM,
+    });
     checks
 }
 
@@ -652,7 +752,7 @@ const DISTINCTIONS: [(TextTone, TextTone); 3] = [
 pub fn distinction_report(tokens: &TokenDocument) -> Vec<DistinctionCheck> {
     let page = tokens.surface(Surface::Canvas).lightness();
     let from_page = |tone: TextTone| (tokens.text(tone).lightness() - page).abs();
-    DISTINCTIONS
+    let mut checks: Vec<DistinctionCheck> = DISTINCTIONS
         .into_iter()
         .map(|(stronger, dimmer)| DistinctionCheck {
             tone: tone_path(stronger).into(),
@@ -660,7 +760,23 @@ pub fn distinction_report(tokens: &TokenDocument) -> Vec<DistinctionCheck> {
             distance: from_page(stronger) - from_page(dimmer),
             minimum: DISTINCTION_MINIMUM,
         })
-        .collect()
+        .collect();
+
+    // The two port states are two facts, and the same failure the tone ladder
+    // has is available here: an idle port and a connected one that are both
+    // perfectly visible on the canvas and identical to each other say nothing
+    // about whether anything is attached. Measured from the page and signed,
+    // like the ladder, so the rule also holds the direction — a connected
+    // port stands further from the canvas than an idle one in both
+    // appearances, because "attached" is the louder fact.
+    let node_from_page = |role: NodeColor| (tokens.node(role).lightness() - page).abs();
+    checks.push(DistinctionCheck {
+        tone: NodeColor::PortConnected.path().into(),
+        against: NodeColor::PortIdle.path().into(),
+        distance: node_from_page(NodeColor::PortConnected) - node_from_page(NodeColor::PortIdle),
+        minimum: DISTINCTION_MINIMUM,
+    });
+    checks
 }
 
 pub fn distinction_failures(tokens: &TokenDocument) -> Vec<DistinctionCheck> {
@@ -729,9 +845,11 @@ mod tests {
         let checks = report(crate::studio_dark());
         // Twenty-three tones against each of six surfaces, ten code checks
         // against each of the two surfaces code is drawn on, the sixteen ANSI
-        // slots against the terminal background, and `onAccent` against
-        // `accent`.
-        assert_eq!(checks.len(), 6 * 23 + 2 * 10 + 16 + 1);
+        // slots against the terminal background, the eight series colours
+        // against each of the three surfaces a chart is drawn on, the two
+        // live canvas roles and the two stackings of an edge label, and
+        // `onAccent` against `accent`.
+        assert_eq!(checks.len(), 6 * 23 + 2 * 10 + 16 + 3 * 8 + 4 + 1);
     }
 
     #[test]
@@ -922,6 +1040,113 @@ mod tests {
             "{failures:#?}"
         );
         assert!(matches!(tokens.validate(), Err(crate::TokenError::Line(_))));
+    }
+
+    /// A series is taken apart by colour, so no two of its slots may be one
+    /// colour — a legend that names eight series a plot draws as seven is
+    /// worse than a plot with no legend, and every ratio in `report` is
+    /// perfectly happy with it.
+    #[test]
+    fn no_shipped_theme_draws_two_series_in_one_colour() {
+        for tokens in crate::all() {
+            let series = tokens.sequence();
+            for (index, color) in series.iter().enumerate() {
+                for (other, against) in series.iter().enumerate().skip(index + 1) {
+                    assert_ne!(
+                        color, against,
+                        "{} draws series {index} and {other} in one colour",
+                        tokens.meta.id
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn every_shipped_theme_draws_a_series_a_reader_can_take_apart() {
+        for tokens in crate::all() {
+            let series: Vec<_> = report(tokens)
+                .into_iter()
+                .filter(|check| check.foreground.starts_with("color.sequence.categorical."))
+                .collect();
+            assert_eq!(
+                series.len(),
+                3 * crate::SEQUENCE_LENGTH,
+                "{}",
+                tokens.meta.id
+            );
+            for check in series {
+                assert!(check.passes(), "{}: {check:#?}", tokens.meta.id);
+            }
+        }
+    }
+
+    #[test]
+    fn every_shipped_theme_says_which_ports_are_attached() {
+        for tokens in crate::all() {
+            let failures = distinction_failures(tokens);
+            assert!(
+                failures.is_empty(),
+                "{} cannot tell an attached port from an empty one: {:#?}",
+                tokens.meta.id,
+                failures
+            );
+        }
+    }
+
+    /// The regression the port rule exists to catch, and the one the canvas
+    /// shipped with: every port drawn in one grey, perfectly visible and
+    /// perfectly silent about whether anything is connected to it.
+    #[test]
+    fn one_grey_for_an_idle_and_a_connected_port_is_rejected() {
+        let mut tokens = crate::studio_dark().clone();
+        tokens.color.node.port_idle = tokens.color.node.port_connected.clone();
+        assert!(
+            line_failures(&tokens).is_empty(),
+            "both are plainly drawn, which is the point"
+        );
+        let failures = distinction_failures(&tokens);
+        assert!(
+            failures
+                .iter()
+                .any(|check| check.tone == "color.node.portConnected"),
+            "{failures:#?}"
+        );
+        assert!(matches!(
+            tokens.validate(),
+            Err(crate::TokenError::Distinction(_))
+        ));
+    }
+
+    /// A grid is meant to be barely there, which is one step away from not
+    /// being there at all.
+    #[test]
+    fn a_canvas_grid_that_rounds_away_is_rejected() {
+        let mut tokens = crate::studio_dark().clone();
+        tokens.color.node.grid = "{neutral.900}/01".into();
+        let failures = line_failures(&tokens);
+        assert!(
+            failures.iter().any(|check| check.line == "color.node.grid"),
+            "{failures:#?}"
+        );
+        assert!(matches!(tokens.validate(), Err(crate::TokenError::Line(_))));
+    }
+
+    /// An edge label sits on its chip on the canvas, and an edge runs under
+    /// both. A chip too thin to cover the line it crosses passes every check
+    /// made on bare canvas.
+    #[test]
+    fn a_label_chip_that_does_not_cover_the_edge_under_it_is_rejected() {
+        let mut tokens = crate::studio_dark().clone();
+        tokens.color.node.label_wash = "{neutral.100}/10".into();
+        tokens.color.node.edge = tokens.color.text.primary.clone();
+        let failures = failures(&tokens);
+        assert!(
+            failures.iter().any(|check| check
+                .background
+                .contains("color.node.edge + color.node.labelWash")),
+            "{failures:#?}"
+        );
     }
 
     #[test]

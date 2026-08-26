@@ -75,6 +75,29 @@ pub(super) fn button(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .child(Button::new("scene.button.md").label("Medium").medium())
                 .child(Button::new("scene.button.lg").label("Large").large()),
         )
+        .child(caption(
+            &theme,
+            "the shared tiers, resolved against a palette colour",
+        ))
+        .children(["indigo", "teal", "red"].map(|group| {
+            row(&theme).children(
+                [
+                    Variant::Filled,
+                    Variant::Light,
+                    Variant::Outline,
+                    Variant::Subtle,
+                    Variant::Default,
+                    Variant::Transparent,
+                ]
+                .map(|tier| {
+                    Button::new(format!("scene.button.{group}.{}", tier.name()))
+                        .label(tier.name())
+                        .variant(tier)
+                        .color(SharedString::from(group))
+                        .on_click(|_, _| {})
+                }),
+            )
+        }))
         .into_any_element()
 }
 

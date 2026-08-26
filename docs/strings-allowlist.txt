@@ -35,6 +35,7 @@ AudioPlayer
 AvatarGroup
 BackspaceAtStart
 Banner
+Binding
 Blur
 Breadcrumb
 BrowserPanel
@@ -84,6 +85,7 @@ Flipped
 Flow
 Focus
 Follow
+Form
 FormField
 Frost
 Glass
@@ -161,6 +163,7 @@ SettingsList
 SettingsRow
 SettingsSection
 Sidebar
+Signal
 Slider
 Slots
 SplitButton
@@ -244,6 +247,7 @@ layout is present until paint
 markdown stream closed `{end:?}` past its root
 month unknown
 more than one root: {}
+motion! does not know this entry: 
 multiline rich-text replacement needs {expected} new block ids, got {actual}
 must be between 0 and 1
 must be finite

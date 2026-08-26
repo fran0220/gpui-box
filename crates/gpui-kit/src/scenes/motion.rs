@@ -1,4 +1,4 @@
-//! Procedural micro-motion, reviewed as itself.
+//! Procedural micro-motion, and a described motion read at rest.
 
 use super::support::*;
 
@@ -76,5 +76,57 @@ pub(super) fn micro(_window: &mut Window, cx: &mut App) -> AnyElement {
                     cx,
                 )),
         )
+        .child(caption(
+            &theme,
+            "a described motion, sampled along its own run rather than played",
+        ))
+        .child(described(&theme))
         .into_any_element()
+}
+
+/// A motion written with `motion!`, laid out as the frames it passes through.
+///
+/// This is the one thing a still frame can say about motion: a described
+/// motion can be read at a point in its run without running it, so the frames
+/// are drawn side by side and the picture is the same every time. Playing it
+/// is [`Animator`]'s job and needs a window; the gallery is where that is
+/// looked at.
+fn described(theme: &Theme) -> gpui::Div {
+    let arrive = crate::motion! {
+        duration: 420;
+        ease: overshoot;
+        opacity: 0.0 => 1.0;
+        y: 12.0 => 0.0;
+    };
+
+    let frame = |head: f32, label: &'static str| {
+        let sample = arrive.sample(theme, head);
+        div()
+            .w(px(96.0))
+            .flex_none()
+            .column()
+            .items_center()
+            .gap_token(theme, Space::Xs)
+            .py_token(theme, Space::Md)
+            .radius(theme, Radius::Card)
+            .well(theme)
+            .child(
+                sample.apply(
+                    div()
+                        .w(px(56.0))
+                        .h(px(24.0))
+                        .radius(theme, Radius::Control)
+                        .bg(theme.colors.accent),
+                ),
+            )
+            .child(caption(theme, label))
+    };
+
+    row(theme)
+        .gap_token(theme, Space::Sm)
+        .child(frame(0.0, "start"))
+        .child(frame(0.25, "quarter"))
+        .child(frame(0.5, "half"))
+        .child(frame(0.75, "three quarters"))
+        .child(frame(1.0, "settled"))
 }
