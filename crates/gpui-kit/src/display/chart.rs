@@ -410,7 +410,7 @@ fn non_ready_body(
                 .items_center()
                 .justify_center()
                 .w_full()
-                .h(px(160.0))
+                .h(px(PLOT_HEIGHT))
                 .overflow_hidden()
                 .radius(theme, Radius::Small)
                 .surface(theme, Surface::Canvas)
@@ -786,12 +786,19 @@ impl RenderOnce for ScatterChart {
     }
 }
 
+/// How tall every plot region in this module is.
+const PLOT_HEIGHT: f32 = 160.0;
+
 #[derive(Debug, Clone)]
 struct ActivePoint {
     selection: ChartSelection,
     series_label: SharedString,
     point: ChartPoint,
     color: Hsla,
+    /// Whether `color` is the caller's own choice. A chart that divides one
+    /// series into categories reaches for the categorical scale instead, and
+    /// may only do so when nobody has already spent a colour here.
+    tinted: bool,
     series_order: usize,
     point_order: usize,
 }
@@ -813,6 +820,7 @@ fn active_points(series: &[ChartSeries], theme: &gpui_kit_theme::Theme) -> Vec<A
                 series_label: series.label.clone(),
                 point: sample.clone(),
                 color: series.color.unwrap_or(theme.colors.accent),
+                tinted: series.color.is_some(),
                 series_order,
                 point_order,
             });
@@ -1191,10 +1199,17 @@ fn ready_chart(
         .relative()
         .flex_1()
         .min_w_0()
-        .h(px(160.0))
+        .h(px(PLOT_HEIGHT))
         .overflow_hidden()
         .radius(theme, Radius::Small)
         .surface(theme, Surface::Canvas)
+        // Behind the data: a rule is the reading the axis already names, put
+        // where the label points, not a mark competing with the series.
+        .children(
+            value_rules(axes)
+                .into_iter()
+                .map(|fraction| value_rule(fraction, PLOT_HEIGHT, theme)),
+        )
         .child(chart_canvas)
         .children(current_tip);
     if let Some(interaction) = interaction {
@@ -1301,7 +1316,7 @@ fn y_axis(axes: &ChartAxes, theme: &gpui_kit_theme::Theme) -> Option<AnyElement>
             .column()
             .flex_none()
             .w(px(44.0))
-            .h(px(160.0))
+            .h(px(PLOT_HEIGHT))
             .justify_between()
             .type_scale(theme, TypeScale::Caption)
             .text_color(theme.colors.text_faint)
@@ -1309,6 +1324,38 @@ fn y_axis(axes: &ChartAxes, theme: &gpui_kit_theme::Theme) -> Option<AnyElement>
             .children(axes.y_start.clone())
             .into_any_element()
     })
+}
+
+/// The value-axis readings this chart already puts a label against, as
+/// normalized heights.
+///
+/// A chart here owns no tick model — it invents no scale, so it computes no
+/// intermediate reading to hang a rule on. The two ends are the readings the
+/// caller named, so those are the two a rule may be drawn at, and a caller
+/// that named neither gets none.
+fn value_rules(axes: &ChartAxes) -> Vec<f32> {
+    let mut rules = Vec::new();
+    if axes.y_start.is_some() {
+        rules.push(0.0);
+    }
+    if axes.y_end.is_some() {
+        rules.push(1.0);
+    }
+    rules
+}
+
+/// One rule across a plot region of `height`, at a normalized reading.
+fn value_rule(fraction: f32, height: f32, theme: &gpui_kit_theme::Theme) -> gpui::Div {
+    let weight = theme.borders.hairline;
+    let top =
+        ((1.0 - fraction.clamp(0.0, 1.0)) * height - weight / 2.0).clamp(0.0, height - weight);
+    div()
+        .absolute()
+        .left_0()
+        .right_0()
+        .top(px(top))
+        .h(px(weight))
+        .bg(theme.colors.hairline)
 }
 
 fn axis_offset(axes: &ChartAxes, theme: &gpui_kit_theme::Theme) -> f32 {
@@ -1472,11 +1519,25 @@ fn ready_bars(
         .iter()
         .map(|point| {
             let key = point_key(&point.selection);
+            // A bar chart divides one series into categories, so what a
+            // reader has to tell apart is a category and not a series. Left
+            // uncoloured they take the categorical scale in order; a caller
+            // that already spent a colour on the series keeps it.
+            let base = match active_by_key.get(&key) {
+                Some(active) if active.tinted => point.color,
+                _ => theme.colors.sequence.get(point.point_order),
+            };
             let bar = div()
                 .flex_1()
                 .h(relative(point.position.y.clamp(0.0, 1.0)))
                 .rounded_t(px(theme.radii.small))
-                .bg(point.color.opacity(point.opacity));
+                .bg(linear_gradient_stops(
+                    180.0,
+                    [
+                        linear_color_stop(base.opacity(point.opacity), 0.0),
+                        linear_color_stop(base.opacity(point.opacity * theme.opacity.muted), 1.0),
+                    ],
+                ));
             match active_by_key.get(&key) {
                 Some(active) => bar
                     .semantic_in(
@@ -1516,12 +1577,18 @@ fn ready_bars(
                 .children(y_axis(axes, theme))
                 .child(
                     div()
+                        .relative()
                         .row()
                         .items_end()
                         .flex_1()
                         .min_w_0()
                         .gap(px(6.0))
-                        .h(px(160.0))
+                        .h(px(PLOT_HEIGHT))
+                        .children(
+                            value_rules(axes)
+                                .into_iter()
+                                .map(|fraction| value_rule(fraction, PLOT_HEIGHT, theme)),
+                        )
                         .children(bars),
                 ),
         )
@@ -2023,16 +2090,25 @@ fn ready_pie(
     let painted = sync_motion(ident, &active, theme, window, cx);
     // A pie divides one series into its parts, so the thing a reader has to
     // tell apart is a slice and not a series. Painted in the series colour
-    // they are one disc with hairline seams in it; each slice takes its own
-    // step down the same colour instead, and the key beside it names the
-    // slices rather than the one series they all came from.
+    // they are one disc with hairline seams in it; uncoloured they take the
+    // categorical scale, and a caller that coloured the series keeps that
+    // colour and steps down it instead. Either way the key beside them names
+    // the slices rather than the one series they all came from.
     let count = painted.len().max(1);
+    let tinted = active.first().is_some_and(|point| point.tinted);
+    let slice_color = |color: Hsla, index: usize| {
+        if tinted {
+            slice_step(color, index, count)
+        } else {
+            theme.colors.sequence.get(index)
+        }
+    };
     let slices = painted
         .iter()
         .enumerate()
         .map(|(index, point)| {
             (
-                slice_step(point.color, index, count),
+                slice_color(point.color, index),
                 point.position.y.clamp(0.0, 1.0),
                 point.opacity,
             )
@@ -2045,7 +2121,7 @@ fn ready_pie(
             id: point.selection.point_id.clone(),
             label: point.point.label.clone(),
             points: Vec::new(),
-            color: Some(slice_step(point.color, index, count)),
+            color: Some(slice_color(point.color, index)),
         })
         .collect();
     div()
@@ -2207,12 +2283,18 @@ fn ready_stacked(
                 .children(y_axis(axes, theme))
                 .child(
                     div()
+                        .relative()
                         .row()
                         .items_end()
                         .flex_1()
                         .min_w_0()
                         .gap(px(6.0))
-                        .h(px(160.0))
+                        .h(px(PLOT_HEIGHT))
+                        .children(
+                            value_rules(axes)
+                                .into_iter()
+                                .map(|fraction| value_rule(fraction, PLOT_HEIGHT, theme)),
+                        )
                         .children(columns),
                 ),
         )

@@ -4,13 +4,19 @@
 //! is already normalized. A refresh failure keeps the last verified reading.
 
 use gpui::{
-    AnyElement, App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div, px,
+    AnyElement, App, Hsla, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window,
+    div, px,
 };
+use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Space, TextTone, Theme, TypeScale};
+use gpui_kit_theme::{
+    ActiveTheme, ColorChoice, Radius, SemanticColor, Space, TextTone, Theme, TypeScale, Variant,
+    VariantColors,
+};
 
 use crate::display::badge::Tone;
 use crate::display::empty::{EmptyKind, EmptyState};
+use crate::display::icon::paint as paint_glyph;
 use crate::display::loading::{Skeleton, SkeletonShape};
 use crate::display::sparkline::{Sparkline, SparklinePoint, SparklineReading, SparklineState};
 use crate::display::status::StatusDot;
@@ -19,16 +25,62 @@ use crate::foundation::{CardVariant, Ident, StyledExt};
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
-/// How tall the region under the caption is, whatever is in it.
+/// The least tall the region under the caption is, whatever is in it.
 ///
 /// A card that loses its shape when the reading does not arrive reports the
 /// absence as a different component; every state of one metric is the same
-/// object in the same place, so the height is the card's and not the
-/// reading's.
-const BODY_HEIGHT: f32 = 92.0;
+/// object in the same place, so the floor is the card's and not the
+/// reading's. It is a floor rather than a fixed height: a state that needs
+/// more room takes it, and a row of cards still lines up because they all
+/// stand on the same one.
+const BODY_HEIGHT: f32 = 76.0;
+
+/// The edge of the arrow beside a delta, in pixels.
+///
+/// Smaller than any control icon step: it sits inside caption text and is
+/// read as part of the number, not as a glyph of its own.
+const DELTA_ARROW: f32 = 11.0;
 
 /// The height the trend plot and the placeholder standing in for it share.
 const TREND_HEIGHT: f32 = 40.0;
+
+/// Which way a delta points.
+///
+/// This is direction, never judgement. Whether moving that way is good is the
+/// caller's [`Tone`], because only the caller knows the polarity of its own
+/// metric — a rising error rate and a rising revenue both point up.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum DeltaDirection {
+    Up,
+    Down,
+    #[default]
+    Flat,
+}
+
+impl DeltaDirection {
+    /// The direction the host's own delta text already states.
+    ///
+    /// Only the leading sign is read, and only the characters a formatter
+    /// writes for one: nothing is inferred from the magnitude, and text
+    /// carrying no sign points nowhere rather than being guessed at.
+    pub fn from_text(delta: &str) -> Self {
+        match delta.trim_start().chars().next() {
+            Some('+') => Self::Up,
+            // ASCII hyphen-minus and the typographic minus a locale-aware
+            // formatter writes instead.
+            Some('-' | '\u{2212}') => Self::Down,
+            _ => Self::Flat,
+        }
+    }
+
+    fn glyph(self) -> Option<Glyph> {
+        match self {
+            Self::Up => Some(Glyph::ArrowUp),
+            Self::Down => Some(Glyph::ArrowDown),
+            Self::Flat => None,
+        }
+    }
+}
 
 /// One verified KPI the host already formatted.
 #[derive(Debug, Clone, PartialEq)]
@@ -36,6 +88,7 @@ pub struct MetricReading {
     pub value: SharedString,
     pub delta: Option<SharedString>,
     pub tone: Tone,
+    pub direction: Option<DeltaDirection>,
     pub trend: Vec<SparklinePoint>,
 }
 
@@ -45,6 +98,7 @@ impl MetricReading {
             value: value.into(),
             delta: None,
             tone: Tone::Neutral,
+            direction: None,
             trend: Vec::new(),
         }
     }
@@ -53,6 +107,24 @@ impl MetricReading {
         self.delta = Some(delta.into());
         self.tone = tone;
         self
+    }
+
+    /// The way the delta points, for text whose sign the card cannot read —
+    /// a word, a ratio, a locale that writes the sign last.
+    pub fn direction(mut self, direction: DeltaDirection) -> Self {
+        self.direction = Some(direction);
+        self
+    }
+
+    /// The direction shown: the caller's when it stated one, otherwise the
+    /// one its own delta text already states.
+    pub fn resolved_direction(&self) -> DeltaDirection {
+        self.direction.unwrap_or_else(|| {
+            self.delta
+                .as_ref()
+                .map(|delta| DeltaDirection::from_text(delta))
+                .unwrap_or_default()
+        })
     }
 
     pub fn trend(mut self, points: impl IntoIterator<Item = SparklinePoint>) -> Self {
@@ -119,6 +191,7 @@ pub struct MetricCard {
     ident: Ident,
     label: SharedString,
     state: MetricState,
+    tint: Option<Hsla>,
     slots: Slots,
 }
 
@@ -132,8 +205,19 @@ impl MetricCard {
             ident: ident.into(),
             label: label.into(),
             state,
+            tint: None,
             slots: Slots::default(),
         }
+    }
+
+    /// The colour this metric is known by, which its trend is drawn in.
+    ///
+    /// Without one the trend takes the theme accent. A caller that has
+    /// already spent a colour on this series elsewhere — a legend, a chart
+    /// the card sits beside — passes it here so the two agree.
+    pub fn tint(mut self, tint: Hsla) -> Self {
+        self.tint = Some(tint);
+        self
     }
 }
 
@@ -205,7 +289,14 @@ impl RenderOnce for MetricCard {
                     MetricState::Stale { reason, .. } => Some(reason.clone()),
                     _ => None,
                 };
-                reading_body(&self.ident, &self.label, reading, stale, &theme)
+                reading_body(
+                    &self.ident,
+                    &self.label,
+                    reading,
+                    stale,
+                    self.tint.unwrap_or(theme.colors.accent),
+                    &theme,
+                )
             }
         };
 
@@ -251,6 +342,7 @@ fn reading_body(
     label: &SharedString,
     reading: &MetricReading,
     stale: Option<SharedString>,
+    tint: Hsla,
     theme: &Theme,
 ) -> AnyElement {
     let trend = (!reading.trend.is_empty()).then(|| {
@@ -265,6 +357,7 @@ fn reading_body(
                     reading.value.clone(),
                 )),
             )
+            .tint(tint)
             .embedded()
             .stale(stale.is_some()),
         )
@@ -286,18 +379,7 @@ fn reading_body(
                         .child(reading.value.clone()),
                 )
                 .children(reading.delta.as_ref().map(|delta| {
-                    div()
-                        .row()
-                        .items_center()
-                        .flex_none()
-                        .gap_token(theme, Space::Xs)
-                        .child(StatusDot::new(reading.tone))
-                        .child(
-                            div()
-                                .type_scale(theme, TypeScale::Caption)
-                                .text_color(reading.tone.color(theme))
-                                .child(delta.clone()),
-                        )
+                    delta_pill(delta, reading.tone, reading.resolved_direction(), theme)
                 })),
         )
         .children(trend)
@@ -314,9 +396,78 @@ fn reading_body(
         .into_any_element()
 }
 
+/// The wash and the readable text one delta tier resolves to.
+fn delta_colors(tone: Tone, theme: &Theme) -> VariantColors {
+    let role = match tone {
+        Tone::Success => SemanticColor::Success,
+        Tone::Warning => SemanticColor::Warning,
+        Tone::Danger => SemanticColor::Danger,
+        Tone::Info => SemanticColor::Info,
+        Tone::Accent => SemanticColor::Accent,
+        // A neutral delta is not claiming anything, so it takes the neutral
+        // track rather than a colour a reader would look for a meaning in.
+        Tone::Neutral => {
+            return VariantColors {
+                background: theme.colors.track,
+                background_hover: theme.colors.track,
+                background_active: theme.colors.track,
+                text: theme.colors.text_muted,
+                border: None,
+            };
+        }
+    };
+    theme.variant_colors(Variant::Light, &ColorChoice::Semantic(role))
+}
+
+/// The delta as a chip: the way it moved, then how much.
+fn delta_pill(
+    delta: &SharedString,
+    tone: Tone,
+    direction: DeltaDirection,
+    theme: &Theme,
+) -> AnyElement {
+    let colors = delta_colors(tone, theme);
+    div()
+        .row()
+        .items_center()
+        .flex_none()
+        .gap(px(2.0))
+        .px_token(theme, Space::Xs)
+        .py(px(1.0))
+        .radius(theme, Radius::Pill)
+        .bg(colors.background)
+        .children(
+            direction
+                .glyph()
+                .map(|glyph| paint_glyph(glyph, DELTA_ARROW, colors.text, false)),
+        )
+        .child(
+            div()
+                .type_scale(theme, TypeScale::Caption)
+                .text_color(colors.text)
+                .child(delta.clone()),
+        )
+        .into_any_element()
+}
+
 #[cfg(test)]
 mod metric_phase_tests {
     use super::*;
+
+    #[test]
+    fn a_delta_points_the_way_its_own_text_says_unless_the_caller_says_otherwise() {
+        let inferred = MetricReading::new("12.4k").delta("-3%", Tone::Danger);
+        assert_eq!(inferred.resolved_direction(), DeltaDirection::Down);
+
+        // Text carrying no sign points nowhere rather than being guessed at,
+        // and the caller can still state the direction itself.
+        let unsigned = MetricReading::new("12.4k").delta("steady", Tone::Neutral);
+        assert_eq!(unsigned.resolved_direction(), DeltaDirection::Flat);
+        assert_eq!(
+            unsigned.direction(DeltaDirection::Up).resolved_direction(),
+            DeltaDirection::Up
+        );
+    }
 
     #[test]
     fn stale_projects_as_error_and_keeps_the_verified_reading() {

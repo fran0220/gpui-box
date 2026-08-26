@@ -2631,7 +2631,9 @@
       "construct": [
         "new(ident: impl Into<Ident>, label: impl Into<SharedString>, state: MetricState) -> Self"
       ],
-      "options": [],
+      "options": [
+        "tint(tint: Hsla) -> Self"
+      ],
       "commands": [],
       "queries": [],
       "slots": [
@@ -6857,6 +6859,22 @@
       ]
     },
     {
+      "name": "DeltaDirection",
+      "path": "gpui_kit::display::DeltaDirection",
+      "summary": "Which way a delta points.",
+      "variants": [
+        "Up",
+        "Down",
+        "Flat"
+      ],
+      "construct": [
+        "from_text(delta: &str) -> Self"
+      ],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "DescriptionItem",
       "path": "gpui_kit::display::DescriptionItem",
       "summary": "One term and what it describes.",
@@ -9614,10 +9632,13 @@
       ],
       "options": [
         "delta(delta: impl Into<SharedString>, tone: Tone) -> Self",
+        "direction(direction: DeltaDirection) -> Self",
         "trend(points: impl IntoIterator<Item = SparklinePoint>) -> Self"
       ],
       "commands": [],
-      "queries": []
+      "queries": [
+        "resolved_direction() -> DeltaDirection"
+      ]
     },
     {
       "name": "MetricState",

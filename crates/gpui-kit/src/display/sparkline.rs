@@ -16,7 +16,8 @@
 
 use gpui::{
     AnyElement, App, Hsla, InteractiveElement, IntoElement, ParentElement, PathBuilder, RenderOnce,
-    SharedString, Styled, Window, canvas, div, point, px, relative,
+    SharedString, Styled, Window, canvas, div, linear_color_stop, linear_gradient_stops, point,
+    prelude::FluentBuilder, px, relative,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TypeScale};
@@ -218,7 +219,7 @@ impl RenderOnce for Sparkline {
             return div()
                 .w_full()
                 .h_full()
-                .child(plot(&theme, points, self.tint, stale))
+                .child(plot(&theme, points, self.tint, stale, true))
                 .into_any_element();
         }
         let (body, spec): (AnyElement, NodeSpec) = match &self.state {
@@ -420,7 +421,7 @@ fn reading_body(
                         .flex_1()
                         .min_w_0()
                         .h(px(PLOT_HEIGHT))
-                        .child(plot(&theme, points, tint, is_stale)),
+                        .child(plot(&theme, points, tint, is_stale, false)),
                 )
                 .child(
                     div()
@@ -455,6 +456,7 @@ fn plot(
     points: Vec<SparklinePoint>,
     tint: Option<Hsla>,
     stale: bool,
+    embedded: bool,
 ) -> impl IntoElement {
     // A trend is data, so it is neutral until a caller says whose it is; a
     // reading that is no longer verified draws quieter than one that is, which
@@ -466,13 +468,21 @@ fn plot(
         (None, true) => theme.colors.text_faint,
     };
     let stroke = theme.borders.thick;
+    let wash = if stale {
+        theme.effects.area_wash_alpha * theme.opacity.muted
+    } else {
+        theme.effects.area_wash_alpha
+    };
     div()
         .relative()
         .w_full()
         .h_full()
         .overflow_hidden()
         .radius(theme, Radius::Small)
-        .surface(theme, Surface::Sunken)
+        // A framed plot is a well of its own; an embedded one is a mark on
+        // the surface that already framed it, and a second floor under it
+        // reads as a hole cut in that surface.
+        .when(!embedded, |plot| plot.surface(theme, Surface::Sunken))
         .child(
             div()
                 .absolute()
@@ -486,7 +496,7 @@ fn plot(
             canvas(
                 |_, _, _| {},
                 move |bounds, _, window, _| {
-                    paint_series(bounds, window, &points, line, stroke, stale);
+                    paint_series(bounds, window, &points, line, stroke, wash, stale);
                 },
             )
             .absolute()
@@ -501,6 +511,7 @@ fn paint_series(
     points: &[SparklinePoint],
     color: Hsla,
     stroke: f32,
+    wash: f32,
     stale: bool,
 ) {
     if points.len() < 2 {
@@ -530,7 +541,16 @@ fn paint_series(
     area.line_to(point(at(points[points.len() - 1]).x, floor));
     area.close();
     if let Ok(path) = area.build() {
-        window.paint_path(path, color.opacity(if stale { 0.06 } else { 0.14 }));
+        window.paint_path(
+            path,
+            linear_gradient_stops(
+                180.0,
+                [
+                    linear_color_stop(color.opacity(wash), 0.0),
+                    linear_color_stop(color.opacity(0.0), 1.0),
+                ],
+            ),
+        );
     }
 
     let mut line = PathBuilder::stroke(px(stroke));
