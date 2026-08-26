@@ -968,7 +968,11 @@ All six affected `data-grid`, `data-grid-editing`, and `tree-grid` baselines
 were re-captured and inspected in `studio-dark` and `studio-light`. The review
 found and corrected one additional hierarchy-header gutter mismatch; the final
 images have aligned header/body geometry, clear frozen casts, legible selected
-and editing states, and no unintended clipping, overlap, or missing glyph.
+and editing states, and no unintended clipping, overlap, or missing glyph. A
+final borderless-language pass removed the hard rule from the frozen cast and
+the decorative underline from grouped labels; placement and typography carry
+the group relationship, while only content-dividing and state-reporting rules
+remain.
 
 ### Claims rejected or reduced after direct review
 

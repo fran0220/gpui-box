@@ -1468,23 +1468,10 @@ impl DataGrid {
                 };
                 cells.push(
                     group_frame(div().id(ident.element_id()), covered, theme)
-                        .relative()
                         .justify_center()
                         .child(
                             text(theme, TypeScale::Caption, group.label.clone())
-                                .text_tone(theme, TextTone::Faint),
-                        )
-                        // The rule is what attaches the label to the columns it
-                        // names. Without it the group row is a caption floating
-                        // above a header it has no stated relationship with.
-                        .child(
-                            div()
-                                .absolute()
-                                .left_0()
-                                .right_0()
-                                .bottom_0()
-                                .h(px(theme.borders.hairline))
-                                .bg(theme.colors.hairline_strong),
+                                .text_tone(theme, TextTone::Muted),
                         )
                         .semantic_in(
                             cx,
@@ -2631,18 +2618,11 @@ fn pinned_edge(theme: &Theme, direction: LayoutDirection) -> gpui::Div {
         .w(px(theme.space(Space::Sm)))
         .h_full()
         .flex_none()
-        .child(
-            div()
-                .w(px(theme.borders.hairline))
-                .h_full()
-                .bg(theme.colors.divider),
-        )
-        .child(div().flex_1().h_full().bg(gpui::linear_gradient(
+        .bg(gpui::linear_gradient(
             if direction.is_rtl() { 270.0 } else { 90.0 },
             gpui::linear_color_stop(cast.opacity(0.22), 0.0),
             gpui::linear_color_stop(cast.opacity(0.0), 1.0),
-        )))
-        .row_reading(direction)
+        ))
 }
 
 /// The width the pinned edge occupies, drawn as nothing.

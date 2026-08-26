@@ -1,5 +1,10 @@
 # Lessons
 
+- A visual-completion pass must re-check every added line against the
+  borderless contract. Do not use a hard rule to attach a group label or mark a
+  frozen edge when placement, typography, surface, or a soft cast can express
+  the relationship. Report local and CI macOS visual validation explicitly,
+  rather than letting a Windows-only caveat make macOS coverage look absent.
 - Before describing platform support, check the current CI matrix and visual
   baselines rather than repeating an older README qualification. Distinguish
   supported platforms from the platform-specific validation mechanism and
