@@ -989,3 +989,33 @@ remain.
 - The earlier short `DataGrid` and `TreeGrid` fixtures were legible, but did not
   establish wide-content completeness. Their replacements now expose that
   behavior directly and retain the same clear short-content states.
+
+### Borderless-language closure
+
+A final source and exhibit audit checked all 180 components against the
+borderless contract: surfaces, spacing, typography, and elevation establish
+resting hierarchy; a line remains only when it reports focus, invalidity,
+refusal, selection, or a drop state, is the pointer-actuated geometry of a
+track/splitter/resize seam, is true chart/diff/timeline geometry, is a semantic
+content rule, or was explicitly requested through an outlined variant.
+
+The audit removed decorative resting outlines and repeated row rules from
+`SettingsSection`, `KeymapEditor`, `DesktopTitlebar`, `NodeGroup`, `GraphNode`,
+`AgentCard`, `AgentRoster`, `PersonaDialogue`, and repeated `SchemaForm` items.
+Fixture-only frames were removed from the image, video, effects, empty-state,
+and aspect-ratio exhibits so the catalog demonstrates the same language it
+documents. Selection and invalidity continue to use accent/state edges; dense
+grid lines remain opt-in rather than becoming the default.
+
+**Borderless consistency: 96/100.** The four remaining points are deliberately
+reserved for review under future component additions: the current catalog has
+no known decorative resting rule, but this is a design constraint rather than
+a property the type system can prove. Component acceptance remains 90/100;
+the catalog still passes 180/180 with an average of 93 and a floor of 90.
+
+All 32 changed `studio-dark` and `studio-light` macOS images across 16 scenes
+were captured and visually inspected at full resolution. Surface boundaries,
+selection, dark-theme contrast, clipping, and final callouts remain clear.
+The horizontal rules retained in `ImageViewer` and `VideoPlayer` exhibits are
+labelled `Divider` subjects separating two review cases, and the baseline in
+the run graph is actual chart geometry; none is a component frame.

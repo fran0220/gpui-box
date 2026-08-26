@@ -762,8 +762,7 @@ fn run_graph_picture(cx: &App) -> AnyElement {
                 .justify_between()
                 .px_token(&theme, Space::Md)
                 .py_token(&theme, Space::Sm)
-                .border_b(px(theme.borders.hairline))
-                .border_color(theme.colors.divider)
+                .surface(&theme, Surface::Raised)
                 .child(crate::foundation::text(
                     &theme,
                     TypeScale::Label,
@@ -824,8 +823,7 @@ fn pasted_workflow_picture(cx: &App) -> AnyElement {
             .w(px(104.0))
             .p_token(&theme, Space::Sm)
             .radius(&theme, Radius::Card)
-            .bg(theme.colors.raised)
-            .hairline(&theme)
+            .frame(&theme, Surface::Raised, Elevation::Raised)
             .child(
                 gpui_kit_assets::icon(icon)
                     .size(px(theme.control.md.icon_size))

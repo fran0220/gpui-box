@@ -1206,8 +1206,7 @@ pub(super) fn empty_state(_window: &mut Window, cx: &mut App) -> AnyElement {
         div()
             .w_full()
             .radius(&theme, Radius::Card)
-            .surface(&theme, Surface::Panel)
-            .hairline(&theme)
+            .frame(&theme, Surface::Panel, Elevation::Raised)
             .child(state)
     };
     stack(&theme)

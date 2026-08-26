@@ -12,7 +12,7 @@ use gpui_kit_theme::{ActiveTheme, Radius, Space, TextTone, TypeScale};
 
 use crate::foundation::{Ident, StyledExt};
 
-/// A group outline drawn over a canvas region the host already decided.
+/// A labelled group drawn over a canvas region the host already decided.
 #[derive(IntoElement)]
 pub struct NodeGroup {
     ident: Ident,
@@ -46,10 +46,9 @@ impl ParentElement for NodeGroup {
 impl RenderOnce for NodeGroup {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        // A group is a boundary, not a colour: the wash is the canvas one
-        // step darker and the edge is the same hairline every other container
-        // in the library wears, so a named region does not out-shout the
-        // nodes inside it.
+        // The sunken wash and label establish the region. A transparent border
+        // reserves geometry for the accent selection report, so selecting the
+        // group neither reflows it nor leaves a decorative resting outline.
         div()
             .relative()
             .column()
@@ -59,9 +58,9 @@ impl RenderOnce for NodeGroup {
             .bg(theme.colors.sunken)
             .border(px(theme.borders.hairline))
             .border_color(if self.selected {
-                theme.colors.hairline_strong
+                theme.colors.accent
             } else {
-                theme.colors.hairline
+                gpui::transparent_black()
             })
             .p_token(&theme, Space::Sm)
             .gap_token(&theme, Space::Sm)

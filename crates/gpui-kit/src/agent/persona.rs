@@ -19,7 +19,9 @@ use gpui::{
     div, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TextTone, TypeScale};
+use gpui_kit_theme::{
+    ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TextTone, TypeScale,
+};
 use web_time::Instant;
 
 use crate::agent::model::AgentSnapshot;
@@ -941,9 +943,7 @@ impl RenderOnce for PersonaDialogue {
             .w_full()
             .p_token(&theme, Space::Lg)
             .radius(&theme, Radius::Card)
-            .border(px(theme.borders.hairline))
-            .border_color(theme.colors.hairline)
-            .bg(theme.colors.panel)
+            .frame(&theme, Surface::Panel, Elevation::Raised)
             .child(portrait)
             .child(content)
             .semantic_in(

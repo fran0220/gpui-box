@@ -15,7 +15,7 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon as Glyph, icon as glyph};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, TextTone, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TextTone, TypeScale};
 
 use crate::agent::model::{
     AgentActivity, AgentExecutionState, AgentId, AgentModelIssue, AgentOutcome, AgentPresence,
@@ -27,7 +27,7 @@ use crate::display::avatar::Avatar;
 use crate::display::badge::{Badge, Tone};
 use crate::display::status::{Callout, StatusDot};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
-use crate::foundation::{FocusRing, Ident, Pressable, StyledExt};
+use crate::foundation::{FocusRing, Ident, Pressable, SelectedRow, StyledExt};
 use crate::motion;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey, Strings};
 
@@ -489,11 +489,9 @@ impl RenderOnce for AgentCard {
             .w_full()
             .p_token(&theme, Space::Md)
             .radius(&theme, Radius::Card)
-            .border(px(theme.borders.hairline))
-            .border_color(theme.colors.hairline)
-            .when(self.selected, |element| element.bg(theme.colors.selected))
-            .when(!self.selected, |element| element.bg(theme.colors.panel))
-            .child(body);
+            .frame(&theme, Surface::Panel, Elevation::Raised)
+            .child(body)
+            .selected_row(&theme, direction, self.selected);
         if let Some(handler) = self.on_action {
             let keyboard_handler = handler.clone();
             let keyboard_id = agent_id.clone();
@@ -680,15 +678,11 @@ fn roster_row(
     if let Some(tint) = appearance.and_then(|appearance| appearance.tint) {
         avatar = avatar.tint(tint);
     }
-    // The rule sits inside the row rather than between rows, so a roster
-    // that scrolls does not leave a stripe hanging under the last name.
     div()
         .h_full()
         .row()
         .items_center()
         .gap_token(theme, Space::Sm)
-        .border_b(px(theme.borders.hairline))
-        .border_color(theme.colors.divider)
         .child(avatar)
         .child(
             div()

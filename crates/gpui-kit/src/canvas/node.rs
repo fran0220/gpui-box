@@ -719,21 +719,16 @@ impl RenderOnce for GraphNode {
                     .column()
                     .gap(px(metrics.gap))
                     .p(px(metrics.padding))
-                    .border_t(px(theme.borders.hairline))
-                    .border_color(theme.colors.hairline)
                     .children(thumbnail)
                     .children(action)
                     .children(strip)
             });
 
-        // The stripe runs the whole height rather than only beside the header,
-        // so a node that has scrolled until only its edge is visible still
-        // says what it is. Without a category it takes the hairline, which
-        // claims nothing: a stripe in a colour that means nothing is worse
-        // than no stripe, because a reader will look for the meaning.
-        let rail = div().flex_none().w(px(metrics.rail)).bg(identity
-            .map(|identity| identity.text)
-            .unwrap_or(theme.colors.hairline));
+        // A category stripe runs the whole height, so a node that has scrolled
+        // until only its edge is visible still says what it is. A node without
+        // a category gets no neutral substitute: a stripe with no meaning is
+        // decoration that invites the reader to search for one.
+        let rail = identity.map(|identity| div().flex_none().w(px(metrics.rail)).bg(identity.text));
 
         let stack = div()
             .flex_1()
@@ -785,7 +780,7 @@ impl RenderOnce for GraphNode {
                     ring(gap, theme.colors.raised),
                 ])
             })
-            .child(rail)
+            .children(rail)
             .child(stack);
 
         // A node that takes a click is a button and a node that does not is a

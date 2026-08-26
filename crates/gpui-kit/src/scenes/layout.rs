@@ -533,7 +533,6 @@ pub(super) fn aspect_ratio(_window: &mut Window, cx: &mut App) -> AnyElement {
             .justify_center()
             .surface(&theme, Surface::Sunken)
             .radius(&theme, Radius::Card)
-            .hairline(&theme)
             .overflow_hidden()
             .child(
                 crate::foundation::text(&theme, TypeScale::Label, label)

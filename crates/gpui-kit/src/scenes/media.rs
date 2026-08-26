@@ -99,8 +99,7 @@ fn walkthrough_frame(cx: &App) -> AnyElement {
                 .gap_token(&theme, Space::Sm)
                 .px_token(&theme, Space::Md)
                 .py_token(&theme, Space::Sm)
-                .border_b(px(theme.borders.hairline))
-                .border_color(theme.colors.divider)
+                .surface(&theme, Surface::Raised)
                 .child(div().size(px(7.0)).rounded_full().bg(theme.colors.success))
                 .child(crate::foundation::text(
                     &theme,
@@ -151,7 +150,7 @@ fn walkthrough_frame(cx: &App) -> AnyElement {
                                 .gap_token(&theme, Space::Xs)
                                 .p_token(&theme, Space::Sm)
                                 .radius(&theme, Radius::Small)
-                                .hairline(&theme)
+                                .surface(&theme, Surface::Raised)
                                 .child(crate::foundation::text(
                                     &theme,
                                     TypeScale::Caption,
@@ -195,8 +194,7 @@ fn walkthrough_poster(cx: &App) -> AnyElement {
                 .items_center()
                 .justify_center()
                 .rounded_full()
-                .bg(theme.colors.raised)
-                .hairline(&theme)
+                .frame(&theme, Surface::Raised, Elevation::Raised)
                 .child(
                     gpui_kit_assets::icon(Icon::Play)
                         .size(px(theme.control.md.icon_size))

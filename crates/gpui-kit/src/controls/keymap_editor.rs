@@ -2,7 +2,7 @@
 
 use gpui::{
     AppContext, Context, Entity, EventEmitter, InteractiveElement, IntoElement, ParentElement,
-    Render, SharedString, Styled, Subscription, Window, div, prelude::FluentBuilder as _, px,
+    Render, SharedString, Styled, Subscription, Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Space, TypeScale};
@@ -316,8 +316,6 @@ impl Render for KeymapEditor {
             .w_full()
             .px(px(theme.space(Space::Md)))
             .py(px(theme.space(Space::Sm)))
-            .border_b(px(theme.borders.hairline))
-            .border_color(theme.colors.hairline)
             .child(
                 foundation_text(
                     &theme,
@@ -337,16 +335,16 @@ impl Render for KeymapEditor {
                         .value(cx.numbers().count(count)),
                 ),
             );
-        // Commands are a list, and a list separated only by air is a set of
-        // unrelated panels floating on the page. One surface holds them, and
-        // a rule between two of them says where one command ends.
+        // One elevated surface holds the command list. Type hierarchy, stable
+        // padding and air separate commands without turning each one into a
+        // ruled table row.
         let rows = div()
             .column()
             .w_full()
-            .card_surface(&theme, CardVariant::Outlined)
+            .card_surface(&theme, CardVariant::Elevated)
             .overflow_hidden()
             .child(header)
-            .children(visible.into_iter().enumerate().map(|(position, command)| {
+            .children(visible.into_iter().map(|command| {
                 let row = self.ident.child(command.id.as_ref());
                 let refused = command.refusal.is_some();
                 let actionable = !disabled && !refused;
@@ -516,11 +514,6 @@ impl Render for KeymapEditor {
                     .w_full()
                     .gap_token(&theme, Space::Sm)
                     .p(px(theme.space(Space::Md)))
-                    .when(position > 0, |command| {
-                        command
-                            .border_t(px(theme.borders.hairline))
-                            .border_color(theme.colors.hairline)
-                    })
                     .child(
                         div()
                             .row()

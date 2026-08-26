@@ -234,8 +234,6 @@ impl RenderOnce for DesktopTitlebar {
             .w_full()
             .h(px(HEIGHT))
             .surface(&theme, Surface::Panel)
-            .border_b(px(theme.borders.hairline))
-            .border_color(theme.colors.divider)
             .window_control_area(WindowControlArea::Drag)
             .on_mouse_down(MouseButton::Left, move |event, window, cx| {
                 if event.click_count >= 2 && window.is_resizable() {

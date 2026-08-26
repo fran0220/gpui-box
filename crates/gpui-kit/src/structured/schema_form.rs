@@ -2278,9 +2278,8 @@ impl SchemaForm {
                         .column()
                         .gap_token(&theme, Space::Sm)
                         .p_token(&theme, Space::Sm)
-                        .border(px(theme.borders.hairline))
-                        .border_color(theme.colors.hairline)
                         .radius(&theme, gpui_kit_theme::Radius::Card)
+                        .surface(&theme, Surface::Raised)
                         .child(
                             div()
                                 .row_reading(direction)

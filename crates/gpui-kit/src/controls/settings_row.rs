@@ -438,23 +438,15 @@ impl RenderOnce for SettingsSection {
                 )
         });
 
-        // Settings in one card are separate decisions, and a card that runs
-        // them together makes the reader find the boundaries by reading. A
-        // hairline between neighbours is where a card says where one ends.
-        let last = self.rows.len().saturating_sub(1);
-        let rows = self.rows.into_iter().enumerate().map(|(index, row)| {
+        // The shared panel, stable row padding and each row's own label/control
+        // alignment carry the grouping. Permanent rules between every setting
+        // would turn a calm preferences surface into a table.
+        let rows = self.rows.into_iter().map(|row| {
             let row = match dimmed.clone() {
                 Some(reason) => row.inapplicable(reason),
                 None => row,
             };
-            div()
-                .w_full()
-                .when(index < last, |element| {
-                    element
-                        .border_b(px(theme.borders.hairline))
-                        .border_color(theme.colors.hairline)
-                })
-                .child(row.render_in(&theme, cx))
+            div().w_full().child(row.render_in(&theme, cx))
         });
 
         div()
