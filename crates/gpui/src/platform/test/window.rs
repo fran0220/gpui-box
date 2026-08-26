@@ -183,11 +183,16 @@ impl TestWindow {
         self.0.lock().start_external_drag_result = result;
     }
 
-    pub(crate) fn set_scene_overlay_supported(&self, supported: bool) {
+    /// Simulates a platform that can or cannot lift a scene into an overlay
+    /// plane, like the neighbouring drag result this is a capability a test
+    /// declares rather than a value the crate reads back.
+    pub fn set_scene_overlay_supported(&self, supported: bool) {
         self.0.lock().scene_overlay_supported = supported;
     }
 
-    pub(crate) fn set_subpixel_rendering_supported(&self, supported: bool) {
+    /// Simulates a platform that renders text with or without subpixel
+    /// coverage.
+    pub fn set_subpixel_rendering_supported(&self, supported: bool) {
         self.0.lock().subpixel_rendering_supported = supported;
     }
 }
