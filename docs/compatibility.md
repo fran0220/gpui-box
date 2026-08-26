@@ -56,6 +56,14 @@ already occupied by its own chrome through `ToastLayer::reserved_edges`.
 `StatusBar::height` exposes the matching shared strip height, so applications
 do not copy framework geometry to keep persistent notifications clear.
 
+Inline sticky subtrees retain ordinary layout while GPUI translates their
+prepaint, hit testing, accessibility bounds, and paint together against the
+active content mask. Overflow containers can reveal a focused descendant with
+physical edge insets reserved for those overlays. `DataGrid` and `TreeGrid`
+use that contract for a single horizontal header/body/summary viewport and a
+direction-aware frozen leading group; their virtualized vertical handle remains
+independent.
+
 Native child views sit between GPUI's base and deferred-overlay scene planes.
 Text on the opaque base plane retains platform subpixel rendering; text in the
 transparent overlay plane uses grayscale antialiasing because RGB subpixel

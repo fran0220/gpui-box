@@ -790,11 +790,13 @@ invariants; source text assertions are not evidence.
 
 The next gaps are a single agent-run/timeline-card aggregate, host-resolved
 image/attachment/file capabilities, and a portable date capability over
-`DateAdapter`. `DataGrid` also deliberately lacks horizontal scrolling. GPUI's
-read-only text primitive now covers one shaped value, while a drag spanning
-separately mounted or virtualized document rows remains unsupported. Those are
-real component limitations, but they need not block a first vocabulary if its
-published capabilities say so.
+`DateAdapter`. `DataGrid` now carries one shared horizontal viewport and a
+frozen leading group, but still needs a bounded wire projection before plugins
+can supply its arbitrary cells and loaded-row protocol. GPUI's read-only text
+primitive covers one shaped value, while a drag spanning separately mounted or
+virtualized document rows remains unsupported. Those are real component
+limitations, but they need not block a first vocabulary if its published
+capabilities say so.
 
 Slot registration, placement, command palette integration, JSON-RPC, and the
 WebView widget are host work, not missing GPUI Box Kit components.

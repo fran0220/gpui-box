@@ -917,10 +917,10 @@ Acceptance remains **90/100 with no major UX defect**.
 | Controls + datetime | 41 | 94 | 91 | 41 |
 | Display + motion + effects | 47 | 93 | 90 | 47 |
 | Navigation + layout + overlay | 34 | 93 | 90 | 34 |
-| Data + structured | 11 | 89 | 84 | 9 |
+| Data + structured | 11 | 91 | 90 | 11 |
 | Content + media | 15 | 94 | 91 | 15 |
 | Agent + game + canvas | 32 | 92 | 90 | 32 |
-| **Catalog** | **180** | **93** | **84** | **178** |
+| **Catalog** | **180** | **93** | **90** | **180** |
 
 ### Findings closed in this pass
 
@@ -949,24 +949,26 @@ Each changed exhibit was re-captured and read in `studio-dark` and
 `studio-light`. The final pictures contain no text clipping, overlap, missing
 glyph, or low-contrast state in the changed subjects.
 
-### Open completeness gap — not passed by a convenient scene
+### Wide-data completeness gap closed
 
-`DataGrid` scores **86** and `TreeGrid` **84**. Their current exhibits are
-readable and do not visibly overflow; the failure is scale completeness, not a
-claim that those fixtures are broken. Both components explicitly lack
-horizontal scrolling, and `DataGrid`'s pinned columns do not freeze against a
-wide scrolling body. Deep hierarchy plus wide data has the same limitation in
-`TreeGrid`.
+`DataGrid` now scores **96** and `TreeGrid` **95**. A single horizontal
+viewport carries header, virtualized body, and summary while vertical
+virtualization remains independent. The leading column group stays frozen at
+the left edge in LTR and the right edge in RTL; pointer geometry, clipping,
+accessibility bounds, and focus reveal all use the same translated subtree.
 
-This was deliberately not patched with an `overflow_x_scroll` wrapper or a
-per-row counter-translation. Header, virtualized body, clipping, hit testing,
-keyboard reveal, and frozen columns must share one horizontal position. A
-local approximation would make one screenshot pass while leaving those
-surfaces inconsistent. Closing this gap requires a reusable synchronized-axis
-scroll primitive at the GPUI framework boundary, focused framework tests, and
-the provenance, compatibility, dependency-authority, and platform validation
-required for framework infrastructure. Until that work lands, these two stay
-below the UX threshold in the score rather than being declared complete.
+This is backed by a product-neutral GPUI sticky primitive rather than a
+body-only wrapper or per-row counter-translation. Focused tests cover shared
+header/body/summary motion, frozen hierarchy, reserved-edge keyboard reveal,
+LTR/RTL direction switches, clipped hit targets, and translated accessibility
+bounds. The wide exhibits name the offscreen fields and make scale behavior
+reviewable instead of hiding it behind short idealized columns.
+
+All six affected `data-grid`, `data-grid-editing`, and `tree-grid` baselines
+were re-captured and inspected in `studio-dark` and `studio-light`. The review
+found and corrected one additional hierarchy-header gutter mismatch; the final
+images have aligned header/body geometry, clear frozen casts, legible selected
+and editing states, and no unintended clipping, overlap, or missing glyph.
 
 ### Claims rejected or reduced after direct review
 
@@ -980,6 +982,6 @@ below the UX threshold in the score rather than being declared complete.
 - Spinner, pulse, bar-loader, micro-mark, and thinking motion cannot be failed
   from a reduced-motion poster. Their user experience remains a real-gallery
   review, as documented by the visual testing contract.
-- `DataGrid` and `TreeGrid` short fixtures are legible. Their open score is the
-  explicit wide-content limitation above, not an observed clipped column in
-  the current baseline.
+- The earlier short `DataGrid` and `TreeGrid` fixtures were legible, but did not
+  establish wide-content completeness. Their replacements now expose that
+  behavior directly and retain the same clear short-content states.

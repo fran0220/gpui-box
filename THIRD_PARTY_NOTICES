@@ -62,6 +62,9 @@ The window-owned document-selection coordinator, isolated selection scopes,
 virtualized-copy coverage, and generic scroll-target contract are GPUI Box work
 over existing framework state and import no editor, product, or third-party
 source.
+The inline sticky-subtree transform, deferred-prepaint clipping retention, and
+inset-aware focus reveal behavior are GPUI Box framework work over existing
+layout, input, and accessibility state and import no grid or third-party source.
 The per-window structural frame counters, retained element-arena growth
 accounting, and deterministic 10,000-item Kit performance budgets are GPUI Box
 work and import no profiler, allocator, benchmark, or product source.

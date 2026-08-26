@@ -1,7 +1,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use gpui::{IntoElement, TestAppContext};
+use gpui::{
+    IntoElement, Modifiers, ParentElement, ScrollDelta, ScrollWheelEvent, Styled, TestAppContext,
+    TouchPhase, div, point, px,
+};
 use gpui_kit::prelude::*;
 use gpui_kit_semantics::Role;
 use gpui_kit_testkit::harness::Harness;
@@ -125,4 +128,72 @@ fn logical_start_column_and_disclosure_follow_reading_direction(cx: &mut TestApp
         .expect("RTL disclosure");
     assert!(rtl_name.left() > rtl_value.left());
     assert!(rtl_disclosure.left() > rtl_name.center().x);
+}
+
+#[gpui::test]
+fn a_wide_tree_grid_keeps_hierarchy_context_frozen_while_fields_scroll(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        div()
+            .w(px(500.0))
+            .child(
+                TreeGrid::new("wide-tree-grid", 4, |index, _, _| {
+                    TreeGridRow::new(format!("node-{index}"), index as u32 + 1)
+                        .text(format!("Nested node {index}"))
+                        .cell(
+                            "name",
+                            Cell::new(format!("Nested node {index}"))
+                                .text(format!("Nested node {index}"))
+                                .published(true),
+                        )
+                        .cell("owner", format!("Owner {index}"))
+                        .cell("status", format!("Status {index}"))
+                        .cell("updated", format!("Updated {index}"))
+                })
+                .columns([
+                    GridColumn::new("name", "Hierarchy")
+                        .fixed(240.0)
+                        .pinned(true),
+                    GridColumn::new("owner", "Owner").fixed(260.0),
+                    GridColumn::new("status", "Status").fixed(260.0),
+                    GridColumn::new("updated", "Updated").fixed(260.0),
+                ])
+                .visible_rows(4)
+                .on_expand(|_, _, _, _| {}),
+            )
+            .into_any_element()
+    });
+
+    let hierarchy_before = harness
+        .bounds("wide-tree-grid.node-0.name")
+        .expect("hierarchy cell");
+    let owner_header_before = harness
+        .bounds("wide-tree-grid.header.owner")
+        .expect("owner header");
+    let owner_cell_before = harness
+        .bounds("wide-tree-grid.node-0.owner")
+        .expect("owner cell");
+    assert_eq!(
+        owner_header_before.origin.x, owner_cell_before.origin.x,
+        "the hierarchy disclosure lives inside its cell and must not offset the header"
+    );
+    let field_before = harness
+        .bounds("wide-tree-grid.header.status")
+        .expect("moving field");
+    let at = harness.point_in("wide-tree-grid");
+    harness.context().simulate_event(ScrollWheelEvent {
+        position: at,
+        delta: ScrollDelta::Pixels(point(px(-280.0), px(0.0))),
+        modifiers: Modifiers::none(),
+        touch_phase: TouchPhase::Moved,
+    });
+    harness.context().run_until_parked();
+
+    let hierarchy_after = harness
+        .bounds("wide-tree-grid.node-0.name")
+        .expect("hierarchy cell after scroll");
+    let field_after = harness
+        .bounds("wide-tree-grid.header.status")
+        .expect("moving field after scroll");
+    assert_eq!(hierarchy_after.origin.x, hierarchy_before.origin.x);
+    assert!(field_after.origin.x < field_before.origin.x - px(240.0));
 }

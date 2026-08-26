@@ -3,8 +3,12 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::time::Duration;
 
-use gpui::{IntoElement, Modifiers, ParentElement, SharedString, TestAppContext, px};
+use gpui::{
+    IntoElement, Modifiers, ParentElement, ScrollDelta, ScrollWheelEvent, SharedString, Styled,
+    TestAppContext, TouchPhase, div, point, px,
+};
 use gpui_kit::prelude::*;
 use gpui_kit_semantics::{Node, Role};
 use gpui_kit_testkit::harness::Harness;
@@ -388,6 +392,243 @@ fn a_pinned_column_cannot_be_carried_out_of_the_left_edge(cx: &mut TestAppContex
     assert!(
         reports.orders.borrow().is_empty(),
         "nothing may be dropped across a pinned column"
+    );
+}
+
+#[gpui::test]
+fn a_wide_grid_scrolls_as_one_surface_and_freezes_its_pinned_group(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        div()
+            .w(px(520.0))
+            .child(
+                DataGrid::new("wide-grid", 3, |index, _, _| {
+                    GridRow::new(format!("row-{index}"))
+                        .cell("name", Cell::new(format!("Pinned {index}")).published(true))
+                        .cell("owner", format!("Owner {index}"))
+                        .cell(
+                            "status",
+                            Cell::new(format!("Status {index}")).published(true),
+                        )
+                        .cell("updated", format!("Updated {index}"))
+                })
+                .columns([
+                    GridColumn::new("name", "Name").fixed(220.0).pinned(true),
+                    GridColumn::new("owner", "Owner").fixed(260.0),
+                    GridColumn::new("status", "Status").fixed(260.0),
+                    GridColumn::new("updated", "Updated").fixed(260.0),
+                ])
+                .footer_cell("updated", "Summary")
+                .visible_rows(3),
+            )
+            .into_any_element()
+    });
+
+    let pinned_before = harness
+        .bounds("wide-grid.header.name")
+        .expect("pinned header");
+    let cell_before = harness
+        .bounds("wide-grid.row-0.name")
+        .expect("pinned body cell");
+    let moving_before = harness
+        .bounds("wide-grid.header.status")
+        .expect("moving header");
+    let moving_cell_before = harness
+        .bounds("wide-grid.row-0.status")
+        .expect("moving body cell");
+    let summary_before = harness
+        .bounds("wide-grid.summary.updated")
+        .expect("moving summary cell");
+    let at = harness.point_in("wide-grid");
+    harness.context().simulate_event(ScrollWheelEvent {
+        position: at,
+        delta: ScrollDelta::Pixels(point(px(-300.0), px(0.0))),
+        modifiers: Modifiers::none(),
+        touch_phase: TouchPhase::Moved,
+    });
+    harness.context().run_until_parked();
+
+    let pinned_after = harness
+        .bounds("wide-grid.header.name")
+        .expect("pinned header after scroll");
+    let cell_after = harness
+        .bounds("wide-grid.row-0.name")
+        .expect("pinned body cell after scroll");
+    let moving_after = harness
+        .bounds("wide-grid.header.status")
+        .expect("moving header after scroll");
+    let moving_cell_after = harness
+        .bounds("wide-grid.row-0.status")
+        .expect("moving body cell after scroll");
+    let summary_after = harness
+        .bounds("wide-grid.summary.updated")
+        .expect("moving summary cell after scroll");
+
+    assert_eq!(pinned_after.origin.x, pinned_before.origin.x);
+    assert_eq!(cell_after.origin.x, cell_before.origin.x);
+    assert!(
+        moving_after.origin.x < moving_before.origin.x - px(250.0),
+        "the header and body share the horizontal viewport"
+    );
+    let shift = moving_after.origin.x - moving_before.origin.x;
+    assert_eq!(
+        moving_cell_after.origin.x - moving_cell_before.origin.x,
+        shift
+    );
+    assert_eq!(summary_after.origin.x - summary_before.origin.x, shift);
+}
+
+#[gpui::test]
+fn keyboard_focus_reveals_a_moving_header_beyond_the_frozen_group(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, |_, _| {
+        div()
+            .w(px(520.0))
+            .child(
+                DataGrid::new("focus-grid", 1, |_, _, _| {
+                    GridRow::new("row")
+                        .cell("name", "Pinned")
+                        .cell("filler", "Middle")
+                        .cell("action", "Focusable")
+                })
+                .columns([
+                    GridColumn::new("name", "Name").fixed(220.0).pinned(true),
+                    GridColumn::new("filler", "Middle").fixed(260.0),
+                    GridColumn::new("action", "Action")
+                        .fixed(260.0)
+                        .sortable(true),
+                ])
+                .visible_rows(1)
+                .on_sort(|_, _, _, _| {}),
+            )
+            .into_any_element()
+    });
+
+    let grid = harness.bounds("focus-grid").expect("grid bounds");
+    let frozen = harness
+        .bounds("focus-grid.header.name")
+        .expect("frozen header");
+    let before = harness
+        .bounds("focus-grid.header.action")
+        .expect("offscreen focus target");
+    assert!(before.right() > grid.right());
+
+    harness.update(|window, cx| window.focus_next(cx));
+
+    let after = harness
+        .bounds("focus-grid.header.action")
+        .expect("revealed focus target");
+    let frozen_after = harness
+        .bounds("focus-grid.header.name")
+        .expect("frozen header after reveal");
+    assert_eq!(frozen_after.origin.x, frozen.origin.x);
+    assert!(
+        after.left() >= frozen.right(),
+        "focused header {after:?} must clear frozen header {frozen:?}"
+    );
+    assert!(
+        after.right() <= grid.right(),
+        "focused header {after:?} must fit viewport {grid:?}; before was {before:?}"
+    );
+}
+
+#[gpui::test]
+fn a_frozen_group_holds_the_right_reading_edge_in_rtl(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(
+        cx,
+        |cx| {
+            gpui_kit::install(cx);
+            set_layout_direction(LayoutDirection::RightToLeft, cx);
+        },
+        |_, _| {
+            div()
+                .w(px(520.0))
+                .child(
+                    DataGrid::new("rtl-grid", 1, |_, _, _| {
+                        GridRow::new("row")
+                            .cell("name", Cell::new("Pinned").published(true))
+                            .cell("owner", "Owner")
+                            .cell("status", "Status")
+                            .cell("updated", "Updated")
+                    })
+                    .columns([
+                        GridColumn::new("name", "Name").fixed(220.0).pinned(true),
+                        GridColumn::new("owner", "Owner").fixed(260.0),
+                        GridColumn::new("status", "Status").fixed(260.0),
+                        GridColumn::new("updated", "Updated").fixed(260.0),
+                    ])
+                    .visible_rows(1),
+                )
+                .into_any_element()
+        },
+    );
+    assert_eq!(
+        harness.update(|_, cx| cx.layout_direction()),
+        LayoutDirection::RightToLeft
+    );
+
+    let grid = harness.bounds("rtl-grid").expect("grid bounds");
+    let pinned_before = harness
+        .bounds("rtl-grid.header.name")
+        .expect("pinned RTL header");
+    let moving_before = harness
+        .bounds("rtl-grid.header.status")
+        .expect("moving RTL header");
+    let owner_before = harness
+        .bounds("rtl-grid.header.owner")
+        .expect("first moving RTL header");
+    let updated_before = harness
+        .bounds("rtl-grid.header.updated")
+        .expect("last moving RTL header");
+    assert!(
+        pinned_before.right() <= grid.right(),
+        "pinned {pinned_before:?}, grid {grid:?}"
+    );
+    assert!(
+        pinned_before.right() > moving_before.right(),
+        "pinned {pinned_before:?}, owner {owner_before:?}, status {moving_before:?}, updated \
+         {updated_before:?}, grid {grid:?}"
+    );
+
+    let at = harness.point_in("rtl-grid");
+    harness.context().simulate_event(ScrollWheelEvent {
+        position: at,
+        delta: ScrollDelta::Pixels(point(px(300.0), px(0.0))),
+        modifiers: Modifiers::none(),
+        touch_phase: TouchPhase::Moved,
+    });
+    harness.context().run_until_parked();
+
+    let pinned_after = harness
+        .bounds("rtl-grid.header.name")
+        .expect("pinned RTL header after scroll");
+    let moving_after = harness
+        .bounds("rtl-grid.header.status")
+        .expect("moving RTL header after scroll");
+    assert_eq!(pinned_after.origin.x, pinned_before.origin.x);
+    assert!(moving_after.origin.x > moving_before.origin.x + px(250.0));
+
+    harness.update(|_, cx| set_layout_direction(LayoutDirection::LeftToRight, cx));
+    assert_eq!(
+        harness.update(|_, cx| cx.layout_direction()),
+        LayoutDirection::LeftToRight
+    );
+    harness.advance(Duration::from_secs(1));
+    let ltr = harness
+        .bounds("rtl-grid.header.name")
+        .expect("pinned header after LTR switch");
+    assert!(ltr.left() >= grid.left(), "LTR pinned header {ltr:?}");
+    assert!(
+        ltr.left() < grid.center().x,
+        "LTR pinned header after direction switch {ltr:?}"
+    );
+
+    harness.update(|_, cx| set_layout_direction(LayoutDirection::RightToLeft, cx));
+    harness.advance(Duration::from_secs(1));
+    let rtl_again = harness
+        .bounds("rtl-grid.header.name")
+        .expect("pinned header after RTL switch");
+    assert!(
+        rtl_again.right() <= grid.right() && rtl_again.left() > grid.center().x,
+        "RTL pinned header after direction switches {rtl_again:?}"
     );
 }
 

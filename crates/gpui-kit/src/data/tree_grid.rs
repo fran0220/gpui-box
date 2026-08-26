@@ -7,8 +7,9 @@
 //! materialized viewport rows publish the ARIA hierarchy
 //! `TreeGrid > Row > GridCell`.
 //!
-//! Columns are fixed or flexible within the available width. There is no
-//! horizontal scrolling or frozen-column behavior.
+//! Columns are fixed or flexible. Wide hierarchies use `DataGrid`'s shared
+//! horizontal viewport, and a pinned leading hierarchy column remains frozen
+//! at the reading edge while the remaining fields scroll beneath it.
 
 use std::rc::Rc;
 

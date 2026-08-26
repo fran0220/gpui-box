@@ -17,14 +17,14 @@
 
 use crate::{
     Action, AnyDrag, AnyElement, AnyTooltip, AnyView, App, Bounds, ClickEvent, DispatchPhase,
-    Display, Element, ElementId, Entity, EntityId, ExternalDragPayload, ExternalDragPayloadSource,
-    FocusHandle, Global, GlobalElementId, Hitbox, HitboxBehavior, HitboxId, InspectorElementId,
-    IntoElement, IsZero, KeyContext, KeyDownEvent, KeyUpEvent, KeyboardButton, KeyboardClickEvent,
-    LayoutId, ModifiersChangedEvent, MouseButton, MouseClickEvent, MouseDownEvent, MouseExitEvent,
-    MouseMoveEvent, MousePressureEvent, MouseUpEvent, OngoingScroll, Overflow, ParentElement,
-    PinchEvent, Pixels, Point, Render, ScrollWheelEvent, SharedString, Size, Style,
-    StyleRefinement, Styled, Task, TooltipId, Visibility, Window, WindowControlArea, point, px,
-    size,
+    Display, Edges, Element, ElementId, Entity, EntityId, ExternalDragPayload,
+    ExternalDragPayloadSource, FocusHandle, Global, GlobalElementId, Hitbox, HitboxBehavior,
+    HitboxId, InspectorElementId, IntoElement, IsZero, KeyContext, KeyDownEvent, KeyUpEvent,
+    KeyboardButton, KeyboardClickEvent, LayoutId, ModifiersChangedEvent, MouseButton,
+    MouseClickEvent, MouseDownEvent, MouseExitEvent, MouseMoveEvent, MousePressureEvent,
+    MouseUpEvent, OngoingScroll, Overflow, ParentElement, PinchEvent, Pixels, Point, Render,
+    ScrollWheelEvent, SharedString, Size, Style, StyleRefinement, Styled, Task, TooltipId,
+    Visibility, Window, WindowControlArea, point, px, size,
 };
 use collections::HashMap;
 use gpui_util::ResultExt;
@@ -796,6 +796,20 @@ pub trait InteractiveElement: Sized {
     fn track_focus(mut self, focus_handle: &FocusHandle) -> Self {
         self.interactivity().focusable = true;
         self.interactivity().tracked_focus_handle = Some(focus_handle.clone());
+        self
+    }
+
+    /// Reveal this element inside `scroll_handle` whenever it receives focus.
+    ///
+    /// `insets` reserves physical viewport edges occupied by overlays such as
+    /// frozen columns. Revealing moves only axes that actually overflow and by
+    /// only the distance needed to expose the focused bounds.
+    fn reveal_on_focus(
+        mut self,
+        scroll_handle: &ScrollHandle,
+        insets: impl Into<Edges<Pixels>>,
+    ) -> Self {
+        self.interactivity().focus_reveal = Some((scroll_handle.clone(), insets.into()));
         self
     }
 
@@ -2199,6 +2213,7 @@ pub struct Interactivity {
     pub(crate) key_context: Option<KeyContext>,
     pub(crate) focusable: bool,
     pub(crate) tracked_focus_handle: Option<FocusHandle>,
+    pub(crate) focus_reveal: Option<(ScrollHandle, Edges<Pixels>)>,
     pub(crate) tracked_scroll_handle: Option<ScrollHandle>,
     pub(crate) scroll_anchor: Option<ScrollAnchor>,
     pub(crate) scroll_offset: Option<Rc<RefCell<Point<Pixels>>>>,
@@ -2381,6 +2396,13 @@ impl Interactivity {
 
         if let Some(focus_handle) = self.tracked_focus_handle.as_ref() {
             window.set_focus_handle(focus_handle, cx);
+
+            if focus_handle.is_focused(window)
+                && let Some((scroll_handle, insets)) = self.focus_reveal.as_ref()
+                && scroll_handle.reveal_bounds(bounds, *insets)
+            {
+                window.refresh();
+            }
 
             if window.a11y.is_active() {
                 if let Some(global_id) = global_id {
@@ -4269,6 +4291,57 @@ impl ScrollHandle {
         self.0.borrow().max_offset
     }
 
+    /// Moves the minimum distance needed to reveal `bounds` inside this
+    /// handle's viewport, after reserving physical `insets` for content drawn
+    /// over the viewport.
+    ///
+    /// Bounds are the element's current painted bounds, including the current
+    /// scroll offset. Returns whether the offset changed.
+    pub fn reveal_bounds(&self, bounds: Bounds<Pixels>, insets: impl Into<Edges<Pixels>>) -> bool {
+        let insets = insets.into();
+        let state = self.0.borrow();
+        let viewport = state.bounds;
+        let max = state.max_offset;
+        let mut next = *state.offset.borrow();
+        if max.x > px(0.0) {
+            let start = viewport.left() + insets.left;
+            let end = viewport.right() - insets.right;
+            if bounds.size.width <= end - start {
+                if bounds.left() < start {
+                    next.x += start - bounds.left();
+                } else if bounds.right() > end {
+                    next.x -= bounds.right() - end;
+                }
+            } else if bounds.right() <= start {
+                next.x += start - bounds.left();
+            } else if bounds.left() >= end {
+                next.x -= bounds.right() - end;
+            }
+            next.x = next.x.clamp(-max.x, px(0.0));
+        }
+        if max.y > px(0.0) {
+            let start = viewport.top() + insets.top;
+            let end = viewport.bottom() - insets.bottom;
+            if bounds.size.height <= end - start {
+                if bounds.top() < start {
+                    next.y += start - bounds.top();
+                } else if bounds.bottom() > end {
+                    next.y -= bounds.bottom() - end;
+                }
+            } else if bounds.bottom() <= start {
+                next.y += start - bounds.top();
+            } else if bounds.top() >= end {
+                next.y -= bounds.bottom() - end;
+            }
+            next.y = next.y.clamp(-max.y, px(0.0));
+        }
+        let changed = next != *state.offset.borrow();
+        if changed {
+            *state.offset.borrow_mut() = next;
+        }
+        changed
+    }
+
     /// Pretend a frame has been laid out, so a test can ask a handle where it
     /// is without building a window to scroll.
     #[cfg(any(test, feature = "test-support"))]
@@ -4780,6 +4853,41 @@ mod tests {
         handle.scroll_to_active_item();
 
         assert_eq!(handle.offset().y, px(-25.));
+    }
+
+    #[test]
+    fn scroll_handle_reveals_bounds_inside_reserved_viewport_edges() {
+        let handle = ScrollHandle::new();
+        handle.set_measured_for_test(
+            Bounds::new(point(px(100.), px(20.)), size(px(200.), px(80.))),
+            point(px(400.), px(0.)),
+        );
+        handle.set_offset(point(px(-180.), px(0.)));
+
+        assert!(handle.reveal_bounds(
+            Bounds::new(point(px(70.), px(30.)), size(px(60.), px(20.))),
+            Edges {
+                left: px(90.),
+                right: px(0.),
+                top: px(0.),
+                bottom: px(0.),
+            },
+        ));
+        assert_eq!(handle.offset().x, px(-60.));
+
+        // A target wider than the unobscured viewport is already as revealed
+        // as it can be once it intersects that viewport. Repeated prepaints
+        // must not oscillate between aligning its two impossible edges.
+        assert!(!handle.reveal_bounds(
+            Bounds::new(point(px(150.), px(30.)), size(px(180.), px(20.))),
+            Edges {
+                left: px(90.),
+                right: px(0.),
+                top: px(0.),
+                bottom: px(0.),
+            },
+        ));
+        assert_eq!(handle.offset().x, px(-60.));
     }
 
     struct InitiallyScrolledVariableList {

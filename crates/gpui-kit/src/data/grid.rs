@@ -20,18 +20,12 @@
 //! that are on screen. A cell publishes a [`Role::Cell`] node only where the
 //! caller marks it with [`Cell::published`] or declares its column editable.
 //!
-//! # What this grid does not do
-//!
-//! **It does not scroll horizontally.** `uniform_list` owns its own scroll
-//! offset and lays every row out at the width it is given; a frozen left group
-//! under a horizontal scroll needs either two vertically-synchronised uniform
-//! lists — and nothing in this GPUI revision keeps two
-//! [`gpui::UniformListScrollHandle`]s in step without one writing the other
-//! every frame, which is a redraw loop — or a per-row counter-translation that
-//! fights the list's own content mask. So [`GridColumn::pinned`] means "this
-//! column keeps the left edge, whatever order the caller puts the columns in,
-//! and cannot be dragged out of it", not "this column stays while the rest
-//! scrolls away". Columns share the grid's width the way `Table`'s do.
+//! Wide grids scroll horizontally as one surface, so the header, virtualized
+//! body, and summary always share one column geometry. [`GridColumn::pinned`]
+//! holds the leading group at the reading edge while the remaining columns
+//! move beneath it. The body keeps its own vertical virtualization handle;
+//! the two axes never synchronize independent lists or write each other's
+//! offsets.
 //!
 //! **It does not measure a column to its content.** A double click on a
 //! resize handle reports a fit request and stops: the grid can only measure
@@ -45,10 +39,10 @@ use std::ops::Range;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, AppContext, ClickEvent, Entity, Focusable, InteractiveElement, IntoElement,
-    ListSizingBehavior, MouseButton, ParentElement, RenderOnce, ScrollStrategy, SharedString,
-    StatefulInteractiveElement, Styled, UniformListScrollHandle, Window, div,
-    prelude::FluentBuilder, px, uniform_list,
+    AnyElement, App, AppContext, ClickEvent, Edges, Entity, Focusable, InteractiveElement,
+    IntoElement, ListSizingBehavior, MouseButton, ParentElement, RenderOnce, ScrollHandle,
+    ScrollStrategy, SharedString, StatefulInteractiveElement, StickyEdge, Styled,
+    UniformListScrollHandle, Window, div, point, prelude::FluentBuilder, px, sticky, uniform_list,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -59,11 +53,12 @@ use gpui_kit_theme::{
 use crate::controls::input::{Cancel, Submit, TextInput};
 use crate::data::table::{Align, Cell, ColumnWidth, SortDirection};
 use crate::display::empty::{EmptyKind, EmptyState};
-use crate::foundation::direction::{ActiveDirection, DirectionalExt};
+use crate::foundation::direction::{ActiveDirection, DirectionalExt, LayoutDirection};
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::window_state;
 use crate::foundation::{
-    Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedRow, Sizable, StyledExt, text,
+    Disableable, FocusRing, Hoverable, Ident, Pressable, SelectedRow, Sizable, StyledExt,
+    selection_rail, text,
 };
 use crate::interaction::dnd::{
     self, DragItem, DropAxis, DropIntent, DropPosition, RowTarget, SurfaceDrag,
@@ -308,9 +303,9 @@ impl GridColumn {
         self
     }
 
-    /// Keeps the column at the left edge whatever order the caller declares,
-    /// and takes it out of the reorder. See the module documentation for what
-    /// pinning does not do here.
+    /// Keeps the column in the leading frozen group whatever order the caller
+    /// declares, and takes it out of the reorder. The group remains at the
+    /// reading edge while wide grids scroll horizontally beneath it.
     pub fn pinned(mut self, pinned: bool) -> Self {
         self.pinned = pinned;
         self
@@ -997,7 +992,17 @@ pub(crate) fn slot_of(index: usize, expanded: &[usize], detail_rows: usize) -> u
 /// [`crate::layout::measure`] uses for measurements.
 #[derive(Default)]
 struct Memory {
+    /// The shared horizontal viewport for header, rows, and summary.
+    horizontal: ScrollHandle,
+    /// The current painted width reserved by the frozen group, including its
+    /// edge cast. Focus reveal uses this rather than exposing a moving cell
+    /// underneath the frozen surface.
+    pinned_width: StdCell<gpui::Pixels>,
     scroll: UniformListScrollHandle,
+    /// The direction the horizontal viewport was initialized for. A direction
+    /// change starts at that direction's reading edge exactly once rather than
+    /// fighting subsequent reader scrolling.
+    direction: StdCell<Option<LayoutDirection>>,
     /// The row the last plain click or keyboard move landed on, which is what
     /// a shift click measures its span from.
     anchor: RefCell<Option<SharedString>>,
@@ -1039,6 +1044,21 @@ impl RenderOnce for DataGrid {
         let ident = self.ident.clone();
         let state = memory(&ident.semantic_id(), window, cx);
         let columns: Vec<GridColumn> = self.ordered_columns().into_iter().cloned().collect();
+        if columns.iter().all(|column| !column.pinned) {
+            state.pinned_width.set(px(0.0));
+        }
+        let direction = cx.layout_direction();
+        if state.direction.get() != Some(direction) {
+            state.horizontal.set_offset(point(
+                if direction.is_rtl() {
+                    gpui::Pixels::MIN
+                } else {
+                    px(0.0)
+                },
+                px(0.0),
+            ));
+            state.direction.set(Some(direction));
+        }
         let expanded = self.expanded_indices();
         let detail_rows = self.detail_rows;
         let slots = slot_count(self.count, &expanded, detail_rows);
@@ -1047,7 +1067,15 @@ impl RenderOnce for DataGrid {
         let editor = self.editor(&state, window, cx);
 
         let extra = self.slots.render(slot::HEADER_EXTRA, window, cx);
-        let header = self.header(&theme, row_height, &columns, reorder.as_ref(), window, cx);
+        let header = self.header(
+            &theme,
+            row_height,
+            &columns,
+            &state,
+            reorder.as_ref(),
+            window,
+            cx,
+        );
         let footer = self.footer_row(&theme, row_height, &columns, cx);
         let vacancy = self.empty.take();
         let body = self.body(
@@ -1064,6 +1092,28 @@ impl RenderOnce for DataGrid {
             cx,
         );
 
+        let content_width = grid_min_width(
+            &columns,
+            self.selection_mode,
+            !self.hierarchy && self.on_expand.is_some(),
+            &theme,
+        );
+        let content = div()
+            .column()
+            .w_full()
+            .min_w(px(content_width))
+            .flex_none()
+            .child(header)
+            .child(body)
+            .children(footer);
+        let viewport = div()
+            .id(ident.child("horizontal").element_id())
+            .w_full()
+            .min_w_0()
+            .overflow_x_scroll()
+            .track_scroll(&state.horizontal)
+            .child(content);
+
         let mut frame = div()
             .id(ident.element_id())
             .column()
@@ -1073,9 +1123,7 @@ impl RenderOnce for DataGrid {
             .overflow_hidden()
             .children(self.banner(&theme, cx))
             .children(extra)
-            .child(header)
-            .child(body)
-            .children(footer);
+            .child(viewport);
 
         frame = self.wire_resize_drag(frame, &state, &columns, window, cx);
         frame = self.wire_keyboard(frame, &state, &drawn, &expanded, &columns);
@@ -1148,8 +1196,8 @@ impl DataGrid {
         Some(Reorder {
             drag: dnd::surface_drag(&surface, window, cx),
             surface,
-            // A pinned column holds the left edge, so nothing may be dropped
-            // across it and it may not be picked up.
+            // A pinned column holds the leading reading edge, so nothing may
+            // be dropped across it and it may not be picked up.
             accepts: Rc::new(move |item: &DragItem, position: &DropPosition| {
                 item.source == own && !pinned.contains(position.anchor())
             }),
@@ -1217,6 +1265,7 @@ impl DataGrid {
         theme: &Theme,
         height: f32,
         columns: &[GridColumn],
+        state: &Rc<Memory>,
         reorder: Option<&Reorder>,
         window: &mut Window,
         cx: &mut App,
@@ -1226,34 +1275,87 @@ impl DataGrid {
         } else {
             Some(self.group_row(theme, height, columns, cx))
         };
+        let direction = cx.layout_direction();
+        let pinned = columns.iter().filter(|column| column.pinned).count();
+        let has_disclosure = !self.hierarchy && self.on_expand.is_some();
         let mut header = div()
             .row()
             .w_full()
             .h(px(height))
             .flex_none()
-            .px_token(theme, Space::Sm)
+            .when(pinned == 0, |header| header.px_token(theme, Space::Sm))
             // No fill: the header is named by its type step and by the one
             // rule under it, the same way `Table`'s is.
             .border_b(px(theme.borders.hairline))
             .border_color(theme.colors.divider)
-            .when(self.hierarchy, |header| {
-                header.row_reading(cx.layout_direction())
-            });
+            .row_reading(direction);
 
-        if let Some(box_element) = self.select_all(theme, cx) {
-            header = header.child(box_element);
-        }
-        if self.on_expand.is_some() {
-            header = header.child(div().w(px(GUTTER)).flex_none());
-        }
-
-        let pinned = columns.iter().filter(|column| column.pinned).count();
-        for (index, column) in columns.iter().enumerate() {
-            header =
-                header.child(self.header_cell(theme, height, column, index, reorder, window, cx));
-            if index + 1 == pinned {
-                header = header.child(pinned_edge(theme));
+        if pinned == 0 {
+            if let Some(box_element) = self.select_all(theme, cx) {
+                header = header.child(box_element);
             }
+            if has_disclosure {
+                header = header.child(div().w(px(GUTTER)).flex_none());
+            }
+            for (index, column) in columns.iter().enumerate() {
+                header = header.child(
+                    self.header_cell(theme, height, column, index, state, reorder, window, cx),
+                );
+            }
+        } else {
+            let gutter_count = usize::from(self.selection_mode == SelectionMode::Multiple)
+                + usize::from(has_disclosure);
+            let held_extra =
+                theme.space(Space::Sm) + gutter_count as f32 * GUTTER + theme.space(Space::Sm);
+            let measured = Rc::clone(state);
+            let mut held = section_frame(div(), &columns[..pinned], held_extra)
+                .row_reading(direction)
+                .bg(theme.colors.panel)
+                .on_children_prepainted(move |bounds, window, _| {
+                    let (Some(first), Some(last)) = (bounds.first(), bounds.last()) else {
+                        return;
+                    };
+                    let left = first.left().min(last.left());
+                    let right = first.right().max(last.right());
+                    let width = right - left;
+                    if (measured.pinned_width.get() - width).abs() > px(0.5) {
+                        measured.pinned_width.set(width);
+                        window.refresh();
+                    }
+                })
+                .child(div().w(px(theme.space(Space::Sm))).h_full().flex_none());
+            if let Some(box_element) = self.select_all(theme, cx) {
+                held = held.child(box_element);
+            }
+            if has_disclosure {
+                held = held.child(div().w(px(GUTTER)).flex_none());
+            }
+            for (index, column) in columns[..pinned].iter().enumerate() {
+                held = held.child(
+                    self.header_cell(theme, height, column, index, state, reorder, window, cx),
+                );
+            }
+            held = held.child(pinned_edge(theme, direction));
+
+            let mut moving = section_frame(div(), &columns[pinned..], theme.space(Space::Sm))
+                .row_reading(direction);
+            for (offset, column) in columns[pinned..].iter().enumerate() {
+                moving = moving.child(self.header_cell(
+                    theme,
+                    height,
+                    column,
+                    pinned + offset,
+                    state,
+                    reorder,
+                    window,
+                    cx,
+                ));
+            }
+            moving = moving.child(div().w(px(theme.space(Space::Sm))).h_full().flex_none());
+
+            header = header
+                .child(sticky(sticky_edge(direction), held))
+                .child(moving);
         }
 
         match groups {
@@ -1275,32 +1377,72 @@ impl DataGrid {
         columns: &[GridColumn],
         cx: &mut App,
     ) -> AnyElement {
+        let direction = cx.layout_direction();
+        let pinned = columns.iter().filter(|column| column.pinned).count();
+        let has_disclosure = !self.hierarchy && self.on_expand.is_some();
         let mut row = div()
             .row()
             .w_full()
             .h(px(height))
             .flex_none()
-            .px_token(theme, Space::Sm);
+            .when(pinned == 0, |row| row.px_token(theme, Space::Sm))
+            .row_reading(direction);
+        if pinned == 0 {
+            if self.selection_mode == SelectionMode::Multiple {
+                row = row.child(div().w(px(GUTTER)).flex_none());
+            }
+            if has_disclosure {
+                row = row.child(div().w(px(GUTTER)).flex_none());
+            }
+            return row
+                .children(self.group_cells(theme, columns, cx))
+                .into_any_element();
+        }
+
+        let gutter_count = usize::from(self.selection_mode == SelectionMode::Multiple)
+            + usize::from(has_disclosure);
+        let held_extra =
+            theme.space(Space::Sm) + gutter_count as f32 * GUTTER + theme.space(Space::Sm);
+        let mut held = section_frame(div(), &columns[..pinned], held_extra)
+            .row_reading(direction)
+            .bg(theme.colors.panel)
+            .child(div().w(px(theme.space(Space::Sm))).h_full().flex_none());
         if self.selection_mode == SelectionMode::Multiple {
-            row = row.child(div().w(px(GUTTER)).flex_none());
+            held = held.child(div().w(px(GUTTER)).flex_none());
         }
-        if self.on_expand.is_some() {
-            row = row.child(div().w(px(GUTTER)).flex_none());
+        if has_disclosure {
+            held = held.child(div().w(px(GUTTER)).flex_none());
         }
-        let pinned = columns.iter().filter(|column| column.pinned).count();
-        let mut edged = pinned == 0;
+        held = held
+            .children(self.group_cells(theme, &columns[..pinned], cx))
+            .child(pinned_gap(theme));
+
+        let moving = section_frame(div(), &columns[pinned..], theme.space(Space::Sm))
+            .row_reading(direction)
+            .children(self.group_cells(theme, &columns[pinned..], cx))
+            .child(div().w(px(theme.space(Space::Sm))).h_full().flex_none());
+
+        row.child(sticky(sticky_edge(direction), held))
+            .child(moving)
+            .into_any_element()
+    }
+
+    /// Group labels for one contiguous section of the ordered columns.
+    /// A caller-owned group that crosses the frozen boundary becomes two
+    /// truthful visual fragments. The continuation receives an identity based
+    /// on its first column, so semantic ids remain unique.
+    fn group_cells(&self, theme: &Theme, columns: &[GridColumn], cx: &mut App) -> Vec<AnyElement> {
+        let mut cells: Vec<AnyElement> = Vec::new();
         let mut consumed = 0usize;
         while consumed < columns.len() {
-            if !edged && consumed >= pinned {
-                row = row.child(pinned_gap(theme));
-                edged = true;
-            }
             let key = &columns[consumed].key;
-            if let Some(group) = self
-                .groups
-                .iter()
-                .find(|group| group.keys.first() == Some(key))
-            {
+            if let Some((group, offset)) = self.groups.iter().find_map(|group| {
+                group
+                    .keys
+                    .iter()
+                    .position(|held| held == key)
+                    .map(|offset| (group, offset))
+            }) {
                 // A group covers the columns it names only while they stay
                 // adjacent; the caller owns the column order, so a group whose
                 // members have been separated covers the run that is still
@@ -1308,6 +1450,7 @@ impl DataGrid {
                 let span = group
                     .keys
                     .iter()
+                    .skip(offset)
                     .enumerate()
                     .take_while(|(offset, held)| {
                         columns
@@ -1317,8 +1460,13 @@ impl DataGrid {
                     .count()
                     .max(1);
                 let covered = &columns[consumed..consumed + span];
-                let ident = self.ident.child("group").child(group.id.as_ref());
-                row = row.child(
+                let base = self.ident.child("group").child(group.id.as_ref());
+                let ident = if offset == 0 {
+                    base
+                } else {
+                    base.child(columns[consumed].key.as_ref())
+                };
+                cells.push(
                     group_frame(div().id(ident.element_id()), covered, theme)
                         .relative()
                         .justify_center()
@@ -1344,15 +1492,16 @@ impl DataGrid {
                                 .parent(self.ident.semantic_id())
                                 .text(group.label.clone())
                                 .value(group.id.clone()),
-                        ),
+                        )
+                        .into_any_element(),
                 );
                 consumed += span;
             } else {
-                row = row.child(column_frame(div(), &columns[consumed], theme));
+                cells.push(column_frame(div(), &columns[consumed], theme).into_any_element());
                 consumed += 1;
             }
         }
-        row.into_any_element()
+        cells
     }
 
     fn footer_row(
@@ -1366,21 +1515,19 @@ impl DataGrid {
             return None;
         }
         let ident = self.ident.child("summary");
+        let direction = cx.layout_direction();
+        let pinned = columns.iter().filter(|column| column.pinned).count();
+        let has_disclosure = !self.hierarchy && self.on_expand.is_some();
         let mut row = div()
             .id(ident.element_id())
             .row()
             .w_full()
             .h(px(height))
             .flex_none()
-            .px_token(theme, Space::Sm)
+            .when(pinned == 0, |row| row.px_token(theme, Space::Sm))
             .border_t(px(theme.borders.hairline))
-            .border_color(theme.colors.divider);
-        if self.selection_mode == SelectionMode::Multiple {
-            row = row.child(div().w(px(GUTTER)).flex_none());
-        }
-        if self.on_expand.is_some() {
-            row = row.child(div().w(px(GUTTER)).flex_none());
-        }
+            .border_color(theme.colors.divider)
+            .row_reading(direction);
         // A row of bare numbers under a table says nothing about what they
         // are, so the first column the caller left empty carries the name of
         // the row itself.
@@ -1388,11 +1535,8 @@ impl DataGrid {
             .footer
             .iter()
             .any(|(key, _)| columns.first().is_some_and(|column| &column.key == key));
-        let pinned = columns.iter().filter(|column| column.pinned).count();
-        for (index, column) in columns.iter().enumerate() {
-            if index == pinned && pinned > 0 {
-                row = row.child(pinned_gap(theme));
-            }
+
+        let mut cell_for = |column: &GridColumn| {
             let mut value = self
                 .footer
                 .iter()
@@ -1406,24 +1550,63 @@ impl DataGrid {
                 named = true;
             }
             let cell = self.ident.child("summary").child(column.key.as_ref());
-            row = row.child(
-                column_frame(div().id(cell.element_id()), column, theme)
-                    .child(text(theme, TypeScale::Caption, value.clone()).text_tone(
-                        theme,
-                        if label {
-                            TextTone::Faint
-                        } else {
-                            TextTone::Muted
-                        },
-                    ))
-                    .semantic_in(
-                        cx,
-                        NodeSpec::new(cell.semantic_id(), Role::Cell)
-                            .parent(ident.semantic_id())
-                            .text(value)
-                            .value(column.key.clone()),
-                    ),
-            );
+            column_frame(div().id(cell.element_id()), column, theme)
+                .child(text(theme, TypeScale::Caption, value.clone()).text_tone(
+                    theme,
+                    if label {
+                        TextTone::Faint
+                    } else {
+                        TextTone::Muted
+                    },
+                ))
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(cell.semantic_id(), Role::Cell)
+                        .parent(ident.semantic_id())
+                        .text(value)
+                        .value(column.key.clone()),
+                )
+        };
+
+        if pinned == 0 {
+            if self.selection_mode == SelectionMode::Multiple {
+                row = row.child(div().w(px(GUTTER)).flex_none());
+            }
+            if has_disclosure {
+                row = row.child(div().w(px(GUTTER)).flex_none());
+            }
+            for column in columns {
+                row = row.child(cell_for(column));
+            }
+        } else {
+            let gutter_count = usize::from(self.selection_mode == SelectionMode::Multiple)
+                + usize::from(has_disclosure);
+            let held_extra =
+                theme.space(Space::Sm) + gutter_count as f32 * GUTTER + theme.space(Space::Sm);
+            let mut held = section_frame(div(), &columns[..pinned], held_extra)
+                .row_reading(direction)
+                .bg(theme.colors.panel)
+                .child(div().w(px(theme.space(Space::Sm))).h_full().flex_none());
+            if self.selection_mode == SelectionMode::Multiple {
+                held = held.child(div().w(px(GUTTER)).flex_none());
+            }
+            if has_disclosure {
+                held = held.child(div().w(px(GUTTER)).flex_none());
+            }
+            for column in &columns[..pinned] {
+                held = held.child(cell_for(column));
+            }
+            held = held.child(pinned_gap(theme));
+
+            let mut moving = section_frame(div(), &columns[pinned..], theme.space(Space::Sm))
+                .row_reading(direction);
+            for column in &columns[pinned..] {
+                moving = moving.child(cell_for(column));
+            }
+            moving = moving.child(div().w(px(theme.space(Space::Sm))).h_full().flex_none());
+            row = row
+                .child(sticky(sticky_edge(direction), held))
+                .child(moving);
         }
         Some(
             row.semantic_in(
@@ -1544,6 +1727,7 @@ impl DataGrid {
         height: f32,
         column: &GridColumn,
         index: usize,
+        state: &Rc<Memory>,
         reorder: Option<&Reorder>,
         window: &mut Window,
         cx: &mut App,
@@ -1603,6 +1787,12 @@ impl DataGrid {
                     .tab_index(0)
                     .pressable(cx)
                     .focus_ring(theme)
+            })
+            .when(!column.pinned, |element| {
+                element.reveal_on_focus(
+                    &state.horizontal,
+                    pinned_insets(state, cx.layout_direction()),
+                )
             })
             .child(
                 div()
@@ -2027,6 +2217,7 @@ impl DataGrid {
             editing: self.editing.clone(),
             editor,
             state: Rc::clone(state),
+            direction: cx.layout_direction(),
             hierarchy: self.hierarchy,
             range,
             on_range_change: self.on_range_change.clone(),
@@ -2167,6 +2358,7 @@ struct RowContext {
     editing: Option<EditingCell>,
     editor: Option<Entity<TextInput>>,
     state: Rc<Memory>,
+    direction: LayoutDirection,
     hierarchy: bool,
     range: RangeMask,
     on_range_change: Option<RangeHandler>,
@@ -2192,20 +2384,29 @@ fn row_element(
         && !context.disabled
         && context.selection_mode != SelectionMode::None
         && context.on_select.is_some();
+    let direction = cx.layout_direction();
+    let pinned = columns.iter().filter(|column| column.pinned).count();
+    let hover_group = ident.child("hover").semantic_id();
 
     let mut element = div()
         .id(ident.element_id())
+        .group(hover_group.clone())
         .relative()
         .row()
         .w_full()
         .h(px(height))
-        .px_token(theme, Space::Sm)
+        .when(pinned == 0, |element| element.px_token(theme, Space::Sm))
         .when(context.lines == GridLines::Rows, |element| {
             element
                 .border_b(px(theme.borders.hairline))
                 .border_color(theme.colors.divider)
         })
-        .selected_row(theme, cx.layout_direction(), selected)
+        .when(pinned == 0, |element| {
+            element.selected_row(theme, direction, selected)
+        })
+        .when(pinned > 0 && selected, |element| {
+            element.bg(theme.colors.selected)
+        })
         .when(selectable, |element| {
             element
                 .cursor_pointer()
@@ -2214,46 +2415,111 @@ fn row_element(
                 .when(!selected, |element| element.hover_row(theme))
                 .focus_ring(theme)
         })
-        .when(context.hierarchy, |element| {
-            element.row_reading(cx.layout_direction())
-        });
+        .row_reading(direction);
 
-    if context.selection_mode == SelectionMode::Multiple {
-        element = element.child(row_mark(theme, selected));
-    }
-
-    if !context.hierarchy
-        && let Some(expand) = context.on_expand.clone().filter(|_| !context.disabled)
-    {
-        element = element.child(disclosure(&ident, theme, &row, open, expand, cx));
-    }
-
-    let pinned = columns.iter().filter(|column| column.pinned).count();
-    for (position, column) in columns.iter().enumerate() {
-        // Tab leaves an open cell for the next editable column in the same
-        // row. A row whose editable columns are exhausted simply commits: the
-        // row after it may not have been drawn, and the grid will not build a
-        // row nobody asked to see in order to guess where a caret should go.
-        let next = columns
-            .iter()
-            .skip(position + 1)
-            .find(|next| next.editable)
-            .map(|next| (row.id.clone(), next.key.clone()));
-        element = element.child(cell_element(
-            &ident,
-            theme,
-            height,
-            column,
-            &mut row,
-            next,
-            position == 0,
-            context,
-            window,
-            cx,
-        ));
-        if position + 1 == pinned {
-            element = element.child(pinned_edge(theme));
+    if pinned == 0 {
+        if context.selection_mode == SelectionMode::Multiple {
+            element = element.child(row_mark(theme, selected));
         }
+        if !context.hierarchy
+            && let Some(expand) = context.on_expand.clone().filter(|_| !context.disabled)
+        {
+            element = element.child(disclosure(&ident, theme, &row, open, expand, cx));
+        }
+        for (position, column) in columns.iter().enumerate() {
+            // Tab leaves an open cell for the next editable column in the same
+            // row. A row whose editable columns are exhausted simply commits:
+            // the row after it may not have been drawn, and the grid will not
+            // build a row nobody asked to see in order to guess where a caret
+            // should go.
+            let next = columns
+                .iter()
+                .skip(position + 1)
+                .find(|next| next.editable)
+                .map(|next| (row.id.clone(), next.key.clone()));
+            element = element.child(cell_element(
+                &ident,
+                theme,
+                height,
+                column,
+                &mut row,
+                next,
+                position == 0,
+                context,
+                window,
+                cx,
+            ));
+        }
+    } else {
+        let has_disclosure = !context.hierarchy && context.on_expand.is_some();
+        let gutter_count = usize::from(context.selection_mode == SelectionMode::Multiple)
+            + usize::from(has_disclosure);
+        let held_extra =
+            theme.space(Space::Sm) + gutter_count as f32 * GUTTER + theme.space(Space::Sm);
+        let mut held = section_frame(div(), &columns[..pinned], held_extra)
+            .relative()
+            .row_reading(direction)
+            .bg(if selected {
+                theme.colors.selected
+            } else {
+                theme.colors.panel
+            })
+            .when(selectable && !selected, |element| {
+                let hover = theme.colors.hover;
+                element.group_hover(hover_group, move |style| style.bg(hover))
+            })
+            .when(selected, |element| {
+                element.child(selection_rail(theme, direction))
+            })
+            .child(div().w(px(theme.space(Space::Sm))).h_full().flex_none());
+        if context.selection_mode == SelectionMode::Multiple {
+            held = held.child(row_mark(theme, selected));
+        }
+        if !context.hierarchy
+            && let Some(expand) = context.on_expand.clone().filter(|_| !context.disabled)
+        {
+            held = held.child(disclosure(&ident, theme, &row, open, expand, cx));
+        } else if has_disclosure {
+            held = held.child(div().w(px(GUTTER)).flex_none());
+        }
+        for (position, column) in columns[..pinned].iter().enumerate() {
+            let next = columns
+                .iter()
+                .skip(position + 1)
+                .find(|next| next.editable)
+                .map(|next| (row.id.clone(), next.key.clone()));
+            held = held.child(cell_element(
+                &ident,
+                theme,
+                height,
+                column,
+                &mut row,
+                next,
+                position == 0,
+                context,
+                window,
+                cx,
+            ));
+        }
+        held = held.child(pinned_edge(theme, direction));
+
+        let mut moving =
+            section_frame(div(), &columns[pinned..], theme.space(Space::Sm)).row_reading(direction);
+        for (offset, column) in columns[pinned..].iter().enumerate() {
+            let position = pinned + offset;
+            let next = columns
+                .iter()
+                .skip(position + 1)
+                .find(|next| next.editable)
+                .map(|next| (row.id.clone(), next.key.clone()));
+            moving = moving.child(cell_element(
+                &ident, theme, height, column, &mut row, next, false, context, window, cx,
+            ));
+        }
+        moving = moving.child(div().w(px(theme.space(Space::Sm))).h_full().flex_none());
+        element = element
+            .child(sticky(sticky_edge(direction), held))
+            .child(moving);
     }
 
     if let (true, Some(handler)) = (selectable, context.on_select.clone()) {
@@ -2359,7 +2625,7 @@ fn row_element(
 /// slides under them, and a short shadow falling away from the edge is what
 /// that actually looks like. A solid rule said the opposite: that the grid
 /// was two tables that happened to be adjacent.
-fn pinned_edge(theme: &Theme) -> gpui::Div {
+fn pinned_edge(theme: &Theme, direction: LayoutDirection) -> gpui::Div {
     let cast = theme.colors.backdrop;
     div()
         .w(px(theme.space(Space::Sm)))
@@ -2372,11 +2638,11 @@ fn pinned_edge(theme: &Theme) -> gpui::Div {
                 .bg(theme.colors.divider),
         )
         .child(div().flex_1().h_full().bg(gpui::linear_gradient(
-            90.0,
+            if direction.is_rtl() { 270.0 } else { 90.0 },
             gpui::linear_color_stop(cast.opacity(0.22), 0.0),
             gpui::linear_color_stop(cast.opacity(0.0), 1.0),
         )))
-        .flex()
+        .row_reading(direction)
 }
 
 /// The width the pinned edge occupies, drawn as nothing.
@@ -2500,7 +2766,7 @@ fn cell_element(
     let editable = column.editable && !row.disabled && !context.disabled;
 
     if let (Some(edit), Some(field)) = (editing, context.editor.clone()) {
-        return editor_cell(theme, column, row, edit, field, next, context);
+        return editor_cell(theme, column, row, edit, field, next, context, cx);
     }
 
     // A treegrid's rendered columns are structural gridcells, not optional
@@ -2598,6 +2864,13 @@ fn cell_element(
             });
     }
 
+    if !column.pinned {
+        frame = frame.reveal_on_focus(
+            &context.state.horizontal,
+            pinned_insets(&context.state, context.direction),
+        );
+    }
+
     if let Some(handler) = context.on_range_change.clone().filter(|_| ranged) {
         let row_id = row.id.clone();
         let column_id = column.key.clone();
@@ -2648,8 +2921,10 @@ fn editor_cell(
     field: Entity<TextInput>,
     next: Option<(SharedString, SharedString)>,
     context: &RowContext,
+    cx: &mut App,
 ) -> AnyElement {
     let reading = field.clone();
+    let focus = field.focus_handle(cx);
     // The field is inset in the cell rather than being the cell. A well drawn
     // at the full height of the row is taller than every value around it and
     // reads as a hole punched through the body; a field the height of a small
@@ -2668,7 +2943,14 @@ fn editor_cell(
         .child(field);
     let frame = column_frame(div(), column, theme)
         .items_center()
-        .overflow_hidden();
+        .overflow_hidden()
+        .track_focus(&focus)
+        .when(!column.pinned, |element| {
+            element.reveal_on_focus(
+                &context.state.horizontal,
+                pinned_insets(&context.state, context.direction),
+            )
+        });
 
     let Some(handler) = context.on_edit.clone() else {
         return frame.child(well).into_any_element();
@@ -2786,6 +3068,81 @@ fn group_frame<E: Styled>(element: E, columns: &[GridColumn], theme: &Theme) -> 
         .items_center()
         .px(px(theme.space(Space::Xs)))
         .gap(px(theme.space(Space::Xs)))
+}
+
+/// A run of columns that remains one flex participant in the complete row.
+///
+/// Frozen and moving runs must divide surplus width exactly as the flat list
+/// of columns did. Their basis therefore carries fixed columns and structural
+/// gutters, their grow factor is the sum of flexible shares, and their minimum
+/// carries every flexible column's own floor.
+fn section_frame<E: Styled>(element: E, columns: &[GridColumn], extra: f32) -> E {
+    let mut flex = 0.0;
+    let mut fixed = extra;
+    let mut flexible_min = 0.0;
+    for column in columns {
+        match column.width {
+            ColumnWidth::Fixed(width) => fixed += width,
+            ColumnWidth::Flex(share) => {
+                flex += share;
+                flexible_min += column.min_width;
+            }
+        }
+    }
+    let element = if flex > 0.0 {
+        element
+            .flex_grow(flex)
+            .flex_shrink(1.0)
+            .flex_basis(px(fixed))
+            .min_w(px(fixed + flexible_min))
+    } else {
+        element.w(px(fixed)).flex_none()
+    };
+    element.row().h_full().items_center()
+}
+
+/// The narrowest complete grid surface. Below this width the shared viewport
+/// scrolls rather than asking columns to violate their declared minimums.
+fn grid_min_width(
+    columns: &[GridColumn],
+    selection: SelectionMode,
+    expands: bool,
+    theme: &Theme,
+) -> f32 {
+    let columns_width = columns
+        .iter()
+        .map(|column| match column.width {
+            ColumnWidth::Fixed(width) => width,
+            ColumnWidth::Flex(_) => column.min_width,
+        })
+        .sum::<f32>();
+    let gutters = usize::from(selection == SelectionMode::Multiple) + usize::from(expands);
+    columns_width
+        + theme.space(Space::Sm) * 2.0
+        + gutters as f32 * GUTTER
+        + if columns.iter().any(|column| column.pinned) {
+            theme.space(Space::Sm)
+        } else {
+            0.0
+        }
+}
+
+fn sticky_edge(direction: LayoutDirection) -> StickyEdge {
+    if direction.is_rtl() {
+        StickyEdge::Right
+    } else {
+        StickyEdge::Left
+    }
+}
+
+fn pinned_insets(state: &Memory, direction: LayoutDirection) -> Edges<gpui::Pixels> {
+    let mut insets = Edges::default();
+    if direction.is_rtl() {
+        insets.right = state.pinned_width.get();
+    } else {
+        insets.left = state.pinned_width.get();
+    }
+    insets
 }
 
 /// One column's slot in a row.

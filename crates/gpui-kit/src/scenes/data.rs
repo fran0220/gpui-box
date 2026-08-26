@@ -335,23 +335,22 @@ pub(super) fn fixture_job_tone(index: usize) -> (&'static str, Tone) {
 
 pub(super) fn grid_columns() -> [GridColumn; 4] {
     [
-        // Declared second, drawn first: a pinned column holds the left edge
-        // whatever order the caller puts the columns in.
+        // Declared second, drawn first: a pinned column holds the leading
+        // reading edge whatever order the caller puts the columns in.
         GridColumn::new("owner", "Owner")
-            .fixed(120.0)
+            .fixed(240.0)
             .reorderable(true)
             .editable(true),
         GridColumn::new("name", "Job")
-            .flex(2.0)
-            .min_width(140.0)
+            .fixed(260.0)
             .pinned(true)
             .sortable(true)
             .resizable(true),
         GridColumn::new("state", "State")
-            .fixed(110.0)
+            .fixed(180.0)
             .reorderable(true),
         GridColumn::new("duration", "Duration")
-            .fixed(104.0)
+            .fixed(180.0)
             .align(Align::End)
             .sortable(true)
             .resizable(true)
@@ -433,10 +432,12 @@ pub(super) fn data_grid(_window: &mut Window, cx: &mut App) -> AnyElement {
             )
             .total(FIXTURE_JOBS_TOTAL)
             .columns(grid_columns())
-            // The columns a group names have to be adjacent in the order the
-            // caller declared, which is what makes the group a bracket over
-            // them rather than a caption over one of them.
-            .group(ColumnGroup::new("identity", "Identity").columns(["name", "owner"]))
+            // Groups stay within one scrolling section, so each bracket has
+            // one visual address while the Job section remains frozen.
+            .group(ColumnGroup::new("identity", "Identity").columns(["name"]))
+            .group(
+                ColumnGroup::new("execution", "Execution").columns(["owner", "state", "duration"]),
+            )
             .footer_cell("duration", "4.2s")
             .sorted_by("duration", SortDirection::Descending)
             .selection_mode(SelectionMode::Multiple)
@@ -464,8 +465,8 @@ pub(super) fn data_grid(_window: &mut Window, cx: &mut App) -> AnyElement {
                 &theme,
                 TypeScale::Caption,
                 SharedString::from(format!(
-                    "{FIXTURE_JOBS_LOADED} rows loaded of {FIXTURE_JOBS_TOTAL}; only the drawn \
-                     ones publish"
+                    "{FIXTURE_JOBS_LOADED} of {FIXTURE_JOBS_TOTAL} loaded · scroll right for \
+                     Duration · Job stays pinned"
                 )),
             )
             .text_tone(&theme, TextTone::Muted),
@@ -564,6 +565,8 @@ pub(super) fn tree_grid(_window: &mut Window, cx: &mut App) -> AnyElement {
             Tone::Danger,
         ),
     ];
+    let owners = ["Platform", "Runtime", "UI systems", "Runtime", "Docs"];
+    let modified = ["12:42", "12:31", "11:58", "11:44", "Yesterday"];
     stack(&theme)
         .w(px(720.0))
         .child(
@@ -578,7 +581,9 @@ pub(super) fn tree_grid(_window: &mut Window, cx: &mut App) -> AnyElement {
                         Cell::new(Badge::new(state).tone(tone))
                             .text(state)
                             .published(true),
-                    );
+                    )
+                    .cell("owner", owners[index])
+                    .cell("modified", modified[index]);
                 if branch {
                     row = row.branch(expanded);
                 }
@@ -588,14 +593,26 @@ pub(super) fn tree_grid(_window: &mut Window, cx: &mut App) -> AnyElement {
                 row
             })
             .columns([
-                GridColumn::new("name", "Name").flex(2.0),
-                GridColumn::new("kind", "Kind").fixed(120.0),
-                GridColumn::new("state", "State").flex(1.0),
+                GridColumn::new("name", "Name").fixed(300.0).pinned(true),
+                GridColumn::new("kind", "Kind").fixed(160.0),
+                GridColumn::new("state", "State").fixed(180.0),
+                GridColumn::new("owner", "Owner").fixed(200.0),
+                GridColumn::new("modified", "Modified").fixed(180.0),
             ])
             .selected("components")
             .visible_rows(5)
             .on_select(|_, _, _| {})
             .on_expand(|_, _, _, _| {}),
+        )
+        .child(
+            crate::foundation::text(
+                &theme,
+                TypeScale::Caption,
+                SharedString::from(
+                    "Scroll right for Owner and Modified; the hierarchy remains pinned.",
+                ),
+            )
+            .text_tone(&theme, TextTone::Muted),
         )
         .into_any_element()
 }

@@ -129,6 +129,13 @@ uniform lists, and measured variable-height lists is GPUI Box work as well.
 Both additions coordinate existing framework layout and input state and import
 no editor, product, or third-party source.
 
+The inline sticky-subtree transform, deferred-prepaint content-mask retention,
+and inset-aware focus reveal contract are subsequent GPUI Box work at the
+shared layout/input boundary. They keep layout, clipping, hit testing,
+accessibility geometry, and paint on one translated subtree and import no
+browser sticky implementation, grid source, product policy, or third-party
+code.
+
 The bounded native external-data drag bridge for encoded images, MIME-tagged
 text, URLs, and promised or virtual files on macOS and Windows is subsequent
 GPUI Box work. It uses operating-system drag and pasteboard APIs and imports no

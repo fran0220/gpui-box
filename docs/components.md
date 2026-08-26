@@ -428,8 +428,8 @@ never the better failure.
 | `Flow` | builder | nothing; the caller's rows report themselves | The virtualized surface `List`'s flowing mode is built from, with no chrome of its own: it draws the element the caller returns and nothing around it, which is what a conversation, a log, or a diff needs. Rows are as tall as what they hold, `keys` keeps a measurement against the row that earned it, and the measured state is registered under the caller's identity so `follow_end`, `scroll_to_row`, `reveal_row`, and `glide_to_row` reach it by name |
 | `DiagnosticsList`, `Diagnostic` | builder | filter, selection, diagnostic action, and retry intents | Composes `FilterBar`, `List`, severity `Badge`s, and caller-owned action buttons. Diagnostic identity, location, message, selection, filters, and actions remain caller-owned; the list never opens a file or executes a fix. Loading, empty, unavailable, error, and a ready set with no filter matches remain distinct |
 | `Table` | builder | the sort a header click implies, and the row that was picked | Sorting is caller-owned: the table reports `(key, next direction)` and renders whatever order it is handed. Columns are fixed or flex, and the header stays put while the body scrolls. Row rules default on; loading, empty, and a refresh failure stay distinct. Not virtualized — reach for `DataGrid` past a few hundred rows |
-| `DataGrid` | builder | a sort, a column width, a column order, a selection change, a disclosure, and a finished edit | The heavyweight tabular surface: virtualized over `uniform_list`, resizable and reorderable columns, a left-pinned group, three selection modes with a truthful select-all, opened rows with a detail region, and cells that become fields. It applies none of it |
-| `TreeGrid`, `TreeGridRow` | builder | caller-owned selection and expansion intents | A DataGrid-backed hierarchy over caller-flattened visible rows. Rows supply stable ids, levels, parent ids and branch state. Disclosure and indentation live in the first ordered column. Fixed/flex columns only; no horizontal scrolling or frozen columns |
+| `DataGrid` | builder | a sort, a column width, a column order, a selection change, a disclosure, and a finished edit | The heavyweight tabular surface: virtualized over `uniform_list`, horizontally scrollable, resizable and reorderable columns, a frozen leading group, three selection modes with a truthful select-all, opened rows with a detail region, and cells that become fields. It applies none of it |
+| `TreeGrid`, `TreeGridRow` | builder | caller-owned selection and expansion intents | A DataGrid-backed hierarchy over caller-flattened visible rows. Rows supply stable ids, levels, parent ids and branch state. Disclosure and indentation live in the first ordered column. Fixed and flex columns share one horizontal viewport; pin the hierarchy column to keep context at the reading edge |
 | `BulkBar` | builder | the wider selection, and the dismissal that clears the selection | Appears over a selection through `Presence`, states the count it actually has, and offers "select all N" as a separate named action when more rows exist than the host has loaded |
 | `Tree` | builder | a node id and the disclosure state it should take, and the node that was picked | A collapsed node renders none of its children. Up and down walk visible nodes, right opens a shut branch or descends into an open one, left shuts an open branch or ascends |
 | `KanbanBoard`, `KanbanColumn`, `KanbanCard` | builder | card activation and a held card's requested destination column | Columns, cards, ordering, the held card, and the accepted move remain caller-owned. Ready, empty, and unavailable are separate; disabled or refused actions install no handler |
@@ -500,18 +500,15 @@ no rows is busy, a successful empty query is empty, and a refresh failure
 keeps any rows that are still true and states the refusal above them. Row
 rules default on for `Table` and stay off for `DataGrid`.
 
-### What DataGrid does not do
+### Wide DataGrid behavior and remaining limits
 
-**It does not scroll horizontally.** `uniform_list` owns its own scroll offset
-and lays every row out at the width it is given. A frozen left group under a
-horizontal scroll needs either two vertically-synchronised uniform lists —
-and nothing keeps two `UniformListScrollHandle`s in step without one writing
-the other every frame, which is a redraw loop — or a per-row
-counter-translation that fights the list's own content mask. So
-`GridColumn::pinned` means "this column holds the left edge whatever order the
-caller declares, and may not be dragged out of it or dropped across", not
-"this column stays while the rest scrolls away". Columns share the grid's
-width the way a table's do.
+**Header, body, and summary scroll as one horizontal surface.** The virtualized
+body keeps its independent vertical handle, but no second horizontal position
+is synchronized. `GridColumn::pinned` places columns in one frozen leading
+group: left in an LTR interface, right in RTL. The group keeps its clipping,
+hit targets, and accessibility bounds at that reading edge while moving
+columns pass beneath it. Keyboard focus reveals a moving header or editable
+cell inside the unobscured viewport rather than behind the frozen group.
 
 **It does not measure a column to its content.** A double click on a resize
 handle reports a fit request through `on_fit` and stops. The grid can only

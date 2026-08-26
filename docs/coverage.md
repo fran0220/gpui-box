@@ -110,16 +110,18 @@ rows and lays all of them out; `DataGrid` takes a render closure and lays out
 only the rows the viewport holds, which is what buys it column resizing and
 reordering, a pinned group, selection over an incompletely loaded set, opened
 rows, and cell editing. `docs/components.md` has the guidance on which to
-reach for, and the limits `DataGrid` states rather than fakes: no horizontal
-scroll, so a pinned column holds the left edge rather than freezing under one;
-and no fit-to-content measurement, so a double click on a column edge reports
-the request and lets the host answer.
+reach for. A wide `DataGrid` uses one horizontal viewport for its header,
+virtualized body, and summary, while a pinned leading group remains frozen at
+the reading edge. Its remaining fit-to-content limit is stated rather than
+faked: a double click on a column edge reports the request and lets the host
+answer.
 
 `TreeGrid` reuses that virtualized machinery for a caller-flattened hierarchy.
 Its `tree-grid` scene and `crates/gpui-kit/tests/tree_grid.rs` cover bounded
 materialization, TreeGrid/Row/GridCell semantics, row hierarchy metadata, and
 logical disclosure/parent keyboard intents. It deliberately adds no second
-flattening, horizontal-scroll, frozen-column, or cross-tree layout system.
+flattening or cross-tree layout system; horizontal scrolling and a frozen
+hierarchy column are inherited from `DataGrid` rather than reimplemented.
 
 ## Helpers, which the four-part rule does not reach
 
