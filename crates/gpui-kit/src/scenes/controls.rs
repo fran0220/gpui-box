@@ -1673,24 +1673,46 @@ pub(super) fn color_picker(_window: &mut Window, cx: &mut App) -> AnyElement {
                     theme.colors.success,
                     theme.colors.accent,
                 ])
-                .recent([theme.colors.accent, current])
+                .recent([theme.colors.accent, theme.colors.success])
                 .on_change(|_, _, _| {}),
         )
         .child(caption(&theme, "a swatch reports the colour it was given"))
         .child(
             row(&theme)
-                .child(ColorSwatch::new(
-                    "scene.color.swatch.accent",
-                    theme.colors.accent,
-                ))
+                .items_start()
                 .child(
-                    ColorSwatch::new("scene.color.swatch.selected", current)
-                        .selected(true)
-                        .on_click(|_, _, _| {}),
+                    div()
+                        .column()
+                        .items_center()
+                        .gap_token(&theme, Space::Xs)
+                        .child(ColorSwatch::new(
+                            "scene.color.swatch.accent",
+                            theme.colors.accent,
+                        ))
+                        .child(caption(&theme, "Default")),
                 )
                 .child(
-                    ColorSwatch::new("scene.color.swatch.disabled", theme.colors.danger)
-                        .disabled(true),
+                    div()
+                        .column()
+                        .items_center()
+                        .gap_token(&theme, Space::Xs)
+                        .child(
+                            ColorSwatch::new("scene.color.swatch.selected", current)
+                                .selected(true)
+                                .on_click(|_, _, _| {}),
+                        )
+                        .child(caption(&theme, "Selected")),
+                )
+                .child(
+                    div()
+                        .column()
+                        .items_center()
+                        .gap_token(&theme, Space::Xs)
+                        .child(
+                            ColorSwatch::new("scene.color.swatch.disabled", theme.colors.danger)
+                                .disabled(true),
+                        )
+                        .child(caption(&theme, "Disabled")),
                 ),
         )
         .into_any_element()

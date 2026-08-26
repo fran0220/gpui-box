@@ -8,7 +8,7 @@ use gpui::{
     AnyElement, App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
     StatefulInteractiveElement, Styled, Window, div, px,
 };
-use gpui_kit_assets::icon as glyph;
+use gpui_kit_assets::{Icon, icon as glyph};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TextTone, TypeScale};
 
@@ -19,9 +19,7 @@ use crate::display::progress::ProgressBar;
 use crate::display::status::Callout;
 use crate::effects::{EffectParticles, EffectPlan};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
-use crate::foundation::{
-    CardVariant, Disableable, FocusRing, Ident, Pressable, Selectable, Sizable, StyledExt,
-};
+use crate::foundation::{CardVariant, FocusRing, Ident, Pressable, Selectable, Sizable, StyledExt};
 use crate::motion::{Animated, Entrance};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey, Strings};
 
@@ -140,7 +138,7 @@ fn party_member(
     let interactive = handler.is_some();
     let mut portrait = PersonaPortrait::new(ident.child("portrait"), member.agent.clone())
         .expression(member.expression)
-        .size(62.0);
+        .size(54.0);
     if let Some(image) = member.image {
         portrait = portrait.image(image);
     }
@@ -179,9 +177,9 @@ fn party_member(
         .id(ident.element_id())
         .row_reading(direction)
         .items_start()
-        .gap_token(theme, Space::Md)
-        .w(px(310.0))
-        .p_token(theme, Space::Md)
+        .gap_token(theme, Space::Sm)
+        .w(px(286.0))
+        .p_token(theme, Space::Sm)
         .card_surface(theme, CardVariant::Outlined)
         .border_color(if chosen {
             theme.colors.hairline_strong
@@ -439,7 +437,7 @@ fn objective_row(
         // under the one above it instead of as a card nested inside it.
         .ms(direction, px(depth as f32 * theme.space(Space::Lg)))
         .me(direction, px(depth as f32 * theme.space(Space::Lg)))
-        .p_token(theme, Space::Md)
+        .p_token(theme, Space::Sm)
         .card_surface(theme, CardVariant::Outlined)
         .bg(if chosen {
             theme.colors.selected
@@ -647,7 +645,7 @@ impl RenderOnce for AbilityBar {
         });
         div()
             .row_reading(direction)
-            .items_stretch()
+            .items_start()
             .flex_wrap()
             .gap_token(&theme, Space::Sm)
             .children(abilities)
@@ -672,28 +670,68 @@ fn ability_control(
     let ready = matches!(ability.state, AbilityState::Ready);
     let chosen = selected == Some(&ability.id);
     let (status, tone, reason) = ability_state(&ability.state, cx.strings());
-    let mut button = Button::new(ident.clone())
-        .label(ability.label.clone())
-        .secondary()
-        .control_size(ControlSize::Md)
-        .full_width(true)
-        .selected(chosen)
-        .disabled(!ready);
-    if let Some(icon) = ability.icon {
-        button = button.icon(icon);
-    }
-    if let Some(detail) = ability.detail.clone() {
-        button = button.accessible_description(detail);
-    }
-    if let Some(reason) = reason.clone() {
-        button = button.accessible_description(reason);
-    }
-    if ready && let Some(handler) = handler.cloned() {
-        let id = ability.id.clone();
-        button = button.on_click(move |window, cx| {
-            handler(&AbilityBarEvent::Activate(id.clone()), window, cx)
-        });
-    }
+    let action = if ready {
+        let mut button = Button::new(ident.clone())
+            .label(ability.label.clone())
+            .secondary()
+            .control_size(ControlSize::Sm)
+            .full_width(true)
+            .selected(chosen);
+        if let Some(icon) = ability.icon {
+            button = button.icon(icon);
+        }
+        if let Some(description) = reason.clone().or(ability.detail.clone()) {
+            button = button.accessible_description(description);
+        }
+        if let Some(handler) = handler.cloned() {
+            let id = ability.id.clone();
+            button = button.on_click(move |window, cx| {
+                handler(&AbilityBarEvent::Activate(id.clone()), window, cx)
+            });
+        }
+        button.into_any_element()
+    } else {
+        // Cooldown, disabled, and unavailable are still identities the player
+        // must scan. A generic disabled button mutes its whole label by design;
+        // this static header keeps the ability readable while publishing a
+        // disabled button and installing no action handler.
+        let mut header = div()
+            .id(ident.element_id())
+            .row()
+            .items_center()
+            .gap_token(theme, Space::Xs)
+            .w_full()
+            .h(px(theme.control.sm.height))
+            .px_token(theme, Space::Sm)
+            .radius(theme, Radius::Control)
+            .bg(if chosen {
+                theme.colors.selected
+            } else {
+                theme.colors.raised
+            })
+            .hairline(theme)
+            .type_scale(theme, TypeScale::Label)
+            .text_tone(theme, TextTone::Muted);
+        if let Some(icon) = ability.icon {
+            header = header.child(
+                glyph(icon)
+                    .size(px(theme.control.sm.icon_size))
+                    .text_color(theme.colors.text_muted),
+            );
+        }
+        let mut spec = NodeSpec::new(ident.semantic_id(), Role::Button)
+            .parent(owner.semantic_id())
+            .text(ability.label.clone())
+            .disabled(true)
+            .selected(chosen);
+        if let Some(description) = reason.clone().or(ability.detail.clone()) {
+            spec = spec.description(description);
+        }
+        header
+            .child(ability.label.clone())
+            .semantic_in(cx, spec)
+            .into_any_element()
+    };
 
     // Every card lays out the same slots in the same order — status and
     // shortcut on one line, then the numbers, then the reason, then the
@@ -752,11 +790,11 @@ fn ability_control(
 
     div()
         .column()
-        .gap_token(theme, Space::Sm)
-        .w(px(168.0))
-        .p_token(theme, Space::Md)
+        .gap_token(theme, Space::Xs)
+        .w(px(174.0))
+        .p_token(theme, Space::Sm)
         .card_surface(theme, CardVariant::Outlined)
-        .child(button)
+        .child(action)
         .child(status_row)
         .children(has_numbers.then_some(numbers))
         .children(reason.map(|reason| {
@@ -765,10 +803,7 @@ fn ability_control(
                 .text_color(tone_color(tone, theme))
                 .child(reason)
         }))
-        // The meter keeps the last slot on every card, whether or not this
-        // ability has one, so a cooling card is not taller in a different
-        // place than a ready one.
-        .child(div().column().flex_1().justify_end().children(meter))
+        .children(meter)
         .into_any_element()
 }
 
@@ -962,11 +997,37 @@ impl RenderOnce for RewardReveal {
                     Some(elapsed) => particles.sample_at(elapsed),
                     None => particles,
                 };
+                // Celebration has a visual address of its own. Letting it
+                // cover the entire title row put glow over the reward's
+                // explanation, so the effect read as damaged text instead of
+                // as a reveal.
                 div()
-                    .absolute()
-                    .inset_0()
-                    .opacity(theme.opacity.muted)
-                    .child(particles)
+                    .relative()
+                    .size(px(52.0))
+                    .flex_none()
+                    .rounded_full()
+                    .overflow_hidden()
+                    .bg(theme.colors.sunken)
+                    .child(
+                        div()
+                            .absolute()
+                            .inset_0()
+                            .opacity(theme.opacity.muted)
+                            .child(particles),
+                    )
+                    .child(
+                        div()
+                            .absolute()
+                            .inset_0()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .child(
+                                glyph(Icon::Archive)
+                                    .size(px(theme.control.md.icon_size))
+                                    .text_color(theme.colors.text_muted),
+                            ),
+                    )
             });
 
         div()
@@ -980,11 +1041,8 @@ impl RenderOnce for RewardReveal {
             .child(
                 div()
                     .relative()
-                    // The celebration is clipped to the heading band: loose in
-                    // the card it surfaced as a stray glow in the gaps between
-                    // the item tiles, which reads as a rendering fault.
-                    .overflow_hidden()
                     .row_reading(direction)
+                    .items_center()
                     .justify_between()
                     .gap_token(&theme, Space::Md)
                     .children(effect)
@@ -1050,6 +1108,7 @@ fn reward_item(
 ) -> AnyElement {
     let ident = owner.child("item").child(item.id.as_str());
     let quantity = cx.numbers().count(item.quantity);
+    let fallback_icon = (item.image.is_none() && item.icon.is_none()).then_some(Icon::Widget);
     let art = div()
         .size(px(42.0))
         .flex_none()
@@ -1059,7 +1118,7 @@ fn reward_item(
         .overflow_hidden()
         .bg(theme.colors.sunken)
         .children(item.image.map(|image| gpui::img(image).size_full()))
-        .children(item.icon.map(|icon| {
+        .children(item.icon.or(fallback_icon).map(|icon| {
             glyph(icon)
                 .size(px(20.0))
                 .text_color(theme.colors.text_muted)

@@ -262,8 +262,9 @@ impl RenderOnce for VideoPlayer {
             picture = picture.child(div().absolute().inset_0().child(element));
         }
 
-        // Whatever is behind it, the surface says what is missing whenever
-        // there is no live frame in it.
+        // Whatever is behind it, the surface says what it is showing whenever
+        // there is no live frame in it. A caller-supplied poster is a valid
+        // fallback, not an error; an entirely empty surface remains a warning.
         if !matches!(content, SurfaceContent::Frame) {
             let place = match content {
                 SurfaceContent::Poster => NoticePlace::Foot,
@@ -274,6 +275,19 @@ impl RenderOnce for VideoPlayer {
             let mark =
                 matches!(content, SurfaceContent::Nothing).then_some(gpui_kit_assets::Icon::Video);
             picture = picture.child(match (&snapshot, &self.transport) {
+                (Some(snapshot), _)
+                    if snapshot.availability.is_ready()
+                        && matches!(content, SurfaceContent::Poster) =>
+                {
+                    notice_at(
+                        &theme,
+                        theme.colors.text_muted,
+                        None,
+                        strings.text(StringKey::VideoPoster),
+                        strings.text(StringKey::VideoPosterDetail),
+                        place,
+                    )
+                }
                 (Some(snapshot), _) if snapshot.availability.is_ready() => notice_at(
                     &theme,
                     theme.colors.warning,

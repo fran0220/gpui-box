@@ -16,7 +16,7 @@ use gpui_kit_theme::{ActiveTheme, Radius, Space, TypeScale};
 
 use crate::foundation::{CardVariant, Disableable, FocusRing, Ident, StyledExt};
 use crate::layout::measure;
-use crate::strings::{ActiveStrings, StringKey};
+use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type ChangeHandler = Rc<dyn Fn(Hsla, &mut Window, &mut App)>;
 
@@ -80,11 +80,20 @@ impl RenderOnce for ColorSwatch {
             .flex_none()
             .radius(&theme, Radius::Small)
             .bg(self.color)
-            .border(px(theme.borders.hairline))
+            .border(px(if self.selected {
+                theme.borders.thick
+            } else {
+                theme.borders.hairline
+            }))
             .border_color(if self.selected {
-                theme.colors.accent
+                theme.colors.accent_strong
             } else {
                 theme.colors.hairline_strong
+            })
+            .opacity(if self.disabled {
+                theme.opacity.disabled
+            } else {
+                1.0
             });
         if let (false, Some(handler)) = (self.disabled, self.on_click.clone()) {
             let color = self.color;
@@ -176,6 +185,12 @@ impl RenderOnce for ColorPicker {
         let hex = hex_of(self.value);
         let (hue, sat, val) = hsl_to_hsv(self.value);
         let report = self.on_change.clone().filter(|_| !self.disabled);
+        let saturation_label = cx.strings().text(StringKey::ColorSaturation);
+        let saturation_value = SharedString::from(format!(
+            "{} / {}",
+            cx.numbers().percent(sat),
+            cx.numbers().percent(val),
+        ));
 
         let board = saturation_board(
             &self.ident,
@@ -190,6 +205,10 @@ impl RenderOnce for ColorPicker {
         let hue_track = channel_track(
             &self.ident.child("hue"),
             cx.strings().text(StringKey::ColorHue),
+            SharedString::from(format!(
+                "{}°",
+                cx.numbers().decimal(f64::from(hue * 360.0), 0)
+            )),
             hue,
             hue_fill(),
             false,
@@ -211,6 +230,7 @@ impl RenderOnce for ColorPicker {
             channel_track(
                 &self.ident.child("alpha"),
                 cx.strings().text(StringKey::ColorAlpha),
+                cx.numbers().percent(self.value.a),
                 self.value.a,
                 linear_gradient_stops(
                     90.0,
@@ -265,6 +285,11 @@ impl RenderOnce for ColorPicker {
             // the picker ends and whatever it was placed next to begins.
             .p_token(&theme, Space::Sm)
             .card_surface(&theme, CardVariant::Outlined)
+            .opacity(if self.disabled {
+                theme.opacity.disabled
+            } else {
+                1.0
+            })
             .child(
                 div()
                     .row()
@@ -281,12 +306,29 @@ impl RenderOnce for ColorPicker {
                     )
                     .child(
                         div()
-                            .type_scale(&theme, TypeScale::Caption)
-                            .text_color(theme.colors.text_muted)
-                            .child(hex.clone()),
+                            .column()
+                            .gap_token(&theme, Space::Xs)
+                            .child(
+                                div()
+                                    .type_scale(&theme, TypeScale::Caption)
+                                    .text_color(theme.colors.text_faint)
+                                    .child(cx.strings().text(StringKey::ColorCurrent)),
+                            )
+                            .child(
+                                div()
+                                    .type_scale(&theme, TypeScale::Label)
+                                    .text_color(theme.colors.text)
+                                    .child(hex.clone()),
+                            ),
                     ),
             )
-            .child(board)
+            .child(
+                div()
+                    .column()
+                    .gap_token(&theme, Space::Xs)
+                    .child(channel_heading(&theme, saturation_label, saturation_value))
+                    .child(board),
+            )
             .child(hue_track)
             .children(alpha_track)
             .children(presets)
@@ -451,6 +493,7 @@ fn checkerboard(theme: &gpui_kit_theme::Theme) -> Vec<gpui::Div> {
 fn channel_track(
     ident: &Ident,
     label: SharedString,
+    display: SharedString,
     value: f32,
     fill: gpui::Background,
     transparency: bool,
@@ -547,14 +590,34 @@ fn channel_track(
             });
     }
 
-    track
-        .semantic_in(
-            cx,
-            NodeSpec::new(ident.semantic_id(), Role::Slider)
-                .text(label)
-                .range(0.0, 1.0, value),
+    div()
+        .column()
+        .gap_token(theme, Space::Xs)
+        .child(channel_heading(theme, label.clone(), display))
+        .child(
+            track.semantic_in(
+                cx,
+                NodeSpec::new(ident.semantic_id(), Role::Slider)
+                    .text(label)
+                    .range(0.0, 1.0, value),
+            ),
         )
         .into_any_element()
+}
+
+fn channel_heading(
+    theme: &gpui_kit_theme::Theme,
+    label: SharedString,
+    value: SharedString,
+) -> gpui::Div {
+    div()
+        .row()
+        .items_center()
+        .justify_between()
+        .gap_token(theme, Space::Sm)
+        .type_scale(theme, TypeScale::Caption)
+        .child(div().text_color(theme.colors.text_muted).child(label))
+        .child(div().text_color(theme.colors.text_faint).child(value))
 }
 
 /// Where along a channel a pointer `offset` from the track's leading edge is.

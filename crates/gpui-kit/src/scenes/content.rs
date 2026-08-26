@@ -744,6 +744,122 @@ pub(super) fn conversation_growing(_window: &mut Window, cx: &mut App) -> AnyEle
         .into_any_element()
 }
 
+/// A deterministic analytics image supplied through `ImageViewer`'s host slot.
+/// It is deliberately composed from theme roles instead of shipping a branded
+/// screenshot, but it carries enough information to review contain/cover as a
+/// media experience rather than as a placeholder experience.
+fn run_graph_picture(cx: &App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let bars = [42.0, 58.0, 51.0, 76.0, 68.0, 91.0, 82.0, 104.0];
+    div()
+        .size_full()
+        .column()
+        .bg(theme.colors.panel)
+        .child(
+            div()
+                .row()
+                .items_center()
+                .justify_between()
+                .px_token(&theme, Space::Md)
+                .py_token(&theme, Space::Sm)
+                .border_b(px(theme.borders.hairline))
+                .border_color(theme.colors.divider)
+                .child(crate::foundation::text(
+                    &theme,
+                    TypeScale::Label,
+                    "Release throughput",
+                ))
+                .child(
+                    crate::foundation::text(&theme, TypeScale::Caption, "4.8k events / min")
+                        .text_tone(&theme, TextTone::Muted),
+                ),
+        )
+        .child(
+            div()
+                .flex_1()
+                .min_h_0()
+                .column()
+                .px_token(&theme, Space::Md)
+                .pt(px(theme.space(Space::Sm)))
+                .child(
+                    div()
+                        .flex_1()
+                        .min_h_0()
+                        .row()
+                        .items_end()
+                        .gap_token(&theme, Space::Xs)
+                        .border_b(px(theme.borders.hairline))
+                        .border_color(theme.colors.divider)
+                        .children(bars.into_iter().enumerate().map(|(index, height)| {
+                            div()
+                                .flex_1()
+                                .h(px(height))
+                                .radius(&theme, Radius::Small)
+                                .bg(theme.colors.sequence.get(index))
+                        })),
+                )
+                .child(
+                    div()
+                        .row()
+                        .justify_between()
+                        .py_token(&theme, Space::Xs)
+                        .children(["10:00", "10:15", "10:30", "10:45"].map(|label| {
+                            crate::foundation::text(&theme, TypeScale::Caption, label)
+                                .text_tone(&theme, TextTone::Faint)
+                        })),
+                ),
+        )
+        .into_any_element()
+}
+
+/// A second host-owned image with no declared natural size. The viewer still
+/// has real content to frame; only its zoom percentage is unknowable.
+fn pasted_workflow_picture(cx: &App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let step = |icon: Icon, title: &'static str, detail: &'static str| {
+        div()
+            .column()
+            .items_center()
+            .gap_token(&theme, Space::Xs)
+            .w(px(104.0))
+            .p_token(&theme, Space::Sm)
+            .radius(&theme, Radius::Card)
+            .bg(theme.colors.raised)
+            .hairline(&theme)
+            .child(
+                gpui_kit_assets::icon(icon)
+                    .size(px(theme.control.md.icon_size))
+                    .text_color(theme.colors.text_muted),
+            )
+            .child(crate::foundation::text(&theme, TypeScale::Label, title))
+            .child(
+                crate::foundation::text(&theme, TypeScale::Caption, detail)
+                    .text_tone(&theme, TextTone::Faint),
+            )
+    };
+    div()
+        .size_full()
+        .flex()
+        .items_center()
+        .justify_center()
+        .gap_token(&theme, Space::Sm)
+        .bg(theme.colors.sunken)
+        .child(step(Icon::Document, "Collect", "3 sources"))
+        .child(
+            gpui_kit_assets::icon(Icon::ArrowRight)
+                .size(px(theme.control.sm.icon_size))
+                .text_color(theme.colors.text_faint),
+        )
+        .child(step(Icon::Tuning, "Review", "2 checks"))
+        .child(
+            gpui_kit_assets::icon(Icon::ArrowRight)
+                .size(px(theme.control.sm.icon_size))
+                .text_color(theme.colors.text_faint),
+        )
+        .child(step(Icon::Archive, "Publish", "ready"))
+        .into_any_element()
+}
+
 pub(super) fn image_viewer(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)
@@ -769,7 +885,7 @@ pub(super) fn image_viewer(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .showing("graph")
                         .fit(FitMode::Contain)
                         .height(200.0)
-                        .image(|_, _, cx| Some(scene_picture("Supplied by the host", cx)))
+                        .image(|_, _, cx| Some(run_graph_picture(cx)))
                         .on_event(|_, _, _| {}),
                     ),
                 )
@@ -800,7 +916,7 @@ pub(super) fn image_viewer(_window: &mut Window, cx: &mut App) -> AnyElement {
                     [ImageFrame::new("sketch", "A pasted sketch").source("clipboard")],
                 )
                 .height(200.0)
-                .image(|_, _, cx| Some(scene_picture("Size never stated", cx)))
+                .image(|_, _, cx| Some(pasted_workflow_picture(cx)))
                 .on_event(|_, _, _| {}),
             ),
         )

@@ -12,7 +12,7 @@ use gpui::{
     Styled, Window, div, prelude::FluentBuilder, px, relative,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Surface};
+use gpui_kit_theme::{ActiveTheme, ColorChoice, Elevation, Radius, Surface, Variant};
 
 use crate::foundation::{FocusRing, Ident, Pressable, StyledExt};
 use crate::layout::measure;
@@ -32,6 +32,10 @@ pub struct MinimapMark {
     pub y: f32,
     pub width: f32,
     pub height: f32,
+    /// Optional caller-owned category colour. A mark without one remains
+    /// neutral; a mark with one resolves through the same palette tier as a
+    /// graph node, so identity survives the change in scale.
+    pub color: Option<ColorChoice>,
 }
 
 impl MinimapMark {
@@ -42,7 +46,13 @@ impl MinimapMark {
             y,
             width,
             height,
+            color: None,
         }
+    }
+
+    pub fn color(mut self, color: impl Into<ColorChoice>) -> Self {
+        self.color = Some(color.into());
+        self
     }
 }
 
@@ -114,13 +124,23 @@ impl RenderOnce for Minimap {
             .marks
             .iter()
             .map(|mark| {
+                let colors = mark
+                    .color
+                    .as_ref()
+                    .map(|color| theme.variant_colors(Variant::Light, color));
                 div()
                     .absolute()
                     .left(relative(mark.x.clamp(0.0, 1.0)))
                     .top(relative(mark.y.clamp(0.0, 1.0)))
                     .w(relative(mark.width.clamp(0.04, 1.0)))
                     .h(relative(mark.height.clamp(0.04, 1.0)))
-                    .bg(theme.colors.loader_placeholder)
+                    .radius(&theme, Radius::Small)
+                    .bg(colors.map_or(theme.colors.loader_placeholder, |colors| colors.background))
+                    .when_some(colors, |element, colors| {
+                        element
+                            .border(px(theme.borders.hairline))
+                            .border_color(colors.text)
+                    })
                     .semantic_in(
                         cx,
                         NodeSpec::new(
@@ -239,5 +259,16 @@ impl RenderOnce for Minimap {
                 });
         }
         frame
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_mark_keeps_the_category_the_caller_gave_it() {
+        let mark = MinimapMark::new("ingest", 0.1, 0.2, 0.3, 0.4).color("teal");
+        assert_eq!(mark.color, Some(ColorChoice::Palette("teal".into())));
     }
 }

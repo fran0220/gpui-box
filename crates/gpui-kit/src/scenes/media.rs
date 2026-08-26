@@ -71,6 +71,150 @@ pub(super) fn audio_player(_window: &mut Window, cx: &mut App) -> AnyElement {
         .into_any_element()
 }
 
+fn walkthrough_frame(cx: &App) -> AnyElement {
+    let theme = cx.theme().clone();
+    let metric = |label: &'static str, value: &'static str| {
+        div()
+            .flex_1()
+            .min_w_0()
+            .column()
+            .gap_token(&theme, Space::Xs)
+            .p_token(&theme, Space::Sm)
+            .radius(&theme, Radius::Small)
+            .bg(theme.colors.raised)
+            .child(
+                crate::foundation::text(&theme, TypeScale::Caption, label)
+                    .text_tone(&theme, TextTone::Muted),
+            )
+            .child(crate::foundation::text(&theme, TypeScale::Subtitle, value))
+    };
+    div()
+        .size_full()
+        .column()
+        .bg(theme.colors.panel)
+        .child(
+            div()
+                .row()
+                .items_center()
+                .gap_token(&theme, Space::Sm)
+                .px_token(&theme, Space::Md)
+                .py_token(&theme, Space::Sm)
+                .border_b(px(theme.borders.hairline))
+                .border_color(theme.colors.divider)
+                .child(div().size(px(7.0)).rounded_full().bg(theme.colors.success))
+                .child(crate::foundation::text(
+                    &theme,
+                    TypeScale::Label,
+                    "Release command center",
+                )),
+        )
+        .child(
+            div()
+                .flex_1()
+                .min_h_0()
+                .row()
+                .child(
+                    div()
+                        .w(px(76.0))
+                        .h_full()
+                        .flex_none()
+                        .column()
+                        .gap_token(&theme, Space::Sm)
+                        .p_token(&theme, Space::Sm)
+                        .bg(theme.colors.sunken)
+                        .children([16.0, 34.0, 26.0, 42.0].map(|width| {
+                            div()
+                                .w(px(width))
+                                .h(px(theme.borders.thick))
+                                .rounded_full()
+                                .bg(theme.colors.hairline_strong)
+                        })),
+                )
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .column()
+                        .gap_token(&theme, Space::Sm)
+                        .p_token(&theme, Space::Md)
+                        .child(
+                            div()
+                                .row()
+                                .gap_token(&theme, Space::Sm)
+                                .child(metric("Checks", "48 / 52"))
+                                .child(metric("Coverage", "92%"))
+                                .child(metric("Elapsed", "04:18")),
+                        )
+                        .child(
+                            div()
+                                .column()
+                                .gap_token(&theme, Space::Xs)
+                                .p_token(&theme, Space::Sm)
+                                .radius(&theme, Radius::Small)
+                                .hairline(&theme)
+                                .child(crate::foundation::text(
+                                    &theme,
+                                    TypeScale::Caption,
+                                    "Verification progress",
+                                ))
+                                .child(
+                                    div()
+                                        .h(px(6.0))
+                                        .w_full()
+                                        .rounded_full()
+                                        .overflow_hidden()
+                                        .bg(theme.colors.track)
+                                        .child(
+                                            div()
+                                                .h_full()
+                                                .w(px(218.0))
+                                                .rounded_full()
+                                                .bg(theme.colors.accent),
+                                        ),
+                                ),
+                        ),
+                ),
+        )
+        .into_any_element()
+}
+
+fn walkthrough_poster(cx: &App) -> AnyElement {
+    let theme = cx.theme().clone();
+    div()
+        .size_full()
+        .flex()
+        .flex_col()
+        .items_center()
+        .justify_center()
+        .gap_token(&theme, Space::Sm)
+        .bg(theme.colors.sunken)
+        .child(
+            div()
+                .size(px(46.0))
+                .flex()
+                .items_center()
+                .justify_center()
+                .rounded_full()
+                .bg(theme.colors.raised)
+                .hairline(&theme)
+                .child(
+                    gpui_kit_assets::icon(Icon::Play)
+                        .size(px(theme.control.md.icon_size))
+                        .text_color(theme.colors.accent_strong),
+                ),
+        )
+        .child(crate::foundation::text(
+            &theme,
+            TypeScale::Subtitle,
+            "Release walkthrough",
+        ))
+        .child(
+            crate::foundation::text(&theme, TypeScale::Caption, "4 minutes · 8 chapters")
+                .text_tone(&theme, TextTone::Muted),
+        )
+        .into_any_element()
+}
+
 pub(super) fn video_player(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     stack(&theme)
@@ -85,7 +229,7 @@ pub(super) fn video_player(_window: &mut Window, cx: &mut App) -> AnyElement {
                         .volume(0.6)
                         .shared(),
                 )
-                .frame(|_, cx| Some(scene_picture("Supplied frame", cx)))
+                .frame(|_, cx| Some(walkthrough_frame(cx)))
                 .elapsed("00:24")
                 .remaining("-01:12")
                 .on_event(|_, _, _| {}),
@@ -93,13 +237,13 @@ pub(super) fn video_player(_window: &mut Window, cx: &mut App) -> AnyElement {
         .child(
             Divider::new()
                 .id("scene.video.rule.poster")
-                .label("Ready, and no frames supplied"),
+                .label("Poster while the first frame is still unavailable"),
         )
         .child(
             VideoPlayer::new("scene.video.poster")
                 .title("Release walkthrough")
                 .transport(FixtureTransport::ready(240.0).shared())
-                .poster(|_, cx| Some(scene_picture("Poster", cx)))
+                .poster(|_, cx| Some(walkthrough_poster(cx)))
                 .elapsed("00:00")
                 .remaining("-04:00")
                 .on_event(|_, _, _| {}),

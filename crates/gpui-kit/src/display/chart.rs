@@ -2450,6 +2450,35 @@ fn ready_radar(
     let accent = theme.colors.accent;
     let faint = theme.colors.text_faint;
     let plotted = series.to_vec();
+    let axis_labels = axes
+        .iter()
+        .enumerate()
+        .map(|(index, axis)| {
+            let angle = radar_angle(index, axis_count);
+            let horizontal = 0.5 + angle.cos() * 0.42;
+            let vertical = 0.5 + angle.sin() * 0.42;
+            div()
+                .absolute()
+                .left(relative(horizontal))
+                .top(relative(vertical))
+                .ml(px(-36.0))
+                .mt(px(-8.0))
+                .w(px(72.0))
+                .type_scale(theme, TypeScale::Caption)
+                .text_align(gpui::TextAlign::Center)
+                .text_color(theme.colors.text_muted)
+                .child(axis.label.clone())
+                .semantic_in(
+                    cx,
+                    NodeSpec::new(
+                        ident.child("axis").child(axis.id.as_ref()).semantic_id(),
+                        Role::Status,
+                    )
+                    .text(axis.label.clone())
+                    .value(axis.value.clone()),
+                )
+        })
+        .collect::<Vec<_>>();
     div()
         .column()
         .w_full()
@@ -2457,87 +2486,76 @@ fn ready_radar(
         .child(chart_heading(label, None, theme))
         .children(stale.map(|reason| stale_warning(ident, reason, theme, cx)))
         .child(
-            canvas(
-                |_, _, _| {},
-                move |bounds, _, window, _| {
-                    let width = f32::from(bounds.size.width);
-                    let height = f32::from(bounds.size.height);
-                    if width <= 0.0 || height <= 0.0 {
-                        return;
-                    }
-                    let center = point(
-                        bounds.origin.x + px(width / 2.0),
-                        bounds.origin.y + px(height / 2.0),
-                    );
-                    let radius = width.min(height) * 0.42;
-                    for ring in rings {
-                        let mut web = PathBuilder::stroke(px(1.0));
-                        for index in 0..=axis_count {
-                            let angle = radar_angle(index % axis_count, axis_count);
-                            let spot = radar_point(center, radius * ring, angle);
-                            if index == 0 {
-                                web.move_to(spot);
-                            } else {
-                                web.line_to(spot);
-                            }
-                        }
-                        if let Ok(path) = web.build() {
-                            window.paint_path(path, faint);
-                        }
-                    }
-                    for series in &plotted {
-                        let color = series.color.unwrap_or(accent);
-                        let mut fill = PathBuilder::fill();
-                        let mut stroke = PathBuilder::stroke(px(1.5));
-                        for (index, point) in series.points.iter().enumerate() {
-                            let angle = radar_angle(index, axis_count);
-                            let spot = radar_point(
-                                center,
-                                radius * point.position.y.clamp(0.0, 1.0),
-                                angle,
-                            );
-                            if index == 0 {
-                                fill.move_to(spot);
-                                stroke.move_to(spot);
-                            } else {
-                                fill.line_to(spot);
-                                stroke.line_to(spot);
-                            }
-                        }
-                        fill.close();
-                        stroke.close();
-                        if let Ok(path) = fill.build() {
-                            window.paint_path(path, color.opacity(0.22));
-                        }
-                        if let Ok(path) = stroke.build() {
-                            window.paint_path(path, color);
-                        }
-                    }
-                },
-            )
-            .w_full()
-            .h(px(200.0)),
-        )
-        .child(
             div()
-                .row()
-                .flex_wrap()
-                .gap_token(theme, Space::Sm)
-                .children(axes.iter().map(|axis| {
-                    div()
-                        .type_scale(theme, TypeScale::Caption)
-                        .text_color(theme.colors.text_muted)
-                        .child(axis.label.clone())
-                        .semantic_in(
-                            cx,
-                            NodeSpec::new(
-                                ident.child("axis").child(axis.id.as_ref()).semantic_id(),
-                                Role::Status,
-                            )
-                            .text(axis.label.clone())
-                            .value(axis.value.clone()),
-                        )
-                })),
+                .relative()
+                .w_full()
+                .h(px(220.0))
+                .child(
+                    canvas(
+                        |_, _, _| {},
+                        move |bounds, _, window, _| {
+                            let width = f32::from(bounds.size.width);
+                            let height = f32::from(bounds.size.height);
+                            if width <= 0.0 || height <= 0.0 {
+                                return;
+                            }
+                            let center = point(
+                                bounds.origin.x + px(width / 2.0),
+                                bounds.origin.y + px(height / 2.0),
+                            );
+                            // Leave a real label lane around the web. Labels
+                            // collected in a row under the plot made angular
+                            // order impossible to read without counting.
+                            let radius = width.min(height) * 0.32;
+                            for ring in rings {
+                                let mut web = PathBuilder::stroke(px(1.0));
+                                for index in 0..=axis_count {
+                                    let angle = radar_angle(index % axis_count, axis_count);
+                                    let spot = radar_point(center, radius * ring, angle);
+                                    if index == 0 {
+                                        web.move_to(spot);
+                                    } else {
+                                        web.line_to(spot);
+                                    }
+                                }
+                                if let Ok(path) = web.build() {
+                                    window.paint_path(path, faint);
+                                }
+                            }
+                            for series in &plotted {
+                                let color = series.color.unwrap_or(accent);
+                                let mut fill = PathBuilder::fill();
+                                let mut stroke = PathBuilder::stroke(px(1.5));
+                                for (index, point) in series.points.iter().enumerate() {
+                                    let angle = radar_angle(index, axis_count);
+                                    let spot = radar_point(
+                                        center,
+                                        radius * point.position.y.clamp(0.0, 1.0),
+                                        angle,
+                                    );
+                                    if index == 0 {
+                                        fill.move_to(spot);
+                                        stroke.move_to(spot);
+                                    } else {
+                                        fill.line_to(spot);
+                                        stroke.line_to(spot);
+                                    }
+                                }
+                                fill.close();
+                                stroke.close();
+                                if let Ok(path) = fill.build() {
+                                    window.paint_path(path, color.opacity(0.22));
+                                }
+                                if let Ok(path) = stroke.build() {
+                                    window.paint_path(path, color);
+                                }
+                            }
+                        },
+                    )
+                    .absolute()
+                    .inset_0(),
+                )
+                .children(axis_labels),
         )
         .into_any_element()
 }
@@ -2649,46 +2667,61 @@ fn ready_gauge(
         .child(chart_heading(label, None, theme))
         .children(stale.map(|reason| stale_warning(ident, reason, theme, cx)))
         .child(
-            canvas(
-                |_, _, _| {},
-                move |bounds, _, window, _| {
-                    let width = f32::from(bounds.size.width);
-                    let height = f32::from(bounds.size.height);
-                    if width <= 0.0 || height <= 0.0 {
-                        return;
-                    }
-                    let center = point(
-                        bounds.origin.x + px(width / 2.0),
-                        bounds.origin.y + px(height * 0.86),
-                    );
-                    let radius = width.min(height * 1.6) * 0.42;
-                    let mut track = PathBuilder::stroke(px(10.0));
-                    gauge_arc(&mut track, center, radius, 0.0, 1.0);
-                    if let Ok(path) = track.build() {
-                        window.paint_path(path, color.opacity(0.18));
-                    }
-                    if let Some(amount) = amount {
-                        let mut fill = PathBuilder::stroke(px(10.0));
-                        gauge_arc(&mut fill, center, radius, 0.0, amount);
-                        if let Ok(path) = fill.build() {
-                            window.paint_path(path, color);
-                        }
-                    }
-                },
-            )
-            .w_full()
-            .h(px(120.0)),
-        )
-        .child(
             div()
-                .type_scale(theme, TypeScale::Subtitle)
-                .text_align(gpui::TextAlign::Center)
-                .child(wording)
-                .semantic_in(
-                    cx,
-                    NodeSpec::new(ident.child("reading").semantic_id(), Role::Status)
-                        .text(label.clone())
-                        .value(reading.map(|point| point.value.clone()).unwrap_or_default()),
+                .relative()
+                .w_full()
+                .h(px(120.0))
+                .child(
+                    canvas(
+                        |_, _, _| {},
+                        move |bounds, _, window, _| {
+                            let width = f32::from(bounds.size.width);
+                            let height = f32::from(bounds.size.height);
+                            if width <= 0.0 || height <= 0.0 {
+                                return;
+                            }
+                            let center = point(
+                                bounds.origin.x + px(width / 2.0),
+                                bounds.origin.y + px(height * 0.86),
+                            );
+                            let radius = width.min(height * 1.6) * 0.42;
+                            let mut track = PathBuilder::stroke(px(10.0));
+                            gauge_arc(&mut track, center, radius, 0.0, 1.0);
+                            if let Ok(path) = track.build() {
+                                window.paint_path(path, color.opacity(0.18));
+                            }
+                            if let Some(amount) = amount {
+                                let mut fill = PathBuilder::stroke(px(10.0));
+                                gauge_arc(&mut fill, center, radius, 0.0, amount);
+                                if let Ok(path) = fill.build() {
+                                    window.paint_path(path, color);
+                                }
+                            }
+                        },
+                    )
+                    .absolute()
+                    .inset_0(),
+                )
+                // The reading belongs inside the scale's open centre. A
+                // separate row beneath the canvas looked like a second metric
+                // with no stated relationship to the arc.
+                .child(
+                    div()
+                        .absolute()
+                        .left_0()
+                        .right_0()
+                        .bottom(px(16.0))
+                        .type_scale(theme, TypeScale::Subtitle)
+                        .text_align(gpui::TextAlign::Center)
+                        .child(wording)
+                        .semantic_in(
+                            cx,
+                            NodeSpec::new(ident.child("reading").semantic_id(), Role::Status)
+                                .text(label.clone())
+                                .value(
+                                    reading.map(|point| point.value.clone()).unwrap_or_default(),
+                                ),
+                        ),
                 ),
         )
         .into_any_element()

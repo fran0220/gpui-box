@@ -290,7 +290,10 @@ pub(super) fn canvas_tools(_window: &mut Window, cx: &mut App) -> AnyElement {
             .child(right)
     };
     stack(&theme)
-        .w(px(920.0))
+        // Keep the scene's own padding inside the review frame. At 920px the
+        // content width plus stack padding overhung the capture and clipped
+        // the first words of the caption.
+        .w(px(840.0))
         .child(caption(
             &theme,
             "overview, chrome, and a named region; the host still owns pan and zoom",
@@ -320,12 +323,17 @@ pub(super) fn canvas_tools(_window: &mut Window, cx: &mut App) -> AnyElement {
                             ),
                         )
                         .child(
-                            div().w(px(240.0)).flex_none().child(
+                            div().w(px(160.0)).flex_none().child(
                                 Minimap::new("scene.canvas.minimap")
                                     .marks([
-                                        MinimapMark::new("ingest", 0.08, 0.42, 0.18, 0.16),
-                                        MinimapMark::new("validate", 0.36, 0.18, 0.20, 0.16),
-                                        MinimapMark::new("publish", 0.68, 0.48, 0.18, 0.16),
+                                        MinimapMark::new("ingest", 0.08, 0.24, 0.18, 0.16)
+                                            .color("teal"),
+                                        MinimapMark::new("validate", 0.32, 0.24, 0.20, 0.16)
+                                            .color("indigo"),
+                                        MinimapMark::new("observe", 0.24, 0.62, 0.20, 0.16)
+                                            .color("orange"),
+                                        MinimapMark::new("publish", 0.50, 0.62, 0.18, 0.16)
+                                            .color("lime"),
                                     ])
                                     .view(MinimapView::new(0.22, 0.20, 0.40, 0.36))
                                     .on_pan(|_, _, _, _| {}),
@@ -364,7 +372,7 @@ pub(super) fn canvas_tools(_window: &mut Window, cx: &mut App) -> AnyElement {
                     ),
                 )
                 .child(
-                    div().relative().w(px(540.0)).ml(px(120.0)).child(
+                    div().relative().w(px(540.0)).ml(px(96.0)).child(
                         NodeGroup::new("scene.canvas.group.quiet", "Observe").child(members(
                             member(
                                 "scene.canvas.node.observe",

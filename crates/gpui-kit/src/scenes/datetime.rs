@@ -159,6 +159,7 @@ pub(super) fn date_range(window: &mut Window, cx: &mut App) -> AnyElement {
     let column = |caption: &'static str, picker: AnyElement| {
         div()
             .column()
+            .w(px(320.0))
             .gap(px(theme.space(Space::Xs)))
             .child(
                 crate::foundation::text(&theme, TypeScale::Caption, caption)
@@ -168,7 +169,8 @@ pub(super) fn date_range(window: &mut Window, cx: &mut App) -> AnyElement {
     };
     stack(&theme)
         .child(
-            row(&theme)
+            div()
+                .row()
                 .items_start()
                 .gap(px(theme.space(Space::Lg)))
                 .child(column(
@@ -178,12 +180,15 @@ pub(super) fn date_range(window: &mut Window, cx: &mut App) -> AnyElement {
                 .child(column(
                     "the same start, previewing the end under the pointer",
                     preview.into_any_element(),
-                ))
-                .child(column(
-                    "a finished range with a blocked day inside it",
-                    blocked.into_any_element(),
                 )),
         )
+        // The third picker used to overhang the fixed review frame and looked
+        // narrower only because its right edge was clipped. Give every state
+        // the same full-width review column instead of squeezing three across.
+        .child(column(
+            "a finished range with a blocked day inside it",
+            blocked.into_any_element(),
+        ))
         .into_any_element()
 }
 

@@ -238,6 +238,8 @@ string_keys! {
     MediaWaveform => "media.waveform", "Waveform";
     VideoNoFrames => "video.no-frames", "No picture";
     VideoNoFramesDetail => "video.no-frames-detail", "The transport holds this video and no frames have been supplied for it.";
+    VideoPoster => "video.poster", "Poster";
+    VideoPosterDetail => "video.poster-detail", "Shown until a playback frame is supplied.";
 
     // Optional cinematic effects. These strings are accessibility descriptions;
     // the decorative layer itself draws no text or control.
@@ -498,6 +500,7 @@ string_keys! {
     ColorSaturation => "color.saturation", "Saturation and brightness";
     ColorAlpha => "color.alpha", "Opacity";
     ColorHex => "color.hex", "Hex";
+    ColorCurrent => "color.current", "Current color";
     ColorPresets => "color.presets", "Presets";
     ColorRecent => "color.recent", "Recent";
     GraphMinimap => "graph.minimap", "Overview";

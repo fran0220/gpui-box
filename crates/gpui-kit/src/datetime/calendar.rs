@@ -581,6 +581,14 @@ impl Calendar {
                     .border(px(theme.borders.thick))
                     .border_color(theme.colors.hairline_strong)
             })
+            // A refused day inside a selected run must remain visible as a
+            // refusal, not merely as a slightly warmer numeral on the range
+            // wash. The range stays continuous underneath this warning edge.
+            .when(blocked.is_some() && in_band, |element| {
+                element
+                    .border(px(theme.borders.thick))
+                    .border_color(theme.colors.warning)
+            })
             .when(cursored, |element| element.shadow(theme.focus_ring()))
             .when(selectable, |element| {
                 element

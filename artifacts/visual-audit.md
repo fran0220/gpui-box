@@ -887,3 +887,99 @@ context.
 `ObjectiveTracker` 94 · `PartyRoster` 93 · `RewardReveal` 92 ·
 `CanvasToolbar` 96 · `GraphNode` 94 · `Minimap` 96 · `NodeGraph` 96 ·
 `NodeGroup` 94.
+
+## UX re-review — visual finish and component completeness, 2026-08-26
+
+The score above answers whether a component is correct, testable, and built at
+the right boundary. This second pass asks a different question: whether a user
+can understand and trust the thing on screen, and whether the public component
+is complete enough for a credible product use. Passing the first rubric does
+not imply passing this one.
+
+All 180 public components were reviewed by family against their implementation,
+declared exhibit, and both current macOS themes. Motion-only conclusions were
+not inferred from still captures: those components retain their gallery review
+requirement. The UX score is a review judgement, not a test metric:
+
+| Dimension | Points | Review question |
+|---|---:|---|
+| Visual completion | 35 | Does hierarchy, density, spacing, contrast, and state emphasis look intentional in both themes? |
+| Component completeness | 30 | Does the public surface cover the states and scale a real host needs without a local imitation? |
+| Usability | 20 | Can a reader discover actions, scan identity, and understand disabled/refused/unknown states? |
+| Exhibit credibility | 15 | Does the review scene exercise believable content rather than hiding behind idealized placeholders? |
+
+Acceptance remains **90/100 with no major UX defect**.
+
+### Current UX score
+
+| Family | Components | Average | Floor | Passing |
+|---|---:|---:|---:|---:|
+| Controls + datetime | 41 | 94 | 91 | 41 |
+| Display + motion + effects | 47 | 93 | 90 | 47 |
+| Navigation + layout + overlay | 34 | 93 | 90 | 34 |
+| Data + structured | 11 | 89 | 84 | 9 |
+| Content + media | 15 | 94 | 91 | 15 |
+| Agent + game + canvas | 32 | 92 | 90 | 32 |
+| **Catalog** | **180** | **93** | **84** | **178** |
+
+### Findings closed in this pass
+
+- `ColorPicker` now names the current colour and visibly reports saturation /
+  brightness, hue, and opacity. `ColorSwatch` selection and disabled treatment
+  survive both themes, and the exhibit no longer selects the same colour in
+  both host lists.
+- `RangePicker` no longer loses the third example beyond the review frame. A
+  blocked day keeps the continuous range underneath it and carries a warning
+  edge as well as the blocked numeral and exact host reason.
+- `RadarChart` puts axis labels at their axes instead of collecting them in an
+  unrelated row. `GaugeChart` puts its reading inside the open centre of its
+  scale instead of below a detached canvas.
+- `ImageViewer` and `VideoPlayer` now receive deterministic but credible host
+  content. A supplied poster is presented as a neutral fallback rather than a
+  warning, while a genuinely empty video surface still says no frame exists.
+- `AbilityBar` is compact and keeps unavailable identities readable without
+  installing actions. `RewardReveal` gives the celebration its own bounded
+  visual address, keeps it off copy, and supplies a neutral fallback glyph for
+  a reward item whose host supplies no art.
+- `MinimapMark` can carry the same caller-owned category colour as a graph
+  node. The canvas exhibit maps all four marks, fixes the clipped caption, and
+  removes the unused minimap column width.
+
+Each changed exhibit was re-captured and read in `studio-dark` and
+`studio-light`. The final pictures contain no text clipping, overlap, missing
+glyph, or low-contrast state in the changed subjects.
+
+### Open completeness gap — not passed by a convenient scene
+
+`DataGrid` scores **86** and `TreeGrid` **84**. Their current exhibits are
+readable and do not visibly overflow; the failure is scale completeness, not a
+claim that those fixtures are broken. Both components explicitly lack
+horizontal scrolling, and `DataGrid`'s pinned columns do not freeze against a
+wide scrolling body. Deep hierarchy plus wide data has the same limitation in
+`TreeGrid`.
+
+This was deliberately not patched with an `overflow_x_scroll` wrapper or a
+per-row counter-translation. Header, virtualized body, clipping, hit testing,
+keyboard reveal, and frozen columns must share one horizontal position. A
+local approximation would make one screenshot pass while leaving those
+surfaces inconsistent. Closing this gap requires a reusable synchronized-axis
+scroll primitive at the GPUI framework boundary, focused framework tests, and
+the provenance, compatibility, dependency-authority, and platform validation
+required for framework infrastructure. Until that work lands, these two stay
+below the UX threshold in the score rather than being declared complete.
+
+### Claims rejected or reduced after direct review
+
+- `AgentRoster` does show its subagent hierarchy; its remaining sparsity is an
+  exhibit-density opportunity, not a missing tree.
+- `PersonaPortrait` / `PersonaDialogue` already show portrait states, choices,
+  a disabled reason, voice-reactive state, and unavailable state. Their fixture
+  nature is visible but the components are not incomplete.
+- `Terminal` has clear rendering and state vocabulary; the large quiet region
+  is a sparse fixture, not a terminal rendering defect.
+- Spinner, pulse, bar-loader, micro-mark, and thinking motion cannot be failed
+  from a reduced-motion poster. Their user experience remains a real-gallery
+  review, as documented by the visual testing contract.
+- `DataGrid` and `TreeGrid` short fixtures are legible. Their open score is the
+  explicit wide-content limitation above, not an observed clipped column in
+  the current baseline.
