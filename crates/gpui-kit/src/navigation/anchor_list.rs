@@ -246,10 +246,16 @@ impl RenderOnce for AnchorList {
         // The bar is a place, not a row of loose words: the track is what says
         // where the set of anchors starts and stops, and it is what the active
         // anchor's wash is read against.
+        let metrics = theme.control.get(self.size);
         let mut strip = div()
             .id(self.ident.element_id())
             .row_reading(direction)
             .items_center()
+            // The track ends where the anchors do. Stretched to whatever holds
+            // it, the groove ran on past the last section and read as a bar
+            // with something missing from it.
+            .self_start()
+            .max_w_full()
             .flex_wrap()
             .gap(px(theme.space(Space::Xs)))
             .p(px(theme.space(Space::Xs)))
@@ -303,13 +309,29 @@ impl RenderOnce for AnchorList {
                     menu.set_trigger_style(ButtonVariant::Ghost, self.size, cx)
                 });
                 let ident = self.ident.child("overflow");
-                div().flex().flex_none().child(menu).semantic_in(
-                    cx,
-                    NodeSpec::new(ident.semantic_id(), Role::Group)
-                        .parent(self.ident.semantic_id())
-                        .text(cx.strings().text(StringKey::AnchorMoreSections))
-                        .value(cx.numbers().count(hidden_count)),
-                )
+                div()
+                    .flex()
+                    .flex_none()
+                    .items_center()
+                    .gap(px(theme.space(Space::Xs)))
+                    // A way to the anchors that did not fit is not one of the
+                    // anchors, and the bar has to say so before it is opened:
+                    // without the break it read as the last section.
+                    .child(
+                        div()
+                            .flex_none()
+                            .w(px(theme.borders.hairline))
+                            .h(px(metrics.height * 0.5))
+                            .bg(theme.colors.divider),
+                    )
+                    .child(menu)
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(ident.semantic_id(), Role::Group)
+                            .parent(self.ident.semantic_id())
+                            .text(cx.strings().text(StringKey::AnchorMoreSections))
+                            .value(cx.numbers().count(hidden_count)),
+                    )
             });
 
         strip.children(overflow).semantic_in(

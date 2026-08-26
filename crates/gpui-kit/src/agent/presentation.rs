@@ -136,6 +136,7 @@ pub struct AgentAvatar {
     image: Option<SharedString>,
     tint: Option<Hsla>,
     size: f32,
+    mark_inset: f32,
     parent: Option<Ident>,
 }
 
@@ -147,8 +148,23 @@ impl AgentAvatar {
             image: None,
             tint: None,
             size: 32.0,
+            mark_inset: 0.0,
             parent: None,
         }
+    }
+
+    /// How far the presence mark is held back from the trailing edge.
+    ///
+    /// Only a stack sets this, and it sets it to however much the next
+    /// identity covers this one: a mark drawn at the edge of an avatar that
+    /// something else is standing in front of cuts a bite out of that
+    /// neighbour's ring, which reads as damage to the neighbour rather than
+    /// as a fact about this agent.
+    pub(crate) fn mark_inset(mut self, inset: f32) -> Self {
+        if inset.is_finite() {
+            self.mark_inset = inset.max(0.0);
+        }
+        self
     }
 
     pub fn image(mut self, image: impl Into<SharedString>) -> Self {
@@ -212,7 +228,7 @@ impl RenderOnce for AgentAvatar {
         // because that dot is one fixed size: at the smallest avatar it stood
         // proud of the disc it belongs to. Offline gets a filled mark in the
         // muted tone, so "not here" is legible instead of nearly the panel.
-        let dot_edge = (self.size * 0.26).clamp(6.0, 11.0);
+        let dot_edge = presence_dot_edge(self.size);
         let presence_color = match &self.agent.presence {
             AgentPresence::Offline => theme.colors.text_muted,
             AgentPresence::Unknown => theme.colors.hairline_strong,
@@ -221,9 +237,13 @@ impl RenderOnce for AgentAvatar {
         let mark = div()
             .absolute()
             .bottom_0()
-            .when(direction.is_ltr(), |element| element.right_0())
-            .when(direction.is_rtl(), |element| element.left_0())
-            .size(px(dot_edge + theme.borders.thick * 2.0))
+            .when(direction.is_ltr(), |element| {
+                element.right(px(self.mark_inset))
+            })
+            .when(direction.is_rtl(), |element| {
+                element.left(px(self.mark_inset))
+            })
+            .size(px(presence_mark_edge(self.size, theme.borders.thick)))
             .items_center()
             .justify_center()
             .rounded_full()
@@ -761,13 +781,16 @@ impl RenderOnce for AgentGroup {
             .into_iter()
             .map(|appearance| (appearance.id.clone(), appearance))
             .collect();
-        let overlap = self.size * 0.28;
+        let overlap = group_overlap(self.size);
         let mut stack: Vec<AnyElement> = Vec::new();
         for (index, agent) in self.agents.into_iter().take(visible).enumerate() {
             let appearance = appearances.get(&agent.descriptor.id);
             let mut avatar =
                 AgentAvatar::new(self.ident.child(agent.descriptor.id.as_str()), agent)
                     .size(self.size)
+                    // The last identity in the stack has nothing in front of
+                    // it, so its mark keeps the edge.
+                    .mark_inset(if index + 1 < visible { overlap } else { 0.0 })
                     .parent(self.ident.clone());
             if let Some(image) = appearance.and_then(|appearance| appearance.image.clone()) {
                 avatar = avatar.image(image);
@@ -1019,6 +1042,26 @@ fn shared_agent_id(id: &AgentId) -> SharedString {
     SharedString::from(id.as_str().to_string())
 }
 
+/// The presence dot's own edge on an avatar of `size`.
+///
+/// It scales rather than holding a floor with an area of its own: the dot sits
+/// in a cut-out two borders wider than itself, and at the smallest avatar a
+/// six-pixel floor put that cut-out over the middle of the disc, so the mark
+/// covered the initial it was a fact about.
+fn presence_dot_edge(size: f32) -> f32 {
+    (size * 0.24).clamp(3.5, 10.0)
+}
+
+/// The whole presence mark, cut-out included.
+fn presence_mark_edge(size: f32, thick: f32) -> f32 {
+    presence_dot_edge(size) + thick * 2.0
+}
+
+/// How much of one identity in a stack the next one covers.
+fn group_overlap(size: f32) -> f32 {
+    size * 0.28
+}
+
 fn presence_tone(presence: &AgentPresence) -> Tone {
     match presence {
         AgentPresence::Unknown | AgentPresence::Offline => Tone::Neutral,
@@ -1059,7 +1102,10 @@ fn execution_glyph(execution: &AgentExecutionState) -> Option<Glyph> {
             AgentOutcome::Succeeded => Glyph::Check,
             AgentOutcome::Partial(_) | AgentOutcome::TimedOut(_) => Glyph::Danger,
             AgentOutcome::Failed(_) | AgentOutcome::Cancelled => Glyph::Close,
-            AgentOutcome::Refused(_) => Glyph::Stop,
+            // Refusal is a decision not to run, which is the one thing the
+            // stop square does not say: it is the mark a running thing is
+            // stopped with, and a run that never started wore it too.
+            AgentOutcome::Refused(_) => Glyph::Forbidden,
         }),
         AgentExecutionState::Unavailable(_) => Some(Glyph::CloseCircle),
     }
@@ -1225,5 +1271,53 @@ mod tests {
         ] {
             assert!(execution_label(&state, &strings).contains(reason));
         }
+    }
+
+    #[test]
+    fn the_presence_mark_never_reaches_the_middle_of_the_avatar() {
+        // The initial, or the portrait, is in the middle. A mark whose
+        // cut-out reaches the centre of the disc hides the identity it is a
+        // fact about, which is what a fixed floor did at the smallest size.
+        for size in [16.0_f32, 20.0, 24.0, 32.0, 44.0, 88.0] {
+            assert!(
+                presence_mark_edge(size, 2.0) < size / 2.0,
+                "the mark covers the middle at {size}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_stacked_identity_keeps_its_mark_off_the_next_one() {
+        // In a stack every identity but the last is covered by the one in
+        // front of it, so its mark is held back by exactly that much and ends
+        // where the neighbour begins.
+        for size in [16.0_f32, 20.0, 30.0, 44.0] {
+            let inset = group_overlap(size);
+            assert!(
+                presence_mark_edge(size, 2.0) + inset <= size,
+                "the mark leaves its own avatar at {size}"
+            );
+        }
+    }
+
+    #[test]
+    fn refusal_and_stopping_are_different_marks() {
+        // A refusal is a decision not to run; the stop square is what a
+        // running thing is stopped with. One glyph for both said the run had
+        // been halted when nothing had started.
+        assert_eq!(
+            execution_glyph(&AgentExecutionState::Completed(AgentOutcome::Refused(
+                "policy".into()
+            ))),
+            Some(Glyph::Forbidden)
+        );
+        assert_ne!(
+            execution_glyph(&AgentExecutionState::Completed(AgentOutcome::Refused(
+                "policy".into()
+            ))),
+            execution_glyph(&AgentExecutionState::Completed(AgentOutcome::Failed(
+                "tests".into()
+            )))
+        );
     }
 }

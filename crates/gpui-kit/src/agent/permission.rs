@@ -409,15 +409,23 @@ fn cell(
 
     // Provenance is shown on every cell that has a state, so "set here" is a
     // statement rather than the absence of one.
+    //
+    // Two lines of it are held open wherever there is any, because a matrix
+    // whose rows are as tall as the longest reason in them steps down the
+    // table on whichever cell happened to wrap.
     let source = (state != PermissionState::NotApplicable).then(|| {
-        text(theme, TypeScale::Caption, entry.source().label(cx))
-            .text_tone(theme, TextTone::Faint)
-            .semantic_in(
-                cx,
-                NodeSpec::new(ident.child("source").semantic_id(), Role::Text)
-                    .text(entry.source().label(cx))
-                    .value(SharedString::new_static(entry.source().name()))
-                    .parent(ident.semantic_id()),
+        div()
+            .min_h(px(2.0 * theme.type_style(TypeScale::Caption).line_height))
+            .child(
+                text(theme, TypeScale::Caption, entry.source().label(cx))
+                    .text_tone(theme, TextTone::Faint)
+                    .semantic_in(
+                        cx,
+                        NodeSpec::new(ident.child("source").semantic_id(), Role::Text)
+                            .text(entry.source().label(cx))
+                            .value(SharedString::new_static(entry.source().name()))
+                            .parent(ident.semantic_id()),
+                    ),
             )
     });
 
@@ -443,11 +451,12 @@ fn cell(
     // one is drawn. Hover and the focus ring arrive too late to answer "can I
     // change this?", and for a permission that question has to be answerable
     // at rest.
+    // A provenance line that wraps needs room under it: at the tighter step
+    // the second line sat on the cell's own border.
     let frame = div()
         .flex_1()
         .min_w_0()
-        .px_token(theme, Space::Sm)
-        .py_token(theme, Space::Xs)
+        .p_token(theme, Space::Sm)
         .hairline(theme)
         .radius(theme, Radius::Control);
 

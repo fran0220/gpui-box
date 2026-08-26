@@ -3,7 +3,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use gpui::{IntoElement, ParentElement, Styled, TestAppContext, div, px};
+use gpui::{
+    IntoElement, Modifiers, MouseButton, ParentElement, Styled, TestAppContext, div, point, px,
+};
+use gpui_kit::foundation::{LayoutDirection, set_layout_direction};
 use gpui_kit::prelude::*;
 use gpui_kit_testkit::harness::Harness;
 
@@ -170,6 +173,53 @@ fn a_slider_reports_a_value_on_the_step_grid(cx: &mut TestAppContext) {
     let reported = *calls.borrow().first().expect("the click reported a value");
     assert_eq!(reported, reported.round(), "value left the step grid");
     assert!((0.0..=10.0).contains(&reported));
+}
+
+#[gpui::test]
+fn slider_endpoints_stay_inside_the_control_and_follow_reading_direction(cx: &mut TestAppContext) {
+    let (calls, sink) = recorder::<f32>();
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        let sink = sink.clone();
+        div()
+            .w(px(200.0))
+            .child(
+                Slider::new("settings.endpoint")
+                    .range(0.0, 10.0)
+                    .value(5.0)
+                    .on_change(move |value, _, _| sink.borrow_mut().push(value)),
+            )
+            .into_any_element()
+    });
+
+    let bounds = harness.bounds("settings.endpoint").expect("laid out");
+    let left = point(bounds.left() + px(0.5), bounds.center().y);
+    let right = point(bounds.right() - px(0.5), bounds.center().y);
+    for at in [left, right] {
+        harness
+            .context()
+            .simulate_mouse_down(at, MouseButton::Left, Modifiers::none());
+        harness
+            .context()
+            .simulate_mouse_up(at, MouseButton::Left, Modifiers::none());
+    }
+    assert_eq!(*calls.borrow(), vec![0.0, 10.0]);
+
+    calls.borrow_mut().clear();
+    harness.update(|_, cx| set_layout_direction(LayoutDirection::RightToLeft, cx));
+    let bounds = harness
+        .bounds("settings.endpoint")
+        .expect("laid out in RTL");
+    let left = point(bounds.left() + px(0.5), bounds.center().y);
+    let right = point(bounds.right() - px(0.5), bounds.center().y);
+    for at in [left, right] {
+        harness
+            .context()
+            .simulate_mouse_down(at, MouseButton::Left, Modifiers::none());
+        harness
+            .context()
+            .simulate_mouse_up(at, MouseButton::Left, Modifiers::none());
+    }
+    assert_eq!(*calls.borrow(), vec![10.0, 0.0]);
 }
 
 #[gpui::test]

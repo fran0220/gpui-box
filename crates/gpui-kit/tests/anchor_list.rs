@@ -3,7 +3,7 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use gpui::{AppContext as _, Entity, IntoElement, TestAppContext};
+use gpui::{AppContext as _, Entity, IntoElement, ParentElement as _, Styled as _, TestAppContext};
 use gpui_kit::prelude::*;
 use gpui_kit_semantics::Role;
 use gpui_kit_testkit::harness::Harness;
@@ -294,4 +294,35 @@ fn keyboard_walks_into_overflowed_anchors(cx: &mut TestAppContext) {
     calls.borrow_mut().clear();
     harness.keystrokes("right");
     assert_eq!(*calls.borrow(), vec!["result"]);
+}
+
+/// The track says where the set of anchors starts and stops. Stretched to
+/// whatever holds it, it ran on past the last section and read as a bar with
+/// something missing from the end of it.
+#[gpui::test]
+fn the_track_ends_where_the_last_anchor_does(cx: &mut TestAppContext) {
+    let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
+        gpui::div()
+            .flex()
+            .flex_col()
+            .child(
+                AnchorList::new("fixture.anchors")
+                    .anchors(fixture())
+                    .active("inputs")
+                    .on_navigate(|_, _, _| {}),
+            )
+            .into_any_element()
+    });
+
+    let strip = harness.bounds("fixture.anchors").expect("laid out");
+    let last = harness.bounds("fixture.anchors.result").expect("laid out");
+
+    assert!(
+        last.right() < strip.right(),
+        "the last anchor reached the edge of its own track"
+    );
+    assert!(
+        strip.right() - last.right() < last.size.width,
+        "the track kept running after the anchors stopped"
+    );
 }

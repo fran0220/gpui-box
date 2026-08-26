@@ -81,7 +81,7 @@ pub(super) fn list(_window: &mut Window, cx: &mut App) -> AnyElement {
             div()
                 .surface(&theme, Surface::Panel)
                 .radius(&theme, Radius::Card)
-                .py_token(&theme, Space::Xs)
+                .py_token(&theme, Space::Sm)
                 .overflow_hidden()
                 .child(
                     List::new("scene.list.records", FIXTURE_RECORDS, |index, _, _| {

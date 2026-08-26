@@ -116,6 +116,7 @@ icons![
     (DragHandle, "drag-handle", Fixed),
     (Filter, "filter", Fixed),
     (Folder, "folder", Directional),
+    (Forbidden, "forbidden", Fixed),
     (FolderWithFiles, "folder-with-files", Directional),
     (GitBranch, "git-branch", Directional),
     (Global, "global", Fixed),
@@ -282,7 +283,7 @@ mod tests {
             .iter()
             .filter(|icon| icon.mirrors_in_rtl())
             .count();
-        assert_eq!(Icon::ALL.len(), 62);
+        assert_eq!(Icon::ALL.len(), 63);
         assert_eq!(directional, 27);
     }
 

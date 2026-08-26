@@ -34,8 +34,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div,
-    prelude::FluentBuilder, px,
+    AnyElement, App, Hsla, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window,
+    div, prelude::FluentBuilder, px, relative,
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
@@ -49,6 +49,7 @@ use crate::display::avatar::Avatar;
 use crate::display::badge::Tone;
 use crate::display::status::StatusDot;
 use crate::display::timeline::EntryTime;
+use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{Ident, Sizable, StyledExt};
 use crate::motion::keyed;
 use crate::motion::{engage_end, follow_end, follows_end};
@@ -195,6 +196,7 @@ pub struct Message {
     body: MessageBody,
     delivery: DeliveryState,
     streaming: bool,
+    tint: Option<Hsla>,
     attachments: Vec<Attachment>,
     reactions: Vec<Reaction>,
 }
@@ -211,6 +213,7 @@ impl Message {
             body: body.into(),
             delivery: DeliveryState::default(),
             streaming: false,
+            tint: None,
             attachments: Vec::new(),
             reactions: Vec::new(),
         }
@@ -242,6 +245,22 @@ impl Message {
         })
     }
 
+    /// The colour this speaker is known by.
+    ///
+    /// A transcript in which every turn is the same grey slab makes the
+    /// reader work out who is talking from the byline alone, which is the one
+    /// line a continued turn does not draw. The colour is carried as a rail
+    /// at the reading edge and a wash behind the turn, quiet enough that a
+    /// long thread still reads as one document.
+    ///
+    /// It is never derived from the author's name, for the reason
+    /// [`Avatar::tint`](crate::display::avatar::Avatar::tint) gives: this
+    /// component cannot know which colours the application has already spent.
+    pub fn tint(mut self, tint: Hsla) -> Self {
+        self.tint = Some(tint);
+        self
+    }
+
     /// Marks the message as still arriving. The body keeps whatever has
     /// arrived so far.
     pub fn streaming(mut self, streaming: bool) -> Self {
@@ -263,6 +282,21 @@ impl Message {
         &self.id
     }
 }
+
+/// The share of the conversation's width one turn may reach before it wraps.
+///
+/// A turn that hugged its text with no ceiling would set a line length nobody
+/// can read at, and one with no ceiling at all is the full-bleed slab this
+/// replaces.
+const MESSAGE_MEASURE: f32 = 0.86;
+
+/// How much of the speaker's colour a whole turn carries.
+///
+/// Far under the band a node header takes: a header is a strip at the top of a
+/// shape, and this is every pixel of every message in the thread. At the
+/// header's alpha a transcript reads as coloured slabs rather than as a
+/// document with a colour in it.
+const SPEAKER_WASH_ALPHA: f32 = 0.05;
 
 type RetryHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 type MarkdownHandler = Rc<dyn Fn(SharedString, &MarkdownEvent, &mut Window, &mut App)>;
@@ -734,7 +768,6 @@ fn row(
 
     let header = div()
         .row()
-        .w_full()
         .gap_token(&theme, Space::Sm)
         .type_scale(&theme, TypeScale::Caption)
         .h(px(theme.typography.caption.line_height))
@@ -780,7 +813,6 @@ fn row(
 
     let mut footer = div()
         .row()
-        .w_full()
         .gap_token(&theme, Space::Sm)
         .h(px(theme.control.get(ControlSize::Sm).height))
         .child(delivery_mark(
@@ -821,21 +853,37 @@ fn row(
     }
 
     let _ = window;
+    let direction = cx.layout_direction();
     // Every message is a surface of its own. Without one the byline, the body
     // and the delivery mark are three runs of text at the same left edge, and
     // which message a status line belongs to is a question about vertical
     // distance: a reader counting gaps had already been told the wrong thing.
     div()
+        .row()
+        .items_start()
         .w_full()
         .py_token(&theme, Space::Xs)
         .child(
             div()
                 .column()
-                .w_full()
+                // A turn takes the width of what it says, up to a measure a
+                // paragraph still reads at. Full-bleed, every message was the
+                // same rectangle whoever wrote it and however little it said.
+                .max_w(relative(MESSAGE_MEASURE))
                 .gap_token(&theme, Space::Xs)
                 .p_token(&theme, Space::Sm)
                 .radius(&theme, Radius::Card)
                 .surface(&theme, Surface::Raised)
+                // The rail keeps its width whether or not the speaker has a
+                // colour, so a thread of coloured and uncoloured turns still
+                // has one reading edge.
+                .border_s(direction, px(theme.effects.rail_width))
+                .border_color(message.tint.unwrap_or(gpui::transparent_black()))
+                .when_some(message.tint, |surface, tint| {
+                    surface.bg(theme
+                        .surface(Surface::Raised)
+                        .blend(tint.opacity(SPEAKER_WASH_ALPHA)))
+                })
                 .child(header)
                 .child(body)
                 .child(footer),
@@ -921,7 +969,6 @@ fn body_element(
                     .on_event(move |event, window, cx| handler(id.clone(), event, window, cx));
             }
             div()
-                .w_full()
                 .when_some(height, |element, height| {
                     element.h(px(height)).overflow_hidden()
                 })
@@ -941,7 +988,6 @@ fn body_element(
             };
             div()
                 .column()
-                .w_full()
                 .when_some(height, |element, height| {
                     element.h(px(height)).overflow_hidden()
                 })
@@ -1112,6 +1158,27 @@ mod tests {
             "The workspace is read only."
         );
         assert!(state.failed());
+    }
+
+    #[test]
+    fn a_speakers_colour_is_the_callers_and_absent_until_one_is_given() {
+        let plain = Message::new("m1", "Is the release still blocked?").author("Ada");
+        assert_eq!(plain.tint, None);
+        let coloured = Message::new("m2", "It is not.").author("Grace").tint(Hsla {
+            h: 0.5,
+            s: 0.5,
+            l: 0.5,
+            a: 1.0,
+        });
+        assert_eq!(
+            coloured.tint,
+            Some(Hsla {
+                h: 0.5,
+                s: 0.5,
+                l: 0.5,
+                a: 1.0
+            })
+        );
     }
 
     #[test]

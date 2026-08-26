@@ -526,6 +526,11 @@ impl RenderOnce for DiagnosticsList {
                             .child(
                                 div()
                                     .flex_none()
+                                    .row()
+                                    // The column is where the badge starts,
+                                    // not how wide the badge is: stretched to
+                                    // the column it became a block of colour
+                                    // with its word at one end.
                                     .w(px(severity_column))
                                     .child(
                                         Badge::new(diagnostic.severity.label(cx))

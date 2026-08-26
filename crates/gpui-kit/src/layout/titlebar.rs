@@ -29,6 +29,11 @@ const HEIGHT: f32 = 38.0;
 const CONTROL_WIDTH: f32 = 46.0;
 const GLYPH_SIZE: f32 = 10.0;
 const MACOS_TRAFFIC_LIGHT_GUTTER: f32 = 76.0;
+/// How far the host's own trailing chrome stands off the window's edge.
+///
+/// It is the inset the leading traffic lights are placed at, so the strip has
+/// one edge margin whichever side a reader looks at.
+const TRAILING_GUTTER: f32 = 12.0;
 
 type EventHandler = Rc<dyn Fn(DesktopTitlebarEvent, &mut Window, &mut App)>;
 
@@ -203,7 +208,21 @@ impl RenderOnce for DesktopTitlebar {
             .h_full()
             .items_center()
             .flex_none()
-            .children(self.right.map(client_slot))
+            // A window button's hit area runs to the window's own edge and is
+            // padded from inside, so it needs no inset. Caller content does:
+            // where the platform puts no button on this side, the host's own
+            // chrome was left standing on the edge of the strip while the
+            // leading side kept a gutter the width of three traffic lights.
+            .children(self.right.map(|content| {
+                div()
+                    .flex()
+                    .items_center()
+                    .h_full()
+                    .when(right_buttons.is_empty(), |element| {
+                        element.pr(px(TRAILING_GUTTER))
+                    })
+                    .child(client_slot(content))
+            }))
             .children(right_buttons);
 
         let drag_handler = handler.clone();

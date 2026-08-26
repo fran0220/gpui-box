@@ -367,6 +367,7 @@ impl UploadList {
         let theme = cx.theme().clone();
         let ident = self.ident.child(upload.id.as_ref());
         let live = !self.disabled;
+        let dismissible = live && (self.on_cancel.is_some() || self.on_remove.is_some());
         let wording = upload.state.wording(cx);
 
         // A refusal never gets a retry: the same file against the same rule
@@ -394,9 +395,12 @@ impl UploadList {
                 let id = upload.id.clone();
                 IconButton::new(
                     ident.child("cancel"),
-                    // A filled square inside a filled chip is a chip with a
-                    // hole in it; the ring reads as a control at this size.
-                    Icon::CloseCircle,
+                    // Stopping a transfer and clearing a settled row are one
+                    // glyph in one column. Two dismiss marks down the same
+                    // edge read as two kinds of control rather than as the
+                    // same control acting on rows in different states, which
+                    // the row's own words already say.
+                    Icon::Close,
                     cx.strings()
                         .format(StringKey::UploadCancel, &[upload.name.as_ref()]),
                 )
@@ -479,18 +483,30 @@ impl UploadList {
                                     .text_tone(&theme, gpui_kit_theme::TextTone::Faint)
                             })),
                     )
-                    .child(match upload.state {
-                        UploadState::Failed { .. } => {
-                            foundation_text(&theme, TypeScale::Caption, wording.clone())
-                                .text_color(theme.colors.danger)
-                        }
-                        UploadState::Refused { .. } => {
-                            foundation_text(&theme, TypeScale::Caption, wording.clone())
-                                .text_color(theme.colors.warning)
-                        }
-                        _ => foundation_text(&theme, TypeScale::Caption, wording.clone())
-                            .text_tone(&theme, gpui_kit_theme::TextTone::Muted),
-                    })
+                    // The retry stands beside the reason it answers rather
+                    // than in the trailing column: a control only some rows
+                    // carry, placed in the column every row shares, moves
+                    // that column's contents by its own width and leaves the
+                    // sizes down the right edge in a ragged line.
+                    .child(
+                        div()
+                            .row()
+                            .w_full()
+                            .gap_token(&theme, Space::Sm)
+                            .child(match upload.state {
+                                UploadState::Failed { .. } => {
+                                    foundation_text(&theme, TypeScale::Caption, wording.clone())
+                                        .text_color(theme.colors.danger)
+                                }
+                                UploadState::Refused { .. } => {
+                                    foundation_text(&theme, TypeScale::Caption, wording.clone())
+                                        .text_color(theme.colors.warning)
+                                }
+                                _ => foundation_text(&theme, TypeScale::Caption, wording.clone())
+                                    .text_tone(&theme, gpui_kit_theme::TextTone::Muted),
+                            })
+                            .children(retry),
+                    )
                     .children(bar.map(|bar| {
                         div()
                             .row()
@@ -505,9 +521,17 @@ impl UploadList {
                             }))
                     })),
             )
-            .children(retry)
-            .children(cancel)
-            .children(remove)
+            // The dismiss column is held open for every row, so a row that
+            // has nothing to dismiss does not pull the size beside it right.
+            .when(dismissible, |element| {
+                element.child(
+                    div()
+                        .flex_none()
+                        .w(px(theme.control.xs.height))
+                        .children(cancel)
+                        .children(remove),
+                )
+            })
             .semantic_in(
                 cx,
                 NodeSpec::new(ident.semantic_id(), Role::Row)

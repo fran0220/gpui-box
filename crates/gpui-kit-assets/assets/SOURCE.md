@@ -57,12 +57,13 @@ and mirrored sidebar glyphs are product-neutral icons derived from Comet,
 Copyright (c) 2026 Wing, MIT licensed.
 
 The calendar, checkbox-empty, checkbox-checked, double-arrow-left,
-double-arrow-right, drag-handle, filter, image, minus, pause, play, sound-wave,
-stop and video glyphs are original drawings for this repository, on the same
-sixteen-unit grid and 1.25 stroke as the set around them. They exist because
-the components that needed them were drawing a character the embedded fonts do
-not cover — a task list rendered its boxes as tofu, a date field borrowed the
-checklist glyph, and a transport had no play or pause of its own.
+double-arrow-right, drag-handle, filter, forbidden, image, minus, pause, play,
+sound-wave, stop and video glyphs are original drawings for this repository, on
+the same sixteen-unit grid and 1.25 stroke as the set around them. They exist
+because the components that needed them were drawing a character the embedded
+fonts do not cover — a task list rendered its boxes as tofu, a date field
+borrowed the checklist glyph, a transport had no play or pause of its own, and
+a refused run wore the stop square that a running one stops with.
 
 Product and provider marks from the source application are deliberately not
 included in this generic asset crate.

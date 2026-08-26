@@ -691,3 +691,50 @@ fn an_overlay_restores_the_theme_it_found(cx: &mut TestAppContext) {
         "the override was popped: {after:?} against {overridden:?}"
     );
 }
+
+/// A retry belongs to the row that failed, not to the column every row shares.
+/// While it stood in that column it moved the size beside it by its own width,
+/// so the sizes read down a ragged edge instead of a line.
+#[gpui::test]
+fn every_upload_row_dismisses_from_the_same_column(cx: &mut TestAppContext) {
+    let mut harness = harness(cx, |_, _| {
+        UploadList::new("attachments")
+            .uploads([
+                Upload::new("brief", "brief.pdf").size("1.2 MB").done(),
+                Upload::new("capture", "capture.png")
+                    .size("4.8 MB")
+                    .uploading(0.4),
+                Upload::new("archive", "archive.zip")
+                    .size("240 MB")
+                    .failed("The connection dropped."),
+            ])
+            .on_retry(|_, _, _| {})
+            .on_cancel(|_, _, _| {})
+            .on_remove(|_, _, _| {})
+            .into_any_element()
+    });
+
+    let settled = harness
+        .bounds("attachments.brief.remove")
+        .expect("laid out");
+    let running = harness
+        .bounds("attachments.capture.cancel")
+        .expect("laid out");
+    let failed = harness
+        .bounds("attachments.archive.remove")
+        .expect("laid out");
+
+    assert_eq!(settled.origin.x, running.origin.x);
+    assert_eq!(
+        settled.origin.x, failed.origin.x,
+        "the row carrying a retry pulled the dismiss column out of line"
+    );
+
+    let retry = harness
+        .bounds("attachments.archive.retry")
+        .expect("laid out");
+    assert!(
+        retry.right() < failed.origin.x,
+        "the retry reached into the column every row dismisses from"
+    );
+}

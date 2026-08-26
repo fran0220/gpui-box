@@ -168,6 +168,7 @@ impl RenderOnce for UndoHistory {
                 &self.ident,
                 &theme,
                 entry,
+                index > 0,
                 index + 1 < count,
                 current.as_ref(),
                 self.disabled,
@@ -223,6 +224,7 @@ fn entry_element(
     history: &Ident,
     theme: &Theme,
     entry: &HistoryEntry,
+    follows: bool,
     continues: bool,
     current: Option<&SharedString>,
     history_disabled: bool,
@@ -239,15 +241,30 @@ fn entry_element(
         theme.colors.hairline
     };
 
+    // The entry's own padding lives on its surface rather than on the row, so
+    // the rail spans the row edge to edge and the thread one entry leaves
+    // meets the thread the next one starts. The lead is what puts the marker
+    // on the first line of the label.
+    let lead = theme.space(Space::Sm) + MARKER_TOP;
     let rail = div()
         .w(px(RAIL_WIDTH))
         .flex_none()
         .column()
         .items_center()
+        .when(follows, |element| {
+            element.child(
+                div()
+                    .h(px(lead))
+                    .w(px(theme.borders.hairline))
+                    .flex_none()
+                    .bg(theme.colors.divider),
+            )
+        })
         .child(
             div()
-                .mt(px(theme.space(Space::Xs) + MARKER_TOP))
+                .when(!follows, |element| element.mt(px(lead)))
                 .size(px(MARKER_SIZE))
+                .flex_none()
                 .rounded_full()
                 .border(px(theme.borders.hairline))
                 .border_color(marker_color)
@@ -256,7 +273,6 @@ fn entry_element(
         .when(continues, |element| {
             element.child(
                 div()
-                    .mt(px(3.0))
                     .w(px(theme.borders.hairline))
                     .flex_1()
                     .min_h(px(theme.space(Space::Lg)))
@@ -332,7 +348,7 @@ fn entry_element(
         .min_w_0()
         .column()
         .px_token(theme, Space::Sm)
-        .py(px(theme.space(Space::Xs)))
+        .py_token(theme, Space::Sm)
         .radius(theme, Radius::Control)
         .when(selected, |element| element.bg(theme.colors.selected))
         .when(actionable, |element| {
@@ -348,8 +364,6 @@ fn entry_element(
         .w_full()
         .gap_token(theme, Space::Sm)
         .px_token(theme, Space::Sm)
-        .pt(px(theme.space(Space::Sm)))
-        .pb(px(theme.space(Space::Md)))
         .radius(theme, Radius::Control)
         .when(history_disabled, |element| {
             element.opacity(theme.opacity.disabled)

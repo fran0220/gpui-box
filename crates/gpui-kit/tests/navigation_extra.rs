@@ -553,3 +553,36 @@ fn undo_history_disabled_state_installs_no_jump_handlers(cx: &mut TestAppContext
 
     assert!(calls.borrow().is_empty());
 }
+
+#[gpui::test]
+fn undo_history_entries_meet_so_the_timeline_reads_as_one_thread(cx: &mut TestAppContext) {
+    let (mut harness, _calls) = undo_history(cx, false);
+
+    let ids = [
+        "document.history.opened",
+        "document.history.managed",
+        "document.history.current",
+        "document.history.draft",
+        "document.history.saved",
+    ];
+    let boxes: Vec<_> = ids
+        .iter()
+        .map(|id| harness.bounds(id).expect("laid out"))
+        .collect();
+
+    for pair in boxes.windows(2) {
+        let (above, below) = (pair[0], pair[1]);
+        // The rail is drawn inside each entry, so a gap between two entries is
+        // a gap in the thread. Every entry has to start where the one above it
+        // ended for the spine to be continuous.
+        assert_eq!(
+            above.bottom(),
+            below.origin.y,
+            "the entries left a gap for the timeline to break in"
+        );
+        assert_eq!(
+            above.size.width, below.size.width,
+            "entries disagreed about how wide a row is"
+        );
+    }
+}

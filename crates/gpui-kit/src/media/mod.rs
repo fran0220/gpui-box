@@ -125,12 +125,21 @@ fn notice_at(
             .left_0()
             .right_0()
             .row()
-            .items_baseline()
+            // The heading stands on the first line of the sentence beside it.
+            // Baseline alignment put it on the *last* line, so a sentence that
+            // wrapped left the heading floating a line below the words it
+            // introduces; both children lead on the same line box instead,
+            // which holds whether the sentence takes one line or three.
+            .items_start()
             .gap_token(theme, Space::Sm)
             .px_token(theme, Space::Md)
             .py_token(theme, Space::Sm)
             .bg(theme.colors.canvas.opacity(0.88))
-            .child(text(theme, TypeScale::Label, title).flex_none())
+            .child(
+                text(theme, TypeScale::Label, title)
+                    .flex_none()
+                    .line_height(px(theme.typography.caption.line_height)),
+            )
             .child(
                 text(theme, TypeScale::Caption, detail)
                     .min_w_0()

@@ -1114,9 +1114,13 @@ impl Rows {
                 .gap(px(theme.space(Space::Xs)))
                 .children(indent_guides(theme, direction, node.level, height))
                 .child(
+                    // A floor rather than a box: the moving mark is a row of
+                    // dots wider than a glyph, and boxed at the glyph's width
+                    // it overran the gap and sat against the label.
                     div()
                         .flex_none()
-                        .size(px(icon_size))
+                        .h(px(icon_size))
+                        .min_w(px(icon_size))
                         .flex()
                         .items_center()
                         .justify_center()

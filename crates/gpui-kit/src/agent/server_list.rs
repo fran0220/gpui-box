@@ -486,6 +486,13 @@ impl ServerList {
         let selected = self.selected.as_ref() == Some(&server.id);
         let selectable = !refused && self.on_select.is_some();
         let toggleable = !refused && self.on_toggle.is_some();
+        // Known before the header is built, because the header's own corners
+        // depend on whether anything is drawn under it.
+        let has_body = open
+            || server.state.reason().is_some()
+            || (self.on_retry.is_some()
+                && !refused
+                && matches!(server.state, ServerState::Failed { .. }));
 
         let chevron = {
             let toggle = ident.child("toggle");
@@ -540,10 +547,16 @@ impl ServerList {
             .w_full()
             .gap_token(theme, Space::Sm)
             .p_token(theme, Space::Sm)
+            // The wash fills the card's own top corners rather than wearing a
+            // second set inside them: rounded on all four it read as a pill
+            // laid over the card instead of as the card's first row.
             .when(selected, |element| {
                 element
                     .bg(theme.colors.selected)
-                    .radius(theme, Radius::Card)
+                    .rounded_t(px(theme.radius(Radius::Card)))
+                    .when(!has_body, |element| {
+                        element.rounded_b(px(theme.radius(Radius::Card)))
+                    })
             })
             .when(selectable, |element| {
                 element
@@ -640,13 +653,22 @@ impl ServerList {
         // Expanded, the header and the catalog under it are one unbroken
         // field of the same surface, so the row that can be pressed and the
         // list it revealed run together. A rule says where the header ends.
-        let has_body = offerings.is_some() || reason.is_some() || retry.is_some();
+        // The header's corners were rounded before any of this was built, so
+        // the prediction and the body it predicted have to agree.
+        debug_assert_eq!(
+            has_body,
+            offerings.is_some() || reason.is_some() || retry.is_some()
+        );
 
         div()
             .column()
             .w_full()
             .gap_token(theme, Space::Xs)
             .card_surface(theme, CardVariant::Elevated)
+            // The card closes below whatever the header revealed. Without it
+            // the last thing in the body — a retry, a rule of offerings —
+            // ended on the card's own edge.
+            .when(has_body, |element| element.pb(px(theme.space(Space::Sm))))
             // The whole entry dims, not only its header. Dimming the header
             // alone left the reason box below it at full strength, which made
             // the one server the reader had switched off the brightest thing

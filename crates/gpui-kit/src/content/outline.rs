@@ -36,7 +36,7 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Radius, Space, Theme};
+use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, Theme};
 
 use crate::data::viewport::{glide_to_row, viewed_rows};
 use crate::foundation::{Ident, StyledExt};
@@ -307,22 +307,40 @@ impl RenderOnce for Outline {
         // mark's place on it means the same thing as a row's place in the
         // list beside it.
         div()
-            .flex()
-            .flex_col()
             .flex_none()
-            .items_center()
-            .h_full()
+            // The groove takes its height from the frame beside it and the
+            // marks divide whatever that turns out to be. Laid out in the
+            // flow they measured themselves instead, and a condensed outline
+            // — where the stack is at its tallest — ran on past the last row
+            // it stands for. Absolute, the stack costs the groove no height,
+            // so the only thing that can set one is the surface it indexes.
+            .self_stretch()
+            .min_h(px(2.0 * SLOT + GAP + 2.0 * theme.space(Space::Sm)))
             .w(px(MARK_WIDTH_HOVERED + 2.0 * theme.space(Space::Xs)))
-            .px_token(&theme, Space::Xs)
-            .py_token(&theme, Space::Sm)
             .radius(&theme, Radius::Pill)
-            .bg(theme.colors.track)
-            .gap(px(GAP))
-            .children(
-                ranges
-                    .into_iter()
-                    .map(|range| self.tick(range, current, &theme, cx))
-                    .collect::<Vec<_>>(),
+            .overflow_hidden()
+            // A groove is a recess, not a bar. At the track colour the rail
+            // carried more weight than the places it indexes.
+            .surface(&theme, Surface::Sunken)
+            .child(
+                div()
+                    .absolute()
+                    .top_0()
+                    .bottom_0()
+                    .left_0()
+                    .right_0()
+                    .flex()
+                    .flex_col()
+                    .items_center()
+                    .px_token(&theme, Space::Xs)
+                    .py_token(&theme, Space::Sm)
+                    .gap(px(GAP))
+                    .children(
+                        ranges
+                            .into_iter()
+                            .map(|range| self.tick(range, current, &theme, cx))
+                            .collect::<Vec<_>>(),
+                    ),
             )
             .semantic_in(
                 cx,

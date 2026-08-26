@@ -28,11 +28,12 @@ use gpui::{
 };
 use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Space, TextTone, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Radius, Space, TextTone, TypeScale};
 
 use crate::display::badge::Tone;
 use crate::display::icon::{Icon as IconView, IconTone};
 use crate::display::status::StatusDot;
+use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{FocusRing, Ident, Pressable, Sizable, StyledExt, text};
 use crate::motion;
 use crate::strings::{ActiveStrings, StringKey};
@@ -184,6 +185,7 @@ impl ThinkingBlock {
 impl RenderOnce for ThinkingBlock {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
+        let direction = cx.layout_direction();
         let ident = self.ident.clone();
         let open = self.open();
         let actionable = self.actionable();
@@ -299,8 +301,16 @@ impl RenderOnce for ThinkingBlock {
             Reasoning::Present(text) if open => Some(
                 div()
                     .w_full()
-                    .pl(px(theme.space(Space::Lg)))
-                    .py(px(2.0))
+                    .column()
+                    .ms(direction, px(theme.space(Space::Lg)))
+                    .p_token(&theme, Space::Sm)
+                    .radius(&theme, Radius::Control)
+                    .well(&theme)
+                    // The header is a label and this is what it labels, so
+                    // the order of emphasis runs the other way: reasoning
+                    // drawn fainter than the word "Thought" and standing on
+                    // no surface of its own read as an aside about the row
+                    // rather than as the thing the row discloses.
                     .children(text.lines().map(|line| {
                         crate::foundation::text(
                             &theme,
@@ -308,7 +318,7 @@ impl RenderOnce for ThinkingBlock {
                             SharedString::from(line.to_string()),
                         )
                         .italic()
-                        .text_tone(&theme, TextTone::Muted)
+                        .text_tone(&theme, TextTone::Primary)
                     }))
                     .semantic_in(
                         cx,

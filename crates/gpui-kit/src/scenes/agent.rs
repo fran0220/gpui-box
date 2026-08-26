@@ -1078,7 +1078,13 @@ pub(super) fn artifact_preview(_window: &mut Window, cx: &mut App) -> AnyElement
         .child(
             ArtifactPreview::new("scene.artifact.ready", "patch.rs")
                 .kind(ArtifactKind::Code)
-                .body("fn ready() -> bool { true }")
+                .language(Language::Rust)
+                .body(
+                    "/// Whether the run may be published.\n\
+                     fn ready(state: &State) -> bool {\n    \
+                         state.checks == 12 && !state.blocked\n\
+                     }",
+                )
                 .state(ArtifactPreviewState::Ready),
         )
         .child(

@@ -12,7 +12,7 @@ use gpui::{
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Surface, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TypeScale};
 
 use crate::controls::button::{ButtonVariant, IconButton};
 use crate::display::badge::{Badge, Tone};
@@ -280,7 +280,13 @@ impl RenderOnce for KanbanBoard {
                 let columns = self
                     .columns
                     .iter()
-                    .map(|column| {
+                    .enumerate()
+                    .map(|(order, column)| {
+                        // A column's place in the board is what it is known
+                        // by here: the host names no colour for a column, and
+                        // a board that took one from the title would recolour
+                        // itself when somebody renamed a lane.
+                        let tint = theme.colors.sequence.get(order);
                         let count = self
                             .cards
                             .iter()
@@ -305,6 +311,12 @@ impl RenderOnce for KanbanBoard {
                                     .p_token(&theme, Space::Sm)
                                     .radius(&theme, Radius::Control)
                                     .surface(&theme, Surface::Raised)
+                                    // A card is a thing on the lane, not a
+                                    // region of it. Flat, a column of them
+                                    // read as one striped panel and nothing
+                                    // said which rectangle a reader could
+                                    // pick up.
+                                    .elevation(&theme, Elevation::Raised)
                                     // The card the reader is carrying stays
                                     // where the host still says it is and
                                     // says so by receding, not by leaving.
@@ -411,11 +423,23 @@ impl RenderOnce for KanbanBoard {
                                     .row()
                                     .items_center()
                                     .gap_token(&theme, Space::Xs)
+                                    // The lane's own mark, at the size of the
+                                    // line it names. Three panels of the same
+                                    // grey side by side said only that the
+                                    // board had three of something.
+                                    .child(
+                                        div()
+                                            .flex_none()
+                                            .w(px(theme.effects.rail_width))
+                                            .h(px(theme.typography.caption.line_height))
+                                            .rounded_full()
+                                            .bg(tint),
+                                    )
                                     .child(
                                         div()
                                             .flex_1()
                                             .type_scale(&theme, TypeScale::Caption)
-                                            .text_color(theme.colors.text_muted)
+                                            .text_color(theme.colors.text)
                                             .child(column.title.clone()),
                                     )
                                     .child(

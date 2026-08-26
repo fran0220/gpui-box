@@ -5,7 +5,7 @@ use std::sync::Arc;
 use gpui::{App, BorrowAppContext, BoxShadow, Global, Hsla, Rgba, SharedString, point, px};
 use gpui_kit_tokens::{
     BorderWeight, Color, DensityScale, InteractiveColor, OpacityRole, TokenDocument, TokenError,
-    bundled, presets,
+    bundled, contrast_ratio, over, presets,
 };
 
 pub use gpui_kit_tokens::{
@@ -36,7 +36,8 @@ impl ActiveTheme for App {
 /// own surface colours and ignores the colour choice entirely.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Variant {
-    /// A solid block of the colour with on-accent text.
+    /// A solid block of the colour with whichever theme text pole stays
+    /// readable across its resting and pressed paints.
     Filled,
     /// A wash of the colour under text in the colour.
     Light,
@@ -127,6 +128,32 @@ const HOVER_STEPS: &[&str] = &["700", "600", "500"];
 const ACTIVE_STEPS: &[&str] = &["800", "700", "600"];
 const READABLE_STEPS_DARK: &[&str] = &["300", "200", "400"];
 const READABLE_STEPS_LIGHT: &[&str] = &["700", "800", "600"];
+
+fn token_color(paint: Hsla) -> Color {
+    let paint = Rgba::from(paint);
+    Color {
+        red: paint.r,
+        green: paint.g,
+        blue: paint.b,
+        alpha: paint.a,
+    }
+}
+
+/// The weakest contrast `foreground` keeps over every interactive paint.
+///
+/// Filled palette and semantic paints are opaque. A custom paint may not be,
+/// so it is composited over the resolver's neutral control surface before it
+/// is compared; that is the same surface a default tier occupies.
+fn weakest_contrast(foreground: Hsla, backgrounds: [Hsla; 3], substrate: Hsla) -> f32 {
+    let substrate = token_color(substrate);
+    backgrounds
+        .into_iter()
+        .map(|background| {
+            let background = over(token_color(background), substrate);
+            contrast_ratio(token_color(foreground), background)
+        })
+        .fold(f32::INFINITY, f32::min)
+}
 
 #[derive(Debug, Clone)]
 pub struct Theme {
@@ -968,13 +995,23 @@ impl Theme {
         let (hover, active) = self.pressed_shades(color, base);
         match variant {
             Variant::Default => unreachable!("resolved above"),
-            Variant::Filled => VariantColors {
-                background: base,
-                background_hover: hover,
-                background_active: active,
-                text: self.colors.text_on_accent,
-                border: None,
-            },
+            Variant::Filled => {
+                let backgrounds = [base, hover, active];
+                let on_accent =
+                    weakest_contrast(self.colors.text_on_accent, backgrounds, self.colors.raised);
+                let prose = weakest_contrast(self.colors.text, backgrounds, self.colors.raised);
+                VariantColors {
+                    background: base,
+                    background_hover: hover,
+                    background_active: active,
+                    text: if on_accent >= prose {
+                        self.colors.text_on_accent
+                    } else {
+                        self.colors.text
+                    },
+                    border: None,
+                }
+            }
             Variant::Light => VariantColors {
                 background: base.opacity(0.15),
                 background_hover: base.opacity(0.22),
@@ -1386,9 +1423,22 @@ mod tests {
             let subtle = theme.variant_colors(Variant::Subtle, &indigo);
             let transparent = theme.variant_colors(Variant::Transparent, &indigo);
 
-            // Filled is the loud tier: a solid block with on-accent text.
+            // Filled is the loud tier: a solid block whose text pole keeps
+            // the stronger weakest contrast across rest, hover, and active.
             assert_eq!(filled.background.a, 1.0);
-            assert_eq!(filled.text, theme.colors.text_on_accent);
+            let backgrounds = [
+                filled.background,
+                filled.background_hover,
+                filled.background_active,
+            ];
+            let chosen = weakest_contrast(filled.text, backgrounds, theme.colors.raised);
+            let other = if filled.text == theme.colors.text_on_accent {
+                theme.colors.text
+            } else {
+                assert_eq!(filled.text, theme.colors.text);
+                theme.colors.text_on_accent
+            };
+            assert!(chosen >= weakest_contrast(other, backgrounds, theme.colors.raised));
             assert_eq!(
                 filled.background,
                 theme.palette_color("indigo.600").expect("full ramp")
@@ -1456,6 +1506,35 @@ mod tests {
 
         let danger = theme.variant_colors(Variant::Filled, &SemanticColor::Danger.into());
         assert_eq!(danger.background, theme.colors.danger);
+    }
+
+    #[test]
+    fn filled_tiers_choose_text_for_the_whole_interactive_paint_set() {
+        let theme = Theme::studio_light();
+        let cyan: Hsla = Rgba {
+            r: 0.082,
+            g: 0.667,
+            b: 0.749,
+            a: 1.0,
+        }
+        .into();
+        let resolved = theme.variant_colors(Variant::Filled, &cyan.into());
+        let backgrounds = [
+            resolved.background,
+            resolved.background_hover,
+            resolved.background_active,
+        ];
+
+        assert_eq!(resolved.text, theme.colors.text);
+        assert!(
+            weakest_contrast(resolved.text, backgrounds, theme.colors.raised)
+                > weakest_contrast(
+                    theme.colors.text_on_accent,
+                    backgrounds,
+                    theme.colors.raised
+                ),
+            "the shared filled resolver left lower-contrast lettering on cyan"
+        );
     }
 
     #[test]

@@ -808,18 +808,27 @@ fn row_element(
         .when(!line.has_members, |element| {
             element.child(div().flex_none().size(px(icon_size)))
         })
-        .child(
-            text(theme, TypeScale::Code, line.label.clone())
-                .flex_none()
-                .text_start(direction)
-                .text_tone(theme, TextTone::Muted),
-        )
         // The separator is what makes a key and a value two things rather
-        // than one sentence. It is JSON punctuation, so it is not translated.
+        // than one sentence. It is JSON punctuation, so it is not translated,
+        // and it is set against the key rather than spaced off it: the row's
+        // gap between them wrote `id :`, which is not what the document says.
         .child(
-            text(theme, TypeScale::Code, SharedString::new_static(":"))
+            div()
                 .flex_none()
-                .text_tone(theme, TextTone::Faint),
+                .row_reading(direction)
+                .child(
+                    text(theme, TypeScale::Code, line.label.clone())
+                        .text_start(direction)
+                        // A key is a name in the document, not punctuation
+                        // around one. Sharing the separator's grey left the
+                        // one word a reader searches by as quiet as the colon
+                        // after it.
+                        .text_color(theme.colors.syntax.get(SyntaxColor::Inline)),
+                )
+                .child(
+                    text(theme, TypeScale::Code, SharedString::new_static(":"))
+                        .text_tone(theme, TextTone::Faint),
+                ),
         )
         .child(
             text(theme, TypeScale::Code, line.shown.clone())

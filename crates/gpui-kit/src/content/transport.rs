@@ -390,6 +390,12 @@ fn seek_at(x: f32, left: f32, width: f32, total: f32) -> f32 {
     (((x - left) / width).clamp(0.0, 1.0) * total).clamp(0.0, total)
 }
 
+/// How far inside its own box a small glyph button's ink starts.
+fn glyph_inset(theme: &gpui_kit_theme::Theme) -> f32 {
+    let metrics = theme.control.get(ControlSize::Sm);
+    (metrics.height - metrics.icon_size) / 2.0
+}
+
 /// An id-safe stem for a speed, so `1.5×` addresses as `speed-1-5`.
 fn speed_id(speed: f32) -> String {
     format!("speed-{}", format!("{speed}").replace('.', "-"))
@@ -681,13 +687,16 @@ impl RenderOnce for TransportBar {
                 } else {
                     StringKey::TransportMute
                 }))
-                .ghost()
+                // Muted is said by the label, which is the control's own
+                // wording for what it will do next. What the label cannot say
+                // on its own is that it is a control at all: with no surface
+                // under it, the one word on the bar that is not a glyph or a
+                // chip read as a caption sitting between two controls. It
+                // takes the same chip the transport's other worded control
+                // takes, and stays quieter than it by carrying no glyph.
+                .secondary()
                 .control_size(ControlSize::Sm)
                 .semantic_parent(ident.semantic_id())
-                // Muted is said by the label, which is the control's own
-                // wording for what it will do next. Filling the chip as well
-                // made one transport's mute the loudest thing on the bar while
-                // the next one's was a word.
                 .disabled(!actionable);
             if actionable {
                 control = control
@@ -756,6 +765,14 @@ impl RenderOnce for TransportBar {
                     .row()
                     .flex_none()
                     .gap_token(&theme, Space::Xs)
+                    // A glyph button is a square with the glyph centred in it,
+                    // so its ink starts a control's own inset to the right of
+                    // where the box does. The run is pulled back by exactly
+                    // that inset, which puts the first mark of the transport
+                    // in the same column as the readout under it and the
+                    // titles above it rather than a control's padding inside
+                    // them.
+                    .ml(px(-glyph_inset(&theme)))
                     .child(step_control(
                         "previous",
                         Icon::AltArrowLeft,

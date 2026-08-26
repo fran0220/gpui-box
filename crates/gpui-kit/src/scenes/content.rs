@@ -490,13 +490,21 @@ pub(super) fn agent_document(_window: &mut Window, cx: &mut App) -> AnyElement {
                 .id("scene.agent-document.long")
                 .label("The same document, virtualized"),
         )
-        .child(caption(
-            &theme,
-            "a conversation that has been running all day: only the blocks on \
-             screen are built and laid out, and the ones above are still there. \
-             A long answer is drawn as a row per block of its own, so a token \
-             arriving in its last paragraph relays out that paragraph",
-        ))
+        // A paragraph rather than a caption. At the caption step this ran the
+        // full width of the document immediately above the body text it
+        // introduces, so the sentence explaining what to look at was set
+        // smaller and fainter than everything it was explaining.
+        .child(
+            crate::foundation::text(
+                &theme,
+                TypeScale::Body,
+                "a conversation that has been running all day: only the blocks on \
+                 screen are built and laid out, and the ones above are still there. \
+                 A long answer is drawn as a row per block of its own, so a token \
+                 arriving in its last paragraph relays out that paragraph",
+            )
+            .text_tone(&theme, TextTone::Muted),
+        )
         .child(
             AgentDocument::new("scene.agent-thread")
                 .virtualized(5)
@@ -550,10 +558,17 @@ pub(super) fn agent_document(_window: &mut Window, cx: &mut App) -> AnyElement {
 }
 
 /// The thread the conversation scene shows, one message per delivery state.
-pub(super) fn scene_thread() -> Vec<Message> {
+///
+/// The colour each speaker is known by is the caller's: a host that has
+/// already spent a colour on a person passes that one, and this scene spends
+/// two steps of the categorical sequence the way a product would.
+pub(super) fn scene_thread(theme: &Theme) -> Vec<Message> {
+    let asking = theme.colors.sequence.get(0);
+    let answering = theme.colors.sequence.get(1);
     vec![
         Message::new("msg-open", "Is the release still blocked?")
             .author("Ada")
+            .tint(asking)
             .time("09:14")
             .delivery(DeliveryState::Read),
         Message::markdown(
@@ -561,6 +576,7 @@ pub(super) fn scene_thread() -> Vec<Message> {
             "It is not. The **retry bound** landed, so the last failure is gone.",
         )
         .author("Grace")
+        .tint(answering)
         .time("09:15")
         .delivery(DeliveryState::Delivered)
         // A reaction's label is the caller's, and this one is written in the
@@ -571,18 +587,22 @@ pub(super) fn scene_thread() -> Vec<Message> {
         .reaction(Reaction::new("thumbs", "+1", 2)),
         Message::new("msg-log", "Attaching the run log.")
             .author("Grace")
+            .tint(answering)
             .time("09:15")
             .delivery(DeliveryState::Sent)
             .attachment(Attachment::new("run-4821", "run-4821.log").detail("12 KB")),
         Message::new("msg-queued", "Then I will publish the artifacts.")
             .author("Ada")
+            .tint(asking)
             .delivery(DeliveryState::Sending),
         Message::new("msg-refused", "Publishing the artifacts now.")
             .author("Ada")
+            .tint(asking)
             .time("09:16")
             .failed("The workspace is frozen for the release."),
         Message::markdown("msg-stream", "Checking the freeze window")
             .author("Assistant")
+            .tint(answering)
             .time("09:16")
             .streaming(true)
             .delivery(DeliveryState::Sending),
@@ -594,7 +614,7 @@ pub(super) fn conversation(_window: &mut Window, cx: &mut App) -> AnyElement {
     stack(&theme)
         .w(px(560.0))
         .child(
-            MessageList::new("scene.conversation.thread", scene_thread())
+            MessageList::new("scene.conversation.thread", scene_thread(&theme))
                 .group_consecutive(true)
                 .body_lines(2)
                 .on_retry(|_, _, _| {})
@@ -609,7 +629,7 @@ pub(super) fn conversation(_window: &mut Window, cx: &mut App) -> AnyElement {
             // A viewport shorter than the thread opens at its top, so the
             // messages below it have never been on screen and the list says
             // how many there are rather than letting them be discovered.
-            MessageList::new("scene.conversation.behind", scene_thread())
+            MessageList::new("scene.conversation.behind", scene_thread(&theme))
                 .visible_rows(2)
                 .body_lines(2)
                 .on_retry(|_, _, _| {}),
@@ -680,10 +700,13 @@ pub(super) fn outline(_window: &mut Window, cx: &mut App) -> AnyElement {
 /// many, and a message that grows to fit is whole.
 pub(super) fn conversation_growing(_window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
-    let long = || {
+    let asking = theme.colors.sequence.get(0);
+    let answering = theme.colors.sequence.get(1);
+    let long = move || {
         vec![
             Message::new("msg-ask", "What did the freeze window actually cover?")
                 .author("Ada")
+                .tint(asking)
                 .time("09:14")
                 .delivery(DeliveryState::Read),
             Message::new(
@@ -691,6 +714,7 @@ pub(super) fn conversation_growing(_window: &mut Window, cx: &mut App) -> AnyEle
                 "Everything published after the tag.\nThe artifacts, the changelog.\nThe signed manifest.\nThe release notes.\nNothing before it moved.",
             )
             .author("Grace")
+            .tint(answering)
             .time("09:15")
             .delivery(DeliveryState::Delivered),
         ]

@@ -1541,7 +1541,15 @@ pub(super) fn detail(_window: &mut Window, cx: &mut App) -> AnyElement {
             &theme,
             "unknown, not applicable, and redacted are three facts",
         ))
+        // The facts are a section of a detail page rather than prose loose on
+        // the canvas, and the list is drawn the way a detail page would hold
+        // it: on a surface with an edge the two columns are read against.
         .child(
+            div()
+                .column()
+                .card_surface(&theme, CardVariant::Elevated)
+                .p_token(&theme, Space::Md)
+                .child(
             DescriptionList::new("scene.detail.facts")
                 .columns(2)
                 .items([
@@ -1557,6 +1565,7 @@ pub(super) fn detail(_window: &mut Window, cx: &mut App) -> AnyElement {
                     .copyable(true),
                 ])
                 .on_copy(|_, _, _| {}),
+                ),
         )
         .child(caption(
             &theme,

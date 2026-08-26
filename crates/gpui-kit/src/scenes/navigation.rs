@@ -185,6 +185,26 @@ pub(super) fn accordion(_window: &mut Window, cx: &mut App) -> AnyElement {
                         )),
                 ),
         )
+        // The open section is the last one, which is the case where the body
+        // meets the card's rounded corners.
+        .child(
+            Accordion::new("scene.accordion.release")
+                .expanded_ids(&["publish"])
+                .on_toggle(|_, _, _, _| {})
+                .section(
+                    AccordionSection::new("build", "Build")
+                        .description("What the last run produced"),
+                )
+                .section(
+                    AccordionSection::new("publish", "Publish")
+                        .description("Where the signed bundle goes")
+                        .body(crate::foundation::text(
+                            &theme,
+                            TypeScale::Body,
+                            "The bundle is published to the workspace channel.",
+                        )),
+                ),
+        )
         .into_any_element()
 }
 

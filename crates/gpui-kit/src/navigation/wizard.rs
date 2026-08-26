@@ -639,14 +639,20 @@ fn connector(theme: &Theme, vertical: bool, behind: bool) -> AnyElement {
     // The line meets the marks, so it sits on the axis the markers are centred
     // on rather than on the middle of the step element.
     let axis = theme.space(Space::Xs) + MARKER / 2.0 - thickness / 2.0;
-    let line = div().flex_none().bg(color);
+    let line = div().bg(color);
     if vertical {
-        line.w(px(thickness))
+        line.flex_none()
+            .w(px(thickness))
             .h(px(theme.space(Space::Lg)))
             .ml(px(axis))
     } else {
-        line.h(px(thickness))
-            .w(px(theme.space(Space::Lg)))
+        // A horizontal strip gives its steps the width, so the gap between two
+        // marks is whatever is left over and never one space step. A line of a
+        // fixed length in it is a dash floating between two steps rather than
+        // the join that says they are a sequence, so the line takes the gap.
+        line.flex_1()
+            .min_w(px(theme.space(Space::Lg)))
+            .h(px(thickness))
             .mt(px(axis))
     }
     .into_any_element()

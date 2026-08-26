@@ -7,7 +7,7 @@
 
 use std::rc::Rc;
 
-use gpui::{App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div};
+use gpui::{App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div, px};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, TypeScale};
 
@@ -16,6 +16,15 @@ use crate::motion::{Easing, MotionSpec, Transition, keyed};
 use crate::strings::ActiveNumbers;
 
 type Format = Rc<dyn Fn(f64) -> String>;
+
+/// How much larger a readout is drawn than prose at the same step.
+///
+/// A reading has to win over the caption naming it from across the room, and
+/// the type scale is a prose ladder that stops at `Title` — the size a heading
+/// inside a component takes. A number set at a heading's size beside a caption
+/// is a heading, not a reading, which is why the step past the ladder lives
+/// here rather than being borrowed from the top of it.
+const READOUT_RATIO: f32 = 1.6;
 
 #[derive(Default)]
 struct Counter(Option<Transition<f32>>);
@@ -113,10 +122,13 @@ impl RenderOnce for AnimatedNumber {
         let announced = self.formatted(self.value, cx);
         let painted = self.formatted(shown as f64, cx);
 
+        let step = theme.type_style(self.scale);
         div()
             .child(
                 div()
                     .type_scale(&theme, self.scale)
+                    .text_size(px(step.size * READOUT_RATIO))
+                    .line_height(px(step.line_height * READOUT_RATIO))
                     .text_color(theme.colors.text)
                     .child(painted),
             )

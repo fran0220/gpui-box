@@ -252,14 +252,18 @@ impl RenderOnce for Slider {
         // The handlers need the track's measured width to turn a pointer
         // position into a value, and only prepaint knows it.
         let measured = measure::cell(&track_id.semantic_id(), window, cx);
-        let mut track = div()
-            .id(track_id.element_id())
-            .relative()
-            .w_full()
-            .h(knob)
+        // The groove is the handle's travel, not the control's outer box. It
+        // starts and ends half a handle inside that box, so a value at either
+        // endpoint keeps all of its handle inside the slider's layout,
+        // semantic bounds, clipping ancestor, and hit target.
+        let travel = div()
+            .absolute()
+            .left(knob / 2.0)
+            .right(knob / 2.0)
+            .top_0()
+            .bottom_0()
             .flex()
             .items_center()
-            .when(actionable, |element| element.cursor_pointer())
             .child(
                 div()
                     .absolute()
@@ -333,6 +337,17 @@ impl RenderOnce for Slider {
             .child(knob_at(physical_fraction, knob, &theme, self.disabled))
             .children(physical_high.map(|high| knob_at(high, knob, &theme, self.disabled)));
 
+        // The outer box is the assertion and pointer target. It includes the
+        // whole handles at both ends while the child above owns their travel.
+        let mut track = div()
+            .id(track_id.element_id())
+            .relative()
+            .w_full()
+            .min_w(knob)
+            .h(knob)
+            .when(actionable, |element| element.cursor_pointer())
+            .child(travel);
+
         if actionable {
             let (min, max, step) = (self.min, self.max, self.step);
             let low = self.clamped();
@@ -358,14 +373,16 @@ impl RenderOnce for Slider {
             track = track.on_mouse_down(MouseButton::Left, move |event, window, cx| {
                 let bounds = down_bounds.get();
                 let width = f32::from(bounds.size.width);
-                if width <= 0.0 {
+                let Some(fraction) = pointer_fraction(
+                    f32::from(event.position.x),
+                    f32::from(bounds.left()),
+                    width,
+                    f32::from(knob),
+                ) else {
                     return;
-                }
+                };
                 down_dragging.borrow_mut().0 = true;
-                let fraction = directed_fraction(
-                    (f32::from(event.position.x - bounds.left()) / width).clamp(0.0, 1.0),
-                    direction,
-                );
+                let fraction = directed_fraction(fraction, direction);
                 down(
                     quantize(min + fraction * (max - min), min, max, step),
                     window,
@@ -382,14 +399,16 @@ impl RenderOnce for Slider {
                 }
                 let bounds = move_bounds.get();
                 let width = f32::from(bounds.size.width);
-                if width <= 0.0 {
+                let Some(fraction) = pointer_fraction(
+                    f32::from(event.position.x),
+                    f32::from(bounds.left()),
+                    width,
+                    f32::from(knob),
+                ) else {
                     return;
-                }
+                };
                 move_dragging.borrow_mut().0 = true;
-                let fraction = directed_fraction(
-                    (f32::from(event.position.x - bounds.left()) / width).clamp(0.0, 1.0),
-                    direction,
-                );
+                let fraction = directed_fraction(fraction, direction);
                 drag(
                     quantize(min + fraction * (max - min), min, max, step),
                     window,
@@ -510,6 +529,12 @@ fn directed_fraction(fraction: f32, direction: LayoutDirection) -> f32 {
     }
 }
 
+/// Pointer position along the handle's actual travel inside the outer box.
+fn pointer_fraction(position: f32, left: f32, width: f32, knob: f32) -> Option<f32> {
+    let travel = width - knob;
+    (travel > 0.0).then(|| ((position - left - knob / 2.0) / travel).clamp(0.0, 1.0))
+}
+
 /// Rounds a value onto the step grid, so a reported value is one the caller
 /// could have produced itself.
 fn quantize(value: f32, min: f32, max: f32, step: Option<f32>) -> f32 {
@@ -532,5 +557,15 @@ mod tests {
         assert_eq!(directed_fraction(0.0, LayoutDirection::RightToLeft), 1.0);
         assert_eq!(directed_fraction(1.0, LayoutDirection::RightToLeft), 0.0);
         assert_eq!(directed_fraction(0.25, LayoutDirection::LeftToRight), 0.25);
+    }
+
+    #[test]
+    fn pointer_values_follow_the_inset_handle_travel() {
+        assert_eq!(pointer_fraction(8.0, 0.0, 100.0, 16.0), Some(0.0));
+        assert_eq!(pointer_fraction(92.0, 0.0, 100.0, 16.0), Some(1.0));
+        assert_eq!(pointer_fraction(50.0, 0.0, 100.0, 16.0), Some(0.5));
+        assert_eq!(pointer_fraction(-20.0, 0.0, 100.0, 16.0), Some(0.0));
+        assert_eq!(pointer_fraction(120.0, 0.0, 100.0, 16.0), Some(1.0));
+        assert_eq!(pointer_fraction(8.0, 0.0, 16.0, 16.0), None);
     }
 }

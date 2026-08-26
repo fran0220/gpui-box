@@ -10,6 +10,8 @@ use gpui::{
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, TypeScale};
 
+use crate::content::code_view::styled_code;
+use crate::content::highlight::{self, Language};
 use crate::display::empty::{EmptyKind, EmptyState};
 use crate::display::loading::PulseLoader;
 use crate::foundation::slot::{self, Slots, Slotted};
@@ -83,6 +85,7 @@ pub struct ArtifactPreview {
     title: SharedString,
     kind: ArtifactKind,
     body: SharedString,
+    language: Option<Language>,
     state: ArtifactPreviewState,
     slots: Slots,
 }
@@ -94,6 +97,7 @@ impl ArtifactPreview {
             title: title.into(),
             kind: ArtifactKind::Document,
             body: SharedString::default(),
+            language: None,
             state: ArtifactPreviewState::Ready,
             slots: Slots::default(),
         }
@@ -101,6 +105,17 @@ impl ArtifactPreview {
 
     pub fn kind(mut self, kind: ArtifactKind) -> Self {
         self.kind = kind;
+        self
+    }
+
+    /// What the body is written in, when the host knows.
+    ///
+    /// Only what a caller says is read, the same rule a fenced block in
+    /// [`crate::prelude::Markdown`] keeps: an artifact whose language nobody
+    /// named is set in the same face at the same size and left uncoloured,
+    /// rather than coloured against a grammar somebody guessed at.
+    pub fn language(mut self, language: Language) -> Self {
+        self.language = Some(language);
         self
     }
 
@@ -166,6 +181,27 @@ impl RenderOnce for ArtifactPreview {
                 }),
                 self.state.name().into(),
             ),
+            // Code is drawn as code: the same monospaced face, size, leading
+            // and syntax colours a fenced block or a diff gets, because an
+            // artifact set in the prose face is the one place in the library
+            // where code stops looking like code.
+            ArtifactPreviewState::Ready if self.kind == ArtifactKind::Code => {
+                let spans = self
+                    .language
+                    .map(|language| highlight::spans(language, &self.body))
+                    .unwrap_or_default();
+                (
+                    div()
+                        .w_full()
+                        .font_family(theme.typography.mono.clone())
+                        .text_size(px(theme.typography.code.size))
+                        .line_height(px(theme.typography.code.line_height))
+                        .text_color(theme.colors.text)
+                        .child(styled_code(&theme, self.body.clone(), &spans))
+                        .into_any_element(),
+                    self.state.name().into(),
+                )
+            }
             ArtifactPreviewState::Ready => (
                 div()
                     .type_scale(&theme, TypeScale::Code)

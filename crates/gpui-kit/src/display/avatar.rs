@@ -52,6 +52,22 @@ impl AvatarPresence {
     }
 }
 
+/// How much of the disc the lettering takes, and the smallest it is drawn at.
+///
+/// The share is of the diameter rather than one size for every avatar: a 56px
+/// mark set at the 28px mark's size reads as a letter that failed to grow with
+/// the circle around it. The floor is where two capitals stop being letters
+/// and start being a smudge, and a smudge that could be anybody's initials is
+/// a worse answer than an honest mark.
+const INITIALS_RATIO: f32 = 0.40;
+const INITIALS_FLOOR: f32 = 9.0;
+
+/// The size initials are drawn at on a disc of `size`, when they are drawn.
+fn initials_size(size: f32) -> Option<f32> {
+    let scaled = (size * INITIALS_RATIO).round();
+    (scaled >= INITIALS_FLOOR).then_some(scaled)
+}
+
 /// A circular mark for a person or a workspace.
 ///
 /// With no image it falls back to initials, and with nothing to take initials
@@ -112,9 +128,11 @@ impl Avatar {
     /// the colour has to be redrawn beside it. The treatment is the tone
     /// language's — a carried wash behind the letters rather than a filled
     /// disc — so a roster of tinted avatars stays as quiet as the rest of the
-    /// surface. A tint is never derived from the name: an application that
-    /// wants a stable colour per name derives it and passes it, because this
-    /// component cannot know which colours that application has already spent.
+    /// surface. A caller that has already spent a colour on this identity
+    /// passes it here. A tint is never derived from the name: an application
+    /// that wants a stable colour per identity derives it and passes it,
+    /// because this component cannot know which colours that application has
+    /// already spent.
     pub fn tint(mut self, tint: Hsla) -> Self {
         self.tint = Some(tint);
         self
@@ -138,6 +156,14 @@ impl RenderOnce for Avatar {
         let theme = cx.theme().clone();
         let initials = self.initials();
         let anonymous = self.image.is_none() && initials.is_empty();
+        // Lettering that has fallen under the legibility floor is not drawn,
+        // so a mark stands where it would have been: the disc still says an
+        // identity is here, and it stops claiming to say whose in glyphs
+        // nobody can read.
+        let lettering = (!initials.is_empty())
+            .then(|| initials_size(self.size))
+            .flatten();
+        let marked = self.image.is_none() && lettering.is_none();
         let spec = self.ident.as_ref().map(|ident| {
             NodeSpec::new(ident.semantic_id(), Role::Image)
                 .text(self.name.clone())
@@ -173,15 +199,15 @@ impl RenderOnce for Avatar {
             .border(px(theme.borders.hairline))
             .border_color(border)
             .font_fallbacks(gpui_kit_assets::text_fallbacks())
-            .text_size(px(self.size * 0.36))
+            .when_some(lettering, |element, size| element.text_size(px(size)))
             .text_color(foreground)
             .when_some(self.image.clone(), |element, source| {
                 element.child(gpui::img(source).size(px(self.size)))
             })
-            .when(self.image.is_none() && !initials.is_empty(), |element| {
+            .when(self.image.is_none() && lettering.is_some(), |element| {
                 element.child(initials.clone())
             })
-            .when(anonymous, |element| {
+            .when(marked, |element| {
                 element.child(
                     div()
                         .size(px((self.size * 0.34).max(8.0)))
@@ -358,5 +384,17 @@ mod tests {
     #[test]
     fn a_nameless_avatar_invents_no_letter() {
         assert_eq!(Avatar::new("   ").initials().as_ref(), "");
+    }
+
+    #[test]
+    fn lettering_grows_with_the_disc_and_stops_at_the_floor() {
+        assert_eq!(initials_size(56.0), Some(22.0));
+        assert_eq!(initials_size(40.0), Some(16.0));
+        assert_eq!(initials_size(28.0), Some(11.0));
+        assert_eq!(
+            initials_size(20.0),
+            None,
+            "eight pixels of two capitals is a smudge, so the disc marks instead"
+        );
     }
 }

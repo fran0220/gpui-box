@@ -179,7 +179,9 @@ impl RenderOnce for Accordion {
             .frame(&theme, Surface::Panel, Elevation::Raised)
             .overflow_hidden();
 
+        let sections = self.sections.len();
         for (position, section) in self.sections.into_iter().enumerate() {
+            let last = position + 1 == sections;
             let open = expanded_ids.contains(&section.id);
             let actionable = !section.disabled && self.on_toggle.is_some();
             let ident = self.ident.child(section.id.as_ref());
@@ -299,8 +301,21 @@ impl RenderOnce for Accordion {
                 let content = div()
                     // A disclosed body is a different plane from the header
                     // that opened it, so an open section reads as opened
-                    // rather than as two paragraphs of one header.
-                    .surface(&theme, Surface::Sunken)
+                    // rather than as two paragraphs of one header. It steps
+                    // down to the page's own level and no further: two steps
+                    // down put the open section below the surface the card is
+                    // standing on, and content that is darker than the page
+                    // around it reads as a hole cut in the card rather than as
+                    // the thing the reader just asked to see.
+                    .surface(&theme, Surface::Canvas)
+                    // The card's own corners are rounded, and a fill that runs
+                    // square into them shows through: `overflow_hidden` clips
+                    // the box, not the radius. The last section's body carries
+                    // the bottom corners itself.
+                    .when(last, |element| {
+                        let radius = px(theme.radius(Radius::Card));
+                        element.rounded_bl(radius).rounded_br(radius)
+                    })
                     // Indented to the title rather than to the
                     // chevron, so the body reads as belonging to the
                     // section it hangs under.
