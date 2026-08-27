@@ -69,7 +69,9 @@ transparent native scene-overlay planes, and Direct3D offscreen-pass target
 restoration are also subsequent GPUI Box work. Deferring a native frame request
 that synchronously re-enters while the application is already borrowed, while
 preserving its forced-render and presentation intents, belongs to this same
-framework-owned window lane. They use the existing operating-system and GPUI
+framework-owned window lane. Discarding accessibility action registrations
+while the per-frame AccessKit state is inactive is a GPUI Box correction in
+that window lane as well. They use the existing operating-system and GPUI
 layout APIs and import no additional source.
 
 The renderer-backed linear, elliptical radial, and conic gradient primitives

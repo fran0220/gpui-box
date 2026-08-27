@@ -34,6 +34,11 @@ the final column. Accessibility capability details remain in
 [`accessibility.md`](accessibility.md), and visual mechanics in
 [`screenshot-testing.md`](screenshot-testing.md).
 
+Accessibility action listeners are frame-local and registered only while the
+window's AccessKit adapter is active for that frame. Adapter activation forces
+a redraw before actions can be delivered, so inactive rendering does not add
+unreachable handlers and active action behavior is unchanged.
+
 Every native row also runs `cargo run -p xtask -- performance check`. The
 command enforces per-window structural budgets over 10,000-item List,
 DataGrid, TreeGrid, CodeView, LogStream, and AgentDocument fixtures and writes

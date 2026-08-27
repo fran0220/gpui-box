@@ -7060,6 +7060,10 @@ impl Window {
     /// The listener will be called when a screen reader requests the given
     /// action on the node identified by `node_id`.
     ///
+    /// Registration is ignored when accessibility is inactive for the current
+    /// frame. Activating accessibility forces a redraw before actions can be
+    /// delivered, so retaining listeners from inactive frames is unnecessary.
+    ///
     /// See the [accessibility guide](crate::_accessibility) for an overview.
     pub fn on_a11y_action(
         &mut self,
@@ -7067,6 +7071,10 @@ impl Window {
         action: accesskit::Action,
         listener: impl FnMut(Option<&accesskit::ActionData>, &mut Window, &mut App) + 'static,
     ) {
+        if !self.a11y.is_active() {
+            return;
+        }
+
         self.a11y
             .action_listeners
             .entry(node_id)
@@ -8097,6 +8105,25 @@ mod tests {
             assert_eq!(stats.semantic_nodes, 0);
             assert_eq!(stats.platform_view_placements, 0);
             assert!(stats.allocator_delta_bytes.is_some());
+        })
+        .expect("window remains available");
+    }
+
+    #[gpui::test]
+    fn inactive_accessibility_does_not_retain_action_listeners(cx: &mut TestAppContext) {
+        let window: AnyWindowHandle = cx.add_window(|_, _| EmptyView).into();
+
+        cx.update_window(window, |_, window, _| {
+            assert!(!window.is_a11y_active());
+            for _ in 0..3 {
+                window.on_a11y_action(
+                    crate::accesskit::NodeId(1),
+                    crate::accesskit::Action::Click,
+                    |_, _, _| {},
+                );
+            }
+
+            assert!(window.a11y.action_listeners.is_empty());
         })
         .expect("window remains available");
     }
