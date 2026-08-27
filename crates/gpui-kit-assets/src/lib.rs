@@ -130,6 +130,7 @@ icons![
     (Magnifier, "magnifer", Directional),
     (Minus, "minus", Fixed),
     (Monitor, "monitor", Fixed),
+    (Notebook, "notebook-minimalistic", Fixed),
     (Paperclip, "paperclip", Directional),
     (Pause, "pause", Fixed),
     (Pen, "pen", Directional),
@@ -283,7 +284,7 @@ mod tests {
             .iter()
             .filter(|icon| icon.mirrors_in_rtl())
             .count();
-        assert_eq!(Icon::ALL.len(), 63);
+        assert_eq!(Icon::ALL.len(), 64);
         assert_eq!(directional, 27);
     }
 
