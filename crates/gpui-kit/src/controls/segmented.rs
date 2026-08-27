@@ -8,7 +8,7 @@
 use std::rc::Rc;
 
 use gpui::{
-    App, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
+    App, Hsla, InteractiveElement, IntoElement, ParentElement, RenderOnce, SharedString,
     StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_kit_assets::{Icon, icon};
@@ -26,11 +26,12 @@ use crate::reactive::Binding;
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 
 /// One choice in the strip, identified by business identity.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Segment {
     id: SharedString,
     label: SharedString,
     icon: Option<Icon>,
+    tint: Option<Hsla>,
     disabled: bool,
 }
 
@@ -40,12 +41,28 @@ impl Segment {
             id: id.into(),
             label: label.into(),
             icon: None,
+            tint: None,
             disabled: false,
         }
     }
 
     pub fn icon(mut self, glyph: Icon) -> Self {
         self.icon = Some(glyph);
+        self
+    }
+
+    /// The colour this segment wears while it holds, in place of the accent.
+    ///
+    /// For a strip whose segments are colour-identified things — a Studio, a
+    /// branch, an environment — where the answer is which one, and each one
+    /// already has a colour the reader knows it by. The tint replaces the
+    /// accent and nothing else: the raised pill, the resting and hover tones,
+    /// and what the node publishes are what an untinted strip has, so a
+    /// colour cannot turn one segment into a second segment shape. An
+    /// untinted segment, and every segment that is not the current answer,
+    /// stays on the accent language.
+    pub fn tint(mut self, tint: Hsla) -> Self {
+        self.tint = Some(tint);
         self
     }
 
@@ -66,6 +83,10 @@ impl Segment {
 
     pub fn is_disabled(&self) -> bool {
         self.disabled
+    }
+
+    pub fn is_tinted(&self) -> bool {
+        self.tint.is_some()
     }
 }
 
@@ -209,7 +230,7 @@ impl RenderOnce for SegmentedControl {
                 let label_color = if refused {
                     theme.colors.text_faint
                 } else if selected {
-                    theme.colors.accent
+                    segment.tint.unwrap_or(theme.colors.accent)
                 } else {
                     theme.colors.text_muted
                 };

@@ -29,6 +29,14 @@ not otherwise draw, while a dialog's initial focus keeps its ring. Editable
 controls are unaffected and still show a click: a field's ring comes from its
 own focused state through `field`, never through this trait.
 
+**A segment can wear the colour its choice is known by.** `Segment::tint`
+paints the segment that holds in a caller-owned colour instead of the accent,
+for a strip whose choices are colour-identified things. The raised pill, the
+resting and hover tones, keyboard stepping and what the node publishes are
+what an untinted strip has, so a colour cannot turn one segment into a second
+segment shape, and an unselected or untinted segment stays on the accent
+language. `Segment` is consequently `PartialEq` but no longer `Eq`.
+
 **Windows overlays keep retained text visible.** GPUI still rasterizes text
 directly into a transparent native scene as grayscale, while cached views now
 include their base-versus-overlay plane in the reuse key. Direct3D also treats

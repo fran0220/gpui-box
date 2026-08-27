@@ -503,6 +503,29 @@ pub(super) fn form(window: &mut Window, cx: &mut App) -> AnyElement {
                 ),
         )
         .child(
+            // Beside the strip above, which is on the accent: the answer here
+            // is which colour-identified thing, so the segment that holds
+            // wears that thing's own colour and the rest of the strip is
+            // unchanged.
+            FormField::new("scene.form.lane.form-field", "Lane")
+                .control("scene.form.lane")
+                .description("Each lane keeps the colour it is known by.")
+                .child(
+                    SegmentedControl::new("scene.form.lane")
+                        .label("Lane")
+                        .segments([
+                            Segment::new("read", "Read")
+                                .tint(super::display::identity_tint(&theme, "agent.read")),
+                            Segment::new("shell", "Shell")
+                                .tint(super::display::identity_tint(&theme, "agent.shell")),
+                            Segment::new("network", "Network")
+                                .tint(super::display::identity_tint(&theme, "agent.network")),
+                        ])
+                        .selected("shell")
+                        .on_select(|_, _, _| {}),
+                ),
+        )
+        .child(
             FormField::new("scene.form.labels.form-field", "Labels")
                 .control("scene.form.labels")
                 // The keystroke lives in the hint, so the description does not
