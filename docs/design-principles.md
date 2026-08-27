@@ -63,13 +63,20 @@ and info are semantic states, not decorative alternatives.
 
 ## Geometry is semantic
 
+- Window planes, edge-attached regions, and rows inside a collection stay
+  square. They are part of the surface behind them rather than detached
+  entities sitting on it.
 - 5px: key caps and tiny controls.
 - 8px: normal controls and menu rows.
 - 12px: cards and popovers.
 - 16px: dialogs and message bubbles.
 - pill: badges and status dots.
 
-Repeated semantic geometry is tokenized. One-off geometry may remain local.
+Repeated semantic geometry is tokenized, and the outer entity consumes the
+role rather than reconstructing it from a raw value. One-off geometry may
+remain local. Flat and rounded therefore describe attachment, not two visual
+styles: a sidebar is flat because it is a window plane; a popover is rounded
+because it is a detached entity.
 
 ## State is complete
 

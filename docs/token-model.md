@@ -75,6 +75,14 @@ popover.radius = radius.card
 Component aliases are implemented in Rust while the catalog is small. Move an
 alias into JSON only when several components must share and evolve it together.
 
+An alias names a complete entity recipe, not only one primitive value. For
+example, `OverlaySurface::FLOATING` pairs `radius.card` with
+`elevation.overlay`, `OverlaySurface::MODAL` pairs `radius.dialog` with
+`elevation.modal`, and `OverlaySurface::EDGE` keeps the modal elevation but no
+radius because a drawer is attached to the window plane. Message surfaces read
+`radius.bubble`. This is what prevents two components with the same elevation
+from accidentally claiming the same shape.
+
 ## Color
 
 Colors use `#RRGGBB`, `#RRGGBBAA`, or a `{group.step}` palette reference. Alpha

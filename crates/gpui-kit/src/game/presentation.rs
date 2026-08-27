@@ -10,7 +10,7 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon as glyph};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TextTone, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Surface, TextTone, TypeScale};
 
 use crate::agent::{AgentActivityLine, AgentId, PersonaPortrait};
 use crate::controls::button::Button;
@@ -1130,7 +1130,7 @@ fn reward_item(
         .w(px(174.0))
         .p_token(theme, Space::Sm)
         .radius(theme, Radius::Card)
-        .bg(theme.colors.raised)
+        .surface(theme, Surface::Raised)
         .hairline(theme)
         .child(art)
         .child(

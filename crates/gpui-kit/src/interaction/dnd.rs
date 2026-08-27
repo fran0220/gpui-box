@@ -849,7 +849,7 @@ pub(crate) fn indicator(
         (DropPosition::Into(_), _) => div()
             .absolute()
             .inset_0()
-            .rounded(px(theme.radii.small))
+            .radius(theme, Radius::Small)
             .bg(color.opacity(theme.effects.selected_ring_alpha))
             .shadow(vec![gpui::BoxShadow {
                 color: color.opacity(0.5),

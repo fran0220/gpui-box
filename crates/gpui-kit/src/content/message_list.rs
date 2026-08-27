@@ -872,7 +872,7 @@ fn row(
                 .max_w(relative(MESSAGE_MEASURE))
                 .gap_token(&theme, Space::Xs)
                 .p_token(&theme, Space::Sm)
-                .radius(&theme, Radius::Card)
+                .radius(&theme, Radius::Bubble)
                 .surface(&theme, Surface::Raised)
                 // The rail keeps its width whether or not the speaker has a
                 // colour, so a thread of coloured and uncoloured turns still

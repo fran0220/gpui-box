@@ -19,7 +19,7 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Space, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Theme, TypeScale};
 
 use crate::controls::button::{Button, ButtonJoin, ButtonVariant};
 use crate::display::icon::flips;
@@ -28,7 +28,7 @@ use crate::foundation::{Ident, Pressable, Selectable, Sizable, StyledExt, text};
 use crate::motion;
 use crate::overlay::focus::FocusTrap;
 use crate::overlay::kbd::Kbd;
-use crate::overlay::layer::{Hang, Overlay, Placement, surface};
+use crate::overlay::layer::{Hang, Overlay, OverlaySurface, Placement, surface};
 use crate::overlay::popover::{self, MenuKey};
 
 /// The narrowest a panel gets, so a one-word command still reads as a menu.
@@ -460,7 +460,7 @@ fn panel<V: 'static>(
         })
         .collect::<Vec<_>>();
 
-    surface(theme, Elevation::Overlay)
+    surface(theme, OverlaySurface::FLOATING)
         .min_w(px(PANEL_MIN_WIDTH))
         .p_token(theme, Space::Xs)
         .children(rows)

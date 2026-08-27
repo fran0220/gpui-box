@@ -10348,6 +10348,16 @@
       "queries": []
     },
     {
+      "name": "OverlaySurface",
+      "path": "gpui_kit::overlay::OverlaySurface",
+      "summary": "The complete token recipe for an overlay entity.",
+      "variants": [],
+      "construct": [],
+      "options": [],
+      "commands": [],
+      "queries": []
+    },
+    {
       "name": "PageTotal",
       "path": "gpui_kit::navigation::PageTotal",
       "summary": "How many pages the host knows about.",
@@ -13763,7 +13773,7 @@
       "uses": [
         "Overlay"
       ],
-      "example": "fn overlay(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(520.0))\n        .h(px(320.0))\n        .child(page_behind(&theme, \"Workspace settings\"))\n        .child(\n            Overlay::modal(\"scene.overlay.dialog\")\n                .placement(Placement::Center)\n                .child(\n                    crate::overlay::surface(&theme, gpui_kit_theme::Elevation::Modal)\n                        .w(px(320.0))\n                        .p(px(theme.spacing.lg))\n                        .gap(px(theme.spacing.sm))\n                        .child(crate::foundation::text(\n                            &theme,\n                            TypeScale::Subtitle,\n                            \"Delete this workspace?\",\n                        ))\n                        .child(\n                            crate::foundation::text(\n                                &theme,\n                                TypeScale::Body,\n                                \"Its runs, filters and saved views are removed for everyone. This \\\n                                 cannot be undone.\",\n                            )\n                            .text_tone(&theme, TextTone::Muted),\n                        )\n                        .child(\n                            div()\n                                .row()\n                                .justify_end()\n                                .gap(px(theme.spacing.sm))\n                                .child(\n                                    Button::new(\"scene.overlay.cancel\")\n                                        .label(\"Cancel\")\n                                        .secondary()\n                                        .on_click(|_, _| {}),\n                                )\n                                .child(\n                                    Button::new(\"scene.overlay.confirm\")\n                                        .label(\"Delete\")\n                                        .danger()\n                                        .on_click(|_, _| {}),\n                                ),\n                        ),\n                ),\n        )\n        .into_any_element()\n}"
+      "example": "fn overlay(_window: &mut Window, cx: &mut App) -> AnyElement {\n    let theme = cx.theme().clone();\n    stack(&theme)\n        .w(px(520.0))\n        .h(px(320.0))\n        .child(page_behind(&theme, \"Workspace settings\"))\n        .child(\n            Overlay::modal(\"scene.overlay.dialog\")\n                .placement(Placement::Center)\n                .child(\n                    crate::overlay::surface(&theme, crate::overlay::OverlaySurface::MODAL)\n                        .w(px(320.0))\n                        .p(px(theme.spacing.lg))\n                        .gap(px(theme.spacing.sm))\n                        .child(crate::foundation::text(\n                            &theme,\n                            TypeScale::Subtitle,\n                            \"Delete this workspace?\",\n                        ))\n                        .child(\n                            crate::foundation::text(\n                                &theme,\n                                TypeScale::Body,\n                                \"Its runs, filters and saved views are removed for everyone. This \\\n                                 cannot be undone.\",\n                            )\n                            .text_tone(&theme, TextTone::Muted),\n                        )\n                        .child(\n                            div()\n                                .row()\n                                .justify_end()\n                                .gap(px(theme.spacing.sm))\n                                .child(\n                                    Button::new(\"scene.overlay.cancel\")\n                                        .label(\"Cancel\")\n                                        .secondary()\n                                        .on_click(|_, _| {}),\n                                )\n                                .child(\n                                    Button::new(\"scene.overlay.confirm\")\n                                        .label(\"Delete\")\n                                        .danger()\n                                        .on_click(|_, _| {}),\n                                ),\n                        ),\n                ),\n        )\n        .into_any_element()\n}"
     },
     {
       "name": "dialog",

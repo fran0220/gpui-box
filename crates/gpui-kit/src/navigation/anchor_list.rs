@@ -177,7 +177,7 @@ impl AnchorList {
             .px(px(metrics.padding_x))
             .flex()
             .items_center()
-            .rounded(px(theme.radii.control))
+            .radius(&theme, Radius::Control)
             .child(
                 text(&theme, TypeScale::Label, anchor.label.clone())
                     .text_size(px(metrics.font_size))

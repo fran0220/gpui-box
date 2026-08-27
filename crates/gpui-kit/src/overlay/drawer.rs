@@ -17,13 +17,13 @@ use gpui::{
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Space, Theme};
+use gpui_kit_theme::{ActiveTheme, Space, Theme};
 
 use crate::controls::button::IconButton;
 use crate::foundation::{Ident, Sizable, StyledExt};
 use crate::motion::{self, Easing, MotionSpec, Phase, Presence};
 use crate::overlay::focus::FocusTrap;
-use crate::overlay::layer::{Edge, Overlay, surface};
+use crate::overlay::layer::{Edge, Overlay, OverlaySurface, surface};
 use crate::overlay::panel::{self, Body};
 use crate::overlay::stack;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
@@ -496,7 +496,7 @@ impl Render for Drawer {
 
         let shown = self.shown_size();
         let handle = self.resize_handle(&theme, cx);
-        let mut card = surface(&theme, Elevation::Modal)
+        let mut card = surface(&theme, OverlaySurface::EDGE)
             .relative()
             .when(horizontal, |element| element.w(px(shown)).h_full())
             .when(!horizontal, |element| element.h(px(shown)).w_full())

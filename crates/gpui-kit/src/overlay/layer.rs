@@ -10,11 +10,60 @@ use gpui::{
     Anchor, AnyElement, App, ClickEvent, Div, ElementId, IntoElement, Pixels, Point, RenderOnce,
     Stateful, Window, div, prelude::*, px,
 };
-use gpui_kit_theme::{Elevation, Layer, Theme};
+use gpui_kit_theme::{Elevation, Layer, Radius, Surface, Theme};
 
 use crate::foundation::{ActiveTheme, Ident, StyledExt};
 
 type DismissHandler = Rc<dyn Fn(&mut Window, &mut App)>;
+
+/// The complete token recipe for an overlay entity.
+///
+/// Placement and elevation are not enough to infer shape: a dialog and a
+/// drawer are both modal, but the dialog is detached while the drawer is a
+/// window plane pinned to an edge. These recipes keep radius and elevation
+/// together without copying either value into each component.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OverlaySurface {
+    radius: Option<Radius>,
+    elevation: Elevation,
+}
+
+impl OverlaySurface {
+    /// A menu, popover, hover card, or toast detached above content.
+    pub const FLOATING: Self = Self {
+        radius: Some(Radius::Card),
+        elevation: Elevation::Overlay,
+    };
+
+    /// A centered decision surface under a modal scrim.
+    pub const MODAL: Self = Self {
+        radius: Some(Radius::Dialog),
+        elevation: Elevation::Modal,
+    };
+
+    /// A modal plane attached to a window edge, such as a drawer.
+    pub const EDGE: Self = Self {
+        radius: None,
+        elevation: Elevation::Modal,
+    };
+}
+
+/// Keeps the earlier elevation-addressed call form source-compatible.
+///
+/// New component code should name one of [`OverlaySurface`]'s entity recipes;
+/// an elevation on its own cannot distinguish an edge-attached plane.
+impl From<Elevation> for OverlaySurface {
+    fn from(elevation: Elevation) -> Self {
+        Self {
+            radius: Some(if elevation == Elevation::Modal {
+                Radius::Dialog
+            } else {
+                Radius::Card
+            }),
+            elevation,
+        }
+    }
+}
 
 /// One side of the window.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -291,13 +340,15 @@ impl RenderOnce for Overlay {
     }
 }
 
-/// A surface at one elevation, sized to its content.
-pub fn surface(theme: &Theme, elevation: Elevation) -> Div {
+/// An overlay entity built from one complete overlay recipe.
+pub fn surface(theme: &Theme, recipe: impl Into<OverlaySurface>) -> Div {
+    let recipe = recipe.into();
     div()
         .column()
-        .bg(theme.colors.overlay)
-        .radius(theme, gpui_kit_theme::Radius::Card)
-        .elevation(theme, elevation)
+        .when_some(recipe.radius, |element, radius| {
+            element.radius(theme, radius)
+        })
+        .frame(theme, Surface::Overlay, recipe.elevation)
         .overflow_hidden()
         .text_color(theme.colors.text)
 }
@@ -363,6 +414,20 @@ mod tests {
         assert_eq!(overlay.layer, Layer::Modal);
         assert_eq!(overlay.placement, Placement::Center);
         assert!(overlay.scrim);
+    }
+
+    #[test]
+    fn each_overlay_entity_takes_one_complete_token_recipe() {
+        assert_eq!(OverlaySurface::FLOATING.radius, Some(Radius::Card));
+        assert_eq!(OverlaySurface::FLOATING.elevation, Elevation::Overlay);
+        assert_eq!(OverlaySurface::MODAL.radius, Some(Radius::Dialog));
+        assert_eq!(OverlaySurface::MODAL.elevation, Elevation::Modal);
+        assert_eq!(OverlaySurface::EDGE.radius, None);
+        assert_eq!(OverlaySurface::EDGE.elevation, Elevation::Modal);
+        assert_eq!(
+            OverlaySurface::from(Elevation::Modal),
+            OverlaySurface::MODAL
+        );
     }
 
     #[test]

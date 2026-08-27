@@ -29,7 +29,7 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{LiveRegion, NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Elevation, Layer, Space, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Layer, Space, Theme, TypeScale};
 use web_time::Instant;
 
 use crate::controls::button::Button;
@@ -37,7 +37,7 @@ use crate::display::badge::Tone;
 use crate::display::status::StatusDot;
 use crate::foundation::{FocusRing, Hoverable, Ident, Sizable, StyledExt, window_state};
 use crate::motion::{Easing, Flipping, MotionSpec, Phase, Presence, flip};
-use crate::overlay::layer::{pinned, priority, surface};
+use crate::overlay::layer::{OverlaySurface, pinned, priority, surface};
 use crate::strings::{ActiveStrings, StringKey};
 
 /// How many toasts stand in the stack before one is evicted to make room.
@@ -519,7 +519,7 @@ impl ToastLayer {
         let hovered = entry.hovered;
         let hover_id = id.clone();
 
-        let card = surface(theme, Elevation::Overlay)
+        let card = surface(theme, OverlaySurface::FLOATING)
             .id(toast.ident.element_id())
             .row()
             .items_start()

@@ -13,7 +13,7 @@ use gpui::{
     prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Space, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Space, TypeScale};
 
 use crate::controls::input::{TextInput, TextInputEvent};
 use crate::display::empty::{EmptyKind, EmptyState};
@@ -21,7 +21,7 @@ use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Ident, Pressable, StyledExt};
 use crate::motion;
 use crate::overlay::kbd::Kbd;
-use crate::overlay::layer::surface;
+use crate::overlay::layer::{OverlaySurface, surface};
 use crate::overlay::popover::{self, MenuKey};
 use crate::strings::{ActiveSearch, ActiveStrings, SearchMatcher, StringKey};
 
@@ -469,7 +469,7 @@ impl Render for CommandPalette {
                 .into_any_element()
         };
 
-        surface(&theme, Elevation::Modal)
+        surface(&theme, OverlaySurface::MODAL)
             .w(px(PALETTE_WIDTH))
             .p_token(&theme, Space::Xs)
             .gap_token(&theme, Space::Xs)

@@ -123,7 +123,7 @@ pub(super) fn overlay(_window: &mut Window, cx: &mut App) -> AnyElement {
             Overlay::modal("scene.overlay.dialog")
                 .placement(Placement::Center)
                 .child(
-                    crate::overlay::surface(&theme, gpui_kit_theme::Elevation::Modal)
+                    crate::overlay::surface(&theme, crate::overlay::OverlaySurface::MODAL)
                         .w(px(320.0))
                         .p(px(theme.spacing.lg))
                         .gap(px(theme.spacing.sm))

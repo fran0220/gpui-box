@@ -15,12 +15,12 @@ use gpui::{
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Space, TextTone, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, Space, TextTone, Theme, TypeScale};
 
 use crate::controls::button::Button;
 use crate::foundation::{Ident, StyledExt, text};
 use crate::overlay::focus::FocusTrap;
-use crate::overlay::layer::{Hang, Overlay, Placement, surface};
+use crate::overlay::layer::{Hang, Overlay, OverlaySurface, Placement, surface};
 use crate::overlay::positioner::Positioner;
 
 use crate::motion;
@@ -162,13 +162,7 @@ pub fn filter_indices_for<S: AsRef<str>>(cx: &App, query: &str, labels: &[S]) ->
 
 /// The elevated surface every anchored overlay draws.
 pub fn card(theme: &Theme) -> gpui::Div {
-    div()
-        .rounded(px(theme.radii.card))
-        .elevation(theme, Elevation::Overlay)
-        .p(px(theme.spacing.xs))
-        .overflow_hidden()
-        .bg(theme.colors.overlay)
-        .text_color(theme.colors.text)
+    surface(theme, OverlaySurface::FLOATING).p(px(theme.spacing.xs))
 }
 
 /// [`card`] without the inner padding, for a surface that draws its own rows
@@ -473,7 +467,7 @@ pub fn key_cap(theme: &Theme, label: impl Into<SharedString>) -> gpui::Div {
     div()
         .h(px(22.0))
         .px(px(5.0))
-        .rounded(px(theme.radii.small))
+        .radius(theme, gpui_kit_theme::Radius::Small)
         .flex()
         .items_center()
         .justify_center()
@@ -483,15 +477,9 @@ pub fn key_cap(theme: &Theme, label: impl Into<SharedString>) -> gpui::Div {
 
 /// The surface a modal draws itself on.
 pub fn dialog_card(theme: &Theme) -> gpui::Div {
-    div()
+    surface(theme, OverlaySurface::MODAL)
         .w(px(360.0))
         .p(px(theme.spacing.xl - theme.spacing.xs))
-        .rounded(px(theme.radii.dialog))
-        .bg(theme.colors.overlay)
-        .elevation(theme, Elevation::Modal)
-        .flex()
-        .flex_col()
-        .text_color(theme.colors.text)
 }
 
 /// The one question a modal is asking.
@@ -742,7 +730,7 @@ impl Render for Popover {
                 self.focus_handle.focus(window, cx);
             }
             let body = self.content.clone().map(|content| content(window, cx));
-            let mut card = surface(&theme, Elevation::Overlay)
+            let mut card = surface(&theme, OverlaySurface::FLOATING)
                 .p_token(&theme, Space::Sm)
                 .track_focus(&self.focus_handle);
             if self.dismissable {

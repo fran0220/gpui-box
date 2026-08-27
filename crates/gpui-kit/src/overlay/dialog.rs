@@ -12,12 +12,12 @@ use gpui::{
     IntoElement, KeyDownEvent, ParentElement, Render, SharedString, Styled, Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Space};
+use gpui_kit_theme::{ActiveTheme, Space};
 
 use crate::controls::button::{Button, ButtonVariant};
 use crate::foundation::{Ident, StyledExt};
 use crate::overlay::focus::FocusTrap;
-use crate::overlay::layer::{Overlay, surface};
+use crate::overlay::layer::{Overlay, OverlaySurface, surface};
 use crate::overlay::panel::{self, Body};
 use crate::overlay::stack;
 
@@ -347,7 +347,7 @@ impl Render for Dialog {
         let description =
             description.map(|description| panel::description(&self.ident, &theme, description, cx));
 
-        let mut card = surface(&theme, Elevation::Modal)
+        let mut card = surface(&theme, OverlaySurface::MODAL)
             .w(px(360.0))
             .track_focus(&self.focus_handle)
             .on_key_down(cx.listener(Self::on_navigation_key));

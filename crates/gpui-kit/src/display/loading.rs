@@ -18,7 +18,7 @@ use gpui::{
     canvas, div, px, relative,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Space, Surface, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Surface, TypeScale};
 
 use crate::controls::button::Button;
 use crate::display::progress_circle::arc;
@@ -645,8 +645,8 @@ impl RenderOnce for RefreshVeil {
             .gap(px(theme.space(Space::Sm)))
             .px(px(theme.space(Space::Md)))
             .py(px(theme.space(Space::Sm)))
-            .rounded(px(theme.radii.control))
-            .bg(theme.surface(Surface::Raised))
+            .radius(&theme, Radius::Control)
+            .surface(&theme, Surface::Raised)
             .hairline(&theme)
             .child(Spinner::new(self.ident.child("spin")))
             .when_some_label(&theme, self.label.clone());

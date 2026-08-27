@@ -51,11 +51,11 @@ use gpui::{
     Styled, Window, div, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Space};
+use gpui_kit_theme::{ActiveTheme, Space};
 use web_time::Instant;
 
 use crate::foundation::{FocusRing, Ident, StyledExt};
-use crate::overlay::layer::{Hang, Overlay, Placement, surface};
+use crate::overlay::layer::{Hang, Overlay, OverlaySurface, Placement, surface};
 use crate::overlay::popover::anchored_slot;
 
 /// How long a pointer has to rest on the trigger before the card opens.
@@ -414,7 +414,7 @@ impl Render for HoverCard {
                 self.pending_focus = false;
             }
             let body = self.content.clone().map(|build| build(window, cx));
-            let card = surface(&theme, Elevation::Overlay)
+            let card = surface(&theme, OverlaySurface::FLOATING)
                 .id(card_ident.element_id())
                 .max_w(px(CARD_MAX_WIDTH))
                 .p_token(&theme, Space::Sm)
