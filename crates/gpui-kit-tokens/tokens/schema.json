@@ -121,14 +121,15 @@
     "textColors": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["primary", "muted", "faint", "placeholder", "disabled", "onAccent"],
+      "required": ["primary", "muted", "faint", "placeholder", "disabled", "onAccent", "onPrimaryFill"],
       "properties": {
         "primary": { "$ref": "#/$defs/color" },
         "muted": { "$ref": "#/$defs/color" },
         "faint": { "$ref": "#/$defs/color" },
         "placeholder": { "$ref": "#/$defs/color" },
         "disabled": { "$ref": "#/$defs/color" },
-        "onAccent": { "$ref": "#/$defs/color" }
+        "onAccent": { "$ref": "#/$defs/color" },
+        "onPrimaryFill": { "$ref": "#/$defs/color" }
       }
     },
     "interactiveColors": {
@@ -142,7 +143,8 @@
         "hairlineStrong",
         "track",
         "divider",
-        "focus"
+        "focus",
+        "primaryFill"
       ],
       "properties": {
         "hover": { "$ref": "#/$defs/color" },
@@ -152,7 +154,8 @@
         "hairlineStrong": { "$ref": "#/$defs/color" },
         "track": { "$ref": "#/$defs/color" },
         "divider": { "$ref": "#/$defs/color" },
-        "focus": { "$ref": "#/$defs/color" }
+        "focus": { "$ref": "#/$defs/color" },
+        "primaryFill": { "$ref": "#/$defs/color" }
       }
     },
     "semanticColors": {

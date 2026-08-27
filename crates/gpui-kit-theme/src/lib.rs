@@ -199,6 +199,14 @@ pub struct Colors {
     pub text_placeholder: Hsla,
     pub text_disabled: Hsla,
     pub text_on_accent: Hsla,
+    /// The one filled control on a surface, and the label it carries.
+    ///
+    /// Its own role rather than `text` reused as a fill. A primary button
+    /// painted in the theme's darkest ink is a decision a theme should be able
+    /// to make or decline; borrowing the prose colour made it the only
+    /// decision available. See `gpui_kit_tokens::InteractiveColor::PrimaryFill`.
+    pub primary_fill: Hsla,
+    pub text_on_primary_fill: Hsla,
     pub hover: Hsla,
     pub active: Hsla,
     pub selected: Hsla,
@@ -604,6 +612,8 @@ impl Theme {
                 text_placeholder: color(tokens.text(TextTone::Placeholder)),
                 text_disabled: color(tokens.text(TextTone::Disabled)),
                 text_on_accent: color(tokens.text(TextTone::OnAccent)),
+                primary_fill: color(tokens.interactive(InteractiveColor::PrimaryFill)),
+                text_on_primary_fill: color(tokens.text(TextTone::OnPrimaryFill)),
                 hover: color(tokens.interactive(InteractiveColor::Hover)),
                 active: color(tokens.interactive(InteractiveColor::Active)),
                 selected: color(tokens.interactive(InteractiveColor::Selected)),
@@ -839,6 +849,7 @@ impl Theme {
             TextTone::Placeholder => self.colors.text_placeholder,
             TextTone::Disabled => self.colors.text_disabled,
             TextTone::OnAccent => self.colors.text_on_accent,
+            TextTone::OnPrimaryFill => self.colors.text_on_primary_fill,
         }
     }
 

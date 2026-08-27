@@ -365,6 +365,36 @@ pub fn report(tokens: &TokenDocument) -> Vec<ContrastCheck> {
         TEXT_MINIMUM,
     ));
 
+    // The one filled control on a surface, and the label it carries. The fill
+    // has to be a shape against every plane it can be dropped on, and the
+    // label has to be readable on the fill — the pair is only a pair because
+    // the fill stopped being borrowed from `text.primary`, which was
+    // guaranteed to read on the page and guaranteed nothing about a label.
+    let primary_fill = tokens.interactive(InteractiveColor::PrimaryFill);
+    checks.push(check(
+        "color.text.onPrimaryFill",
+        tokens.text(TextTone::OnPrimaryFill),
+        "color.interactive.primaryFill",
+        primary_fill,
+        TEXT_MINIMUM,
+    ));
+    for surface in [
+        Surface::Backdrop,
+        Surface::Canvas,
+        Surface::Sunken,
+        Surface::Panel,
+        Surface::Raised,
+        Surface::Overlay,
+    ] {
+        checks.push(check(
+            "color.interactive.primaryFill",
+            primary_fill,
+            surface_path(surface),
+            tokens.surface(surface),
+            NON_TEXT_MINIMUM,
+        ));
+    }
+
     checks
 }
 
@@ -794,6 +824,7 @@ fn tone_path(tone: TextTone) -> &'static str {
         TextTone::Placeholder => "color.text.placeholder",
         TextTone::Disabled => "color.text.disabled",
         TextTone::OnAccent => "color.text.onAccent",
+        TextTone::OnPrimaryFill => "color.text.onPrimaryFill",
     }
 }
 
@@ -847,9 +878,51 @@ mod tests {
         // against each of the two surfaces code is drawn on, the sixteen ANSI
         // slots against the terminal background, the eight series colours
         // against each of the three surfaces a chart is drawn on, the two
-        // live canvas roles and the two stackings of an edge label, and
-        // `onAccent` against `accent`.
-        assert_eq!(checks.len(), 6 * 23 + 2 * 10 + 16 + 3 * 8 + 4 + 1);
+        // live canvas roles and the two stackings of an edge label,
+        // `onAccent` against `accent`, and the primary fill against each of
+        // the six surfaces with its own label over it.
+        assert_eq!(checks.len(), 6 * 23 + 2 * 10 + 16 + 3 * 8 + 4 + 1 + 6 + 1);
+    }
+
+    /// The primary fill is a role a theme owns, not the prose colour under a
+    /// second name.
+    ///
+    /// It shipped as `text.primary` reused as a background, so a theme that
+    /// wanted a primary button softer than its darkest ink had nowhere to say
+    /// so, and any theme that softened its prose softened its buttons with it.
+    /// Moving one has to leave the other where it was, and the report has to
+    /// measure the fill against the label that lands on it.
+    #[test]
+    fn a_theme_moves_its_primary_fill_without_moving_its_prose() {
+        let mut tokens = crate::studio_dark().clone();
+        let prose = tokens.text(TextTone::Primary);
+        tokens.color.interactive.primary_fill = "{indigo.400}".into();
+        tokens.color.text.on_primary_fill = "{neutral.ink}".into();
+
+        assert_eq!(
+            tokens.text(TextTone::Primary),
+            prose,
+            "prose followed the fill"
+        );
+        assert_ne!(
+            tokens.interactive(InteractiveColor::PrimaryFill),
+            prose,
+            "the fill is still the prose colour"
+        );
+
+        // And the pair is measured: a label that cannot be read on the new
+        // fill is a failure the report names rather than a thing a reader
+        // discovers.
+        let checks = report(&tokens);
+        let named: Vec<&str> = checks
+            .iter()
+            .filter(|check| check.background == "color.interactive.primaryFill")
+            .map(|check| check.foreground.as_str())
+            .collect();
+        assert!(
+            named.contains(&"color.text.onPrimaryFill"),
+            "the report never checks a label on the primary fill: {named:?}"
+        );
     }
 
     #[test]

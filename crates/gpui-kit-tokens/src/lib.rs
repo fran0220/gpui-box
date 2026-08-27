@@ -457,6 +457,10 @@ impl TokenDocument {
             ),
             TextTone::Disabled => ("color.text.disabled", self.color.text.disabled.as_str()),
             TextTone::OnAccent => ("color.text.onAccent", self.color.text.on_accent.as_str()),
+            TextTone::OnPrimaryFill => (
+                "color.text.onPrimaryFill",
+                self.color.text.on_primary_fill.as_str(),
+            ),
         };
         self.resolved(path, value)
     }
@@ -490,6 +494,10 @@ impl TokenDocument {
             InteractiveColor::Divider => (
                 "color.interactive.divider",
                 self.color.interactive.divider.as_str(),
+            ),
+            InteractiveColor::PrimaryFill => (
+                "color.interactive.primaryFill",
+                self.color.interactive.primary_fill.as_str(),
             ),
             InteractiveColor::Focus => (
                 "color.interactive.focus",
@@ -926,6 +934,8 @@ pub enum TextTone {
     Placeholder,
     Disabled,
     OnAccent,
+    /// The label a primary action carries, over `interactive.primaryFill`.
+    OnPrimaryFill,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -938,6 +948,12 @@ pub enum InteractiveColor {
     Track,
     Divider,
     Focus,
+    /// The one filled control on a surface.
+    ///
+    /// Its own role rather than a reuse of `text.primary`, which is what it
+    /// was: a fill and a body of prose are two facts, and a theme that wants
+    /// a softer primary button than its darkest ink had nowhere to say so.
+    PrimaryFill,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1559,6 +1575,7 @@ pub struct TextColors {
     pub placeholder: String,
     pub disabled: String,
     pub on_accent: String,
+    pub on_primary_fill: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -1572,6 +1589,7 @@ pub struct InteractiveColors {
     pub track: String,
     pub divider: String,
     pub focus: String,
+    pub primary_fill: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

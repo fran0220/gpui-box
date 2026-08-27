@@ -581,6 +581,13 @@ Appearance: `Dark`.
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 6.70 | 4.5 |
 | `color.text.muted` | `color.surface.canvas + color.node.edge + color.node.labelWash` | 6.42 | 4.5 |
 | `color.text.onAccent` | `color.semantic.accent` | 6.17 | 4.5 |
+| `color.text.onPrimaryFill` | `color.interactive.primaryFill` | 15.90 | 4.5 |
+| `color.interactive.primaryFill` | `color.surface.backdrop` | 16.79 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.canvas` | 15.30 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.sunken` | 16.31 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.panel` | 14.19 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.raised` | 12.14 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.overlay` | 12.79 | 3.0 |
 
 ### Surface separation
 
@@ -1185,6 +1192,13 @@ Appearance: `Light`.
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 7.32 | 4.5 |
 | `color.text.muted` | `color.surface.canvas + color.node.edge + color.node.labelWash` | 7.03 | 4.5 |
 | `color.text.onAccent` | `color.semantic.accent` | 6.30 | 4.5 |
+| `color.text.onPrimaryFill` | `color.interactive.primaryFill` | 17.89 | 4.5 |
+| `color.interactive.primaryFill` | `color.surface.backdrop` | 13.10 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.canvas` | 15.05 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.sunken` | 13.60 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.panel` | 16.44 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.raised` | 17.89 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.overlay` | 17.89 | 3.0 |
 
 ### Surface separation
 
@@ -1789,6 +1803,13 @@ Appearance: `Dark`.
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 6.72 | 4.5 |
 | `color.text.muted` | `color.surface.canvas + color.node.edge + color.node.labelWash` | 6.30 | 4.5 |
 | `color.text.onAccent` | `color.semantic.accent` | 8.91 | 4.5 |
+| `color.text.onPrimaryFill` | `color.interactive.primaryFill` | 12.97 | 4.5 |
+| `color.interactive.primaryFill` | `color.surface.backdrop` | 12.97 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.canvas` | 11.34 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.sunken` | 12.14 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.panel` | 10.28 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.raised` | 8.69 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.overlay` | 9.36 | 3.0 |
 
 ### Surface separation
 
@@ -2393,6 +2414,13 @@ Appearance: `Light`.
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 6.51 | 4.5 |
 | `color.text.muted` | `color.surface.canvas + color.node.edge + color.node.labelWash` | 6.25 | 4.5 |
 | `color.text.onAccent` | `color.semantic.accent` | 4.91 | 4.5 |
+| `color.text.onPrimaryFill` | `color.interactive.primaryFill` | 7.99 | 4.5 |
+| `color.interactive.primaryFill` | `color.surface.backdrop` | 6.04 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.canvas` | 7.06 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.sunken` | 6.57 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.panel` | 7.52 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.raised` | 7.99 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.overlay` | 7.99 | 3.0 |
 
 ### Surface separation
 
@@ -2997,6 +3025,13 @@ Appearance: `Dark`.
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 9.31 | 4.5 |
 | `color.text.muted` | `color.surface.canvas + color.node.edge + color.node.labelWash` | 8.98 | 4.5 |
 | `color.text.onAccent` | `color.semantic.accent` | 8.17 | 4.5 |
+| `color.text.onPrimaryFill` | `color.interactive.primaryFill` | 14.18 | 4.5 |
+| `color.interactive.primaryFill` | `color.surface.backdrop` | 14.18 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.canvas` | 12.16 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.sunken` | 13.16 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.panel` | 10.84 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.raised` | 8.73 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.overlay` | 9.59 | 3.0 |
 
 ### Surface separation
 
@@ -3601,6 +3636,13 @@ Appearance: `Dark`.
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 6.97 | 4.5 |
 | `color.text.muted` | `color.surface.canvas + color.node.edge + color.node.labelWash` | 6.60 | 4.5 |
 | `color.text.onAccent` | `color.semantic.accent` | 7.14 | 4.5 |
+| `color.text.onPrimaryFill` | `color.interactive.primaryFill` | 11.14 | 4.5 |
+| `color.interactive.primaryFill` | `color.surface.backdrop` | 11.84 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.canvas` | 10.59 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.sunken` | 11.14 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.panel` | 9.02 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.raised` | 7.97 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.overlay` | 8.32 | 3.0 |
 
 ### Surface separation
 
@@ -4205,6 +4247,13 @@ Appearance: `Dark`.
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 7.92 | 4.5 |
 | `color.text.muted` | `color.surface.canvas + color.node.edge + color.node.labelWash` | 7.57 | 4.5 |
 | `color.text.onAccent` | `color.semantic.accent` | 6.29 | 4.5 |
+| `color.text.onPrimaryFill` | `color.interactive.primaryFill` | 12.33 | 4.5 |
+| `color.interactive.primaryFill` | `color.surface.backdrop` | 12.33 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.canvas` | 10.75 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.sunken` | 11.67 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.panel` | 9.86 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.raised` | 8.98 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.overlay` | 9.14 | 3.0 |
 
 ### Surface separation
 
@@ -4809,6 +4858,13 @@ Appearance: `Dark`.
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 7.82 | 4.5 |
 | `color.text.muted` | `color.surface.canvas + color.node.edge + color.node.labelWash` | 7.32 | 4.5 |
 | `color.text.onAccent` | `color.semantic.accent` | 6.55 | 4.5 |
+| `color.text.onPrimaryFill` | `color.interactive.primaryFill` | 14.81 | 4.5 |
+| `color.interactive.primaryFill` | `color.surface.backdrop` | 17.01 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.canvas` | 14.81 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.sunken` | 15.72 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.panel` | 13.36 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.raised` | 11.05 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.overlay` | 11.93 | 3.0 |
 
 ### Surface separation
 
@@ -5413,6 +5469,13 @@ Appearance: `Dark`.
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 6.69 | 4.5 |
 | `color.text.muted` | `color.surface.canvas + color.node.edge + color.node.labelWash` | 6.24 | 4.5 |
 | `color.text.onAccent` | `color.semantic.accent` | 5.35 | 4.5 |
+| `color.text.onPrimaryFill` | `color.interactive.primaryFill` | 10.62 | 4.5 |
+| `color.interactive.primaryFill` | `color.surface.backdrop` | 10.62 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.canvas` | 9.15 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.sunken` | 9.92 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.panel` | 8.09 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.raised` | 7.00 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.overlay` | 7.29 | 3.0 |
 
 ### Surface separation
 
@@ -6017,6 +6080,13 @@ Appearance: `Light`.
 | `color.text.muted` | `color.surface.canvas + color.node.labelWash` | 6.29 | 4.5 |
 | `color.text.muted` | `color.surface.canvas + color.node.edge + color.node.labelWash` | 5.99 | 4.5 |
 | `color.text.onAccent` | `color.semantic.accent` | 5.37 | 4.5 |
+| `color.text.onPrimaryFill` | `color.interactive.primaryFill` | 7.31 | 4.5 |
+| `color.interactive.primaryFill` | `color.surface.backdrop` | 5.43 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.canvas` | 6.36 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.sunken` | 5.91 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.panel` | 6.77 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.raised` | 7.31 | 3.0 |
+| `color.interactive.primaryFill` | `color.surface.overlay` | 7.18 | 3.0 |
 
 ### Surface separation
 

@@ -556,7 +556,7 @@ fn joined(element: Div, theme: &Theme, join: ButtonJoin, direction: LayoutDirect
 
 fn foreground(theme: &Theme, variant: ButtonVariant) -> Hsla {
     match variant {
-        ButtonVariant::Primary => theme.colors.text_on_accent,
+        ButtonVariant::Primary => theme.colors.text_on_primary_fill,
         ButtonVariant::Secondary => theme.colors.text,
         ButtonVariant::Ghost => theme.colors.text_muted,
         ButtonVariant::Danger => theme.colors.danger,
@@ -623,7 +623,7 @@ fn frame(
     }
     match variant {
         ButtonVariant::Primary => base
-            .bg(theme.colors.text)
+            .bg(theme.colors.primary_fill)
             .when(!inert, |element| element.hover(|style| style.opacity(0.9))),
         // A tonal fill and no outline. A secondary action is the second
         // strongest thing in its area, which a surface step says on its own;

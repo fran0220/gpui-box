@@ -235,7 +235,8 @@
       "faint": "#64646b",
       "placeholder": "#6f6f76",
       "disabled": "#7a7a81",
-      "onAccent": "{neutral.ink}"
+      "onAccent": "{neutral.ink}",
+      "onPrimaryFill": "{neutral.ink}"
     },
     "interactive": {
       "hover": "{neutral.850}/0f",
@@ -245,7 +246,8 @@
       "hairlineStrong": "{neutral.850}/8c",
       "track": "{neutral.850}/8c",
       "divider": "{neutral.850}/14",
-      "focus": "{indigo.400}"
+      "focus": "{indigo.400}",
+      "primaryFill": "{neutral.800}"
     },
     "semantic": {
       "accent": "{indigo.400}",
