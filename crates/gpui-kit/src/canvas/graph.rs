@@ -88,11 +88,15 @@ pub enum NodeGraphEvent {
         from: GraphEndpoint,
         to: GraphEndpoint,
     },
+    /// A connection gesture ended on open canvas rather than another port.
+    /// The position uses the same canvas coordinates as placed nodes.
+    ConnectionDropped { from: GraphEndpoint, at: Point<f32> },
     /// Proposes removing one controlled edge by its stable identity.
     DisconnectRequested { id: SharedString },
 }
 
 type EventHandler = Rc<dyn Fn(&NodeGraphEvent, &mut Window, &mut App)>;
+type ConnectionValidator = Rc<dyn Fn(&GraphEndpoint, &GraphEndpoint) -> bool>;
 
 /// Which controlled changes an interactive graph may propose.
 ///
@@ -135,6 +139,7 @@ enum Gesture {
     },
     Connect {
         from: GraphEndpoint,
+        direction: PortDirection,
     },
     Marquee {
         origin: Point<Pixels>,
@@ -332,6 +337,8 @@ struct RouteCache {
 #[derive(Debug, Clone)]
 struct ConnectionPreview {
     route: OrthogonalRoute,
+    from: GraphEndpoint,
+    direction: PortDirection,
     target: Option<(GraphEndpoint, bool)>,
 }
 
@@ -444,6 +451,7 @@ pub struct NodeGraph {
     zoom_range: (f32, f32),
     interaction: GraphInteraction,
     on_event: Option<EventHandler>,
+    can_connect: Option<ConnectionValidator>,
     minimap: bool,
 }
 
@@ -481,6 +489,7 @@ impl NodeGraph {
             zoom_range: (0.5, 2.0),
             interaction: GraphInteraction::default(),
             on_event: None,
+            can_connect: None,
             minimap: false,
         }
     }
@@ -566,6 +575,17 @@ impl NodeGraph {
         handler: impl Fn(&NodeGraphEvent, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_event = Some(Rc::new(handler));
+        self
+    }
+
+    /// Supplies the caller's connection rules so the graph can preview legal
+    /// and illegal targets before proposing a connection. Endpoints are
+    /// always passed as output then input, including gestures begun at input.
+    pub fn can_connect(
+        mut self,
+        validator: impl Fn(&GraphEndpoint, &GraphEndpoint) -> bool + 'static,
+    ) -> Self {
+        self.can_connect = Some(Rc::new(validator));
         self
     }
 
@@ -743,9 +763,11 @@ fn auto_anchors(
 fn connection_target(
     nodes: &[NodeGeometry],
     from: &GraphEndpoint,
+    from_direction: PortDirection,
     pointer: Point<f32>,
     viewport: GraphViewport,
     radius: f32,
+    can_connect: Option<&ConnectionValidator>,
 ) -> Option<(GraphEndpoint, bool)> {
     nodes
         .iter()
@@ -755,7 +777,13 @@ fn connection_target(
             let distance = (at.x - pointer.x).powi(2) + (at.y - pointer.y).powi(2);
             (distance <= radius.powi(2)).then(|| {
                 let endpoint = GraphEndpoint::new(node.id.clone(), port.id.clone());
-                let valid = port.direction == PortDirection::Input && &endpoint != from;
+                let valid_direction = port.direction != from_direction && &endpoint != from;
+                let valid = valid_direction
+                    && can_connect.is_none_or(|validator| {
+                        let (output, input) =
+                            normalized_connection(from.clone(), from_direction, endpoint.clone());
+                        validator(&output, &input)
+                    });
                 (distance, endpoint, valid)
             })
         })
@@ -765,6 +793,17 @@ fn connection_target(
                 .unwrap_or(std::cmp::Ordering::Equal)
         })
         .map(|(_, endpoint, valid)| (endpoint, valid))
+}
+
+fn normalized_connection(
+    from: GraphEndpoint,
+    from_direction: PortDirection,
+    target: GraphEndpoint,
+) -> (GraphEndpoint, GraphEndpoint) {
+    match from_direction {
+        PortDirection::Output => (from, target),
+        PortDirection::Input => (target, from),
+    }
 }
 
 impl RenderOnce for NodeGraph {
@@ -1081,7 +1120,7 @@ impl RenderOnce for NodeGraph {
         let preview = {
             let state = gesture.borrow();
             match (&state.gesture, state.pointer) {
-                (Some(Gesture::Connect { from }), Some(pointer)) => {
+                (Some(Gesture::Connect { from, direction }), Some(pointer)) => {
                     let source = geometry
                         .iter()
                         .find(|node| node.id == from.node)
@@ -1095,12 +1134,16 @@ impl RenderOnce for NodeGraph {
                         let world = screen_to_world(pointer, viewport);
                         ConnectionPreview {
                             route: route_preview(source.anchor, world),
+                            from: from.clone(),
+                            direction: *direction,
                             target: connection_target(
                                 &geometry,
                                 from,
+                                *direction,
                                 pointer,
                                 viewport,
                                 (14.0 * viewport.zoom).max(10.0),
+                                self.can_connect.as_ref(),
                             ),
                         }
                     })
@@ -1402,6 +1445,19 @@ impl RenderOnce for NodeGraph {
                     .and_then(|preview| preview.target.as_ref())
                     .filter(|(target, _)| target == &endpoint)
                     .map(|(_, valid)| *valid);
+                let candidate = preview.as_ref().and_then(|preview| {
+                    (endpoint != preview.from).then(|| {
+                        port.direction() != preview.direction
+                            && self.can_connect.as_ref().is_none_or(|validator| {
+                                let (output, input) = normalized_connection(
+                                    preview.from.clone(),
+                                    preview.direction,
+                                    endpoint.clone(),
+                                );
+                                validator(&output, &input)
+                            })
+                    })
+                });
                 let connected = wired.contains(&(node.id.clone(), port_geometry.id.clone()));
                 // A wired port wears the connection's own colour and a free
                 // one stays neutral, so "what is already joined up" is read
@@ -1411,6 +1467,7 @@ impl RenderOnce for NodeGraph {
                 let color = match target {
                     Some(true) => theme.colors.success,
                     Some(false) => theme.colors.danger,
+                    None if candidate == Some(true) => theme.colors.success,
                     None if connected => theme.colors.node.port_connected,
                     None => theme.colors.node.port_idle,
                 };
@@ -1471,6 +1528,9 @@ impl RenderOnce for NodeGraph {
                             .border(px(theme.borders.hairline * 2.0))
                             .border_color(color)
                     })
+                    .when(candidate == Some(false) && target.is_none(), |element| {
+                        element.opacity(theme.opacity.disabled)
+                    })
                     // Reaching for a 12px target is easier when the target
                     // answers, and a port that grows under the pointer is the
                     // one affordance a connection gesture has before it starts.
@@ -1479,15 +1539,19 @@ impl RenderOnce for NodeGraph {
                 if editable {
                     view = view.cursor_pointer();
                 }
-                if editable && port.direction() == PortDirection::Output {
+                if editable {
                     let down = Rc::clone(&gesture);
                     let from = endpoint.clone();
+                    let from_direction = port.direction();
                     view = view.on_mouse_down_with_pointer_capture(
                         MouseButton::Left,
                         move |event, window, cx| {
                             let mut state = down.borrow_mut();
                             state.pointer = Some(event.position);
-                            state.gesture = Some(Gesture::Connect { from: from.clone() });
+                            state.gesture = Some(Gesture::Connect {
+                                from: from.clone(),
+                                direction: from_direction,
+                            });
                             window.refresh();
                             cx.stop_propagation();
                         },
@@ -1505,30 +1569,54 @@ impl RenderOnce for NodeGraph {
                     let up = Rc::clone(&gesture);
                     let candidates = geometry.clone();
                     let report = self.on_event.clone();
+                    let can_connect = self.can_connect.clone();
                     let target_bounds = Rc::clone(&measured);
                     view = view.on_mouse_up(MouseButton::Left, move |event, window, cx| {
                         let mut state = up.borrow_mut();
-                        if let Some(Gesture::Connect { from }) = state.gesture.take() {
+                        if let Some(Gesture::Connect { from, direction }) = state.gesture.take() {
                             let bounds = target_bounds.get();
                             let pointer = point(
                                 f32::from(event.position.x - bounds.origin.x),
                                 f32::from(event.position.y - bounds.origin.y),
                             );
-                            if let (Some(report), Some((to, true))) = (
-                                &report,
-                                connection_target(
-                                    &candidates,
-                                    &from,
-                                    pointer,
-                                    viewport,
-                                    (14.0 * viewport.zoom).max(10.0),
-                                ),
-                            ) {
-                                report(
-                                    &NodeGraphEvent::ConnectionRequested { from, to },
-                                    window,
-                                    cx,
-                                );
+                            let target = connection_target(
+                                &candidates,
+                                &from,
+                                direction,
+                                pointer,
+                                viewport,
+                                (14.0 * viewport.zoom).max(10.0),
+                                can_connect.as_ref(),
+                            );
+                            if let Some(report) = &report {
+                                let opposite = target.as_ref().is_some_and(|(target, _)| {
+                                    candidates
+                                        .iter()
+                                        .find(|node| node.id == target.node)
+                                        .and_then(|node| {
+                                            node.ports.iter().find(|port| port.id == target.port)
+                                        })
+                                        .is_some_and(|port| port.direction != direction)
+                                });
+                                match (target, opposite) {
+                                    (Some((to, _)), true) => {
+                                        let (from, to) = normalized_connection(from, direction, to);
+                                        report(
+                                            &NodeGraphEvent::ConnectionRequested { from, to },
+                                            window,
+                                            cx,
+                                        );
+                                    }
+                                    (None, _) => report(
+                                        &NodeGraphEvent::ConnectionDropped {
+                                            from,
+                                            at: screen_to_world(pointer, viewport),
+                                        },
+                                        window,
+                                        cx,
+                                    ),
+                                    _ => {}
+                                }
                             }
                         }
                         state.pointer = None;
@@ -2169,6 +2257,88 @@ mod tests {
             .node(GraphNode::new("b", "B"), 300.0, 0.0)
             .edge(GraphEdge::new("a", "b"));
         assert!(duplicate.routable(&theme).is_empty());
+    }
+
+    #[test]
+    fn connection_targets_follow_direction_and_caller_rules() {
+        let nodes = vec![
+            NodeGeometry {
+                id: "source".into(),
+                bounds: Bounds::new(point(0.0, 0.0), size(10.0, 10.0)),
+                tint: gpui_kit_theme::Theme::studio_dark().colors.text_faint,
+                ports: vec![PortGeometry {
+                    id: "out".into(),
+                    anchor: Anchor {
+                        point: point(0.0, 0.0),
+                        side: PortSide::Right,
+                    },
+                    direction: PortDirection::Output,
+                }],
+            },
+            NodeGeometry {
+                id: "target".into(),
+                bounds: Bounds::new(point(100.0, 0.0), size(10.0, 10.0)),
+                tint: gpui_kit_theme::Theme::studio_dark().colors.text_faint,
+                ports: vec![PortGeometry {
+                    id: "in".into(),
+                    anchor: Anchor {
+                        point: point(100.0, 0.0),
+                        side: PortSide::Left,
+                    },
+                    direction: PortDirection::Input,
+                }],
+            },
+        ];
+        let source = GraphEndpoint::new("source", "out");
+        let target = GraphEndpoint::new("target", "in");
+        let viewport = GraphViewport::default();
+
+        assert_eq!(
+            connection_target(
+                &nodes,
+                &source,
+                PortDirection::Output,
+                point(100.0, 0.0),
+                viewport,
+                10.0,
+                None,
+            ),
+            Some((target.clone(), true))
+        );
+        assert_eq!(
+            connection_target(
+                &nodes,
+                &target,
+                PortDirection::Input,
+                point(0.0, 0.0),
+                viewport,
+                10.0,
+                None,
+            ),
+            Some((source.clone(), true))
+        );
+
+        let rejects_all: ConnectionValidator = Rc::new(|_, _| false);
+        assert_eq!(
+            connection_target(
+                &nodes,
+                &source,
+                PortDirection::Output,
+                point(100.0, 0.0),
+                viewport,
+                10.0,
+                Some(&rejects_all),
+            ),
+            Some((target, false))
+        );
+        assert_eq!(
+            normalized_connection(
+                GraphEndpoint::new("target", "in"),
+                PortDirection::Input,
+                GraphEndpoint::new("source", "out"),
+            ),
+            (source, GraphEndpoint::new("target", "in"))
+        );
     }
 
     #[test]

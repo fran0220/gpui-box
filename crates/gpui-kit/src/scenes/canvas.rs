@@ -231,6 +231,7 @@ pub(super) fn node_graph(_window: &mut Window, cx: &mut App) -> AnyElement {
                                     );
                                 }
                             }
+                            NodeGraphEvent::ConnectionDropped { .. } => {}
                             NodeGraphEvent::DisconnectRequested { id } => {
                                 scene.edges.retain(|edge| edge.edge_id() != *id);
                             }
