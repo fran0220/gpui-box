@@ -456,49 +456,72 @@ unreadable source remains `failed`; neither is converted to empty media.
 
 The internal inventory is not enough to discover a family that does not exist,
 so the component catalog is also compared against a mature external baseline.
-The 2026-08-27 baseline is the official
-[Ant Design v6 component overview](https://ant.design/components/overview),
-which displayed v6.6.1 and 73 core catalog entries. That count includes the
-deprecated `List` and its `Listy` replacement as separate entries. The mapping
-compares product-neutral behavior, not React, DOM, CSS, or API spelling:
+The 2026-08-27 primary baseline is the official
+[Material UI component overview](https://mui.com/material-ui/all-components/).
+That page lists 59 entries: Inputs (13), Data display (10), Feedback (6),
+Surface (4), Navigation (9), Layout (5), Lab (2), and Utils (10). The current
+[MUI component index](https://mui.com/components/) also exposes newer entries
+such as `Number Field` and `InitColorSchemeScript`; because the two official
+indexes are not yet identical, this document records the dated overview rather
+than pretending that a component count is a stable quality score.
 
-| Ant family | Entries | Strong equivalent | Foundation, composition, or partial | Uncovered | Deliberate / not comparable |
-|---|---:|---:|---:|---:|---:|
-| General | 4 | 2 | 2 | 0 | 0 |
-| Layout | 7 | 2 | 3 | 2 | 0 |
-| Navigation | 7 | 7 | 0 | 0 | 0 |
-| Data Entry | 18 | 13 | 2 | 2 | 1 |
-| Data Display | 21 | 18 | 0 | 2 | 1 |
-| Feedback | 11 | 9 | 0 | 2 | 0 |
-| Other | 5 | 0 | 2 | 1 | 2 |
-| **Total** | **73** | **51** | **9** | **9** | **4** |
+[MUI X](https://mui.com/x/introduction/) is tracked separately: its current
+stable advanced families are Data Grid, Date and Time Pickers, Charts, and Tree
+View. Scheduler is listed as Preview, and advanced Pro/Premium features are
+not silently counted as free Core coverage. The mapping compares
+product-neutral behavior, not React, DOM, CSS, or API spelling:
 
-`FloatButton`, `Typography`, `Flex`, `Layout`, `Space`, `App`, and
-`ConfigProvider` map to existing GPUI elements, typed text/theme helpers, or
-installation/context systems rather than requiring duplicate Kit components.
-`Select` and `Slider` are partial because the baseline components include
-multi-selection and vertical orientation respectively. `Carousel` and
-decorative `BorderBeam` remain outside desktop application vocabulary, and
-Ant's internal `Util` is not a component contract. Generic scalar `Rate` is
-also outside the current scope, but that decision is narrower than
-`FeedbackRating`: the latter is specifically a helpful/not-helpful vote and is
-not evidence that a general rating input exists.
+The secondary reference is [shadcn/ui](https://ui.shadcn.com/docs), whose
+official description is a set of accessible components **and a code
+distribution platform**. Its [component catalog](https://ui.shadcn.com/docs/components)
+is intentionally extensible through copied source and community registries,
+so it is useful for reviewing composition, source ownership, slots, and escape
+hatches, but its catalog is not a stable package boundary or a meaningful
+component-count denominator. GPUI Box already follows the important part of
+that model — callers own data and actions, while the Kit owns reusable visual
+and interaction contracts — but those contracts must still be complete and
+machine-tested like a maintained library.
 
-The resulting component and component-capability gaps are:
+| MUI family | Entries | GPUI Box mapping | Verdict |
+|---|---:|---|---|
+| Inputs | 13 | `Autocomplete` → `Combobox` (single-answer); `Button`/`Button Group` → `Button`/`ButtonGroup`; `Checkbox` → `Checkbox`; `Radio Group` → caller-composed `Radio`; `Select` → `Select` (single-answer); `Slider` → `Slider` (horizontal); `Switch` → `Switch`; `Text Field` → `TextInput`/`NumberInput`/`TextArea`; `Toggle Button` → `Toggle`/`ToggleGroup` | Broad coverage; Floating Action Button is a deliberate desktop composition, while multiple selection, scalar rating, Transfer List, and vertical slider remain incomplete. |
+| Data display | 10 | `Avatar`, `Badge`, `Tag`, `Divider`, `Icon`, `List`, `Table`, `Tooltip`, foundation text/type scale | Strong coverage; typography and icon families are correctly foundation/catalog concerns rather than duplicate leaf components. |
+| Feedback | 6 | `Callout`/`Banner`/`StateView`, `Overlay`, `Dialog`, `ProgressBar`/`ProgressCircle`, `Skeleton`, `Toast`/`ToastLayer` | Strong product-neutral coverage, with feedback states retained as caller-owned facts. |
+| Surface | 4 | `Accordion`, `DesktopTitlebar`/`Toolbar`, `Card`, theme surface recipes plus `Frost`/`Glass` | Strong coverage by composition and complete surface recipes; no need for a second `Paper` shell. |
+| Navigation | 9 | `Tabs`, `Breadcrumb`, `Drawer`, `Menu`, `Pagination`, `Wizard`/`StepList`, `Sidebar` | Strong desktop coverage; Bottom Navigation and Speed Dial are mobile-oriented patterns, not missing desktop primitives. |
+| Layout | 5 | `Responsive`, `SplitPane`, `SplitTree`, `AspectRatio`, raw GPUI flex/stack composition | Partial: a measured responsive wrapper exists, but declarative grid/container/image-list APIs are not yet first-class. |
+| Lab | 2 | `Timeline` | Partial: Timeline is covered; Masonry is not. |
+| Utils | 10 | `Popover`, `Overlay`, positioner/focus/portal internals, `TextArea`, motion system, `Responsive` | Foundation coverage is present; these are not all user-facing components and should not inflate the public component count. |
+| MUI X | 4 stable families | `DataGrid`, `Calendar`/`DateInput`/`RangePicker`/`TimeInput`, chart family, `Tree`/`TreeGrid` | Strong advanced coverage, with the documented non-virtualized `Table`/`Tree` limitation. |
+
+Several MUI names intentionally resolve to existing primitives instead of new
+public types. `Paper` is a surface recipe, `Typography` is the typed text
+foundation, `Stack` and `Box` are ordinary GPUI composition, `Radio Group` is
+the caller's group of `Radio` controls, and Modal/Popper/Portal/Transitions
+are overlay and motion infrastructure. This is not a gap: duplicating them as
+thin wrappers would create another style system. Conversely, a component is
+not marked covered merely because a similarly named primitive can be composed;
+the state, input, semantic, and caller-owned event contracts must also line up.
+
+The MUI-derived component and capability gaps are:
 
 | Gap | Current boundary | What complete support requires |
 |---|---|---|
-| `MultiSelect` | `Select` and `Combobox` each publish one caller-owned answer; `TagInput` accepts free-form text and is not a listbox selection model. | A searchable multi-select listbox with stable option identity, caller-owned selected values, removable selected chips, keyboard range/toggle semantics, explicit unavailable options, truthful result counts, and virtualized presentation for a large option set. It should compose the existing field, popover, list, tag, and selection recipes rather than fork them. |
-| `TreeSelect` | `Cascader` drills through columns and `Tree` presents a hierarchy, but neither is a field-anchored hierarchical choice. | Caller-owned single/multiple/checkable values, stable parent and child identity, search, lazy-load requests, explicit unavailable nodes, virtualized presentation, and one coherent keyboard and accessibility tree/listbox contract. |
-| `Transfer` | Lists, bulk selection, filtering, and caller-owned selection intents exist separately. There is no two-pane assignment control. | Stable source/target identity, search and truthful counts on each side, bulk and individual selection, one-way or two-way move intents, disabled/refused items, virtualized panes, and no component-owned mutation of caller data. |
-| Vertical `Slider` | `Slider` covers horizontal single/range values, steps, marks, RTL, pointer, keyboard, and semantics. It has no orientation API. | One orientation contract that rotates layout, hit geometry, direction-aware keyboard mapping, marks, range fill, and accessibility orientation together. A vertical skin over the current horizontal hit model would not count. Range-track dragging, a settled-change event, and optional value presentation should be reviewed at the same boundary. |
-| `ConfirmPopover` | `Popover`, `Dialog`, and buttons can be assembled into one, but every caller would have to repeat focus, pending confirmation, refusal, and dismissal behavior. | Trigger anchoring, initial and restored focus, confirm/cancel intents, pending and refusal states, keyboard dismissal, collision-aware placement, and disabled behavior that installs no trigger. |
-| `Tour` | Overlay placement and semantic target bounds exist, but no component coordinates a caller-owned sequence of targets. | Stable semantic target ids, controlled current step, previous/next/finish/close intents, target-missing and offscreen behavior, mask cutout and placement, focus policy, reduced motion, and truthful refusal when a target cannot be reached. |
-| Responsive `Grid` | Raw GPUI flex layout and `Responsive` can produce a grid, but every caller authors thresholds, spans, gutters, and collapse policy again. | Token-backed container breakpoints, columns, spans, gaps and ordering while keeping semantic reading order independent from visual placement. This should build on measured containers rather than window width. |
+| Multiple selection / `MultiSelect` | `Select` and `Combobox` each publish one caller-owned answer; `TagInput` accepts free-form text and is not a listbox selection model. | A searchable multi-select listbox with stable option identity, caller-owned selected values, removable selected chips, keyboard toggle semantics, explicit unavailable options, truthful result counts, and virtualized presentation for a large option set. It should compose the existing field, popover, list, tag, and selection recipes. |
+| Scalar `Rating` | `FeedbackRating` is a helpful/not-helpful vote, not a numeric star or range rating. | A caller-owned scalar or bounded rating with keyboard and pointer precision, half-step policy, clear/disabled states, accessible value text, and a token-backed glyph presentation. |
+| `Transfer List` | Lists, bulk selection, filtering, and caller-owned selection intents exist separately. There is no two-pane assignment control. | Stable source/target identity, search and truthful counts on each side, bulk and individual selection, one-way or two-way move intents, disabled/refused items, virtualized panes, and no component-owned mutation of caller data. |
+| Vertical `Slider` | `Slider` covers horizontal single/range values, steps, marks, RTL, pointer, keyboard, and semantics. It has no orientation API. | One orientation contract that rotates layout, hit geometry, direction-aware keyboard mapping, marks, range fill, and accessibility orientation together. A vertical skin over the current horizontal hit model would not count. |
+| Declarative `Grid` / `Container` | Raw GPUI flex layout and `Responsive` can produce a grid, but every caller authors thresholds, spans, gutters, and collapse policy again. | Token-backed container breakpoints, columns, spans, gaps and ordering while keeping semantic reading order independent from visual placement. This must build on measured containers rather than window width. |
+| `Image List` | `Flow` and `ImageViewer` can be composed, but there is no image-list contract for stable tiles, labels, and selection. | Stable item identity and reading order, measured responsive columns, token gaps, loading/error/unavailable media states, clipping and hit testing, and a declared virtualization boundary. |
 | `Masonry` | No Kit or framework primitive places variable-height items into measured columns. | Stable item identity and reading order, measured responsive columns, token gaps, incremental relayout, clipping and hit testing consistent with visual placement, and a declared virtualization boundary. |
-| `Affix` / sticky content | A caller can manually react to a `ScrollArea`, but GPUI has no generic sticky layout primitive. | A framework-level sticky contract for layout, clipping, hit testing and semantics relative to a named scroll container; a component-local scroll-offset workaround would not count. |
-| `QRCode` | The library can draw caller-owned geometry but does not encode or present a machine-readable matrix. | Bounded standards-compliant encoding, quiet-zone and error-level contracts, deterministic pixels, accessible source description, active/loading/expired/scanned states, and caller-owned refresh/download actions without URL or network policy. |
-| `Watermark` | Overlays exist, but there is no repeated non-interactive text/image mark over a subtree. | Deterministic tiled placement, text or caller-rendered mark, rotation/gap/offset tokens, overlay inheritance, no interception of input or semantics, and explicit documentation that a watermark is a deterrent rather than a security boundary. |
+| Auto-growing `TextArea` | `TextArea` covers multiline editing, but the MUI `Textarea Autosize` contract is not a named capability. | Bounded min/max rows, measurement without layout oscillation, IME/selection continuity, caller-owned value and edit events, and a scroll fallback once the maximum is reached. |
+
+These are distinct from cross-library or product patterns such as a
+confirmation popover, product tour, sticky/affixed content, QR code, or
+watermark. They may be useful additions, but they are not MUI Core entries and
+must not be reported as MUI coverage gaps. Their priority should be decided by
+desktop product demand and by whether GPUI has the required framework primitive,
+not by inflating a benchmark score.
 
 Document tabs, `SearchField`, `FindReplace`, `NotificationCenter`, `CodeView`,
 and `UploadList` are covered above. `FailurePanel` presents an ordinary

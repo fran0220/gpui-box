@@ -56,3 +56,10 @@
   real gaps, and deliberate exclusions. Searching only the repository can
   verify what exists, but cannot establish that missing families such as
   `Transfer`, `TreeSelect`, or `Tour` were considered.
+
+## 2026-08-27: benchmark choice follows the user's library preference
+
+- When comparing a component ecosystem, use the library the user names as the
+  benchmark. Material UI is the primary coverage baseline here; shadcn/ui is a
+  secondary reference for source ownership and composition, not a reason to
+  substitute an unrequested library or invent a package-count denominator.
