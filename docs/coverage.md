@@ -454,12 +454,51 @@ unreadable source remains `failed`; neither is converted to empty media.
 
 ### Components
 
-Two ordinary desktop-choice capabilities remain uncovered:
+The internal inventory is not enough to discover a family that does not exist,
+so the component catalog is also compared against a mature external baseline.
+The 2026-08-27 baseline is the official
+[Ant Design v6 component overview](https://ant.design/components/overview),
+which displayed v6.6.1 and 73 core catalog entries. That count includes the
+deprecated `List` and its `Listy` replacement as separate entries. The mapping
+compares product-neutral behavior, not React, DOM, CSS, or API spelling:
+
+| Ant family | Entries | Strong equivalent | Foundation, composition, or partial | Uncovered | Deliberate / not comparable |
+|---|---:|---:|---:|---:|---:|
+| General | 4 | 2 | 2 | 0 | 0 |
+| Layout | 7 | 2 | 3 | 2 | 0 |
+| Navigation | 7 | 7 | 0 | 0 | 0 |
+| Data Entry | 18 | 13 | 2 | 2 | 1 |
+| Data Display | 21 | 18 | 0 | 2 | 1 |
+| Feedback | 11 | 9 | 0 | 2 | 0 |
+| Other | 5 | 0 | 2 | 1 | 2 |
+| **Total** | **73** | **51** | **9** | **9** | **4** |
+
+`FloatButton`, `Typography`, `Flex`, `Layout`, `Space`, `App`, and
+`ConfigProvider` map to existing GPUI elements, typed text/theme helpers, or
+installation/context systems rather than requiring duplicate Kit components.
+`Select` and `Slider` are partial because the baseline components include
+multi-selection and vertical orientation respectively. `Carousel` and
+decorative `BorderBeam` remain outside desktop application vocabulary, and
+Ant's internal `Util` is not a component contract. Generic scalar `Rate` is
+also outside the current scope, but that decision is narrower than
+`FeedbackRating`: the latter is specifically a helpful/not-helpful vote and is
+not evidence that a general rating input exists.
+
+The resulting component and component-capability gaps are:
 
 | Gap | Current boundary | What complete support requires |
 |---|---|---|
 | `MultiSelect` | `Select` and `Combobox` each publish one caller-owned answer; `TagInput` accepts free-form text and is not a listbox selection model. | A searchable multi-select listbox with stable option identity, caller-owned selected values, removable selected chips, keyboard range/toggle semantics, explicit unavailable options, truthful result counts, and virtualized presentation for a large option set. It should compose the existing field, popover, list, tag, and selection recipes rather than fork them. |
-| Vertical `Slider` | `Slider` covers horizontal single/range values, steps, marks, RTL, pointer, keyboard, and semantics. It has no orientation API. | One orientation contract that rotates layout, hit geometry, direction-aware keyboard mapping, marks, range fill, and accessibility orientation together. A vertical skin over the current horizontal hit model would not count. |
+| `TreeSelect` | `Cascader` drills through columns and `Tree` presents a hierarchy, but neither is a field-anchored hierarchical choice. | Caller-owned single/multiple/checkable values, stable parent and child identity, search, lazy-load requests, explicit unavailable nodes, virtualized presentation, and one coherent keyboard and accessibility tree/listbox contract. |
+| `Transfer` | Lists, bulk selection, filtering, and caller-owned selection intents exist separately. There is no two-pane assignment control. | Stable source/target identity, search and truthful counts on each side, bulk and individual selection, one-way or two-way move intents, disabled/refused items, virtualized panes, and no component-owned mutation of caller data. |
+| Vertical `Slider` | `Slider` covers horizontal single/range values, steps, marks, RTL, pointer, keyboard, and semantics. It has no orientation API. | One orientation contract that rotates layout, hit geometry, direction-aware keyboard mapping, marks, range fill, and accessibility orientation together. A vertical skin over the current horizontal hit model would not count. Range-track dragging, a settled-change event, and optional value presentation should be reviewed at the same boundary. |
+| `ConfirmPopover` | `Popover`, `Dialog`, and buttons can be assembled into one, but every caller would have to repeat focus, pending confirmation, refusal, and dismissal behavior. | Trigger anchoring, initial and restored focus, confirm/cancel intents, pending and refusal states, keyboard dismissal, collision-aware placement, and disabled behavior that installs no trigger. |
+| `Tour` | Overlay placement and semantic target bounds exist, but no component coordinates a caller-owned sequence of targets. | Stable semantic target ids, controlled current step, previous/next/finish/close intents, target-missing and offscreen behavior, mask cutout and placement, focus policy, reduced motion, and truthful refusal when a target cannot be reached. |
+| Responsive `Grid` | Raw GPUI flex layout and `Responsive` can produce a grid, but every caller authors thresholds, spans, gutters, and collapse policy again. | Token-backed container breakpoints, columns, spans, gaps and ordering while keeping semantic reading order independent from visual placement. This should build on measured containers rather than window width. |
+| `Masonry` | No Kit or framework primitive places variable-height items into measured columns. | Stable item identity and reading order, measured responsive columns, token gaps, incremental relayout, clipping and hit testing consistent with visual placement, and a declared virtualization boundary. |
+| `Affix` / sticky content | A caller can manually react to a `ScrollArea`, but GPUI has no generic sticky layout primitive. | A framework-level sticky contract for layout, clipping, hit testing and semantics relative to a named scroll container; a component-local scroll-offset workaround would not count. |
+| `QRCode` | The library can draw caller-owned geometry but does not encode or present a machine-readable matrix. | Bounded standards-compliant encoding, quiet-zone and error-level contracts, deterministic pixels, accessible source description, active/loading/expired/scanned states, and caller-owned refresh/download actions without URL or network policy. |
+| `Watermark` | Overlays exist, but there is no repeated non-interactive text/image mark over a subtree. | Deterministic tiled placement, text or caller-rendered mark, rotation/gap/offset tokens, overlay inheritance, no interception of input or semantics, and explicit documentation that a watermark is a deterrent rather than a security boundary. |
 
 Document tabs, `SearchField`, `FindReplace`, `NotificationCenter`, `CodeView`,
 and `UploadList` are covered above. `FailurePanel` presents an ordinary

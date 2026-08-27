@@ -48,3 +48,11 @@
 - Read the public builder and generated API before listing a component's
   capabilities. Do not infer an orientation or mode from the component name;
   `Slider` is horizontal and RTL-aware, but has no vertical API.
+
+## 2026-08-27: an internal catalog cannot reveal absent component families
+
+- A component-ecosystem audit needs a dated, authoritative external catalog
+  mapped item by item into strong equivalents, composition/partial support,
+  real gaps, and deliberate exclusions. Searching only the repository can
+  verify what exists, but cannot establish that missing families such as
+  `Transfer`, `TreeSelect`, or `Tour` were considered.
