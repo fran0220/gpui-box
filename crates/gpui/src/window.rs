@@ -46,7 +46,7 @@ use smallvec::SmallVec;
 use std::{
     any::{Any, TypeId},
     borrow::Cow,
-    cell::{Cell, RefCell},
+    cell::{BorrowMutError, Cell, RefCell},
     cmp,
     fmt::{Debug, Display},
     hash::{Hash, Hasher},
@@ -1681,6 +1681,7 @@ impl Window {
             let next_frame_callbacks = next_frame_callbacks.clone();
             let input_rate_tracker = input_rate_tracker.clone();
             let mut deferred_force_render = false;
+            let mut deferred_require_presentation = false;
             move |request_frame_options| {
                 // This must be checked before anything else: if this request
                 // arrived re-entrantly while a draw is on this thread's stack
@@ -1700,6 +1701,7 @@ impl Window {
                 if draw_in_progress() {
                     log::debug!("deferring re-entrant window draw request");
                     deferred_force_render |= request_frame_options.force_render;
+                    deferred_require_presentation |= request_frame_options.require_presentation;
                     return;
                 }
                 #[cfg(target_family = "wasm")]
@@ -1730,17 +1732,32 @@ impl Window {
                 // force a second, redundant render on the next frame.
                 let force_render =
                     mem::take(&mut deferred_force_render) || request_frame_options.force_render;
+                let require_presentation = mem::take(&mut deferred_require_presentation)
+                    || request_frame_options.require_presentation;
 
-                let thermal_state = handle
-                    .update(&mut cx, |_, _, cx| cx.thermal_state())
-                    .log_err();
+                let thermal_state = match handle.update(&mut cx, |_, _, cx| cx.thermal_state()) {
+                    Ok(thermal_state) => Some(thermal_state),
+                    Err(error) if error.downcast_ref::<BorrowMutError>().is_some() => {
+                        // Native window procedures may synchronously request a
+                        // frame while another callback owns the application.
+                        // This is the same deferred-frame case as a nested
+                        // draw, just before drawing has begun. Returning here
+                        // avoids three doomed App updates; the platform keeps
+                        // the window invalidated and asks again after the outer
+                        // callback releases the borrow.
+                        log::debug!("deferring window frame request while App is borrowed");
+                        deferred_force_render |= force_render;
+                        deferred_require_presentation |= require_presentation;
+                        return;
+                    }
+                    Err(error) => Err::<ThermalState, _>(error).log_err(),
+                };
 
                 // Throttle frame rate based on conditions:
                 // - Thermal pressure (Serious/Critical): cap to ~60fps
                 // - Inactive window (not focused): cap to ~30fps to save energy
-                let min_frame_interval = if request_frame_options.require_presentation
-                    || (!request_frame_options.force_render
-                        && next_frame_callbacks.borrow().is_empty())
+                let min_frame_interval = if require_presentation
+                    || (!force_render && next_frame_callbacks.borrow().is_empty())
                 {
                     None
                 } else if !active.get() && !input_rate_tracker.borrow_mut().is_high_rate() {
@@ -1783,7 +1800,7 @@ impl Window {
                 // Keep presenting if input was recently arriving at a high rate (>= 60fps).
                 // Once high-rate input is detected, we sustain presentation for 1 second
                 // to prevent display underclocking during active input.
-                let needs_present = request_frame_options.require_presentation
+                let needs_present = require_presentation
                     || needs_present.get()
                     || input_rate_tracker.borrow_mut().is_high_rate();
 
@@ -7804,7 +7821,7 @@ mod tests {
         ExternalDragPayload, ExternalDrop, ExternalDropData, ExternalDropEvent, ExternalDropItem,
         ExternalImage, ExternalPaths, FileDragPaths, FileDropEvent, FocusHandle, FontId,
         ImageFormat, InputEvent as _, InteractiveElement as _, IntoElement, MouseButton,
-        MouseDownEvent, MouseMoveEvent, ParentElement, Pixels, Point, Render,
+        MouseDownEvent, MouseMoveEvent, ParentElement, Pixels, Point, Render, RequestFrameOptions,
         StatefulInteractiveElement as _, StyleRefinement, Styled, TestAppContext,
         TextRenderingMode, Window, WindowAppearance, WindowControlArea, WindowOptions, canvas,
         deferred, div, point, px, size,
@@ -7816,6 +7833,15 @@ mod tests {
 
     impl Render for EmptyView {
         fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+            div()
+        }
+    }
+
+    struct CountRenders(Rc<Cell<usize>>);
+
+    impl Render for CountRenders {
+        fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+            self.0.set(self.0.get() + 1);
             div()
         }
     }
@@ -8131,6 +8157,37 @@ mod tests {
         // subsequent draws of both windows work against a fresh arena.
         cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
             .expect("required framework invariant must hold");
+    }
+
+    #[test]
+    fn test_frame_request_while_app_is_borrowed_is_deferred() {
+        let mut cx = TestAppContext::single();
+        let renders = Rc::new(Cell::new(0));
+        let window = cx.add_window({
+            let renders = renders.clone();
+            move |_, _| CountRenders(renders)
+        });
+        let platform_window = cx.test_window(window.into());
+        let before = renders.get();
+
+        cx.update(|_| {
+            platform_window.simulate_request_frame(RequestFrameOptions {
+                require_presentation: true,
+                force_render: true,
+            });
+        });
+        assert_eq!(
+            renders.get(),
+            before,
+            "a re-entrant frame request rendered while App was borrowed"
+        );
+
+        platform_window.simulate_request_frame(RequestFrameOptions::default());
+        assert_eq!(
+            renders.get(),
+            before + 1,
+            "the deferred forced frame was not rendered after App became available"
+        );
     }
 
     #[gpui::test]

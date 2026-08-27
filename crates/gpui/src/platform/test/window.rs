@@ -31,6 +31,7 @@ pub(crate) struct TestWindowState {
     close_handler: Option<Box<dyn FnOnce()>>,
     hit_test_window_control_callback:
         Option<Box<dyn FnMut(Point<Pixels>) -> Option<WindowControlArea>>>,
+    request_frame_callback: Option<Box<dyn FnMut(RequestFrameOptions)>>,
     input_callback: Option<Box<dyn FnMut(PlatformInput) -> DispatchEventResult>>,
     active_status_change_callback: Option<Box<dyn FnMut(bool)>>,
     hover_status_change_callback: Option<Box<dyn FnMut(bool)>>,
@@ -91,6 +92,7 @@ impl TestWindow {
             should_close_handler: None,
             close_handler: None,
             hit_test_window_control_callback: None,
+            request_frame_callback: None,
             input_callback: None,
             active_status_change_callback: None,
             hover_status_change_callback: None,
@@ -173,6 +175,16 @@ impl TestWindow {
         let result = callback(position);
         self.0.lock().hit_test_window_control_callback = Some(callback);
         result
+    }
+
+    pub fn simulate_request_frame(&self, options: RequestFrameOptions) {
+        let mut lock = self.0.lock();
+        let Some(mut callback) = lock.request_frame_callback.take() else {
+            return;
+        };
+        drop(lock);
+        callback(options);
+        self.0.lock().request_frame_callback = Some(callback);
     }
 
     pub fn external_drag_files(&self) -> Vec<(PathBuf, bool)> {
@@ -356,7 +368,9 @@ impl PlatformWindow for TestWindow {
         self.0.lock().is_fullscreen
     }
 
-    fn on_request_frame(&self, _callback: Box<dyn FnMut(RequestFrameOptions)>) {}
+    fn on_request_frame(&self, callback: Box<dyn FnMut(RequestFrameOptions)>) {
+        self.0.lock().request_frame_callback = Some(callback)
+    }
 
     fn on_input(&self, callback: Box<dyn FnMut(crate::PlatformInput) -> DispatchEventResult>) {
         self.0.lock().input_callback = Some(callback)

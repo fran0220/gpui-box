@@ -66,9 +66,11 @@ programmatic close requests, current-request-position native caption hit tests,
 corrected Windows horizontal/vertical resize-frame metrics for transparent
 title bars, host-reserved Toast edges, grayscale glyph rasterization on
 transparent native scene-overlay planes, and Direct3D offscreen-pass target
-restoration are also subsequent GPUI Box work. They change only framework-owned
-window and overlay behavior and use the existing operating-system and GPUI
-layout APIs; they import no additional source.
+restoration are also subsequent GPUI Box work. Deferring a native frame request
+that synchronously re-enters while the application is already borrowed, while
+preserving its forced-render and presentation intents, belongs to this same
+framework-owned window lane. They use the existing operating-system and GPUI
+layout APIs and import no additional source.
 
 The renderer-backed linear, elliptical radial, and conic gradient primitives
 with up to eight ordered color stops are also subsequent GPUI Box work. Their
