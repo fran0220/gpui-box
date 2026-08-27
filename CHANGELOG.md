@@ -10,6 +10,25 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ### Changed
 
+**Focus-visible follows where focus came from, not what was typed last.**
+`focus_visible` asked whether the window's last input event was a key, which
+answers a different question than the one it is styling: a dialog that moves
+focus to its own primary button after the person clicked *Open* had that
+button's ring suppressed, because a mouse was the last thing touched. GPUI now
+records whether a pointer press is what placed the current focus —
+`Window::focus_from_pointer` alongside `Window::focus`, read back through
+`Window::focus_is_visible` — and `focus_visible` matches unless that press put
+it there. Focus a tab stop, an action, a focus trap, or the application moved
+is visible; focus somebody clicked onto is not.
+
+**The focus ring answers the keyboard, and only the keyboard.** `FocusRing`
+draws through `focus_visible` rather than `focus`. It always said "the
+keyboard is here" and now it only says it then: a mouse-focused strip, tab,
+sidebar row or slider no longer wears an outline the borderless catalogue does
+not otherwise draw, while a dialog's initial focus keeps its ring. Editable
+controls are unaffected and still show a click: a field's ring comes from its
+own focused state through `field`, never through this trait.
+
 **Windows overlays keep retained text visible.** GPUI still rasterizes text
 directly into a transparent native scene as grayscale, while cached views now
 include their base-versus-overlay plane in the reuse key. Direct3D also treats

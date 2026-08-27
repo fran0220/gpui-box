@@ -271,9 +271,17 @@ impl<T: gpui::InteractiveElement + Sized> Hoverable for T {}
 /// so "the keyboard is here" looks identical whether it is on a button, a
 /// table header, or a tree row. It is a shadow rather than a border so turning
 /// focus on never reflows what is around it.
+///
+/// The ring answers "the keyboard is here", so it is drawn for keyboard focus
+/// and not for a pointer that landed on the same element. A person who just
+/// clicked a strip knows where they clicked; outlining it tells them nothing
+/// and reads as chrome the borderless catalogue does not otherwise draw. An
+/// editable control is the case this does not cover, and it does not go
+/// through here: a field says where the caret is with [`StyledExt::well`] and
+/// its own focused state, which a click must show.
 pub trait FocusRing: InteractiveElement + Sized {
     fn focus_ring(self, theme: &Theme) -> Self {
-        self.focus(|style| {
+        self.focus_visible(|style| {
             style
                 .border_color(theme.colors.focus)
                 .shadow(theme.focus_ring())

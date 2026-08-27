@@ -250,6 +250,20 @@ route. Its AccessKit adapter mirrors roles, focus, actions, values, and
 canvas-scaled bounds into semantic DOM, but the JSON semantic snapshot is only
 a testing/debug surface.
 
+## Focus visibility
+
+`focus_visible` styling is placed by focus provenance, not by input history.
+`Window::focus_from_pointer` is the move a pointer press makes and is the only
+one that suppresses the styling; `Window::focus`, tab stops, focus traps, and
+accessibility focus actions all leave it visible, so a dialog that moves focus
+to its own action still says so. `Window::focus_is_visible` reads the current
+answer. `Window::last_input_was_keyboard` is unchanged and still governs hover
+suppression, which is about the pointer's position rather than focus.
+
+Behaviour is platform-independent: it is decided in `Window` from dispatched
+events, so macOS, Windows, Linux, and the browser host agree without any
+platform reporting a focus modality of its own.
+
 ## Native external data drag and drop
 
 macOS and Windows preserve the existing `ExternalPaths` contract for real

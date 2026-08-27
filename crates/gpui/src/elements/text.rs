@@ -1461,7 +1461,7 @@ fn paint_document_selection_handlers(
                 .document_selection_mut()
                 .begin(scope, endpoint, unit, kind);
         }
-        focus_for_down.focus(window, cx);
+        window.focus_from_pointer(&focus_for_down, cx);
         window.capture_pointer(hitbox_for_down.id);
         window.refresh();
     });
@@ -1906,7 +1906,7 @@ impl Element for InteractiveText {
                             }
                             selection.dragging = true;
                             drop(selection);
-                            focus_for_down.focus(window, cx);
+                            window.focus_from_pointer(&focus_for_down, cx);
                             window.capture_pointer(hitbox_for_down.id);
                             window.refresh();
                         });

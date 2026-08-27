@@ -1208,6 +1208,10 @@ pub struct Window {
     pub(crate) activation_observers: SubscriberSet<(), AnyObserver>,
     pub(crate) focus: Option<FocusId>,
     focus_enabled: bool,
+    /// Whether a pointer press put focus where it currently is, rather than a
+    /// tab stop, an action, or the application moving it. Read by
+    /// focus-visible styling; see [`Window::focus_is_visible`].
+    focus_placed_by_pointer: bool,
     /// Incremented every time focus moves. Used to invalidate a
     /// pending keyboard activation state when focus changes.
     pub(crate) focus_generation: u64,
@@ -2042,6 +2046,7 @@ impl Window {
             activation_observers: SubscriberSet::new(),
             focus: None,
             focus_enabled: true,
+            focus_placed_by_pointer: false,
             focus_generation: 0,
             pending_input: None,
             pending_modifier: ModifierState::default(),
@@ -2234,7 +2239,19 @@ impl Window {
 
     /// Move focus to the element associated with the given [`FocusHandle`].
     pub fn focus(&mut self, handle: &FocusHandle, cx: &mut App) {
-        if !self.focus_enabled || self.focus == Some(handle.id) {
+        if !self.focus_enabled {
+            return;
+        }
+
+        // Focus that arrives any way other than a pointer press is worth
+        // drawing, including when it lands back on the element the pointer
+        // last put it on.
+        if self.focus_placed_by_pointer {
+            self.focus_placed_by_pointer = false;
+            self.refresh();
+        }
+
+        if self.focus == Some(handle.id) {
             return;
         }
 
@@ -2256,6 +2273,30 @@ impl Window {
         self.refresh();
     }
 
+    /// Move focus to the element a pointer press just landed on.
+    ///
+    /// The same move as [`Window::focus`], and additionally the record that
+    /// this focus was placed by that press. It is the one distinction
+    /// focus-visible styling turns on: somebody who clicked a control already
+    /// knows where they clicked, while focus a tab stop, an action, or a
+    /// dialog moved is only visible because the ring says so.
+    pub fn focus_from_pointer(&mut self, handle: &FocusHandle, cx: &mut App) {
+        self.focus(handle, cx);
+        if self.focus_enabled && !self.focus_placed_by_pointer {
+            self.focus_placed_by_pointer = true;
+            self.refresh();
+        }
+    }
+
+    /// Whether the focused element's focus is worth drawing a ring around.
+    ///
+    /// False only while a pointer press is what put focus there. See
+    /// [`Window::focus_from_pointer`] and
+    /// [`InteractiveElement::focus_visible`].
+    pub fn focus_is_visible(&self) -> bool {
+        !self.focus_placed_by_pointer
+    }
+
     /// Remove focus from all elements within this context's window.
     pub fn blur(&mut self) {
         if !self.focus_enabled {
@@ -2266,6 +2307,7 @@ impl Window {
             self.focus_generation = self.focus_generation.wrapping_add(1);
         }
         self.focus = None;
+        self.focus_placed_by_pointer = false;
         self.refresh();
     }
 
