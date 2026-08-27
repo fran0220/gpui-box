@@ -31,9 +31,6 @@ use crate::overlay::popover;
 use crate::state::{AsyncStatus, AsyncValue, HasPhase};
 use crate::strings::{ActiveSearch, ActiveStrings, SearchMatcher, StringKey};
 
-const MENU_WIDTH: f32 = 320.0;
-const MENU_MAX_HEIGHT: f32 = 240.0;
-
 /// One caller-owned answer to a mention query.
 #[derive(Clone, PartialEq, Eq)]
 pub struct MentionCandidate {
@@ -474,14 +471,14 @@ impl MentionInput {
             .then(|| self.empty_menu_state(has_value, cx));
 
         popover::card_flush(&theme)
-            .w(px(MENU_WIDTH))
-            .max_h(px(MENU_MAX_HEIGHT))
+            .w(px(theme.measures.compact_overlay_width))
+            .max_h(px(theme.measures.compact_menu_max_height))
             .id(menu_ident.element_id())
             .children(top)
             .child(
                 div()
                     .p(px(theme.space(Space::Xs)))
-                    .max_h(px(MENU_MAX_HEIGHT))
+                    .max_h(px(theme.measures.compact_menu_max_height))
                     .id(menu_ident.child("scroll").element_id())
                     .overflow_y_scroll()
                     .track_scroll(&self.scroll)
@@ -598,7 +595,7 @@ impl MentionInput {
                 div()
                     .column()
                     .min_w_0()
-                    .gap(px(2.0))
+                    .gap(px(theme.space(Space::Xxs)))
                     .child(
                         foundation_text(&theme, TypeScale::Caption, title).text_color(text_color),
                     )
@@ -651,7 +648,7 @@ impl MentionInput {
                     .column()
                     .flex_1()
                     .min_w_0()
-                    .gap(px(2.0))
+                    .gap(px(theme.space(Space::Xxs)))
                     .child(popover::menu_label_state(
                         &theme,
                         candidate.label.clone(),

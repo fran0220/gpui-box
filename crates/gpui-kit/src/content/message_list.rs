@@ -39,7 +39,9 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Surface, Theme, TypeScale};
+use gpui_kit_theme::{
+    ActiveTheme, ControlSize, Radius, SemanticWash, Space, Surface, Theme, TypeScale,
+};
 use web_time::Instant;
 
 use crate::content::markdown::{Markdown, MarkdownEvent};
@@ -289,14 +291,6 @@ impl Message {
 /// can read at, and one with no ceiling at all is the full-bleed slab this
 /// replaces.
 const MESSAGE_MEASURE: f32 = 0.86;
-
-/// How much of the speaker's colour a whole turn carries.
-///
-/// Far under the band a node header takes: a header is a strip at the top of a
-/// shape, and this is every pixel of every message in the thread. At the
-/// header's alpha a transcript reads as coloured slabs rather than as a
-/// document with a colour in it.
-const SPEAKER_WASH_ALPHA: f32 = 0.05;
 
 type RetryHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 type MarkdownHandler = Rc<dyn Fn(SharedString, &MarkdownEvent, &mut Window, &mut App)>;
@@ -882,7 +876,7 @@ fn row(
                 .when_some(message.tint, |surface, tint| {
                     surface.bg(theme
                         .surface(Surface::Raised)
-                        .blend(tint.opacity(SPEAKER_WASH_ALPHA)))
+                        .blend(theme.color_wash(tint, SemanticWash::Faint)))
                 })
                 .child(header)
                 .child(body)
@@ -1003,7 +997,7 @@ fn streaming_mark(ident: &Ident, theme: &Theme, cx: &mut App) -> AnyElement {
     let label = cx.strings().text(StringKey::MessageStreaming);
     div()
         .row()
-        .gap(px(4.0))
+        .gap(px(theme.space(Space::Xs)))
         .text_color(theme.colors.accent)
         // The mark already published `busy`; a still dot meant a reader
         // watching the screen had to take the word for it.
@@ -1041,7 +1035,7 @@ fn delivery_mark(
     let tone = state.tone();
     div()
         .row()
-        .gap(px(4.0))
+        .gap(px(theme.space(Space::Xs)))
         .min_w_0()
         .type_scale(theme, TypeScale::Caption)
         .text_color(tone.color(theme))

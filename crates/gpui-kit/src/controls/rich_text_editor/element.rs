@@ -312,7 +312,7 @@ impl Element for RichTextEditorElement {
                     layout.layout.caret_bounds_aligned(
                         selection.head.offset,
                         block.screen_origin,
-                        px(1.5),
+                        px(theme.measures.caret_width),
                         layout.align,
                         layout.width,
                     ),
@@ -577,7 +577,7 @@ fn runs_for_block(
                 underline: diagnostic_color
                     .map(|color| UnderlineStyle {
                         color: Some(color),
-                        thickness: px(1.0),
+                        thickness: px(theme.measures.text_decoration_width),
                         wavy: true,
                     })
                     .or_else(|| {
@@ -587,14 +587,14 @@ fn runs_for_block(
                             } else {
                                 base.color
                             }),
-                            thickness: px(1.0),
+                            thickness: px(theme.measures.text_decoration_width),
                             wavy: false,
                         })
                     }),
                 strikethrough: style
                     .format(RichTextFormat::Strike)
                     .then_some(StrikethroughStyle {
-                        thickness: px(1.0),
+                        thickness: px(theme.measures.text_decoration_width),
                         color: Some(base.color),
                     }),
             })

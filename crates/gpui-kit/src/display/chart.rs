@@ -792,6 +792,8 @@ const PLOT_HEIGHT: f32 = 160.0;
 
 /// How far the current-point readout stands off the corner of the plot.
 const TOOLTIP_MARGIN: f32 = 8.0;
+const RADAR_LABEL_WIDTH: f32 = 72.0;
+const RADAR_LABEL_Y_OFFSET: f32 = -8.0;
 
 #[derive(Debug, Clone)]
 struct ActivePoint {
@@ -865,6 +867,31 @@ struct PaintPoint {
     opacity: f32,
 }
 
+/// Theme-owned paint shared by every Cartesian chart canvas. Geometry and
+/// data interpolation remain local; opacity and line weight do not.
+#[derive(Debug, Clone, Copy)]
+struct CartesianPaint {
+    crosshair_color: Hsla,
+    crosshair_width: f32,
+    crosshair_primary_alpha: f32,
+    crosshair_secondary_alpha: f32,
+    area_start_alpha: f32,
+    area_middle_alpha: f32,
+}
+
+impl CartesianPaint {
+    fn from_theme(theme: &gpui_kit_theme::Theme) -> Self {
+        Self {
+            crosshair_color: theme.colors.hairline_strong,
+            crosshair_width: theme.borders.hairline,
+            crosshair_primary_alpha: theme.effects.accent_border_strong_alpha,
+            crosshair_secondary_alpha: theme.effects.semantic_border_alpha,
+            area_start_alpha: theme.effects.area_wash_alpha,
+            area_middle_alpha: theme.effects.semantic_wash_alpha,
+        }
+    }
+}
+
 fn sync_motion(
     ident: &Ident,
     active: &[ActivePoint],
@@ -900,7 +927,7 @@ fn sync_motion(
         .enumerate()
         .map(|(rank, key)| (key.clone(), rank))
         .collect::<HashMap<_, _>>();
-    let stagger = Stagger::rows();
+    let stagger = Stagger::rows(theme);
 
     for target in active {
         let key = point_key(&target.selection);
@@ -1161,25 +1188,11 @@ fn ready_chart(
                 .map(|weight| (point.selection.clone(), weight))
         })
         .collect();
+    let paint = CartesianPaint::from_theme(theme);
     let chart_canvas = if scatter {
-        scatter_canvas(
-            painted,
-            weights,
-            stroke,
-            crosshair_position,
-            theme.colors.hairline_strong,
-        )
-        .into_any_element()
+        scatter_canvas(painted, weights, stroke, crosshair_position, paint).into_any_element()
     } else {
-        line_canvas(
-            painted,
-            stroke,
-            area,
-            smooth,
-            crosshair_position,
-            theme.colors.hairline_strong,
-        )
-        .into_any_element()
+        line_canvas(painted, stroke, area, smooth, crosshair_position, paint).into_any_element()
     };
     let current_tip = current.as_ref().map(|current| {
         current_tooltip(ident, current, tooltip_anchor(&active, current), theme, cx)
@@ -1494,9 +1507,9 @@ fn current_tooltip(
             }
         })
         .column()
-        .gap(px(1.0))
+        .gap(px(theme.space(Space::Xxs) / 2.0))
         .px_token(theme, Space::Xs)
-        .py(px(4.0))
+        .py(px(theme.space(Space::Xs)))
         .radius(theme, Radius::Small)
         .frame(theme, Surface::Overlay, Elevation::Overlay)
         .child(
@@ -1616,7 +1629,7 @@ fn ready_bars(
                         .items_end()
                         .flex_1()
                         .min_w_0()
-                        .gap(px(6.0))
+                        .gap(px(theme.space(Space::Xs) + theme.space(Space::Xxs)))
                         .h(px(PLOT_HEIGHT))
                         .children(
                             value_rules(axes)
@@ -1630,7 +1643,7 @@ fn ready_bars(
             div()
                 .row()
                 .ml(px(offset))
-                .gap(px(6.0))
+                .gap(px(theme.space(Space::Xs) + theme.space(Space::Xxs)))
                 .children(active.iter().map(|point| {
                     div()
                         .flex_1()
@@ -1684,7 +1697,7 @@ fn scatter_canvas(
     weights: HashMap<ChartSelection, f32>,
     stroke: f32,
     crosshair: Option<Point<f32>>,
-    crosshair_color: Hsla,
+    paint: CartesianPaint,
 ) -> impl IntoElement {
     canvas(
         |_, _, _| {},
@@ -1726,19 +1739,7 @@ fn scatter_canvas(
                 }
             }
             if let Some(crosshair) = crosshair {
-                let target = at(crosshair);
-                let mut vertical = PathBuilder::stroke(px(1.0));
-                vertical.move_to(point(target.x, bounds.top()));
-                vertical.line_to(point(target.x, bounds.bottom()));
-                if let Ok(path) = vertical.build() {
-                    window.paint_path(path, crosshair_color.opacity(0.72));
-                }
-                let mut horizontal = PathBuilder::stroke(px(1.0));
-                horizontal.move_to(point(bounds.left(), target.y));
-                horizontal.line_to(point(bounds.right(), target.y));
-                if let Ok(path) = horizontal.build() {
-                    window.paint_path(path, crosshair_color.opacity(0.46));
-                }
+                paint_crosshair(window, bounds, at(crosshair), paint);
             }
         },
     )
@@ -1752,7 +1753,7 @@ fn line_canvas(
     area: bool,
     smooth: bool,
     crosshair: Option<Point<f32>>,
-    crosshair_color: Hsla,
+    paint: CartesianPaint,
 ) -> impl IntoElement {
     canvas(
         |_, _, _| {},
@@ -1809,8 +1810,14 @@ fn line_canvas(
                             linear_gradient_stops(
                                 180.0,
                                 [
-                                    linear_color_stop(color.opacity(0.30 * opacity), 0.0),
-                                    linear_color_stop(color.opacity(0.14 * opacity), 0.58),
+                                    linear_color_stop(
+                                        color.opacity(paint.area_start_alpha * opacity),
+                                        0.0,
+                                    ),
+                                    linear_color_stop(
+                                        color.opacity(paint.area_middle_alpha * opacity),
+                                        0.58,
+                                    ),
                                     linear_color_stop(color.opacity(0.0), 1.0),
                                 ],
                             ),
@@ -1836,24 +1843,41 @@ fn line_canvas(
             }
 
             if let Some(crosshair) = crosshair {
-                let target = at(crosshair);
-                let mut vertical = PathBuilder::stroke(px(1.0));
-                vertical.move_to(point(target.x, bounds.top()));
-                vertical.line_to(point(target.x, bounds.bottom()));
-                if let Ok(path) = vertical.build() {
-                    window.paint_path(path, crosshair_color.opacity(0.72));
-                }
-                let mut horizontal = PathBuilder::stroke(px(1.0));
-                horizontal.move_to(point(bounds.left(), target.y));
-                horizontal.line_to(point(bounds.right(), target.y));
-                if let Ok(path) = horizontal.build() {
-                    window.paint_path(path, crosshair_color.opacity(0.46));
-                }
+                paint_crosshair(window, bounds, at(crosshair), paint);
             }
         },
     )
     .w_full()
     .h_full()
+}
+
+fn paint_crosshair(
+    window: &mut Window,
+    bounds: Bounds<Pixels>,
+    target: Point<Pixels>,
+    paint: CartesianPaint,
+) {
+    let mut vertical = PathBuilder::stroke(px(paint.crosshair_width));
+    vertical.move_to(point(target.x, bounds.top()));
+    vertical.line_to(point(target.x, bounds.bottom()));
+    if let Ok(path) = vertical.build() {
+        window.paint_path(
+            path,
+            paint.crosshair_color.opacity(paint.crosshair_primary_alpha),
+        );
+    }
+
+    let mut horizontal = PathBuilder::stroke(px(paint.crosshair_width));
+    horizontal.move_to(point(bounds.left(), target.y));
+    horizontal.line_to(point(bounds.right(), target.y));
+    if let Ok(path) = horizontal.build() {
+        window.paint_path(
+            path,
+            paint
+                .crosshair_color
+                .opacity(paint.crosshair_secondary_alpha),
+        );
+    }
 }
 
 /// A pie or donut over one host-owned series of shares.
@@ -2322,7 +2346,7 @@ fn ready_stacked(
                         .items_end()
                         .flex_1()
                         .min_w_0()
-                        .gap(px(6.0))
+                        .gap(px(theme.space(Space::Xs) + theme.space(Space::Xxs)))
                         .h(px(PLOT_HEIGHT))
                         .children(
                             value_rules(axes)
@@ -2336,7 +2360,7 @@ fn ready_stacked(
             div()
                 .row()
                 .ml(px(offset))
-                .gap(px(6.0))
+                .gap(px(theme.space(Space::Xs) + theme.space(Space::Xxs)))
                 .children(categories.iter().map(|category| {
                     let label = series
                         .iter()
@@ -2449,6 +2473,7 @@ fn ready_radar(
     let rings = [0.25, 0.5, 0.75, 1.0];
     let accent = theme.colors.accent;
     let faint = theme.colors.text_faint;
+    let area_wash_alpha = theme.effects.area_wash_alpha;
     let plotted = series.to_vec();
     let axis_labels = axes
         .iter()
@@ -2461,9 +2486,9 @@ fn ready_radar(
                 .absolute()
                 .left(relative(horizontal))
                 .top(relative(vertical))
-                .ml(px(-36.0))
-                .mt(px(-8.0))
-                .w(px(72.0))
+                .ml(px(-RADAR_LABEL_WIDTH / 2.0))
+                .mt(px(RADAR_LABEL_Y_OFFSET))
+                .w(px(RADAR_LABEL_WIDTH))
                 .type_scale(theme, TypeScale::Caption)
                 .text_align(gpui::TextAlign::Center)
                 .text_color(theme.colors.text_muted)
@@ -2544,7 +2569,7 @@ fn ready_radar(
                                 fill.close();
                                 stroke.close();
                                 if let Ok(path) = fill.build() {
-                                    window.paint_path(path, color.opacity(0.22));
+                                    window.paint_path(path, color.opacity(area_wash_alpha));
                                 }
                                 if let Ok(path) = stroke.build() {
                                     window.paint_path(path, color);
@@ -2657,6 +2682,7 @@ fn ready_gauge(
     cx: &mut App,
 ) -> AnyElement {
     let amount = reading.map(|point| point.position.y.clamp(0.0, 1.0));
+    let track_alpha = theme.effects.soft_contrast_alpha;
     let wording = reading
         .map(|point| point.value.clone())
         .unwrap_or_else(|| cx.strings().text(StringKey::GaugeEmpty));
@@ -2688,7 +2714,7 @@ fn ready_gauge(
                             let mut track = PathBuilder::stroke(px(10.0));
                             gauge_arc(&mut track, center, radius, 0.0, 1.0);
                             if let Ok(path) = track.build() {
-                                window.paint_path(path, color.opacity(0.18));
+                                window.paint_path(path, color.opacity(track_alpha));
                             }
                             if let Some(amount) = amount {
                                 let mut fill = PathBuilder::stroke(px(10.0));

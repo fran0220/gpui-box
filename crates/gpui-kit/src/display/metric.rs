@@ -431,9 +431,9 @@ fn delta_pill(
         .row()
         .items_center()
         .flex_none()
-        .gap(px(2.0))
+        .gap(px(theme.space(Space::Xxs)))
         .px_token(theme, Space::Xs)
-        .py(px(1.0))
+        .py(px(theme.space(Space::Xxs) / 2.0))
         .radius(theme, Radius::Pill)
         .bg(colors.background)
         .children(

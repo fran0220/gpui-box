@@ -9,6 +9,7 @@
     "meta",
     "color",
     "space",
+    "measure",
     "radius",
     "control",
     "border",
@@ -37,6 +38,7 @@
       "additionalProperties": false,
       "required": [
         "palette",
+        "paletteSteps",
         "surface",
         "text",
         "interactive",
@@ -50,6 +52,7 @@
       ],
       "properties": {
         "palette": { "$ref": "#/$defs/palette" },
+        "paletteSteps": { "$ref": "#/$defs/paletteSteps" },
         "surface": { "$ref": "#/$defs/surfaceColors" },
         "text": { "$ref": "#/$defs/textColors" },
         "interactive": { "$ref": "#/$defs/interactiveColors" },
@@ -73,6 +76,7 @@
       }
     },
     "space": { "$ref": "#/$defs/spacing" },
+    "measure": { "$ref": "#/$defs/measure" },
     "radius": { "$ref": "#/$defs/radii" },
     "control": { "$ref": "#/$defs/control" },
     "border": { "$ref": "#/$defs/border" },
@@ -101,6 +105,25 @@
         "minProperties": 1,
         "additionalProperties": { "$ref": "#/$defs/colorLiteral" }
       }
+    },
+    "paletteSteps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["filled", "hover", "active", "readableDark", "readableLight"],
+      "properties": {
+        "filled": { "$ref": "#/$defs/paletteStepFallback" },
+        "hover": { "$ref": "#/$defs/paletteStepFallback" },
+        "active": { "$ref": "#/$defs/paletteStepFallback" },
+        "readableDark": { "$ref": "#/$defs/paletteStepFallback" },
+        "readableLight": { "$ref": "#/$defs/paletteStepFallback" }
+      }
+    },
+    "paletteStepFallback": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
     },
     "positiveNumber": { "type": "number", "minimum": 0 },
     "strictlyPositiveNumber": { "type": "number", "exclusiveMinimum": 0 },
@@ -144,7 +167,10 @@
         "track",
         "divider",
         "focus",
-        "primaryFill"
+        "primaryFill",
+        "whiteFill",
+        "whiteFillHover",
+        "whiteFillActive"
       ],
       "properties": {
         "hover": { "$ref": "#/$defs/color" },
@@ -155,7 +181,10 @@
         "track": { "$ref": "#/$defs/color" },
         "divider": { "$ref": "#/$defs/color" },
         "focus": { "$ref": "#/$defs/color" },
-        "primaryFill": { "$ref": "#/$defs/color" }
+        "primaryFill": { "$ref": "#/$defs/color" },
+        "whiteFill": { "$ref": "#/$defs/color" },
+        "whiteFillHover": { "$ref": "#/$defs/color" },
+        "whiteFillActive": { "$ref": "#/$defs/color" }
       }
     },
     "semanticColors": {
@@ -267,14 +296,59 @@
     "spacing": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["xs", "sm", "md", "lg", "xl", "xxl"],
+      "required": ["xxs", "xs", "sm", "md", "lg", "xl", "xxl"],
       "properties": {
+        "xxs": { "$ref": "#/$defs/positiveNumber" },
         "xs": { "$ref": "#/$defs/positiveNumber" },
         "sm": { "$ref": "#/$defs/positiveNumber" },
         "md": { "$ref": "#/$defs/positiveNumber" },
         "lg": { "$ref": "#/$defs/positiveNumber" },
         "xl": { "$ref": "#/$defs/positiveNumber" },
         "xxl": { "$ref": "#/$defs/positiveNumber" }
+      }
+    },
+    "measure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "readableWidth",
+        "dialogWidth",
+        "menuMinWidth",
+        "compactMenuMinWidth",
+        "menuMaxHeight",
+        "compactMenuMaxHeight",
+        "standaloneIcon",
+        "scrollbarTrack",
+        "scrollbarThumb",
+        "scrollbarMinThumb",
+        "caretWidth",
+        "textDecorationWidth",
+        "progressTrackHeight",
+        "sliderTrackHeight",
+        "compactOverlayWidth",
+        "mediaViewerHeight",
+        "timelineRailWidth",
+        "statusMark"
+      ],
+      "properties": {
+        "readableWidth": { "$ref": "#/$defs/strictlyPositiveNumber" },
+        "dialogWidth": { "$ref": "#/$defs/strictlyPositiveNumber" },
+        "menuMinWidth": { "$ref": "#/$defs/strictlyPositiveNumber" },
+        "compactMenuMinWidth": { "$ref": "#/$defs/strictlyPositiveNumber" },
+        "menuMaxHeight": { "$ref": "#/$defs/strictlyPositiveNumber" },
+        "compactMenuMaxHeight": { "$ref": "#/$defs/strictlyPositiveNumber" },
+        "standaloneIcon": { "$ref": "#/$defs/strictlyPositiveNumber" },
+        "scrollbarTrack": { "$ref": "#/$defs/strictlyPositiveNumber" },
+        "scrollbarThumb": { "$ref": "#/$defs/strictlyPositiveNumber" },
+        "scrollbarMinThumb": { "$ref": "#/$defs/strictlyPositiveNumber" },
+        "caretWidth": { "$ref": "#/$defs/strictlyPositiveNumber" },
+        "textDecorationWidth": { "$ref": "#/$defs/strictlyPositiveNumber" },
+        "progressTrackHeight": { "$ref": "#/$defs/strictlyPositiveNumber" },
+        "sliderTrackHeight": { "$ref": "#/$defs/strictlyPositiveNumber" },
+        "compactOverlayWidth": { "$ref": "#/$defs/strictlyPositiveNumber" },
+        "mediaViewerHeight": { "$ref": "#/$defs/strictlyPositiveNumber" },
+        "timelineRailWidth": { "$ref": "#/$defs/strictlyPositiveNumber" },
+        "statusMark": { "$ref": "#/$defs/strictlyPositiveNumber" }
       }
     },
     "radii": {
@@ -433,10 +507,11 @@
     "typography": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["sans", "mono", "scale"],
+      "required": ["sans", "mono", "readoutScale", "scale"],
       "properties": {
         "sans": { "$ref": "#/$defs/font" },
         "mono": { "$ref": "#/$defs/font" },
+        "readoutScale": { "type": "number", "minimum": 1 },
         "scale": {
           "type": "object",
           "additionalProperties": false,
@@ -483,10 +558,16 @@
         "entrance",
         "slow",
         "staggerStep",
+        "microBounce",
+        "microWobble",
+        "microPop",
         "spin",
         "pulse",
         "shimmer",
-        "toast"
+        "toast",
+        "hoverCardOpen",
+        "hoverCardGrace",
+        "confirmation"
       ],
       "properties": {
         "instant": { "type": "integer", "minimum": 0 },
@@ -497,10 +578,16 @@
         "entrance": { "type": "integer", "minimum": 0 },
         "slow": { "type": "integer", "minimum": 0 },
         "staggerStep": { "type": "integer", "minimum": 0 },
+        "microBounce": { "type": "integer", "minimum": 0 },
+        "microWobble": { "type": "integer", "minimum": 0 },
+        "microPop": { "type": "integer", "minimum": 0 },
         "spin": { "type": "integer", "minimum": 0 },
         "pulse": { "type": "integer", "minimum": 0 },
         "shimmer": { "type": "integer", "minimum": 0 },
-        "toast": { "type": "integer", "minimum": 0 }
+        "toast": { "type": "integer", "minimum": 0 },
+        "hoverCardOpen": { "type": "integer", "minimum": 0 },
+        "hoverCardGrace": { "type": "integer", "minimum": 0 },
+        "confirmation": { "type": "integer", "minimum": 0 }
       }
     },
     "cubicBezier": {
@@ -542,6 +629,7 @@
         "durationMs",
         "easing",
         "spring",
+        "staggerMaxItems",
         "pressOffsetPx",
         "hoverLiftPx",
         "flickVelocityPxPerSec",
@@ -561,6 +649,7 @@
             "grab": { "$ref": "#/$defs/spring" }
           }
         },
+        "staggerMaxItems": { "type": "integer", "minimum": 2 },
         "pressOffsetPx": { "$ref": "#/$defs/positiveNumber" },
         "hoverLiftPx": { "$ref": "#/$defs/positiveNumber" },
         "flickVelocityPxPerSec": { "type": "number", "exclusiveMinimum": 0 },
@@ -595,7 +684,37 @@
         "sheenAlpha",
         "areaWashAlpha",
         "headerTintAlpha",
-        "railWidth"
+        "nodeActiveWashAlpha",
+        "nodeActiveStrokeAlpha",
+        "nodeTrafficAlpha",
+        "nodePreviewAlpha",
+        "nodeMinimapAlpha",
+        "railWidth",
+        "semanticWashFaintAlpha",
+        "semanticWashAlpha",
+        "semanticWashStrongAlpha",
+        "semanticBorderAlpha",
+        "accentBorderAlpha",
+        "accentBorderStrongAlpha",
+        "subtleHoverAlpha",
+        "softContrastAlpha",
+        "contrastTintAlpha",
+        "trackRestingAlpha",
+        "contentVeilAlpha",
+        "criticalFillAlpha",
+        "criticalInactiveAlpha",
+        "variantLightAlpha",
+        "variantLightHoverAlpha",
+        "variantLightActiveAlpha",
+        "variantOutlineHoverAlpha",
+        "variantOutlineActiveAlpha",
+        "variantSubtleHoverAlpha",
+        "variantSubtleActiveAlpha",
+        "primaryHoverOpacity",
+        "customColorReadableDarkFloor",
+        "customColorReadableLightCeiling",
+        "customColorHoverLightnessDelta",
+        "customColorActiveLightnessDelta"
       ],
       "properties": {
         "edgeFadeBand": { "$ref": "#/$defs/positiveNumber" },
@@ -622,7 +741,37 @@
         "sheenAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
         "areaWashAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
         "headerTintAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
-        "railWidth": { "$ref": "#/$defs/strictlyPositiveNumber" }
+        "nodeActiveWashAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "nodeActiveStrokeAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "nodeTrafficAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "nodePreviewAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "nodeMinimapAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "railWidth": { "$ref": "#/$defs/strictlyPositiveNumber" },
+        "semanticWashFaintAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "semanticWashAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "semanticWashStrongAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "semanticBorderAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "accentBorderAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "accentBorderStrongAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "subtleHoverAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "softContrastAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "contrastTintAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "trackRestingAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "contentVeilAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "criticalFillAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "criticalInactiveAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "variantLightAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "variantLightHoverAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "variantLightActiveAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "variantOutlineHoverAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "variantOutlineActiveAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "variantSubtleHoverAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "variantSubtleActiveAlpha": { "type": "number", "minimum": 0, "maximum": 1 },
+        "primaryHoverOpacity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "customColorReadableDarkFloor": { "type": "number", "minimum": 0, "maximum": 1 },
+        "customColorReadableLightCeiling": { "type": "number", "minimum": 0, "maximum": 1 },
+        "customColorHoverLightnessDelta": { "type": "number", "minimum": 0, "maximum": 1 },
+        "customColorActiveLightnessDelta": { "type": "number", "minimum": 0, "maximum": 1 }
       }
     }
   }

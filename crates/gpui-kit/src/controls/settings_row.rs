@@ -201,7 +201,7 @@ impl SettingsRow {
             .column()
             .flex_1()
             .min_w_0()
-            .gap(px(2.0))
+            .gap(px(theme.space(Space::Xxs)))
             .child(
                 foundation_text(theme, TypeScale::Label, self.label.clone())
                     .row_reading(direction)
@@ -224,7 +224,7 @@ impl SettingsRow {
                 .column()
                 .items_end()
                 .flex_none()
-                .gap(px(2.0))
+                .gap(px(theme.space(Space::Xxs)))
                 .children(self.value.clone().map(|value| {
                     foundation_text(theme, TypeScale::Label, value)
                         .text_tone(theme, gpui_kit_theme::TextTone::Muted)
@@ -397,7 +397,7 @@ impl RenderOnce for SettingsSection {
                     .column()
                     .flex_1()
                     .min_w_0()
-                    .gap(px(2.0))
+                    .gap(px(theme.space(Space::Xxs)))
                     .child(foundation_text(
                         &theme,
                         TypeScale::Label,

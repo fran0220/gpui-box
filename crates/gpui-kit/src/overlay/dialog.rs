@@ -348,7 +348,7 @@ impl Render for Dialog {
             description.map(|description| panel::description(&self.ident, &theme, description, cx));
 
         let mut card = surface(&theme, OverlaySurface::MODAL)
-            .w(px(360.0))
+            .w(px(theme.measures.dialog_width))
             .track_focus(&self.focus_handle)
             .on_key_down(cx.listener(Self::on_navigation_key));
         if self.dismissable {

@@ -401,6 +401,7 @@ pub struct TextArea {
     last_layout: Option<EditableTextLayout>,
     last_layout_text: SharedString,
     last_bounds: Option<Bounds<Pixels>>,
+    caret_width: Pixels,
     /// Bumped once per layout pass, so a host that resizes the frame around
     /// this area can tell a measurement taken after its last change from one
     /// taken before it.
@@ -454,6 +455,7 @@ impl TextArea {
             last_layout: None,
             last_layout_text: SharedString::default(),
             last_bounds: None,
+            caret_width: px(cx.theme().measures.caret_width),
             layout_pass: 0,
             accessibility_revision: 0,
             accessible_snapshot: Arc::default(),
@@ -777,7 +779,7 @@ impl TextArea {
         Some(layout.caret_bounds(
             self.cursor_offset(),
             point(bounds.left(), bounds.top() - self.scroll_offset),
-            px(1.0),
+            self.caret_width,
         ))
     }
 
@@ -837,6 +839,7 @@ impl TextArea {
         layout: EditableTextLayout,
         text: SharedString,
         bounds: Bounds<Pixels>,
+        caret_width: Pixels,
     ) -> bool {
         let rows = layout.visual_rows(&text);
         let changed = self.last_layout_text != text
@@ -849,6 +852,7 @@ impl TextArea {
         self.last_layout = Some(layout);
         self.last_layout_text = text;
         self.last_bounds = Some(bounds);
+        self.caret_width = caret_width;
         self.layout_pass = self.layout_pass.wrapping_add(1);
         changed
     }

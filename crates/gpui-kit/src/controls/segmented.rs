@@ -295,8 +295,8 @@ impl RenderOnce for SegmentedControl {
             .id(self.ident.child("strip").element_id())
             .row()
             .flex_none()
-            .gap(px(2.0))
-            .p(px(2.0))
+            .gap(px(theme.space(Space::Xxs)))
+            .p(px(theme.space(Space::Xxs)))
             .radius(&theme, Radius::Control)
             .surface(&theme, Surface::Sunken)
             .when(self.disabled, |element| {

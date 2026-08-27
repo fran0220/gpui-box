@@ -29,9 +29,6 @@ use crate::overlay::{Hang, Placement};
 use crate::reactive::Signal;
 use crate::strings::{ActiveStrings, StringKey};
 
-const MENU_MIN_WIDTH: f32 = 180.0;
-const MENU_MAX_HEIGHT: f32 = 320.0;
-
 /// One choice, identified by business identity rather than by position.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SelectOption {
@@ -552,7 +549,7 @@ impl Select {
                     .flex_col()
                     .flex_1()
                     .min_w_0()
-                    .gap(px(2.0))
+                    .gap(px(theme.space(Space::Xxs)))
                     .child(popover::menu_label_state(
                         &theme,
                         option.label.clone(),
@@ -577,7 +574,7 @@ impl Select {
                 element.child(
                     div().ml_auto().child(
                         icon(Icon::Check)
-                            .size(px(14.0))
+                            .size(px(theme.control.sm.icon_size))
                             .text_color(theme.colors.text),
                     ),
                 )
@@ -646,8 +643,8 @@ impl Render for Select {
                 window,
                 self.trigger_bounds.get(),
                 &theme,
-                MENU_MAX_HEIGHT,
-                MENU_MIN_WIDTH,
+                theme.measures.menu_max_height,
+                theme.measures.compact_menu_min_width,
             )
         });
         let placement = geometry.map_or(Placement::Below, |geometry| geometry.placement);

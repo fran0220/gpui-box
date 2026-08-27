@@ -1474,8 +1474,9 @@ fn a_token_spring_preset_is_what_it_always_was(_cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn a_row_wave_is_capped_however_long_the_list_is(_cx: &mut TestAppContext) {
-    let cap = gpui_kit::motion::ROW_STAGGER_CAP;
-    let stagger = gpui_kit::motion::Stagger::rows();
+    let theme = Theme::studio_dark();
+    let cap = gpui_kit::motion::row_stagger_cap(&theme);
+    let stagger = gpui_kit::motion::Stagger::rows(&theme);
     for count in [3, 12, 400] {
         assert!(
             stagger.delay(count - 1, count).as_millis() <= cap.as_millis(),

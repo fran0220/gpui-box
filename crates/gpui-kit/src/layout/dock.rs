@@ -513,7 +513,7 @@ impl Dock {
                 .p_token(theme, Space::Lg)
                 .child(
                     icon(Icon::CloseCircle)
-                        .size(px(20.0))
+                        .size(px(theme.measures.standalone_icon))
                         .text_color(theme.colors.warning),
                 )
                 .child(
@@ -524,7 +524,7 @@ impl Dock {
                 )
                 .child(
                     div()
-                        .max_w(px(320.0))
+                        .max_w(px(theme.measures.readable_width))
                         .text_align(gpui::TextAlign::Center)
                         .type_scale(theme, TypeScale::Caption)
                         .text_color(theme.colors.text_muted)

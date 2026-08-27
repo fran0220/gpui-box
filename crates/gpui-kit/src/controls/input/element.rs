@@ -124,7 +124,7 @@ impl Element for TextElement {
                     len: marked.end - marked.start,
                     underline: Some(UnderlineStyle {
                         color: Some(run.color),
-                        thickness: px(1.0),
+                        thickness: px(theme.measures.text_decoration_width),
                         wavy: false,
                     }),
                     ..run.clone()
@@ -199,7 +199,7 @@ impl Element for TextElement {
             (
                 Vec::new(),
                 Some(fill(
-                    layout.caret_bounds(cursor, origin, px(1.5)),
+                    layout.caret_bounds(cursor, origin, px(theme.measures.caret_width)),
                     theme.colors.accent,
                 )),
             )

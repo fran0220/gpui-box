@@ -8,8 +8,8 @@ use gpui::{
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{
-    ActiveTheme, ColorChoice, ControlMetrics, ControlSize, Radius, Theme, TypeScale, Variant,
-    VariantColors,
+    ActiveTheme, ColorChoice, ControlMetrics, ControlSize, Radius, SemanticColor, Theme, TypeScale,
+    Variant, VariantColors,
 };
 
 use crate::display::icon::{Icon as IconView, IconTone};
@@ -622,9 +622,9 @@ fn frame(
             });
     }
     match variant {
-        ButtonVariant::Primary => base
-            .bg(theme.colors.primary_fill)
-            .when(!inert, |element| element.hover(|style| style.opacity(0.9))),
+        ButtonVariant::Primary => base.bg(theme.colors.primary_fill).when(!inert, |element| {
+            element.hover(|style| style.opacity(theme.effects.primary_hover_opacity))
+        }),
         // A tonal fill and no outline. A secondary action is the second
         // strongest thing in its area, which a surface step says on its own;
         // the outline it used to carry made it the most drawn-around thing on
@@ -639,11 +639,15 @@ fn frame(
         // the loudest object on any surface it lands on, and this variant is
         // reserved for irreversible intent, which is a thing a reader has to
         // *find* rather than a thing that has to shout across the window.
-        ButtonVariant::Danger => base
-            .bg(theme.colors.danger.opacity(0.16))
-            .when(!inert, |element| {
-                element.hover(|style| style.bg(theme.colors.danger.opacity(0.26)))
-            }),
+        ButtonVariant::Danger => {
+            let colors = theme.variant_colors(
+                Variant::Light,
+                &ColorChoice::Semantic(SemanticColor::Danger),
+            );
+            base.bg(colors.background).when(!inert, |element| {
+                element.hover(move |style| style.bg(colors.background_hover))
+            })
+        }
         ButtonVariant::Link => base.px(px(0.0)),
     }
 }

@@ -32,11 +32,6 @@ use crate::overlay::popover::{self, MenuKey};
 use crate::overlay::{Hang, Placement};
 use crate::strings::{ActiveStrings, StringKey};
 
-/// How wide the list gets before it stops growing, and how tall before it
-/// scrolls. Both occur once, so they stay next to the component.
-const MENU_MIN_WIDTH: f32 = 200.0;
-const MENU_MAX_HEIGHT: f32 = 320.0;
-
 /// What a combobox reports. The owner decides what any of it means.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ComboboxEvent {
@@ -620,7 +615,7 @@ impl Combobox {
                     .column()
                     .flex_1()
                     .min_w_0()
-                    .gap(px(2.0))
+                    .gap(px(theme.space(Space::Xxs)))
                     .child(popover::menu_label_state(
                         &theme,
                         option.label.clone(),
@@ -645,7 +640,7 @@ impl Combobox {
                 element.child(
                     div().ml_auto().child(
                         icon(Icon::Check)
-                            .size(px(14.0))
+                            .size(px(theme.control.sm.icon_size))
                             .text_color(theme.colors.text),
                     ),
                 )
@@ -730,8 +725,8 @@ impl Render for Combobox {
                 window,
                 self.trigger_bounds.get(),
                 &theme,
-                MENU_MAX_HEIGHT,
-                MENU_MIN_WIDTH,
+                theme.measures.menu_max_height,
+                theme.measures.menu_min_width,
             )
         });
         let placement = geometry.map_or(Placement::Below, |geometry| geometry.placement);

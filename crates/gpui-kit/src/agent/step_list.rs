@@ -31,9 +31,6 @@ use crate::display::status::StatusDot;
 use crate::foundation::{Ident, StyledExt, text};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
-/// How wide the column holding the rail and its dots is.
-const RAIL: f32 = 16.0;
-
 /// Where one step has got to.
 ///
 /// A step that did not run and a step that ran and failed are different
@@ -269,11 +266,11 @@ fn step_element(
     let running = matches!(step.state, StepState::Running);
 
     let rail = div()
-        .w(px(RAIL))
+        .w(px(theme.measures.timeline_rail_width))
         .flex_none()
         .column()
         .items_center()
-        .child(div().mt(px(4.0)).child({
+        .child(div().mt(px(theme.space(Space::Xs))).child({
             let dot = StatusDot::new(step.state.tone());
             // The step that is running is the one a reader is looking for, so
             // it is the one that moves.
@@ -286,7 +283,7 @@ fn step_element(
         .when(continues, |element| {
             element.child(
                 div()
-                    .mt(px(4.0))
+                    .mt(px(theme.space(Space::Xs)))
                     .w(px(theme.borders.hairline))
                     .flex_1()
                     .min_h(px(theme.space(Space::Md)))
@@ -320,7 +317,7 @@ fn step_element(
                 .column()
                 .flex_1()
                 .min_w_0()
-                .gap(px(2.0))
+                .gap(px(theme.space(Space::Xxs)))
                 .child(
                     div()
                         .row()

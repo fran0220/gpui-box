@@ -220,6 +220,13 @@
         "900": "#d9480f"
       }
     },
+    "paletteSteps": {
+      "filled": ["600", "500", "400"],
+      "hover": ["700", "600", "500"],
+      "active": ["800", "700", "600"],
+      "readableDark": ["300", "200", "400"],
+      "readableLight": ["700", "800", "600"]
+    },
     "surface": {
       "backdrop": "{neutral.10}",
       "canvas": "{neutral.50}",
@@ -247,7 +254,10 @@
       "track": "{neutral.850}/8c",
       "divider": "{neutral.850}/14",
       "focus": "#1b6fab",
-      "primaryFill": "{neutral.800}"
+      "primaryFill": "{neutral.800}",
+      "whiteFill": "#ffffff",
+      "whiteFillHover": "#f5f5f5",
+      "whiteFillActive": "#ebebeb"
     },
     "semantic": {
       "accent": "#1b6fab",
@@ -329,12 +339,33 @@
     }
   },
   "space": {
+    "xxs": 2,
     "xs": 4,
     "sm": 8,
     "md": 12,
     "lg": 16,
     "xl": 24,
     "xxl": 32
+  },
+  "measure": {
+    "readableWidth": 360,
+    "dialogWidth": 360,
+    "menuMinWidth": 200,
+    "compactMenuMinWidth": 180,
+    "menuMaxHeight": 320,
+    "compactMenuMaxHeight": 240,
+    "standaloneIcon": 20,
+    "scrollbarTrack": 10,
+    "scrollbarThumb": 6,
+    "scrollbarMinThumb": 24,
+    "caretWidth": 1.5,
+    "textDecorationWidth": 1,
+    "progressTrackHeight": 4,
+    "sliderTrackHeight": 6,
+    "compactOverlayWidth": 320,
+    "mediaViewerHeight": 320,
+    "timelineRailWidth": 16,
+    "statusMark": 7
   },
   "radius": {
     "small": 5,
@@ -462,6 +493,7 @@
       "fallbackWindows": "Consolas",
       "fallbackLinux": "DejaVu Sans Mono"
     },
+    "readoutScale": 1.6,
     "scale": {
       "caption": {
         "size": 10.5,
@@ -509,11 +541,17 @@
       "resize": 200,
       "entrance": 500,
       "slow": 320,
-      "staggerStep": 28,
+      "staggerStep": 16,
+      "microBounce": 360,
+      "microWobble": 280,
+      "microPop": 240,
       "spin": 900,
       "pulse": 2400,
       "shimmer": 1400,
-      "toast": 6000
+      "toast": 6000,
+      "hoverCardOpen": 400,
+      "hoverCardGrace": 300,
+      "confirmation": 1600
     },
     "easing": {
       "linear": [
@@ -593,6 +631,7 @@
         "mass": 1
       }
     },
+    "staggerMaxItems": 8,
     "pressOffsetPx": 1,
     "hoverLiftPx": 1,
     "flickVelocityPxPerSec": 420,
@@ -623,6 +662,36 @@
     "sheenAlpha": 0.05,
     "areaWashAlpha": 0.16,
     "headerTintAlpha": 0.14,
-    "railWidth": 3
+    "nodeActiveWashAlpha": 0.14,
+    "nodeActiveStrokeAlpha": 0.72,
+    "nodeTrafficAlpha": 0.82,
+    "nodePreviewAlpha": 0.88,
+    "nodeMinimapAlpha": 0.7,
+    "railWidth": 3,
+    "semanticWashFaintAlpha": 0.06,
+    "semanticWashAlpha": 0.1,
+    "semanticWashStrongAlpha": 0.16,
+    "semanticBorderAlpha": 0.4,
+    "accentBorderAlpha": 0.55,
+    "accentBorderStrongAlpha": 0.7,
+    "subtleHoverAlpha": 0.3,
+    "softContrastAlpha": 0.18,
+    "contrastTintAlpha": 0.28,
+    "trackRestingAlpha": 0.55,
+    "contentVeilAlpha": 0.88,
+    "criticalFillAlpha": 0.84,
+    "criticalInactiveAlpha": 0.1,
+    "variantLightAlpha": 0.15,
+    "variantLightHoverAlpha": 0.22,
+    "variantLightActiveAlpha": 0.28,
+    "variantOutlineHoverAlpha": 0.08,
+    "variantOutlineActiveAlpha": 0.12,
+    "variantSubtleHoverAlpha": 0.12,
+    "variantSubtleActiveAlpha": 0.18,
+    "primaryHoverOpacity": 0.9,
+    "customColorReadableDarkFloor": 0.72,
+    "customColorReadableLightCeiling": 0.4,
+    "customColorHoverLightnessDelta": 0.05,
+    "customColorActiveLightnessDelta": 0.1
   }
 }

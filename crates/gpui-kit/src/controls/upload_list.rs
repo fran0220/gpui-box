@@ -45,9 +45,6 @@ use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text as foundation_text};
 
-/// The width of the status mark a row leads with. The overall bar is indented
-/// by it so both bars measure from the same edge.
-const STATUS_MARK: f32 = 7.0;
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -452,15 +449,20 @@ impl UploadList {
             .gap_token(&theme, Space::Sm)
             .px_token(&theme, Space::Sm)
             .py_token(&theme, Space::Xs)
-            .child(div().flex_none().mt(px(5.0)).child({
-                let dot = StatusDot::new(upload.state.tone());
-                // Only a file actually on its way moves. A queued one is
-                // waiting for a turn, which is not the same as working.
-                match upload.state {
-                    UploadState::Uploading { .. } => dot.busy(ident.child("mark")),
-                    _ => dot,
-                }
-            }))
+            .child(
+                div()
+                    .flex_none()
+                    .mt(px(theme.space(Space::Xs) + theme.space(Space::Xxs) / 2.0))
+                    .child({
+                        let dot = StatusDot::new(upload.state.tone());
+                        // Only a file actually on its way moves. A queued one is
+                        // waiting for a turn, which is not the same as working.
+                        match upload.state {
+                            UploadState::Uploading { .. } => dot.busy(ident.child("mark")),
+                            _ => dot,
+                        }
+                    }),
+            )
             .child(
                 div()
                     .column()
@@ -618,7 +620,7 @@ impl RenderOnce for UploadList {
                     .px_token(&theme, Space::Sm)
                     .ps(
                         cx.layout_direction(),
-                        px(theme.space(Space::Sm) * 2.0 + STATUS_MARK),
+                        px(theme.space(Space::Sm) * 2.0 + theme.measures.status_mark),
                     )
                     .child(progress)
             }))

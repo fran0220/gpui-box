@@ -235,7 +235,7 @@ pub fn row_in<E>(
 where
     E: Styled + IntoElement + 'static,
 {
-    let spec = super::Stagger::rows().spec(index, count, menu(theme));
+    let spec = super::Stagger::rows(theme).spec(index, count, menu(theme));
     element.with_animation(id, spec.animation(), |element, progress| {
         element.opacity(progress)
     })

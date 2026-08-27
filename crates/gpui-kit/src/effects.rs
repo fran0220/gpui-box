@@ -20,7 +20,7 @@ use gpui::{
     RenderImage, RenderOnce, SharedString, SpriteBlendMode, SpriteColorMode, Styled, Window,
     bounds, canvas, div, point, px, radians, size,
 };
-use gpui_kit_theme::ActiveTheme;
+use gpui_kit_theme::{ActiveTheme, ContrastTint};
 use web_time::Instant;
 
 use crate::foundation::{direction::ActiveDirection, window_state};
@@ -270,7 +270,7 @@ impl RenderOnce for EffectParticles {
             cx.reduce_motion() || matches!(self.plan.presentation, EffectPresentation::Static(_));
         let elapsed = particle_elapsed(&self.plan, self.sample_at, static_presentation, window, cx);
         let theme = cx.theme();
-        let contrast_tint = |color: Hsla| color.blend(theme.colors.text.opacity(0.28));
+        let contrast_tint = |color: Hsla| theme.contrast_tint(color, ContrastTint::Standard);
         let palette = EffectPalette {
             accent: contrast_tint(theme.colors.accent_strong),
             info: contrast_tint(theme.colors.info),

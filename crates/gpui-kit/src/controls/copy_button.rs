@@ -49,9 +49,6 @@ use crate::controls::button::{Button, ButtonVariant};
 use crate::foundation::{Disableable, Ident, Sizable, StyledExt, text as foundation_text};
 use crate::strings::{ActiveStrings, StringKey};
 
-/// How long a confirmation stays before the button goes back to offering.
-pub const DEFAULT_CONFIRMATION: Duration = Duration::from_millis(1600);
-
 /// What the button is currently claiming.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum CopyState {
@@ -143,7 +140,7 @@ impl CopyButton {
             size: ControlSize::Md,
             disabled: false,
             copier: None,
-            confirmation: DEFAULT_CONFIRMATION,
+            confirmation: Duration::from_millis(cx.theme().motion.confirmation_ms),
             state: CopyState::Idle,
             remaining: None,
             last_tick: None,

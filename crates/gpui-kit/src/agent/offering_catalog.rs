@@ -13,7 +13,7 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, TextTone, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, SemanticWash, Space, TextTone, TypeScale};
 
 use crate::agent::server_list::{Offering, OfferingKind};
 use crate::display::badge::{Badge, Tone};
@@ -356,8 +356,12 @@ impl OfferingCatalog {
             .gap_token(theme, Space::Sm)
             .p_token(theme, Space::Sm)
             .radius(theme, Radius::Control)
-            .bg(tone.color(theme).opacity(0.12))
-            .child(div().mt(px(4.0)).child(StatusDot::new(tone)))
+            .bg(theme.color_wash(tone.color(theme), SemanticWash::Standard))
+            .child(
+                div()
+                    .mt(px(theme.space(Space::Xs)))
+                    .child(StatusDot::new(tone)),
+            )
             .child(
                 div()
                     .column()
@@ -503,7 +507,7 @@ impl OfferingCatalog {
                     // list has; at full strength the hover fill outshone the
                     // selected row it sat next to.
                     .when(!selected, |element| {
-                        element.hover(|style| style.bg(theme.colors.hover.opacity(0.3)))
+                        element.hover(|style| style.bg(theme.subtle_hover()))
                     })
                     .focus_ring(theme)
             })

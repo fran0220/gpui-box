@@ -115,15 +115,17 @@ impl RenderOnce for Tag {
         // On the shared tiers, the resolver decides both paints; otherwise
         // the tone (or the caller's tint) is worn as a wash whose depth also
         // carries selection.
-        let (color, tier_surface) = if let Some(variant) = self.variant {
+        let (color, surface) = if let Some(variant) = self.variant {
             let choice = self
                 .color
                 .clone()
                 .unwrap_or_else(|| ColorChoice::Custom(self.tone.mark_color(self.tint, &theme)));
             let resolved = theme.variant_colors(variant, &choice);
-            (resolved.text, Some(resolved))
+            (resolved.text, resolved)
         } else {
-            (self.tone.mark_color(self.tint, &theme), None)
+            let color = self.tone.mark_color(self.tint, &theme);
+            let surface = theme.variant_colors(Variant::Light, &ColorChoice::Custom(color));
+            (color, surface)
         };
         let removable = !self.disabled && self.on_remove.is_some();
         let remove_ident = self.ident.child("remove");
@@ -139,7 +141,11 @@ impl RenderOnce for Tag {
                 .tab_index(0)
                 .focus_ring(&theme)
                 .pressable(cx)
-                .child(icon(Icon::Close).size(px(10.0)).text_color(color))
+                .child(
+                    icon(Icon::Close)
+                        .size(px(theme.control.xs.icon_size))
+                        .text_color(color),
+                )
                 .semantic_in(
                     cx,
                     NodeSpec::new(remove_ident.semantic_id(), Role::Button)
@@ -168,24 +174,23 @@ impl RenderOnce for Tag {
             .flex_none()
             .gap(px(theme.space(Space::Xs)))
             .px(px(theme.space(Space::Sm)))
-            .py(px(2.0))
+            .py(px(theme.space(Space::Xxs)))
             .radius(&theme, Radius::Pill)
             // Selection is carried by the depth of the block rather than by an
             // outline drawn round it, so the two states differ by more than a
             // line a reader has to look for.
-            .map(|element| match &tier_surface {
-                Some(resolved) => element
+            .map(|element| {
+                element
                     .bg(if self.selected {
-                        resolved.background_active
+                        surface.background_active
                     } else {
-                        resolved.background
+                        surface.background
                     })
-                    .when_some(resolved.border, |element, border| {
+                    .when_some(surface.border, |element, border| {
                         element
                             .border(px(theme.borders.hairline))
                             .border_color(border)
-                    }),
-                None => element.bg(color.opacity(if self.selected { 0.34 } else { 0.14 })),
+                    })
             })
             .when(self.disabled, |element| {
                 element.opacity(theme.opacity.disabled)

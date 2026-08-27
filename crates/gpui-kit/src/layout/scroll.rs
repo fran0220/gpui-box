@@ -32,15 +32,6 @@ use crate::layout::scroll_fade::{FadeEdges, ScrollFade};
 use crate::motion::ScrollLink;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
-/// How wide the reserved gutter is and how thick the thumb inside it is drawn.
-/// Neither value repeats anywhere else.
-const TRACK: f32 = 10.0;
-const THUMB: f32 = 6.0;
-
-/// The shortest a thumb gets, so a very long document still leaves something
-/// to grab.
-const MIN_THUMB: f32 = 24.0;
-
 /// Which way the content may be scrolled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ScrollAxis {
@@ -367,8 +358,10 @@ fn bar(
     // the loudest thing in a panel that is mostly text.
     let hover_group = bar_ident.child("hover").semantic_id();
     let thumb = overflowing.then(|| {
-        let resting = theme.colors.track.opacity(0.55);
+        let resting = theme.resting_track();
         let active = theme.colors.track;
+        let track_width = theme.measures.scrollbar_track;
+        let thumb_width = theme.measures.scrollbar_thumb;
         div()
             .absolute()
             .rounded_full()
@@ -376,17 +369,17 @@ fn bar(
             .group_hover(hover_group.clone(), move |style| style.bg(active))
             .when(vertical, |element| {
                 element
-                    .w(px(THUMB))
-                    .left(px((TRACK - THUMB) / 2.0))
-                    .min_h(px(MIN_THUMB))
+                    .w(px(thumb_width))
+                    .left(px((track_width - thumb_width) / 2.0))
+                    .min_h(px(theme.measures.scrollbar_min_thumb))
                     .h(relative(fraction))
                     .top(relative(position * (1.0 - fraction)))
             })
             .when(!vertical, |element| {
                 element
-                    .h(px(THUMB))
-                    .top(px((TRACK - THUMB) / 2.0))
-                    .min_w(px(MIN_THUMB))
+                    .h(px(thumb_width))
+                    .top(px((track_width - thumb_width) / 2.0))
+                    .min_w(px(theme.measures.scrollbar_min_thumb))
                     .w(relative(fraction))
                     .left(relative(position * (1.0 - fraction)))
             })
@@ -494,13 +487,13 @@ fn bar(
         // already saying the region stops.
         .when(vertical, |element| {
             element
-                .w(px(TRACK))
+                .w(px(theme.measures.scrollbar_track))
                 .h_full()
                 .py(px(theme.space(gpui_kit_theme::Space::Sm)))
         })
         .when(!vertical, |element| {
             element
-                .h(px(TRACK))
+                .h(px(theme.measures.scrollbar_track))
                 .w_full()
                 .px(px(theme.space(gpui_kit_theme::Space::Sm)))
         })

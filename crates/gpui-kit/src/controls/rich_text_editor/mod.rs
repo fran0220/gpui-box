@@ -1483,7 +1483,7 @@ impl EntityInputHandler for RichTextEditor {
                     bounds.left() + layout.left,
                     bounds.top() + layout.top - self.scroll_offset,
                 ),
-                px(1.0),
+                px(cx.theme().measures.caret_width),
                 layout.align,
                 layout.width,
             ));

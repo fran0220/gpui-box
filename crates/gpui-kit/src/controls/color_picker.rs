@@ -19,6 +19,7 @@ use crate::layout::measure;
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type ChangeHandler = Rc<dyn Fn(Hsla, &mut Window, &mut App)>;
+const SATURATION_HANDLE: f32 = 10.0;
 
 /// A clickable colour chip. Reports the colour it was given; applies nothing.
 #[derive(IntoElement)]
@@ -401,9 +402,9 @@ fn saturation_board(
                 .absolute()
                 .left(relative(sat.clamp(0.0, 1.0)))
                 .top(relative((1.0 - val).clamp(0.0, 1.0)))
-                .ml(px(-5.0))
-                .mt(px(-5.0))
-                .size(px(10.0))
+                .ml(px(-SATURATION_HANDLE / 2.0))
+                .mt(px(-SATURATION_HANDLE / 2.0))
+                .size(px(SATURATION_HANDLE))
                 .rounded_full()
                 .border(px(theme.borders.thick))
                 .border_color(theme.colors.text_on_accent)

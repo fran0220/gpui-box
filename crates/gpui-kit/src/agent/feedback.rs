@@ -203,7 +203,7 @@ impl RenderOnce for FeedbackRating {
                         .id(self.ident.child("tag").child(id.as_ref()).element_id())
                         .focus_ring(&theme)
                         .px(px(theme.space(Space::Xs)))
-                        .py(px(2.0))
+                        .py(px(theme.space(Space::Xxs)))
                         .radius(&theme, Radius::Small)
                         .hairline(&theme),
                     selected,

@@ -233,7 +233,7 @@ impl RenderOnce for Slider {
         });
         let physical_fraction = directed_fraction(fraction, direction);
         let physical_high = high_fraction.map(|high| directed_fraction(high, direction));
-        let track_height = px(6.0);
+        let track_height = px(theme.measures.slider_track_height);
         // A disabled slider still reports a value, so it keeps its fill and
         // loses only the colour that says the value can be moved. Dimming
         // alone left it all but identical to the live one beside it.
@@ -319,12 +319,12 @@ impl RenderOnce for Slider {
                     div()
                         .absolute()
                         .left(gpui::relative(at))
-                        .ml(px(-1.0))
-                        .w(px(2.0))
+                        .ml(px(-theme.space(Space::Xxs) / 2.0))
+                        .w(px(theme.space(Space::Xxs)))
                         .h(if filled {
                             track_height
                         } else {
-                            track_height + px(4.0)
+                            track_height + px(theme.space(Space::Xxs) * 2.0)
                         })
                         .rounded_full()
                         .bg(if filled {

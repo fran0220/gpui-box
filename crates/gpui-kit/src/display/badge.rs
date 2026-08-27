@@ -4,7 +4,9 @@ use gpui::{
 };
 use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ColorChoice, ControlSize, Theme, TypeScale, Variant};
+use gpui_kit_theme::{
+    ActiveTheme, ColorChoice, ControlSize, SemanticBorder, SemanticWash, Theme, TypeScale, Variant,
+};
 
 use crate::foundation::{Ident, Sizable, StyledExt};
 
@@ -203,7 +205,6 @@ impl RenderOnce for Badge {
         // word, and a word sitting in a saturated pill is a word that has to
         // be read through its own background; what identifies it is the
         // colour of the text, with just enough behind it to bound the shape.
-        let wash = 0.12;
         let (foreground, background, tier_border) = if let Some(variant) = self.variant {
             // On the shared tiers the badge reads the same resolver as every
             // other coloured surface. The colour is the caller's choice,
@@ -224,11 +225,11 @@ impl RenderOnce for Badge {
                 // the coloured treatment even at Neutral: the tone says
                 // nothing about severity there, which is exactly the case an
                 // identity colour is for.
-                (Some(tint), _) => (tint, tint.opacity(wash)),
+                (Some(tint), _) => (tint, theme.color_wash(tint, SemanticWash::Standard)),
                 (None, Tone::Neutral) => (theme.colors.text_muted, theme.colors.hover),
                 (None, tone) => {
                     let color = tone.color(&theme);
-                    (color, color.opacity(wash))
+                    (color, theme.color_wash(color, SemanticWash::Standard))
                 }
             };
             (foreground, background, None)
@@ -251,14 +252,13 @@ impl RenderOnce for Badge {
                 } else if self.outlined {
                     element
                         .border(px(theme.borders.hairline))
-                        .border_color(foreground.opacity(0.45))
+                        .border_color(theme.color_border(foreground, SemanticBorder::Report))
                 } else {
                     element.bg(background)
                 }
             })
             .type_scale(&theme, TypeScale::Caption)
-            .text_size(px(step.font_size * 0.86))
-            .font_weight(gpui::FontWeight(500.0))
+            .font_weight(gpui::FontWeight(theme.typography.label.weight))
             .text_color(foreground)
             .children(self.glyph.map(|glyph| {
                 crate::display::icon::paint(glyph, step.icon_size * 0.8, foreground, false)

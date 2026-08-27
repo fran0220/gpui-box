@@ -584,7 +584,7 @@ pub(crate) fn paint_route(
             route,
             transform,
             width * 5.0,
-            active_color.opacity(0.14),
+            active_color.opacity(theme.effects.node_active_wash_alpha),
             edge.kind.dashes(),
             corner,
         );
@@ -604,7 +604,7 @@ pub(crate) fn paint_route(
             route,
             transform,
             width * 1.2,
-            active_color.opacity(0.72),
+            active_color.opacity(theme.effects.node_active_stroke_alpha),
             edge.kind.dashes(),
             corner,
         );
@@ -615,7 +615,7 @@ pub(crate) fn paint_route(
                 transform,
                 width.max(1.0),
                 phase,
-                active_color,
+                active_color.opacity(theme.effects.node_traffic_alpha),
                 corner,
             );
         }
@@ -680,7 +680,7 @@ fn paint_comet_interval(
     let mut builder = PathBuilder::stroke(px(width * 1.9)).stroke_trim(interval.0, interval.1);
     trace_route(&mut builder, route, transform, corner);
     if let Ok(path) = builder.build() {
-        window.paint_path(path, color.opacity(0.82));
+        window.paint_path(path, color);
     }
 }
 

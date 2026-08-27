@@ -5,7 +5,7 @@ use gpui::{
     prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, SemanticBorder, SemanticWash, Theme, TypeScale};
 
 use crate::foundation::{Ident, StyledExt};
 use crate::strings::ActiveNumbers;
@@ -171,7 +171,11 @@ impl RenderOnce for Avatar {
         });
 
         let (background, border, foreground) = match (self.tint, anonymous) {
-            (Some(tint), _) => (tint.opacity(0.18), tint.opacity(0.35), tint),
+            (Some(tint), _) => (
+                theme.color_wash(tint, SemanticWash::Strong),
+                theme.color_border(tint, SemanticBorder::Report),
+                tint,
+            ),
             // Nothing to derive a mark from is its own state, and it is drawn
             // as one: a recessed well inside a stronger ring, which is what
             // separates it from a filled disc whose picture failed to arrive.

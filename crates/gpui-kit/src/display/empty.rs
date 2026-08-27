@@ -144,7 +144,11 @@ impl RenderOnce for EmptyState {
             .gap(px(theme.space(Space::Sm)))
             .w_full()
             .text_align(gpui::TextAlign::Center)
-            .child(icon(glyph).size(px(20.0)).text_color(tint))
+            .child(
+                icon(glyph)
+                    .size(px(theme.measures.standalone_icon))
+                    .text_color(tint),
+            )
             .child(
                 div()
                     .text_size(px(theme.typography.body.size))
@@ -154,7 +158,7 @@ impl RenderOnce for EmptyState {
             .when_some(self.detail.clone(), |element, detail| {
                 element.child(
                     div()
-                        .max_w(px(360.0))
+                        .max_w(px(theme.measures.readable_width))
                         .text_size(px(theme.typography.caption.size))
                         .text_color(theme.colors.text_muted)
                         .child(detail),

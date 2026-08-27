@@ -111,7 +111,7 @@ fn notice_at(
             .child(text(theme, TypeScale::Subtitle, title))
             .child(
                 text(theme, TypeScale::Body, detail)
-                    .max_w(px(360.0))
+                    .max_w(px(theme.measures.readable_width))
                     .text_color(tint),
             )
             .into_any_element(),
@@ -134,7 +134,7 @@ fn notice_at(
             .gap_token(theme, Space::Sm)
             .px_token(theme, Space::Md)
             .py_token(theme, Space::Sm)
-            .bg(theme.colors.canvas.opacity(0.88))
+            .bg(theme.content_veil())
             .child(
                 text(theme, TypeScale::Label, title)
                     .flex_none()

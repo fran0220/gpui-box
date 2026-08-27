@@ -6,9 +6,7 @@ use gpui::{
 };
 use gpui_kit_assets::Icon as Glyph;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{
-    ActiveTheme, ColorChoice, ControlSize, Radius, Space, Surface, TypeScale, Variant,
-};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, SemanticWash, Space, Surface, TypeScale};
 
 use crate::controls::button::IconButton;
 use crate::display::badge::Tone;
@@ -60,16 +58,10 @@ fn severity_mark(tone: Tone, theme: &gpui_kit_theme::Theme) -> AnyElement {
 
 /// The tone a page-level report wears across its whole surface.
 ///
-/// The Light tier is sized for a chip. Laid across a strip at full strength
-/// it put the warning banner ahead of the refusal beneath it, which is the
-/// weighting that took the wash off reports in the first place — so a strip
-/// takes a share of it, and every tone takes the same share.
+/// The faint semantic wash is sized for a report spanning a whole row rather
+/// than for a compact chip, and every tone takes the same theme-owned weight.
 fn banner_wash(theme: &gpui_kit_theme::Theme, color: gpui::Hsla) -> gpui::Hsla {
-    const SHARE: f32 = 0.4;
-    let tier = theme
-        .variant_colors(Variant::Light, &ColorChoice::Custom(color))
-        .background;
-    tier.opacity(tier.a * SHARE)
+    theme.color_wash(color, SemanticWash::Faint)
 }
 
 /// The band at the reading edge that carries the severity.
@@ -159,13 +151,17 @@ impl RenderOnce for StatusDot {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let color = self.tone.mark_color(self.tint, &theme);
-        let dot = div().flex_none().size(px(7.0)).rounded_full().bg(color);
+        let dot = div()
+            .flex_none()
+            .size(px(theme.measures.status_mark))
+            .rounded_full()
+            .bg(color);
         match self.busy {
             Some(ident) if self.activity == motion::Activity::Advancing => {
                 let mark = div()
                     .relative()
                     .flex_none()
-                    .size(px(7.0))
+                    .size(px(theme.measures.status_mark))
                     .rounded_full()
                     .overflow_hidden()
                     .bg(color)

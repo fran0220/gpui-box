@@ -46,9 +46,6 @@ use crate::motion::keyed;
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
-/// How tall the frame is when the caller says nothing. The value occurs once.
-const DEFAULT_HEIGHT: f32 = 320.0;
-
 /// How far one keystroke or one wheel notch moves the zoom.
 const ZOOM_STEP: f32 = 1.25;
 
@@ -389,7 +386,7 @@ pub struct ImageViewer {
     fit: FitMode,
     min_zoom: f32,
     max_zoom: f32,
-    height: f32,
+    height: Option<f32>,
     disabled: bool,
     image: Option<ImageSupplier>,
     on_event: Option<EventHandler>,
@@ -419,7 +416,7 @@ impl ImageViewer {
             fit: FitMode::default(),
             min_zoom: 0.1,
             max_zoom: 8.0,
-            height: DEFAULT_HEIGHT,
+            height: None,
             disabled: false,
             image: None,
             on_event: None,
@@ -449,7 +446,7 @@ impl ImageViewer {
     }
 
     pub fn height(mut self, height: f32) -> Self {
-        self.height = height.max(1.0);
+        self.height = Some(height.max(1.0));
         self
     }
 
@@ -492,9 +489,10 @@ impl RenderOnce for ImageViewer {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
         let ident = self.ident.clone();
+        let height = self.height.unwrap_or(theme.measures.media_viewer_height);
 
         let Some(frame) = self.frames.get(self.index()).cloned() else {
-            return empty_viewer(&ident, &theme, self.height, cx);
+            return empty_viewer(&ident, &theme, height, cx);
         };
 
         let index = self.index();
@@ -603,7 +601,7 @@ impl RenderOnce for ImageViewer {
             .id(ident.child("frame").element_id())
             .relative()
             .w_full()
-            .h(px(self.height))
+            .h(px(height))
             .overflow_hidden()
             .radius(&theme, Radius::Card)
             .frame(&theme, Surface::Raised, Elevation::Raised)
@@ -957,7 +955,7 @@ fn notice(
         )
         .child(
             div()
-                .max_w(px(360.0))
+                .max_w(px(theme.measures.readable_width))
                 .type_scale(theme, TypeScale::Caption)
                 .text_color(tint)
                 .child(detail),

@@ -23,7 +23,9 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Theme, TypeScale};
+use gpui_kit_theme::{
+    ActiveTheme, ControlSize, Radius, SemanticColor, SemanticWash, Space, Theme, TypeScale,
+};
 
 use crate::controls::button::Button;
 use crate::display::badge::Tone;
@@ -344,10 +346,11 @@ impl StatusBar {
             .radius(theme, Radius::Control)
             .type_scale(theme, TypeScale::Caption)
             .text_color(text_color)
-            .children(
-                item.icon
-                    .map(|glyph| icon(glyph).size(px(11.0)).text_color(text_color)),
-            );
+            .children(item.icon.map(|glyph| {
+                icon(glyph)
+                    .size(px(theme.control.xs.icon_size))
+                    .text_color(text_color)
+            }));
 
         match &item.content {
             Content::State(tone) => row = row.child(StatusDot::new(*tone)),
@@ -379,7 +382,7 @@ impl StatusBar {
                     .flex_none()
                     .px(px(theme.spacing.xs / 2.0))
                     .radius(theme, Radius::Small)
-                    .bg(theme.colors.warning.opacity(0.16))
+                    .bg(theme.semantic_wash(SemanticColor::Warning, SemanticWash::Strong))
                     .text_color(theme.colors.warning)
                     .child(cx.strings().text(StringKey::StatusStale)),
             );

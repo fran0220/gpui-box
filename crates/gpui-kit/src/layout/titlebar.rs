@@ -400,11 +400,7 @@ fn control_button(
             cx.strings().text(StringKey::WindowClose),
         ),
     };
-    let hover = if button == WindowButton::Close {
-        theme.colors.danger.opacity(0.84)
-    } else {
-        theme.colors.text.opacity(0.10)
-    };
+    let hover = theme.critical_window_fill(button == WindowButton::Close);
     let glyph = control_glyph(button, maximized, theme);
     let click_handler = handler.clone();
     let key_handler = handler;

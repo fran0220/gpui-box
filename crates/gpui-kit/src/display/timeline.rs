@@ -25,9 +25,6 @@ use crate::display::status::StatusDot;
 use crate::foundation::{Ident, StyledExt};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
-/// How wide the column holding the rail and its dots is.
-const RAIL: f32 = 16.0;
-
 /// When an entry happened, as far as anyone knows.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum EntryTime {
@@ -253,7 +250,7 @@ impl RenderOnce for Timeline {
                 .gap_token(&theme, Space::Sm)
                 .type_scale(&theme, TypeScale::Caption)
                 .text_color(theme.colors.text_faint)
-                .child(div().w(px(RAIL)).flex_none())
+                .child(div().w(px(theme.measures.timeline_rail_width)).flex_none())
                 .child(group.label.clone())
                 .child(
                     div()
@@ -304,15 +301,19 @@ fn entry_element(
     let unknown = entry.time == EntryTime::Unknown;
 
     let rail = div()
-        .w(px(RAIL))
+        .w(px(theme.measures.timeline_rail_width))
         .flex_none()
         .column()
         .items_center()
-        .child(div().mt(px(4.0)).child(StatusDot::new(entry.tone)))
+        .child(
+            div()
+                .mt(px(theme.space(Space::Xs)))
+                .child(StatusDot::new(entry.tone)),
+        )
         .when(continues, |element| {
             element.child(
                 div()
-                    .mt(px(4.0))
+                    .mt(px(theme.space(Space::Xs)))
                     .w(px(theme.borders.hairline))
                     .flex_1()
                     .min_h(px(theme.space(Space::Md)))
@@ -357,7 +358,7 @@ fn entry_element(
                 .column()
                 .flex_1()
                 .min_w_0()
-                .gap(px(2.0))
+                .gap(px(theme.space(Space::Xxs)))
                 .child(heading)
                 .child(
                     div()

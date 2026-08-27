@@ -20,7 +20,9 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface};
+use gpui_kit_theme::{
+    ActiveTheme, Elevation, Radius, SemanticBorder, SemanticColor, SemanticWash, Space, Surface,
+};
 use web_time::Instant;
 
 use crate::display::empty::EmptyState;
@@ -1200,7 +1202,7 @@ impl RenderOnce for NodeGraph {
                         &preview.route,
                         RouteTransform::new(bounds.origin, viewport.offset, viewport.zoom),
                         stroke * 1.5,
-                        color.opacity(0.88),
+                        color.opacity(edge_theme.effects.node_preview_alpha),
                         None,
                         route_corner(&edge_theme),
                     );
@@ -1923,7 +1925,9 @@ impl RenderOnce for NodeGraph {
                         .h(px((max.y - min.y) + 16.0))
                         .rounded(px(theme.radius(Radius::Card)))
                         .border(px(theme.borders.hairline))
-                        .border_color(theme.colors.accent.opacity(0.55))
+                        .border_color(
+                            theme.semantic_border(SemanticColor::Accent, SemanticBorder::Selected),
+                        )
                         .into_any_element(),
                 )
             })
@@ -1945,8 +1949,11 @@ impl RenderOnce for NodeGraph {
                             .w(px(width))
                             .h(px(height))
                             .border(px(theme.borders.hairline))
-                            .border_color(theme.colors.accent.opacity(0.7))
-                            .bg(theme.colors.accent.opacity(0.08))
+                            .border_color(
+                                theme
+                                    .semantic_border(SemanticColor::Accent, SemanticBorder::Target),
+                            )
+                            .bg(theme.semantic_wash(SemanticColor::Accent, SemanticWash::Faint))
                             .into_any_element(),
                     )
                 }
@@ -2011,7 +2018,7 @@ fn graph_minimap(
                         // A mark carries the node's own colour, so the
                         // overview is the same graph seen small rather than a
                         // second diagram a reader has to map back by position.
-                        .bg(node.tint.opacity(0.7))
+                        .bg(node.tint.opacity(theme.effects.node_minimap_alpha))
                 })
                 .collect::<Vec<_>>()
         })

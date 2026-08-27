@@ -230,7 +230,7 @@ impl RenderOnce for Sparkline {
                         .items_center()
                         .justify_center()
                         .w_full()
-                        .p(px(24.0))
+                        .p(px(theme.space(Space::Xl)))
                         .child(
                             PulseLoader::new(self.ident.child("loading"))
                                 .label(cx.strings().text(StringKey::Loading)),
@@ -480,7 +480,7 @@ fn plot(
     // is the difference the mark itself was missing.
     let line = match (tint, stale) {
         (Some(tint), false) => tint,
-        (Some(tint), true) => tint.opacity(0.45),
+        (Some(tint), true) => tint.opacity(theme.opacity.muted),
         (None, false) => theme.colors.text,
         (None, true) => theme.colors.text_faint,
     };

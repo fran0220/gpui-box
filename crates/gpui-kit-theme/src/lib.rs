@@ -54,6 +54,31 @@ pub enum Variant {
     White,
 }
 
+/// Strengths of a semantic colour used as a background wash.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SemanticWash {
+    Faint,
+    Standard,
+    Strong,
+}
+
+/// Strengths of a semantic outline, from a report boundary through an active
+/// drop or canvas target.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SemanticBorder {
+    Report,
+    Selected,
+    Target,
+}
+
+/// How much primary text is mixed into decorative colour to keep it visible
+/// in both appearances.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContrastTint {
+    Soft,
+    Standard,
+}
+
 impl Variant {
     /// The stable name a semantic node publishes for the tier.
     pub const fn name(self) -> &'static str {
@@ -120,14 +145,14 @@ pub struct VariantColors {
     pub border: Option<Hsla>,
 }
 
-/// The palette steps each role prefers, first available wins. The filled step
-/// matches the open-color convention of shade six as the saturated middle;
-/// the readable steps sit far enough from the page to carry text.
-const FILLED_STEPS: &[&str] = &["600", "500", "400"];
-const HOVER_STEPS: &[&str] = &["700", "600", "500"];
-const ACTIVE_STEPS: &[&str] = &["800", "700", "600"];
-const READABLE_STEPS_DARK: &[&str] = &["300", "200", "400"];
-const READABLE_STEPS_LIGHT: &[&str] = &["700", "800", "600"];
+#[derive(Debug, Clone)]
+struct PaletteSteps {
+    filled: [String; 3],
+    hover: [String; 3],
+    active: [String; 3],
+    readable_dark: [String; 3],
+    readable_light: [String; 3],
+}
 
 fn token_color(paint: Hsla) -> Color {
     let paint = Rgba::from(paint);
@@ -164,6 +189,7 @@ pub struct Theme {
     pub colors: Colors,
     pub typography: Typography,
     pub spacing: Spacing,
+    pub measures: Measures,
     pub radii: Radii,
     pub control: Control,
     pub borders: Borders,
@@ -179,6 +205,7 @@ pub struct Theme {
     /// Read it through [`Theme::palette_color`]. Shared behind an `Arc`
     /// because a theme is cloned on every render that reads it.
     pub palette: Arc<Palette>,
+    palette_steps: PaletteSteps,
 }
 
 #[derive(Debug, Clone)]
@@ -206,6 +233,9 @@ pub struct Colors {
     /// to make or decline; borrowing the prose colour made it the only
     /// decision available. See `gpui_kit_tokens::InteractiveColor::PrimaryFill`.
     pub primary_fill: Hsla,
+    pub white_fill: Hsla,
+    pub white_fill_hover: Hsla,
+    pub white_fill_active: Hsla,
     pub text_on_primary_fill: Hsla,
     pub hover: Hsla,
     pub active: Hsla,
@@ -369,6 +399,7 @@ pub struct Typography {
     pub sans_fallback: SharedString,
     pub mono: SharedString,
     pub mono_fallback: SharedString,
+    pub readout_scale: f32,
     pub caption: TypeStyle,
     pub label: TypeStyle,
     pub body: TypeStyle,
@@ -387,12 +418,35 @@ pub struct TypeStyle {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Spacing {
+    pub xxs: f32,
     pub xs: f32,
     pub sm: f32,
     pub md: f32,
     pub lg: f32,
     pub xl: f32,
     pub xxl: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Measures {
+    pub readable_width: f32,
+    pub dialog_width: f32,
+    pub menu_min_width: f32,
+    pub compact_menu_min_width: f32,
+    pub menu_max_height: f32,
+    pub compact_menu_max_height: f32,
+    pub standalone_icon: f32,
+    pub scrollbar_track: f32,
+    pub scrollbar_thumb: f32,
+    pub scrollbar_min_thumb: f32,
+    pub caret_width: f32,
+    pub text_decoration_width: f32,
+    pub progress_track_height: f32,
+    pub slider_track_height: f32,
+    pub compact_overlay_width: f32,
+    pub media_viewer_height: f32,
+    pub timeline_rail_width: f32,
+    pub status_mark: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -458,9 +512,16 @@ pub struct Motion {
     pub slow_ms: u64,
     /// The gap between one member of a staggered group and the next.
     pub stagger_step_ms: u64,
+    pub stagger_max_items: usize,
+    pub micro_bounce_ms: u64,
+    pub micro_wobble_ms: u64,
+    pub micro_pop_ms: u64,
     pub pulse_ms: u64,
     pub shimmer_ms: u64,
     pub toast_ms: u64,
+    pub hover_card_open_ms: u64,
+    pub hover_card_grace_ms: u64,
+    pub confirmation_ms: u64,
     pub linear: [f32; 4],
     pub standard: [f32; 4],
     pub ease_in: [f32; 4],
@@ -564,10 +625,40 @@ pub struct Effects {
     pub area_wash_alpha: f32,
     /// How strongly a node header band takes its category colour.
     pub header_tint_alpha: f32,
+    pub node_active_wash_alpha: f32,
+    pub node_active_stroke_alpha: f32,
+    pub node_traffic_alpha: f32,
+    pub node_preview_alpha: f32,
+    pub node_minimap_alpha: f32,
     /// How wide an identity rail is, in pixels: a node's category stripe, a
     /// callout's edge. Distinct from `selection_rail_width`, which reports a
     /// transient state rather than what a thing is.
     pub rail_width: f32,
+    pub semantic_wash_faint_alpha: f32,
+    pub semantic_wash_alpha: f32,
+    pub semantic_wash_strong_alpha: f32,
+    pub semantic_border_alpha: f32,
+    pub accent_border_alpha: f32,
+    pub accent_border_strong_alpha: f32,
+    pub subtle_hover_alpha: f32,
+    pub soft_contrast_alpha: f32,
+    pub contrast_tint_alpha: f32,
+    pub track_resting_alpha: f32,
+    pub content_veil_alpha: f32,
+    pub critical_fill_alpha: f32,
+    pub critical_inactive_alpha: f32,
+    pub variant_light_alpha: f32,
+    pub variant_light_hover_alpha: f32,
+    pub variant_light_active_alpha: f32,
+    pub variant_outline_hover_alpha: f32,
+    pub variant_outline_active_alpha: f32,
+    pub variant_subtle_hover_alpha: f32,
+    pub variant_subtle_active_alpha: f32,
+    pub primary_hover_opacity: f32,
+    pub custom_color_readable_dark_floor: f32,
+    pub custom_color_readable_light_ceiling: f32,
+    pub custom_color_hover_lightness_delta: f32,
+    pub custom_color_active_lightness_delta: f32,
 }
 
 impl Theme {
@@ -613,6 +704,9 @@ impl Theme {
                 text_disabled: color(tokens.text(TextTone::Disabled)),
                 text_on_accent: color(tokens.text(TextTone::OnAccent)),
                 primary_fill: color(tokens.interactive(InteractiveColor::PrimaryFill)),
+                white_fill: color(tokens.interactive(InteractiveColor::WhiteFill)),
+                white_fill_hover: color(tokens.interactive(InteractiveColor::WhiteFillHover)),
+                white_fill_active: color(tokens.interactive(InteractiveColor::WhiteFillActive)),
                 text_on_primary_fill: color(tokens.text(TextTone::OnPrimaryFill)),
                 hover: color(tokens.interactive(InteractiveColor::Hover)),
                 active: color(tokens.interactive(InteractiveColor::Active)),
@@ -684,6 +778,7 @@ impl Theme {
                     .platform_fallback()
                     .to_string()
                     .into(),
+                readout_scale: tokens.typography.readout_scale,
                 caption: style(TypeScale::Caption),
                 label: style(TypeScale::Label),
                 body: style(TypeScale::Body),
@@ -693,12 +788,33 @@ impl Theme {
                 code: style(TypeScale::Code),
             },
             spacing: Spacing {
+                xxs: scale_space(tokens.spacing(Space::Xxs), scale),
                 xs: scale_space(tokens.spacing(Space::Xs), scale),
                 sm: scale_space(tokens.spacing(Space::Sm), scale),
                 md: scale_space(tokens.spacing(Space::Md), scale),
                 lg: scale_space(tokens.spacing(Space::Lg), scale),
                 xl: scale_space(tokens.spacing(Space::Xl), scale),
                 xxl: scale_space(tokens.spacing(Space::Xxl), scale),
+            },
+            measures: Measures {
+                readable_width: tokens.measure.readable_width,
+                dialog_width: tokens.measure.dialog_width,
+                menu_min_width: tokens.measure.menu_min_width,
+                compact_menu_min_width: tokens.measure.compact_menu_min_width,
+                menu_max_height: tokens.measure.menu_max_height,
+                compact_menu_max_height: tokens.measure.compact_menu_max_height,
+                standalone_icon: tokens.measure.standalone_icon,
+                scrollbar_track: tokens.measure.scrollbar_track,
+                scrollbar_thumb: tokens.measure.scrollbar_thumb,
+                scrollbar_min_thumb: tokens.measure.scrollbar_min_thumb,
+                caret_width: tokens.measure.caret_width,
+                text_decoration_width: tokens.measure.text_decoration_width,
+                progress_track_height: tokens.measure.progress_track_height,
+                slider_track_height: tokens.measure.slider_track_height,
+                compact_overlay_width: tokens.measure.compact_overlay_width,
+                media_viewer_height: tokens.measure.media_viewer_height,
+                timeline_rail_width: tokens.measure.timeline_rail_width,
+                status_mark: tokens.measure.status_mark,
             },
             radii: Radii {
                 small: tokens.radius(Radius::Small),
@@ -745,9 +861,16 @@ impl Theme {
                 spin_ms: millis(tokens, MotionDuration::Spin),
                 slow_ms: millis(tokens, MotionDuration::Slow),
                 stagger_step_ms: millis(tokens, MotionDuration::StaggerStep),
+                stagger_max_items: tokens.motion.stagger_max_items,
+                micro_bounce_ms: millis(tokens, MotionDuration::MicroBounce),
+                micro_wobble_ms: millis(tokens, MotionDuration::MicroWobble),
+                micro_pop_ms: millis(tokens, MotionDuration::MicroPop),
                 pulse_ms: millis(tokens, MotionDuration::Pulse),
                 shimmer_ms: millis(tokens, MotionDuration::Shimmer),
                 toast_ms: millis(tokens, MotionDuration::Toast),
+                hover_card_open_ms: millis(tokens, MotionDuration::HoverCardOpen),
+                hover_card_grace_ms: millis(tokens, MotionDuration::HoverCardGrace),
+                confirmation_ms: millis(tokens, MotionDuration::Confirmation),
                 linear: tokens.easing(MotionEasing::Linear),
                 standard: tokens.easing(MotionEasing::Standard),
                 ease_in: tokens.easing(MotionEasing::EaseIn),
@@ -806,9 +929,52 @@ impl Theme {
                 sheen_alpha: tokens.effect.sheen_alpha,
                 area_wash_alpha: tokens.effect.area_wash_alpha,
                 header_tint_alpha: tokens.effect.header_tint_alpha,
+                node_active_wash_alpha: tokens.effect.node_active_wash_alpha,
+                node_active_stroke_alpha: tokens.effect.node_active_stroke_alpha,
+                node_traffic_alpha: tokens.effect.node_traffic_alpha,
+                node_preview_alpha: tokens.effect.node_preview_alpha,
+                node_minimap_alpha: tokens.effect.node_minimap_alpha,
                 rail_width: tokens.effect.rail_width,
+                semantic_wash_faint_alpha: tokens.effect.semantic_wash_faint_alpha,
+                semantic_wash_alpha: tokens.effect.semantic_wash_alpha,
+                semantic_wash_strong_alpha: tokens.effect.semantic_wash_strong_alpha,
+                semantic_border_alpha: tokens.effect.semantic_border_alpha,
+                accent_border_alpha: tokens.effect.accent_border_alpha,
+                accent_border_strong_alpha: tokens.effect.accent_border_strong_alpha,
+                subtle_hover_alpha: tokens.effect.subtle_hover_alpha,
+                soft_contrast_alpha: tokens.effect.soft_contrast_alpha,
+                contrast_tint_alpha: tokens.effect.contrast_tint_alpha,
+                track_resting_alpha: tokens.effect.track_resting_alpha,
+                content_veil_alpha: tokens.effect.content_veil_alpha,
+                critical_fill_alpha: tokens.effect.critical_fill_alpha,
+                critical_inactive_alpha: tokens.effect.critical_inactive_alpha,
+                variant_light_alpha: tokens.effect.variant_light_alpha,
+                variant_light_hover_alpha: tokens.effect.variant_light_hover_alpha,
+                variant_light_active_alpha: tokens.effect.variant_light_active_alpha,
+                variant_outline_hover_alpha: tokens.effect.variant_outline_hover_alpha,
+                variant_outline_active_alpha: tokens.effect.variant_outline_active_alpha,
+                variant_subtle_hover_alpha: tokens.effect.variant_subtle_hover_alpha,
+                variant_subtle_active_alpha: tokens.effect.variant_subtle_active_alpha,
+                primary_hover_opacity: tokens.effect.primary_hover_opacity,
+                custom_color_readable_dark_floor: tokens.effect.custom_color_readable_dark_floor,
+                custom_color_readable_light_ceiling: tokens
+                    .effect
+                    .custom_color_readable_light_ceiling,
+                custom_color_hover_lightness_delta: tokens
+                    .effect
+                    .custom_color_hover_lightness_delta,
+                custom_color_active_lightness_delta: tokens
+                    .effect
+                    .custom_color_active_lightness_delta,
             },
             palette: Arc::new(tokens.color.palette.clone()),
+            palette_steps: PaletteSteps {
+                filled: tokens.color.palette_steps.filled.clone(),
+                hover: tokens.color.palette_steps.hover.clone(),
+                active: tokens.color.palette_steps.active.clone(),
+                readable_dark: tokens.color.palette_steps.readable_dark.clone(),
+                readable_light: tokens.color.palette_steps.readable_light.clone(),
+            },
         }
     }
 
@@ -864,8 +1030,71 @@ impl Theme {
         }
     }
 
+    /// A semantic colour used as a background without becoming a solid fill.
+    pub fn semantic_wash(&self, color: SemanticColor, strength: SemanticWash) -> Hsla {
+        self.color_wash(self.semantic_color(color), strength)
+    }
+
+    /// A caller-owned colour used as a background without becoming a solid
+    /// fill. The strength remains theme-owned even when the hue is not.
+    pub fn color_wash(&self, color: Hsla, strength: SemanticWash) -> Hsla {
+        let alpha = match strength {
+            SemanticWash::Faint => self.effects.semantic_wash_faint_alpha,
+            SemanticWash::Standard => self.effects.semantic_wash_alpha,
+            SemanticWash::Strong => self.effects.semantic_wash_strong_alpha,
+        };
+        color.opacity(alpha)
+    }
+
+    /// A semantic boundary, with stronger tiers reserved for selected and
+    /// actively targeted entities.
+    pub fn semantic_border(&self, color: SemanticColor, strength: SemanticBorder) -> Hsla {
+        self.color_border(self.semantic_color(color), strength)
+    }
+
+    /// A theme-owned boundary strength applied to a caller-owned colour.
+    pub fn color_border(&self, color: Hsla, strength: SemanticBorder) -> Hsla {
+        let alpha = match strength {
+            SemanticBorder::Report => self.effects.semantic_border_alpha,
+            SemanticBorder::Selected => self.effects.accent_border_alpha,
+            SemanticBorder::Target => self.effects.accent_border_strong_alpha,
+        };
+        color.opacity(alpha)
+    }
+
+    pub fn subtle_hover(&self) -> Hsla {
+        self.colors.hover.opacity(self.effects.subtle_hover_alpha)
+    }
+
+    pub fn contrast_tint(&self, color: Hsla, strength: ContrastTint) -> Hsla {
+        let alpha = match strength {
+            ContrastTint::Soft => self.effects.soft_contrast_alpha,
+            ContrastTint::Standard => self.effects.contrast_tint_alpha,
+        };
+        color.blend(self.colors.text.opacity(alpha))
+    }
+
+    pub fn resting_track(&self) -> Hsla {
+        self.colors.track.opacity(self.effects.track_resting_alpha)
+    }
+
+    pub fn content_veil(&self) -> Hsla {
+        self.colors.canvas.opacity(self.effects.content_veil_alpha)
+    }
+
+    pub fn critical_window_fill(&self, active: bool) -> Hsla {
+        if active {
+            self.colors.danger.opacity(self.effects.critical_fill_alpha)
+        } else {
+            self.colors
+                .text
+                .opacity(self.effects.critical_inactive_alpha)
+        }
+    }
+
     pub fn space(&self, step: Space) -> f32 {
         match step {
+            Space::Xxs => self.spacing.xxs,
             Space::Xs => self.spacing.xs,
             Space::Sm => self.spacing.sm,
             Space::Md => self.spacing.md,
@@ -969,7 +1198,7 @@ impl Theme {
             color: self.colors.text.opacity(self.effects.selected_ring_alpha),
             offset: point(px(0.0), px(0.0)),
             blur_radius: px(0.0),
-            spread_radius: px(1.0),
+            spread_radius: px(self.borders.hairline),
             inset: true,
         }]
     }
@@ -1024,23 +1253,23 @@ impl Theme {
                 }
             }
             Variant::Light => VariantColors {
-                background: base.opacity(0.15),
-                background_hover: base.opacity(0.22),
-                background_active: base.opacity(0.28),
+                background: base.opacity(self.effects.variant_light_alpha),
+                background_hover: base.opacity(self.effects.variant_light_hover_alpha),
+                background_active: base.opacity(self.effects.variant_light_active_alpha),
                 text: readable,
                 border: None,
             },
             Variant::Outline => VariantColors {
                 background: transparent,
-                background_hover: base.opacity(0.08),
-                background_active: base.opacity(0.12),
+                background_hover: base.opacity(self.effects.variant_outline_hover_alpha),
+                background_active: base.opacity(self.effects.variant_outline_active_alpha),
                 text: readable,
                 border: Some(readable),
             },
             Variant::Subtle => VariantColors {
                 background: transparent,
-                background_hover: base.opacity(0.12),
-                background_active: base.opacity(0.18),
+                background_hover: base.opacity(self.effects.variant_subtle_hover_alpha),
+                background_active: base.opacity(self.effects.variant_subtle_active_alpha),
                 text: readable,
                 border: None,
             },
@@ -1051,21 +1280,13 @@ impl Theme {
                 text: readable,
                 border: None,
             },
-            Variant::White => {
-                let white = Hsla {
-                    h: 0.0,
-                    s: 0.0,
-                    l: 1.0,
-                    a: 1.0,
-                };
-                VariantColors {
-                    background: white,
-                    background_hover: Hsla { l: 0.96, ..white },
-                    background_active: Hsla { l: 0.92, ..white },
-                    text: base,
-                    border: None,
-                }
-            }
+            Variant::White => VariantColors {
+                background: self.colors.white_fill,
+                background_hover: self.colors.white_fill_hover,
+                background_active: self.colors.white_fill_active,
+                text: base,
+                border: None,
+            },
         }
     }
 
@@ -1080,7 +1301,7 @@ impl Theme {
             ColorChoice::Semantic(role) => self.semantic_color(*role),
             ColorChoice::Custom(paint) => *paint,
             ColorChoice::Palette(group) => self
-                .ramp_step(group, FILLED_STEPS)
+                .ramp_step(group, &self.palette_steps.filled)
                 .unwrap_or(self.colors.accent),
         }
     }
@@ -1088,9 +1309,9 @@ impl Theme {
     /// The shade of the colour that reads as text on this theme's surfaces.
     fn readable_shade(&self, color: &ColorChoice, base: Hsla) -> Hsla {
         if let ColorChoice::Palette(group) = color {
-            let steps: &[&str] = match self.appearance {
-                Appearance::Dark => READABLE_STEPS_DARK,
-                Appearance::Light => READABLE_STEPS_LIGHT,
+            let steps = match self.appearance {
+                Appearance::Dark => &self.palette_steps.readable_dark,
+                Appearance::Light => &self.palette_steps.readable_light,
             };
             if let Some(shade) = self.ramp_step(group, steps) {
                 return shade;
@@ -1098,11 +1319,11 @@ impl Theme {
         }
         match self.appearance {
             Appearance::Dark => Hsla {
-                l: base.l.max(0.72),
+                l: base.l.max(self.effects.custom_color_readable_dark_floor),
                 ..base
             },
             Appearance::Light => Hsla {
-                l: base.l.min(0.40),
+                l: base.l.min(self.effects.custom_color_readable_light_ceiling),
                 ..base
             },
         }
@@ -1112,30 +1333,30 @@ impl Theme {
     fn pressed_shades(&self, color: &ColorChoice, base: Hsla) -> (Hsla, Hsla) {
         if let ColorChoice::Palette(group) = color
             && let (Some(hover), Some(active)) = (
-                self.ramp_step(group, HOVER_STEPS),
-                self.ramp_step(group, ACTIVE_STEPS),
+                self.ramp_step(group, &self.palette_steps.hover),
+                self.ramp_step(group, &self.palette_steps.active),
             )
         {
             return (hover, active);
         }
         (
             Hsla {
-                l: (base.l - 0.05).max(0.0),
+                l: (base.l - self.effects.custom_color_hover_lightness_delta).max(0.0),
                 ..base
             },
             Hsla {
-                l: (base.l - 0.10).max(0.0),
+                l: (base.l - self.effects.custom_color_active_lightness_delta).max(0.0),
                 ..base
             },
         )
     }
 
     /// The first step of `preferred` the active palette carries for `group`.
-    fn ramp_step(&self, group: &str, preferred: &[&str]) -> Option<Hsla> {
+    fn ramp_step(&self, group: &str, preferred: &[String]) -> Option<Hsla> {
         let steps = self.palette.get(group)?;
         preferred
             .iter()
-            .find_map(|step| steps.get(*step).map(|value| (*step, value.as_str())))
+            .find_map(|step| steps.get(step).map(|value| (step.as_str(), value.as_str())))
             .and_then(|(step, value)| {
                 Color::resolve(&format!("{group}.{step}"), value, &self.palette)
                     .ok()

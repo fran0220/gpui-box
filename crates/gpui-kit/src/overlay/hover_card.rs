@@ -30,9 +30,9 @@
 //! across a row of them. Leaving the trigger before that countdown runs out
 //! cancels it, so a pointer passing through opens nothing.
 //!
-//! Both durations are caller-settable and neither is a token: they are
-//! reaction times, not paint, and nothing in `crates/gpui-kit-tokens/tokens/*.json` describes how
-//! long a hand takes to cross two centimetres.
+//! Both durations are caller-settable. Their defaults are motion tokens so a
+//! product can tune interaction tempo consistently; the setters remain for a
+//! trigger whose physical distance or policy genuinely differs.
 //!
 //! # The keyboard
 //!
@@ -57,21 +57,6 @@ use web_time::Instant;
 use crate::foundation::{FocusRing, Ident, StyledExt};
 use crate::overlay::layer::{Hang, Overlay, OverlaySurface, Placement, surface};
 use crate::overlay::popover::anchored_slot;
-
-/// How long a pointer has to rest on the trigger before the card opens.
-///
-/// Long enough that crossing a row of triggers opens none of them, short
-/// enough that resting on one on purpose does not feel broken.
-pub const DEFAULT_OPEN_DELAY: Duration = Duration::from_millis(400);
-
-/// How long the card survives with the pointer over neither surface.
-///
-/// This is the time to cross the gap between the trigger and the card, plus
-/// the slack a hand that overshoots needs to come back.
-pub const DEFAULT_GRACE: Duration = Duration::from_millis(300);
-
-/// The widest the card gets before its text wraps.
-const CARD_MAX_WIDTH: f32 = 320.0;
 
 /// What the card is currently counting towards.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -140,8 +125,8 @@ impl HoverCard {
             content: None,
             placement: Placement::Below,
             hang: Hang::Start,
-            open_delay: DEFAULT_OPEN_DELAY,
-            grace: DEFAULT_GRACE,
+            open_delay: Duration::from_millis(cx.theme().motion.hover_card_open_ms),
+            grace: Duration::from_millis(cx.theme().motion.hover_card_grace_ms),
             over_trigger: false,
             over_card: false,
             open: false,
@@ -416,7 +401,7 @@ impl Render for HoverCard {
             let body = self.content.clone().map(|build| build(window, cx));
             let card = surface(&theme, OverlaySurface::FLOATING)
                 .id(card_ident.element_id())
-                .max_w(px(CARD_MAX_WIDTH))
+                .max_w(px(theme.measures.compact_overlay_width))
                 .p_token(&theme, Space::Sm)
                 .gap_token(&theme, Space::Xs)
                 .tab_index(0)

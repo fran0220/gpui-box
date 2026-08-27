@@ -15,7 +15,10 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon as Glyph, icon as glyph};
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, Surface, TextTone, TypeScale};
+use gpui_kit_theme::{
+    ActiveTheme, Elevation, Radius, SemanticBorder, SemanticWash, Space, Surface, TextTone,
+    TypeScale,
+};
 
 use crate::agent::model::{
     AgentActivity, AgentExecutionState, AgentId, AgentModelIssue, AgentOutcome, AgentPresence,
@@ -214,9 +217,9 @@ impl RenderOnce for AgentAvatar {
             .items_center()
             .justify_center()
             .rounded_full()
-            .bg(color.opacity(0.18))
+            .bg(theme.color_wash(color, SemanticWash::Strong))
             .border(px(theme.borders.thick))
-            .border_color(color.opacity(0.72))
+            .border_color(theme.color_border(color, SemanticBorder::Target))
             .child(avatar);
         let disc = if busy {
             motion::breathe(disc, self.ident.child("activity").element_id(), &theme, cx)
@@ -262,7 +265,7 @@ impl RenderOnce for AgentAvatar {
                 .when(direction.is_ltr(), |element| element.left_0())
                 .when(direction.is_rtl(), |element| element.right_0())
                 .size(px((self.size * 0.34).clamp(9.0, 14.0)))
-                .p(px(1.0))
+                .p(px(theme.space(Space::Xxs) / 2.0))
                 .rounded_full()
                 .bg(theme.colors.panel)
                 .text_color(color)

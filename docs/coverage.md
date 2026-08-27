@@ -454,6 +454,13 @@ unreadable source remains `failed`; neither is converted to empty media.
 
 ### Components
 
+Two ordinary desktop-choice capabilities remain uncovered:
+
+| Gap | Current boundary | What complete support requires |
+|---|---|---|
+| `MultiSelect` | `Select` and `Combobox` each publish one caller-owned answer; `TagInput` accepts free-form text and is not a listbox selection model. | A searchable multi-select listbox with stable option identity, caller-owned selected values, removable selected chips, keyboard range/toggle semantics, explicit unavailable options, truthful result counts, and virtualized presentation for a large option set. It should compose the existing field, popover, list, tag, and selection recipes rather than fork them. |
+| Vertical `Slider` | `Slider` covers horizontal single/range values, steps, marks, RTL, pointer, keyboard, and semantics. It has no orientation API. | One orientation contract that rotates layout, hit geometry, direction-aware keyboard mapping, marks, range fill, and accessibility orientation together. A vertical skin over the current horizontal hit model would not count. |
+
 Document tabs, `SearchField`, `FindReplace`, `NotificationCenter`, `CodeView`,
 and `UploadList` are covered above. `FailurePanel` presents an ordinary
 caller-owned failure; a render error boundary is not implementable while GPUI

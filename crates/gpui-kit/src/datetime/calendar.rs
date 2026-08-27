@@ -35,10 +35,6 @@ use crate::foundation::{
 use crate::motion;
 use crate::overlay::Tooltipped;
 
-/// How wide one day cell is, and how tall. This geometry occurs once, so it
-/// stays beside the component rather than in the token document.
-const CELL_SIZE: f32 = 34.0;
-
 /// How far a month slides as it arrives.
 const MONTH_TRAVEL: f32 = 12.0;
 
@@ -471,7 +467,7 @@ impl Calendar {
             .row_reading(direction)
             .children(self.adapter.weekday_labels().into_iter().map(|label| {
                 foundation_text(theme, TypeScale::Caption, label)
-                    .w(px(CELL_SIZE))
+                    .w(px(theme.control.lg.height))
                     .flex_none()
                     .text_align(gpui::TextAlign::Center)
                     .text_tone(theme, TextTone::Faint)
@@ -489,7 +485,10 @@ impl Calendar {
     ) -> AnyElement {
         let theme = cx.theme().clone();
         let Some(day) = cell.day() else {
-            return div().size(px(CELL_SIZE)).flex_none().into_any_element();
+            return div()
+                .size(px(theme.control.lg.height))
+                .flex_none()
+                .into_any_element();
         };
 
         let day_id = format!("day-{}", day.0);
@@ -562,7 +561,7 @@ impl Calendar {
 
         let cell = div()
             .id(ident.element_id())
-            .size(px(CELL_SIZE))
+            .size(px(theme.control.lg.height))
             .flex_none()
             .relative()
             .flex()

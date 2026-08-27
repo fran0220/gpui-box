@@ -32,9 +32,6 @@ use crate::overlay::Tooltipped;
 const EXPANDED_WIDTH: f32 = 240.0;
 const COLLAPSED_WIDTH: f32 = 52.0;
 
-/// How far a nested item is indented from its parent in the expanded rail.
-const NESTING_INDENT: f32 = 16.0;
-
 type SelectHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 
 /// What sits in the glyph slot: a catalog mark, or a caller-owned image.
@@ -266,7 +263,7 @@ impl Sidebar {
         let indent = if self.collapsed || level == 1 {
             0.0
         } else {
-            NESTING_INDENT
+            theme.space(Space::Lg)
         };
         let glyph_slot = flip(ident.child("glyph").semantic_id(), window, cx);
 

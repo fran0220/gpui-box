@@ -31,8 +31,6 @@ use crate::overlay::kbd::Kbd;
 use crate::overlay::layer::{Hang, Overlay, OverlaySurface, Placement, surface};
 use crate::overlay::popover::{self, MenuKey};
 
-/// The narrowest a panel gets, so a one-word command still reads as a menu.
-const PANEL_MIN_WIDTH: f32 = 200.0;
 /// The leading slot every row reserves, so labels line up whether or not the
 /// row carries a check or an icon.
 const GLYPH_SLOT: f32 = 16.0;
@@ -461,7 +459,7 @@ fn panel<V: 'static>(
         .collect::<Vec<_>>();
 
     surface(theme, OverlaySurface::FLOATING)
-        .min_w(px(PANEL_MIN_WIDTH))
+        .min_w(px(theme.measures.menu_min_width))
         .p_token(theme, Space::Xs)
         .children(rows)
         .into_any_element()
@@ -538,7 +536,11 @@ fn row<V: 'static>(
                         .flex_none()
                         .w(px(GLYPH_SLOT))
                         .justify_center()
-                        .children(glyph.map(|glyph| icon(glyph).size(px(14.0)).text_color(color))),
+                        .children(glyph.map(|glyph| {
+                            icon(glyph)
+                                .size(px(theme.control.sm.icon_size))
+                                .text_color(color)
+                        })),
                 )
                 .child(
                     text(theme, TypeScale::Label, item.label.clone())
@@ -556,7 +558,7 @@ fn row<V: 'static>(
                     let flipped = flips(Icon::AltArrowRight, cx.layout_direction());
                     element.child(
                         icon(Icon::AltArrowRight)
-                            .size(px(12.0))
+                            .size(px(theme.control.xs.icon_size))
                             .text_color(if item.destructive {
                                 theme.colors.danger
                             } else {

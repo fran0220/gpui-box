@@ -20,7 +20,7 @@ use gpui::{
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{
-    ActiveTheme, ControlSize, Elevation, Radius, Space, Surface, TextTone, TypeScale,
+    ActiveTheme, ContrastTint, ControlSize, Elevation, Radius, Space, Surface, TextTone, TypeScale,
 };
 use web_time::Instant;
 
@@ -35,6 +35,8 @@ use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{Disableable, Ident, Selectable, Sizable, StyledExt};
 use crate::motion::keyed;
 use crate::strings::{ActiveStrings, StringKey};
+
+const EXPRESSION_MARK_RADIUS: f32 = 1.0;
 
 /// A caller-observed expression, independent of execution state.
 ///
@@ -261,7 +263,7 @@ impl RenderOnce for VoiceReactive {
                     .row()
                     .items_center()
                     .justify_center()
-                    .gap(px(3.0))
+                    .gap(px(theme.space(Space::Xxs) * 1.5))
                     .h(px(42.0))
                     .px_token(&theme, Space::Xs)
                     .radius(&theme, Radius::Control)
@@ -363,13 +365,13 @@ fn voice_levels(
 }
 
 fn voice_color(state: &VoiceState, theme: &gpui_kit_theme::Theme) -> Hsla {
-    match state {
+    let color = match state {
         VoiceState::Silent => theme.colors.text_muted,
         VoiceState::Listening => theme.colors.info,
         VoiceState::Speaking => theme.colors.accent_strong,
         VoiceState::Unavailable(_) => theme.colors.danger,
-    }
-    .blend(theme.colors.text.opacity(0.18))
+    };
+    theme.contrast_tint(color, ContrastTint::Soft)
 }
 
 /// A large expressive portrait built on the standard [`AgentAvatar`].
@@ -454,8 +456,8 @@ impl RenderOnce for PersonaPortrait {
             PersonaExpression::Focused => theme.colors.info,
             PersonaExpression::Concerned => theme.colors.warning,
             PersonaExpression::Celebrating => theme.colors.success,
-        }
-        .blend(theme.colors.text.opacity(0.18));
+        };
+        let expression_color = theme.contrast_tint(expression_color, ContrastTint::Soft);
         let voice_state = self
             .voice
             .as_ref()
@@ -480,7 +482,7 @@ impl RenderOnce for PersonaPortrait {
             .row()
             .items_center()
             .justify_center()
-            .gap(px(2.0))
+            .gap(px(theme.space(Space::Xxs)))
             .w(px(24.0))
             .h(px(10.0))
             .rounded_full()
@@ -489,7 +491,9 @@ impl RenderOnce for PersonaPortrait {
                 div()
                     .size(px(if index == 1 { 4.0 } else { 3.0 }))
                     .when(index % 2 == 0, |mark| mark.rounded_full())
-                    .when(index % 2 == 1, |mark| mark.rounded(px(1.0)))
+                    .when(index % 2 == 1, |mark| {
+                        mark.rounded(px(EXPRESSION_MARK_RADIUS))
+                    })
                     .bg(expression_color)
             }));
 
@@ -511,7 +515,7 @@ impl RenderOnce for PersonaPortrait {
                 .flex_none()
                 .items_center()
                 .justify_center()
-                .gap(px(2.0))
+                .gap(px(theme.space(Space::Xxs)))
                 .w(px(38.0))
                 .h(px(16.0))
                 .rounded_full()
@@ -542,7 +546,7 @@ impl RenderOnce for PersonaPortrait {
             .column()
             .flex_none()
             .items_center()
-            .gap(px(4.0))
+            .gap(px(theme.space(Space::Xs)))
             .child(
                 div()
                     .relative()

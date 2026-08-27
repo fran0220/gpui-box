@@ -107,7 +107,7 @@ pub trait Animated: Styled + IntoElement + Sized + 'static {
         index: usize,
         count: usize,
     ) -> AnimationElement<Self> {
-        let spec = Stagger::rows().spec(index, count, entrance.spec(cx.theme()));
+        let spec = Stagger::rows(cx.theme()).spec(index, count, entrance.spec(cx.theme()));
         self.animate_with(id, entrance, spec)
     }
 
@@ -210,11 +210,11 @@ mod tests {
     fn a_staggered_group_finishes_within_the_row_cap() {
         let theme = Theme::studio_dark();
         let spec = Entrance::Fade.spec(&theme);
-        let stagger = Stagger::rows();
+        let stagger = Stagger::rows(&theme);
         for count in [2, 8, 50, 500] {
             let last = stagger.spec(count - 1, count, spec);
             assert!(
-                last.delay_ms <= super::super::ROW_STAGGER_CAP.as_millis() as u64,
+                last.delay_ms <= super::super::row_stagger_cap(&theme).as_millis() as u64,
                 "{count} rows waited {}ms",
                 last.delay_ms
             );

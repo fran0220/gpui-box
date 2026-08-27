@@ -78,6 +78,26 @@ remain local. Flat and rounded therefore describe attachment, not two visual
 styles: a sidebar is flat because it is a window plane; a popover is rounded
 because it is a detached entity.
 
+## Production style has one authority
+
+A component does not invent anonymous spacing, corner radius, type size,
+weight, theme-colour alpha, or reusable measure. It consumes the theme's typed
+tokens or a complete shared recipe. This applies to small values too: 2px is a
+spacing step when it separates content, not an exception because it is small;
+360px is a measure when several explanatory surfaces share it, not four local
+widths that happen to agree.
+
+Local values remain valid where tokenization would misstate ownership: chart
+topology, normalized data encoding, asset proportions, hit testing, algorithmic
+physics, and one component's layout geometry. Such values are named beside the
+algorithm they explain. Mathematical zero and one remain local endpoints.
+This boundary keeps themes fully retunable without turning the token document
+into a collection of arbitrary coordinates.
+
+The token gate parses production Rust and enforces this distinction. It skips
+scenes and test fixtures, so examples can describe their own canvas while
+shipping components cannot quietly create a second style system.
+
 ## State is complete
 
 Interactive components define default, hover, pressed, selected, disabled, and

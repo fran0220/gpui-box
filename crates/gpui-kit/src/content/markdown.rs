@@ -41,7 +41,8 @@ use gpui::{
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{
-    ActiveTheme, Elevation, Radius, Space, Surface, SyntaxColor, Theme, TypeScale,
+    ActiveTheme, Elevation, Radius, SemanticBorder, SemanticColor, SemanticWash, Space, Surface,
+    SyntaxColor, Theme, TypeScale,
 };
 use web_time::Instant;
 
@@ -782,7 +783,7 @@ impl Painter {
             // rectangle would hide which image is missing.
             None => div()
                 .column()
-                .gap(px(2.0))
+                .gap(px(theme.space(Space::Xxs)))
                 .px_token(&theme, Space::Sm)
                 .py_token(&theme, Space::Xs)
                 .radius(&theme, Radius::Small)
@@ -1148,13 +1149,13 @@ impl Painter {
         div()
             .column()
             .w_full()
-            .gap(px(2.0))
+            .gap(px(theme.space(Space::Xxs)))
             .px_token(&theme, Space::Sm)
             .py_token(&theme, Space::Xs)
             .radius(&theme, Radius::Small)
             .border(px(theme.borders.hairline))
-            .border_color(theme.colors.warning.opacity(0.4))
-            .bg(theme.colors.warning.opacity(0.06))
+            .border_color(theme.semantic_border(SemanticColor::Warning, SemanticBorder::Report))
+            .bg(theme.semantic_wash(SemanticColor::Warning, SemanticWash::Faint))
             .child(
                 div()
                     .type_scale(&theme, TypeScale::Caption)
@@ -1186,9 +1187,9 @@ impl Painter {
         let theme = self.theme.clone();
         let ident = self.ident_for("html", "inline");
         div()
-            .px(px(2.0))
+            .px(px(theme.space(Space::Xxs)))
             .radius(&theme, Radius::Small)
-            .bg(theme.colors.warning.opacity(0.1))
+            .bg(theme.semantic_wash(SemanticColor::Warning, SemanticWash::Standard))
             .font_family(theme.typography.mono.clone())
             .text_size(px(theme.typography.code.size))
             .text_color(theme.colors.warning)

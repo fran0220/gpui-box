@@ -13,16 +13,10 @@ use gpui::{
     App, ListAlignment, ListOffset, ListState, Pixels, ScrollStrategy, SharedString,
     UniformListScrollHandle, Window, WindowId, px,
 };
+use gpui_kit_theme::ActiveTheme;
 
 use crate::foundation::{Ident, window_state};
-use crate::motion::{CubicBezier, Glide, MotionSpec, reduce_motion};
-
-/// How long a glide takes to cross whatever distance it has, and on what
-/// curve. Ease-in-out over the whole travel, so a jump across a long
-/// conversation leaves gently, covers ground, and settles — which is what
-/// makes the arrival legible as "you moved there" rather than "the page
-/// changed".
-const GLIDE: MotionSpec = MotionSpec::new(500, CubicBezier::new(0.42, 0.0, 0.58, 1.0));
+use crate::motion::{Easing, Glide, MotionSpec, reduce_motion};
 
 /// The interval a glide asks for its frames at, near enough to a 60Hz frame.
 const FRAME: Duration = Duration::from_millis(16);
@@ -236,7 +230,14 @@ pub fn glide_to_row(ident: &Ident, index: usize, window: &Window, cx: &mut App) 
         reveal_row(ident, index, window, cx);
         return;
     };
-    let total = GLIDE.total();
+    // Ease-in-out over the tokenized entrance duration, so a jump across a
+    // long conversation leaves gently, covers ground, and settles without
+    // becoming a second motion vocabulary hidden inside virtualization.
+    let glide_spec = MotionSpec::new(
+        cx.theme().motion.entrance_ms,
+        Easing::EaseInOut.curve(cx.theme()),
+    );
+    let total = glide_spec.total();
     cx.spawn(async move |cx| {
         let mut glide = Glide::new();
         // The executor's clock rather than the wall clock, because they are
@@ -258,7 +259,7 @@ pub fn glide_to_row(ident: &Ident, index: usize, window: &Window, cx: &mut App) 
                 .saturating_duration_since(started)
                 .as_secs_f32()
                 / total.as_secs_f32();
-            let share = glide.step(GLIDE.curve.eval(elapsed.min(1.0)));
+            let share = glide.step(glide_spec.curve.eval(elapsed.min(1.0)));
             if glide.arrived() {
                 break;
             }

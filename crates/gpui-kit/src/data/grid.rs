@@ -2620,7 +2620,7 @@ fn pinned_edge(theme: &Theme, direction: LayoutDirection) -> gpui::Div {
         .flex_none()
         .bg(gpui::linear_gradient(
             if direction.is_rtl() { 270.0 } else { 90.0 },
-            gpui::linear_color_stop(cast.opacity(0.22), 0.0),
+            gpui::linear_color_stop(cast.opacity(theme.effects.area_wash_alpha), 0.0),
             gpui::linear_color_stop(cast.opacity(0.0), 1.0),
         ))
 }

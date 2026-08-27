@@ -57,10 +57,12 @@ pointer would fight the drag it exists to serve.
 
 ### The stagger cap
 
-`Stagger::rows` is 16ms a row across at most eight rows, so a wave never
-lasts longer than `ROW_STAGGER_CAP` — 112ms — however many rows there are.
-Past eight rows the step shrinks rather than the window growing, so a fifty-row
-menu is fully drawn in about a sixth of a second instead of most of a second.
+`Stagger::rows(theme)` reads both its neighbour delay and maximum item window
+from `motion.durationMs.staggerStep` and `motion.staggerMaxItems`. In the bundled
+themes that is 16ms a row across at most eight rows, so `row_stagger_cap(theme)`
+is 112ms. Past eight rows the step shrinks rather than the window growing, so a
+fifty-row menu is fully drawn in about a sixth of a second instead of most of a
+second. Custom themes can change either part without replacing motion code.
 
 ### Which end a wave starts from
 

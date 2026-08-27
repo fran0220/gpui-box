@@ -120,7 +120,7 @@ impl Element for TextAreaElement {
                     len: marked.end - marked.start,
                     underline: Some(UnderlineStyle {
                         color: Some(run.color),
-                        thickness: px(1.0),
+                        thickness: px(theme.measures.text_decoration_width),
                         wavy: false,
                     }),
                     ..run.clone()
@@ -179,7 +179,7 @@ impl Element for TextAreaElement {
             .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(accessible_geometry);
         let cursor = (selected.is_empty()).then(|| {
             fill(
-                layout.caret_bounds(cursor, origin, px(1.5)),
+                layout.caret_bounds(cursor, origin, px(theme.measures.caret_width)),
                 theme.colors.accent,
             )
         });
@@ -240,13 +240,18 @@ impl Element for TextAreaElement {
                     )
                     .ok();
                 }
+                let caret_width = px(cx.theme().measures.caret_width);
                 self.area.update(cx, |area, cx| {
                     let grew = area.visible_rows() != visible_rows;
                     let scroll_changed = area.scroll_offset() != scroll_offset;
                     area.set_visible_rows(visible_rows);
                     area.set_scroll_offset(scroll_offset);
-                    let layout_changed =
-                        area.set_last_layout(layout, prepaint.source_text.clone(), bounds);
+                    let layout_changed = area.set_last_layout(
+                        layout,
+                        prepaint.source_text.clone(),
+                        bounds,
+                        caret_width,
+                    );
                     // Geometry and accessibility consumers need one
                     // corrective frame when shaped rows, bounds, or scrolling
                     // change. Notifying on every paint would redraw forever.

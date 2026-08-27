@@ -45,9 +45,6 @@ use crate::motion::keyed;
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
-/// How tall the frame is when the caller says nothing.
-const DEFAULT_HEIGHT: f32 = 320.0;
-
 /// How tall the frame is when it holds a sentence rather than a model.
 const SENTENCE_HEIGHT: f32 = 112.0;
 
@@ -165,7 +162,7 @@ pub struct ModelViewer {
     shading: ModelShading,
     yaw: f32,
     pitch: f32,
-    height: f32,
+    height: Option<f32>,
     disabled: bool,
     on_event: Option<EventHandler>,
 }
@@ -194,7 +191,7 @@ impl ModelViewer {
             shading: ModelShading::default(),
             yaw: PI / 6.0,
             pitch: PI / 8.0,
-            height: DEFAULT_HEIGHT,
+            height: None,
             disabled: false,
             on_event: None,
         }
@@ -238,7 +235,7 @@ impl ModelViewer {
     }
 
     pub fn height(mut self, height: f32) -> Self {
-        self.height = height.max(1.0);
+        self.height = Some(height.max(1.0));
         self
     }
 
@@ -292,10 +289,11 @@ impl RenderOnce for ModelViewer {
         // lines of text is mostly a claim that something is about to appear
         // there.
         let vacant = matches!(self.state, ModelState::Rejected(_) | ModelState::Empty);
+        let viewer_height = self.height.unwrap_or(theme.measures.media_viewer_height);
         let height = if vacant {
-            self.height.min(SENTENCE_HEIGHT)
+            viewer_height.min(SENTENCE_HEIGHT)
         } else {
-            self.height
+            viewer_height
         };
         let mut frame = div()
             .id(ident.child("frame").element_id())

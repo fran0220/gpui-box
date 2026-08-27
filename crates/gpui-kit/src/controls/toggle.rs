@@ -11,7 +11,7 @@ use gpui::{
     SharedString, Styled, Window, div, point, prelude::FluentBuilder, px,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Radius, Space, Theme, TypeScale};
 
 use crate::foundation::{
     Disableable, FocusRing, Ident, Pressable, Selectable, Sizable, StyledExt,
@@ -493,7 +493,7 @@ impl RenderOnce for Switch {
             .flex()
             .items_center()
             .rounded_full()
-            .p(px(2.0))
+            .p(px(theme.space(Space::Xxs)))
             .bg(theme
                 .colors
                 .hairline_strong
@@ -586,13 +586,13 @@ fn choice_row(
                 .focus_ring(theme)
                 .pressable(cx)
         })
-        .child(div().mt(px(1.0)).child(mark))
+        .child(div().mt(px(theme.space(Space::Xxs) / 2.0)).child(mark))
         .when_some(label, |element, label| {
             element.child(
                 div()
                     .flex()
                     .flex_col()
-                    .gap(px(2.0))
+                    .gap(px(theme.space(Space::Xxs)))
                     .child(
                         foundation_text(theme, TypeScale::Label, label)
                             .text_size(px(font_size))
@@ -601,7 +601,6 @@ fn choice_row(
                     .when_some(description, |element, description| {
                         element.child(
                             foundation_text(theme, TypeScale::Caption, description)
-                                .text_size(px(font_size * 0.9))
                                 .text_tone(theme, gpui_kit_theme::TextTone::Muted),
                         )
                     }),

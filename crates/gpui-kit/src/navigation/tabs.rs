@@ -50,10 +50,6 @@ type CloseHandler = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 type ReorderHandler = Rc<dyn Fn(&DropIntent, &mut Window, &mut App)>;
 type Accepts = Rc<dyn Fn(&DragItem, &DropPosition) -> bool>;
 
-/// The width of the dot a tab wears while it has something unsaved. It occurs
-/// once, so it stays next to the component rather than in the token document.
-const MARK_SIZE: f32 = 7.0;
-
 /// How wide the fade at a scrolling strip's edge is. Wide enough that a tab
 /// passing under it dims over several pixels of travel rather than meeting a
 /// line, which is what makes it read as "there is more" instead of as damage.
@@ -500,7 +496,7 @@ impl Tabs {
         Some(
             div()
                 .flex_none()
-                .size(px(MARK_SIZE))
+                .size(px(theme.measures.status_mark))
                 .rounded_full()
                 .when(filled, |element| element.bg(color))
                 .when(!filled, |element| {
@@ -529,7 +525,6 @@ impl Tabs {
         tab: &TabItem,
         ident: &Ident,
         theme: &Theme,
-        metrics: ControlMetrics,
         cx: &mut App,
     ) -> Option<gpui::AnyElement> {
         let handler = self.on_close.clone().filter(|_| self.closes(tab))?;
@@ -540,6 +535,7 @@ impl Tabs {
         let id = tab.id.clone();
         let keyed_id = id.clone();
         let keyed = Rc::clone(&handler);
+        let close_metrics = theme.control.get(ControlSize::Xs);
 
         Some(
             div()
@@ -548,7 +544,7 @@ impl Tabs {
                 .flex_none()
                 .items_center()
                 .justify_center()
-                .size(px(metrics.icon_size + 4.0))
+                .size(px(close_metrics.height))
                 .rounded_full()
                 .cursor_pointer()
                 .tab_index(0)
@@ -556,7 +552,7 @@ impl Tabs {
                 .focus_ring(theme)
                 .child(
                     icon(Icon::Close)
-                        .size(px(metrics.icon_size - 3.0))
+                        .size(px(close_metrics.icon_size))
                         .text_color(theme.colors.text_muted),
                 )
                 .on_click(move |_, window, cx| {
@@ -634,7 +630,7 @@ impl Tabs {
                     )
                     .children(tab.badge.clone().map(|badge| Badge::new(badge).neutral()))
                     .children(self.save_mark(tab, &ident, theme, cx))
-                    .children(self.close_control(tab, &ident, theme, metrics, cx)),
+                    .children(self.close_control(tab, &ident, theme, cx)),
             )
             // The underline is a sibling rather than a border so an unselected
             // tab reserves the same height and nothing shifts when it is

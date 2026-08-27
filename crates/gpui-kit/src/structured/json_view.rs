@@ -804,7 +804,7 @@ fn row_element(
                 .tab_index(0)
                 .pressable(cx)
                 .when(!selected, |element| {
-                    element.hover(|style| style.bg(theme.colors.hover.opacity(0.3)))
+                    element.hover(|style| style.bg(theme.subtle_hover()))
                 })
                 .focus_ring(theme)
         })

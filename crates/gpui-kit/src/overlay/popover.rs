@@ -466,7 +466,7 @@ pub fn separator(theme: &Theme) -> gpui::Div {
 pub fn key_cap(theme: &Theme, label: impl Into<SharedString>) -> gpui::Div {
     div()
         .h(px(22.0))
-        .px(px(5.0))
+        .px(px(theme.space(Space::Xs) + theme.space(Space::Xxs) / 2.0))
         .radius(theme, gpui_kit_theme::Radius::Small)
         .flex()
         .items_center()
@@ -478,7 +478,7 @@ pub fn key_cap(theme: &Theme, label: impl Into<SharedString>) -> gpui::Div {
 /// The surface a modal draws itself on.
 pub fn dialog_card(theme: &Theme) -> gpui::Div {
     surface(theme, OverlaySurface::MODAL)
-        .w(px(360.0))
+        .w(px(theme.measures.dialog_width))
         .p(px(theme.spacing.xl - theme.spacing.xs))
 }
 

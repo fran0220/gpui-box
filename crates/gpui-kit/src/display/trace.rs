@@ -48,6 +48,16 @@ const DEFAULT_TICKS: [f32; 5] = [0.0, 0.25, 0.5, 0.75, 1.0];
 /// A bar that ends past this much of the axis has its name drawn before it,
 /// because there is no room left after it.
 const NAME_AFTER_LIMIT: f32 = 0.7;
+/// Alpha is part of the trace's data encoding: outline means pending, solid
+/// means observed, and the current span is emphasized within either state.
+/// These values are local together because no other component speaks this
+/// waterfall vocabulary.
+const PENDING_ALPHA: f32 = 0.16;
+const PENDING_CURRENT_ALPHA: f32 = 0.24;
+const PENDING_BORDER_ALPHA: f32 = 0.62;
+const PENDING_CURRENT_BORDER_ALPHA: f32 = 0.82;
+const OBSERVED_ALPHA: f32 = 0.72;
+const OBSERVED_CURRENT_ALPHA: f32 = 0.92;
 
 /// One position on the host's axis, with the host's exact wording for it.
 #[derive(Debug, Clone, PartialEq)]
@@ -565,11 +575,23 @@ fn span_row(
         .w(relative(width))
         .radius(theme, Radius::Small);
     fill = if pending {
-        fill.bg(color.opacity(if current { 0.24 } else { 0.16 }))
-            .border(px(theme.borders.hairline))
-            .border_color(color.opacity(if current { 0.82 } else { 0.62 }))
+        fill.bg(color.opacity(if current {
+            PENDING_CURRENT_ALPHA
+        } else {
+            PENDING_ALPHA
+        }))
+        .border(px(theme.borders.hairline))
+        .border_color(color.opacity(if current {
+            PENDING_CURRENT_BORDER_ALPHA
+        } else {
+            PENDING_BORDER_ALPHA
+        }))
     } else {
-        fill.bg(color.opacity(if current { 0.92 } else { 0.72 }))
+        fill.bg(color.opacity(if current {
+            OBSERVED_CURRENT_ALPHA
+        } else {
+            OBSERVED_ALPHA
+        }))
     };
 
     let mut track = div().relative().size_full().overflow_hidden().child(fill);

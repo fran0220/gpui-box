@@ -346,6 +346,13 @@ impl Wizard {
             window,
             cx,
         );
+        let marker_border_alpha = theme.effects.variant_light_hover_alpha
+            + (1.0 - theme.effects.variant_light_hover_alpha) * filled;
+        let marker_fill_alpha = theme.effects.variant_subtle_hover_alpha
+            + (theme.effects.variant_light_active_alpha - theme.effects.variant_subtle_hover_alpha)
+                * filled;
+        let marker_core_alpha = theme.effects.variant_light_active_alpha
+            + (1.0 - theme.effects.variant_light_active_alpha) * filled;
 
         let marker = div()
             .size(px(MARKER))
@@ -355,8 +362,8 @@ impl Wizard {
             .justify_center()
             .rounded_full()
             .border(px(theme.borders.hairline))
-            .border_color(color.opacity(0.2 + 0.8 * filled))
-            .bg(color.opacity(0.12 + 0.16 * filled))
+            .border_color(color.opacity(marker_border_alpha))
+            .bg(color.opacity(marker_fill_alpha))
             .text_color(color)
             .children(
                 step.status
@@ -368,7 +375,7 @@ impl Wizard {
                     div()
                         .size(px(MARKER * 0.3 * filled.max(0.5)))
                         .rounded_full()
-                        .bg(color.opacity(0.3 + 0.7 * filled)),
+                        .bg(color.opacity(marker_core_alpha)),
                 )
             });
 
@@ -388,7 +395,7 @@ impl Wizard {
         let text_element = div()
             .column()
             .min_w_0()
-            .gap(px(2.0))
+            .gap(px(theme.space(Space::Xxs)))
             .child(
                 foundation_text(theme, TypeScale::Label, step.title.clone()).text_tone(
                     theme,

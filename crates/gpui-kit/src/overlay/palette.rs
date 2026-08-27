@@ -28,8 +28,6 @@ use crate::strings::{ActiveSearch, ActiveStrings, SearchMatcher, StringKey};
 /// How wide the palette is. The value occurs once, so it stays here rather
 /// than in the token document.
 const PALETTE_WIDTH: f32 = 480.0;
-/// How tall the result list grows before it scrolls.
-const RESULTS_MAX_HEIGHT: f32 = 320.0;
 
 /// One thing the application can do.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -462,7 +460,7 @@ impl Render for CommandPalette {
                 .id(self.ident.child("results").element_id())
                 .flex()
                 .flex_col()
-                .max_h(px(RESULTS_MAX_HEIGHT))
+                .max_h(px(theme.measures.menu_max_height))
                 .overflow_y_scroll()
                 .children(rows)
                 .semantic_in(cx, NodeSpec::new(results_id, Role::Menu))

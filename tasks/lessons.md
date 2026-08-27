@@ -42,3 +42,9 @@
 - A package-cohort patch list should contain only the package's transitive local
   dependencies. Passing every cohort member to every `cargo package` succeeds,
   but floods the proof log with truthful "patch was not used" warnings.
+
+## 2026-08-27: verify component capabilities before describing them
+
+- Read the public builder and generated API before listing a component's
+  capabilities. Do not infer an orientation or mode from the component name;
+  `Slider` is horizontal and RTL-aware, but has no vertical API.

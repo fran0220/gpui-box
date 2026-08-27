@@ -203,6 +203,7 @@ Appearance: `Dark`.
 | `color.text.placeholder` | `#868686` | `#868686` |
 | `color.text.disabled` | `#7d7d7d` | `#7d7d7d` |
 | `color.text.onAccent` | `{neutral.ink}` | `#0e0e0e` |
+| `color.text.onPrimaryFill` | `{neutral.ink}` | `#0e0e0e` |
 | `color.interactive.hover` | `{neutral.850}/14` | `#ebebeb14` |
 | `color.interactive.active` | `{neutral.850}/24` | `#ebebeb24` |
 | `color.interactive.selected` | `{neutral.850}/1c` | `#ebebeb1c` |
@@ -211,6 +212,10 @@ Appearance: `Dark`.
 | `color.interactive.track` | `{neutral.900}/66` | `#ffffff66` |
 | `color.interactive.divider` | `{neutral.900}/10` | `#ffffff10` |
 | `color.interactive.focus` | `{indigo.400}` | `#7c86ff` |
+| `color.interactive.primaryFill` | `{neutral.800}` | `#e9e9e9` |
+| `color.interactive.whiteFill` | `#ffffff` | `#ffffff` |
+| `color.interactive.whiteFillHover` | `#f5f5f5` | `#f5f5f5` |
+| `color.interactive.whiteFillActive` | `#ebebeb` | `#ebebeb` |
 | `color.semantic.accent` | `{indigo.400}` | `#7c86ff` |
 | `color.semantic.accentStrong` | `{indigo.600}` | `#5865f2` |
 | `color.semantic.danger` | `{red.400}` | `#ff6467` |
@@ -256,16 +261,50 @@ Appearance: `Dark`.
 | `color.terminal.ansi.14` | `{ansi.14}` | `#67e8f9` |
 | `color.terminal.ansi.15` | `{ansi.15}` | `#fafafa` |
 
+### Palette variant steps
+
+| Recipe | Preferred steps |
+|---|---|
+| `color.paletteSteps.filled` | `600 → 500 → 400` |
+| `color.paletteSteps.hover` | `700 → 600 → 500` |
+| `color.paletteSteps.active` | `800 → 700 → 600` |
+| `color.paletteSteps.readableDark` | `300 → 200 → 400` |
+| `color.paletteSteps.readableLight` | `700 → 800 → 600` |
+
 ### Spacing
 
 | Step | Pixels |
 |---|---:|
+| `xxs` | 2 |
 | `xs` | 4 |
 | `sm` | 8 |
 | `md` | 12 |
 | `lg` | 16 |
 | `xl` | 24 |
 | `xxl` | 32 |
+
+### Measures
+
+| Token | Pixels |
+|---|---:|
+| `measure.readableWidth` | 360 |
+| `measure.dialogWidth` | 360 |
+| `measure.menuMinWidth` | 200 |
+| `measure.compactMenuMinWidth` | 180 |
+| `measure.menuMaxHeight` | 320 |
+| `measure.compactMenuMaxHeight` | 240 |
+| `measure.standaloneIcon` | 20 |
+| `measure.scrollbarTrack` | 10 |
+| `measure.scrollbarThumb` | 6 |
+| `measure.scrollbarMinThumb` | 24 |
+| `measure.caretWidth` | 1.5 |
+| `measure.textDecorationWidth` | 1 |
+| `measure.progressTrackHeight` | 4 |
+| `measure.sliderTrackHeight` | 6 |
+| `measure.compactOverlayWidth` | 320 |
+| `measure.mediaViewerHeight` | 320 |
+| `measure.timelineRailWidth` | 16 |
+| `measure.statusMark` | 7 |
 
 ### Radius
 
@@ -294,6 +333,20 @@ Appearance: `Dark`.
 | `compact` | 0.75 | 0.86 | 0.94 |
 | `comfortable` | 1 | 1 | 1 |
 
+### Typography
+
+Numeric readout scale: 1.6×
+
+| Step | Size | Line height | Weight |
+|---|---:|---:|---:|---:|
+| `caption` | 10.5 | 14 | 400 |
+| `label` | 12 | 16 | 500 |
+| `body` | 13 | 19 | 400 |
+| `strong` | 13 | 19 | 600 |
+| `subtitle` | 14 | 20 | 600 |
+| `title` | 16 | 22 | 600 |
+| `code` | 12 | 18 | 400 |
+
 ### Elevation
 
 | Step | Layer | Y | Blur | Spread | Color |
@@ -319,6 +372,29 @@ Appearance: `Dark`.
 | `Toast` | 600 |
 
 ### Motion
+
+| Duration | Milliseconds |
+|---|---:|
+| `motion.durationMs.instant` | 90 |
+| `motion.durationMs.quick` | 150 |
+| `motion.durationMs.menu` | 140 |
+| `motion.durationMs.dialog` | 180 |
+| `motion.durationMs.resize` | 200 |
+| `motion.durationMs.entrance` | 500 |
+| `motion.durationMs.spin` | 900 |
+| `motion.durationMs.slow` | 320 |
+| `motion.durationMs.staggerStep` | 16 |
+| `motion.durationMs.microBounce` | 360 |
+| `motion.durationMs.microWobble` | 280 |
+| `motion.durationMs.microPop` | 240 |
+| `motion.durationMs.pulse` | 2400 |
+| `motion.durationMs.shimmer` | 1400 |
+| `motion.durationMs.toast` | 6000 |
+| `motion.durationMs.hoverCardOpen` | 400 |
+| `motion.durationMs.hoverCardGrace` | 300 |
+| `motion.durationMs.confirmation` | 1600 |
+
+Row stagger maximum items: `8`.
 
 | Easing | Curve |
 |---|---|
@@ -365,14 +441,59 @@ Appearance: `Dark`.
 |---|---:|
 | `effect.edgeFadeBand` | 20 |
 | `effect.selectedRingAlpha` | 0.09 |
+| `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.7 |
+| `effect.glowAlpha` | 0.26 |
+| `effect.glowBlur` | 12 |
+| `effect.glowSpread` | -5 |
 | `effect.glassAlpha` | 0.72 |
 | `effect.glassBlur` | 24 |
+| `effect.glassLiquidAlpha` | 0.34 |
+| `effect.glassBevel` | 18 |
+| `effect.glassRefraction` | 0.9 |
+| `effect.glassDispersion` | 0.16 |
+| `effect.glassSpecular` | 0.4 |
+| `effect.glassSpecularSharpness` | 12 |
+| `effect.glassLightAngle` | 0.7853982 |
+| `effect.glassMergeDistance` | 28 |
+| `effect.glassContrastFlipLow` | 0.42 |
+| `effect.glassContrastFlipHigh` | 0.58 |
+| `effect.glassPressDepth` | 1.5 |
 | `effect.sheenAlpha` | 0.08 |
 | `effect.areaWashAlpha` | 0.22 |
 | `effect.headerTintAlpha` | 0.18 |
+| `effect.nodeActiveWashAlpha` | 0.14 |
+| `effect.nodeActiveStrokeAlpha` | 0.72 |
+| `effect.nodeTrafficAlpha` | 0.82 |
+| `effect.nodePreviewAlpha` | 0.88 |
+| `effect.nodeMinimapAlpha` | 0.7 |
 | `effect.railWidth` | 3 |
+| `effect.semanticWashFaintAlpha` | 0.06 |
+| `effect.semanticWashAlpha` | 0.1 |
+| `effect.semanticWashStrongAlpha` | 0.16 |
+| `effect.semanticBorderAlpha` | 0.4 |
+| `effect.accentBorderAlpha` | 0.55 |
+| `effect.accentBorderStrongAlpha` | 0.7 |
+| `effect.subtleHoverAlpha` | 0.3 |
+| `effect.softContrastAlpha` | 0.18 |
+| `effect.contrastTintAlpha` | 0.28 |
+| `effect.trackRestingAlpha` | 0.55 |
+| `effect.contentVeilAlpha` | 0.88 |
+| `effect.criticalFillAlpha` | 0.84 |
+| `effect.criticalInactiveAlpha` | 0.1 |
+| `effect.variantLightAlpha` | 0.15 |
+| `effect.variantLightHoverAlpha` | 0.22 |
+| `effect.variantLightActiveAlpha` | 0.28 |
+| `effect.variantOutlineHoverAlpha` | 0.08 |
+| `effect.variantOutlineActiveAlpha` | 0.12 |
+| `effect.variantSubtleHoverAlpha` | 0.12 |
+| `effect.variantSubtleActiveAlpha` | 0.18 |
+| `effect.primaryHoverOpacity` | 0.9 |
+| `effect.customColorReadableDarkFloor` | 0.72 |
+| `effect.customColorReadableLightCeiling` | 0.4 |
+| `effect.customColorHoverLightnessDelta` | 0.05 |
+| `effect.customColorActiveLightnessDelta` | 0.1 |
 
 ### Contrast
 
@@ -814,6 +935,7 @@ Appearance: `Light`.
 | `color.text.placeholder` | `#6f6f76` | `#6f6f76` |
 | `color.text.disabled` | `#7a7a81` | `#7a7a81` |
 | `color.text.onAccent` | `{neutral.ink}` | `#ffffff` |
+| `color.text.onPrimaryFill` | `{neutral.ink}` | `#ffffff` |
 | `color.interactive.hover` | `{neutral.850}/0f` | `#0a0a0c0f` |
 | `color.interactive.active` | `{neutral.850}/1c` | `#0a0a0c1c` |
 | `color.interactive.selected` | `{neutral.850}/14` | `#0a0a0c14` |
@@ -822,6 +944,10 @@ Appearance: `Light`.
 | `color.interactive.track` | `{neutral.850}/8c` | `#0a0a0c8c` |
 | `color.interactive.divider` | `{neutral.850}/14` | `#0a0a0c14` |
 | `color.interactive.focus` | `{indigo.400}` | `#4952c9` |
+| `color.interactive.primaryFill` | `{neutral.800}` | `#17171a` |
+| `color.interactive.whiteFill` | `#ffffff` | `#ffffff` |
+| `color.interactive.whiteFillHover` | `#f5f5f5` | `#f5f5f5` |
+| `color.interactive.whiteFillActive` | `#ebebeb` | `#ebebeb` |
 | `color.semantic.accent` | `{indigo.400}` | `#4952c9` |
 | `color.semantic.accentStrong` | `{indigo.600}` | `#363fa8` |
 | `color.semantic.danger` | `{red.400}` | `#d5322f` |
@@ -867,16 +993,50 @@ Appearance: `Light`.
 | `color.terminal.ansi.14` | `{ansi.14}` | `#155e75` |
 | `color.terminal.ansi.15` | `{ansi.15}` | `#18181b` |
 
+### Palette variant steps
+
+| Recipe | Preferred steps |
+|---|---|
+| `color.paletteSteps.filled` | `600 → 500 → 400` |
+| `color.paletteSteps.hover` | `700 → 600 → 500` |
+| `color.paletteSteps.active` | `800 → 700 → 600` |
+| `color.paletteSteps.readableDark` | `300 → 200 → 400` |
+| `color.paletteSteps.readableLight` | `700 → 800 → 600` |
+
 ### Spacing
 
 | Step | Pixels |
 |---|---:|
+| `xxs` | 2 |
 | `xs` | 4 |
 | `sm` | 8 |
 | `md` | 12 |
 | `lg` | 16 |
 | `xl` | 24 |
 | `xxl` | 32 |
+
+### Measures
+
+| Token | Pixels |
+|---|---:|
+| `measure.readableWidth` | 360 |
+| `measure.dialogWidth` | 360 |
+| `measure.menuMinWidth` | 200 |
+| `measure.compactMenuMinWidth` | 180 |
+| `measure.menuMaxHeight` | 320 |
+| `measure.compactMenuMaxHeight` | 240 |
+| `measure.standaloneIcon` | 20 |
+| `measure.scrollbarTrack` | 10 |
+| `measure.scrollbarThumb` | 6 |
+| `measure.scrollbarMinThumb` | 24 |
+| `measure.caretWidth` | 1.5 |
+| `measure.textDecorationWidth` | 1 |
+| `measure.progressTrackHeight` | 4 |
+| `measure.sliderTrackHeight` | 6 |
+| `measure.compactOverlayWidth` | 320 |
+| `measure.mediaViewerHeight` | 320 |
+| `measure.timelineRailWidth` | 16 |
+| `measure.statusMark` | 7 |
 
 ### Radius
 
@@ -905,6 +1065,20 @@ Appearance: `Light`.
 | `compact` | 0.75 | 0.86 | 0.94 |
 | `comfortable` | 1 | 1 | 1 |
 
+### Typography
+
+Numeric readout scale: 1.6×
+
+| Step | Size | Line height | Weight |
+|---|---:|---:|---:|---:|
+| `caption` | 10.5 | 14 | 400 |
+| `label` | 12 | 16 | 500 |
+| `body` | 13 | 19 | 400 |
+| `strong` | 13 | 19 | 600 |
+| `subtitle` | 14 | 20 | 600 |
+| `title` | 16 | 22 | 600 |
+| `code` | 12 | 18 | 400 |
+
 ### Elevation
 
 | Step | Layer | Y | Blur | Spread | Color |
@@ -930,6 +1104,29 @@ Appearance: `Light`.
 | `Toast` | 600 |
 
 ### Motion
+
+| Duration | Milliseconds |
+|---|---:|
+| `motion.durationMs.instant` | 90 |
+| `motion.durationMs.quick` | 150 |
+| `motion.durationMs.menu` | 140 |
+| `motion.durationMs.dialog` | 180 |
+| `motion.durationMs.resize` | 200 |
+| `motion.durationMs.entrance` | 500 |
+| `motion.durationMs.spin` | 900 |
+| `motion.durationMs.slow` | 320 |
+| `motion.durationMs.staggerStep` | 16 |
+| `motion.durationMs.microBounce` | 360 |
+| `motion.durationMs.microWobble` | 280 |
+| `motion.durationMs.microPop` | 240 |
+| `motion.durationMs.pulse` | 2400 |
+| `motion.durationMs.shimmer` | 1400 |
+| `motion.durationMs.toast` | 6000 |
+| `motion.durationMs.hoverCardOpen` | 400 |
+| `motion.durationMs.hoverCardGrace` | 300 |
+| `motion.durationMs.confirmation` | 1600 |
+
+Row stagger maximum items: `8`.
 
 | Easing | Curve |
 |---|---|
@@ -976,14 +1173,59 @@ Appearance: `Light`.
 |---|---:|
 | `effect.edgeFadeBand` | 20 |
 | `effect.selectedRingAlpha` | 0.12 |
+| `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.8 |
+| `effect.glowAlpha` | 0.18 |
+| `effect.glowBlur` | 12 |
+| `effect.glowSpread` | -5 |
 | `effect.glassAlpha` | 0.78 |
 | `effect.glassBlur` | 24 |
+| `effect.glassLiquidAlpha` | 0.34 |
+| `effect.glassBevel` | 18 |
+| `effect.glassRefraction` | 0.9 |
+| `effect.glassDispersion` | 0.12 |
+| `effect.glassSpecular` | 0.28 |
+| `effect.glassSpecularSharpness` | 12 |
+| `effect.glassLightAngle` | 0.7853982 |
+| `effect.glassMergeDistance` | 28 |
+| `effect.glassContrastFlipLow` | 0.42 |
+| `effect.glassContrastFlipHigh` | 0.58 |
+| `effect.glassPressDepth` | 1.5 |
 | `effect.sheenAlpha` | 0.05 |
 | `effect.areaWashAlpha` | 0.16 |
 | `effect.headerTintAlpha` | 0.14 |
+| `effect.nodeActiveWashAlpha` | 0.14 |
+| `effect.nodeActiveStrokeAlpha` | 0.72 |
+| `effect.nodeTrafficAlpha` | 0.82 |
+| `effect.nodePreviewAlpha` | 0.88 |
+| `effect.nodeMinimapAlpha` | 0.7 |
 | `effect.railWidth` | 3 |
+| `effect.semanticWashFaintAlpha` | 0.06 |
+| `effect.semanticWashAlpha` | 0.1 |
+| `effect.semanticWashStrongAlpha` | 0.16 |
+| `effect.semanticBorderAlpha` | 0.4 |
+| `effect.accentBorderAlpha` | 0.55 |
+| `effect.accentBorderStrongAlpha` | 0.7 |
+| `effect.subtleHoverAlpha` | 0.3 |
+| `effect.softContrastAlpha` | 0.18 |
+| `effect.contrastTintAlpha` | 0.28 |
+| `effect.trackRestingAlpha` | 0.55 |
+| `effect.contentVeilAlpha` | 0.88 |
+| `effect.criticalFillAlpha` | 0.84 |
+| `effect.criticalInactiveAlpha` | 0.1 |
+| `effect.variantLightAlpha` | 0.15 |
+| `effect.variantLightHoverAlpha` | 0.22 |
+| `effect.variantLightActiveAlpha` | 0.28 |
+| `effect.variantOutlineHoverAlpha` | 0.08 |
+| `effect.variantOutlineActiveAlpha` | 0.12 |
+| `effect.variantSubtleHoverAlpha` | 0.12 |
+| `effect.variantSubtleActiveAlpha` | 0.18 |
+| `effect.primaryHoverOpacity` | 0.9 |
+| `effect.customColorReadableDarkFloor` | 0.72 |
+| `effect.customColorReadableLightCeiling` | 0.4 |
+| `effect.customColorHoverLightnessDelta` | 0.05 |
+| `effect.customColorActiveLightnessDelta` | 0.1 |
 
 ### Contrast
 
@@ -1425,6 +1667,7 @@ Appearance: `Dark`.
 | `color.text.placeholder` | `#868cab` | `#868cab` |
 | `color.text.disabled` | `#797fa0` | `#797fa0` |
 | `color.text.onAccent` | `{neutral.ink}` | `#11111b` |
+| `color.text.onPrimaryFill` | `{neutral.ink}` | `#11111b` |
 | `color.interactive.hover` | `{neutral.850}/14` | `#cdd6f414` |
 | `color.interactive.active` | `{neutral.850}/24` | `#cdd6f424` |
 | `color.interactive.selected` | `{neutral.850}/1c` | `#cdd6f41c` |
@@ -1433,6 +1676,10 @@ Appearance: `Dark`.
 | `color.interactive.track` | `{neutral.900}/66` | `#ffffff66` |
 | `color.interactive.divider` | `{neutral.900}/10` | `#ffffff10` |
 | `color.interactive.focus` | `#89b4fa` | `#89b4fa` |
+| `color.interactive.primaryFill` | `{neutral.800}` | `#cdd6f4` |
+| `color.interactive.whiteFill` | `#ffffff` | `#ffffff` |
+| `color.interactive.whiteFillHover` | `#f5f5f5` | `#f5f5f5` |
+| `color.interactive.whiteFillActive` | `#ebebeb` | `#ebebeb` |
 | `color.semantic.accent` | `#89b4fa` | `#89b4fa` |
 | `color.semantic.accentStrong` | `#b4befe` | `#b4befe` |
 | `color.semantic.danger` | `#f38ba8` | `#f38ba8` |
@@ -1478,16 +1725,50 @@ Appearance: `Dark`.
 | `color.terminal.ansi.14` | `{ansi.14}` | `#94e2d5` |
 | `color.terminal.ansi.15` | `{ansi.15}` | `#a6adc8` |
 
+### Palette variant steps
+
+| Recipe | Preferred steps |
+|---|---|
+| `color.paletteSteps.filled` | `600 → 500 → 400` |
+| `color.paletteSteps.hover` | `700 → 600 → 500` |
+| `color.paletteSteps.active` | `800 → 700 → 600` |
+| `color.paletteSteps.readableDark` | `300 → 200 → 400` |
+| `color.paletteSteps.readableLight` | `700 → 800 → 600` |
+
 ### Spacing
 
 | Step | Pixels |
 |---|---:|
+| `xxs` | 2 |
 | `xs` | 4 |
 | `sm` | 8 |
 | `md` | 12 |
 | `lg` | 16 |
 | `xl` | 24 |
 | `xxl` | 32 |
+
+### Measures
+
+| Token | Pixels |
+|---|---:|
+| `measure.readableWidth` | 360 |
+| `measure.dialogWidth` | 360 |
+| `measure.menuMinWidth` | 200 |
+| `measure.compactMenuMinWidth` | 180 |
+| `measure.menuMaxHeight` | 320 |
+| `measure.compactMenuMaxHeight` | 240 |
+| `measure.standaloneIcon` | 20 |
+| `measure.scrollbarTrack` | 10 |
+| `measure.scrollbarThumb` | 6 |
+| `measure.scrollbarMinThumb` | 24 |
+| `measure.caretWidth` | 1.5 |
+| `measure.textDecorationWidth` | 1 |
+| `measure.progressTrackHeight` | 4 |
+| `measure.sliderTrackHeight` | 6 |
+| `measure.compactOverlayWidth` | 320 |
+| `measure.mediaViewerHeight` | 320 |
+| `measure.timelineRailWidth` | 16 |
+| `measure.statusMark` | 7 |
 
 ### Radius
 
@@ -1516,6 +1797,20 @@ Appearance: `Dark`.
 | `compact` | 0.75 | 0.86 | 0.94 |
 | `comfortable` | 1 | 1 | 1 |
 
+### Typography
+
+Numeric readout scale: 1.6×
+
+| Step | Size | Line height | Weight |
+|---|---:|---:|---:|---:|
+| `caption` | 10.5 | 14 | 400 |
+| `label` | 12 | 16 | 500 |
+| `body` | 13 | 19 | 400 |
+| `strong` | 13 | 19 | 600 |
+| `subtitle` | 14 | 20 | 600 |
+| `title` | 16 | 22 | 600 |
+| `code` | 12 | 18 | 400 |
+
 ### Elevation
 
 | Step | Layer | Y | Blur | Spread | Color |
@@ -1541,6 +1836,29 @@ Appearance: `Dark`.
 | `Toast` | 600 |
 
 ### Motion
+
+| Duration | Milliseconds |
+|---|---:|
+| `motion.durationMs.instant` | 90 |
+| `motion.durationMs.quick` | 150 |
+| `motion.durationMs.menu` | 140 |
+| `motion.durationMs.dialog` | 180 |
+| `motion.durationMs.resize` | 200 |
+| `motion.durationMs.entrance` | 500 |
+| `motion.durationMs.spin` | 900 |
+| `motion.durationMs.slow` | 320 |
+| `motion.durationMs.staggerStep` | 16 |
+| `motion.durationMs.microBounce` | 360 |
+| `motion.durationMs.microWobble` | 280 |
+| `motion.durationMs.microPop` | 240 |
+| `motion.durationMs.pulse` | 2400 |
+| `motion.durationMs.shimmer` | 1400 |
+| `motion.durationMs.toast` | 6000 |
+| `motion.durationMs.hoverCardOpen` | 400 |
+| `motion.durationMs.hoverCardGrace` | 300 |
+| `motion.durationMs.confirmation` | 1600 |
+
+Row stagger maximum items: `8`.
 
 | Easing | Curve |
 |---|---|
@@ -1587,14 +1905,59 @@ Appearance: `Dark`.
 |---|---:|
 | `effect.edgeFadeBand` | 20 |
 | `effect.selectedRingAlpha` | 0.09 |
+| `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.7 |
+| `effect.glowAlpha` | 0.26 |
+| `effect.glowBlur` | 12 |
+| `effect.glowSpread` | -5 |
 | `effect.glassAlpha` | 0.72 |
 | `effect.glassBlur` | 24 |
+| `effect.glassLiquidAlpha` | 0.34 |
+| `effect.glassBevel` | 18 |
+| `effect.glassRefraction` | 0.9 |
+| `effect.glassDispersion` | 0.16 |
+| `effect.glassSpecular` | 0.4 |
+| `effect.glassSpecularSharpness` | 12 |
+| `effect.glassLightAngle` | 0.7853982 |
+| `effect.glassMergeDistance` | 28 |
+| `effect.glassContrastFlipLow` | 0.42 |
+| `effect.glassContrastFlipHigh` | 0.58 |
+| `effect.glassPressDepth` | 1.5 |
 | `effect.sheenAlpha` | 0.08 |
 | `effect.areaWashAlpha` | 0.22 |
 | `effect.headerTintAlpha` | 0.18 |
+| `effect.nodeActiveWashAlpha` | 0.14 |
+| `effect.nodeActiveStrokeAlpha` | 0.72 |
+| `effect.nodeTrafficAlpha` | 0.82 |
+| `effect.nodePreviewAlpha` | 0.88 |
+| `effect.nodeMinimapAlpha` | 0.7 |
 | `effect.railWidth` | 3 |
+| `effect.semanticWashFaintAlpha` | 0.06 |
+| `effect.semanticWashAlpha` | 0.1 |
+| `effect.semanticWashStrongAlpha` | 0.16 |
+| `effect.semanticBorderAlpha` | 0.4 |
+| `effect.accentBorderAlpha` | 0.55 |
+| `effect.accentBorderStrongAlpha` | 0.7 |
+| `effect.subtleHoverAlpha` | 0.3 |
+| `effect.softContrastAlpha` | 0.18 |
+| `effect.contrastTintAlpha` | 0.28 |
+| `effect.trackRestingAlpha` | 0.55 |
+| `effect.contentVeilAlpha` | 0.88 |
+| `effect.criticalFillAlpha` | 0.84 |
+| `effect.criticalInactiveAlpha` | 0.1 |
+| `effect.variantLightAlpha` | 0.15 |
+| `effect.variantLightHoverAlpha` | 0.22 |
+| `effect.variantLightActiveAlpha` | 0.28 |
+| `effect.variantOutlineHoverAlpha` | 0.08 |
+| `effect.variantOutlineActiveAlpha` | 0.12 |
+| `effect.variantSubtleHoverAlpha` | 0.12 |
+| `effect.variantSubtleActiveAlpha` | 0.18 |
+| `effect.primaryHoverOpacity` | 0.9 |
+| `effect.customColorReadableDarkFloor` | 0.72 |
+| `effect.customColorReadableLightCeiling` | 0.4 |
+| `effect.customColorHoverLightnessDelta` | 0.05 |
+| `effect.customColorActiveLightnessDelta` | 0.1 |
 
 ### Contrast
 
@@ -2036,6 +2399,7 @@ Appearance: `Light`.
 | `color.text.placeholder` | `#6f7289` | `#6f7289` |
 | `color.text.disabled` | `#797c92` | `#797c92` |
 | `color.text.onAccent` | `{neutral.ink}` | `#ffffff` |
+| `color.text.onPrimaryFill` | `{neutral.ink}` | `#ffffff` |
 | `color.interactive.hover` | `{neutral.850}/0f` | `#2325370f` |
 | `color.interactive.active` | `{neutral.850}/1c` | `#2325371c` |
 | `color.interactive.selected` | `{neutral.850}/14` | `#23253714` |
@@ -2044,6 +2408,10 @@ Appearance: `Light`.
 | `color.interactive.track` | `{neutral.850}/8c` | `#2325378c` |
 | `color.interactive.divider` | `{neutral.850}/14` | `#23253714` |
 | `color.interactive.focus` | `#1e66f5` | `#1e66f5` |
+| `color.interactive.primaryFill` | `{neutral.800}` | `#4c4f69` |
+| `color.interactive.whiteFill` | `#ffffff` | `#ffffff` |
+| `color.interactive.whiteFillHover` | `#f5f5f5` | `#f5f5f5` |
+| `color.interactive.whiteFillActive` | `#ebebeb` | `#ebebeb` |
 | `color.semantic.accent` | `#1e66f5` | `#1e66f5` |
 | `color.semantic.accentStrong` | `#8032e6` | `#8032e6` |
 | `color.semantic.danger` | `#d20f39` | `#d20f39` |
@@ -2089,16 +2457,50 @@ Appearance: `Light`.
 | `color.terminal.ansi.14` | `{ansi.14}` | `#179299` |
 | `color.terminal.ansi.15` | `{ansi.15}` | `#4c4f69` |
 
+### Palette variant steps
+
+| Recipe | Preferred steps |
+|---|---|
+| `color.paletteSteps.filled` | `600 → 500 → 400` |
+| `color.paletteSteps.hover` | `700 → 600 → 500` |
+| `color.paletteSteps.active` | `800 → 700 → 600` |
+| `color.paletteSteps.readableDark` | `300 → 200 → 400` |
+| `color.paletteSteps.readableLight` | `700 → 800 → 600` |
+
 ### Spacing
 
 | Step | Pixels |
 |---|---:|
+| `xxs` | 2 |
 | `xs` | 4 |
 | `sm` | 8 |
 | `md` | 12 |
 | `lg` | 16 |
 | `xl` | 24 |
 | `xxl` | 32 |
+
+### Measures
+
+| Token | Pixels |
+|---|---:|
+| `measure.readableWidth` | 360 |
+| `measure.dialogWidth` | 360 |
+| `measure.menuMinWidth` | 200 |
+| `measure.compactMenuMinWidth` | 180 |
+| `measure.menuMaxHeight` | 320 |
+| `measure.compactMenuMaxHeight` | 240 |
+| `measure.standaloneIcon` | 20 |
+| `measure.scrollbarTrack` | 10 |
+| `measure.scrollbarThumb` | 6 |
+| `measure.scrollbarMinThumb` | 24 |
+| `measure.caretWidth` | 1.5 |
+| `measure.textDecorationWidth` | 1 |
+| `measure.progressTrackHeight` | 4 |
+| `measure.sliderTrackHeight` | 6 |
+| `measure.compactOverlayWidth` | 320 |
+| `measure.mediaViewerHeight` | 320 |
+| `measure.timelineRailWidth` | 16 |
+| `measure.statusMark` | 7 |
 
 ### Radius
 
@@ -2127,6 +2529,20 @@ Appearance: `Light`.
 | `compact` | 0.75 | 0.86 | 0.94 |
 | `comfortable` | 1 | 1 | 1 |
 
+### Typography
+
+Numeric readout scale: 1.6×
+
+| Step | Size | Line height | Weight |
+|---|---:|---:|---:|---:|
+| `caption` | 10.5 | 14 | 400 |
+| `label` | 12 | 16 | 500 |
+| `body` | 13 | 19 | 400 |
+| `strong` | 13 | 19 | 600 |
+| `subtitle` | 14 | 20 | 600 |
+| `title` | 16 | 22 | 600 |
+| `code` | 12 | 18 | 400 |
+
 ### Elevation
 
 | Step | Layer | Y | Blur | Spread | Color |
@@ -2152,6 +2568,29 @@ Appearance: `Light`.
 | `Toast` | 600 |
 
 ### Motion
+
+| Duration | Milliseconds |
+|---|---:|
+| `motion.durationMs.instant` | 90 |
+| `motion.durationMs.quick` | 150 |
+| `motion.durationMs.menu` | 140 |
+| `motion.durationMs.dialog` | 180 |
+| `motion.durationMs.resize` | 200 |
+| `motion.durationMs.entrance` | 500 |
+| `motion.durationMs.spin` | 900 |
+| `motion.durationMs.slow` | 320 |
+| `motion.durationMs.staggerStep` | 16 |
+| `motion.durationMs.microBounce` | 360 |
+| `motion.durationMs.microWobble` | 280 |
+| `motion.durationMs.microPop` | 240 |
+| `motion.durationMs.pulse` | 2400 |
+| `motion.durationMs.shimmer` | 1400 |
+| `motion.durationMs.toast` | 6000 |
+| `motion.durationMs.hoverCardOpen` | 400 |
+| `motion.durationMs.hoverCardGrace` | 300 |
+| `motion.durationMs.confirmation` | 1600 |
+
+Row stagger maximum items: `8`.
 
 | Easing | Curve |
 |---|---|
@@ -2198,14 +2637,59 @@ Appearance: `Light`.
 |---|---:|
 | `effect.edgeFadeBand` | 20 |
 | `effect.selectedRingAlpha` | 0.12 |
+| `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 1 |
+| `effect.glowAlpha` | 0.18 |
+| `effect.glowBlur` | 12 |
+| `effect.glowSpread` | -5 |
 | `effect.glassAlpha` | 0.78 |
 | `effect.glassBlur` | 24 |
+| `effect.glassLiquidAlpha` | 0.34 |
+| `effect.glassBevel` | 18 |
+| `effect.glassRefraction` | 0.9 |
+| `effect.glassDispersion` | 0.12 |
+| `effect.glassSpecular` | 0.28 |
+| `effect.glassSpecularSharpness` | 12 |
+| `effect.glassLightAngle` | 0.7853982 |
+| `effect.glassMergeDistance` | 28 |
+| `effect.glassContrastFlipLow` | 0.42 |
+| `effect.glassContrastFlipHigh` | 0.58 |
+| `effect.glassPressDepth` | 1.5 |
 | `effect.sheenAlpha` | 0.05 |
 | `effect.areaWashAlpha` | 0.16 |
 | `effect.headerTintAlpha` | 0.14 |
+| `effect.nodeActiveWashAlpha` | 0.14 |
+| `effect.nodeActiveStrokeAlpha` | 0.72 |
+| `effect.nodeTrafficAlpha` | 0.82 |
+| `effect.nodePreviewAlpha` | 0.88 |
+| `effect.nodeMinimapAlpha` | 0.7 |
 | `effect.railWidth` | 3 |
+| `effect.semanticWashFaintAlpha` | 0.06 |
+| `effect.semanticWashAlpha` | 0.1 |
+| `effect.semanticWashStrongAlpha` | 0.16 |
+| `effect.semanticBorderAlpha` | 0.4 |
+| `effect.accentBorderAlpha` | 0.55 |
+| `effect.accentBorderStrongAlpha` | 0.7 |
+| `effect.subtleHoverAlpha` | 0.3 |
+| `effect.softContrastAlpha` | 0.18 |
+| `effect.contrastTintAlpha` | 0.28 |
+| `effect.trackRestingAlpha` | 0.55 |
+| `effect.contentVeilAlpha` | 0.88 |
+| `effect.criticalFillAlpha` | 0.84 |
+| `effect.criticalInactiveAlpha` | 0.1 |
+| `effect.variantLightAlpha` | 0.15 |
+| `effect.variantLightHoverAlpha` | 0.22 |
+| `effect.variantLightActiveAlpha` | 0.28 |
+| `effect.variantOutlineHoverAlpha` | 0.08 |
+| `effect.variantOutlineActiveAlpha` | 0.12 |
+| `effect.variantSubtleHoverAlpha` | 0.12 |
+| `effect.variantSubtleActiveAlpha` | 0.18 |
+| `effect.primaryHoverOpacity` | 0.9 |
+| `effect.customColorReadableDarkFloor` | 0.72 |
+| `effect.customColorReadableLightCeiling` | 0.4 |
+| `effect.customColorHoverLightnessDelta` | 0.05 |
+| `effect.customColorActiveLightnessDelta` | 0.1 |
 
 ### Contrast
 
@@ -2647,6 +3131,7 @@ Appearance: `Dark`.
 | `color.text.placeholder` | `#98a4b8` | `#98a4b8` |
 | `color.text.disabled` | `#8794a9` | `#8794a9` |
 | `color.text.onAccent` | `{neutral.ink}` | `#1c2027` |
+| `color.text.onPrimaryFill` | `{neutral.ink}` | `#1c2027` |
 | `color.interactive.hover` | `{neutral.850}/14` | `#e5e9f014` |
 | `color.interactive.active` | `{neutral.850}/24` | `#e5e9f024` |
 | `color.interactive.selected` | `{neutral.850}/1c` | `#e5e9f01c` |
@@ -2655,6 +3140,10 @@ Appearance: `Dark`.
 | `color.interactive.track` | `{neutral.900}/66` | `#ffffff66` |
 | `color.interactive.divider` | `{neutral.900}/10` | `#ffffff10` |
 | `color.interactive.focus` | `#88c0d0` | `#88c0d0` |
+| `color.interactive.primaryFill` | `{neutral.800}` | `#eceff4` |
+| `color.interactive.whiteFill` | `#ffffff` | `#ffffff` |
+| `color.interactive.whiteFillHover` | `#f5f5f5` | `#f5f5f5` |
+| `color.interactive.whiteFillActive` | `#ebebeb` | `#ebebeb` |
 | `color.semantic.accent` | `#88c0d0` | `#88c0d0` |
 | `color.semantic.accentStrong` | `#7595c4` | `#7595c4` |
 | `color.semantic.danger` | `#cf7c85` | `#cf7c85` |
@@ -2700,16 +3189,50 @@ Appearance: `Dark`.
 | `color.terminal.ansi.14` | `{ansi.14}` | `#8fbcbb` |
 | `color.terminal.ansi.15` | `{ansi.15}` | `#eceff4` |
 
+### Palette variant steps
+
+| Recipe | Preferred steps |
+|---|---|
+| `color.paletteSteps.filled` | `600 → 500 → 400` |
+| `color.paletteSteps.hover` | `700 → 600 → 500` |
+| `color.paletteSteps.active` | `800 → 700 → 600` |
+| `color.paletteSteps.readableDark` | `300 → 200 → 400` |
+| `color.paletteSteps.readableLight` | `700 → 800 → 600` |
+
 ### Spacing
 
 | Step | Pixels |
 |---|---:|
+| `xxs` | 2 |
 | `xs` | 4 |
 | `sm` | 8 |
 | `md` | 12 |
 | `lg` | 16 |
 | `xl` | 24 |
 | `xxl` | 32 |
+
+### Measures
+
+| Token | Pixels |
+|---|---:|
+| `measure.readableWidth` | 360 |
+| `measure.dialogWidth` | 360 |
+| `measure.menuMinWidth` | 200 |
+| `measure.compactMenuMinWidth` | 180 |
+| `measure.menuMaxHeight` | 320 |
+| `measure.compactMenuMaxHeight` | 240 |
+| `measure.standaloneIcon` | 20 |
+| `measure.scrollbarTrack` | 10 |
+| `measure.scrollbarThumb` | 6 |
+| `measure.scrollbarMinThumb` | 24 |
+| `measure.caretWidth` | 1.5 |
+| `measure.textDecorationWidth` | 1 |
+| `measure.progressTrackHeight` | 4 |
+| `measure.sliderTrackHeight` | 6 |
+| `measure.compactOverlayWidth` | 320 |
+| `measure.mediaViewerHeight` | 320 |
+| `measure.timelineRailWidth` | 16 |
+| `measure.statusMark` | 7 |
 
 ### Radius
 
@@ -2738,6 +3261,20 @@ Appearance: `Dark`.
 | `compact` | 0.75 | 0.86 | 0.94 |
 | `comfortable` | 1 | 1 | 1 |
 
+### Typography
+
+Numeric readout scale: 1.6×
+
+| Step | Size | Line height | Weight |
+|---|---:|---:|---:|---:|
+| `caption` | 10.5 | 14 | 400 |
+| `label` | 12 | 16 | 500 |
+| `body` | 13 | 19 | 400 |
+| `strong` | 13 | 19 | 600 |
+| `subtitle` | 14 | 20 | 600 |
+| `title` | 16 | 22 | 600 |
+| `code` | 12 | 18 | 400 |
+
 ### Elevation
 
 | Step | Layer | Y | Blur | Spread | Color |
@@ -2763,6 +3300,29 @@ Appearance: `Dark`.
 | `Toast` | 600 |
 
 ### Motion
+
+| Duration | Milliseconds |
+|---|---:|
+| `motion.durationMs.instant` | 90 |
+| `motion.durationMs.quick` | 150 |
+| `motion.durationMs.menu` | 140 |
+| `motion.durationMs.dialog` | 180 |
+| `motion.durationMs.resize` | 200 |
+| `motion.durationMs.entrance` | 500 |
+| `motion.durationMs.spin` | 900 |
+| `motion.durationMs.slow` | 320 |
+| `motion.durationMs.staggerStep` | 16 |
+| `motion.durationMs.microBounce` | 360 |
+| `motion.durationMs.microWobble` | 280 |
+| `motion.durationMs.microPop` | 240 |
+| `motion.durationMs.pulse` | 2400 |
+| `motion.durationMs.shimmer` | 1400 |
+| `motion.durationMs.toast` | 6000 |
+| `motion.durationMs.hoverCardOpen` | 400 |
+| `motion.durationMs.hoverCardGrace` | 300 |
+| `motion.durationMs.confirmation` | 1600 |
+
+Row stagger maximum items: `8`.
 
 | Easing | Curve |
 |---|---|
@@ -2809,14 +3369,59 @@ Appearance: `Dark`.
 |---|---:|
 | `effect.edgeFadeBand` | 20 |
 | `effect.selectedRingAlpha` | 0.09 |
+| `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.7 |
+| `effect.glowAlpha` | 0.26 |
+| `effect.glowBlur` | 12 |
+| `effect.glowSpread` | -5 |
 | `effect.glassAlpha` | 0.72 |
 | `effect.glassBlur` | 24 |
+| `effect.glassLiquidAlpha` | 0.34 |
+| `effect.glassBevel` | 18 |
+| `effect.glassRefraction` | 0.9 |
+| `effect.glassDispersion` | 0.16 |
+| `effect.glassSpecular` | 0.4 |
+| `effect.glassSpecularSharpness` | 12 |
+| `effect.glassLightAngle` | 0.7853982 |
+| `effect.glassMergeDistance` | 28 |
+| `effect.glassContrastFlipLow` | 0.42 |
+| `effect.glassContrastFlipHigh` | 0.58 |
+| `effect.glassPressDepth` | 1.5 |
 | `effect.sheenAlpha` | 0.08 |
 | `effect.areaWashAlpha` | 0.22 |
 | `effect.headerTintAlpha` | 0.18 |
+| `effect.nodeActiveWashAlpha` | 0.14 |
+| `effect.nodeActiveStrokeAlpha` | 0.72 |
+| `effect.nodeTrafficAlpha` | 0.82 |
+| `effect.nodePreviewAlpha` | 0.88 |
+| `effect.nodeMinimapAlpha` | 0.7 |
 | `effect.railWidth` | 3 |
+| `effect.semanticWashFaintAlpha` | 0.06 |
+| `effect.semanticWashAlpha` | 0.1 |
+| `effect.semanticWashStrongAlpha` | 0.16 |
+| `effect.semanticBorderAlpha` | 0.4 |
+| `effect.accentBorderAlpha` | 0.55 |
+| `effect.accentBorderStrongAlpha` | 0.7 |
+| `effect.subtleHoverAlpha` | 0.3 |
+| `effect.softContrastAlpha` | 0.18 |
+| `effect.contrastTintAlpha` | 0.28 |
+| `effect.trackRestingAlpha` | 0.55 |
+| `effect.contentVeilAlpha` | 0.88 |
+| `effect.criticalFillAlpha` | 0.84 |
+| `effect.criticalInactiveAlpha` | 0.1 |
+| `effect.variantLightAlpha` | 0.15 |
+| `effect.variantLightHoverAlpha` | 0.22 |
+| `effect.variantLightActiveAlpha` | 0.28 |
+| `effect.variantOutlineHoverAlpha` | 0.08 |
+| `effect.variantOutlineActiveAlpha` | 0.12 |
+| `effect.variantSubtleHoverAlpha` | 0.12 |
+| `effect.variantSubtleActiveAlpha` | 0.18 |
+| `effect.primaryHoverOpacity` | 0.9 |
+| `effect.customColorReadableDarkFloor` | 0.72 |
+| `effect.customColorReadableLightCeiling` | 0.4 |
+| `effect.customColorHoverLightnessDelta` | 0.05 |
+| `effect.customColorActiveLightnessDelta` | 0.1 |
 
 ### Contrast
 
@@ -3258,6 +3863,7 @@ Appearance: `Dark`.
 | `color.text.placeholder` | `#858db5` | `#858db5` |
 | `color.text.disabled` | `#787fa8` | `#787fa8` |
 | `color.text.onAccent` | `{neutral.ink}` | `#16161e` |
+| `color.text.onPrimaryFill` | `{neutral.ink}` | `#16161e` |
 | `color.interactive.hover` | `{neutral.850}/14` | `#c0caf514` |
 | `color.interactive.active` | `{neutral.850}/24` | `#c0caf524` |
 | `color.interactive.selected` | `{neutral.850}/1c` | `#c0caf51c` |
@@ -3266,6 +3872,10 @@ Appearance: `Dark`.
 | `color.interactive.track` | `{neutral.900}/66` | `#ffffff66` |
 | `color.interactive.divider` | `{neutral.900}/10` | `#ffffff10` |
 | `color.interactive.focus` | `#7aa2f7` | `#7aa2f7` |
+| `color.interactive.primaryFill` | `{neutral.800}` | `#c0caf5` |
+| `color.interactive.whiteFill` | `#ffffff` | `#ffffff` |
+| `color.interactive.whiteFillHover` | `#f5f5f5` | `#f5f5f5` |
+| `color.interactive.whiteFillActive` | `#ebebeb` | `#ebebeb` |
 | `color.semantic.accent` | `#7aa2f7` | `#7aa2f7` |
 | `color.semantic.accentStrong` | `#bb9af7` | `#bb9af7` |
 | `color.semantic.danger` | `#f7768e` | `#f7768e` |
@@ -3311,16 +3921,50 @@ Appearance: `Dark`.
 | `color.terminal.ansi.14` | `{ansi.14}` | `#0db9d7` |
 | `color.terminal.ansi.15` | `{ansi.15}` | `#c0caf5` |
 
+### Palette variant steps
+
+| Recipe | Preferred steps |
+|---|---|
+| `color.paletteSteps.filled` | `600 → 500 → 400` |
+| `color.paletteSteps.hover` | `700 → 600 → 500` |
+| `color.paletteSteps.active` | `800 → 700 → 600` |
+| `color.paletteSteps.readableDark` | `300 → 200 → 400` |
+| `color.paletteSteps.readableLight` | `700 → 800 → 600` |
+
 ### Spacing
 
 | Step | Pixels |
 |---|---:|
+| `xxs` | 2 |
 | `xs` | 4 |
 | `sm` | 8 |
 | `md` | 12 |
 | `lg` | 16 |
 | `xl` | 24 |
 | `xxl` | 32 |
+
+### Measures
+
+| Token | Pixels |
+|---|---:|
+| `measure.readableWidth` | 360 |
+| `measure.dialogWidth` | 360 |
+| `measure.menuMinWidth` | 200 |
+| `measure.compactMenuMinWidth` | 180 |
+| `measure.menuMaxHeight` | 320 |
+| `measure.compactMenuMaxHeight` | 240 |
+| `measure.standaloneIcon` | 20 |
+| `measure.scrollbarTrack` | 10 |
+| `measure.scrollbarThumb` | 6 |
+| `measure.scrollbarMinThumb` | 24 |
+| `measure.caretWidth` | 1.5 |
+| `measure.textDecorationWidth` | 1 |
+| `measure.progressTrackHeight` | 4 |
+| `measure.sliderTrackHeight` | 6 |
+| `measure.compactOverlayWidth` | 320 |
+| `measure.mediaViewerHeight` | 320 |
+| `measure.timelineRailWidth` | 16 |
+| `measure.statusMark` | 7 |
 
 ### Radius
 
@@ -3349,6 +3993,20 @@ Appearance: `Dark`.
 | `compact` | 0.75 | 0.86 | 0.94 |
 | `comfortable` | 1 | 1 | 1 |
 
+### Typography
+
+Numeric readout scale: 1.6×
+
+| Step | Size | Line height | Weight |
+|---|---:|---:|---:|---:|
+| `caption` | 10.5 | 14 | 400 |
+| `label` | 12 | 16 | 500 |
+| `body` | 13 | 19 | 400 |
+| `strong` | 13 | 19 | 600 |
+| `subtitle` | 14 | 20 | 600 |
+| `title` | 16 | 22 | 600 |
+| `code` | 12 | 18 | 400 |
+
 ### Elevation
 
 | Step | Layer | Y | Blur | Spread | Color |
@@ -3374,6 +4032,29 @@ Appearance: `Dark`.
 | `Toast` | 600 |
 
 ### Motion
+
+| Duration | Milliseconds |
+|---|---:|
+| `motion.durationMs.instant` | 90 |
+| `motion.durationMs.quick` | 150 |
+| `motion.durationMs.menu` | 140 |
+| `motion.durationMs.dialog` | 180 |
+| `motion.durationMs.resize` | 200 |
+| `motion.durationMs.entrance` | 500 |
+| `motion.durationMs.spin` | 900 |
+| `motion.durationMs.slow` | 320 |
+| `motion.durationMs.staggerStep` | 16 |
+| `motion.durationMs.microBounce` | 360 |
+| `motion.durationMs.microWobble` | 280 |
+| `motion.durationMs.microPop` | 240 |
+| `motion.durationMs.pulse` | 2400 |
+| `motion.durationMs.shimmer` | 1400 |
+| `motion.durationMs.toast` | 6000 |
+| `motion.durationMs.hoverCardOpen` | 400 |
+| `motion.durationMs.hoverCardGrace` | 300 |
+| `motion.durationMs.confirmation` | 1600 |
+
+Row stagger maximum items: `8`.
 
 | Easing | Curve |
 |---|---|
@@ -3420,14 +4101,59 @@ Appearance: `Dark`.
 |---|---:|
 | `effect.edgeFadeBand` | 20 |
 | `effect.selectedRingAlpha` | 0.09 |
+| `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.7 |
+| `effect.glowAlpha` | 0.26 |
+| `effect.glowBlur` | 12 |
+| `effect.glowSpread` | -5 |
 | `effect.glassAlpha` | 0.72 |
 | `effect.glassBlur` | 24 |
+| `effect.glassLiquidAlpha` | 0.34 |
+| `effect.glassBevel` | 18 |
+| `effect.glassRefraction` | 0.9 |
+| `effect.glassDispersion` | 0.16 |
+| `effect.glassSpecular` | 0.4 |
+| `effect.glassSpecularSharpness` | 12 |
+| `effect.glassLightAngle` | 0.7853982 |
+| `effect.glassMergeDistance` | 28 |
+| `effect.glassContrastFlipLow` | 0.42 |
+| `effect.glassContrastFlipHigh` | 0.58 |
+| `effect.glassPressDepth` | 1.5 |
 | `effect.sheenAlpha` | 0.08 |
 | `effect.areaWashAlpha` | 0.22 |
 | `effect.headerTintAlpha` | 0.18 |
+| `effect.nodeActiveWashAlpha` | 0.14 |
+| `effect.nodeActiveStrokeAlpha` | 0.72 |
+| `effect.nodeTrafficAlpha` | 0.82 |
+| `effect.nodePreviewAlpha` | 0.88 |
+| `effect.nodeMinimapAlpha` | 0.7 |
 | `effect.railWidth` | 3 |
+| `effect.semanticWashFaintAlpha` | 0.06 |
+| `effect.semanticWashAlpha` | 0.1 |
+| `effect.semanticWashStrongAlpha` | 0.16 |
+| `effect.semanticBorderAlpha` | 0.4 |
+| `effect.accentBorderAlpha` | 0.55 |
+| `effect.accentBorderStrongAlpha` | 0.7 |
+| `effect.subtleHoverAlpha` | 0.3 |
+| `effect.softContrastAlpha` | 0.18 |
+| `effect.contrastTintAlpha` | 0.28 |
+| `effect.trackRestingAlpha` | 0.55 |
+| `effect.contentVeilAlpha` | 0.88 |
+| `effect.criticalFillAlpha` | 0.84 |
+| `effect.criticalInactiveAlpha` | 0.1 |
+| `effect.variantLightAlpha` | 0.15 |
+| `effect.variantLightHoverAlpha` | 0.22 |
+| `effect.variantLightActiveAlpha` | 0.28 |
+| `effect.variantOutlineHoverAlpha` | 0.08 |
+| `effect.variantOutlineActiveAlpha` | 0.12 |
+| `effect.variantSubtleHoverAlpha` | 0.12 |
+| `effect.variantSubtleActiveAlpha` | 0.18 |
+| `effect.primaryHoverOpacity` | 0.9 |
+| `effect.customColorReadableDarkFloor` | 0.72 |
+| `effect.customColorReadableLightCeiling` | 0.4 |
+| `effect.customColorHoverLightnessDelta` | 0.05 |
+| `effect.customColorActiveLightnessDelta` | 0.1 |
 
 ### Contrast
 
@@ -3869,6 +4595,7 @@ Appearance: `Dark`.
 | `color.text.placeholder` | `#9a8b7b` | `#9a8b7b` |
 | `color.text.disabled` | `#8d7f71` | `#8d7f71` |
 | `color.text.onAccent` | `{neutral.ink}` | `#1b1d1e` |
+| `color.text.onPrimaryFill` | `{neutral.ink}` | `#1b1d1e` |
 | `color.interactive.hover` | `{neutral.850}/14` | `#ebdbb214` |
 | `color.interactive.active` | `{neutral.850}/24` | `#ebdbb224` |
 | `color.interactive.selected` | `{neutral.850}/1c` | `#ebdbb21c` |
@@ -3877,6 +4604,10 @@ Appearance: `Dark`.
 | `color.interactive.track` | `{neutral.900}/66` | `#ffffff66` |
 | `color.interactive.divider` | `{neutral.900}/10` | `#ffffff10` |
 | `color.interactive.focus` | `#83a598` | `#83a598` |
+| `color.interactive.primaryFill` | `{neutral.800}` | `#ebdbb2` |
+| `color.interactive.whiteFill` | `#ffffff` | `#ffffff` |
+| `color.interactive.whiteFillHover` | `#f5f5f5` | `#f5f5f5` |
+| `color.interactive.whiteFillActive` | `#ebebeb` | `#ebebeb` |
 | `color.semantic.accent` | `#83a598` | `#83a598` |
 | `color.semantic.accentStrong` | `#8ec07c` | `#8ec07c` |
 | `color.semantic.danger` | `#fb4934` | `#fb4934` |
@@ -3922,16 +4653,50 @@ Appearance: `Dark`.
 | `color.terminal.ansi.14` | `{ansi.14}` | `#8ec07c` |
 | `color.terminal.ansi.15` | `{ansi.15}` | `#ebdbb2` |
 
+### Palette variant steps
+
+| Recipe | Preferred steps |
+|---|---|
+| `color.paletteSteps.filled` | `600 → 500 → 400` |
+| `color.paletteSteps.hover` | `700 → 600 → 500` |
+| `color.paletteSteps.active` | `800 → 700 → 600` |
+| `color.paletteSteps.readableDark` | `300 → 200 → 400` |
+| `color.paletteSteps.readableLight` | `700 → 800 → 600` |
+
 ### Spacing
 
 | Step | Pixels |
 |---|---:|
+| `xxs` | 2 |
 | `xs` | 4 |
 | `sm` | 8 |
 | `md` | 12 |
 | `lg` | 16 |
 | `xl` | 24 |
 | `xxl` | 32 |
+
+### Measures
+
+| Token | Pixels |
+|---|---:|
+| `measure.readableWidth` | 360 |
+| `measure.dialogWidth` | 360 |
+| `measure.menuMinWidth` | 200 |
+| `measure.compactMenuMinWidth` | 180 |
+| `measure.menuMaxHeight` | 320 |
+| `measure.compactMenuMaxHeight` | 240 |
+| `measure.standaloneIcon` | 20 |
+| `measure.scrollbarTrack` | 10 |
+| `measure.scrollbarThumb` | 6 |
+| `measure.scrollbarMinThumb` | 24 |
+| `measure.caretWidth` | 1.5 |
+| `measure.textDecorationWidth` | 1 |
+| `measure.progressTrackHeight` | 4 |
+| `measure.sliderTrackHeight` | 6 |
+| `measure.compactOverlayWidth` | 320 |
+| `measure.mediaViewerHeight` | 320 |
+| `measure.timelineRailWidth` | 16 |
+| `measure.statusMark` | 7 |
 
 ### Radius
 
@@ -3960,6 +4725,20 @@ Appearance: `Dark`.
 | `compact` | 0.75 | 0.86 | 0.94 |
 | `comfortable` | 1 | 1 | 1 |
 
+### Typography
+
+Numeric readout scale: 1.6×
+
+| Step | Size | Line height | Weight |
+|---|---:|---:|---:|---:|
+| `caption` | 10.5 | 14 | 400 |
+| `label` | 12 | 16 | 500 |
+| `body` | 13 | 19 | 400 |
+| `strong` | 13 | 19 | 600 |
+| `subtitle` | 14 | 20 | 600 |
+| `title` | 16 | 22 | 600 |
+| `code` | 12 | 18 | 400 |
+
 ### Elevation
 
 | Step | Layer | Y | Blur | Spread | Color |
@@ -3985,6 +4764,29 @@ Appearance: `Dark`.
 | `Toast` | 600 |
 
 ### Motion
+
+| Duration | Milliseconds |
+|---|---:|
+| `motion.durationMs.instant` | 90 |
+| `motion.durationMs.quick` | 150 |
+| `motion.durationMs.menu` | 140 |
+| `motion.durationMs.dialog` | 180 |
+| `motion.durationMs.resize` | 200 |
+| `motion.durationMs.entrance` | 500 |
+| `motion.durationMs.spin` | 900 |
+| `motion.durationMs.slow` | 320 |
+| `motion.durationMs.staggerStep` | 16 |
+| `motion.durationMs.microBounce` | 360 |
+| `motion.durationMs.microWobble` | 280 |
+| `motion.durationMs.microPop` | 240 |
+| `motion.durationMs.pulse` | 2400 |
+| `motion.durationMs.shimmer` | 1400 |
+| `motion.durationMs.toast` | 6000 |
+| `motion.durationMs.hoverCardOpen` | 400 |
+| `motion.durationMs.hoverCardGrace` | 300 |
+| `motion.durationMs.confirmation` | 1600 |
+
+Row stagger maximum items: `8`.
 
 | Easing | Curve |
 |---|---|
@@ -4031,14 +4833,59 @@ Appearance: `Dark`.
 |---|---:|
 | `effect.edgeFadeBand` | 20 |
 | `effect.selectedRingAlpha` | 0.09 |
+| `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.7 |
+| `effect.glowAlpha` | 0.26 |
+| `effect.glowBlur` | 12 |
+| `effect.glowSpread` | -5 |
 | `effect.glassAlpha` | 0.72 |
 | `effect.glassBlur` | 24 |
+| `effect.glassLiquidAlpha` | 0.34 |
+| `effect.glassBevel` | 18 |
+| `effect.glassRefraction` | 0.9 |
+| `effect.glassDispersion` | 0.16 |
+| `effect.glassSpecular` | 0.4 |
+| `effect.glassSpecularSharpness` | 12 |
+| `effect.glassLightAngle` | 0.7853982 |
+| `effect.glassMergeDistance` | 28 |
+| `effect.glassContrastFlipLow` | 0.42 |
+| `effect.glassContrastFlipHigh` | 0.58 |
+| `effect.glassPressDepth` | 1.5 |
 | `effect.sheenAlpha` | 0.08 |
 | `effect.areaWashAlpha` | 0.22 |
 | `effect.headerTintAlpha` | 0.18 |
+| `effect.nodeActiveWashAlpha` | 0.14 |
+| `effect.nodeActiveStrokeAlpha` | 0.72 |
+| `effect.nodeTrafficAlpha` | 0.82 |
+| `effect.nodePreviewAlpha` | 0.88 |
+| `effect.nodeMinimapAlpha` | 0.7 |
 | `effect.railWidth` | 3 |
+| `effect.semanticWashFaintAlpha` | 0.06 |
+| `effect.semanticWashAlpha` | 0.1 |
+| `effect.semanticWashStrongAlpha` | 0.16 |
+| `effect.semanticBorderAlpha` | 0.4 |
+| `effect.accentBorderAlpha` | 0.55 |
+| `effect.accentBorderStrongAlpha` | 0.7 |
+| `effect.subtleHoverAlpha` | 0.3 |
+| `effect.softContrastAlpha` | 0.18 |
+| `effect.contrastTintAlpha` | 0.28 |
+| `effect.trackRestingAlpha` | 0.55 |
+| `effect.contentVeilAlpha` | 0.88 |
+| `effect.criticalFillAlpha` | 0.84 |
+| `effect.criticalInactiveAlpha` | 0.1 |
+| `effect.variantLightAlpha` | 0.15 |
+| `effect.variantLightHoverAlpha` | 0.22 |
+| `effect.variantLightActiveAlpha` | 0.28 |
+| `effect.variantOutlineHoverAlpha` | 0.08 |
+| `effect.variantOutlineActiveAlpha` | 0.12 |
+| `effect.variantSubtleHoverAlpha` | 0.12 |
+| `effect.variantSubtleActiveAlpha` | 0.18 |
+| `effect.primaryHoverOpacity` | 0.9 |
+| `effect.customColorReadableDarkFloor` | 0.72 |
+| `effect.customColorReadableLightCeiling` | 0.4 |
+| `effect.customColorHoverLightnessDelta` | 0.05 |
+| `effect.customColorActiveLightnessDelta` | 0.1 |
 
 ### Contrast
 
@@ -4480,6 +5327,7 @@ Appearance: `Dark`.
 | `color.text.placeholder` | `#838dbb` | `#838dbb` |
 | `color.text.disabled` | `#7580ae` | `#7580ae` |
 | `color.text.onAccent` | `{neutral.ink}` | `#21222c` |
+| `color.text.onPrimaryFill` | `{neutral.ink}` | `#21222c` |
 | `color.interactive.hover` | `{neutral.850}/14` | `#f8f8f214` |
 | `color.interactive.active` | `{neutral.850}/24` | `#f8f8f224` |
 | `color.interactive.selected` | `{neutral.850}/1c` | `#f8f8f21c` |
@@ -4488,6 +5336,10 @@ Appearance: `Dark`.
 | `color.interactive.track` | `{neutral.900}/66` | `#ffffff66` |
 | `color.interactive.divider` | `{neutral.900}/10` | `#ffffff10` |
 | `color.interactive.focus` | `#bd93f9` | `#bd93f9` |
+| `color.interactive.primaryFill` | `{neutral.800}` | `#f8f8f2` |
+| `color.interactive.whiteFill` | `#ffffff` | `#ffffff` |
+| `color.interactive.whiteFillHover` | `#f5f5f5` | `#f5f5f5` |
+| `color.interactive.whiteFillActive` | `#ebebeb` | `#ebebeb` |
 | `color.semantic.accent` | `#bd93f9` | `#bd93f9` |
 | `color.semantic.accentStrong` | `#ff79c6` | `#ff79c6` |
 | `color.semantic.danger` | `#ff5555` | `#ff5555` |
@@ -4533,16 +5385,50 @@ Appearance: `Dark`.
 | `color.terminal.ansi.14` | `{ansi.14}` | `#a4ffff` |
 | `color.terminal.ansi.15` | `{ansi.15}` | `#ffffff` |
 
+### Palette variant steps
+
+| Recipe | Preferred steps |
+|---|---|
+| `color.paletteSteps.filled` | `600 → 500 → 400` |
+| `color.paletteSteps.hover` | `700 → 600 → 500` |
+| `color.paletteSteps.active` | `800 → 700 → 600` |
+| `color.paletteSteps.readableDark` | `300 → 200 → 400` |
+| `color.paletteSteps.readableLight` | `700 → 800 → 600` |
+
 ### Spacing
 
 | Step | Pixels |
 |---|---:|
+| `xxs` | 2 |
 | `xs` | 4 |
 | `sm` | 8 |
 | `md` | 12 |
 | `lg` | 16 |
 | `xl` | 24 |
 | `xxl` | 32 |
+
+### Measures
+
+| Token | Pixels |
+|---|---:|
+| `measure.readableWidth` | 360 |
+| `measure.dialogWidth` | 360 |
+| `measure.menuMinWidth` | 200 |
+| `measure.compactMenuMinWidth` | 180 |
+| `measure.menuMaxHeight` | 320 |
+| `measure.compactMenuMaxHeight` | 240 |
+| `measure.standaloneIcon` | 20 |
+| `measure.scrollbarTrack` | 10 |
+| `measure.scrollbarThumb` | 6 |
+| `measure.scrollbarMinThumb` | 24 |
+| `measure.caretWidth` | 1.5 |
+| `measure.textDecorationWidth` | 1 |
+| `measure.progressTrackHeight` | 4 |
+| `measure.sliderTrackHeight` | 6 |
+| `measure.compactOverlayWidth` | 320 |
+| `measure.mediaViewerHeight` | 320 |
+| `measure.timelineRailWidth` | 16 |
+| `measure.statusMark` | 7 |
 
 ### Radius
 
@@ -4571,6 +5457,20 @@ Appearance: `Dark`.
 | `compact` | 0.75 | 0.86 | 0.94 |
 | `comfortable` | 1 | 1 | 1 |
 
+### Typography
+
+Numeric readout scale: 1.6×
+
+| Step | Size | Line height | Weight |
+|---|---:|---:|---:|---:|
+| `caption` | 10.5 | 14 | 400 |
+| `label` | 12 | 16 | 500 |
+| `body` | 13 | 19 | 400 |
+| `strong` | 13 | 19 | 600 |
+| `subtitle` | 14 | 20 | 600 |
+| `title` | 16 | 22 | 600 |
+| `code` | 12 | 18 | 400 |
+
 ### Elevation
 
 | Step | Layer | Y | Blur | Spread | Color |
@@ -4596,6 +5496,29 @@ Appearance: `Dark`.
 | `Toast` | 600 |
 
 ### Motion
+
+| Duration | Milliseconds |
+|---|---:|
+| `motion.durationMs.instant` | 90 |
+| `motion.durationMs.quick` | 150 |
+| `motion.durationMs.menu` | 140 |
+| `motion.durationMs.dialog` | 180 |
+| `motion.durationMs.resize` | 200 |
+| `motion.durationMs.entrance` | 500 |
+| `motion.durationMs.spin` | 900 |
+| `motion.durationMs.slow` | 320 |
+| `motion.durationMs.staggerStep` | 16 |
+| `motion.durationMs.microBounce` | 360 |
+| `motion.durationMs.microWobble` | 280 |
+| `motion.durationMs.microPop` | 240 |
+| `motion.durationMs.pulse` | 2400 |
+| `motion.durationMs.shimmer` | 1400 |
+| `motion.durationMs.toast` | 6000 |
+| `motion.durationMs.hoverCardOpen` | 400 |
+| `motion.durationMs.hoverCardGrace` | 300 |
+| `motion.durationMs.confirmation` | 1600 |
+
+Row stagger maximum items: `8`.
 
 | Easing | Curve |
 |---|---|
@@ -4642,14 +5565,59 @@ Appearance: `Dark`.
 |---|---:|
 | `effect.edgeFadeBand` | 20 |
 | `effect.selectedRingAlpha` | 0.09 |
+| `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 0.7 |
+| `effect.glowAlpha` | 0.26 |
+| `effect.glowBlur` | 12 |
+| `effect.glowSpread` | -5 |
 | `effect.glassAlpha` | 0.72 |
 | `effect.glassBlur` | 24 |
+| `effect.glassLiquidAlpha` | 0.34 |
+| `effect.glassBevel` | 18 |
+| `effect.glassRefraction` | 0.9 |
+| `effect.glassDispersion` | 0.16 |
+| `effect.glassSpecular` | 0.4 |
+| `effect.glassSpecularSharpness` | 12 |
+| `effect.glassLightAngle` | 0.7853982 |
+| `effect.glassMergeDistance` | 28 |
+| `effect.glassContrastFlipLow` | 0.42 |
+| `effect.glassContrastFlipHigh` | 0.58 |
+| `effect.glassPressDepth` | 1.5 |
 | `effect.sheenAlpha` | 0.08 |
 | `effect.areaWashAlpha` | 0.22 |
 | `effect.headerTintAlpha` | 0.18 |
+| `effect.nodeActiveWashAlpha` | 0.14 |
+| `effect.nodeActiveStrokeAlpha` | 0.72 |
+| `effect.nodeTrafficAlpha` | 0.82 |
+| `effect.nodePreviewAlpha` | 0.88 |
+| `effect.nodeMinimapAlpha` | 0.7 |
 | `effect.railWidth` | 3 |
+| `effect.semanticWashFaintAlpha` | 0.06 |
+| `effect.semanticWashAlpha` | 0.1 |
+| `effect.semanticWashStrongAlpha` | 0.16 |
+| `effect.semanticBorderAlpha` | 0.4 |
+| `effect.accentBorderAlpha` | 0.55 |
+| `effect.accentBorderStrongAlpha` | 0.7 |
+| `effect.subtleHoverAlpha` | 0.3 |
+| `effect.softContrastAlpha` | 0.18 |
+| `effect.contrastTintAlpha` | 0.28 |
+| `effect.trackRestingAlpha` | 0.55 |
+| `effect.contentVeilAlpha` | 0.88 |
+| `effect.criticalFillAlpha` | 0.84 |
+| `effect.criticalInactiveAlpha` | 0.1 |
+| `effect.variantLightAlpha` | 0.15 |
+| `effect.variantLightHoverAlpha` | 0.22 |
+| `effect.variantLightActiveAlpha` | 0.28 |
+| `effect.variantOutlineHoverAlpha` | 0.08 |
+| `effect.variantOutlineActiveAlpha` | 0.12 |
+| `effect.variantSubtleHoverAlpha` | 0.12 |
+| `effect.variantSubtleActiveAlpha` | 0.18 |
+| `effect.primaryHoverOpacity` | 0.9 |
+| `effect.customColorReadableDarkFloor` | 0.72 |
+| `effect.customColorReadableLightCeiling` | 0.4 |
+| `effect.customColorHoverLightnessDelta` | 0.05 |
+| `effect.customColorActiveLightnessDelta` | 0.1 |
 
 ### Contrast
 
@@ -5091,6 +6059,7 @@ Appearance: `Dark`.
 | `color.text.placeholder` | `#7a9094` | `#7a9094` |
 | `color.text.disabled` | `#6d8286` | `#6d8286` |
 | `color.text.onAccent` | `{neutral.ink}` | `#000d11` |
+| `color.text.onPrimaryFill` | `{neutral.ink}` | `#000d11` |
 | `color.interactive.hover` | `{neutral.850}/14` | `#eee8d514` |
 | `color.interactive.active` | `{neutral.850}/24` | `#eee8d524` |
 | `color.interactive.selected` | `{neutral.850}/1c` | `#eee8d51c` |
@@ -5099,6 +6068,10 @@ Appearance: `Dark`.
 | `color.interactive.track` | `{neutral.900}/66` | `#ffffff66` |
 | `color.interactive.divider` | `{neutral.900}/10` | `#ffffff10` |
 | `color.interactive.focus` | `#268bd2` | `#268bd2` |
+| `color.interactive.primaryFill` | `{neutral.800}` | `#b3c1c1` |
+| `color.interactive.whiteFill` | `#ffffff` | `#ffffff` |
+| `color.interactive.whiteFillHover` | `#f5f5f5` | `#f5f5f5` |
+| `color.interactive.whiteFillActive` | `#ebebeb` | `#ebebeb` |
 | `color.semantic.accent` | `#268bd2` | `#268bd2` |
 | `color.semantic.accentStrong` | `#868bd8` | `#868bd8` |
 | `color.semantic.danger` | `#e35a52` | `#e35a52` |
@@ -5144,16 +6117,50 @@ Appearance: `Dark`.
 | `color.terminal.ansi.14` | `{ansi.14}` | `#93a1a1` |
 | `color.terminal.ansi.15` | `{ansi.15}` | `#fdf6e3` |
 
+### Palette variant steps
+
+| Recipe | Preferred steps |
+|---|---|
+| `color.paletteSteps.filled` | `600 → 500 → 400` |
+| `color.paletteSteps.hover` | `700 → 600 → 500` |
+| `color.paletteSteps.active` | `800 → 700 → 600` |
+| `color.paletteSteps.readableDark` | `300 → 200 → 400` |
+| `color.paletteSteps.readableLight` | `700 → 800 → 600` |
+
 ### Spacing
 
 | Step | Pixels |
 |---|---:|
+| `xxs` | 2 |
 | `xs` | 4 |
 | `sm` | 8 |
 | `md` | 12 |
 | `lg` | 16 |
 | `xl` | 24 |
 | `xxl` | 32 |
+
+### Measures
+
+| Token | Pixels |
+|---|---:|
+| `measure.readableWidth` | 360 |
+| `measure.dialogWidth` | 360 |
+| `measure.menuMinWidth` | 200 |
+| `measure.compactMenuMinWidth` | 180 |
+| `measure.menuMaxHeight` | 320 |
+| `measure.compactMenuMaxHeight` | 240 |
+| `measure.standaloneIcon` | 20 |
+| `measure.scrollbarTrack` | 10 |
+| `measure.scrollbarThumb` | 6 |
+| `measure.scrollbarMinThumb` | 24 |
+| `measure.caretWidth` | 1.5 |
+| `measure.textDecorationWidth` | 1 |
+| `measure.progressTrackHeight` | 4 |
+| `measure.sliderTrackHeight` | 6 |
+| `measure.compactOverlayWidth` | 320 |
+| `measure.mediaViewerHeight` | 320 |
+| `measure.timelineRailWidth` | 16 |
+| `measure.statusMark` | 7 |
 
 ### Radius
 
@@ -5182,6 +6189,20 @@ Appearance: `Dark`.
 | `compact` | 0.75 | 0.86 | 0.94 |
 | `comfortable` | 1 | 1 | 1 |
 
+### Typography
+
+Numeric readout scale: 1.6×
+
+| Step | Size | Line height | Weight |
+|---|---:|---:|---:|---:|
+| `caption` | 10.5 | 14 | 400 |
+| `label` | 12 | 16 | 500 |
+| `body` | 13 | 19 | 400 |
+| `strong` | 13 | 19 | 600 |
+| `subtitle` | 14 | 20 | 600 |
+| `title` | 16 | 22 | 600 |
+| `code` | 12 | 18 | 400 |
+
 ### Elevation
 
 | Step | Layer | Y | Blur | Spread | Color |
@@ -5207,6 +6228,29 @@ Appearance: `Dark`.
 | `Toast` | 600 |
 
 ### Motion
+
+| Duration | Milliseconds |
+|---|---:|
+| `motion.durationMs.instant` | 90 |
+| `motion.durationMs.quick` | 150 |
+| `motion.durationMs.menu` | 140 |
+| `motion.durationMs.dialog` | 180 |
+| `motion.durationMs.resize` | 200 |
+| `motion.durationMs.entrance` | 500 |
+| `motion.durationMs.spin` | 900 |
+| `motion.durationMs.slow` | 320 |
+| `motion.durationMs.staggerStep` | 16 |
+| `motion.durationMs.microBounce` | 360 |
+| `motion.durationMs.microWobble` | 280 |
+| `motion.durationMs.microPop` | 240 |
+| `motion.durationMs.pulse` | 2400 |
+| `motion.durationMs.shimmer` | 1400 |
+| `motion.durationMs.toast` | 6000 |
+| `motion.durationMs.hoverCardOpen` | 400 |
+| `motion.durationMs.hoverCardGrace` | 300 |
+| `motion.durationMs.confirmation` | 1600 |
+
+Row stagger maximum items: `8`.
 
 | Easing | Curve |
 |---|---|
@@ -5253,14 +6297,59 @@ Appearance: `Dark`.
 |---|---:|
 | `effect.edgeFadeBand` | 20 |
 | `effect.selectedRingAlpha` | 0.09 |
+| `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 1 |
+| `effect.glowAlpha` | 0.26 |
+| `effect.glowBlur` | 12 |
+| `effect.glowSpread` | -5 |
 | `effect.glassAlpha` | 0.72 |
 | `effect.glassBlur` | 24 |
+| `effect.glassLiquidAlpha` | 0.34 |
+| `effect.glassBevel` | 18 |
+| `effect.glassRefraction` | 0.9 |
+| `effect.glassDispersion` | 0.16 |
+| `effect.glassSpecular` | 0.4 |
+| `effect.glassSpecularSharpness` | 12 |
+| `effect.glassLightAngle` | 0.7853982 |
+| `effect.glassMergeDistance` | 28 |
+| `effect.glassContrastFlipLow` | 0.42 |
+| `effect.glassContrastFlipHigh` | 0.58 |
+| `effect.glassPressDepth` | 1.5 |
 | `effect.sheenAlpha` | 0.08 |
 | `effect.areaWashAlpha` | 0.22 |
 | `effect.headerTintAlpha` | 0.18 |
+| `effect.nodeActiveWashAlpha` | 0.14 |
+| `effect.nodeActiveStrokeAlpha` | 0.72 |
+| `effect.nodeTrafficAlpha` | 0.82 |
+| `effect.nodePreviewAlpha` | 0.88 |
+| `effect.nodeMinimapAlpha` | 0.7 |
 | `effect.railWidth` | 3 |
+| `effect.semanticWashFaintAlpha` | 0.06 |
+| `effect.semanticWashAlpha` | 0.1 |
+| `effect.semanticWashStrongAlpha` | 0.16 |
+| `effect.semanticBorderAlpha` | 0.4 |
+| `effect.accentBorderAlpha` | 0.55 |
+| `effect.accentBorderStrongAlpha` | 0.7 |
+| `effect.subtleHoverAlpha` | 0.3 |
+| `effect.softContrastAlpha` | 0.18 |
+| `effect.contrastTintAlpha` | 0.28 |
+| `effect.trackRestingAlpha` | 0.55 |
+| `effect.contentVeilAlpha` | 0.88 |
+| `effect.criticalFillAlpha` | 0.84 |
+| `effect.criticalInactiveAlpha` | 0.1 |
+| `effect.variantLightAlpha` | 0.15 |
+| `effect.variantLightHoverAlpha` | 0.22 |
+| `effect.variantLightActiveAlpha` | 0.28 |
+| `effect.variantOutlineHoverAlpha` | 0.08 |
+| `effect.variantOutlineActiveAlpha` | 0.12 |
+| `effect.variantSubtleHoverAlpha` | 0.12 |
+| `effect.variantSubtleActiveAlpha` | 0.18 |
+| `effect.primaryHoverOpacity` | 0.9 |
+| `effect.customColorReadableDarkFloor` | 0.72 |
+| `effect.customColorReadableLightCeiling` | 0.4 |
+| `effect.customColorHoverLightnessDelta` | 0.05 |
+| `effect.customColorActiveLightnessDelta` | 0.1 |
 
 ### Contrast
 
@@ -5702,6 +6791,7 @@ Appearance: `Light`.
 | `color.text.placeholder` | `#61787e` | `#61787e` |
 | `color.text.disabled` | `#6a8087` | `#6a8087` |
 | `color.text.onAccent` | `{neutral.ink}` | `#ffffff` |
+| `color.text.onPrimaryFill` | `{neutral.ink}` | `#ffffff` |
 | `color.interactive.hover` | `{neutral.850}/0f` | `#002b360f` |
 | `color.interactive.active` | `{neutral.850}/1c` | `#002b361c` |
 | `color.interactive.selected` | `{neutral.850}/14` | `#002b3614` |
@@ -5710,6 +6800,10 @@ Appearance: `Light`.
 | `color.interactive.track` | `{neutral.850}/8c` | `#002b368c` |
 | `color.interactive.divider` | `{neutral.850}/14` | `#002b3614` |
 | `color.interactive.focus` | `#1b6fab` | `#1b6fab` |
+| `color.interactive.primaryFill` | `{neutral.800}` | `#435a61` |
+| `color.interactive.whiteFill` | `#ffffff` | `#ffffff` |
+| `color.interactive.whiteFillHover` | `#f5f5f5` | `#f5f5f5` |
+| `color.interactive.whiteFillActive` | `#ebebeb` | `#ebebeb` |
 | `color.semantic.accent` | `#1b6fab` | `#1b6fab` |
 | `color.semantic.accentStrong` | `#6c71c4` | `#6c71c4` |
 | `color.semantic.danger` | `#dc322f` | `#dc322f` |
@@ -5755,16 +6849,50 @@ Appearance: `Light`.
 | `color.terminal.ansi.14` | `{ansi.14}` | `#798d90` |
 | `color.terminal.ansi.15` | `{ansi.15}` | `#073642` |
 
+### Palette variant steps
+
+| Recipe | Preferred steps |
+|---|---|
+| `color.paletteSteps.filled` | `600 → 500 → 400` |
+| `color.paletteSteps.hover` | `700 → 600 → 500` |
+| `color.paletteSteps.active` | `800 → 700 → 600` |
+| `color.paletteSteps.readableDark` | `300 → 200 → 400` |
+| `color.paletteSteps.readableLight` | `700 → 800 → 600` |
+
 ### Spacing
 
 | Step | Pixels |
 |---|---:|
+| `xxs` | 2 |
 | `xs` | 4 |
 | `sm` | 8 |
 | `md` | 12 |
 | `lg` | 16 |
 | `xl` | 24 |
 | `xxl` | 32 |
+
+### Measures
+
+| Token | Pixels |
+|---|---:|
+| `measure.readableWidth` | 360 |
+| `measure.dialogWidth` | 360 |
+| `measure.menuMinWidth` | 200 |
+| `measure.compactMenuMinWidth` | 180 |
+| `measure.menuMaxHeight` | 320 |
+| `measure.compactMenuMaxHeight` | 240 |
+| `measure.standaloneIcon` | 20 |
+| `measure.scrollbarTrack` | 10 |
+| `measure.scrollbarThumb` | 6 |
+| `measure.scrollbarMinThumb` | 24 |
+| `measure.caretWidth` | 1.5 |
+| `measure.textDecorationWidth` | 1 |
+| `measure.progressTrackHeight` | 4 |
+| `measure.sliderTrackHeight` | 6 |
+| `measure.compactOverlayWidth` | 320 |
+| `measure.mediaViewerHeight` | 320 |
+| `measure.timelineRailWidth` | 16 |
+| `measure.statusMark` | 7 |
 
 ### Radius
 
@@ -5793,6 +6921,20 @@ Appearance: `Light`.
 | `compact` | 0.75 | 0.86 | 0.94 |
 | `comfortable` | 1 | 1 | 1 |
 
+### Typography
+
+Numeric readout scale: 1.6×
+
+| Step | Size | Line height | Weight |
+|---|---:|---:|---:|---:|
+| `caption` | 10.5 | 14 | 400 |
+| `label` | 12 | 16 | 500 |
+| `body` | 13 | 19 | 400 |
+| `strong` | 13 | 19 | 600 |
+| `subtitle` | 14 | 20 | 600 |
+| `title` | 16 | 22 | 600 |
+| `code` | 12 | 18 | 400 |
+
 ### Elevation
 
 | Step | Layer | Y | Blur | Spread | Color |
@@ -5818,6 +6960,29 @@ Appearance: `Light`.
 | `Toast` | 600 |
 
 ### Motion
+
+| Duration | Milliseconds |
+|---|---:|
+| `motion.durationMs.instant` | 90 |
+| `motion.durationMs.quick` | 150 |
+| `motion.durationMs.menu` | 140 |
+| `motion.durationMs.dialog` | 180 |
+| `motion.durationMs.resize` | 200 |
+| `motion.durationMs.entrance` | 500 |
+| `motion.durationMs.spin` | 900 |
+| `motion.durationMs.slow` | 320 |
+| `motion.durationMs.staggerStep` | 16 |
+| `motion.durationMs.microBounce` | 360 |
+| `motion.durationMs.microWobble` | 280 |
+| `motion.durationMs.microPop` | 240 |
+| `motion.durationMs.pulse` | 2400 |
+| `motion.durationMs.shimmer` | 1400 |
+| `motion.durationMs.toast` | 6000 |
+| `motion.durationMs.hoverCardOpen` | 400 |
+| `motion.durationMs.hoverCardGrace` | 300 |
+| `motion.durationMs.confirmation` | 1600 |
+
+Row stagger maximum items: `8`.
 
 | Easing | Curve |
 |---|---|
@@ -5864,14 +7029,59 @@ Appearance: `Light`.
 |---|---:|
 | `effect.edgeFadeBand` | 20 |
 | `effect.selectedRingAlpha` | 0.12 |
+| `effect.selectionRailWidth` | 2.5 |
 | `effect.focusRingWidth` | 2 |
 | `effect.focusRingAlpha` | 1 |
+| `effect.glowAlpha` | 0.18 |
+| `effect.glowBlur` | 12 |
+| `effect.glowSpread` | -5 |
 | `effect.glassAlpha` | 0.78 |
 | `effect.glassBlur` | 24 |
+| `effect.glassLiquidAlpha` | 0.34 |
+| `effect.glassBevel` | 18 |
+| `effect.glassRefraction` | 0.9 |
+| `effect.glassDispersion` | 0.12 |
+| `effect.glassSpecular` | 0.28 |
+| `effect.glassSpecularSharpness` | 12 |
+| `effect.glassLightAngle` | 0.7853982 |
+| `effect.glassMergeDistance` | 28 |
+| `effect.glassContrastFlipLow` | 0.42 |
+| `effect.glassContrastFlipHigh` | 0.58 |
+| `effect.glassPressDepth` | 1.5 |
 | `effect.sheenAlpha` | 0.05 |
 | `effect.areaWashAlpha` | 0.16 |
 | `effect.headerTintAlpha` | 0.14 |
+| `effect.nodeActiveWashAlpha` | 0.14 |
+| `effect.nodeActiveStrokeAlpha` | 0.72 |
+| `effect.nodeTrafficAlpha` | 0.82 |
+| `effect.nodePreviewAlpha` | 0.88 |
+| `effect.nodeMinimapAlpha` | 0.7 |
 | `effect.railWidth` | 3 |
+| `effect.semanticWashFaintAlpha` | 0.06 |
+| `effect.semanticWashAlpha` | 0.1 |
+| `effect.semanticWashStrongAlpha` | 0.16 |
+| `effect.semanticBorderAlpha` | 0.4 |
+| `effect.accentBorderAlpha` | 0.55 |
+| `effect.accentBorderStrongAlpha` | 0.7 |
+| `effect.subtleHoverAlpha` | 0.3 |
+| `effect.softContrastAlpha` | 0.18 |
+| `effect.contrastTintAlpha` | 0.28 |
+| `effect.trackRestingAlpha` | 0.55 |
+| `effect.contentVeilAlpha` | 0.88 |
+| `effect.criticalFillAlpha` | 0.84 |
+| `effect.criticalInactiveAlpha` | 0.1 |
+| `effect.variantLightAlpha` | 0.15 |
+| `effect.variantLightHoverAlpha` | 0.22 |
+| `effect.variantLightActiveAlpha` | 0.28 |
+| `effect.variantOutlineHoverAlpha` | 0.08 |
+| `effect.variantOutlineActiveAlpha` | 0.12 |
+| `effect.variantSubtleHoverAlpha` | 0.12 |
+| `effect.variantSubtleActiveAlpha` | 0.18 |
+| `effect.primaryHoverOpacity` | 0.9 |
+| `effect.customColorReadableDarkFloor` | 0.72 |
+| `effect.customColorReadableLightCeiling` | 0.4 |
+| `effect.customColorHoverLightnessDelta` | 0.05 |
+| `effect.customColorActiveLightnessDelta` | 0.1 |
 
 ### Contrast
 

@@ -534,7 +534,7 @@ impl RenderOnce for ToolCall {
             .flex_1()
             .items_center()
             .gap_token(&theme, Space::Sm)
-            .py(px(2.0))
+            .py(px(theme.space(Space::Xxs)))
             .child(dot)
             .child(
                 // Family lives on the mark, not on the name. Colouring every
@@ -735,7 +735,7 @@ fn evidence_body(
     div()
         .w_full()
         .column()
-        .gap(px(2.0))
+        .gap(px(theme.space(Space::Xxs)))
         .pl(px(theme.space(Space::Lg)))
         .child(
             div()

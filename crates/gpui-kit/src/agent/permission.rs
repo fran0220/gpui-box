@@ -401,7 +401,7 @@ fn cell(
         .child(
             div()
                 .flex_none()
-                .size(px(7.0))
+                .size(px(theme.measures.status_mark))
                 .rounded_full()
                 .bg(state.color(theme)),
         )

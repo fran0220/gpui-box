@@ -63,7 +63,9 @@ use gpui::{
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, Elevation, Radius, Space, SpringPreset, Surface};
+use gpui_kit_theme::{
+    ActiveTheme, Elevation, Radius, SemanticBorder, Space, SpringPreset, Surface,
+};
 use web_time::Instant;
 
 use crate::display::icon::Icon as IconView;
@@ -852,7 +854,7 @@ pub(crate) fn indicator(
             .radius(theme, Radius::Small)
             .bg(color.opacity(theme.effects.selected_ring_alpha))
             .shadow(vec![gpui::BoxShadow {
-                color: color.opacity(0.5),
+                color: theme.color_border(color, SemanticBorder::Selected),
                 offset: gpui::point(px(0.0), px(0.0)),
                 blur_radius: px(0.0),
                 spread_radius: px(theme.borders.hairline),

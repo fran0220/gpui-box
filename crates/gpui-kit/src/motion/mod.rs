@@ -88,7 +88,7 @@ pub use spec::{
     menu, menu_in, pulse_wave, resize, row_in, shimmer_offset, state_change, surface_in, tracking,
 };
 pub use spring::Spring;
-pub use stagger::{ROW_STAGGER_CAP, Stagger, StaggerBudget, staggered_phase};
+pub use stagger::{Stagger, StaggerBudget, row_stagger_cap, staggered_phase};
 pub use transition::Transition;
 pub(crate) use transition::{tracked, tracked_or_snap};
 

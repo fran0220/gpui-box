@@ -266,7 +266,7 @@ impl RenderOnce for Card {
                         .column()
                         .flex_1()
                         .min_w_0()
-                        .gap(px(2.0))
+                        .gap(px(theme.space(Space::Xxs)))
                         .child(
                             text(&theme, TypeScale::Subtitle, header.title)
                                 .text_tone(&theme, title_tone),
@@ -497,7 +497,7 @@ impl RenderOnce for ListRow {
         let row = div()
             .w_full()
             .px(px(theme.spacing.lg + theme.spacing.xs))
-            .py(px(theme.spacing.md + 2.0))
+            .py(px(theme.spacing.md + theme.spacing.xxs))
             .selected_row(&theme, direction, selected)
             .when(!selected && !disabled, |element| element.hover_row(&theme))
             // A disabled row states that it is unavailable and stays legible
@@ -507,7 +507,7 @@ impl RenderOnce for ListRow {
                 element.text_tone(&theme, TextTone::Disabled)
             })
             .row_reading(direction)
-            .gap(px(theme.spacing.md + 2.0))
+            .gap(px(theme.spacing.md + theme.spacing.xxs))
             .children(self.leading)
             .children(self.children)
             .children(self.trailing);

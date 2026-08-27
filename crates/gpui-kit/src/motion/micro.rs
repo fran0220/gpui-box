@@ -56,11 +56,11 @@ impl Micro {
 
     fn spec(self, theme: &gpui_kit_theme::Theme) -> MotionSpec {
         let duration = match self {
-            Self::Heartbeat => theme.motion.pulse_ms.max(480),
-            Self::Bounce => theme.motion.quick_ms.max(360),
-            Self::Wobble => theme.motion.quick_ms.max(280),
-            Self::Pop => theme.motion.quick_ms.max(240),
-            Self::Sparkle => theme.motion.shimmer_ms.max(640),
+            Self::Heartbeat => theme.motion.pulse_ms,
+            Self::Bounce => theme.motion.micro_bounce_ms,
+            Self::Wobble => theme.motion.micro_wobble_ms,
+            Self::Pop => theme.motion.micro_pop_ms,
+            Self::Sparkle => theme.motion.shimmer_ms,
         };
         MotionSpec::new(duration, Easing::EaseInOut.curve(theme))
     }

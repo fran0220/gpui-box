@@ -49,9 +49,8 @@ use crate::motion::{self, keyed};
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
-/// How tall the scrubber's track is, and how wide the volume control is.
-/// Neither value repeats anywhere else.
-const TRACK_HEIGHT: f32 = 4.0;
+/// How wide the volume control is. This is local control topology; the shared
+/// scrubber/progress track height comes from `theme.measures`.
 const KNOB: f32 = 11.0;
 const VOLUME_WIDTH: f32 = 96.0;
 
@@ -456,7 +455,7 @@ impl RenderOnce for TransportBar {
             .absolute()
             .left_0()
             .right_0()
-            .h(px(TRACK_HEIGHT))
+            .h(px(theme.measures.progress_track_height))
             .radius(&theme, Radius::Pill)
             .overflow_hidden()
             .bg(signature::track(&theme));

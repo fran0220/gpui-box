@@ -218,7 +218,7 @@ impl RenderOnce for ThinkingBlock {
             .min_w_0()
             .items_center()
             .gap_token(&theme, Space::Sm)
-            .py(px(2.0))
+            .py(px(theme.space(Space::Xxs)))
             .child(dot)
             .child(
                 // Absence is drawn quieter than a thought that happened. A
@@ -334,7 +334,7 @@ impl RenderOnce for ThinkingBlock {
         div()
             .w_full()
             .column()
-            .gap(px(2.0))
+            .gap(px(theme.space(Space::Xxs)))
             .child(header)
             .children(body)
     }

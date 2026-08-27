@@ -61,6 +61,7 @@ pub struct TokenDocument {
     pub meta: Metadata,
     pub color: ColorTokens,
     pub space: SpacingTokens,
+    pub measure: MeasureTokens,
     pub radius: RadiusTokens,
     pub control: ControlTokens,
     pub border: BorderTokens,
@@ -94,6 +95,14 @@ impl TokenDocument {
         for (group, steps) in &self.color.palette {
             for (step, value) in steps {
                 Color::parse(&format!("color.palette.{group}.{step}"), value)?;
+            }
+        }
+        for (path, steps) in self.color.palette_steps.entries() {
+            if steps.iter().any(|step| step.trim().is_empty()) {
+                return invalid(path, "steps must not be empty");
+            }
+            if steps[0] == steps[1] || steps[0] == steps[2] || steps[1] == steps[2] {
+                return invalid(path, "fallback steps must be distinct");
             }
         }
         for (path, value) in self.color.entries() {
@@ -161,6 +170,7 @@ impl TokenDocument {
         }
 
         let spacing = [
+            self.space.xxs,
             self.space.xs,
             self.space.sm,
             self.space.md,
@@ -175,6 +185,70 @@ impl TokenDocument {
             return invalid("space", "steps must be strictly increasing");
         }
 
+        for (path, value) in [
+            ("measure.readableWidth", self.measure.readable_width),
+            ("measure.dialogWidth", self.measure.dialog_width),
+            ("measure.menuMinWidth", self.measure.menu_min_width),
+            (
+                "measure.compactMenuMinWidth",
+                self.measure.compact_menu_min_width,
+            ),
+            ("measure.menuMaxHeight", self.measure.menu_max_height),
+            (
+                "measure.compactMenuMaxHeight",
+                self.measure.compact_menu_max_height,
+            ),
+            ("measure.standaloneIcon", self.measure.standalone_icon),
+            ("measure.scrollbarTrack", self.measure.scrollbar_track),
+            ("measure.scrollbarThumb", self.measure.scrollbar_thumb),
+            (
+                "measure.scrollbarMinThumb",
+                self.measure.scrollbar_min_thumb,
+            ),
+            ("measure.caretWidth", self.measure.caret_width),
+            (
+                "measure.textDecorationWidth",
+                self.measure.text_decoration_width,
+            ),
+            (
+                "measure.progressTrackHeight",
+                self.measure.progress_track_height,
+            ),
+            (
+                "measure.sliderTrackHeight",
+                self.measure.slider_track_height,
+            ),
+            (
+                "measure.compactOverlayWidth",
+                self.measure.compact_overlay_width,
+            ),
+            (
+                "measure.mediaViewerHeight",
+                self.measure.media_viewer_height,
+            ),
+            (
+                "measure.timelineRailWidth",
+                self.measure.timeline_rail_width,
+            ),
+            ("measure.statusMark", self.measure.status_mark),
+        ] {
+            if value <= 0.0 {
+                return invalid(path, "must be positive");
+            }
+        }
+        if self.measure.scrollbar_thumb >= self.measure.scrollbar_track {
+            return invalid(
+                "measure.scrollbarThumb",
+                "must be narrower than measure.scrollbarTrack",
+            );
+        }
+        if self.measure.compact_menu_min_width > self.measure.menu_min_width {
+            return invalid(
+                "measure.compactMenuMinWidth",
+                "must not be wider than measure.menuMinWidth",
+            );
+        }
+
         for (path, radius) in [
             ("radius.small", self.radius.small),
             ("radius.control", self.radius.control),
@@ -186,6 +260,10 @@ impl TokenDocument {
             if radius < 0.0 {
                 return invalid(path, "must not be negative");
             }
+        }
+
+        if self.typography.readout_scale < 1.0 {
+            return invalid("typography.readoutScale", "must be at least 1");
         }
 
         for (path, step) in self.typography.scale.entries() {
@@ -276,6 +354,90 @@ impl TokenDocument {
             ("effect.sheenAlpha", self.effect.sheen_alpha),
             ("effect.areaWashAlpha", self.effect.area_wash_alpha),
             ("effect.headerTintAlpha", self.effect.header_tint_alpha),
+            (
+                "effect.nodeActiveWashAlpha",
+                self.effect.node_active_wash_alpha,
+            ),
+            (
+                "effect.nodeActiveStrokeAlpha",
+                self.effect.node_active_stroke_alpha,
+            ),
+            ("effect.nodeTrafficAlpha", self.effect.node_traffic_alpha),
+            ("effect.nodePreviewAlpha", self.effect.node_preview_alpha),
+            ("effect.nodeMinimapAlpha", self.effect.node_minimap_alpha),
+            (
+                "effect.semanticWashFaintAlpha",
+                self.effect.semantic_wash_faint_alpha,
+            ),
+            ("effect.semanticWashAlpha", self.effect.semantic_wash_alpha),
+            (
+                "effect.semanticWashStrongAlpha",
+                self.effect.semantic_wash_strong_alpha,
+            ),
+            (
+                "effect.semanticBorderAlpha",
+                self.effect.semantic_border_alpha,
+            ),
+            ("effect.accentBorderAlpha", self.effect.accent_border_alpha),
+            (
+                "effect.accentBorderStrongAlpha",
+                self.effect.accent_border_strong_alpha,
+            ),
+            ("effect.subtleHoverAlpha", self.effect.subtle_hover_alpha),
+            ("effect.softContrastAlpha", self.effect.soft_contrast_alpha),
+            ("effect.contrastTintAlpha", self.effect.contrast_tint_alpha),
+            ("effect.trackRestingAlpha", self.effect.track_resting_alpha),
+            ("effect.contentVeilAlpha", self.effect.content_veil_alpha),
+            ("effect.criticalFillAlpha", self.effect.critical_fill_alpha),
+            (
+                "effect.criticalInactiveAlpha",
+                self.effect.critical_inactive_alpha,
+            ),
+            ("effect.variantLightAlpha", self.effect.variant_light_alpha),
+            (
+                "effect.variantLightHoverAlpha",
+                self.effect.variant_light_hover_alpha,
+            ),
+            (
+                "effect.variantLightActiveAlpha",
+                self.effect.variant_light_active_alpha,
+            ),
+            (
+                "effect.variantOutlineHoverAlpha",
+                self.effect.variant_outline_hover_alpha,
+            ),
+            (
+                "effect.variantOutlineActiveAlpha",
+                self.effect.variant_outline_active_alpha,
+            ),
+            (
+                "effect.variantSubtleHoverAlpha",
+                self.effect.variant_subtle_hover_alpha,
+            ),
+            (
+                "effect.variantSubtleActiveAlpha",
+                self.effect.variant_subtle_active_alpha,
+            ),
+            (
+                "effect.primaryHoverOpacity",
+                self.effect.primary_hover_opacity,
+            ),
+            (
+                "effect.customColorReadableDarkFloor",
+                self.effect.custom_color_readable_dark_floor,
+            ),
+            (
+                "effect.customColorReadableLightCeiling",
+                self.effect.custom_color_readable_light_ceiling,
+            ),
+            (
+                "effect.customColorHoverLightnessDelta",
+                self.effect.custom_color_hover_lightness_delta,
+            ),
+            (
+                "effect.customColorActiveLightnessDelta",
+                self.effect.custom_color_active_lightness_delta,
+            ),
             ("effect.glassAlpha", self.effect.glass_alpha),
             ("effect.glassLiquidAlpha", self.effect.glass_liquid_alpha),
             ("effect.glassDispersion", self.effect.glass_dispersion),
@@ -303,6 +465,24 @@ impl TokenDocument {
             return invalid(
                 "effect.glassContrastFlipLow",
                 "must not be above effect.glassContrastFlipHigh",
+            );
+        }
+
+        if self.effect.custom_color_readable_light_ceiling
+            > self.effect.custom_color_readable_dark_floor
+        {
+            return invalid(
+                "effect.customColorReadableLightCeiling",
+                "must not exceed effect.customColorReadableDarkFloor",
+            );
+        }
+
+        if self.effect.custom_color_hover_lightness_delta
+            > self.effect.custom_color_active_lightness_delta
+        {
+            return invalid(
+                "effect.customColorHoverLightnessDelta",
+                "must not exceed effect.customColorActiveLightnessDelta",
             );
         }
 
@@ -337,6 +517,9 @@ impl TokenDocument {
             || self.motion.rubber_band_tension == 0.0
         {
             return invalid("motion.rubberBandTension", "must be above 0 and at most 1");
+        }
+        if self.motion.stagger_max_items < 2 {
+            return invalid("motion.staggerMaxItems", "must be at least 2");
         }
 
         let failures = contrast::failures(self);
@@ -499,6 +682,18 @@ impl TokenDocument {
                 "color.interactive.primaryFill",
                 self.color.interactive.primary_fill.as_str(),
             ),
+            InteractiveColor::WhiteFill => (
+                "color.interactive.whiteFill",
+                self.color.interactive.white_fill.as_str(),
+            ),
+            InteractiveColor::WhiteFillHover => (
+                "color.interactive.whiteFillHover",
+                self.color.interactive.white_fill_hover.as_str(),
+            ),
+            InteractiveColor::WhiteFillActive => (
+                "color.interactive.whiteFillActive",
+                self.color.interactive.white_fill_active.as_str(),
+            ),
             InteractiveColor::Focus => (
                 "color.interactive.focus",
                 self.color.interactive.focus.as_str(),
@@ -655,6 +850,7 @@ impl TokenDocument {
 
     pub fn spacing(&self, step: Space) -> f32 {
         match step {
+            Space::Xxs => self.space.xxs,
             Space::Xs => self.space.xs,
             Space::Sm => self.space.sm,
             Space::Md => self.space.md,
@@ -771,9 +967,15 @@ impl TokenDocument {
             MotionDuration::Spin => self.motion.duration_ms.spin,
             MotionDuration::Slow => self.motion.duration_ms.slow,
             MotionDuration::StaggerStep => self.motion.duration_ms.stagger_step,
+            MotionDuration::MicroBounce => self.motion.duration_ms.micro_bounce,
+            MotionDuration::MicroWobble => self.motion.duration_ms.micro_wobble,
+            MotionDuration::MicroPop => self.motion.duration_ms.micro_pop,
             MotionDuration::Pulse => self.motion.duration_ms.pulse,
             MotionDuration::Shimmer => self.motion.duration_ms.shimmer,
             MotionDuration::Toast => self.motion.duration_ms.toast,
+            MotionDuration::HoverCardOpen => self.motion.duration_ms.hover_card_open,
+            MotionDuration::HoverCardGrace => self.motion.duration_ms.hover_card_grace,
+            MotionDuration::Confirmation => self.motion.duration_ms.confirmation,
         })
     }
 
@@ -954,6 +1156,9 @@ pub enum InteractiveColor {
     /// was: a fill and a body of prose are two facts, and a theme that wants
     /// a softer primary button than its darkest ink had nowhere to say so.
     PrimaryFill,
+    WhiteFill,
+    WhiteFillHover,
+    WhiteFillActive,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1117,6 +1322,7 @@ impl SyntaxColor {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Space {
+    Xxs,
     Xs,
     Sm,
     Md,
@@ -1280,11 +1486,21 @@ pub enum MotionDuration {
     Slow,
     /// The gap between one member of a staggered group and the next.
     StaggerStep,
+    MicroBounce,
+    MicroWobble,
+    MicroPop,
     Pulse,
     /// How long a loading placeholder's highlight takes to cross it.
     Shimmer,
     /// How long a transient notification stays before it leaves on its own.
     Toast,
+    /// How long a pointer rests before contextual detail opens.
+    HoverCardOpen,
+    /// How long contextual detail remains reachable while the pointer crosses
+    /// the gap from its trigger.
+    HoverCardGrace,
+    /// How long a control reports that a short action, such as copying, held.
+    Confirmation,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1444,9 +1660,10 @@ pub struct SpringPresetTokens {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ColorTokens {
     pub palette: color::Palette,
+    pub palette_steps: PaletteStepTokens,
     pub surface: SurfaceColors,
     pub text: TextColors,
     pub interactive: InteractiveColors,
@@ -1459,13 +1676,38 @@ pub struct ColorTokens {
     pub terminal: TerminalColors,
 }
 
+/// Preferred numbered steps for colour variants built from a caller-selected
+/// palette group. Each list is ordered, so a palette with a sparse ramp can
+/// fall back without moving the policy into the theme adapter.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PaletteStepTokens {
+    pub filled: [String; 3],
+    pub hover: [String; 3],
+    pub active: [String; 3],
+    pub readable_dark: [String; 3],
+    pub readable_light: [String; 3],
+}
+
+impl PaletteStepTokens {
+    fn entries(&self) -> [(&'static str, &[String; 3]); 5] {
+        [
+            ("color.paletteSteps.filled", &self.filled),
+            ("color.paletteSteps.hover", &self.hover),
+            ("color.paletteSteps.active", &self.active),
+            ("color.paletteSteps.readableDark", &self.readable_dark),
+            ("color.paletteSteps.readableLight", &self.readable_light),
+        ]
+    }
+}
+
 impl ColorTokens {
     /// Every role, paired with the source string the document declares it as.
     ///
     /// A `Vec` of owned paths rather than a fixed array, because the series
     /// scale is addressed by index and has no name to be `'static` about.
     fn entries(&self) -> Vec<(String, &str)> {
-        let fixed: [(&'static str, &str); 55] = [
+        let fixed: [(&'static str, &str); 60] = [
             ("color.agent.read", &self.agent.read),
             ("color.agent.network", &self.agent.network),
             ("color.agent.shell", &self.agent.shell),
@@ -1495,6 +1737,7 @@ impl ColorTokens {
             ("color.text.placeholder", &self.text.placeholder),
             ("color.text.disabled", &self.text.disabled),
             ("color.text.onAccent", &self.text.on_accent),
+            ("color.text.onPrimaryFill", &self.text.on_primary_fill),
             ("color.interactive.hover", &self.interactive.hover),
             ("color.interactive.active", &self.interactive.active),
             ("color.interactive.selected", &self.interactive.selected),
@@ -1506,6 +1749,19 @@ impl ColorTokens {
             ("color.interactive.track", &self.interactive.track),
             ("color.interactive.divider", &self.interactive.divider),
             ("color.interactive.focus", &self.interactive.focus),
+            (
+                "color.interactive.primaryFill",
+                &self.interactive.primary_fill,
+            ),
+            ("color.interactive.whiteFill", &self.interactive.white_fill),
+            (
+                "color.interactive.whiteFillHover",
+                &self.interactive.white_fill_hover,
+            ),
+            (
+                "color.interactive.whiteFillActive",
+                &self.interactive.white_fill_active,
+            ),
             ("color.semantic.accent", &self.semantic.accent),
             ("color.semantic.accentStrong", &self.semantic.accent_strong),
             ("color.semantic.danger", &self.semantic.danger),
@@ -1590,6 +1846,9 @@ pub struct InteractiveColors {
     pub divider: String,
     pub focus: String,
     pub primary_fill: String,
+    pub white_fill: String,
+    pub white_fill_hover: String,
+    pub white_fill_active: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -1749,12 +2008,61 @@ pub struct TerminalColors {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SpacingTokens {
+    pub xxs: f32,
     pub xs: f32,
     pub sm: f32,
     pub md: f32,
     pub lg: f32,
     pub xl: f32,
     pub xxl: f32,
+}
+
+/// Reusable physical measures that are neither spacing nor the geometry of a
+/// single component.
+///
+/// Measures stay unscaled unless their consumer explicitly combines them with
+/// density-aware spacing: a readable line and a painter hairline are physical
+/// contracts, not whitespace.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MeasureTokens {
+    /// Maximum width for explanatory copy in empty, unavailable and error
+    /// states.
+    pub readable_width: f32,
+    /// Width of the library's compact modal question surface.
+    pub dialog_width: f32,
+    /// Minimum widths for normal option surfaces and compact field-anchored
+    /// option surfaces.
+    pub menu_min_width: f32,
+    pub compact_menu_min_width: f32,
+    /// Height at which a normal option menu starts scrolling.
+    pub menu_max_height: f32,
+    /// Height at which a compact, caret-anchored option menu starts scrolling.
+    pub compact_menu_max_height: f32,
+    /// An icon standing alone above explanatory copy.
+    pub standalone_icon: f32,
+    pub scrollbar_track: f32,
+    pub scrollbar_thumb: f32,
+    pub scrollbar_min_thumb: f32,
+    /// Width used to paint insertion carets.
+    pub caret_width: f32,
+    /// Width used to paint underlines and strike-through decoration.
+    pub text_decoration_width: f32,
+    /// Shared physical measures for progress grooves and semantic status
+    /// marks.
+    pub progress_track_height: f32,
+    /// Height of the numeric slider groove. It is deliberately independent
+    /// from progress: one reports a reading, while the other must carry a
+    /// handle and marks without disappearing underneath them.
+    pub slider_track_height: f32,
+    /// Width shared by compact floating surfaces such as previews,
+    /// notifications, and rich suggestion menus.
+    pub compact_overlay_width: f32,
+    /// Default height of viewers whose caller did not choose a frame.
+    pub media_viewer_height: f32,
+    /// Width reserved for a chronology rail and its status marks.
+    pub timeline_rail_width: f32,
+    pub status_mark: f32,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -1818,6 +2126,11 @@ pub struct OpacityTokens {
 pub struct TypographyTokens {
     pub sans: FontTokens,
     pub mono: FontTokens,
+    /// Scale applied to numeric readouts after the caller chooses their prose
+    /// step. Kept separate from the prose ladder so `Title` remains a heading
+    /// rather than silently changing every title in the library.
+    #[serde(rename = "readoutScale")]
+    pub readout_scale: f32,
     pub scale: TypeScaleTokens,
 }
 
@@ -1882,6 +2195,8 @@ pub struct MotionTokens {
     pub duration_ms: DurationTokens,
     pub easing: EasingTokens,
     pub spring: SpringPresetTokens,
+    /// The most rows a stagger spans before its total window is compressed.
+    pub stagger_max_items: usize,
     /// How far a control sinks while the pointer is held on it.
     pub press_offset_px: f32,
     /// How far a control rises under the pointer.
@@ -1910,10 +2225,18 @@ pub struct DurationTokens {
     pub slow: u64,
     /// The gap between one member of a staggered group and the next.
     pub stagger_step: u64,
+    /// One-shot procedural reactions whose timing is distinct from general
+    /// control response durations.
+    pub micro_bounce: u64,
+    pub micro_wobble: u64,
+    pub micro_pop: u64,
     pub pulse: u64,
     /// How long a loading placeholder's highlight takes to cross it.
     pub shimmer: u64,
     pub toast: u64,
+    pub hover_card_open: u64,
+    pub hover_card_grace: u64,
+    pub confirmation: u64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -2021,6 +2344,13 @@ pub struct EffectTokens {
     pub area_wash_alpha: f32,
     /// How strongly a node's header band takes the node's category colour.
     pub header_tint_alpha: f32,
+    /// Paint ladder for active routes, traffic marks, connection previews and
+    /// minimap identities on a node canvas.
+    pub node_active_wash_alpha: f32,
+    pub node_active_stroke_alpha: f32,
+    pub node_traffic_alpha: f32,
+    pub node_preview_alpha: f32,
+    pub node_minimap_alpha: f32,
     /// How wide an identity rail is, in pixels: a node's category stripe, a
     /// callout's edge.
     ///
@@ -2030,6 +2360,45 @@ pub struct EffectTokens {
     /// wider because it has to read as part of the surface rather than as a
     /// state on top of it.
     pub rail_width: f32,
+    /// The weakest semantic-colour wash, used behind supporting prose.
+    pub semantic_wash_faint_alpha: f32,
+    /// The normal semantic-colour wash.
+    pub semantic_wash_alpha: f32,
+    /// The semantic-colour wash for a compact state that must remain visible.
+    pub semantic_wash_strong_alpha: f32,
+    /// A semantic report's outline over its wash.
+    pub semantic_border_alpha: f32,
+    /// Accent outlines for selected and actively targeted canvas entities.
+    pub accent_border_alpha: f32,
+    pub accent_border_strong_alpha: f32,
+    /// A quiet hover when the base interactive hover role is intentionally
+    /// reduced inside a dense collection.
+    pub subtle_hover_alpha: f32,
+    /// Text mixed into decorative colour so it survives both appearances.
+    pub soft_contrast_alpha: f32,
+    pub contrast_tint_alpha: f32,
+    /// Resting strength of a scrollbar thumb before its region is hovered.
+    pub track_resting_alpha: f32,
+    /// Opaque-enough backing for copy laid over caller-owned media.
+    pub content_veil_alpha: f32,
+    /// Active and inactive strengths of the destructive window affordance.
+    pub critical_fill_alpha: f32,
+    pub critical_inactive_alpha: f32,
+    /// Alpha ladder for the shared colour variant recipes.
+    pub variant_light_alpha: f32,
+    pub variant_light_hover_alpha: f32,
+    pub variant_light_active_alpha: f32,
+    pub variant_outline_hover_alpha: f32,
+    pub variant_outline_active_alpha: f32,
+    pub variant_subtle_hover_alpha: f32,
+    pub variant_subtle_active_alpha: f32,
+    pub primary_hover_opacity: f32,
+    /// Fallback recipes for caller-provided colours that do not have a named
+    /// palette ramp. Palette-backed colours use their authored steps instead.
+    pub custom_color_readable_dark_floor: f32,
+    pub custom_color_readable_light_ceiling: f32,
+    pub custom_color_hover_lightness_delta: f32,
+    pub custom_color_active_lightness_delta: f32,
 }
 
 #[cfg(test)]
@@ -2214,6 +2583,62 @@ mod tests {
         value["control"]["lg"]["height"] = serde_json::json!(10);
         let error = TokenDocument::parse(&value.to_string()).expect_err("unordered heights");
         assert!(error.to_string().contains("control"));
+    }
+
+    #[test]
+    fn compact_menu_measure_cannot_be_wider_than_the_normal_menu() {
+        let mut value: serde_json::Value =
+            serde_json::from_str(studio_dark_json()).expect("bundled JSON");
+        value["measure"]["compactMenuMinWidth"] = serde_json::json!(240);
+        let error = TokenDocument::parse(&value.to_string()).expect_err("wider compact menu");
+        assert!(error.to_string().contains("measure.compactMenuMinWidth"));
+    }
+
+    #[test]
+    fn readout_scale_cannot_shrink_below_its_selected_type_step() {
+        let mut value: serde_json::Value =
+            serde_json::from_str(studio_dark_json()).expect("bundled JSON");
+        value["typography"]["readoutScale"] = serde_json::json!(0.9);
+        let error = TokenDocument::parse(&value.to_string()).expect_err("shrinking readout");
+        assert!(error.to_string().contains("typography.readoutScale"));
+    }
+
+    #[test]
+    fn custom_color_recipes_keep_readability_and_interaction_ladders_ordered() {
+        let mut value: serde_json::Value =
+            serde_json::from_str(studio_dark_json()).expect("bundled JSON");
+        value["effect"]["customColorReadableLightCeiling"] = serde_json::json!(0.8);
+        let error = TokenDocument::parse(&value.to_string()).expect_err("crossed readability");
+        assert!(
+            error
+                .to_string()
+                .contains("effect.customColorReadableLightCeiling")
+        );
+
+        let mut value: serde_json::Value =
+            serde_json::from_str(studio_dark_json()).expect("bundled JSON");
+        value["effect"]["customColorHoverLightnessDelta"] = serde_json::json!(0.2);
+        let error = TokenDocument::parse(&value.to_string()).expect_err("crossed interaction");
+        assert!(
+            error
+                .to_string()
+                .contains("effect.customColorHoverLightnessDelta")
+        );
+    }
+
+    #[test]
+    fn palette_variant_fallbacks_and_stagger_window_are_validated() {
+        let mut value: serde_json::Value =
+            serde_json::from_str(studio_dark_json()).expect("bundled JSON");
+        value["color"]["paletteSteps"]["filled"] = serde_json::json!(["600", "600", "400"]);
+        let error = TokenDocument::parse(&value.to_string()).expect_err("duplicate fallback");
+        assert!(error.to_string().contains("color.paletteSteps.filled"));
+
+        let mut value: serde_json::Value =
+            serde_json::from_str(studio_dark_json()).expect("bundled JSON");
+        value["motion"]["staggerMaxItems"] = serde_json::json!(1);
+        let error = TokenDocument::parse(&value.to_string()).expect_err("one-row window");
+        assert!(error.to_string().contains("motion.staggerMaxItems"));
     }
 
     #[test]

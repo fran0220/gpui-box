@@ -265,7 +265,7 @@ impl RenderOnce for ProgressBar {
                 div()
                     .relative()
                     .w_full()
-                    .h(px(4.0))
+                    .h(px(theme.measures.progress_track_height))
                     .rounded_full()
                     .overflow_hidden()
                     .bg(signature::track(&theme))

@@ -29,7 +29,7 @@ use gpui::{
 };
 use gpui_kit_assets::{Icon, icon};
 use gpui_kit_semantics::{LiveRegion, NodeSpec, Role, Semantic};
-use gpui_kit_theme::{ActiveTheme, ControlSize, Layer, Space, Theme, TypeScale};
+use gpui_kit_theme::{ActiveTheme, ControlSize, Layer, SemanticWash, Space, Theme, TypeScale};
 use web_time::Instant;
 
 use crate::controls::button::Button;
@@ -43,10 +43,8 @@ use crate::strings::{ActiveStrings, StringKey};
 /// How many toasts stand in the stack before one is evicted to make room.
 const DEFAULT_CAPACITY: usize = 3;
 
-/// The width of one notification, and the distance it travels while entering
-/// or leaving. Neither value repeats anywhere else, so both stay next to the
-/// component instead of in the token document.
-const CARD_WIDTH: f32 = 320.0;
+/// The distance a notification travels while entering or leaving. This is the
+/// toast animation's own keyframe geometry, not shared surface policy.
 const TRAVEL: f32 = 8.0;
 
 type ActionHandler = Rc<dyn Fn(&mut Window, &mut App)>;
@@ -523,13 +521,13 @@ impl ToastLayer {
             .id(toast.ident.element_id())
             .row()
             .items_start()
-            .w(px(CARD_WIDTH))
+            .w(px(theme.measures.compact_overlay_width))
             .gap_token(theme, Space::Sm)
             .p_token(theme, Space::Md)
             // The tone washes the whole surface instead of outlining it, so a
             // toast that is a failure is a different colour rather than the
             // same colour inside a different line.
-            .bg(color.opacity(0.12))
+            .bg(theme.color_wash(color, SemanticWash::Standard))
             .opacity(entry.progress)
             .top(px(if self.corner.is_top() {
                 -travel

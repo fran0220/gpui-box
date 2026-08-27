@@ -487,6 +487,7 @@ impl Cascader {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let ident = self.ident.child(parent.id.as_ref()).child("state");
+        let theme = cx.theme().clone();
         let weak = cx.entity().downgrade();
         let state = parent.children.as_ref().expect("branch");
         let content: AnyElement = match state {
@@ -500,7 +501,7 @@ impl Cascader {
             Loadable::Ready(children) => self.option_column(children, &ident, cx),
             Loadable::Loading => self.slots.or_else(slot::LOADING, window, cx, |_, cx| {
                 div()
-                    .p(px(24.0))
+                    .p(px(theme.space(Space::Xl)))
                     .child(
                         PulseLoader::new(ident.clone())
                             .label(cx.strings().text(StringKey::Loading)),
@@ -578,10 +579,11 @@ impl Cascader {
         ident: &Ident,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        let theme = cx.theme().clone();
         div()
             .id(ident.element_id())
-            .min_w(px(180.0))
-            .max_h(px(320.0))
+            .min_w(px(theme.measures.compact_menu_min_width))
+            .max_h(px(theme.measures.menu_max_height))
             .overflow_y_scroll()
             .flex()
             .flex_col()

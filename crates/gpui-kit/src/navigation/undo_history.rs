@@ -308,7 +308,7 @@ fn entry_element(
 
     let mut content = div()
         .column()
-        .gap(px(2.0))
+        .gap(px(theme.space(Space::Xxs)))
         .child(
             foundation_text(theme, TypeScale::Label, entry.label.clone()).text_tone(
                 theme,

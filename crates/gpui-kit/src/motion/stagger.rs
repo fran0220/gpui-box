@@ -2,15 +2,16 @@
 
 use std::time::Duration;
 
+use gpui_kit_theme::Theme;
+
 use super::MotionSpec;
 
-/// How far apart two neighbouring rows start, and how many rows the wave is
-/// allowed to span before it compresses instead of growing.
-const ROW_STEP_MS: u64 = 16;
-const ROW_WINDOW: usize = 8;
-
 /// The longest a row wave can last, whatever the row count.
-pub const ROW_STAGGER_CAP: Duration = Duration::from_millis(ROW_STEP_MS * (ROW_WINDOW as u64 - 1));
+pub fn row_stagger_cap(theme: &Theme) -> Duration {
+    Duration::from_millis(
+        theme.motion.stagger_step_ms * (theme.motion.stagger_max_items as u64 - 1),
+    )
+}
 
 /// Delays each item in a list so a group animates as a wave.
 ///
@@ -38,11 +39,13 @@ impl Stagger {
 
     /// The wave a list of menu-shaped rows arrives on.
     ///
-    /// Sixteen milliseconds a row across at most eight rows, so the last row
-    /// in a fifty-row menu starts 112ms after the first rather than a second
-    /// later: past eight rows the step shrinks to keep the window fixed.
-    pub fn rows() -> Self {
-        Self::new(Duration::from_millis(ROW_STEP_MS), ROW_WINDOW)
+    /// Both the neighbour delay and the maximum span come from the active
+    /// theme. Past that span the step shrinks to keep the window fixed.
+    pub fn rows(theme: &Theme) -> Self {
+        Self::new(
+            Duration::from_millis(theme.motion.stagger_step_ms),
+            theme.motion.stagger_max_items,
+        )
     }
 
     pub fn max_items(mut self, max_items: usize) -> Self {
@@ -191,7 +194,9 @@ mod tests {
 
     #[test]
     fn a_row_wave_never_outlasts_its_cap() {
-        let stagger = Stagger::rows();
+        let theme = Theme::studio_dark();
+        let cap = row_stagger_cap(&theme);
+        let stagger = Stagger::rows(&theme);
         assert_eq!(stagger.delay(0, 50), Duration::ZERO);
         for count in [2, 8, 50, 500] {
             // Compared in whole milliseconds, which is the granularity the cap
@@ -199,11 +204,11 @@ mod tests {
             // a few tens of nanoseconds either side of it.
             let waited = stagger.delay(count - 1, count);
             assert!(
-                waited.as_millis() <= ROW_STAGGER_CAP.as_millis(),
+                waited.as_millis() <= cap.as_millis(),
                 "{count} rows waited {waited:?}"
             );
         }
-        assert_eq!(stagger.delay(7, 8), ROW_STAGGER_CAP);
+        assert_eq!(stagger.delay(7, 8), cap);
     }
 
     #[test]
@@ -229,16 +234,18 @@ mod tests {
 
     #[test]
     fn a_reversed_wave_compresses_the_same_way_a_forward_one_does() {
-        let stagger = Stagger::rows().reversed();
+        let theme = Theme::studio_dark();
+        let cap = row_stagger_cap(&theme);
+        let stagger = Stagger::rows(&theme).reversed();
         for count in [2, 8, 50, 500] {
             let waited = stagger.delay(0, count);
             assert!(
-                waited.as_millis() <= ROW_STAGGER_CAP.as_millis(),
+                waited.as_millis() <= cap.as_millis(),
                 "{count} rows waited {waited:?}"
             );
         }
         assert_eq!(stagger.delay(7, 8), Duration::ZERO);
-        assert_eq!(stagger.delay(0, 8), ROW_STAGGER_CAP);
+        assert_eq!(stagger.delay(0, 8), cap);
     }
 
     #[test]
