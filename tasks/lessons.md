@@ -60,6 +60,6 @@
 ## 2026-08-27: benchmark choice follows the user's library preference
 
 - When comparing a component ecosystem, use the library the user names as the
-  benchmark. Material UI is the primary coverage baseline here; shadcn/ui is a
-  secondary reference for source ownership and composition, not a reason to
-  substitute an unrequested library or invent a package-count denominator.
+  benchmark. Material UI and shadcn/ui are both valid open-source coverage
+  baselines here; compare each catalog by behavior, keep their differing name
+  granularity explicit, and never substitute an unrequested library.

@@ -471,16 +471,35 @@ View. Scheduler is listed as Preview, and advanced Pro/Premium features are
 not silently counted as free Core coverage. The mapping compares
 product-neutral behavior, not React, DOM, CSS, or API spelling:
 
-The secondary reference is [shadcn/ui](https://ui.shadcn.com/docs), whose
+The second coverage baseline is [shadcn/ui](https://ui.shadcn.com/docs), whose
 official description is a set of accessible components **and a code
-distribution platform**. Its [component catalog](https://ui.shadcn.com/docs/components)
-is intentionally extensible through copied source and community registries,
-so it is useful for reviewing composition, source ownership, slots, and escape
-hatches, but its catalog is not a stable package boundary or a meaningful
-component-count denominator. GPUI Box already follows the important part of
-that model — callers own data and actions, while the Kit owns reusable visual
-and interaction contracts — but those contracts must still be complete and
-machine-tested like a maintained library.
+distribution platform**. Its current [component catalog](https://ui.shadcn.com/docs/components)
+lists 64 first-party entries. That is a valid open-source component coverage
+baseline alongside MUI: the source-distribution model changes ownership and
+customisation, not whether an input, overlay, data, or layout capability needs
+to exist. Community registries remain outside this dated first-party count.
+GPUI Box already follows the important part of that model — callers own data
+and actions, while the Kit owns reusable visual and interaction contracts — but
+those contracts must still be complete and machine-tested like a maintained
+library. The count is not added to MUI's count because names and granularity
+differ; every entry is instead mapped by behavior below.
+
+| shadcn family | Entries | Strong equivalent | Partial / foundation | Unimplemented |
+|---|---:|---|---|---|
+| Interaction and forms | 20 | `Button`, `Button Group`, `Checkbox`, `Combobox`, `Calendar`, `Date Picker`, `Field`, `Input`, `Input OTP`, `Radio Group`, `Select`, `Switch`, `Textarea`, `Toggle`, `Toggle Group`, `Label` | `Input Group`, `Native Select`, `Slider`, `Questionnaire` | — |
+| Feedback and surfaces | 20 | `Accordion`, `Alert`, `Aspect Ratio`, `Avatar`, `Badge`, `Card`, `Collapsible`, `Dialog`, `Empty`, `Hover Card`, `Message Scroller`, `Progress`, `Sheet`, `Skeleton`, `Toast` | `Alert Dialog`, `Attachment`, `Message` | `Bubble`, `Carousel` |
+| Navigation and overlays | 13 | `Breadcrumb`, `Command`, `Context Menu`, `Drawer`, `Dropdown Menu`, `Menubar`, `Pagination`, `Popover`, `Sidebar`, `Tabs`, `Tooltip`, `Kbd` | `Navigation Menu` | — |
+| Data, layout, and foundation | 11 | `Chart`, `Data Table`, `Direction`, `Item`, `Separator`, `Table`, `Typography`, `Resizable`, `Scroll Area`, `Spinner` | `Marker` | — |
+| **Total** | **64** | **53** | **9** | **2** |
+
+This normalized shadcn mapping is intentionally stricter than a name search.
+For example, `Message Scroller` maps to the virtualized `MessageList`,
+`Resizable` maps to the shared `SplitPane` divider, and `Direction` maps to the
+layout-direction foundation. `Native Select` is only partial because GPUI's
+`Select` is a themed popup control, and `Slider` is only partial because the
+current contract is horizontal. Multiple-selection behavior is reported as a
+capability gap below rather than giving the existing single-value controls a
+false full match.
 
 | MUI family | Entries | GPUI Box mapping | Verdict |
 |---|---:|---|---|
@@ -503,7 +522,7 @@ thin wrappers would create another style system. Conversely, a component is
 not marked covered merely because a similarly named primitive can be composed;
 the state, input, semantic, and caller-owned event contracts must also line up.
 
-The MUI-derived component and capability gaps are:
+The MUI- and shadcn-derived component and capability gaps are:
 
 | Gap | Current boundary | What complete support requires |
 |---|---|---|
@@ -515,6 +534,8 @@ The MUI-derived component and capability gaps are:
 | `Image List` | `Flow` and `ImageViewer` can be composed, but there is no image-list contract for stable tiles, labels, and selection. | Stable item identity and reading order, measured responsive columns, token gaps, loading/error/unavailable media states, clipping and hit testing, and a declared virtualization boundary. |
 | `Masonry` | No Kit or framework primitive places variable-height items into measured columns. | Stable item identity and reading order, measured responsive columns, token gaps, incremental relayout, clipping and hit testing consistent with visual placement, and a declared virtualization boundary. |
 | Auto-growing `TextArea` | `TextArea` covers multiline editing, but the MUI `Textarea Autosize` contract is not a named capability. | Bounded min/max rows, measurement without layout oscillation, IME/selection continuity, caller-owned value and edit events, and a scroll fallback once the maximum is reached. |
+| `Bubble` | `PersonaDialogue` and message surfaces can render product-specific conversation layouts, but there is no generic caller-owned speech-bubble primitive. | A neutral message surface with placement, author/role, grouped messages, safe content, selection semantics, and caller-owned actions without importing conversation policy. |
+| `Carousel` | `ImageViewer` handles one viewport and `Flow` handles a collection, but neither owns a paged, focusable track. | Stable item identity, previous/next and direct-page intents, keyboard/pointer controls, viewport clipping, reduced motion, and truthful loading/unavailable states. |
 
 These are distinct from cross-library or product patterns such as a
 confirmation popover, product tour, sticky/affixed content, QR code, or
