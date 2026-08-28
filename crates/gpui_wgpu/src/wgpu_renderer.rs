@@ -165,6 +165,11 @@ struct PathRasterizationVertex {
 pub struct WgpuSurfaceConfig {
     pub size: Size<DevicePixels>,
     pub transparent: bool,
+    /// Color space used to present the surface. [`wgpu::SurfaceColorSpace::Auto`]
+    /// preserves the SDR-safe platform default. Explicit color spaces opt into
+    /// the matching wide-gamut or HDR output contract; callers must render
+    /// content using the transfer function that color space expects.
+    pub color_space: wgpu::SurfaceColorSpace,
     /// Preferred presentation mode. When `Some`, the renderer will use this
     /// mode if supported by the surface, falling back to `Fifo`.
     /// When `None`, defaults to `Fifo` (VSync).
@@ -172,6 +177,22 @@ pub struct WgpuSurfaceConfig {
     /// Mobile platforms may prefer `Mailbox` (triple-buffering) to avoid
     /// blocking in `get_current_texture()` during lifecycle transitions.
     pub preferred_present_mode: Option<wgpu::PresentMode>,
+}
+
+fn surface_formats_for_color_space(
+    capabilities: &wgpu::SurfaceCapabilities,
+    color_space: wgpu::SurfaceColorSpace,
+) -> Vec<wgpu::TextureFormat> {
+    let Some(color_space) = color_space.to_color_spaces() else {
+        return capabilities.formats.clone();
+    };
+
+    capabilities
+        .format_capabilities
+        .iter()
+        .filter(|capabilities| capabilities.color_spaces.contains(color_space))
+        .map(|capabilities| capabilities.format)
+        .collect()
 }
 
 struct WgpuPipelines {
@@ -481,6 +502,7 @@ impl WgpuRenderer {
         atlas: Arc<WgpuAtlas>,
     ) -> anyhow::Result<Self> {
         let surface_caps = surface.get_capabilities(&context.adapter);
+        let surface_formats = surface_formats_for_color_space(&surface_caps, config.color_space);
         let preferred_formats = [
             wgpu::TextureFormat::Bgra8Unorm,
             wgpu::TextureFormat::Rgba8Unorm,
@@ -496,27 +518,26 @@ impl WgpuRenderer {
         let surface_format = preferred_formats
             .iter()
             .find(|format| {
-                surface_caps.formats.contains(format) && supports_backdrop_blur(**format)
+                surface_formats.contains(format) && supports_backdrop_blur(**format)
             })
             .copied()
             .or_else(|| {
-                surface_caps
-                    .formats
+                surface_formats
                     .iter()
                     .find(|format| !format.is_srgb() && supports_backdrop_blur(**format))
                     .copied()
             })
             .or_else(|| {
-                surface_caps
-                    .formats
+                surface_formats
                     .iter()
                     .find(|format| supports_backdrop_blur(**format))
                     .copied()
             })
             .ok_or_else(|| {
                 anyhow::anyhow!(
-                    "Surface reports no renderable, sampleable, filterable texture formats for adapter {:?}",
-                    context.adapter.get_info().name
+                    "Surface reports no renderable, sampleable, filterable texture formats for color space {:?} on adapter {:?}",
+                    config.color_space,
+                    context.adapter.get_info().name,
                 )
             })?;
 
@@ -570,6 +591,7 @@ impl WgpuRenderer {
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
+            color_space: config.color_space,
             width: clamped_width.max(1),
             height: clamped_height.max(1),
             present_mode: config
@@ -623,6 +645,7 @@ impl WgpuRenderer {
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
             format: surface_format,
+            color_space: wgpu::SurfaceColorSpace::Auto,
             width: 1,
             height: 1,
             present_mode: wgpu::PresentMode::Fifo,
@@ -1804,7 +1827,10 @@ impl WgpuRenderer {
             anyhow::bail!("GPU error during headless rendering: {error}");
         }
 
-        let mapped_data = readback_buffer.slice(..).get_mapped_range();
+        let mapped_data = readback_buffer
+            .slice(..)
+            .get_mapped_range()
+            .map_err(|error| anyhow::anyhow!("Failed to read mapped headless buffer: {error}"))?;
         let mut pixels = Vec::with_capacity(pixel_capacity);
         for row in mapped_data
             .chunks_exact(padded_bytes_per_row as usize)
@@ -1976,7 +2002,7 @@ impl WgpuRenderer {
         if let Err(error) = self.draw_to_view(scene, &frame_view, wgpu::Color::TRANSPARENT) {
             log::error!("{error}");
         }
-        frame.present();
+        self.resources().queue.present(frame);
         true
     }
 
@@ -2604,7 +2630,11 @@ impl WgpuRenderer {
             .probe_inflight
             .take()
             .expect("required framework invariant must hold");
-        let data = inflight.buffer.slice(..).get_mapped_range();
+        let data = inflight
+            .buffer
+            .slice(..)
+            .get_mapped_range()
+            .expect("successfully mapped probe buffer must remain readable until collection");
         for &slot in &inflight.requests {
             let mut total = 0.0;
             for index in 0..LUMINANCE_PROBE_SAMPLES {
@@ -3162,6 +3192,26 @@ impl WgpuRenderer {
 
         let surface = create_surface(instance, window_handle.as_raw())?;
 
+        let supports_current_format = {
+            let gpu_context = self
+                .context
+                .as_ref()
+                .expect("replace_surface requires gpu_context");
+            let context = gpu_context.borrow();
+            let context = context
+                .as_ref()
+                .expect("replace_surface requires an initialized context");
+            let capabilities = surface.get_capabilities(&context.adapter);
+            surface_formats_for_color_space(&capabilities, config.color_space)
+                .contains(&self.surface_config.format)
+        };
+        anyhow::ensure!(
+            supports_current_format,
+            "Replacement surface does not support format {:?} in color space {:?}",
+            self.surface_config.format,
+            config.color_space,
+        );
+
         let width = (config.size.width.0 as u32).max(1);
         let height = (config.size.height.0 as u32).max(1);
 
@@ -3174,6 +3224,7 @@ impl WgpuRenderer {
         self.surface_config.width = width;
         self.surface_config.height = height;
         self.surface_config.alpha_mode = alpha_mode;
+        self.surface_config.color_space = config.color_space;
         if let Some(mode) = config.preferred_present_mode {
             self.surface_config.present_mode = mode;
         }
@@ -3270,6 +3321,7 @@ impl WgpuRenderer {
                 height: gpui::DevicePixels(self.surface_config.height as i32),
             },
             transparent: self.surface_config.alpha_mode != wgpu::CompositeAlphaMode::Opaque,
+            color_space: self.surface_config.color_space,
             preferred_present_mode: Some(self.surface_config.present_mode),
         };
         let gpu_context = Rc::clone(gpu_context);
@@ -3451,6 +3503,40 @@ mod tests {
             lobes: [GlassLobe::default(); MAX_GLASS_LOBES],
             lobe_count: 0,
         }
+    }
+
+    #[test]
+    fn surface_color_space_selection_keeps_auto_sdr_safe_and_exposes_opt_in_formats() {
+        let capabilities = wgpu::SurfaceCapabilities {
+            formats: vec![wgpu::TextureFormat::Bgra8Unorm],
+            format_capabilities: vec![
+                wgpu::SurfaceFormatCapabilities {
+                    format: wgpu::TextureFormat::Bgra8Unorm,
+                    color_spaces: wgpu::SurfaceColorSpaces::SRGB,
+                },
+                wgpu::SurfaceFormatCapabilities {
+                    format: wgpu::TextureFormat::Rgba16Float,
+                    color_spaces: wgpu::SurfaceColorSpaces::EXTENDED_SRGB_LINEAR,
+                },
+            ],
+            ..Default::default()
+        };
+
+        assert_eq!(
+            surface_formats_for_color_space(&capabilities, wgpu::SurfaceColorSpace::Auto),
+            vec![wgpu::TextureFormat::Bgra8Unorm]
+        );
+        assert_eq!(
+            surface_formats_for_color_space(&capabilities, wgpu::SurfaceColorSpace::Srgb),
+            vec![wgpu::TextureFormat::Bgra8Unorm]
+        );
+        assert_eq!(
+            surface_formats_for_color_space(
+                &capabilities,
+                wgpu::SurfaceColorSpace::ExtendedSrgbLinear,
+            ),
+            vec![wgpu::TextureFormat::Rgba16Float]
+        );
     }
 
     #[test]

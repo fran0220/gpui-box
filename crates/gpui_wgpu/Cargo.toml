@@ -60,7 +60,7 @@ criterion.workspace = true
 env_logger.workspace = true
 gpui = { package = "gpui-box", path = "../gpui", features = ["test-support"] }
 image.workspace = true
-naga = { version = "29.0.4", features = ["wgsl-in"] }
+naga = { version = "=30.0.0", features = ["wgsl-in"] }
 
 [[bench]]
 name = "layout_line"

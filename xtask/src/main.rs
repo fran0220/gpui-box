@@ -1233,7 +1233,7 @@ fn headless(command: &str, only: &[String]) -> Result<()> {
 }
 
 const WASM_TARGET: &str = "wasm32-unknown-unknown";
-const WASM_BINDGEN_VERSION: &str = "0.2.126";
+const WASM_BINDGEN_VERSION: &str = "0.2.127";
 const WASM_DENY_WARNINGS: &str = "target.wasm32-unknown-unknown.rustflags=['-Dwarnings']";
 
 fn web_check() -> Result<()> {
@@ -1277,7 +1277,7 @@ fn web_build() -> Result<()> {
         .output()
         .context(
             "wasm-bindgen-cli is required; install it with `cargo install \
-             wasm-bindgen-cli --version 0.2.126 --locked`",
+             wasm-bindgen-cli --version 0.2.127 --locked`",
         )?;
     let expected = format!("wasm-bindgen {WASM_BINDGEN_VERSION}");
     if !version.status.success() || String::from_utf8_lossy(&version.stdout).trim() != expected {

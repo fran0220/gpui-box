@@ -250,7 +250,7 @@ wasm-bindgen-futures = "0.4"
 js-sys = "0.3"
 console_error_panic_hook = "0.1.7"
 web-time = "1.1.0"
-wgpu = "29.0.4"
+wgpu = "30.0.1"
 windows = { version = "0.61", features = [
     "Data_Xml_Dom",
     "Foundation_Numerics",

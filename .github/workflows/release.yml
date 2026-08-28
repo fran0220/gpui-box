@@ -230,7 +230,7 @@ jobs:
         with: { toolchain: 1.97.1, targets: wasm32-unknown-unknown }
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
-        with: { tool: "wasm-bindgen-cli@0.2.126" }
+        with: { tool: "wasm-bindgen-cli@0.2.127" }
       - run: cargo run -p xtask -- web gate button input dialog node-graph
 
   semver:

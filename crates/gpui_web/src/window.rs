@@ -137,6 +137,7 @@ impl WebWindow {
                 height: DevicePixels(0),
             },
             transparent: false,
+            color_space: wgpu::SurfaceColorSpace::Auto,
             preferred_present_mode: None,
         };
         let renderer = WgpuRenderer::new_from_surface(context, surface, renderer_config)?;
