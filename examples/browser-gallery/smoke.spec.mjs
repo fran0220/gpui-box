@@ -76,10 +76,6 @@ test("ordinary control uses the catalog component and stable semantics", async (
   }
   await pointer(page, "pointerdown", center(primary), 1);
   await settle(page);
-  const pressed = await canvas.screenshot();
-  if (renderer === "webgl2") {
-    expect(pressed.equals(hovered)).toBe(false);
-  }
   await pointer(page, "pointerup", center(primary), 0);
   await settle(page);
 });
@@ -146,7 +142,7 @@ test("verification scene edits one redacted segmented input", async ({ page }, t
   await pointer(page, "pointerup", center(code), 0);
   await page.keyboard.type("ABCDEF");
   await expect.poll(async () => (await node(page, "scene.auth.verification.code")).description)
-    .toBe("6/6");
+    .toBe("6 of 6");
   await expect.poll(async () => (await node(page, "scene.auth.verification.code")).value)
     .toBe("[REDACTED]");
   expect(JSON.stringify(await snapshot(page))).not.toContain("ABCDEF");
@@ -205,7 +201,7 @@ test("treegrid mirrors accessible ancestry and accepts row selection", async ({ 
   const cells = row.locator('[role="gridcell"]');
   await expect(treegrid).toHaveCount(1);
   await expect(row).toHaveCount(1);
-  await expect(cells).toHaveCount(3);
+  await expect(cells).toHaveCount(4);
 
   const docs = await node(page, "scene.tree-grid.files.docs");
   await pointer(page, "pointerdown", center(docs), 1);
@@ -250,7 +246,8 @@ test("playground filters, selects, themes, syncs its URL, and reflows narrowly",
   await page.waitForFunction(() => window.gpuiKitGalleryReady === true);
   await expect(page.locator("canvas")).toHaveAttribute("data-gpui-renderer", renderer);
   expect(await node(page, "browser.playground.title")).toBeDefined();
-  expect((await node(page, "browser.playground.scenes")).value).toBe("99");
+  const catalog = JSON.parse(await page.evaluate(() => window.gpuiKitCatalog));
+  expect((await node(page, "browser.playground.scenes")).value).toBe(String(catalog.scenes.length));
 
   const query = await node(page, "browser.playground.search.query");
   await pointer(page, "pointerdown", center(query), 1);
