@@ -24,7 +24,7 @@ use gpui_kit_theme::{ActiveTheme, ContrastTint};
 use web_time::Instant;
 
 use crate::foundation::{direction::ActiveDirection, window_state};
-use crate::motion::keyed;
+use crate::motion::{MotionPolicy, MotionRole, keyed};
 
 mod dotlottie;
 
@@ -171,6 +171,20 @@ impl EffectRecipe {
             Self::FailurePulse => EffectCost::new(1, 1, 12, 48_000),
         }
     }
+
+    fn motion_role(self) -> MotionRole {
+        match self {
+            Self::RewardCelebration => MotionRole::Celebration,
+            Self::ArrivalHalo
+            | Self::DelegationTrace
+            | Self::HandoffTrace
+            | Self::AggregationPulse
+            | Self::SuccessBurst
+            | Self::AttentionPulse
+            | Self::RefusalMark
+            | Self::FailurePulse => MotionRole::Feedback,
+        }
+    }
 }
 
 /// How the chosen recipe is allowed to appear.
@@ -266,10 +280,20 @@ impl RenderOnce for EffectParticles {
             return div().size_full().into_any_element();
         }
 
+        let theme = cx.theme().clone();
+        let motion =
+            MotionPolicy::resolve_for(self.plan.recipe.motion_role(), &theme, cx.reduce_motion());
+        let timing = EffectTiming::new(self.plan.recipe, motion.spec().total());
         let static_presentation =
-            cx.reduce_motion() || matches!(self.plan.presentation, EffectPresentation::Static(_));
-        let elapsed = particle_elapsed(&self.plan, self.sample_at, static_presentation, window, cx);
-        let theme = cx.theme();
+            !motion.animates() || matches!(self.plan.presentation, EffectPresentation::Static(_));
+        let elapsed = particle_elapsed(
+            &self.plan,
+            self.sample_at,
+            static_presentation,
+            timing,
+            window,
+            cx,
+        );
         let contrast_tint = |color: Hsla| theme.contrast_tint(color, ContrastTint::Standard);
         let palette = EffectPalette {
             accent: contrast_tint(theme.colors.accent_strong),
@@ -285,7 +309,8 @@ impl RenderOnce for EffectParticles {
         canvas(
             |_, _, _| {},
             move |frame, _, window, _| {
-                let emitters = particle_emitters(&plan, frame, palette, rtl, static_presentation);
+                let emitters =
+                    particle_emitters(&plan, frame, palette, rtl, static_presentation, timing);
                 window
                     .paint_particle_batch(atlas.clone(), 0, elapsed, &emitters)
                     .expect("policy-owned particle recipes must remain valid");
@@ -303,11 +328,12 @@ fn particle_elapsed(
     plan: &EffectPlan,
     sample_at: Option<Duration>,
     static_presentation: bool,
+    timing: EffectTiming,
     window: &mut Window,
     cx: &mut App,
 ) -> Duration {
     if static_presentation {
-        return Duration::from_millis(100);
+        return timing.fraction(0.1);
     }
     if let Some(elapsed) = sample_at {
         return elapsed;
@@ -322,23 +348,36 @@ fn particle_elapsed(
         let started = *clock.0.get_or_insert(now);
         now.saturating_duration_since(started)
     };
-    if elapsed < particle_recipe_duration(plan.recipe) {
+    if elapsed < timing.total {
         window.request_animation_frame();
     }
     elapsed
 }
 
-fn particle_recipe_duration(recipe: EffectRecipe) -> Duration {
-    Duration::from_millis(match recipe {
-        EffectRecipe::ArrivalHalo => 900,
-        EffectRecipe::DelegationTrace => 970,
-        EffectRecipe::HandoffTrace => 1_150,
-        EffectRecipe::AggregationPulse => 900,
-        EffectRecipe::SuccessBurst => 1_100,
-        EffectRecipe::RewardCelebration => 1_680,
-        EffectRecipe::FailurePulse => 750,
-        EffectRecipe::AttentionPulse | EffectRecipe::RefusalMark => 0,
-    })
+#[derive(Debug, Clone, Copy)]
+struct EffectTiming {
+    total: Duration,
+}
+
+impl EffectTiming {
+    fn new(recipe: EffectRecipe, total: Duration) -> Self {
+        Self {
+            total: if recipe.cost().emitters == 0 {
+                Duration::ZERO
+            } else {
+                total
+            },
+        }
+    }
+
+    fn fraction(self, fraction: f32) -> Duration {
+        self.total.mul_f32(fraction)
+    }
+
+    fn split(self, emission_fraction: f32) -> (Duration, Duration) {
+        let emission = self.fraction(emission_fraction);
+        (emission, self.total.saturating_sub(emission))
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -356,12 +395,13 @@ fn particle_emitters(
     palette: EffectPalette,
     rtl: bool,
     static_presentation: bool,
+    timing: EffectTiming,
 ) -> Vec<ParticleEmitter> {
     if plan.recipe.cost().emitters == 0 {
         return Vec::new();
     }
     if static_presentation {
-        return static_particle_emitters(plan, frame, palette);
+        return static_particle_emitters(plan, frame, palette, timing);
     }
 
     let center = frame.center();
@@ -381,6 +421,8 @@ fn particle_emitters(
             .color_mode(SpriteColorMode::AlphaMask, tint)
             .blend_mode(blend)
     };
+    let (trace_emission, trace_lifetime) = timing.split(0.43);
+    let (celebration_emission, celebration_lifetime) = timing.split(0.11);
 
     match plan.recipe {
         EffectRecipe::ArrivalHalo => vec![
@@ -392,7 +434,7 @@ fn particle_emitters(
                 palette.info,
                 SpriteBlendMode::Screen,
             )
-            .lifetime(Duration::from_millis(900))
+            .lifetime(timing.total)
             .speed(12.0, 64.0)
             .size(size(px(18.0), px(18.0)), size(px(2.0), px(2.0)))
             .fade(0.0, 0.45),
@@ -407,8 +449,8 @@ fn particle_emitters(
                 SpriteBlendMode::Normal,
             )
             .spawn_area(size(Pixels::ZERO, frame.size.height * 0.18))
-            .emission_span(Duration::from_millis(420))
-            .lifetime(Duration::from_millis(550))
+            .emission_span(trace_emission)
+            .lifetime(trace_lifetime)
             .direction(reading_direction, radians(0.18))
             .speed(105.0, 145.0)
             .size(size(px(8.0), px(8.0)), size(px(3.0), px(3.0)))
@@ -424,8 +466,8 @@ fn particle_emitters(
                 SpriteBlendMode::Screen,
             )
             .spawn_area(size(Pixels::ZERO, frame.size.height * 0.22))
-            .emission_span(Duration::from_millis(500))
-            .lifetime(Duration::from_millis(650))
+            .emission_span(trace_emission)
+            .lifetime(trace_lifetime)
             .direction(reading_direction, radians(0.24))
             .speed(120.0, 175.0)
             .size(size(px(11.0), px(11.0)), size(px(4.0), px(4.0)))
@@ -441,7 +483,7 @@ fn particle_emitters(
                 palette.accent,
                 SpriteBlendMode::Screen,
             )
-            .lifetime(Duration::from_millis(900))
+            .lifetime(timing.total)
             .speed(30.0, 82.0)
             .size(size(px(15.0), px(15.0)), size(px(3.0), px(3.0)))
             .fade(0.0, 0.52),
@@ -455,7 +497,7 @@ fn particle_emitters(
                 palette.success,
                 SpriteBlendMode::Normal,
             )
-            .lifetime(Duration::from_millis(1_100))
+            .lifetime(timing.total)
             .direction(radians(-std::f32::consts::FRAC_PI_2), radians(2.2))
             .speed(70.0, 145.0)
             .acceleration(point(0.0, 92.0))
@@ -474,8 +516,8 @@ fn particle_emitters(
                     palette.warning,
                     SpriteBlendMode::Normal,
                 )
-                .emission_span(Duration::from_millis(180))
-                .lifetime(Duration::from_millis(1_500))
+                .emission_span(celebration_emission)
+                .lifetime(celebration_lifetime)
                 .direction(radians(-std::f32::consts::FRAC_PI_2), radians(2.65))
                 .speed(105.0, 205.0)
                 .acceleration(point(0.0, 155.0))
@@ -490,8 +532,8 @@ fn particle_emitters(
                     palette.accent,
                     SpriteBlendMode::Normal,
                 )
-                .emission_span(Duration::from_millis(180))
-                .lifetime(Duration::from_millis(1_500))
+                .emission_span(celebration_emission)
+                .lifetime(celebration_lifetime)
                 .direction(radians(-std::f32::consts::FRAC_PI_2), radians(2.9))
                 .speed(95.0, 190.0)
                 .acceleration(point(0.0, 150.0))
@@ -509,7 +551,7 @@ fn particle_emitters(
                 palette.danger,
                 SpriteBlendMode::Normal,
             )
-            .lifetime(Duration::from_millis(750))
+            .lifetime(timing.total)
             .speed(20.0, 58.0)
             .size(size(px(13.0), px(13.0)), size(px(3.0), px(3.0)))
             .fade(0.0, 0.5),
@@ -522,6 +564,7 @@ fn static_particle_emitters(
     plan: &EffectPlan,
     frame: Bounds<Pixels>,
     palette: EffectPalette,
+    timing: EffectTiming,
 ) -> Vec<ParticleEmitter> {
     let (tile, tint) = match plan.recipe {
         EffectRecipe::ArrivalHalo | EffectRecipe::HandoffTrace => (2, palette.info),
@@ -535,7 +578,7 @@ fn static_particle_emitters(
     vec![
         ParticleEmitter::new(plan.seed, particle_source(tile), frame.center(), count)
             .spawn_area(size(frame.size.width * 0.14, frame.size.height * 0.2))
-            .lifetime(Duration::from_secs(1))
+            .lifetime(timing.total)
             .speed(0.0, 0.0)
             .size(size(px(17.0), px(17.0)), size(px(17.0), px(17.0)))
             .size_variation(0.45)
@@ -936,7 +979,7 @@ pub fn plan_effect(event: EffectEvent, window: &Window, cx: &mut App) -> EffectP
     install(cx);
     let window_id = window.window_handle().window_id();
     let frame = keyed::frame_counter(window_id, cx).unwrap_or_default();
-    let reduce_motion = cx.reduce_motion();
+    let reduce_motion = !MotionPolicy::resolve(event.cue.recipe().motion_role(), cx).animates();
     let installed = cx.global::<InstalledEffects>();
     let policy = installed.policy.clone();
     let version = installed.version;
@@ -967,6 +1010,15 @@ fn replay_key(surface: &str, id: &str) -> SharedString {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gpui_kit_theme::Theme;
+
+    fn particle_recipe_duration(recipe: EffectRecipe, theme: &Theme) -> Duration {
+        EffectTiming::new(
+            recipe,
+            MotionPolicy::spec(recipe.motion_role(), theme).total(),
+        )
+        .total
+    }
 
     fn event(id: &'static str, surface: &'static str, cue: VisualCue) -> EffectEvent {
         EffectEvent::new(id, surface, "target", cue)
@@ -1001,6 +1053,7 @@ mod tests {
 
     #[test]
     fn animated_particle_topology_matches_the_budget_authority() {
+        let theme = Theme::studio_dark();
         let recipes = [
             EffectRecipe::ArrivalHalo,
             EffectRecipe::DelegationTrace,
@@ -1013,12 +1066,17 @@ mod tests {
             EffectRecipe::FailurePulse,
         ];
         for recipe in recipes {
+            let timing = EffectTiming::new(
+                recipe,
+                MotionPolicy::spec(recipe.motion_role(), &theme).total(),
+            );
             let emitters = particle_emitters(
                 &plan(recipe, EffectPresentation::Animated),
                 frame(),
                 palette(),
                 false,
                 false,
+                timing,
             );
             assert_eq!(emitters.len(), usize::from(recipe.cost().emitters));
             assert_eq!(
@@ -1031,14 +1089,19 @@ mod tests {
                     .map(ParticleEmitter::total_duration)
                     .max()
                     .unwrap_or_default(),
-                particle_recipe_duration(recipe)
+                particle_recipe_duration(recipe, &theme)
             );
         }
     }
 
     #[test]
     fn static_fallback_is_bounded_and_has_no_timeline() {
+        let theme = Theme::studio_dark();
         let recipe = EffectRecipe::RewardCelebration;
+        let timing = EffectTiming::new(
+            recipe,
+            MotionPolicy::spec(recipe.motion_role(), &theme).total(),
+        );
         let emitters = particle_emitters(
             &plan(
                 recipe,
@@ -1048,11 +1111,12 @@ mod tests {
             palette(),
             false,
             true,
+            timing,
         );
         assert_eq!(emitters.len(), 1);
         assert!(emitters[0].count() < recipe.cost().particles);
         assert_eq!(
-            particle_recipe_duration(EffectRecipe::AttentionPulse),
+            particle_recipe_duration(EffectRecipe::AttentionPulse, &theme),
             Duration::ZERO
         );
     }

@@ -17,7 +17,7 @@ use crate::foundation::{
     Disableable, FocusRing, Ident, Pressable, Selectable, Sizable, StyledExt,
     text as foundation_text,
 };
-use crate::motion::{self, Interpolate};
+use crate::motion::{self, Interpolate, MotionPolicy, MotionRole};
 use crate::reactive::Binding;
 
 type ToggleHandler = Rc<dyn Fn(bool, &mut Window, &mut App)>;
@@ -140,7 +140,7 @@ impl RenderOnce for Checkbox {
         let drawn = motion::tracked(
             &self.ident.semantic_id(),
             point(f32::from(u8::from(on)), f32::from(u8::from(mixed))),
-            motion::state_change(&theme),
+            MotionPolicy::spec(MotionRole::StateChange, &theme),
             window,
             cx,
         );
@@ -312,7 +312,7 @@ impl RenderOnce for Radio {
         let drawn = motion::tracked(
             &self.ident.semantic_id(),
             f32::from(u8::from(self.selected)),
-            motion::state_change(&theme),
+            MotionPolicy::spec(MotionRole::StateChange, &theme),
             window,
             cx,
         );
@@ -481,7 +481,7 @@ impl RenderOnce for Switch {
         let drawn = motion::tracked(
             &self.ident.semantic_id(),
             f32::from(u8::from(self.on)),
-            motion::state_change(&theme),
+            MotionPolicy::spec(MotionRole::StateChange, &theme),
             window,
             cx,
         );

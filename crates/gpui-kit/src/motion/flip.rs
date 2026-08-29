@@ -44,11 +44,10 @@ use gpui::{
     App, AvailableSpace, Bounds, Element, ElementId, GlobalElementId, Hsla, InspectorElementId,
     IntoElement, LayoutId, Pixels, Point, SharedString, Size, Style, Window, px, size,
 };
-use gpui_kit_theme::{ActiveTheme, SpringPreset};
 use web_time::Instant;
 
 use super::keyed;
-use super::{Interpolate, MotionSpec, Spring, Transition};
+use super::{Interpolate, MotionPolicy, MotionRole, MotionSpec, Spring, Transition};
 
 /// How far an origin or an edge has to move before it counts as a move.
 ///
@@ -417,11 +416,11 @@ impl Flip {
     /// div().shaped(shape).flip(&handle, window, cx)
     /// ```
     pub fn shape(&self, target: Shape, window: &mut Window, cx: &App) -> Shape {
-        let spring = Spring::preset(cx.theme(), SpringPreset::Grab);
-        let spec = MotionSpec::sprung(spring);
+        let motion = MotionPolicy::resolve(MotionRole::Tracking, cx);
+        let spec = motion.spec();
         let now = Instant::now();
         let mut state = self.state.borrow_mut();
-        let drawn = if cx.reduce_motion() {
+        let drawn = if !motion.animates() {
             state.settle_shape(target, spec, now)
         } else {
             state.record_shape(target, spec, now)
@@ -540,16 +539,20 @@ fn flipped<E: IntoElement>(
     window: &mut Window,
     cx: &mut App,
 ) -> Flipped {
-    let spring = Spring::preset(cx.theme(), SpringPreset::Grab);
+    let motion = MotionPolicy::resolve(MotionRole::Tracking, cx);
+    let spring = motion
+        .spec()
+        .spring()
+        .expect("tracking motion is spring-backed");
     let element = Flipped {
         element: element.into_any_element(),
         state: Rc::clone(&flip.state),
         spring,
-        settle: spring.settle_time(),
+        settle: motion.spec().total(),
         sized,
         measuring: false,
         measured_against: None,
-        reduce_motion: cx.reduce_motion(),
+        reduce_motion: !motion.animates(),
         frame: keyed::frame_counter(window.window_handle().window_id(), cx),
     };
     // A slide that is still running needs the next frame even when nothing
@@ -781,10 +784,12 @@ impl Element for Flipped {
 mod tests {
     use super::*;
     use gpui::{point, size};
-    use gpui_kit_theme::Theme;
+    use gpui_kit_theme::{SpringPreset, Theme};
 
     fn grab() -> Spring {
-        Spring::preset(&Theme::studio_dark(), SpringPreset::Grab)
+        MotionPolicy::spec(MotionRole::Tracking, &Theme::studio_dark())
+            .spring()
+            .expect("tracking motion is spring-backed")
     }
 
     fn spec() -> MotionSpec {

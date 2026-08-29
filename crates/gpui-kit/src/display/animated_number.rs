@@ -12,7 +12,7 @@ use gpui_kit_semantics::{NodeSpec, Role, Semantic};
 use gpui_kit_theme::{ActiveTheme, TypeScale};
 
 use crate::foundation::{Ident, StyledExt};
-use crate::motion::{Easing, MotionSpec, Transition, keyed};
+use crate::motion::{MotionPolicy, MotionRole, MotionSpec, Transition, keyed};
 use crate::strings::ActiveNumbers;
 
 type Format = Rc<dyn Fn(f64) -> String>;
@@ -87,9 +87,9 @@ impl AnimatedNumber {
 impl RenderOnce for AnimatedNumber {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let spec = self.spec.unwrap_or_else(|| {
-            MotionSpec::new(theme.motion.resize_ms, Easing::Standard.curve(&theme))
-        });
+        let spec = self
+            .spec
+            .unwrap_or_else(|| MotionPolicy::spec(MotionRole::Resize, &theme));
         let target = self.value as f32;
 
         let counter = keyed::slot::<Counter>(

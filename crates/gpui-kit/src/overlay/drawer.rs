@@ -21,7 +21,7 @@ use gpui_kit_theme::{ActiveTheme, Space, Theme};
 
 use crate::controls::button::IconButton;
 use crate::foundation::{Ident, Sizable, StyledExt};
-use crate::motion::{self, Easing, MotionSpec, Phase, Presence};
+use crate::motion::{MotionPolicy, MotionRole, MotionSpec, Phase, Presence};
 use crate::overlay::focus::FocusTrap;
 use crate::overlay::layer::{Edge, Overlay, OverlaySurface, surface};
 use crate::overlay::panel::{self, Body};
@@ -423,11 +423,11 @@ impl Drawer {
 /// A drawer is a heavy thing being pulled out, so it arrives on a spring and
 /// leaves on a curve: the pull has weight, the dismissal is just gone.
 fn enter_spec(theme: &Theme) -> MotionSpec {
-    motion::dialog_arrival(theme)
+    MotionPolicy::spec(MotionRole::ModalEnter, theme)
 }
 
 fn exit_spec(theme: &Theme) -> MotionSpec {
-    MotionSpec::new(theme.motion.quick_ms, Easing::Exit.curve(theme))
+    MotionPolicy::spec(MotionRole::Exit, theme)
 }
 
 impl Focusable for Drawer {

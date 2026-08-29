@@ -30,7 +30,7 @@ use crate::display::state_view::StateView;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{FocusRing, Ident, Pressable, StyledExt};
 use crate::layout::measure;
-use crate::motion::keyed;
+use crate::motion::{Activity, MotionPolicy, MotionRole, keyed};
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -961,11 +961,15 @@ impl RenderOnce for NodeGraph {
             window.window_handle().window_id(),
             cx,
         );
-        let animation_phase = if moving_effects && !cx.reduce_motion() {
+        let activity = MotionPolicy::resolve(MotionRole::Activity(Activity::Advancing), cx);
+        let animation_phase = if moving_effects && activity.animates() {
             let now = cx.background_executor().now();
             let mut state = gesture.borrow_mut();
             let started = *state.animation_started.get_or_insert(now);
-            Some((now.duration_since(started).as_secs_f32() / 1.8).rem_euclid(1.0))
+            Some(
+                (now.duration_since(started).as_secs_f32() / activity.spec().total().as_secs_f32())
+                    .rem_euclid(1.0),
+            )
         } else {
             gesture.borrow_mut().animation_started = None;
             None

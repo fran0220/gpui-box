@@ -14,11 +14,12 @@ use gpui::{
     StyledImage, Window, div, img,
 };
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
+use gpui_kit_theme::{ActiveTheme, Theme};
 
 use super::{EffectParticles, EffectPlan, EffectPresentation, EffectRecipe};
 use crate::foundation::Ident;
 use crate::foundation::direction::ActiveDirection;
-use crate::motion::keyed;
+use crate::motion::{MotionPolicy, MotionRole, keyed};
 use crate::strings::{ActiveStrings, StringKey};
 
 /// Absolute ceilings accepted by any Box dotLottie adapter.
@@ -504,18 +505,22 @@ impl CinematicRecipe {
         }
     }
 
-    pub const fn duration(self) -> Duration {
-        Duration::from_millis(match self {
-            Self::Arrival => 900,
-            Self::Delegation => 970,
-            Self::Handoff => 1_150,
-            Self::Aggregation => 900,
-            Self::Success => 1_100,
-            Self::Reward => 1_680,
-            Self::Attention => 700,
-            Self::Refusal => 650,
-            Self::Failure => 750,
-        })
+    pub fn duration(self, theme: &Theme) -> Duration {
+        MotionPolicy::spec(self.motion_role(), theme).total()
+    }
+
+    pub const fn motion_role(self) -> MotionRole {
+        match self {
+            Self::Reward => MotionRole::Celebration,
+            Self::Arrival
+            | Self::Delegation
+            | Self::Handoff
+            | Self::Aggregation
+            | Self::Success
+            | Self::Attention
+            | Self::Refusal
+            | Self::Failure => MotionRole::Feedback,
+        }
     }
 
     pub const fn poster_progress_per_mille(self) -> u16 {
@@ -628,21 +633,22 @@ impl RenderOnce for CinematicEffect {
         }
 
         let recipe = self.plan.cinematic_recipe();
+        let motion =
+            MotionPolicy::resolve_for(recipe.motion_role(), cx.theme(), cx.reduce_motion());
+        let duration = motion.spec().total();
         let static_presentation =
-            cx.reduce_motion() || matches!(self.plan.presentation, EffectPresentation::Static(_));
+            !motion.animates() || matches!(self.plan.presentation, EffectPresentation::Static(_));
         let mirror_x = cx.is_rtl() && recipe.mirrors_in_rtl();
         let (elapsed, sample, live) = if static_presentation {
             (
-                recipe
-                    .duration()
-                    .mul_f32(f32::from(recipe.poster_progress_per_mille()) / 1_000.0),
+                duration.mul_f32(f32::from(recipe.poster_progress_per_mille()) / 1_000.0),
                 DotLottieSample::poster(recipe.poster_progress_per_mille(), mirror_x),
                 false,
             )
         } else if let Some(elapsed) = self.sample_at {
             (
-                elapsed.min(recipe.duration()),
-                DotLottieSample::from_elapsed(elapsed, recipe.duration(), mirror_x),
+                elapsed.min(duration),
+                DotLottieSample::from_elapsed(elapsed, duration, mirror_x),
                 false,
             )
         } else {
@@ -653,13 +659,12 @@ impl RenderOnce for CinematicEffect {
             let elapsed = {
                 let mut clock = slot.borrow_mut();
                 let started = *clock.0.get_or_insert(now);
-                now.saturating_duration_since(started)
-                    .min(recipe.duration())
+                now.saturating_duration_since(started).min(duration)
             };
             (
                 elapsed,
-                DotLottieSample::from_elapsed(elapsed, recipe.duration(), mirror_x),
-                elapsed < recipe.duration(),
+                DotLottieSample::from_elapsed(elapsed, duration, mirror_x),
+                elapsed < duration,
             )
         };
 
@@ -1437,6 +1442,7 @@ mod tests {
 
     #[test]
     fn semantic_recipes_own_slots_timelines_posters_and_rtl() {
+        let theme = Theme::studio_dark();
         let recipes = [
             CinematicRecipe::Arrival,
             CinematicRecipe::Delegation,
@@ -1450,7 +1456,7 @@ mod tests {
         ];
         for recipe in recipes {
             assert!(!recipe.asset_slot().is_empty());
-            assert!(!recipe.duration().is_zero());
+            assert!(!recipe.duration(&theme).is_zero());
             assert!(recipe.poster_progress_per_mille() <= 1_000);
         }
         assert!(CinematicRecipe::Delegation.mirrors_in_rtl());

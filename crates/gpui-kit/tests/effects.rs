@@ -12,6 +12,7 @@ use gpui::{
 };
 use gpui_kit::prelude::*;
 use gpui_kit::semantics::Role;
+use gpui_kit::theme::Theme;
 use gpui_kit_testkit::harness::Harness;
 
 struct WindowFixture;
@@ -201,6 +202,10 @@ fn active_reduced_motion_stops_an_already_animated_particle_plan(cx: &mut TestAp
 
 #[gpui::test]
 fn exact_cinematic_samples_own_no_timeline_and_mirror_direction_in_rtl(cx: &mut TestAppContext) {
+    let sample_at = Duration::from_millis(575);
+    let duration = CinematicRecipe::Handoff.duration(&Theme::studio_dark());
+    let expected_progress =
+        u16::try_from(sample_at.as_nanos() * 1_000 / duration.as_nanos()).expect("per mille");
     let plan = animated_plan("cinematic-handoff", VisualCue::Handoff);
     let (samples, clip) = recording_clip();
     let mut harness = Harness::new(cx, gpui_kit::install, move |_, _| {
@@ -210,7 +215,7 @@ fn exact_cinematic_samples_own_no_timeline_and_mirror_direction_in_rtl(cx: &mut 
             .child(
                 CinematicEffect::new("cinematic.handoff", plan.clone())
                     .clip(clip.clone())
-                    .sample_at(Duration::from_millis(575)),
+                    .sample_at(sample_at),
             )
             .into_any_element()
     });
@@ -219,7 +224,7 @@ fn exact_cinematic_samples_own_no_timeline_and_mirror_direction_in_rtl(cx: &mut 
     assert_eq!(node.role, Role::Image);
     assert_eq!(node.value.as_deref(), Some("adapter-frame"));
     let sample = *samples.borrow().last().expect("clip sampled");
-    assert_eq!(sample.progress_per_mille(), 500);
+    assert_eq!(sample.progress_per_mille(), expected_progress);
     assert!(!sample.mirror_x());
     assert_eq!(
         harness.update(|window, cx| window.simulate_next_frame(cx)),
@@ -230,7 +235,7 @@ fn exact_cinematic_samples_own_no_timeline_and_mirror_direction_in_rtl(cx: &mut 
     harness.update(|_, cx| set_layout_direction(LayoutDirection::RightToLeft, cx));
     harness.snapshot();
     let sample = *samples.borrow().last().expect("RTL clip sampled");
-    assert_eq!(sample.progress_per_mille(), 500);
+    assert_eq!(sample.progress_per_mille(), expected_progress);
     assert!(sample.mirror_x());
 }
 

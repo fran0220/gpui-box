@@ -14,7 +14,7 @@ use crate::foundation::{
     Disableable, FocusRing, Ident, Sizable, StyledExt, text as foundation_text,
 };
 use crate::layout::measure;
-use crate::motion::{self, keyed};
+use crate::motion::{self, MotionPolicy, MotionRole, keyed};
 use crate::reactive::Binding;
 
 /// Set by the slider's own pointer handlers, and cleared by the render that
@@ -244,7 +244,7 @@ impl RenderOnce for Slider {
         let fraction = motion::tracked_or_snap(
             &self.ident.semantic_id(),
             self.fraction(),
-            motion::tracking(&theme),
+            MotionPolicy::spec(MotionRole::Tracking, &theme),
             snap,
             window,
             cx,
@@ -253,7 +253,7 @@ impl RenderOnce for Slider {
             motion::tracked_or_snap(
                 &self.ident.child("high").semantic_id(),
                 high,
-                motion::tracking(&theme),
+                MotionPolicy::spec(MotionRole::Tracking, &theme),
                 snap,
                 window,
                 cx,

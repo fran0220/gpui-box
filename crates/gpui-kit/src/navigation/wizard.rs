@@ -26,7 +26,7 @@ use crate::foundation::{
     CardVariant, Disableable, FocusRing, Ident, Pressable, Sizable, StyledExt,
     text as foundation_text,
 };
-use crate::motion;
+use crate::motion::{self, MotionPolicy, MotionRole};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// How wide the marker beside a step is.
@@ -342,7 +342,7 @@ impl Wizard {
         let filled = motion::tracked(
             &ident.semantic_id(),
             f32::from(u8::from(current || step.status == StepStatus::Complete)),
-            motion::state_change(theme),
+            MotionPolicy::spec(MotionRole::StateChange, theme),
             window,
             cx,
         );

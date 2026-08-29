@@ -10,6 +10,20 @@ See `docs/releasing.md` for the protected publication and verification runbook.
 
 ### Changed
 
+**Components now choose why they move, not how long they move.** The public
+`MotionRole` and `MotionPolicy` boundary is the sole mapping from semantic
+entrance, state, resize, tracking, navigation, activity, feedback, and
+celebration roles to theme-backed curves, springs, and durations. Controls,
+navigation, overlays, charts, loading, streaming text, drag/FLIP, persona,
+graph, Glass, particles, and dotLottie effects now resolve that policy instead
+of carrying component-local timings. Reduced motion is part of the same
+answer: finite transitions settle, activity and streaming timelines are
+suppressed, and feedback or celebration renders a representative poster.
+Downstream components can resolve a role with `MotionPolicy::resolve`, while
+`MotionPolicy::spec` supplies tokenized timing to `Transition` and `Presence`.
+`CinematicRecipe::duration` consequently takes the active `Theme` instead of
+returning a hard-coded recipe duration.
+
 **Focus-visible follows where focus came from, not what was typed last.**
 `focus_visible` asked whether the window's last input event was a key, which
 answers a different question than the one it is styling: a dialog that moves

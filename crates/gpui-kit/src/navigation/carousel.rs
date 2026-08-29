@@ -18,7 +18,7 @@ use crate::controls::button::{Button, IconButton};
 use crate::display::state_view::StateView;
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{Disableable, FocusRing, Ident, Selectable, Sizable, StyledExt, text};
-use crate::motion;
+use crate::motion::{self, MotionPolicy, MotionRole};
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -256,7 +256,7 @@ impl RenderOnce for Carousel {
             let drawn_index = motion::tracked(
                 &self.ident.semantic_id(),
                 active_index as f32,
-                motion::state_change(&theme),
+                MotionPolicy::spec(MotionRole::Navigation, &theme),
                 window,
                 cx,
             );

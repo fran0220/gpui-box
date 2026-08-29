@@ -12,7 +12,7 @@ use gpui_kit_theme::{ActiveTheme, ControlSize, Space};
 use crate::controls::button::Button;
 use crate::display::signature;
 use crate::foundation::{Ident, Sizable};
-use crate::motion;
+use crate::motion::{self, MotionPolicy, MotionRole};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 type CancelHandler = Rc<dyn Fn(&mut Window, &mut App)>;
@@ -190,7 +190,7 @@ impl RenderOnce for ProgressBar {
             motion::tracked(
                 &self.ident.semantic_id(),
                 fraction,
-                motion::resize(&theme),
+                MotionPolicy::spec(MotionRole::Resize, &theme),
                 window,
                 cx,
             )

@@ -24,7 +24,7 @@ use crate::controls::button::Button;
 use crate::display::progress_circle::arc;
 use crate::display::signature;
 use crate::foundation::{Ident, Sizable, StyledExt};
-use crate::motion::{self, Activity, AnimationExt as _, MotionSpec};
+use crate::motion::{self, Activity, AnimationExt as _, MotionPolicy, MotionRole};
 use crate::strings::{ActiveStrings, StringKey};
 
 const PULSE_CELLS: usize = 3;
@@ -88,11 +88,12 @@ impl RenderOnce for PulseLoader {
         let theme = cx.theme();
         let color = self.tint.unwrap_or(signature::mark(theme));
         let dot = (theme.control.get(self.size).icon_size * 0.4).round();
-        let period = MotionSpec::new(
-            Activity::Deliberating.period_ms(theme),
-            Activity::Deliberating.curve(theme),
+        let motion = MotionPolicy::resolve_for(
+            MotionRole::Activity(Activity::Deliberating),
+            theme,
+            cx.reduce_motion(),
         );
-        let still = motion::reduce_motion(cx);
+        let still = !motion.animates();
         let ident = self.ident.clone();
         let spec = busy_spec(&self.ident, self.label.clone());
         div()
@@ -110,7 +111,7 @@ impl RenderOnce for PulseLoader {
                 }
                 cell.with_animation(
                     ident.indexed_element_id(index),
-                    period.repeating(),
+                    motion.spec().repeating(),
                     move |element, delta| {
                         let phase = motion::staggered_phase(delta, index, PULSE_STAGGER);
                         element.opacity(motion::breath(motion::pulse_wave(phase)))
@@ -173,18 +174,19 @@ impl RenderOnce for Spinner {
         let mark = self.tint.unwrap_or(signature::mark(theme));
         let spec = busy_spec(&self.ident, self.label.clone());
 
-        let ring: AnyElement = if motion::reduce_motion(cx) {
+        let motion = MotionPolicy::resolve_for(
+            MotionRole::Activity(Activity::Working),
+            theme,
+            cx.reduce_motion(),
+        );
+        let ring: AnyElement = if !motion.animates() {
             spinner_canvas(diameter, radius, stroke, track, mark, None).into_any_element()
         } else {
-            let period = MotionSpec::new(
-                Activity::Working.period_ms(theme),
-                Activity::Working.curve(theme),
-            );
             div()
                 .size(px(diameter))
                 .with_animation(
                     self.ident.child("turn").element_id(),
-                    period.repeating(),
+                    motion.spec().repeating(),
                     move |element, phase| {
                         element.child(spinner_canvas(
                             diameter,
@@ -342,13 +344,14 @@ impl RenderOnce for Skeleton {
         let color = theme.colors.loader_placeholder;
         let radius = theme.radii.small;
         let row_height = self.row_height;
-        let period = MotionSpec::new(
-            Activity::Advancing.period_ms(theme),
-            Activity::Advancing.curve(theme),
+        let motion = MotionPolicy::resolve_for(
+            MotionRole::Activity(Activity::Advancing),
+            theme,
+            cx.reduce_motion(),
         );
         // A sheen held still is a bright sliver parked on one part of every
         // row; the placeholder fill carries the state on its own.
-        let still = motion::reduce_motion(cx);
+        let still = !motion.animates();
         let ident = self.ident.clone();
         let spec = busy_spec(&self.ident, self.label.clone());
         let bands: Vec<(f32, f32, bool)> = if self.shapes.is_empty() {
@@ -395,7 +398,7 @@ impl RenderOnce for Skeleton {
                         }
                         row.child(signature::shimmer_band(theme).with_animation(
                             ident.indexed_element_id(index),
-                            period.repeating(),
+                            motion.spec().repeating(),
                             move |element, delta| {
                                 let phase =
                                     motion::staggered_phase(delta, index, SHIMMER_ROW_OFFSET);

@@ -16,8 +16,7 @@ use gpui_kit_theme::{ActiveTheme, TypeScale};
 use crate::foundation::{Ident, StyledExt};
 use crate::strings::{ActiveStrings, StringKey};
 
-use super::spec::MotionSpec;
-use super::{Easing, reduce_motion};
+use super::{MotionPolicy, MotionRole};
 
 /// A named procedural reaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,17 +52,6 @@ impl Micro {
     fn repeating(self) -> bool {
         matches!(self, Self::Heartbeat | Self::Sparkle)
     }
-
-    fn spec(self, theme: &gpui_kit_theme::Theme) -> MotionSpec {
-        let duration = match self {
-            Self::Heartbeat => theme.motion.pulse_ms,
-            Self::Bounce => theme.motion.micro_bounce_ms,
-            Self::Wobble => theme.motion.micro_wobble_ms,
-            Self::Pop => theme.motion.micro_pop_ms,
-            Self::Sparkle => theme.motion.shimmer_ms,
-        };
-        MotionSpec::new(duration, Easing::EaseInOut.curve(theme))
-    }
 }
 
 /// Applies a named micro-motion. Honors reduced motion by doing nothing.
@@ -72,14 +60,14 @@ where
     E: Styled + IntoElement + 'static,
 {
     let theme = cx.theme().clone();
-    if reduce_motion(cx) {
+    let motion = MotionPolicy::resolve_for(MotionRole::Micro(kind), &theme, cx.reduce_motion());
+    if !motion.animates() {
         return element.into_any_element();
     }
-    let spec = kind.spec(&theme);
     let animation = if kind.repeating() {
-        spec.repeating()
+        motion.spec().repeating()
     } else {
-        spec.animation()
+        motion.spec().animation()
     };
     element
         .with_animation(id.into(), animation, move |element, delta| match kind {

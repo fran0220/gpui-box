@@ -8,6 +8,7 @@ without a window.
 | Curve | `CubicBezier`, `Easing` | Names a shape; `Easing` resolves against the theme. |
 | Physics | `Spring` | Closed-form damped spring from stiffness, damping and mass. |
 | Specification | `MotionSpec` | A curve — or a spring, via `MotionSpec::sprung` — plus duration and delay. |
+| Policy | `MotionRole`, `MotionPolicy`, `ResolvedMotion` | Names why UI moves, resolves one theme-backed specification, and chooses the reduced-motion disposition. |
 | Value | `Interpolate` | Moves `f32`, `Pixels`, `Rems`, `Hsla`, `Point` and `Size`, and measures how far apart two of them are. |
 | Path | `Keyframes` | Takes a value through named stops rather than straight across. |
 | State | `Transition` | Animates a value whose target can change mid-flight, carrying the speed it already had. |
@@ -21,33 +22,83 @@ without a window.
 | Pointer | `Pressable`, `HoverLift` | The two responses a control gives a pointer. |
 | Value | `AnimatedNumber` | Counts to a new number while publishing the target. |
 
+## Components choose roles, not timings
+
+`MotionRole` is the component boundary. A component may say that a value is a
+`StateChange`, that the reader is making a `Navigation`, or that a mark reports
+`Activity::Working`; it may not choose milliseconds, a bezier, or a spring.
+`MotionPolicy` is the only mapping from those reasons to the theme. This keeps
+motion coherent when a theme changes and keeps reduced motion from becoming a
+different local `if` in every component.
+
+| Role | Used for | Theme-backed shape |
+|---|---|---|
+| `Entrance` | Content joining the current surface | `durationMs.entrance` + settle curve |
+| `MenuEnter` | Menus, popovers, and other direct pointer answers | `durationMs.menu` + standard curve |
+| `ModalEnter` | A modal panel taking over a region | `spring.smooth` |
+| `ModalTransition` | Content changing inside that modal | `durationMs.dialog` + standard curve |
+| `Exit` | Dismissed content leaving | `durationMs.quick` + exit curve |
+| `StateChange` | A local control response | `durationMs.quick` + standard curve |
+| `Resize` | A measured value or extent changing | `durationMs.resize` + standard curve |
+| `Tracking` | A value following a pointer or moving target | `spring.grab` |
+| `Navigation` | Travel between locations, pages, or months | `durationMs.entrance` + ease-in-out curve |
+| `Streaming` | Newly arrived text settling in place | cadence bounded by menu/entrance roles |
+| `Feedback` | A one-shot outcome, transfer, or handoff | `durationMs.feedback` + settle curve |
+| `Celebration` | A deliberately prominent reward | `durationMs.celebration` + emphasized curve |
+| `Activity(Activity)` | Advancing, working, or deliberating loops | the activity's shimmer/spin/pulse token |
+| `Micro(Micro)` | Heartbeat, bounce, wobble, pop, or sparkle | the named micro token |
+
+Downstream components use the same boundary. `Transition` and `Presence`
+already finish immediately for reduced motion, so they take the resolved spec:
+
+```rust
+let motion = MotionPolicy::resolve(MotionRole::StateChange, cx);
+let transition = Transition::new(current, motion.spec());
+
+let presence = Presence::hidden(
+    MotionPolicy::spec(MotionRole::MenuEnter, theme),
+    MotionPolicy::spec(MotionRole::Exit, theme),
+);
+```
+
+For a repeating or decorative timeline, inspect `motion.disposition()` or the
+short form `motion.animates()` before scheduling frames. `MotionSpec::new`
+remains available for motion tooling, authored keyframes, and tests; it is not
+a component styling API. The older `entrance`, `menu`, `dialog`, `resize`,
+`state_change`, and `tracking` helpers remain source-compatible wrappers and
+delegate to `MotionPolicy`.
+
 ## What moves, where
 
 Every animation in the library is one of the layers above applied to one
 component. Anything not listed here does not move.
 
-| Component | What moves | Layer | Why |
+| Component | What moves | Role + mechanism | Why |
 |---|---|---|---|
-| `Button`, `IconButton`, `SplitButton` | Sinks while held | `Pressable` | The control answers the pointer that is on it. |
-| `Checkbox` | Check draws in, mixed bar and check cross over | `Transition<Point<f32>>` on `motion.quick` | Mixed and checked are tracked separately, so the box is never momentarily empty between them. |
-| `Radio` | Dot scales in, border tints | `Transition<f32>` on `motion.quick` | The dot arrives rather than blinking on. |
-| `Switch` | Knob slides, track crossfades | `Transition<f32>` on `motion.quick` | The knob is placed by margin, so the switch is the same size at every point of the slide. |
-| `Slider` | Fill and handle follow the value | `Transition<f32>` on `spring.grab`, snapped while dragging | A value the pointer is holding must be exactly under the pointer; a value from anywhere else settles onto it. |
-| `SegmentedControl` | Selection background slides | `Flipping::flip` | One background for the whole strip, so choosing moves it rather than redrawing it elsewhere. |
-| `Select`, `Combobox`, `Menu`, `ContextMenu`, `CommandPalette` | Rows fade in as a wave | `Stagger::rows` + `motion.menu` | Opacity only: a rise is a layout input and would publish a moving box. |
-| `Tabs` | Accent underline slides | `Flipping::flip` | The indicator is one element for the strip, not one per tab. |
-| `Accordion` | Body height opens and closes | `Transition<f32>` on `motion.resize` + `layout::measure` | A settled section is laid out exactly as it was before there was motion here; only a section in flight is driven. |
-| `Sidebar` | Icon slot slides on collapse | `Flipping::flip` | The glyph is what survives collapsing, so it travels rather than being redrawn narrow. |
-| `ProgressBar` | Determinate fill moves | `Transition<f32>` on `motion.resize` | The published range is the caller's number from the frame it changes. |
-| `Skeleton` | Highlight band sweeps | `with_animation`, `motion.shimmer` | A sweep reads as work moving through the list where a pulse reads as the list blinking. |
-| `PulseLoader` | Dots breathe | `Activity::Deliberating`, `motion.pulse` | The quietest claim there is: something is being waited on. Under reduced motion the dots stand still and solid rather than holding frame zero, which was a row of nearly invisible marks. |
-| `Spinner` | An open arc turns | `Activity::Working`, `motion.spin` | The gap is what says the ring is not a position. Under reduced motion the arc rests longer and still. |
-| `EmptyState`, `Callout` | Content fades and rises | `motion::content_in` | The travel is inside the element that publishes the node, so the published box never moves. |
-| `Card` | Rises on hover, sinks while held | `HoverLift`, `Pressable` | Only when the card is itself an action. |
-| `ListRow`, `List`, `Table`, `Tree` rows | Sink while held | `Pressable` | Rows get no entrance: a row scrolled into a viewport is the same row that was always there. |
-| `Dialog`, `Drawer` | Arrive on a spring, leave on a curve | `Presence` + `spring.smooth` | Arriving has weight; being dismissed is just gone. |
-| `Toast` | Slot slides when the stack reflows | `Flipping::flip` | The slot slides, not the card, because the card is already carrying its own arrival. |
-| `AnimatedNumber` | Glyphs count | `Transition<f32>` | The target is published from the frame it changes. |
+| `Button`, `IconButton`, `SplitButton` | Sinks while held | `StateChange` + `Pressable` | The control answers the pointer that is on it. |
+| `Checkbox` | Check draws in, mixed bar and check cross over | `StateChange` + `Transition<Point<f32>>` | Mixed and checked are tracked separately, so the box is never momentarily empty between them. |
+| `Radio` | Dot scales in, border tints | `StateChange` + `Transition<f32>` | The dot arrives rather than blinking on. |
+| `Switch` | Knob slides, track crossfades | `StateChange` + `Transition<f32>` | The knob is placed by margin, so the switch is the same size at every point of the slide. |
+| `Slider`, media scrubbers | Fill and handle follow the value | `Tracking` + `Transition<f32>`, snapped while dragging | A value the pointer is holding must be exactly under the pointer; a value from anywhere else settles onto it. |
+| `SegmentedControl`, `Tabs`, `Sidebar` | Indicator or surviving glyph changes slots | `Tracking` + `Flipping::flip` | One visual identity travels rather than being redrawn elsewhere. |
+| `Select`, `Combobox`, `Menu`, `ContextMenu`, `CommandPalette` | Rows fade in as a wave | `MenuEnter` + `Stagger::rows` | Opacity only: a rise is a layout input and would publish a moving box. |
+| `Accordion` | Body height opens and closes | `Resize` + `Transition<f32>` + `layout::measure` | A settled section is laid out exactly as it was before there was motion here; only a section in flight is driven. |
+| `ProgressBar`, `ProgressCircle`, `AnimatedNumber` | Determinate value moves | `Resize` + `Transition` | The published value is the caller's number from the frame it changes. |
+| `Skeleton`, unknown progress, graph activity | Highlight or trace sweeps | `Activity::Advancing` + repeating timeline | A sweep reads as work moving through known direction without inventing a percentage. |
+| `PulseLoader`, listening voice | Dots or bars breathe | `Activity::Deliberating` + repeating timeline | The quietest claim there is: something is being waited on. Reduced motion leaves a static meaningful mark. |
+| `Spinner`, speaking voice | Arc or bars cycle | `Activity::Working` + repeating timeline | A turn has no endpoint to imply; reduced motion suppresses the timeline. |
+| `EmptyState`, `Callout` | Content fades and rises | `Entrance` + `content_in` | The travel is inside the element that publishes the node, so the published box never moves. |
+| `Card` | Rises on hover, sinks while held | `StateChange` + `HoverLift`/`Pressable` | Only when the card is itself an action. |
+| `ListRow`, `List`, `Table`, `Tree` rows | Sink while held | `StateChange` + `Pressable` | Rows get no entrance: a row scrolled into a viewport is the same row that was always there. |
+| `Dialog`, `Drawer` | Arrive on a spring, leave on a curve | `ModalEnter`/`Exit` + `Presence` | Arriving has weight; being dismissed is just gone. |
+| `Toast` | Arrives, exits, and changes stack slot | `MenuEnter`/`Exit` + `Presence`; `Tracking` + FLIP | The slot slides, not the card, because the card already carries its own arrival. |
+| `Carousel`, `Calendar`, virtualized glide | Page, month, or viewport travels | `Navigation` + `Transition`/`Glide` | Travel preserves the reader's direction and place. |
+| `Wizard` | Current/completed marker fills | `StateChange` + `Transition<f32>` | Status changes in place without changing the published step. |
+| Charts | Marks enter, move, leave, and crosshair follows | `Entrance`/`Resize`/`Exit`/`Tracking` | Data identity and target values are settled facts; only paint travels. |
+| Streaming `Markdown` | Newly appended text fades to settled opacity | `Streaming` + cadence policy | Text is laid out immediately; only the newest glyphs soften their arrival. |
+| `Glass` | Press refraction depth follows state | `StateChange` + `Transition<f32>` | Material response uses the same control rhythm as the pointer action. |
+| `EffectParticles`, `CinematicEffect` | Semantic outcomes and rewards play once | `Feedback`/`Celebration` | Outcomes share global timing; reduced motion receives a policy-owned poster. |
+| Drag ghost and make-way slots | Ghost/slot follows a moving target | `Tracking` + `spring.grab` | Pointer-owned movement remains attached and settles coherently. |
 | `ScrollArea` | Top shadow fades in once the content is off the top | `ScrollLink` | A function of the offset rather than of a clock, so it never animates on its own and asks for no frames. |
 
 Deliberately still: `Tooltip`, `Badge`, `Tag` (the body of it), `Breadcrumb`,
@@ -81,8 +132,10 @@ in.
 keeping its own delay as the gap between the two:
 
 ```rust
-let panel = motion::dialog(theme);
-let content = motion::entrance(theme).with_delay(40).after(panel);
+let panel = MotionPolicy::spec(MotionRole::ModalEnter, theme);
+let content = MotionPolicy::spec(MotionRole::Entrance, theme)
+    .with_delay(40)
+    .after(panel);
 ```
 
 `Sequence` is the same composition for more than two, and exists for what a
@@ -129,10 +182,22 @@ difference costs.
 
 ## Reduced motion
 
-`gpui::App::reduce_motion` is authoritative. GPUI's `with_animation` already
-renders a static state when it is set; `Transition::animate` and
-`Presence::animate` honor the same preference by finishing immediately, so a
-caller never has to branch on it.
+`gpui::App::reduce_motion` is authoritative, but not every kind of motion has
+the same truthful static answer. `MotionPolicy` resolves the answer with the
+role instead of leaving each component to improvise a preference branch:
+
+| Role under reduced motion | Disposition | Static answer |
+|---|---|---|
+| Finite transitions (`Entrance` through `Navigation`) | `Settle` | Publish and paint the endpoint immediately. |
+| `Activity`, `Streaming`, repeating `Micro` | `Suppress` | Start no timeline; leave the meaningful static state in place. |
+| `Feedback`, `Celebration` | `Poster` | Paint the policy-owned representative frame once. |
+| Finite `Micro` | `Settle` | Paint its endpoint without playing the reaction. |
+
+GPUI's `with_animation`, `Transition::animate`, and `Presence::animate` already
+settle finite motion. Repeating and procedural renderers check the resolved
+disposition before asking for frames, and effect renderers select their poster
+when the policy says `Poster`. A downstream component should therefore resolve
+one role rather than read `cx.reduce_motion()` directly.
 
 Tests set `cx.set_reduce_motion(true)` when they need a deterministic frame.
 `crates/gpui-kit/tests/motion.rs` carries one reduced-motion test per family —
@@ -142,10 +207,11 @@ publishes for good.
 
 ## Choosing a layer
 
-Decorative, self-contained loops (spinners, pulses, skeletons) use
-`with_animation` with a `MotionSpec`. Motion that follows application state
-(a value that moves, a panel that opens) uses `Transition` or `Presence`,
-because those survive interruption:
+Decorative, self-contained loops (spinners, pulses, skeletons) resolve an
+`Activity` role, check its disposition, then use `with_animation` with the
+resolved specification. Motion that follows application state (a value that
+moves, a panel that opens) resolves its finite role and uses `Transition` or
+`Presence`, because those survive interruption:
 
 - retargeting a `Transition` continues from the value on screen instead of
   restarting from the old target;

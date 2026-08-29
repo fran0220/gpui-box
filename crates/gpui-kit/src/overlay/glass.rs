@@ -42,7 +42,7 @@ use gpui_kit_theme::{ActiveTheme, Radius, Space, Surface, Theme};
 
 use crate::foundation::Ident;
 use crate::layout::measure;
-use crate::motion::{self, keyed};
+use crate::motion::{self, MotionPolicy, MotionRole, keyed};
 
 /// How a glass surface responds to light.
 ///
@@ -437,7 +437,13 @@ impl RenderOnce for Glass {
             } else {
                 1.0
             };
-            let depth = motion::tracked(&id, target, motion::state_change(&theme), window, cx);
+            let depth = motion::tracked(
+                &id,
+                target,
+                MotionPolicy::spec(MotionRole::StateChange, &theme),
+                window,
+                cx,
+            );
             material.refraction *= depth;
         }
 

@@ -33,7 +33,7 @@ use crate::display::status::StatusLine;
 use crate::effects::{EffectParticles, EffectPlan};
 use crate::foundation::direction::{ActiveDirection, DirectionalExt};
 use crate::foundation::{Disableable, Ident, Selectable, Sizable, StyledExt};
-use crate::motion::keyed;
+use crate::motion::{Activity, MotionPolicy, MotionRole, ResolvedMotion, keyed};
 use crate::strings::{ActiveStrings, StringKey};
 
 const EXPRESSION_MARK_RADIUS: f32 = 1.0;
@@ -229,8 +229,16 @@ impl VoiceReactive {
 impl RenderOnce for VoiceReactive {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let elapsed = voice_elapsed(&self.ident, &self.sample, self.sample_at, window, cx);
-        let bars = voice_levels(&self.sample, elapsed, cx.reduce_motion(), 7);
+        let motion = voice_motion(&self.sample.state, cx);
+        let elapsed = voice_elapsed(
+            &self.ident,
+            &self.sample,
+            self.sample_at,
+            motion,
+            window,
+            cx,
+        );
+        let bars = voice_levels(&self.sample, elapsed, motion, 7);
         let state = self.sample.state.name();
         let color = voice_color(&self.sample.state, &theme);
         let unavailable = match &self.sample.state {
@@ -305,10 +313,11 @@ fn voice_elapsed(
     ident: &Ident,
     sample: &VoiceSample,
     sample_at: Option<Duration>,
+    motion: ResolvedMotion,
     window: &mut Window,
     cx: &mut App,
 ) -> Duration {
-    if cx.reduce_motion() {
+    if !motion.animates() {
         return Duration::ZERO;
     }
     if let Some(elapsed) = sample_at {
@@ -333,10 +342,20 @@ fn voice_elapsed(
     elapsed
 }
 
+fn voice_motion(state: &VoiceState, cx: &App) -> ResolvedMotion {
+    let activity = match state {
+        VoiceState::Speaking => Activity::Working,
+        VoiceState::Listening | VoiceState::Silent | VoiceState::Unavailable(_) => {
+            Activity::Deliberating
+        }
+    };
+    MotionPolicy::resolve(MotionRole::Activity(activity), cx)
+}
+
 fn voice_levels(
     sample: &VoiceSample,
     elapsed: Duration,
-    reduce_motion: bool,
+    motion: ResolvedMotion,
     count: usize,
 ) -> Vec<f32> {
     let center = (count.saturating_sub(1)) as f32 / 2.0;
@@ -345,14 +364,10 @@ fn voice_levels(
         .map(|index| {
             let distance = ((index as f32 - center).abs() / center.max(1.0)).min(1.0);
             let envelope_shape = 1.0 - distance * 0.48;
-            let carrier = if reduce_motion || !sample.state.active() {
+            let carrier = if !motion.animates() || !sample.state.active() {
                 0.58
             } else {
-                let speed = match sample.state {
-                    VoiceState::Speaking => 8.0,
-                    VoiceState::Listening => 4.5,
-                    VoiceState::Silent | VoiceState::Unavailable(_) => 0.0,
-                };
+                let speed = std::f32::consts::TAU / motion.spec().total().as_secs_f32();
                 0.48 + 0.52 * (time * speed + index as f32 * 0.82).sin().abs()
             };
             let floor = if sample.state.active() { 0.12 } else { 0.06 };
@@ -498,10 +513,12 @@ impl RenderOnce for PersonaPortrait {
             }));
 
         let voice = self.voice.map(|sample| {
+            let motion = voice_motion(&sample.state, cx);
             let elapsed = voice_elapsed(
                 &self.ident.child("voice"),
                 &sample,
                 self.sample_at,
+                motion,
                 window,
                 cx,
             );
@@ -521,7 +538,7 @@ impl RenderOnce for PersonaPortrait {
                 .rounded_full()
                 .well(&theme)
                 .children(
-                    voice_levels(&sample, elapsed, cx.reduce_motion(), 5)
+                    voice_levels(&sample, elapsed, motion, 5)
                         .into_iter()
                         .map(|level| {
                             div()
@@ -985,7 +1002,10 @@ mod tests {
     #[test]
     fn reduced_motion_voice_shape_is_static_and_symmetric() {
         let sample = VoiceSample::new(VoiceState::Speaking, 0.8, 0.6).expect("valid");
-        let levels = voice_levels(&sample, Duration::from_secs(9), true, 7);
+        let theme = gpui_kit_theme::Theme::studio_dark();
+        let motion =
+            MotionPolicy::resolve_for(MotionRole::Activity(Activity::Working), &theme, true);
+        let levels = voice_levels(&sample, Duration::from_secs(9), motion, 7);
         assert_eq!(levels[0], levels[6]);
         assert_eq!(levels[1], levels[5]);
         assert_eq!(levels[2], levels[4]);

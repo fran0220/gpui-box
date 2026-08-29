@@ -8,6 +8,8 @@
 use gpui::{App, InteractiveElement, StatefulInteractiveElement, StyleRefinement, Styled, px};
 use gpui_kit_theme::{ActiveTheme, Elevation};
 
+use crate::motion::{MotionPolicy, MotionRole};
+
 /// The response a control gives while the pointer is held on it.
 pub trait Pressable: StatefulInteractiveElement + Styled + Sized {
     /// Sinks the control by `motion.pressOffsetPx` while it is held.
@@ -18,7 +20,7 @@ pub trait Pressable: StatefulInteractiveElement + Styled + Sized {
     /// different size, which is a layout change wearing a costume. A press is
     /// therefore reported the way a physical key reports one — it goes down.
     fn pressable(self, cx: &App) -> Self {
-        if cx.reduce_motion() {
+        if !MotionPolicy::resolve(MotionRole::StateChange, cx).animates() {
             return self;
         }
         let sink = px(cx.theme().motion.press_offset);
@@ -50,7 +52,7 @@ pub trait HoverLift: InteractiveElement + Styled + Sized {
         cx: &App,
         wash: impl FnOnce(StyleRefinement) -> StyleRefinement,
     ) -> Self {
-        if cx.reduce_motion() {
+        if !MotionPolicy::resolve(MotionRole::StateChange, cx).animates() {
             return self.hover(wash);
         }
         let theme = cx.theme();

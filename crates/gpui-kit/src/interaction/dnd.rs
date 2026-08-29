@@ -63,15 +63,15 @@ use gpui::{
 };
 use gpui_kit_assets::Icon;
 use gpui_kit_semantics::{NodeSpec, Role, Semantic};
-use gpui_kit_theme::{
-    ActiveTheme, Elevation, Radius, SemanticBorder, Space, SpringPreset, Surface,
-};
+use gpui_kit_theme::{ActiveTheme, Elevation, Radius, SemanticBorder, Space, Surface};
 use web_time::Instant;
 
 use crate::display::icon::Icon as IconView;
 use crate::foundation::Sizable;
 use crate::foundation::StyledExt;
-use crate::motion::{Interpolate, Spring, Velocity, VelocityTracker, keyed};
+use crate::motion::{
+    Interpolate, MotionPolicy, MotionRole, Spring, Velocity, VelocityTracker, keyed,
+};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
 /// The semantic id of the node a drag publishes while it is in flight.
@@ -755,11 +755,15 @@ impl DragGhost {
 impl Render for DragGhost {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pointer = window.mouse_position();
-        if cx.reduce_motion() {
+        let tracking = MotionPolicy::resolve(MotionRole::Tracking, cx);
+        if !tracking.animates() {
             self.snap(pointer);
         } else {
-            let spring = Spring::preset(cx.theme(), SpringPreset::Grab);
-            let settle = spring.settle_time();
+            let spring = tracking
+                .spec()
+                .spring()
+                .expect("tracking motion is spring-backed");
+            let settle = tracking.spec().total();
             let now = cx.background_executor().now();
             self.trail(pointer, spring, settle, now);
         }
@@ -938,8 +942,12 @@ pub(crate) trait MakingWay: IntoElement + Sized {
     ) -> MakeWay {
         let id = id.into();
         let state = keyed::slot::<SlideState>(&id, window.window_handle().window_id(), cx);
-        let spring = Spring::preset(cx.theme(), SpringPreset::Grab);
-        let instant = cx.reduce_motion() || is_staged(cx);
+        let tracking = MotionPolicy::resolve(MotionRole::Tracking, cx);
+        let spring = tracking
+            .spec()
+            .spring()
+            .expect("tracking motion is spring-backed");
+        let instant = !tracking.animates() || is_staged(cx);
         if state.borrow().current != offset {
             window.request_animation_frame();
         }
@@ -948,7 +956,7 @@ pub(crate) trait MakingWay: IntoElement + Sized {
             state,
             offset,
             spring,
-            settle: spring.settle_time(),
+            settle: tracking.spec().total(),
             instant,
         }
     }
@@ -1060,7 +1068,9 @@ mod tests {
     use gpui_kit_theme::Theme;
 
     fn grab() -> Spring {
-        Spring::preset(&Theme::studio_dark(), SpringPreset::Grab)
+        MotionPolicy::spec(MotionRole::Tracking, &Theme::studio_dark())
+            .spring()
+            .expect("tracking motion is spring-backed")
     }
 
     #[test]

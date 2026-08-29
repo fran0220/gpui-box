@@ -36,7 +36,7 @@ use crate::controls::button::Button;
 use crate::display::badge::Tone;
 use crate::display::status::StatusDot;
 use crate::foundation::{FocusRing, Hoverable, Ident, Sizable, StyledExt, window_state};
-use crate::motion::{Easing, Flipping, MotionSpec, Phase, Presence, flip};
+use crate::motion::{Flipping, MotionPolicy, MotionRole, MotionSpec, Phase, Presence, flip};
 use crate::overlay::layer::{OverlaySurface, pinned, priority, surface};
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -190,11 +190,11 @@ fn reports_failure(tone: Tone) -> bool {
 }
 
 fn enter_spec(theme: &Theme) -> MotionSpec {
-    MotionSpec::new(theme.motion.menu_ms, Easing::Settle.curve(theme))
+    MotionPolicy::spec(MotionRole::MenuEnter, theme)
 }
 
 fn exit_spec(theme: &Theme) -> MotionSpec {
-    MotionSpec::new(theme.motion.quick_ms, Easing::Exit.curve(theme))
+    MotionPolicy::spec(MotionRole::Exit, theme)
 }
 
 /// One toast on screen, with the state that outlives a frame.

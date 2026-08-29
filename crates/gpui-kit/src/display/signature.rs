@@ -18,7 +18,7 @@ use gpui::{
 };
 use gpui_kit_theme::Theme;
 
-use crate::motion::{self, Activity, MotionSpec};
+use crate::motion::{self, Activity, MotionPolicy, MotionRole};
 
 /// How much of an unknown-extent track the travelling band covers.
 const SWEEP_BAND: f32 = 0.42;
@@ -81,15 +81,16 @@ pub(crate) fn unknown(id: impl Into<gpui::ElementId>, theme: &Theme, cx: &App) -
             ],
         ));
 
-    if motion::reduce_motion(cx) {
+    let motion = MotionPolicy::resolve_for(
+        MotionRole::Activity(Activity::Advancing),
+        theme,
+        cx.reduce_motion(),
+    );
+    if !motion.animates() {
         return band.left(relative(0.08)).into_any_element();
     }
 
-    let period = MotionSpec::new(
-        Activity::Advancing.period_ms(theme),
-        Activity::Advancing.curve(theme),
-    );
-    band.with_animation(id.into(), period.repeating(), |element, progress| {
+    band.with_animation(id.into(), motion.spec().repeating(), |element, progress| {
         element.left(relative(motion::shimmer_offset(progress, SWEEP_BAND)))
     })
     .into_any_element()

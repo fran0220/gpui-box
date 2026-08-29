@@ -34,7 +34,7 @@ use crate::display::status::StatusDot;
 use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{FocusRing, Ident, StyledExt};
 use crate::layout::measure;
-use crate::motion::{self, Presence, Stagger, Transition, keyed};
+use crate::motion::{self, MotionPolicy, MotionRole, Presence, Stagger, Transition, keyed};
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveStrings, StringKey};
 
@@ -936,13 +936,19 @@ fn sync_motion(
             animated.color = target.color;
             animated.series_order = target.series_order;
             animated.point_order = target.point_order;
-            animated.position = animated.position.spec(motion::resize(theme));
+            animated.position = animated
+                .position
+                .spec(MotionPolicy::spec(MotionRole::Resize, theme));
             animated.position.set(target_position);
             animated.presence.show();
         } else {
             let rank = new_ranks.get(&key).copied().unwrap_or_default();
-            let enter = stagger.spec(rank, new_keys.len(), motion::entrance(theme));
-            let mut presence = Presence::hidden(enter, motion::state_change(theme));
+            let enter = stagger.spec(
+                rank,
+                new_keys.len(),
+                MotionPolicy::spec(MotionRole::Entrance, theme),
+            );
+            let mut presence = Presence::hidden(enter, MotionPolicy::spec(MotionRole::Exit, theme));
             presence.show();
             motion_state.points.insert(
                 key,
@@ -951,7 +957,10 @@ fn sync_motion(
                     color: target.color,
                     series_order: target.series_order,
                     point_order: target.point_order,
-                    position: Transition::new(target_position, motion::resize(theme)),
+                    position: Transition::new(
+                        target_position,
+                        MotionPolicy::spec(MotionRole::Resize, theme),
+                    ),
                     presence,
                 },
             );
@@ -1146,7 +1155,7 @@ fn ready_chart(
         motion::tracked(
             &ident.child("crosshair").semantic_id(),
             point(current.point.position.x, current.point.position.y),
-            motion::state_change(theme),
+            MotionPolicy::spec(MotionRole::Tracking, theme),
             window,
             cx,
         )

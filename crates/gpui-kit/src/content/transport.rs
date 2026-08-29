@@ -45,7 +45,7 @@ use crate::display::signature;
 use crate::display::status::StatusLine;
 use crate::foundation::{Disableable, FocusRing, Ident, Sizable, StyledExt};
 use crate::layout::measure;
-use crate::motion::{self, keyed};
+use crate::motion::{self, MotionPolicy, MotionRole, keyed};
 use crate::state::{HasPhase, Phase};
 use crate::strings::{ActiveNumbers, ActiveStrings, StringKey};
 
@@ -438,7 +438,7 @@ impl RenderOnce for TransportBar {
             motion::tracked_or_snap(
                 &ident.child("scrubber").semantic_id(),
                 fraction,
-                motion::tracking(&theme),
+                MotionPolicy::spec(MotionRole::Tracking, &theme),
                 held,
                 window,
                 cx,

@@ -36,8 +36,8 @@ use gpui::{
 };
 use gpui_kit_theme::Theme;
 
-use super::spec::{MotionSpec, pulse_wave, shimmer_offset};
-use super::{CubicBezier, Easing, reduce_motion};
+use super::spec::{pulse_wave, shimmer_offset};
+use super::{CubicBezier, Easing, MotionPolicy, MotionRole};
 
 /// How faint a breathing element gets at the bottom of its breath.
 ///
@@ -80,10 +80,6 @@ impl Activity {
             Self::Advancing | Self::Deliberating => Easing::EaseInOut.curve(theme),
         }
     }
-
-    fn spec(self, theme: &Theme) -> MotionSpec {
-        MotionSpec::new(self.period_ms(theme), self.curve(theme))
-    }
 }
 
 /// Turns a glyph, for work whose remaining extent is unknown.
@@ -92,17 +88,17 @@ impl Activity {
 /// and GPUI carries transforms on `Svg` alone. [`crate::display::icon::paint`]
 /// is the supported way to get one that already honours reading direction.
 pub fn spin(icon: Svg, id: impl Into<ElementId>, theme: &Theme, cx: &App) -> AnyElement {
-    if reduce_motion(cx) {
+    let motion = MotionPolicy::resolve_for(
+        MotionRole::Activity(Activity::Working),
+        theme,
+        cx.reduce_motion(),
+    );
+    if !motion.animates() {
         return icon.into_any_element();
     }
-    let activity = Activity::Working;
-    icon.with_animation(
-        id.into(),
-        activity.spec(theme).repeating(),
-        |element, progress| {
-            element.with_transformation(Transformation::rotate(percentage(progress)))
-        },
-    )
+    icon.with_animation(id.into(), motion.spec().repeating(), |element, progress| {
+        element.with_transformation(Transformation::rotate(percentage(progress)))
+    })
     .into_any_element()
 }
 
@@ -133,17 +129,15 @@ pub fn breathe_as<E>(
 where
     E: Styled + IntoElement + 'static,
 {
-    if reduce_motion(cx) {
+    let motion =
+        MotionPolicy::resolve_for(MotionRole::Activity(activity), theme, cx.reduce_motion());
+    if !motion.animates() {
         return element.into_any_element();
     }
     element
-        .with_animation(
-            id.into(),
-            activity.spec(theme).repeating(),
-            |element, progress| {
-                element.opacity(BREATH_FLOOR + (1.0 - BREATH_FLOOR) * pulse_wave(progress))
-            },
-        )
+        .with_animation(id.into(), motion.spec().repeating(), |element, progress| {
+            element.opacity(BREATH_FLOOR + (1.0 - BREATH_FLOOR) * pulse_wave(progress))
+        })
         .into_any_element()
 }
 
@@ -159,10 +153,14 @@ pub fn sweep(
     color: gpui::Hsla,
     cx: &App,
 ) -> Option<AnyElement> {
-    if reduce_motion(cx) {
+    let motion = MotionPolicy::resolve_for(
+        MotionRole::Activity(Activity::Advancing),
+        theme,
+        cx.reduce_motion(),
+    );
+    if !motion.animates() {
         return None;
     }
-    let activity = Activity::Advancing;
     // Two halves rather than one block: a band needs three stops — up, held,
     // and back down — and this renderer takes two per gradient.
     let band = div()
@@ -182,11 +180,9 @@ pub fn sweep(
             gpui::linear_color_stop(color, 0.0),
             gpui::linear_color_stop(color.opacity(0.0), 1.0),
         )))
-        .with_animation(
-            id.into(),
-            activity.spec(theme).repeating(),
-            |element, progress| element.left(relative(shimmer_offset(progress, SWEEP_BAND))),
-        );
+        .with_animation(id.into(), motion.spec().repeating(), |element, progress| {
+            element.left(relative(shimmer_offset(progress, SWEEP_BAND)))
+        });
     Some(band.into_any_element())
 }
 

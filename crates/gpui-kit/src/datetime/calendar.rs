@@ -32,7 +32,7 @@ use crate::foundation::slot::{self, Slots, Slotted};
 use crate::foundation::{
     Disableable, FocusRing, Ident, Sizable, StyledExt, text as foundation_text,
 };
-use crate::motion;
+use crate::motion::{MotionPolicy, MotionRole};
 use crate::overlay::Tooltipped;
 
 /// How far a month slides as it arrives.
@@ -827,7 +827,7 @@ where
     let offset = MONTH_TRAVEL * direction as f32;
     element.with_animation(
         id,
-        motion::menu(theme).animation(),
+        MotionPolicy::spec(MotionRole::Navigation, theme).animation(),
         move |element, progress| {
             element
                 .relative()

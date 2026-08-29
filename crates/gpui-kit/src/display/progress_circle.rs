@@ -18,7 +18,7 @@ use crate::controls::button::Button;
 use crate::display::progress::{ProgressPace, ProgressValue};
 use crate::display::signature;
 use crate::foundation::{Ident, Sizable, StyledExt};
-use crate::motion::{self, MotionSpec};
+use crate::motion::{self, MotionPolicy, MotionRole};
 use crate::strings::{ActiveStrings, StringKey};
 
 type CancelHandler = Rc<dyn Fn(&mut Window, &mut App)>;
@@ -149,7 +149,7 @@ impl RenderOnce for ProgressCircle {
             motion::tracked(
                 &self.ident.semantic_id(),
                 fraction,
-                motion::resize(&theme),
+                MotionPolicy::spec(MotionRole::Resize, &theme),
                 window,
                 cx,
             )
@@ -163,17 +163,14 @@ impl RenderOnce for ProgressCircle {
         // the same short arc parked at the top. A fully tinted ring looked
         // like work at ninety-something percent, which invented the position
         // this branch exists to avoid.
-        let still = motion::reduce_motion(cx) || !self.value.is_moving();
+        let activity = MotionPolicy::resolve(MotionRole::Activity(motion::Activity::Working), cx);
+        let still = !activity.animates() || !self.value.is_moving();
         let ring: AnyElement = if drawn.is_none() && !still {
-            let period = MotionSpec::new(
-                motion::Activity::Working.period_ms(&theme),
-                motion::Activity::Working.curve(&theme),
-            );
             div()
                 .size(px(diameter))
                 .with_animation(
                     self.ident.child("turn").element_id(),
-                    period.repeating(),
+                    activity.spec().repeating(),
                     move |element, phase| {
                         element.child(ring_canvas(
                             diameter,

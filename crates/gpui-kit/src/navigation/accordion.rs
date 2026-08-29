@@ -25,7 +25,7 @@ use crate::foundation::{
     FocusRing, Ident, Pressable, Sizable, StyledExt, rule, text as foundation_text,
 };
 use crate::layout::measure;
-use crate::motion;
+use crate::motion::{self, MotionPolicy, MotionRole};
 
 type ToggleHandler = Rc<dyn Fn(SharedString, bool, &mut Window, &mut App)>;
 
@@ -277,7 +277,7 @@ impl RenderOnce for Accordion {
             let disclosed = motion::tracked(
                 &body_id,
                 f32::from(u8::from(open)),
-                motion::resize(&theme),
+                MotionPolicy::spec(MotionRole::Resize, &theme),
                 window,
                 cx,
             );

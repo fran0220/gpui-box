@@ -9,14 +9,12 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
+use crate::foundation::{Ident, window_state};
+use crate::motion::{Glide, MotionPolicy, MotionRole};
 use gpui::{
     App, ListAlignment, ListOffset, ListState, Pixels, ScrollStrategy, SharedString,
     UniformListScrollHandle, Window, WindowId, px,
 };
-use gpui_kit_theme::ActiveTheme;
-
-use crate::foundation::{Ident, window_state};
-use crate::motion::{Easing, Glide, MotionSpec, reduce_motion};
 
 /// The interval a glide asks for its frames at, near enough to a 60Hz frame.
 const FRAME: Duration = Duration::from_millis(16);
@@ -226,17 +224,12 @@ pub fn reveal_row(ident: &Ident, index: usize, window: &Window, cx: &mut App) {
 /// this to solve and its own scroll already lands correctly.
 pub fn glide_to_row(ident: &Ident, index: usize, window: &Window, cx: &mut App) {
     let window_id = window.window_handle().window_id();
-    let Some(state) = flow_state(ident, window_id, cx).filter(|_| !reduce_motion(cx)) else {
+    let navigation = MotionPolicy::resolve(MotionRole::Navigation, cx);
+    let Some(state) = flow_state(ident, window_id, cx).filter(|_| navigation.animates()) else {
         reveal_row(ident, index, window, cx);
         return;
     };
-    // Ease-in-out over the tokenized entrance duration, so a jump across a
-    // long conversation leaves gently, covers ground, and settles without
-    // becoming a second motion vocabulary hidden inside virtualization.
-    let glide_spec = MotionSpec::new(
-        cx.theme().motion.entrance_ms,
-        Easing::EaseInOut.curve(cx.theme()),
-    );
+    let glide_spec = navigation.spec();
     let total = glide_spec.total();
     cx.spawn(async move |cx| {
         let mut glide = Glide::new();
